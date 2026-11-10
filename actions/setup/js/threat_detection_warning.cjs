@@ -50,6 +50,7 @@ function getDetectionReasonText(reason, threatKinds = process.env.GH_AW_DETECTIO
     threat_detected: `Potential security threats were detected in the agent output. ${getDetectedThreatKindsText(threatKinds)}`,
     agent_failure: "The threat detection engine failed to produce results.",
     parse_error: "The threat detection results could not be parsed.",
+    github_api_quota_exhausted: "GitHub API quota exhausted: threat detection was deferred before it could run. This is not a security pass.",
   };
   const normalizedReason = String(reason || "").trim();
   return reasonDescriptions[normalizedReason] || "The threat detection analysis could not be completed.";

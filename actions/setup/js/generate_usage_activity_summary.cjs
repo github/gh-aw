@@ -1066,7 +1066,7 @@ function writeDetectionUsageResult(detectionDir = DETECTION_DIR, outputPath = DE
   const result = {
     job_result: jobResult,
     conclusion: ["success", "failure", "warning", "skipped"].includes(process.env.GH_AW_DETECTION_CONCLUSION || "") ? process.env.GH_AW_DETECTION_CONCLUSION : "",
-    reason: ["threat_detected", "agent_failure", "parse_error", "detection_skipped"].includes(process.env.GH_AW_DETECTION_REASON || "") ? process.env.GH_AW_DETECTION_REASON : "",
+    reason: ["threat_detected", "agent_failure", "parse_error", "detection_skipped", "github_api_quota_exhausted"].includes(process.env.GH_AW_DETECTION_REASON || "") ? process.env.GH_AW_DETECTION_REASON : "",
   };
   if (jobResult !== "skipped") {
     const structured = parseStructuredResultFile(path.join(detectionDir, "detection_result.json"));

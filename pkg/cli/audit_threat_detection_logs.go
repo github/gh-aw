@@ -60,7 +60,7 @@ func readConclusionDetectionUsageResult(runDir string) (detectionUsageResult, bo
 				block.Conclusion = value
 			case "GH_AW_DETECTION_REASON":
 				switch value {
-				case "threat_detected", "agent_failure", "parse_error", "detection_skipped":
+				case "threat_detected", "agent_failure", "parse_error", "detection_skipped", "github_api_quota_exhausted":
 					block.Reason = value
 				}
 			}

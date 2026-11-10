@@ -613,7 +613,8 @@ jobs:
     name: agent
     needs: activation
     if: >
-      ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true')
+      ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
+      needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked')
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
@@ -1613,6 +1614,15 @@ jobs:
       - name: Warn if threat detection produced no verdict
         if: always() && needs.detection.result != 'skipped' && (needs.detection.outputs.detection_reason == 'agent_failure' || needs.detection.outputs.detection_reason == 'parse_error' || needs.detection.outputs.detection_conclusion == '')
         run: echo "::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs."
+      - name: Report quota-blocked threat detection
+        if: always() && needs.detection.outputs.detection_reason == 'github_api_quota_exhausted'
+        run: |
+          echo "::warning::GitHub API quota exhausted: threat detection was deferred and is not a security pass. Safe outputs were not published; agent artifacts are retained for a later run."
+          {
+            echo "### GitHub API quota exhausted"
+            echo ""
+            echo "Threat detection was deferred because AWF attestation verification could not complete before the GitHub API quota reset. This is not a security pass: safe outputs were not published, and completed agent artifacts are retained. See the detection job summary for resource, limit, remaining, and reset details."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Download detection artifact
         id: download-detection-artifact
         continue-on-error: true
@@ -2111,6 +2121,7 @@ jobs:
           mkdir -p /tmp/gh-aw/threat-detection
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
+        id: detection_awf_install
         env:
           GH_TOKEN: ${{ github.token }}
           GH_HOST: github.com
@@ -2132,7 +2143,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh" v0.5.3 --artifact-base-url https://github.com/github/gh-aw-threat-detection/releases/download --sha256-amd64 7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009 --sha256-arm64 6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6
       - name: Execute threat detection with AWF
         id: detection_agentic_execution
-        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true' && steps.threat_detect_install.outcome == 'success'
+        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true' && steps.threat_detect_install.outcome == 'success' && steps.detection_awf_install.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 10
         env:
@@ -2316,6 +2327,7 @@ jobs:
           RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}
           DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}
           THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}
+          AWF_INSTALL_OUTCOME: ${{ steps.detection_awf_install.outcome }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json

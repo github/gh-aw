@@ -389,6 +389,164 @@ else
   fail "required download failure diagnostics were incomplete" "$TEST_FAILURE_REASON"
 fi
 
+# Test 6b: attestation verification handles GitHub API quota exhaustion
+echo "Test 6b: attestation verification waits for or reports GitHub API quota exhaustion..."
+# Public asset downloads succeed while the attestations API answers with a quota
+# 403. Uses a fake clock (date/sleep) instead of a live quota experiment.
+#   $1 scenario: quota | permission
+#   $2 number of quota failures before verification succeeds
+#   $3 reset offset in seconds from the fake clock ("" omits the reset header)
+#   $4 expected installer exit status
+#   $5 expected blocked reason ("" when the install must succeed or fail without a quota stop)
+test_attestation_quota() {
+  local scenario="$1" failures="$2" reset_offset="$3" expected_exit="$4" expected_reason="$5"
+  local test_dir installer_exit=0 reset=""
+  TEST_FAILURE_REASON=""
+  test_dir="${TEST_ROOT}/quota-${RANDOM}"
+  mkdir -m 700 "$test_dir"
+  mkdir -p "${test_dir}/bin" "${test_dir}/home"
+  printf '1000\n' > "${test_dir}/clock"
+  printf '%s\n' "$failures" > "${test_dir}/failures"
+  if [ -n "$reset_offset" ]; then reset=$((1000 + reset_offset)); fi
+  cat > "${test_dir}/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then output="$2"; break; fi
+  shift
+done
+[ -n "${output:-}" ] || exit 0
+if [[ "${output}" == *checksums.txt ]]; then
+  printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
+elif [[ "${output}" == *release-identity.txt ]]; then
+  printf '%s  refs/tags/%s\n' "$AWF_TEST_MANIFEST_SHA256" v0.29.5 > "$output"
+else
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
+fi
+EOF
+  cat > "${test_dir}/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = api ]; then
+  printf '%s\n' "$*" >> "${AWF_TEST_DIR}/probes"
+  printf 'HTTP/2.0 403 Forbidden\r\n'
+  printf 'x-ratelimit-resource: core\r\nx-ratelimit-limit: 15000\r\nx-ratelimit-remaining: 0\r\nx-ratelimit-used: 15000\r\n'
+  [ -n "$AWF_TEST_RESET" ] && printf 'x-ratelimit-reset: %s\r\n' "$AWF_TEST_RESET"
+  printf '\r\n{"message":"API rate limit exceeded for installation."}\n'
+  exit 1
+fi
+test "$1" = attestation && test "$2" = verify || exit 91
+test "${12}" = --deny-self-hosted-runners || exit 96
+printf '%s at %s\n' "$3" "$(cat "${AWF_TEST_DIR}/clock")" >> "${AWF_TEST_DIR}/attestations"
+remaining=$(cat "${AWF_TEST_DIR}/failures")
+if [ "$remaining" -gt 0 ]; then
+  printf '%s\n' $((remaining - 1)) > "${AWF_TEST_DIR}/failures"
+  if [ "$AWF_TEST_SCENARIO" = permission ]; then
+    echo "HTTP 403: Resource not accessible by integration (https://api.github.com/repos/github/gh-aw-firewall/attestations/sha256:0)" >&2
+  else
+    echo "HTTP 403: API rate limit exceeded for installation ID 1. (https://api.github.com/repos/github/gh-aw-firewall/attestations/sha256:0)" >&2
+  fi
+  exit 1
+fi
+exit 0
+EOF
+  cat > "${test_dir}/bin/date" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = +%s ]; then cat "${AWF_TEST_DIR}/clock"; exit 0; fi
+exec /bin/date "$@"
+EOF
+  cat > "${test_dir}/bin/sleep" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >> "${AWF_TEST_DIR}/sleeps"
+printf '%s\n' $(( $(cat "${AWF_TEST_DIR}/clock") + $1 )) > "${AWF_TEST_DIR}/clock"
+EOF
+  printf '#!/usr/bin/env bash\necho v18.0.0\n' > "${test_dir}/bin/node"
+  cat > "${test_dir}/bin/sha256sum" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == *checksums.txt ]]; then
+  printf '%s %s\n' "$AWF_TEST_MANIFEST_SHA256" "$1"
+else
+  printf '%064d %s\n' 0 "$1"
+fi
+EOF
+  printf '#!/usr/bin/env bash\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n' > "${test_dir}/bin/uname"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${test_dir}/bin/sudo"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${test_dir}/bin/find"
+  chmod +x "${test_dir}/bin/"*
+  AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall v0.29.5 checksums.txt)" \
+    AWF_TEST_DIR="$test_dir" AWF_TEST_SCENARIO="$scenario" AWF_TEST_RESET="$reset" \
+    GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS=300 GITHUB_STEP_SUMMARY="${test_dir}/summary" GITHUB_ENV="${test_dir}/github-env" \
+    HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" \
+    bash "${SCRIPT_DIR}/install_awf_binary.sh" v0.29.5 --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
+  if [ "$installer_exit" -ne "$expected_exit" ]; then
+    TEST_FAILURE_REASON="expected exit ${expected_exit}, got ${installer_exit}: $(tail -n 5 "${test_dir}/output")"
+    rm -rf "$test_dir"; return 1
+  fi
+  if [ "$expected_exit" -eq 0 ]; then
+    if [ ! -e "${test_dir}/home/.local/bin/awf" ] || [ "$(wc -l < "${test_dir}/attestations")" -ne $((3 + failures)) ]; then
+      TEST_FAILURE_REASON="AWF was not installed after every attestation was re-verified"
+      rm -rf "$test_dir"; return 1
+    fi
+    if [ "$failures" -gt 0 ]; then
+      # No verification may run before the server reset.
+      if [ "$(sed -n '2p' "${test_dir}/attestations" | awk '{print $NF}')" -le "$reset" ] ||
+        [ "$(cat "${test_dir}/sleeps")" != "$((reset_offset + 1))" ]; then
+        TEST_FAILURE_REASON="verification was retried before the server reset"
+        rm -rf "$test_dir"; return 1
+      fi
+    fi
+    if grep -q GH_AW_GITHUB_API_QUOTA_BLOCKED "${test_dir}/github-env" 2>/dev/null; then
+      TEST_FAILURE_REASON="a recovered quota stop was reported as blocked"
+      rm -rf "$test_dir"; return 1
+    fi
+    rm -rf "$test_dir"; return 0
+  fi
+  if [ -e "${test_dir}/home/.local/bin/awf" ]; then
+    TEST_FAILURE_REASON="an unverified AWF release was installed"
+    rm -rf "$test_dir"; return 1
+  fi
+  if [ -n "$expected_reason" ]; then
+    if ! grep -qF "### GitHub API quota exhausted" "${test_dir}/summary" ||
+      ! grep -qF "| Remaining | 0 |" "${test_dir}/summary" ||
+      ! grep -qF "GH_AW_GITHUB_API_QUOTA_BLOCKED=resource=core; limit=15000; remaining=0; used=15000; reset=" "${test_dir}/github-env" ||
+      ! grep -qF "reason=${expected_reason}" "${test_dir}/github-env" ||
+      ! grep -qF "GitHub API quota exhausted" "${test_dir}/output"; then
+      TEST_FAILURE_REASON="quota-blocked summary or environment was incomplete: $(cat "${test_dir}/summary" "${test_dir}/github-env" 2>/dev/null)"
+      rm -rf "$test_dir"; return 1
+    fi
+  else
+    if [ -e "${test_dir}/probes" ] || [ -s "${test_dir}/summary" ] || grep -q GH_AW_GITHUB_API_QUOTA_BLOCKED "${test_dir}/github-env" 2>/dev/null; then
+      TEST_FAILURE_REASON="a non-quota attestation failure was reclassified as quota exhaustion"
+      rm -rf "$test_dir"; return 1
+    fi
+  fi
+  rm -rf "$test_dir"
+}
+
+if test_attestation_quota quota 1 120 0 ""; then
+  pass "quota 403 with reset inside the budget waits, re-verifies, and installs AWF"
+else
+  fail "quota 403 inside the wait budget did not recover" "$TEST_FAILURE_REASON"
+fi
+if test_attestation_quota quota 1 1200 75 reset_exceeds_budget; then
+  pass "quota 403 with reset beyond the budget blocks installation with a quota summary"
+else
+  fail "quota 403 beyond the wait budget was not reported as blocked" "$TEST_FAILURE_REASON"
+fi
+if test_attestation_quota quota 2 60 75 renewed_exhaustion; then
+  pass "renewed quota exhaustion after the reset blocks installation"
+else
+  fail "renewed quota exhaustion was not reported as blocked" "$TEST_FAILURE_REASON"
+fi
+if test_attestation_quota quota 1 "" 75 unknown_reset; then
+  pass "quota 403 without a reset blocks installation without waiting"
+else
+  fail "quota 403 without a reset was not reported as blocked" "$TEST_FAILURE_REASON"
+fi
+if test_attestation_quota permission 1 120 1 ""; then
+  pass "permission 403 from attestation verification is not reclassified as quota exhaustion"
+else
+  fail "permission 403 was treated as quota exhaustion" "$TEST_FAILURE_REASON"
+fi
+
 # Test 7: warning emitted when GITHUB_PATH is unset in rootless mode
 echo "Test 7: warning emitted when GITHUB_PATH is unset in rootless mode..."
 warning_output=$(bash -c '

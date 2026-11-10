@@ -38,6 +38,36 @@ if [ "${RUN_DETECTION:-}" = "false" ] && [ "${THREAT_DETECT_INSTALL_OUTCOME}" = 
   exit 0
 fi
 
+# The detector runs under AWF; execution is gated on a verified AWF install.
+# This is checked first: a failed AWF install skips the later threat-detect
+# install, so its outcome would otherwise mask the real cause.
+# When that install stopped on GitHub API quota exhaustion (attestation
+# verification could not complete before the server reset fit the wait budget),
+# report it explicitly. A deferred detection is never a security pass: it always
+# concludes failure so unverified safe outputs are not released, and completed
+# agent artifacts are left untouched for a later run.
+AWF_INSTALL_OUTCOME="${AWF_INSTALL_OUTCOME:-}"
+if [ "${RUN_DETECTION:-}" = "true" ] && [ -n "${AWF_INSTALL_OUTCOME}" ] && [ "${AWF_INSTALL_OUTCOME}" != "success" ]; then
+  if [ -n "${GH_AW_GITHUB_API_QUOTA_BLOCKED:-}" ]; then
+    quota_details="$(printf '%s' "${GH_AW_GITHUB_API_QUOTA_BLOCKED}" | tr -cd 'A-Za-z0-9_=;:.+ -' | cut -c1-512)"
+    echo "success=false" >> "${GITHUB_OUTPUT}"
+    echo "reason=github_api_quota_exhausted" >> "${GITHUB_OUTPUT}"
+    echo "conclusion=failure" >> "${GITHUB_OUTPUT}"
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+      {
+        echo "### GitHub API quota exhausted"
+        echo ""
+        echo "Threat detection is deferred: AWF attestation verification could not complete within the wait budget (${quota_details})."
+        echo "This is not a security pass. Safe outputs are not published; completed agent artifacts are retained."
+        echo ""
+      } >> "${GITHUB_STEP_SUMMARY}" || true
+    fi
+    echo "::error::GitHub API quota exhausted: threat detection deferred because AWF attestation verification did not complete (${quota_details}). Safe outputs are not published."
+    exit 1
+  fi
+  report_detector_unavailable "AWF installation did not complete verification (install outcome: ${AWF_INSTALL_OUTCOME})"
+fi
+
 # Fail closed when the pinned-digest installation did not succeed. The binary on
 # PATH is then either absent, a stale/preinstalled copy that was never verified
 # against the compiler-supplied digests, or the install script's fail-closed

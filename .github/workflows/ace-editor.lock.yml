@@ -656,7 +656,7 @@ jobs:
       - post_ace_link
     if: >
       ((!cancelled()) && needs.activation.result == 'success' && needs.post_ace_link.result == 'success') &&
-      (needs.activation.outputs.daily_ai_credits_exceeded != 'true')
+      (needs.activation.outputs.daily_ai_credits_exceeded != 'true' && needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked')
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:

@@ -620,7 +620,7 @@ jobs:
     if: >
       ((!cancelled()) && needs.activation.result == 'success' && needs.precompute.result == 'success') &&
       ((needs.precompute.outputs.action != 'none') &&
-      (needs.activation.outputs.daily_ai_credits_exceeded != 'true'))
+      (needs.activation.outputs.daily_ai_credits_exceeded != 'true' && needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'))
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:

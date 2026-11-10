@@ -435,6 +435,90 @@ func TestConcludeThreatDetectionScript_FailedInstallDoesNotInvokeDetector(t *tes
 	}
 }
 
+// TestConcludeThreatDetectionScript_AWFInstallQuotaBlocked verifies that an AWF
+// install stopped by GitHub API quota exhaustion concludes as an explicit,
+// deferred failure (never a pass, even in warn mode), while other AWF install
+// failures keep the generic detector-unavailable handling.
+func TestConcludeThreatDetectionScript_AWFInstallQuotaBlocked(t *testing.T) {
+	tests := []struct {
+		name            string
+		continueOnError string
+		quotaBlocked    string
+		wantErr         bool
+		wantReason      string
+		wantConclusion  string
+		wantMessage     string
+	}{
+		{name: "quota blocked warn mode", continueOnError: "true", quotaBlocked: "resource=core; limit=15000; remaining=0; used=15000; reset=2026-11-10T00:00:04Z; reason=reset_exceeds_budget", wantErr: true, wantReason: "reason=github_api_quota_exhausted", wantConclusion: "conclusion=failure", wantMessage: "GitHub API quota exhausted"},
+		{name: "quota blocked strict mode", continueOnError: "false", quotaBlocked: "resource=core; limit=15000; remaining=0; used=15000; reset=unknown; reason=unknown_reset", wantErr: true, wantReason: "reason=github_api_quota_exhausted", wantConclusion: "conclusion=failure", wantMessage: "GitHub API quota exhausted"},
+		{name: "non-quota install failure", continueOnError: "true", wantErr: false, wantReason: "reason=agent_failure", wantConclusion: "conclusion=warning", wantMessage: "AWF installation did not complete verification"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			scriptPath := filepath.Join("..", "..", "actions", "setup", "sh", "conclude_threat_detection.sh")
+			resultFile := filepath.Join(tmpDir, "detection_result.json")
+			outputFile := filepath.Join(tmpDir, "github_output.txt")
+			summaryFile := filepath.Join(tmpDir, "summary.md")
+			callLog := filepath.Join(tmpDir, "call.log")
+			binDir := filepath.Join(tmpDir, "bin")
+			if err := os.MkdirAll(binDir, 0755); err != nil {
+				t.Fatalf("failed to create bin dir: %v", err)
+			}
+			stub := "#!/usr/bin/env bash\necho \"$*\" >> \"$CALL_LOG\"\n"
+			if err := os.WriteFile(filepath.Join(binDir, "threat-detect"), []byte(stub), 0755); err != nil {
+				t.Fatalf("failed to write threat-detect stub: %v", err)
+			}
+
+			cmd := exec.Command("bash", scriptPath, resultFile)
+			cmd.Env = append(os.Environ(),
+				"RUN_DETECTION=true",
+				// A failed AWF install skips the later threat-detect install.
+				"THREAT_DETECT_INSTALL_OUTCOME=skipped",
+				"AWF_INSTALL_OUTCOME=failure",
+				"GH_AW_GITHUB_API_QUOTA_BLOCKED="+tt.quotaBlocked,
+				"GH_AW_DETECTION_CONTINUE_ON_ERROR="+tt.continueOnError,
+				"GITHUB_OUTPUT="+outputFile,
+				"GITHUB_STEP_SUMMARY="+summaryFile,
+				"CALL_LOG="+callLog,
+				"PATH="+binDir+":"+os.Getenv("PATH"),
+			)
+
+			out, err := cmd.CombinedOutput()
+			if tt.wantErr && err == nil {
+				t.Fatalf("script should exit non-zero, output: %s", out)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("script should exit 0: %v\nOutput: %s", err, out)
+			}
+			if _, statErr := os.Stat(callLog); statErr == nil {
+				t.Fatal("script must not invoke threat-detect when AWF installation did not succeed")
+			}
+			outputData, err := os.ReadFile(outputFile)
+			if err != nil {
+				t.Fatalf("failed to read GITHUB_OUTPUT: %v", err)
+			}
+			outputText := string(outputData)
+			if !strings.Contains(outputText, "success=false") || !strings.Contains(outputText, tt.wantReason) || !strings.Contains(outputText, tt.wantConclusion) {
+				t.Fatalf("expected %q and %q, got: %s", tt.wantReason, tt.wantConclusion, outputText)
+			}
+			if !strings.Contains(string(out), tt.wantMessage) {
+				t.Fatalf("expected %q in output, got: %s", tt.wantMessage, out)
+			}
+			if tt.quotaBlocked != "" {
+				summary, err := os.ReadFile(summaryFile)
+				if err != nil {
+					t.Fatalf("failed to read step summary: %v", err)
+				}
+				if !strings.Contains(string(summary), "### GitHub API quota exhausted") || !strings.Contains(string(summary), "remaining=0") || !strings.Contains(string(summary), "not a security pass") {
+					t.Fatalf("expected quota-exhausted summary with metadata, got: %s", summary)
+				}
+			}
+		})
+	}
+}
+
 // TestConcludeThreatDetectionScript_SuccessfulInstallDelegates verifies that a
 // successful install outcome leaves the normal delegation path intact.
 func TestConcludeThreatDetectionScript_SuccessfulInstallDelegates(t *testing.T) {

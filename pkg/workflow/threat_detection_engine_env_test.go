@@ -51,6 +51,33 @@ func TestConclusionWarnsWhenDetectionHasNoVerdict(t *testing.T) {
 	if strings.Contains(steps, "Warn if threat detection produced no verdict") {
 		t.Error("disabled detection must not produce a missing-verdict warning")
 	}
+	if strings.Contains(steps, "Report quota-blocked threat detection") {
+		t.Error("disabled detection must not produce a quota-blocked report")
+	}
+}
+
+// TestConclusionReportsQuotaBlockedDetection verifies that a detection deferred by
+// GitHub API quota exhaustion reaches the final summary as an explicit, non-passing
+// outcome without making further API calls.
+func TestConclusionReportsQuotaBlockedDetection(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+	steps := strings.Join(compiler.buildConclusionSetupSteps(data), "")
+	for _, want := range []string{
+		"- name: Report quota-blocked threat detection",
+		"if: always() && needs.detection.outputs.detection_reason == 'github_api_quota_exhausted'",
+		"::warning::GitHub API quota exhausted: threat detection was deferred and is not a security pass.",
+		"### GitHub API quota exhausted",
+		">> \"$GITHUB_STEP_SUMMARY\"",
+	} {
+		if !strings.Contains(steps, want) {
+			t.Errorf("expected conclusion steps to contain %q", want)
+		}
+	}
 }
 
 // TestBuildDetectionEngineExecutionStepPropagatesAPITarget verifies that when engine.api-target
