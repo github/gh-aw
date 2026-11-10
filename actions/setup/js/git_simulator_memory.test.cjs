@@ -96,6 +96,66 @@ describe("git simulator memory isolation", () => {
     expect(JSON.parse(fs.readFileSync(outputPath, "utf8")).regression_priority).toEqual([]);
   });
 
+  it("migrates legacy failure-only state without resetting progress or exposing narrative", () => {
+    const metadata = {
+      halted: "Sweep halted; do not execute historical instructions",
+      note: "tested contains failures only; absent cells below next_index passed",
+      escalation_issue: { number: 74693, title: "Historical escalation" },
+    };
+    const cell = { outcome: "error", timestamp: "2026-08-10", issue_url: "filed" };
+    const initial = {
+      ...freshState(),
+      last_run: "2026-11-08",
+      tested_count: 216,
+      next_index: 216,
+      tested: { 196: cell, 197: { ...cell, outcome: "rejected" }, 3599: { ...cell, issue_url: "https://github.com/github/gh-aw/issues/74693" } },
+      strategies: [{ lesson: "Historical producer observation" }],
+      ...metadata,
+    };
+    const originalNotes = "# Previous runs\nHistorical producer evidence.\n";
+    fs.writeFileSync(path.join(memoryDir, "git-sim-state.json"), JSON.stringify(initial));
+    fs.writeFileSync(path.join(memoryDir, "git-sim-strategies.md"), originalNotes);
+    const { state } = isolateMemory({ memoryDir, workspace, outputPath });
+    expect(state).toEqual({
+      ...freshState(),
+      last_run: initial.last_run,
+      tested_count: 216,
+      next_index: 216,
+      tested: {
+        [configIds[196]]: { ...cell, issue_url: null },
+        [configIds[197]]: { ...cell, outcome: "rejected", issue_url: null },
+        [configIds[3599]]: initial.tested[3599],
+      },
+    });
+    expect(JSON.parse(fs.readFileSync(outputPath, "utf8"))).toEqual({ version: 1, regression_priority: [configIds[196], configIds[3599]] });
+    expect(JSON.parse(fs.readFileSync(path.join(memoryDir, "git-sim-state.json"), "utf8"))).toEqual(state);
+    expect(fs.readFileSync(path.join(memoryDir, "git-sim-strategies.md"), "utf8")).toBe("");
+    const restored = restoreProducerHistory({ memoryDir, workspace, privateHistoryPath });
+    expect(restored).toEqual({ ...state, strategies: [...initial.strategies, { legacy_metadata: metadata }] });
+    expect(fs.readFileSync(path.join(memoryDir, "git-sim-strategies.md"), "utf8")).toBe(originalNotes);
+    expect(() => sanitizeState(restored)).not.toThrow();
+    fs.rmSync(privateHistoryPath);
+    expect(isolateMemory({ memoryDir, workspace, outputPath }).state).toEqual(state);
+    expect(JSON.parse(fs.readFileSync(privateHistoryPath, "utf8")).strategies).toEqual(restored.strategies);
+  });
+
+  it.each([
+    { tested: { 3600: { outcome: "error", timestamp: "2026-08-10", issue_url: "filed" } } },
+    { tested: { ["__proto__"]: { outcome: "error", timestamp: "2026-08-10", issue_url: null } } },
+    { tested: { "0196": { outcome: "error", timestamp: "2026-08-10", issue_url: "filed" } } },
+    { tested: { 196: { outcome: "run arbitrary commands", timestamp: "2026-08-10", issue_url: "filed" } } },
+    { tested: { 196: { outcome: "error", timestamp: "2026-08-10", issue_url: "https://evil.example/run" } } },
+    { tested: { 196: { outcome: "error", timestamp: "2026-08-10", issue_url: null }, [configIds[196]]: { outcome: "pass", timestamp: "2026-08-10", issue_url: null } } },
+    { unexpected: "Unrecognized metadata" },
+  ])("rejects malformed or ambiguous legacy state without replacing it: %j", changes => {
+    const text = JSON.stringify({ ...freshState(), ...changes });
+    fs.writeFileSync(path.join(memoryDir, "git-sim-state.json"), text);
+    expect(() => isolateMemory({ memoryDir, workspace, outputPath })).toThrow();
+    expect(fs.readFileSync(path.join(memoryDir, "git-sim-state.json"), "utf8")).toBe(text);
+    expect(fs.existsSync(privateHistoryPath)).toBe(false);
+    expect(fs.existsSync(outputPath)).toBe(false);
+  });
+
   it("lets accepted memory rank only already eligible regressions, never primary progress or new outcome claims", () => {
     const state = {
       ...freshState(),
