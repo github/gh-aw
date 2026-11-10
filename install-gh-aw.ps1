@@ -272,12 +272,13 @@ function Invoke-DownloadWithRetry {
     }
 
     if ($env:GH_TOKEN) {
-        Write-WarningMessage "GitHub token was rejected; retrying binary download without authentication."
+        Write-WarningMessage "Authenticated download failed; retrying binary download without authentication."
         try {
             Invoke-WebRequest -Uri $Url -Headers $AnonymousHeaders -OutFile $DestinationPath -TimeoutSec 120 | Out-Null
             Write-Success "Binary downloaded successfully"
             return $true
         } catch {
+            Write-WarningMessage "Anonymous binary download failed: $($_.Exception.Message)"
         }
     }
 
@@ -425,11 +426,7 @@ if (-not $SkipChecksum) {
             Write-Success "Checksums file downloaded successfully"
             break
         } catch {
-            if ($attempt -eq 3) {
-                Write-WarningMessage "Failed to download checksums file after 3 attempts"
-                Write-WarningMessage "Checksum verification will be skipped for this version."
-                Write-Info "This may occur for older releases that don't include checksums."
-            } else {
+            if ($attempt -lt 3) {
                 Write-WarningMessage "Checksum download attempt $attempt failed. Retrying in 2s..."
                 Start-Sleep -Seconds 2
             }
@@ -437,13 +434,19 @@ if (-not $SkipChecksum) {
     }
 
     if (-not $checksumsDownloaded -and $env:GH_TOKEN) {
-        Write-WarningMessage "GitHub token was rejected; retrying checksums download without authentication."
+        Write-WarningMessage "Authenticated download failed; retrying checksums download without authentication."
         try {
             Invoke-WebRequest -Uri $ChecksumsURL -Headers $AnonymousHeaders -OutFile $ChecksumsPath -TimeoutSec 60 | Out-Null
             $checksumsDownloaded = $true
             Write-Success "Checksums file downloaded successfully"
         } catch {
         }
+    }
+
+    if (-not $checksumsDownloaded) {
+        Write-WarningMessage "Failed to download checksums file after 3 attempts"
+        Write-WarningMessage "Checksum verification will be skipped for this version."
+        Write-Info "This may occur for older releases that don't include checksums."
     }
 
     if ($checksumsDownloaded) {

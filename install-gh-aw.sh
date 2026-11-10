@@ -508,7 +508,7 @@ download_binary_with_retry() {
     done
 
     if [ "${#AUTH_CURL_ARGS[@]}" -gt 0 ]; then
-        print_warning "GitHub token was rejected; retrying binary download without authentication."
+        print_warning "Authenticated download failed; retrying binary download without authentication."
         if curl -L -f --connect-timeout 15 --max-time 120 -o "$STAGED_BINARY_PATH" "$url"; then
             print_success "Binary downloaded successfully"
             return 0
@@ -551,7 +551,7 @@ if [ "$SKIP_CHECKSUM" = false ]; then
             fi
         done
         if [ "${#AUTH_CURL_ARGS[@]}" -gt 0 ]; then
-            print_warning "GitHub token was rejected; retrying checksums download without authentication."
+            print_warning "Authenticated download failed; retrying checksums download without authentication."
             if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$url" 2>/dev/null; then
                 print_success "Checksums file downloaded successfully"
                 return 0

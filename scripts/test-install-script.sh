@@ -482,7 +482,7 @@ EOF
                 fail "checksums did not exhaust authenticated retries"
             [ "$(awk -F '\t' '$1 ~ /\/download\/v0[.]37[.]18\/checksums.txt$/ && $2 == "anonymous" { count++ } END { print count+0 }' "$case_root/requests")" -eq 1 ] ||
                 fail "checksums did not retry anonymously once"
-            [ "$(grep -c 'GitHub token was rejected' "$output")" -eq 2 ] || fail "authenticated download failures did not warn before anonymous fallback"
+            [ "$(grep -c 'Authenticated download failed' "$output")" -eq 2 ] || fail "authenticated download failures did not warn before anonymous fallback"
             ;;
         auth-latest)
             [ "$(wc -l < "$case_root/requests" | tr -d ' ')" -eq 3 ] || {
