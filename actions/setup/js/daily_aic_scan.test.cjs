@@ -1078,7 +1078,7 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Accounting remains unverified; agent startup is blocked"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Activation stage: Restore daily AIC scan observations"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("API responses observed by this restore: 1; shared quota used is not this step's request count"));
-    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Snapshot discovery has not started; cache reuse has not been evaluated"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Snapshot discovery has not started in the failed restore phase attempt; earlier attempts may have queried history or artifacts"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Blocked until at least 2026-10-14T10:06:00.000Z"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Check existing scheduled runs after the deadline before retrying"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("github-token reference"));
@@ -1117,6 +1117,9 @@ describe("trusted artifact fallback without writable Actions cache", () => {
 
   it.each([
     [{ "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1791972360", "retry-after": "120" }, "2026-10-14T10:06:13.000Z"],
+    [{ "x-ratelimit-remaining": "4000", "x-ratelimit-reset": "1791972900", "retry-after": "120" }, "2026-10-14T10:06:13.000Z"],
+    [{ "x-ratelimit-remaining": "100", "x-ratelimit-reset": "1791972900", "retry-after": "120" }, "2026-10-14T10:15:00.000Z"],
+    [{ "x-ratelimit-remaining": "4000", "x-ratelimit-reset": "1791972900", "retry-after": "invalid" }, null],
     [{ "retry-after": "120" }, "2026-10-14T10:06:13.000Z"],
     [{ "x-ratelimit-remaining": "0" }, null],
     [{ "x-ratelimit-remaining": "0", "x-ratelimit-reset": "9999999999999999", "retry-after": "private-header-value" }, null],

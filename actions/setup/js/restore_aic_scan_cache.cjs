@@ -136,12 +136,15 @@ async function mainWithPaths(cachePath = AIC_SCAN_CACHE_FILE_PATH, options = {})
   } catch (error) {
     const diagnostic = getGitHubAPIDiagnostic(error);
     const failure = getAPIReadFailure(error);
-    const retryAt = diagnostic?.retryNotBefore || retryNotBefore(error?.response?.headers, Date.now(), isQuotaError(error));
+    const retryAt = diagnostic?.retryNotBefore ?? retryNotBefore(error?.response?.headers);
     if (failure) {
       const detail = diagnostic?.message ?? `GitHub API read failed (HTTP ${failure.status ?? "unknown"}; reason=${failure.reason})`;
       const message = `Daily AIC snapshot restore stopped at ${failure.operation} after ${failure.attempts} attempt(s): ${detail}. Accounting remains unverified; agent startup is blocked.`;
       const stage = `Activation stage: Restore daily AIC scan observations. API responses observed by this restore: ${budget.snapshot().requests}; shared quota used is not this step's request count.`;
-      const discovery = failure.operation === API_READ_OPERATIONS.CURRENT_RUN ? "Snapshot discovery has not started; cache reuse has not been evaluated." : "Snapshot restoration did not complete; a cache miss has not been established.";
+      const discovery =
+        failure.operation === API_READ_OPERATIONS.CURRENT_RUN
+          ? "Snapshot discovery has not started in the failed restore phase attempt; earlier attempts may have queried history or artifacts."
+          : "Snapshot restoration did not complete; a cache miss has not been established.";
       const recovery =
         diagnostic?.quota || failure.reason === "retry_restricted"
           ? `${retryAt ? `Blocked until at least ${retryAt}.` : "Blocked until: unknown; no valid future retry deadline was provided."} Check existing scheduled runs after the deadline before retrying; do not queue simultaneous reruns. Inspect this step's github-token reference and concurrent consumers of that credential's quota; never print token values. A reset does not verify accounting or authorize agent startup.`

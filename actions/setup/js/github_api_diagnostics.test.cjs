@@ -25,6 +25,11 @@ describe("failed-response GitHub API diagnostics", () => {
     expect(getGitHubAPIDiagnostic(failure, now).message).toContain("remaining=100");
   });
 
+  it("does not bind a synthetic secondary-limit stop to the primary reset", () => {
+    const failure = Object.assign(error(403, { "x-ratelimit-remaining": "4000", "x-ratelimit-reset": "1791972900", "retry-after": "120" }), { code: "DAILY_AIC_QUOTA_STOP" });
+    expect(getGitHubAPIDiagnostic(failure, now).retryNotBefore).toBe("2026-10-14T10:06:13.000Z");
+  });
+
   it.each([
     [403, {}, "API rate limit exceeded for installation"],
     [403, {}, "You have exceeded a secondary rate limit"],
