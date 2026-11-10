@@ -49,6 +49,7 @@ name: Delight
 pre-agent-steps:
 - name: Sample files and load memory
   run: |
+    set -euo pipefail
     mkdir -p /tmp/gh-aw/agent
     # Sample documentation files (eliminates agent exploratory find turns)
     find docs/src/content/docs \( -name '*.md' -o -name '*.mdx' \) | shuf -n 2 > /tmp/gh-aw/agent/doc-samples.txt
@@ -57,8 +58,18 @@ pre-agent-steps:
     # Sample validation files
     find pkg -name '*validation*.go' | shuf -n 1 > /tmp/gh-aw/agent/validation-sample.txt || echo "No validation files found" > /tmp/gh-aw/agent/validation-sample.txt
     # Load historical memory (eliminates agent memory-read turns)
-    cat memory/delight/previous-findings.json 2>/dev/null > /tmp/gh-aw/agent/previous-findings.json || echo "[]" > /tmp/gh-aw/agent/previous-findings.json
-    cat memory/delight/improvement-themes.json 2>/dev/null > /tmp/gh-aw/agent/improvement-themes.json || echo "[]" > /tmp/gh-aw/agent/improvement-themes.json
+    if [[ -f /tmp/gh-aw/repo-memory/default/previous-findings.json ]]; then
+      cat /tmp/gh-aw/repo-memory/default/previous-findings.json > /tmp/gh-aw/agent/previous-findings.json
+    else
+      echo "No previous-findings.json history; starting fresh"
+      printf '[]\n' > /tmp/gh-aw/agent/previous-findings.json
+    fi
+    if [[ -f /tmp/gh-aw/repo-memory/default/improvement-themes.json ]]; then
+      cat /tmp/gh-aw/repo-memory/default/improvement-themes.json > /tmp/gh-aw/agent/improvement-themes.json
+    else
+      echo "No improvement-themes.json history; starting fresh"
+      printf '[]\n' > /tmp/gh-aw/agent/improvement-themes.json
+    fi
     # Pre-read file contents (eliminates view/read tool denials)
     xargs -a /tmp/gh-aw/agent/doc-samples.txt cat > /tmp/gh-aw/agent/doc-samples-content.txt 2>/dev/null || echo "(no doc samples found)" > /tmp/gh-aw/agent/doc-samples-content.txt
     xargs -a /tmp/gh-aw/agent/workflow-samples.txt cat > /tmp/gh-aw/agent/workflow-samples-content.txt 2>/dev/null || echo "(no workflow samples found)" > /tmp/gh-aw/agent/workflow-samples-content.txt
@@ -70,7 +81,8 @@ tools:
   - find docs/src/content/docs -name "*.md" -o -name "*.mdx"
   - find .github/workflows -name "*.md"
   - ./gh-aw --help
-  - ./gh-aw * --help
+  - ./gh-aw compile --help
+  - ./gh-aw run --help
   - cat /tmp/gh-aw/agent/*
   - cat docs/src/content/docs/*.md
   - cat docs/src/content/docs/*.mdx
@@ -100,6 +112,17 @@ features:
 {{#runtime-import? .github/shared-instructions.md}}
 
 # Delight Agent 📊
+
+Use one standalone command per call. Do not prepend `cd` or append commands,
+redirections, or pipelines to the commands shown below. Use built-in file
+inspection tools to read source and historical memory; the effective shell
+defaults also permit standalone `cat`, `ls`, `grep`, and `head`.
+
+On the first tool denial, stop that operation and switch to a known permitted
+alternative. Do not probe with `which`, Python, or another directory-changing
+command. A workflow tool denial is not a GitHub authentication error; do not
+request new credentials or broader permissions. If required work is blocked,
+call `report_incomplete` before exhausting the three-denial budget.
 
 You are the Delight Agent - a user experience specialist focused on improving clarity, usability, and professionalism in **enterprise software** context. While "delight" traditionally evokes consumer-focused experiences, in enterprise software it means: **clear documentation, efficient workflows, predictable behavior, and professional communication**.
 
@@ -196,11 +219,18 @@ cat /tmp/gh-aw/agent/doc-samples-content.txt
 **Select 1-2 high-impact CLI commands:**
 
 ```bash
-# Get help output for commonly used commands
-./gh-aw --help | grep -E "^  [a-z]" | shuf -n 2
+./gh-aw --help
 ```
 
-For each selected command, run `./gh-aw [command] --help` and evaluate:
+Choose one or both of the permitted help invocations below, each in a separate
+call. Do not discover the binary with `which` or run arbitrary subcommands:
+
+```bash
+./gh-aw compile --help
+./gh-aw run --help
+```
+
+Evaluate the selected help output:
 
 #### Quality Factors
 - ✅ **Clear purpose**: Is the description precise and informative?
@@ -441,13 +471,16 @@ Here are 1-2 targeted improvement tasks, each affecting a single file:
 
 ### Step 7: Update Memory
 
-Save findings to repo-memory:
+Save findings with built-in edit tools, using the actual restored repo-memory
+directory, not the branch name `memory/delight`. Do not use `cd`, shell
+redirection, or Python to write or validate memory JSON. Use concrete UTC date
+strings and valid JSON values, not the illustrative placeholders below.
 
-```bash
-# Update findings log
-cat > memory/delight/findings-$(date +%Y-%m-%d).json << 'EOF'
+Write `/tmp/gh-aw/repo-memory/default/findings-<YYYY-MM-DD>.json`:
+
+```json
 {
-  "date": "$(date -I)",
+  "date": "<YYYY-MM-DD>",
   "files_analyzed": {
     "documentation": [...],
     "cli": [...],
@@ -464,12 +497,13 @@ cat > memory/delight/findings-$(date +%Y-%m-%d).json << 'EOF'
     }
   ]
 }
-EOF
+```
 
-# Update improvement tracking
-cat > memory/delight/improvements.json << 'EOF'
+Update `/tmp/gh-aw/repo-memory/default/improvements.json`:
+
+```json
 {
-  "last_updated": "$(date -I)",
+  "last_updated": "<YYYY-MM-DD>",
   "pending_tasks": [
     {
       "file": "path/to/file.ext",
@@ -478,7 +512,6 @@ cat > memory/delight/improvements.json << 'EOF'
     }
   ]
 }
-EOF
 ```
 
 ## Important Guidelines

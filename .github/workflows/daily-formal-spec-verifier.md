@@ -51,8 +51,8 @@ tools:
     max-file-size: 65536
   edit: null
   bash:
-    - "gofmt -w *"
-    - "go test *"
+    - "gofmt -w:*"
+    - "go test:*"
     - "find specs -type f -name \"*.md\" | sort"
     - "cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json"
     - "cat specs/*.md"
@@ -62,15 +62,8 @@ tools:
     - "find specs -type f -name \"*.tla\""
     - "find specs -type f -name \"*.kk\""
     - "sha256sum *"
-    - "mkdir -p /tmp/gh-aw/agent/formal-spec-verifier/*"
-    - "/tmp/gh-aw/agent/koka/bin/koka --version"
-    - "/tmp/gh-aw/agent/tla-tools/jre/bin/java -version"
-    - "timeout --kill-after=30s * /tmp/gh-aw/agent/tla-tools/jre/bin/java *"
-    - "cd specs/*"
-    - "timeout --kill-after=30s * /tmp/gh-aw/agent/koka/bin/koka *"
-    - "timeout --kill-after=30s * /tmp/gh-aw/agent/formal-spec-verifier/*"
+    - "node .github/scripts/formal_spec_check.cjs:*"
     - "cat /tmp/gh-aw/agent/formal-spec-verifier/*"
-    - "tee /tmp/gh-aw/agent/formal-spec-verifier/*"
 
 steps:
     - name: Validate fixture-based TLA+ installer
@@ -105,6 +98,21 @@ features:
 # Daily Formal Spec Verifier 🔬
 
 Use only commands listed under `tools.bash`, one standalone command per call. Pipelines are permitted only when the complete pipeline is explicitly allowlisted. Do not append commands, redirections, or subshells to an allowed command. If a required operation is blocked, stop and report it instead of probing command variants.
+
+On the first tool denial, stop that operation and use a known permitted alternative:
+native file inspection for source and notes, or a standalone command below. Do not
+retry `go version`, `git log`, Python, or another ungranted discovery command.
+A workflow tool denial is not a GitHub authentication error; do not request new
+credentials or broader permissions. If a required capability has no permitted
+alternative, call `report_incomplete` before exhausting the three-denial budget.
+
+| Operation | Permitted standalone invocation |
+|---|---|
+| Read source or prior notes | Built-in file inspection tools, using the full path |
+| Check existing work | `gh pr list --state open --search "formal-spec" --json number,title` |
+| Format the generated test | `gofmt -w pkg/workflow/example_formal_test.go` (use the actual test path) |
+| Run focused tests | `go test ./pkg/workflow -run '^TestSelectedSpec' -count=1` (use the actual package and selector) |
+| Run a bounded formal check | `node .github/scripts/formal_spec_check.cjs sany specs/example.md Model.tla` (see the model contract below) |
 
 You are a formal methods expert and Go test engineer. Your mission is to:
 
@@ -218,11 +226,11 @@ Rules:
 ### Optional executable models and gradual adoption
 
 Inspect the selected spec's existing `.tla`/`.cfg` or `.kk` files and documented
-verification wrapper. Preserve established model paths, tool compatibility,
-expected negative controls, and finite bounds. Run a wrapper only if it can
-restrict execution to this spec within the limits below and its command is
-already allowed; otherwise use the declared direct tool commands. Never run the
-whole corpus. Report a pinned-tool incompatibility instead of downloading another tool.
+verification wrapper. Preserve tool compatibility, expected negative controls,
+and finite bounds. This workflow permits only the bounded formal-check helper
+below, not arbitrary repository wrappers or direct tool commands. If an existing
+model cannot use this contract without changing its semantics, keep it unchanged
+and report the incompatibility. Never run the whole corpus or download another tool.
 
 If no suitable model exists and modeling adds value, add a small model under
 `specs/formal/<spec-slug>/`, where the slug derives from the complete selected
@@ -231,14 +239,29 @@ the `.tla`/`.cfg` or `.kk` sources with the Go tests. Do not add markdown files
 there that would enter the spec rotation, port production code to Koka, or
 introduce a Koka dependency into the Go application's build.
 
-Use `JAVA_BIN`, `TLA2TOOLS_JAR`, and `KOKA_BIN` from the shared setup. Keep all
-transient outputs under `/tmp/gh-aw/agent/formal-spec-verifier/<spec-slug>/`,
-not in the committed model directory. Invoke tools through the declared bash
-patterns, with `timeout --kill-after=30s`: at most 2 minutes per compilation or
-TLC invocation, 30 seconds per Koka executable, and **8 minutes total** for all
-formal checks. TLC uses at most 2 workers and a 2 GiB Java heap. Leave at least
-10 minutes for Go tests and delivery; narrow the model before starting if these
-limits cannot accommodate it.
+Use `node .github/scripts/formal_spec_check.cjs` with one operation per call:
+
+```text
+node .github/scripts/formal_spec_check.cjs sany specs/<selected-spec>.md Model.tla
+node .github/scripts/formal_spec_check.cjs tlc specs/<selected-spec>.md Model.tla Model.cfg
+node .github/scripts/formal_spec_check.cjs koka specs/<selected-spec>.md main.kk
+```
+
+Replace the specification path and model basenames with actual files. The helper
+derives `<spec-slug>` from the complete selected spec path, accepts models only
+under `specs/formal/<spec-slug>/`, and rejects path traversal, symlinks, unknown
+operations, and extra arguments. Do not edit the helper. Models needing different
+paths or unsupported flags must be reported as incompatible, not run through an
+ungranted `cd`, `timeout`, interpreter, or wrapper.
+
+The helper uses only the pinned tool paths from shared setup. It runs from the
+model directory, creates fresh evidence/build directories under
+`/tmp/gh-aw/agent/formal-spec-verifier/<spec-slug>/`, and captures tool versions,
+source hashes, exact arguments, statuses, and complete stdout/stderr. It enforces
+`timeout --kill-after=30s`, at most 2 minutes per compilation or TLC invocation,
+30 seconds per Koka executable, and a shared **8-minute total** formal-check
+budget. TLC uses 2 workers and a 2 GiB Java heap. Leave at least 10 minutes for Go
+tests and delivery; narrow the model before starting if these limits cannot fit.
 
 For TLA+, run SANY and the documented TLC configuration, retaining exhaustion
 status, checked invariants/temporal properties, state counts, and counterexamples.
