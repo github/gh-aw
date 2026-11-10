@@ -449,7 +449,7 @@ func TestConcludeThreatDetectionScript_AWFInstallQuotaBlocked(t *testing.T) {
 		wantConclusion  string
 		wantMessage     string
 	}{
-		{name: "quota blocked warn mode", continueOnError: "true", quotaBlocked: "resource=core; limit=15000; remaining=0; used=15000; reset=2026-11-10T00:00:04Z; reason=reset_exceeds_budget", wantErr: true, wantReason: "reason=github_api_quota_exhausted", wantConclusion: "conclusion=failure", wantMessage: "GitHub API quota exhausted"},
+		{name: "quota blocked warn mode", continueOnError: "true", quotaBlocked: "resource=core; limit=15000; remaining=0; used=15000; reset=2026-11-10T00:00:04Z; reason=reset_exceeds_budget", wantReason: "reason=github_api_quota_exhausted", wantConclusion: "conclusion=warning", wantMessage: "GitHub API quota exhausted"},
 		{name: "quota blocked strict mode", continueOnError: "false", quotaBlocked: "resource=core; limit=15000; remaining=0; used=15000; reset=unknown; reason=unknown_reset", wantErr: true, wantReason: "reason=github_api_quota_exhausted", wantConclusion: "conclusion=failure", wantMessage: "GitHub API quota exhausted"},
 		{name: "non-quota install failure", continueOnError: "true", wantErr: false, wantReason: "reason=agent_failure", wantConclusion: "conclusion=warning", wantMessage: "AWF installation did not complete verification"},
 	}
