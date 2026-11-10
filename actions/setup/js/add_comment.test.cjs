@@ -1864,7 +1864,7 @@ describe("add_comment", () => {
       expect(errorCalls.length).toBe(0);
     });
 
-    it("should detect 404 from error message containing '404'", async () => {
+    it("should not classify digit substrings in an error message as HTTP status", async () => {
       const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
 
       let warningCalls = [];
@@ -1886,10 +1886,37 @@ describe("add_comment", () => {
 
       const result = await handler(message, {});
 
-      expect(result.success).toBe(true);
-      expect(result.warning).toBeTruthy();
-      expect(result.skipped).toBe(true);
-      expect(warningCalls.length).toBeGreaterThan(0);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("API request failed with status 404");
+      expect(result.skipped).not.toBe(true);
+      expect(warningCalls).toHaveLength(0);
+    });
+
+    it.each([
+      [404, false],
+      [404, true],
+      [500, false],
+      [500, true],
+      [undefined, false],
+    ])("uses structured HTTP status %s (response-only: %s) despite a 404 request ID", async (status, responseOnly) => {
+      const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+      mockGithub.rest.issues.createComment = async () => {
+        throw Object.assign(new Error(""), {
+          ...(responseOnly ? {} : { status }),
+          response: { status, headers: { "x-github-request-id": "C404:2AB8:1D6F25E:1E1B2C5:6553A7F0" } },
+        });
+      };
+
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const result = await handler({ type: "add_comment", body: "Test comment" }, {});
+
+      if (status === 404) {
+        expect(result).toMatchObject({ success: true, skipped: true, reasonCode: "TARGET_NOT_FOUND" });
+      } else {
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("request ID C404:");
+        expect(result.skipped).not.toBe(true);
+      }
     });
 
     it("should detect 404 from error message containing 'Not Found'", async () => {

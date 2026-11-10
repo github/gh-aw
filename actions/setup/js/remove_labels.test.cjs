@@ -552,7 +552,7 @@ describe("remove_labels", () => {
 
       mockGithub.rest.issues.removeLabel = async params => {
         if (params.name === "missing") {
-          const error = new Error("404 Not Found");
+          const error = Object.assign(new Error("Not Found"), { status: 404 });
           throw error;
         }
         return {};
@@ -568,6 +568,33 @@ describe("remove_labels", () => {
 
       expect(result.success).toBe(true);
       expect(result.labelsRemoved).toEqual(["bug"]);
+    });
+
+    it.each([
+      [404, false],
+      [404, true],
+      [500, false],
+      [500, true],
+      [undefined, false],
+    ])("uses structured HTTP status %s (response-only: %s) despite a 404 request ID", async (status, responseOnly) => {
+      const handler = await main({ max: 10 });
+      mockGithub.rest.issues.removeLabel = async () => {
+        throw Object.assign(new Error(""), {
+          ...(responseOnly ? {} : { status }),
+          response: { status, headers: { "x-github-request-id": "C404:2AB8:1D6F25E:1E1B2C5:6553A7F0" } },
+        });
+      };
+
+      const result = await handler({ labels: ["bug"] }, {});
+
+      expect(result.labelsRemoved).toEqual([]);
+      if (status === 404) {
+        expect(result.failedLabels).toBeUndefined();
+        expect(mockCore.warnings).toHaveLength(0);
+      } else {
+        expect(result.failedLabels).toEqual([{ label: "bug", error: expect.stringContaining("request ID C404:") }]);
+        expect(mockCore.warnings).toHaveLength(1);
+      }
     });
 
     it("should handle API errors gracefully", async () => {
