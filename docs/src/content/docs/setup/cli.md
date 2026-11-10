@@ -434,7 +434,7 @@ gh aw compile --actions-lock               # Update the standard Actions depende
 gh aw compile --purge                      # Remove orphaned .lock.yml files
 ```
 
-For `--zizmor` and `--poutine`, compilation automatically uses a binary on `PATH` when its version is at least 1.31.1 or 1.1.6, respectively. The version is checked with `zizmor --version` or `poutine version --disable-version-check`. If the binary is missing, too old, or its version cannot be determined, the scanner uses the pinned Docker image instead. Other Docker-based checks still require Docker.
+For `--zizmor` and `--poutine`, compilation automatically uses a binary on `PATH` when its version is at least 1.32.0 or 1.1.6, respectively. The version is checked with `zizmor --version` or `poutine version --disable-version-check`. If the binary is missing, too old, or its version cannot be determined, the scanner uses the pinned Docker image instead. Other Docker-based checks still require Docker.
 
 If the repository root contains an [`aw.yml` manifest](/gh-aw/reference/aw-yml-package-manifest/), `gh aw compile` validates it before compiling workflows.
 

@@ -14,6 +14,7 @@ describe("failed-response GitHub API diagnostics", () => {
     expect(diagnostic).toEqual({
       quota: true,
       classification: "quota_exhausted",
+      retryNotBefore: "2026-10-14T10:06:00.000Z",
       message: "GitHub API quota_exhausted (HTTP 403; resource=core; remaining=0; limit=15000; used=15000; reset=2026-10-14T10:06:00.000Z; retry_not_before=2026-10-14T10:06:00.000Z)",
     });
   });
@@ -22,6 +23,11 @@ describe("failed-response GitHub API diagnostics", () => {
     const failure = Object.assign(error(200, { "x-ratelimit-remaining": "100", "x-ratelimit-reset": reset }), { code: "DAILY_AIC_QUOTA_STOP" });
     expect(getGitHubAPIDiagnostic(failure, now)).toMatchObject({ quota: true, classification: "quota_reserve" });
     expect(getGitHubAPIDiagnostic(failure, now).message).toContain("remaining=100");
+  });
+
+  it("does not bind a synthetic secondary-limit stop to the primary reset", () => {
+    const failure = Object.assign(error(403, { "x-ratelimit-remaining": "4000", "x-ratelimit-reset": "1791972900", "retry-after": "120" }), { code: "DAILY_AIC_QUOTA_STOP" });
+    expect(getGitHubAPIDiagnostic(failure, now).retryNotBefore).toBe("2026-10-14T10:06:13.000Z");
   });
 
   it.each([
