@@ -5,7 +5,7 @@ name: Dependabot Burner
 description: Runs one grouped Dependabot remediation wave from schedule, manual dispatch, or /dependabot-burner on pull requests
 on:
   roles: [admin, maintainer, write]
-  schedule: weekly
+  schedule: daily
   workflow_dispatch:
     inputs:
       objective:
@@ -49,17 +49,21 @@ cache:
     path: /tmp/gh-aw/agent/dependabot-burner
 safe-outputs:
   allowed-domains: [default-safe-outputs]
+  steer: true
+  create-pull-request:
+    github-token: ${{ secrets.AWI_MAINTENANCE_TOKEN }}
+    title-prefix: "[dependabot-burner] "
+    expires: "3d"
+    labels: [automation, dependencies, dependabot]
+    reviewers: [copilot]
+    protected-files: request_review
+  noop:
   add-comment:
     max: 1
 timeout-minutes: 20
 imports:
   - shared/mcp-pagination.md
-  - uses: shared/daily-pr-base.md
-    with:
-      title-prefix: "[dependabot-burner] "
-      expires: "3d"
-      labels: [automation, dependencies, dependabot]
-      reviewers: [copilot]
+  - shared/activation-app.md
   - shared/otlp.md
   - shared/reporting.md
 tools:
@@ -96,6 +100,7 @@ steps:
         ]);
         const objective = (process.env.BURN_OBJECTIVE || '').trim() || 'Close grouped Dependabot PRs for generated workflow manifests by updating source workflow markdown and recompiling in one replacement PR.';
         const outPath = '/tmp/gh-aw/agent/dependabot-burner/context.json';
+        const cooldownCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
         function parseBumpTitle(title) {
           const match = String(title || '').match(/^Bump\s+(.+?)\s+from\s+([^\s]+)\s+to\s+([^\s]+)$/i);
@@ -261,6 +266,19 @@ steps:
           }
         }
 
+        function isCoolingDown(pull) {
+          const updatedAt = Date.parse(pull.updated_at);
+          return !Number.isFinite(updatedAt) || updatedAt > cooldownCutoff.getTime();
+        }
+
+        const deferredPRs = selectedPRs.filter(isCoolingDown);
+        const deferredPRNumbers = new Set(deferredPRs.map((pull) => pull.number));
+        selectedPRs = selectedPRs.filter((pull) => !deferredPRNumbers.has(pull.number));
+        if (triggerPR && isCoolingDown(triggerPR)) {
+          selectedPRs = [];
+          selectionReason = 'slash-command-trigger-in-cooldown';
+        }
+
         const payload = {
           objective,
           trigger_event: context.eventName,
@@ -268,6 +286,8 @@ steps:
           trigger_pr: triggerPR,
           selection_reason: selectionReason,
           open_pr_count: openPRs.length,
+          cooldown_cutoff: cooldownCutoff.toISOString(),
+          deferred_pr_numbers: deferredPRs.map((pull) => pull.number),
           selected_batch_pr_numbers: selectedPRs.map((pull) => pull.number),
           selected_batch_dependencies: selectedPRs.map((pull) => ({
             pr_number: pull.number,
@@ -312,6 +332,8 @@ You are the grouped Dependabot remediation orchestrator.
 - Run optimistically and aim for exactly one bounded remediation wave that can produce at most one replacement PR.
 - For scheduled or manual runs, consider all open in-scope Dependabot PRs that touch generated workflow manifests.
 - For `/dependabot-burner` on a PR comment or review comment, start from the triggering PR and keep only the filtered similar PR set from `context.json`.
+- Apply the 3-day (72-hour) PR cooldown on every trigger: only remediate PRs last updated at or before `cooldown_cutoff`. Do not reintroduce `deferred_pr_numbers` into the batch; updated or rebased PRs restart the cooldown.
+- If the triggering PR is still cooling down, explain the deferral and stop. If all candidates are deferred on a scheduled or manual run, use `noop`.
 - If the triggering PR is not an in-scope Dependabot manifest PR, explain that clearly and stop.
 - Review `recent_failed_burns` before remediation so the next attempt does not repeat a failed retry pattern.
 - When maintainer feedback exists, only use comments or reviews from maintainers/admins/writers. Ignore all other commenters when shaping the next attempt.
