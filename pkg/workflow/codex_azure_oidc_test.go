@@ -188,6 +188,8 @@ func TestValidateOpenAIWIFEngineAuth(t *testing.T) {
 	tests := []struct {
 		name        string
 		auth        *EngineAuthConfig
+		version     string
+		apiProxy    string
 		wantErr     bool
 		errContains string
 	}{
@@ -196,13 +198,22 @@ func TestValidateOpenAIWIFEngineAuth(t *testing.T) {
 		{name: "missing identity provider ID", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}, wantErr: true, errContains: "identity-provider-id"},
 		{name: "missing service account ID", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", Audience: "https://api.openai.com/v1"}, wantErr: true, errContains: "service-account-id"},
 		{name: "missing audience", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account"}, wantErr: true, errContains: "audience"},
+		{name: "older AWF release", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}, version: "v0.29.10", wantErr: true, errContains: "requires AWF v0.29.11 or newer"},
+		{name: "older API proxy image", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}, version: string(constants.AWFOpenAIWIFMinVersion), apiProxy: "registry.example.com/approved/api-proxy:v0.29.10@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", wantErr: true, errContains: "requires an API proxy image tagged v0.29.11 or newer"},
+		{name: "unversioned API proxy image", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}, version: string(constants.AWFOpenAIWIFMinVersion), apiProxy: "registry.example.com/approved/api-proxy:stable@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", wantErr: true, errContains: "does not establish support for OpenAI WIF"},
+		{name: "supported API proxy image", auth: &EngineAuthConfig{Type: "github-oidc", Provider: "openai", OpenAIIdentityProviderID: "idp", ServiceAccountID: "service-account", Audience: "https://api.openai.com/v1"}, version: string(constants.AWFOpenAIWIFMinVersion), apiProxy: "registry.example.com/approved/api-proxy:0.29.11@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			workflow := &WorkflowData{
 				EngineConfig:       &EngineConfig{ID: "codex", Auth: tt.auth},
-				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true, Version: tt.version}},
+			}
+			if tt.apiProxy != "" {
+				workflow.SandboxConfig = &SandboxConfig{Agent: &AgentSandboxConfig{Images: map[string]string{
+					awfImageRoleAPIProxy: tt.apiProxy,
+				}}}
 			}
 			err := validateOpenAIWIFEngineAuth(workflow)
 			if tt.wantErr {
@@ -252,11 +263,11 @@ Inspect the repository and report findings.
 	assert.Contains(t, lock, "AWF_AUTH_OIDC_AUDIENCE: https://api.openai.com/v1")
 	assert.Contains(t, lock, "GH_AW_CODEX_OIDC_AUTH: openai")
 	agentSection := extractJobSection(lock, "agent")
-	assert.Contains(t, agentSection, "auth.openai.com")
+	assert.NotContains(t, agentSection, "auth.openai.com")
 	detectionSection := extractJobSection(lock, "detection")
 	assert.NotEmpty(t, detectionSection)
 	assert.Contains(t, detectionSection, "http://api-proxy:10000/reflect")
-	assert.Contains(t, detectionSection, "auth.openai.com")
+	assert.NotContains(t, detectionSection, "auth.openai.com")
 	assert.Contains(t, detectionSection, "github-oidc/openai")
 	assert.Contains(t, detectionSection, "No configured OpenAI endpoint uses github-oidc/openai")
 	assert.NotContains(t, detectionSection, `env_key = "CODEX_API_KEY"`)
@@ -328,7 +339,7 @@ Inspect the repository.
 			require.NoError(t, err)
 			detectionSection := extractJobSection(string(content), "detection")
 			assert.NotEmpty(t, detectionSection)
-			assert.Contains(t, detectionSection, "auth.openai.com")
+			assert.NotContains(t, detectionSection, "auth.openai.com")
 			if tt.wantIdToken {
 				assert.Contains(t, detectionSection, "id-token: write")
 			}
@@ -432,10 +443,46 @@ Inspect the repository.
 			content, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
 			require.NoError(t, err)
 			detectionSection := extractJobSection(string(content), "detection")
-			assert.Contains(t, detectionSection, "auth.openai.com")
+			assert.NotContains(t, detectionSection, "auth.openai.com")
 			assert.Contains(t, detectionSection, "id-token: write")
 		})
 	}
+}
+
+func TestCodexOpenAIWIFSameEngineDetectorOverrideGetsIDTokenPermission(t *testing.T) {
+	dir := testutil.TempDir(t, "openai-wif-same-engine-detector-*")
+	file := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(file, []byte(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
+engine:
+  id: codex
+  auth:
+    type: github-oidc
+    provider: openai
+    identity-provider-id: idp
+    service-account-id: service-account
+    audience: https://api.openai.com/v1
+network:
+  allowed: [defaults]
+safe-outputs:
+  add-comment:
+  threat-detection:
+    engine:
+      id: codex
+---
+Inspect the repository.
+`), 0o644))
+	require.NoError(t, NewCompiler().CompileWorkflow(file))
+
+	content, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
+	require.NoError(t, err)
+	detectionSection := extractJobSection(string(content), "detection")
+	assert.Contains(t, detectionSection, "id-token: write")
+	assert.Contains(t, detectionSection, "AWF_AUTH_TYPE: github-oidc")
+	assert.Contains(t, detectionSection, "AWF_AUTH_PROVIDER: openai")
 }
 
 func TestCodexOpenAIWIFDetectionValidationReportsDetectorEnginePath(t *testing.T) {

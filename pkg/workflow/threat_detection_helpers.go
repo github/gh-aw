@@ -93,11 +93,6 @@ func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData, engineID str
 
 	additional := make([]string, 0)
 	seen := make(map[string]struct{})
-	if detectionEngineConfig := resolveExternalDetectorEngineConfig(data, engineID); engineID == string(constants.CodexEngine) &&
-		detectionEngineConfig.Auth != nil && detectionEngineConfig.Auth.Type == "github-oidc" && detectionEngineConfig.Auth.Provider == "openai" {
-		seen["auth.openai.com"] = struct{}{}
-		additional = append(additional, "auth.openai.com")
-	}
 	if data.NetworkPermissions == nil {
 		return additional
 	}

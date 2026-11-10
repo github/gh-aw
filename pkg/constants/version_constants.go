@@ -80,6 +80,10 @@ const DefaultGitHubMCPServerVersion Version = "v2.1.0"
 // refreshes the container SHA pins that were resolved during the first pass.
 const DefaultFirewallVersion Version = "v0.29.11"
 
+// AWFOpenAIWIFMinVersion is the first AWF release whose API proxy supports
+// OpenAI Workload Identity Federation.
+const AWFOpenAIWIFMinVersion Version = "v0.29.11"
+
 // AWFDockerEnclaveSetupMinVersion includes the sealed Copilot native runtime and
 // the maintained public Docker enclave diagnostic collector.
 const AWFDockerEnclaveSetupMinVersion Version = "v0.29.5"

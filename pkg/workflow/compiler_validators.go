@@ -11,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/goccy/go-yaml"
 )
 
@@ -797,10 +798,24 @@ func validateOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
 }
 
 func validateOpenAIWIFEngineAuthAtPath(workflowData *WorkflowData, engineConfigPath string) error {
-	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.Auth == nil {
+	if workflowData == nil || workflowData.EngineConfig == nil {
 		return nil
 	}
 	auth := workflowData.EngineConfig.Auth
+	if auth == nil &&
+		workflowData.EngineConfig.Env["AWF_AUTH_TYPE"] == "github-oidc" &&
+		workflowData.EngineConfig.Env["AWF_AUTH_PROVIDER"] == "openai" {
+		auth = &EngineAuthConfig{
+			Type:                     "github-oidc",
+			Provider:                 "openai",
+			OpenAIIdentityProviderID: workflowData.EngineConfig.Env["AWF_AUTH_OPENAI_IDENTITY_PROVIDER_ID"],
+			ServiceAccountID:         workflowData.EngineConfig.Env["AWF_AUTH_OPENAI_SERVICE_ACCOUNT_ID"],
+			Audience:                 workflowData.EngineConfig.Env["AWF_AUTH_OIDC_AUDIENCE"],
+		}
+	}
+	if auth == nil {
+		return nil
+	}
 	if auth.Type != "github-oidc" || auth.Provider != "openai" {
 		return nil
 	}
@@ -827,7 +842,54 @@ func validateOpenAIWIFEngineAuthAtPath(workflowData *WorkflowData, engineConfigP
 	if NewCodexEngine().ResolveLLMProvider(workflowData) != LLMProviderOpenAI {
 		return fmt.Errorf("%s.auth with provider=openai requires the OpenAI inference provider", engineConfigPath)
 	}
+	if err := validateOpenAIWIFVersionSupport(workflowData, engineConfigPath); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateOpenAIWIFVersionSupport(workflowData *WorkflowData, engineConfigPath string) error {
+	firewallConfig := getFirewallConfig(workflowData)
+	configuredVersion := ""
+	if firewallConfig != nil {
+		configuredVersion = firewallConfig.Version
+	}
+	effectiveVersion := configuredVersion
+	if effectiveVersion == "" {
+		effectiveVersion = string(constants.DefaultFirewallVersion)
+	}
+	minVersion := string(constants.AWFOpenAIWIFMinVersion)
+	if !versionAtLeast(configuredVersion, string(constants.DefaultFirewallVersion), minVersion) {
+		return NewValidationError(
+			engineConfigPath+".auth",
+			effectiveVersion,
+			fmt.Sprintf("OpenAI WIF requires AWF %s or newer", minVersion),
+			fmt.Sprintf("The effective AWF version is %s. Set sandbox.agent.version or network.firewall.version to %s or newer.", effectiveVersion, minVersion),
+		)
+	}
+
+	if image, ok := getSandboxAgentImages(workflowData)[awfImageRoleAPIProxy]; ok {
+		imageTag := awfImageTag(image)
+		if !semverutil.IsValid(imageTag) || semverutil.Compare(imageTag, minVersion) < 0 {
+			return NewValidationError(
+				"sandbox.agent.images.api-proxy",
+				image,
+				fmt.Sprintf("OpenAI WIF requires an API proxy image tagged %s or newer", minVersion),
+				fmt.Sprintf("The API proxy image tag %q does not establish support for OpenAI WIF. Use a digest-pinned image with a semantic version tag of %s or newer.", imageTag, minVersion),
+			)
+		}
+	}
+	return nil
+}
+
+func awfImageTag(image string) string {
+	image = strings.SplitN(image, "@", 2)[0]
+	lastSlash := strings.LastIndex(image, "/")
+	lastColon := strings.LastIndex(image, ":")
+	if lastColon <= lastSlash {
+		return ""
+	}
+	return image[lastColon+1:]
 }
 
 func validateAzureWIFEngineAuth(workflowData *WorkflowData) error {

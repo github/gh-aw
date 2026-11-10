@@ -24,6 +24,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Pi CLI", DefaultPiVersion, "1.5.0"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.1.0"},
 		{"Firewall", DefaultFirewallVersion, "v0.29.11"},
+		{"OpenAI WIF", AWFOpenAIWIFMinVersion, "v0.29.11"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"Router image release", AWFRouterReleaseImageMinVersion, "v0.28.62"},
 		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.6"},
