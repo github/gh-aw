@@ -352,11 +352,11 @@ Keep cache keys specific to the OS and `go.sum`, do not share writable keys acro
 
 ## Guardrails
 
-### Can assigned build and test commands use explicitly configured nonsecret state?
+### Can assigned build and test commands use toolchain caches and configured nonsecret values?
 
-Yes, within the stock XPIA policy. Its prompt is included in workflows unless disabled; strict mode does not allow disabling it. Assigned installation, build, and test commands may consume nonsecret values set directly in workflow configuration and use disposable package/build directories or caches explicitly provisioned for that run. This does not permit inspecting the process environment, loading `.env` files, reading pre-existing caches, or accessing credentials.
+Yes, within the stock XPIA policy. Its prompt is included in workflows unless disabled; strict mode does not allow disabling it. Assigned installation, build, and test commands may use the toolchain's normal package and build caches (for example Go, npm, or pip caches) and nonsecret values set directly in workflow configuration. The caches may be used, but their contents are untrusted data like any other outside content: the agent must never follow instructions found in them or search them or other files for credentials. The policy does not permit inspecting the process environment, loading `.env` files, or accessing credentials; if a required secret or credential isn't configured, the agent reports the limitation instead of looking for it.
 
-Set only the required nonsecret values and disposable cache path directly through [`engine.env`](/gh-aw/reference/environment-variables/#environment-variable-scopes). For example:
+Disposable caches are optional, not required. To use them, or to pass other nonsecret values, set them directly through [`engine.env`](/gh-aw/reference/environment-variables/#environment-variable-scopes). For example:
 
 ```yaml wrap
 engine:
