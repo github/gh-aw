@@ -55,7 +55,7 @@ const SESSION_EVENT_PRIORITIES = {
   "firewall.token_usage": 5,
   "memory.push": 6,
 };
-const FAILURE_STATUSES = new Set(["failure", "failed", "fail", "error", "denied", "blocked", "exceeded", "structural_error", "transient_error", "timed_out", "cancelled", "interrupted"]);
+const FAILURE_STATUSES = new Set(["failure", "failed", "fail", "error", "denied", "blocked", "quota_blocked", "exceeded", "structural_error", "transient_error", "timed_out", "cancelled", "interrupted"]);
 
 /** @param {unknown} event @returns {number} */
 function sessionEventPriority(event) {

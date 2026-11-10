@@ -264,10 +264,13 @@ report_release_quota_blocked() {
 # installer) and verify again. Never skip verification; other failures keep
 # their original status.
 verify_release_attestation() {
-  local file="$1" repository="$2" output status attempt now deadline delay reason max_wait
+  local file="$1" repository="$2" output status now deadline delay reason max_wait
+  local transient_retries=0 waited=0
   max_wait="${GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS:-300}"
   [[ "$max_wait" =~ ^[0-9]{1,6}$ ]] || max_wait=300
-  for attempt in 1 2 3; do
+  # Bounded: at most two transient retries and one quota wait, and every
+  # permitted wait is followed by another verification.
+  while true; do
     status=0
     output=$(gh attestation verify "$file" --hostname github.com \
       --repo "$repository" \
@@ -281,7 +284,8 @@ verify_release_attestation() {
     fi
     release_quota_probe "$file" "$repository" || return "$status"
     if [ "$RELEASE_QUOTA_STATUS" != 403 ] && [ "$RELEASE_QUOTA_STATUS" != 429 ]; then
-      if [[ "$RELEASE_QUOTA_STATUS" =~ ^2 ]] && [ "$attempt" -lt 3 ]; then
+      if [[ "$RELEASE_QUOTA_STATUS" =~ ^2 ]] && [ "$transient_retries" -lt 2 ]; then
+        transient_retries=$((transient_retries + 1))
         continue
       fi
       return "$status"
@@ -299,7 +303,7 @@ verify_release_attestation() {
       deadline=$((now + RELEASE_QUOTA_RETRY_AFTER))
     fi
     reason=""
-    if [ "$attempt" -ge 2 ]; then
+    if [ "$waited" -eq 1 ]; then
       reason="renewed_exhaustion"
     elif [ -z "$deadline" ]; then
       reason="unknown_reset"
@@ -316,8 +320,8 @@ verify_release_attestation() {
     echo "GitHub API quota exhausted during attestation verification for $(basename "$file"); waiting ${delay}s for the server reset at $(release_quota_iso_time "$deadline") before verifying again." >&2
     sleep "$delay"
     RELEASE_QUOTA_WAITED_SECONDS=$((RELEASE_QUOTA_WAITED_SECONDS + delay))
+    waited=1
   done
-  return "$status"
 }
 
 verify_release_identity() {

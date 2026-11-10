@@ -393,7 +393,9 @@ fi
 echo "Test 6b: attestation verification waits for or reports GitHub API quota exhaustion..."
 # Public asset downloads succeed while the attestations API answers with a quota
 # 403. Uses a fake clock (date/sleep) instead of a live quota experiment.
-#   $1 scenario: quota | permission
+#   $1 scenario: quota | permission | transient (first failure carries a
+#      non-quota rate-limit message and its probe returns 200; the quota is
+#      only confirmed on the second verification)
 #   $2 number of quota failures before verification succeeds
 #   $3 reset offset in seconds from the fake clock ("" omits the reset header)
 #   $4 expected installer exit status
@@ -426,6 +428,11 @@ EOF
   cat > "${test_dir}/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = api ]; then
+  if [ "$AWF_TEST_SCENARIO" = transient ] && [ ! -e "${AWF_TEST_DIR}/probes" ]; then
+    printf '%s\n' "$*" >> "${AWF_TEST_DIR}/probes"
+    printf 'HTTP/2.0 200 OK\r\nx-ratelimit-resource: core\r\nx-ratelimit-limit: 15000\r\nx-ratelimit-remaining: 10\r\n\r\n[]\n'
+    exit 0
+  fi
   printf '%s\n' "$*" >> "${AWF_TEST_DIR}/probes"
   printf 'HTTP/2.0 403 Forbidden\r\n'
   printf 'x-ratelimit-resource: core\r\nx-ratelimit-limit: 15000\r\nx-ratelimit-remaining: 0\r\nx-ratelimit-used: 15000\r\n'
@@ -439,7 +446,9 @@ printf '%s at %s\n' "$3" "$(cat "${AWF_TEST_DIR}/clock")" >> "${AWF_TEST_DIR}/at
 remaining=$(cat "${AWF_TEST_DIR}/failures")
 if [ "$remaining" -gt 0 ]; then
   printf '%s\n' $((remaining - 1)) > "${AWF_TEST_DIR}/failures"
-  if [ "$AWF_TEST_SCENARIO" = permission ]; then
+  if [ "$AWF_TEST_SCENARIO" = transient ] && [ ! -e "${AWF_TEST_DIR}/probes" ]; then
+    echo "HTTP 403: You have exceeded a secondary rate limit. Please wait a few minutes before you try again." >&2
+  elif [ "$AWF_TEST_SCENARIO" = permission ]; then
     echo "HTTP 403: Resource not accessible by integration (https://api.github.com/repos/github/gh-aw-firewall/attestations/sha256:0)" >&2
   else
     echo "HTTP 403: API rate limit exceeded for installation ID 1. (https://api.github.com/repos/github/gh-aw-firewall/attestations/sha256:0)" >&2
@@ -487,7 +496,7 @@ EOF
     fi
     if [ "$failures" -gt 0 ]; then
       # No verification may run before the server reset.
-      if [ "$(sed -n '2p' "${test_dir}/attestations" | awk '{print $NF}')" -le "$reset" ] ||
+      if [ "$(sed -n "$((failures + 1))p" "${test_dir}/attestations" | awk '{print $NF}')" -le "$reset" ] ||
         [ "$(cat "${test_dir}/sleeps")" != "$((reset_offset + 1))" ]; then
         TEST_FAILURE_REASON="verification was retried before the server reset"
         rm -rf "$test_dir"; return 1
@@ -535,6 +544,11 @@ if test_attestation_quota quota 2 60 75 renewed_exhaustion; then
   pass "renewed quota exhaustion after the reset blocks installation"
 else
   fail "renewed quota exhaustion was not reported as blocked" "$TEST_FAILURE_REASON"
+fi
+if test_attestation_quota transient 2 60 0 ""; then
+  pass "first confirmed quota exhaustion after a transient rate limit waits for the reset and installs AWF"
+else
+  fail "first confirmed quota exhaustion after a transient rate limit was not waited for" "$TEST_FAILURE_REASON"
 fi
 if test_attestation_quota quota 1 "" 75 unknown_reset; then
   pass "quota 403 without a reset blocks installation without waiting"
