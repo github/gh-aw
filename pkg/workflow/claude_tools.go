@@ -92,7 +92,7 @@ func isExplicitlyDisabledTool(tool any) bool {
 	return ok && !enabled
 }
 
-// computeAllowedClaudeToolsString generates the tool specification string for Claude's --allowed-tools flag.
+// computeAllowedClaudeToolsStringWithDynamicWorkflows generates the tool specification string for Claude's --allowed-tools flag.
 //
 // Why --allowed-tools instead of --tools (introduced in v2.0.31)?
 // While --tools is simpler (e.g., "Bash,Edit,Read"), it lacks the fine-grained control gh-aw requires:
@@ -111,10 +111,6 @@ func isExplicitlyDisabledTool(tool any) bool {
 // --permission-mode acceptEdits is in use, because acceptEdits actually enforces the
 // allowlist (unlike bypassPermissions which silently ignores it).
 // Panics if callers pass a Claude-specific tools section instead of neutral tools.
-func (e *ClaudeEngine) computeAllowedClaudeToolsString(tools map[string]any, safeOutputs *SafeOutputsConfig, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig, mcpScripts *MCPScriptsConfig, sandboxConfig *SandboxConfig) string {
-	return e.computeAllowedClaudeToolsStringWithDynamicWorkflows(tools, safeOutputs, cacheMemoryConfig, driveMemoryConfig, mcpScripts, sandboxConfig, false)
-}
-
 func (e *ClaudeEngine) computeAllowedClaudeToolsStringWithDynamicWorkflows(tools map[string]any, safeOutputs *SafeOutputsConfig, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig, mcpScripts *MCPScriptsConfig, sandboxConfig *SandboxConfig, dynamicWorkflows bool) string {
 	claudeToolsLog.Print("Computing allowed Claude tools string")
 

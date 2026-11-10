@@ -47,12 +47,12 @@ func (e *DockerUnavailableError) Error() string {
 
 // DockerImages defines the Docker images used by the compile tool's static analysis scanners
 const (
-	ZizmorImage      = "ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9"
+	ZizmorImage      = "ghcr.io/zizmorcore/zizmor:1.32.0@sha256:3014cc8f68f663935f69b3c3e0e41f5ce102b268d97db13db0f62208747f860d"
 	PoutineImage     = "ghcr.io/boostsecurityio/poutine:1.1.6@sha256:722a8e0999b583c1540fe2974e691032b2d9d21b9256a17965132b6bfd0081b0"
 	ActionlintImage  = "rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667"
 	RunnerGuardImage = "ghcr.io/vigilant-llc/runner-guard:3.1.5@sha256:2df426ef96d21f1622e05b21329f26bd263fc46110609cefb6afe43457613ac0"
-	SyftImage        = "anchore/syft:v1.56.0@sha256:697ae864af1299cfa43c54b161cea3dd65c6d54de82e3dba66ea3dccb3acc313"
-	GrypeImage       = "anchore/grype:v0.121.1@sha256:6b06708b036f74b2cd70e94b706b4586af96d1932e6ac46255940b2e39dd44a9"
+	SyftImage        = "anchore/syft:v1.57.0@sha256:3c70e6d5979364cefdc22b51617a78fd264574d3bd6b4f84a351204147025e2a"
+	GrypeImage       = "anchore/grype:v0.121.2@sha256:6a36234da13f9faa327306ac0b3dab3405cfa2b4eb20c8f904125a8707863913"
 	GrantImage       = "anchore/grant:v0.7.0@sha256:2f273ee261204d24a4d7e8799c2bcc210374c652000e7c415da2bb5173ec99d3"
 	YamllintImage    = "pipelinecomponents/yamllint:latest@sha256:f7f7b4f8824839e33690a880dbe20944128b0dc9c55522a0b92a29b3a905cecf"
 	// ShellcheckImage is the Docker fallback for shellcheck when the binary is not installed.
