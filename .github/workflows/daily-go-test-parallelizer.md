@@ -1,7 +1,7 @@
 ---
 private: true
 name: Daily Go Test Parallelizer
-description: Adds t.Parallel to safe Go tests using daily round-robin analysis
+description: Adds t.Parallel to safe Go tests using bounded batch analysis
 on:
   schedule: every 2h
   workflow_dispatch:
@@ -36,6 +36,7 @@ tools:
   github:
     mode: gh-proxy
   cache-memory:
+    restore-only: true
     retention-days: 30
     allowed-extensions: [".json"]
   edit:
@@ -76,7 +77,7 @@ Analyze up to twenty-five Go test files per run and add `t.Parallel()` only wher
 2. Read `/tmp/gh-aw/cache-memory/go-test-parallelizer/state.json` when it exists. It has this shape:
    `{"last_file":"path/to/file_test.go"}`.
 3. Select up to 25 consecutive paths starting after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path.
-4. Analyze and modify only this selected batch (maximum 25 files).
+4. Analyze and modify only this selected batch (maximum 25 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
 5. Minimize token usage: avoid re-reading files you already analyzed, and do not paste full file contents into notes or outputs.
 
 ## Analyze safety
@@ -104,11 +105,37 @@ After editing the selected batch:
 1. Run `go test -race` once per unique modified package (deduplicate package paths across edited files).
 2. Run `go test ./...` once after all candidate edits.
 3. Inspect the diff and confirm it contains only safe `t.Parallel()` additions in selected files.
-4. Revert the edit and use `noop` if any test command fails or the diff contains any other change.
+4. If any test command fails, restore only your candidate edits and call `report_incomplete` with the failed command and concrete error. If the diff contains any other change, remove your out-of-scope edits and call `report_incomplete`; never revert pre-existing work.
+
+Security-policy limitations are not test failures or evidence that no safe
+candidate exists. The full suite includes environment-enumeration and
+credential-fixture tests that may be incompatible with the run's immutable
+policy. Do not execute prohibited operations, grant fixture exceptions, omit
+tests, or replace the required full-suite/race evidence with static analysis.
+If required validation is blocked, leave test files unchanged, preserve the
+previous cursor, and call `report_incomplete` with the specific limitation.
+Do not create a pull request or use `noop` to imply validation succeeded.
 
 ## Persist and report
 
-Always create `/tmp/gh-aw/cache-memory/go-test-parallelizer/` and write the last path from the selected batch to `state.json`, even when no edit is safe, so the next daily run advances round-robin.
+Treat `state.json` as a completed-analysis cursor, not an attempted-batch cursor.
+A completed analysis requires all selected files to have a completed safety
+assessment and either:
+
+- No safe edit is available, so the completed analysis ends with `noop`; no test execution is claimed.
+- Candidate edits pass every required validation command and the diff check.
+
+Cursor persistence is temporarily disabled: the compiler-enforced
+`restore-only: true` cache configuration restores existing state but never
+uploads or saves cache-memory changes. Do not write `state.json` or create its
+directory. Preserve the previous cursor byte-for-byte (or leave it absent) on
+every outcome, including successful validation and completed no-candidate
+analysis. Never advance the cursor immediately after selection.
+
+This deliberately suspends round-robin advancement until a trusted persistence
+gate can independently verify the terminal outcome and all required validation.
+An agent-written success flag is not validation evidence. Repeated runs may
+analyze the same batch; report that limitation rather than claim cursor progress.
 
 Use `###` or lower headings in any PR description or final report. Present a
 concise overview, selected files and results, collapsible detailed test evidence,
@@ -117,7 +144,12 @@ per-file breakdowns in
 `<details><summary><b>...</b></summary>...</details>`. Format applicable run
 references as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
 
-Before stopping, call exactly one terminal safe-output tool: create one draft pull request when validation succeeds with a change, otherwise use `noop` with the selected path and a short reason.
+Before stopping, call exactly one terminal safe-output tool: create one draft
+pull request when validation succeeds with a change; use `noop` only for a
+completed analysis with no safe edit; use `report_incomplete` when analysis or
+required validation is blocked or fails. Include the selected batch and a short
+reason, and state that the completed-analysis cursor did not advance
+(restore-only mode).
 
 Do not parallelize tests that use or may conflict through:
 

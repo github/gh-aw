@@ -115,6 +115,14 @@ This workflow imports `shared/go-make.md` which provides:
 
 ## Phase 1: Run Performance Benchmarks
 
+Toolchain and cache access are governed by the immutable security policy; this
+task grants no additional permissions. Do not inspect the process environment,
+provision toolchains, or alter environment/cache settings to work around policy.
+Never substitute restored historical metrics for a new measurement.
+If security policy blocks a required benchmark
+or validation command, call `report_incomplete` with the limitation; do not
+store partial results or create an unvalidated regression pull request.
+
 ### 1.1 Run Compilation Benchmarks
 
 Run the benchmark suite and capture results using **bash** (not mcpscripts — the MCP connection may time out during the analysis phases that follow):
@@ -132,6 +140,8 @@ make bench-performance
 ```
 
 This runs targeted performance benchmarks and saves results to `bench_performance.txt`.
+If the command fails, stop and call `report_incomplete`; do not parse or persist
+its partial output as a successful measurement.
 
 The targeted benchmarks include:
 - **Workflow compilation**: CompileSimpleWorkflow, CompileComplexWorkflow, CompileMCPWorkflow, CompileMemoryUsage
@@ -159,71 +169,26 @@ grep "Benchmark" /tmp/gh-aw/agent/benchmarks/bench_results.txt > /tmp/gh-aw/agen
 
 ### 1.2 Parse Benchmark Results
 
-Parse the benchmark output and extract key metrics:
+Parse the benchmark output and require every expected benchmark with complete,
+finite metrics before updating history or analyzing trends:
 
 ```bash
-# Extract benchmark results using awk
-cat > /tmp/gh-aw/agent/benchmarks/parse_results.sh << 'EOF'
-#!/bin/bash
-# Parse Go benchmark output and create JSON
-results_file="/tmp/gh-aw/agent/benchmarks/bench_results.txt"
-output_file="/tmp/gh-aw/agent/benchmarks/current_metrics.json"
-
-# Initialize JSON
-echo "{" > "$output_file"
-{
-  echo '  "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",'
-  echo '  "date": "'$(date -u +%Y-%m-%d)'",'
-  echo '  "benchmarks": {'
-} >> "$output_file"
-
-first=true
-while IFS= read -r line; do
-  if [[ $line =~ ^Benchmark([A-Za-z_]+)-([0-9]+)[[:space:]]+([0-9]+)[[:space:]]+([0-9]+)[[:space:]]ns/op[[:space:]]+([0-9]+)[[:space:]]B/op[[:space:]]+([0-9]+)[[:space:]]allocs/op ]]; then
-    name="${BASH_REMATCH[1]}"
-    iterations="${BASH_REMATCH[3]}"
-    ns_per_op="${BASH_REMATCH[4]}"
-    bytes_per_op="${BASH_REMATCH[5]}"
-    allocs_per_op="${BASH_REMATCH[6]}"
-    
-    # Add comma if not first entry
-    if [ "$first" = true ]; then
-      first=false
-    else
-      echo "," >> "$output_file"
-    fi
-    
-    # Write benchmark entry
-    {
-      echo -n "    \"$name\": {"
-      echo -n "\"ns_per_op\": $ns_per_op, "
-      echo -n "\"bytes_per_op\": $bytes_per_op, "
-      echo -n "\"allocs_per_op\": $allocs_per_op, "
-      echo -n "\"iterations\": $iterations"
-      echo -n "}"
-    } >> "$output_file"
-  fi
-done < "$results_file"
-
-{
-  echo ""
-  echo "  }"
-  echo "}"
-} >> "$output_file"
-
-echo "Parsed benchmark results to $output_file"
-cat "$output_file"
-EOF
-
-chmod +x /tmp/gh-aw/agent/benchmarks/parse_results.sh
-/tmp/gh-aw/agent/benchmarks/parse_results.sh
+python3 scripts/parse_benchmark_results.py \
+  /tmp/gh-aw/agent/benchmarks/bench_results.txt \
+  /tmp/gh-aw/agent/benchmarks/current_metrics.json
 ```
+
+If parsing fails, call `report_incomplete` with the validation error and do not
+update historical metrics or publish a regression claim.
 
 ## Phase 2: Load Historical Data
 
 ### 2.1 Check for Historical Benchmark Data
 
-Look for historical data in cache memory:
+Only after Phase 1 completes successfully, read
+`/tmp/gh-aw/repo-memory/default/benchmark_history.jsonl` for historical comparison
+only. This history must never substitute for the current run's benchmark
+measurement and validated metrics.
 
 ```bash
 # List available historical data
