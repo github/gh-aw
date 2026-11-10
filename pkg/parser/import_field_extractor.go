@@ -85,6 +85,9 @@ type importAccumulator struct {
 	// First engine.model found in imports that have no engine.id (first-wins strategy).
 	// These express a model preference without selecting a specific engine.
 	mergedEngineModel string
+	// engineModelChoiceDeclared records that an import declares a top-level model
+	// or a preference-only engine model choice, including empty values.
+	engineModelChoiceDeclared bool
 	// First top-level max-turns / max-runs / max-ai-credits /
 	// max-daily-ai-credits found across imports (first-wins).
 	// Values are stored as JSON-encoded raw values so numeric literals and strings
@@ -364,6 +367,9 @@ func parseFrontmatterForExtraction(rawContent string, wasSubstituted bool, origF
 // Side effects: acc.engines, acc.mergedEngineMCPToolTimeout,
 // acc.mergedEngineMCPSessionTimeout, acc.mergedEngineModel.
 func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath string) {
+	if _, ok := fm["model"]; ok {
+		acc.engineModelChoiceDeclared = true
+	}
 	if modelStr, ok := fm["model"].(string); ok && modelStr != "" && acc.mergedEngineModel == "" {
 		acc.mergedEngineModel = modelStr
 		parserLog.Printf("Extracted top-level model preference from import %s: %s", fullPath, modelStr)
@@ -401,6 +407,11 @@ func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath st
 			// No engine ID or runtime — this is a model/MCP-only preference.
 			// Extract the model hint (first-wins) so it can be applied to the
 			// resolved engine after all imports are processed.
+			for _, key := range []string{"model", "model-routing", "fallback-models"} {
+				if _, ok := v[key]; ok {
+					acc.engineModelChoiceDeclared = true
+				}
+			}
 			if modelStr, ok := v["model"].(string); ok && modelStr != "" {
 				if acc.mergedEngineModel == "" {
 					acc.mergedEngineModel = modelStr
@@ -1133,6 +1144,7 @@ func (acc *importAccumulator) populateImportsResultScalars(result *ImportsResult
 	result.MergedEngineMCPToolTimeout = acc.mergedEngineMCPToolTimeout
 	result.MergedEngineMCPSessionTimeout = acc.mergedEngineMCPSessionTimeout
 	result.MergedEngineModel = acc.mergedEngineModel
+	result.EngineModelChoiceDeclared = acc.engineModelChoiceDeclared
 	result.MergedMaxTurns = acc.mergedMaxTurns
 	result.MergedMaxToolDenials = acc.mergedMaxToolDenials
 	result.MergedMaxToolCalls = acc.mergedMaxToolCalls

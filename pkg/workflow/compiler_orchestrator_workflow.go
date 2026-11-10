@@ -300,7 +300,13 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
 	}
 	ctx.workflowData.AmbientFolders = ambientFolders
-	return c.processOnSectionAndFilters(ctx.frontmatter.Frontmatter, ctx.workflowData, ctx.cleanPath)
+	if err := c.processOnSectionAndFilters(ctx.frontmatter.Frontmatter, ctx.workflowData, ctx.cleanPath); err != nil {
+		return err
+	}
+	// Shared by every parse entry point so file, string, document, and Wasm
+	// compilation resolve the implicit model-routing default identically.
+	c.applyDefaultModelRouting(ctx)
+	return nil
 }
 
 func (c *Compiler) attachSharedActionResolver(workflowData *WorkflowData) {

@@ -3260,9 +3260,13 @@ engine:
   # Experimental per-run model and reasoning-effort selection from the task text for
   # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
   # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-  # fixed model and effort settings. See
-  # https://github.github.com/gh-aw/reference/model-routing/.
+  # fixed model and effort settings. Eligible workflows that choose no model or
+  # routing on GitHub Copilot inference default to goal cost and mode balanced; set
+  # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: object
   model-routing:
     # Routing objective: cost prefers the cheapest model and effort that meet the
     # mode's target; cost-speed prefers the fastest model and effort that meet it.
@@ -3287,6 +3291,10 @@ engine:
     # (optional)
     allowed-models: []
       # Array of strings
+
+  # Format 2: Disable the implicit cost/balanced model-routing default without
+  # pinning a model; the existing model variables and fallback model apply.
+  model-routing: false
 
   # Optional model context window metadata for engines that need to register
   # explicit model catalog entries. Supported by the Pi engine when generating its

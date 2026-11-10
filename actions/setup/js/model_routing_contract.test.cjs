@@ -180,6 +180,26 @@ describe("cross-module model routing contract", () => {
     expect(result.otel["gh-aw.model_routing.status"]).toBe("rejected");
   });
 
+  it.each([
+    ["0", "false"],
+    ["", ""],
+  ])("does not require or report a routing selection when activation disabled implicit routing (GH_AW_MODEL_ROUTING=%j)", (routingFlag, routingEnabled) => {
+    // Runtime-guarded implicit routing compiles GH_AW_MODEL_ROUTING and
+    // GH_AW_MODEL_ROUTING_ENABLED as expressions that resolve to "0"/"false" when a
+    // model variable selected the non-routed path before AWF started.
+    writeFixture(fixtures.copilotResponses);
+    process.env.GH_AW_MODEL_ROUTING = routingFlag;
+    process.env.GH_AW_MODEL_ROUTING_ENABLED = routingEnabled;
+    delete process.env.GH_AW_COPILOT_ROUTING_EFFORT;
+    const reflectData = structuredClone(fixtures.copilotResponses.reflectData);
+    delete reflectData.routing;
+    const harness = copilot.resolveCopilotModelRouting(reflectData, process.env.GH_AW_MODEL_ROUTING === "1", () => {});
+    expect(harness).toMatchObject({ selection: null, error: null });
+    expect(process.env.GH_AW_COPILOT_ROUTING_EFFORT).toBeUndefined();
+    expect(fs.existsSync(path.join(root, "agent/awf-routing-outcome.json"))).toBe(false);
+    expect(resolveModelRoutingOutcome(process.env, root)).toBeNull();
+  });
+
   const expectedEffort = {
     copilot: Object.fromEntries(ROUTING_REASONING_EFFORTS.map(effort => [effort, effort])),
     claude: Object.fromEntries(ROUTING_REASONING_EFFORTS.map(effort => [effort, ["low", "medium", "high", "xhigh", "max"].includes(effort) ? effort : null])),

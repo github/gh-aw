@@ -15504,41 +15504,50 @@
               "description": "Ordered alternative models after model-specific failures, supported by engines with a built-in retry harness. Each model receives its own harness retry budget. Cannot be combined with model-routing or a custom driver or harness."
             },
             "model-routing": {
-              "type": "object",
-              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. See https://github.github.com/gh-aw/reference/model-routing/.",
-              "required": ["goal", "mode"],
-              "additionalProperties": false,
-              "properties": {
-                "goal": {
-                  "type": "string",
-                  "enum": ["cost", "cost-speed"],
-                  "description": "Routing objective: cost prefers the cheapest model and effort that meet the mode's target; cost-speed prefers the fastest model and effort that meet it."
-                },
-                "mode": {
-                  "type": "string",
-                  "enum": ["economy", "balanced", "robust", "auto"],
-                  "description": "Routing quality profile: economy, balanced, and robust set increasing quality bars, generally with increasing cost; auto lets the classifier recommend one of these profiles per task."
-                },
-                "allowed-models": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200,
-                    "anyOf": [
-                      {
-                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. Eligible workflows that choose no model or routing on GitHub Copilot inference default to goal cost and mode balanced; set false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": ["goal", "mode"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "goal": {
+                      "type": "string",
+                      "enum": ["cost", "cost-speed"],
+                      "description": "Routing objective: cost prefers the cheapest model and effort that meet the mode's target; cost-speed prefers the fastest model and effort that meet it."
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["economy", "balanced", "robust", "auto"],
+                      "description": "Routing quality profile: economy, balanced, and robust set increasing quality bars, generally with increasing cost; auto lets the classifier recommend one of these profiles per task."
+                    },
+                    "allowed-models": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "anyOf": [
+                          {
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+                          },
+                          {
+                            "pattern": "\\$\\{\\{[^}]+\\}\\}"
+                          }
+                        ]
                       },
-                      {
-                        "pattern": "\\$\\{\\{[^}]+\\}\\}"
-                      }
-                    ]
-                  },
-                  "description": "Optional exact model names of the routing provider or gh-aw model aliases (such as small or sonnet) that narrow the router's choice for the main agent only. Aliases expand to their model patterns for the routing provider (GitHub Copilot, or Anthropic or OpenAI for native Claude and Codex routing), limited to the engine's model family for Claude and Codex. This is not a request policy; put patterns such as gpt-* in models.allowed or models.blocked. When omitted, the router chooses from the models that policy allows (Claude and Codex only from their own model family). Among workflows that enable routing for the same engine, if any omits allowed-models, the router has no shortlist; otherwise, their lists are combined. GitHub Actions expressions are allowed only when neither models.allowed nor models.blocked is set."
+                      "description": "Optional exact model names of the routing provider or gh-aw model aliases (such as small or sonnet) that narrow the router's choice for the main agent only. Aliases expand to their model patterns for the routing provider (GitHub Copilot, or Anthropic or OpenAI for native Claude and Codex routing), limited to the engine's model family for Claude and Codex. This is not a request policy; put patterns such as gpt-* in models.allowed or models.blocked. When omitted, the router chooses from the models that policy allows (Claude and Codex only from their own model family). Among workflows that enable routing for the same engine, if any omits allowed-models, the router has no shortlist; otherwise, their lists are combined. GitHub Actions expressions are allowed only when neither models.allowed nor models.blocked is set."
+                    }
+                  }
+                },
+                {
+                  "type": "boolean",
+                  "const": false,
+                  "description": "Disable the implicit cost/balanced model-routing default without pinning a model; the existing model variables and fallback model apply."
                 }
-              }
+              ]
             },
             "context-window": {
               "type": "integer",
