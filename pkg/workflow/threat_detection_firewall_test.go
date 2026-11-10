@@ -233,7 +233,7 @@ func TestGetThreatDetectionAdditionalAllowedDomains_DetectionOnlyBaseURL(t *test
 	}
 }
 
-func TestGetThreatDetectionAdditionalAllowedDomains_OpenAIWIF(t *testing.T) {
+func TestGetThreatDetectionAdditionalAllowedDomains_OpenAIWIFDoesNotAllowTokenHost(t *testing.T) {
 	data := &WorkflowData{
 		EngineConfig: &EngineConfig{
 			ID: "codex",
@@ -254,8 +254,8 @@ func TestGetThreatDetectionAdditionalAllowedDomains_OpenAIWIF(t *testing.T) {
 	}
 
 	got := getThreatDetectionAdditionalAllowedDomains(data, string(constants.CodexEngine))
-	if !slices.Contains(got, "auth.openai.com") {
-		t.Fatalf("OpenAI WIF exchange host must be allowed for the inherited detector, got %v", got)
+	if slices.Contains(got, "auth.openai.com") {
+		t.Fatalf("OpenAI WIF exchange host is reached through the API proxy, not the detector allowlist; got %v", got)
 	}
 }
 
