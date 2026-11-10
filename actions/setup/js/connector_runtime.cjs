@@ -1325,6 +1325,7 @@ async function callMCP(encoded, registration, tool, args, options = {}) {
     const normalized = normalizeArguments(args);
     const constraints = server.tools[tool];
     await validateArguments(constraints.inputs, constraints.resources, plan.connection.resources, normalized);
+    const endpoint = new URL(server.url).href;
     let session;
     let protocol = "2025-03-26";
     /** @param {string} method @param {any} params @param {number|undefined} [id] */
@@ -1335,7 +1336,7 @@ async function callMCP(encoded, registration, tool, args, options = {}) {
       authenticate(plan, server.credential, "agent", headers, env);
       const message = { jsonrpc: "2.0", method, params };
       if (id !== undefined) message["id"] = id;
-      const { text, response } = await boundedHTTP(fetchImpl, server.url, { method: "POST", headers, body: goJSON(message) }, server.maxResponseBytes, id);
+      const { text, response } = await boundedHTTP(fetchImpl, endpoint, { method: "POST", headers, body: goJSON(message) }, server.maxResponseBytes, id);
       const nextSession = response.headers.get("mcp-session-id");
       if (nextSession !== null) {
         assert(boundedString(nextSession, 256, 1) && /^[\x21-\x7E]+$/u.test(nextSession) && (!session || session === nextSession), "Connector HTTP MCP returned an invalid session header");
@@ -1422,7 +1423,8 @@ async function serve(encoded, input = process.stdin, output = process.stdout, op
     else if (message.method === "tools/call") {
       try {
         assert(typeof message.params?.name === "string" && tools.has(message.params.name), "Connector MCP tool is not selected");
-        const data = await tools.get(message.params.name).call(message.params.arguments);
+        const args = message.params.arguments === undefined ? {} : message.params.arguments;
+        const data = await tools.get(message.params.name).call(args);
         result = { content: [{ type: "text", text: goJSON(data) }] };
       } catch (cause) {
         result = { isError: true, content: [{ type: "text", text: cause instanceof ConnectorError ? cause.message : "Connector MCP request failed" }] };

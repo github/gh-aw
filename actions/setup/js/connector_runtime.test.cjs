@@ -1013,7 +1013,7 @@ function remoteDocument() {
 function remoteFetch(overrides = {}) {
   return vi.fn(async (url, init) => {
     const request = JSON.parse(init.body);
-    expect(url).toBe("https://mcp.example.com/v1/mcp");
+    expect(url).toBe(overrides.url || "https://mcp.example.com/v1/mcp");
     expect(init.headers.Authorization).toBe("Bearer " + env.GH_AW_CONNECTOR_SECRET_TEST_TOKEN);
     expect(init.headers["X-MCP-Tenant"]).toBe("fixed");
     if (request.method === "initialize")
@@ -1022,13 +1022,37 @@ function remoteFetch(overrides = {}) {
     expect(init.headers["MCP-Protocol-Version"]).toBe("2025-03-26");
     if (request.method === "notifications/initialized") return new Response(null, { status: 202 });
     expect(request.method).toBe("tools/call");
-    expect(request.params).toEqual({ name: "getIssue", arguments: { record: "approved" } });
+    expect(request.params).toEqual({ name: "getIssue", arguments: overrides.arguments || { record: "approved" } });
     if (overrides.call) return overrides.call(request);
     return jsonResponse({ jsonrpc: "2.0", id: request.id, result: { content: [{ type: "text", text: "untrusted provider text" }], ...overrides.result } });
   });
 }
 
 describe("fixed-endpoint HTTP MCP", () => {
+  it.each(["https://mcp.example.com", "https://MCP.EXAMPLE.COM:443/v1/mcp"])("uses the canonical fetch URL for the fixed endpoint %s", async endpoint => {
+    const doc = remoteDocument();
+    doc.spec.httpMcp.registration.url = endpoint;
+    const canonical = new URL(endpoint).href;
+    const provider = remoteFetch({ url: canonical });
+    const fetchImpl = vi.fn(async (url, init) => {
+      expect(url).toBe(canonical);
+      const response = await provider(url, init);
+      Object.defineProperty(response, "url", { value: canonical });
+      return response;
+    });
+    await expect(callMCP(encode(doc), "registration", "getIssue", { record: "approved" }, { env, fetchImpl })).resolves.toMatchObject({ content: [{ text: "untrusted provider text" }] });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls.every(([, init]) => init.redirect === "manual")).toBe(true);
+  });
+
+  it("rejects a response from a different URL even on the approved origin", async () => {
+    const response = jsonResponse({});
+    Object.defineProperty(response, "url", { value: "https://mcp.example.com/other" });
+    const fetchImpl = vi.fn(async () => response);
+    await expect(callMCP(encode(remoteDocument()), "registration", "getIssue", { record: "approved" }, { env, fetchImpl })).rejects.toThrow(/redirects and endpoint changes/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("initializes, notifies, and calls the exact selected tool with same-endpoint session state", async () => {
     const fetchImpl = remoteFetch();
     const result = await callMCP(encode(remoteDocument()), "registration", "getIssue", { record: "approved" }, { env, fetchImpl });
@@ -1127,6 +1151,27 @@ describe("stdio MCP and CLI adapters", () => {
       .map(line => JSON.parse(line));
   }
 
+  it("accepts omitted arguments for no-input tools while rejecting null and missing required inputs", async () => {
+    const noInputs = document("agent", { inputs: {}, resources: {}, request: { endpoint: "api", method: "GET", path: "/records" } }, {});
+    const fetchImpl = vi.fn(async () => jsonResponse({ id: "read" }));
+    const replies = await protocol(
+      noInputs,
+      [
+        { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get-issue" } },
+        { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "get-issue", arguments: null } },
+      ],
+      { fetchImpl }
+    );
+    expect(replies[0].result.isError).toBeUndefined();
+    expect(JSON.parse(replies[0].result.content[0].text)).toMatchObject({ untrusted: true, capability: "mcp/operation" });
+    expect(replies[1].result.isError).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    fetchImpl.mockClear();
+    const required = await protocol(document("agent"), [{ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get-issue" } }], { fetchImpl });
+    expect(required[0].result.isError).toBe(true);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("preserves exact hyphenated REST ToolNames and handles initialization, notifications and ping", async () => {
     const replies = await protocol(document("agent"), [
       { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } },
@@ -1189,6 +1234,17 @@ describe("stdio MCP and CLI adapters", () => {
     );
     expect(replies[0].result.tools[0].name).toBe("registration__getIssue");
     expect(JSON.parse(replies[1].result.content[0].text)).toMatchObject({ untrusted: true, connector: "example.com/issues", result: { content: [{ text: "untrusted provider text" }] } });
+  });
+
+  it("forwards omitted arguments to an exactly selected no-input remote tool as an empty object", async () => {
+    const doc = remoteDocument();
+    doc.spec.httpMcp.registration.tools.getIssue = { inputs: {} };
+    doc.connection.resources = {};
+    const fetchImpl = remoteFetch({ arguments: {} });
+    const replies = await protocol(doc, [{ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "registration__getIssue" } }], { fetchImpl });
+    expect(replies[0].result.isError).toBeUndefined();
+    expect(JSON.parse(replies[0].result.content[0].text)).toMatchObject({ untrusted: true, result: { content: [{ text: "untrusted provider text" }] } });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it("rejects oversized stdio messages", async () => {

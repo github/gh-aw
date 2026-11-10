@@ -171,6 +171,9 @@ func decodeToolArguments(request *mcp.CallToolRequest) (map[string]any, error) {
 	if request.Params == nil || len(request.Params.Arguments) > MaxDocumentBytes {
 		return nil, errors.New("connector MCP arguments are missing or exceed the byte bound")
 	}
+	if len(request.Params.Arguments) == 0 {
+		return map[string]any{}, nil
+	}
 	var args map[string]any
 	if err := decodeJSON(request.Params.Arguments, &args); err != nil || args == nil {
 		return nil, errors.New("connector MCP arguments must be a JSON object")

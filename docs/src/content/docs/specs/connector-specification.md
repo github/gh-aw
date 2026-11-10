@@ -218,6 +218,10 @@ Each `mcp-servers` registration requires a fixed HTTPS `url`, an agent credentia
 `readOnly: true`, a nonempty exact `tools` map, and `maxResponseBytes`.
 Each native tool declares the same primitive `inputs` and exact `resources`
 constraints. Optional fixed registration headers use `X-MCP-*` names.
+Endpoint comparison uses the canonical URL representation, including the root
+slash and default HTTPS port; redirects and different endpoint paths remain
+prohibited. An omitted MCP `arguments` object is an empty object, not permission
+to omit required inputs. Explicit null and other non-object arguments MUST fail.
 
 The shared local adapter MUST validate tool selection, arguments, grants, phase,
 and endpoint before forwarding `tools/call`. Remote read-only annotations are

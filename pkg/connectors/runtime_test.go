@@ -202,6 +202,10 @@ func TestRemoteMCPAndGatewayAdapter(t *testing.T) {
 		calls++
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "native MCP reply"}}}, nil
 	})
+	upstream.AddTool(&mcp.Tool{Name: "get_version", InputSchema: map[string]any{"type": "object", "additionalProperties": false}}, func(_ context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		calls++
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "1"}}}, nil
+	})
 	handler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return upstream }, nil)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer agent-only" || r.Header.Get("X-MCP-Readonly") != "true" {
@@ -212,7 +216,10 @@ func TestRemoteMCPAndGatewayAdapter(t *testing.T) {
 	defer server.Close()
 	plan := fixturePlan(t, server.URL)
 	plan.spec.HTTPMCP = map[string]HTTPMCP{"native": {URL: server.URL, Credential: "reader", ReadOnly: true, Headers: map[string]string{"X-MCP-Readonly": "true"}, MaxResponseBytes: 65536,
-		Tools: map[string]MCPTool{"get_issue": {Inputs: map[string]Input{"issue": {Type: "string", Required: true, MaxLength: 80}}, Resources: map[string]string{"issue": "issues"}}}}}
+		Tools: map[string]MCPTool{
+			"get_issue":   {Inputs: map[string]Input{"issue": {Type: "string", Required: true, MaxLength: 80}}, Resources: map[string]string{"issue": "issues"}},
+			"get_version": {Inputs: map[string]Input{}},
+		}}}
 	plan.binding.HTTPMCP = []string{"native"}
 	runtime := testRuntime(server.Client(), server.URL, "agent")
 	if _, err := plan.CallMCP(t.Context(), runtime, "native", "get_issue", map[string]any{"issue": "ISSUE-1"}); err != nil {
@@ -242,5 +249,44 @@ func TestRemoteMCPAndGatewayAdapter(t *testing.T) {
 	result, err := downstream.CallTool(t.Context(), &mcp.CallToolParams{Name: "native__get_issue", Arguments: map[string]any{"issue": "ISSUE-1"}})
 	if err != nil || result.IsError || calls != 2 {
 		t.Fatalf("MCP adapter failed: %+v %v calls=%d", result, err, calls)
+	}
+	result, err = downstream.CallTool(t.Context(), &mcp.CallToolParams{Name: "native__get_version"})
+	if err != nil || result.IsError || calls != 3 {
+		t.Fatalf("no-input MCP adapter failed: %+v %v calls=%d", result, err, calls)
+	}
+	result, err = downstream.CallTool(t.Context(), &mcp.CallToolParams{Name: "native__get_issue"})
+	if err == nil && (result == nil || !result.IsError) {
+		t.Fatal("omitted required arguments accepted")
+	}
+	if calls != 3 {
+		t.Fatalf("invalid arguments reached upstream: calls=%d", calls)
+	}
+}
+
+func TestDecodeToolArgumentsOptionalObject(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		args json.RawMessage
+		ok   bool
+	}{
+		{name: "omitted", ok: true},
+		{name: "empty object", args: json.RawMessage(`{}`), ok: true},
+		{name: "null", args: json.RawMessage(`null`)},
+		{name: "array", args: json.RawMessage(`[]`)},
+		{name: "invalid JSON", args: json.RawMessage(`{`)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			args, err := decodeToolArguments(&mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: test.args}})
+			if test.ok {
+				if err != nil || args == nil || len(args) != 0 {
+					t.Fatalf("expected an empty argument object, got %v: %v", args, err)
+				}
+			} else if err == nil {
+				t.Fatal("invalid argument object accepted")
+			}
+		})
+	}
+	if _, err := decodeToolArguments(&mcp.CallToolRequest{}); err == nil {
+		t.Fatal("missing call parameters accepted")
 	}
 }
