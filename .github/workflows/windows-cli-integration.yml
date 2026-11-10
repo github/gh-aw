@@ -86,6 +86,7 @@ jobs:
               [string[]] $ArgumentList = @(),
               [string] $RawArguments = "",
               [int] $TimeoutMs = 30000,
+              [ValidateRange(1, 60000)] [int] $PostExitDrainTimeoutMs = 2000,
               [string] $WorkingDirectory = (Get-Location).Path,
               [hashtable] $EnvironmentOverrides = @{},
               [string[]] $UnsetEnvironment = @(),
@@ -140,47 +141,116 @@ jobs:
             $displayArgs = if ($RawArguments) { $RawArguments } else { $ArgumentList -join ' ' }
 
             $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-            $proc = [System.Diagnostics.Process]::Start($psi)
-            if ($CloseStandardInput) {
-              $proc.StandardInput.Close()
-            }
-            $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
-            $stderrTask = $proc.StandardError.ReadToEndAsync()
-            if (-not $proc.WaitForExit($TimeoutMs)) {
-              try { $proc.Kill($true) } catch {}
-              [void]$proc.WaitForExit(1000)
-              $stdout = if ($stdoutTask.Wait(1000)) { $stdoutTask.GetAwaiter().GetResult() } else { "<stdout capture timed out after process termination>" }
-              $stderr = if ($stderrTask.Wait(1000)) { $stderrTask.GetAwaiter().GetResult() } else { "<stderr capture timed out after process termination>" }
-              $stopwatch.Stop()
-              throw "TIMEOUT: '$FilePath $displayArgs' exceeded ${TimeoutMs}ms (elapsed $($stopwatch.ElapsedMilliseconds)ms)`nCaptured output:`n$stdout`n$stderr"
-            }
+            $stdoutBuffer = [System.Text.StringBuilder]::new()
+            $stderrBuffer = [System.Text.StringBuilder]::new()
+            $proc = $null
+            try {
+              $proc = [System.Diagnostics.Process]::Start($psi)
+              if ($CloseStandardInput) {
+                $proc.StandardInput.Close()
+              }
+              $stdoutChars = [char[]]::new(4096)
+              $stderrChars = [char[]]::new(4096)
+              $stdoutRead = $proc.StandardOutput.ReadAsync($stdoutChars, 0, $stdoutChars.Length)
+              $stderrRead = $proc.StandardError.ReadAsync($stderrChars, 0, $stderrChars.Length)
+              $stdoutDone = $false
+              $stderrDone = $false
+              $processTimedOut = $false
+              $processCleanupWatch = $null
+              $drainWatch = $null
+              while ($true) {
+                # Bound each batch so busy streams cannot starve timeout checks or each other.
+                for ($reads = 0; $reads -lt 64 -and -not $stdoutDone -and $stdoutRead.IsCompleted; $reads++) {
+                  $readCount = $stdoutRead.GetAwaiter().GetResult()
+                  if ($readCount -eq 0) {
+                    $stdoutDone = $true
+                  } else {
+                    [void]$stdoutBuffer.Append($stdoutChars, 0, $readCount)
+                    $stdoutRead = $proc.StandardOutput.ReadAsync($stdoutChars, 0, $stdoutChars.Length)
+                  }
+                }
+                for ($reads = 0; $reads -lt 64 -and -not $stderrDone -and $stderrRead.IsCompleted; $reads++) {
+                  $readCount = $stderrRead.GetAwaiter().GetResult()
+                  if ($readCount -eq 0) {
+                    $stderrDone = $true
+                  } else {
+                    [void]$stderrBuffer.Append($stderrChars, 0, $readCount)
+                    $stderrRead = $proc.StandardError.ReadAsync($stderrChars, 0, $stderrChars.Length)
+                  }
+                }
 
-            $proc.WaitForExit()
-            $stdout = $stdoutTask.GetAwaiter().GetResult()
-            $stderr = $stderrTask.GetAwaiter().GetResult()
-            $output = "$stdout`n$stderr"
-            $stopwatch.Stop()
+                $processExited = $proc.HasExited
+                if ($processExited -and $null -eq $drainWatch) {
+                  $drainWatch = [System.Diagnostics.Stopwatch]::StartNew()
+                } elseif (-not $processExited -and -not $processTimedOut -and $stopwatch.ElapsedMilliseconds -ge $TimeoutMs) {
+                  $processTimedOut = $true
+                  $processCleanupWatch = [System.Diagnostics.Stopwatch]::StartNew()
+                  try { $proc.Kill($true) } catch {}
+                  [void]$proc.WaitForExit(1000)
+                  $processExited = $proc.HasExited
+                  if ($processExited -and $null -eq $drainWatch) {
+                    $drainWatch = [System.Diagnostics.Stopwatch]::StartNew()
+                  }
+                  continue
+                }
+
+                if ($processExited -and $stdoutDone -and $stderrDone) { break }
+                if ($processExited -and $drainWatch.ElapsedMilliseconds -ge $PostExitDrainTimeoutMs) { break }
+                if ($processTimedOut -and -not $processExited -and $processCleanupWatch.ElapsedMilliseconds -ge 1000) { break }
+                if (-not ((-not $stdoutDone -and $stdoutRead.IsCompleted) -or (-not $stderrDone -and $stderrRead.IsCompleted))) {
+                  Start-Sleep -Milliseconds 10
+                }
+              }
+
+              $stdout = $stdoutBuffer.ToString()
+              $stderr = $stderrBuffer.ToString()
+              if (-not $stdoutDone) {
+                $reason = if ($processTimedOut) { "capture timed out after process termination" } else { "drain timed out after process exit" }
+                if ($stdout) { $stdout += "`n" }
+                $stdout += "<stdout $reason>"
+              }
+              if (-not $stderrDone) {
+                $reason = if ($processTimedOut) { "capture timed out after process termination" } else { "drain timed out after process exit" }
+                if ($stderr) { $stderr += "`n" }
+                $stderr += "<stderr $reason>"
+              }
+              if ($processTimedOut) {
+                $stopwatch.Stop()
+                throw "TIMEOUT: '$FilePath $displayArgs' exceeded ${TimeoutMs}ms (elapsed $($stopwatch.ElapsedMilliseconds)ms)`nCaptured output:`n$stdout`n$stderr"
+              }
+              if (-not $stdoutDone -or -not $stderrDone) {
+                $exitCode = $proc.ExitCode
+                $stopwatch.Stop()
+                throw "OUTPUT DRAIN TIMEOUT: '$FilePath $displayArgs' exited with code $exitCode; stdout/stderr drain exceeded ${PostExitDrainTimeoutMs}ms after process exit (elapsed $($stopwatch.ElapsedMilliseconds)ms)`nCaptured output:`n$stdout`n$stderr"
+              }
+
+              $output = "$stdout`n$stderr"
+              $exitCode = $proc.ExitCode
+              $stopwatch.Stop()
+            } finally {
+              if ($null -ne $proc) { $proc.Dispose() }
+            }
 
             if ($AssertNoAnsi -and $output -match "\x1B\[[0-9;]*[A-Za-z]") {
               throw "Unexpected ANSI escape sequences for '$FilePath $displayArgs' after $($stopwatch.ElapsedMilliseconds)ms`nCaptured output:`n$output"
             }
 
             if ($ExpectFailure) {
-              if ($proc.ExitCode -eq 0) {
+              if ($exitCode -eq 0) {
                 throw "Expected failure but '$FilePath $displayArgs' exited 0 after $($stopwatch.ElapsedMilliseconds)ms`nCaptured output:`n$output"
               }
               if ($ExpectedErrorPattern -and $output -notmatch $ExpectedErrorPattern) {
-                throw "Expected error pattern '$ExpectedErrorPattern' not found for '$FilePath $displayArgs' (exit $($proc.ExitCode), elapsed $($stopwatch.ElapsedMilliseconds)ms)`nCaptured output:`n$output"
+                throw "Expected error pattern '$ExpectedErrorPattern' not found for '$FilePath $displayArgs' (exit $exitCode, elapsed $($stopwatch.ElapsedMilliseconds)ms)`nCaptured output:`n$output"
               }
-            } elseif ($proc.ExitCode -ne 0 -and -not $AllowFailure) {
-              throw "Exit code $($proc.ExitCode) for '$FilePath $displayArgs' after $($stopwatch.ElapsedMilliseconds)ms`nCaptured output:`n$output"
+            } elseif ($exitCode -ne 0 -and -not $AllowFailure) {
+              throw "Exit code $exitCode for '$FilePath $displayArgs' after $($stopwatch.ElapsedMilliseconds)ms`nCaptured output:`n$output"
             }
-            if ($AllowFailure -and $proc.ExitCode -ne 0 -and $output -notmatch $ExpectedErrorPattern) {
-              throw "Unexpected failure for '$FilePath $displayArgs' (exit $($proc.ExitCode))`nCaptured output:`n$output"
+            if ($AllowFailure -and $exitCode -ne 0 -and $output -notmatch $ExpectedErrorPattern) {
+              throw "Unexpected failure for '$FilePath $displayArgs' (exit $exitCode)`nCaptured output:`n$output"
             }
 
             return @{
-              ExitCode            = $proc.ExitCode
+              ExitCode            = $exitCode
               Output              = $output
               ElapsedMilliseconds = $stopwatch.ElapsedMilliseconds
             }

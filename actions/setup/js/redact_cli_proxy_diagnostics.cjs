@@ -1,10 +1,10 @@
 // @ts-check
-const fs = require("node:fs");
 const { PROXY_ENV_NAMES } = require("./constants.cjs");
 const { redactArtifactContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 
 const MAX_DIAGNOSTIC_BYTES = 1024 * 1024;
+const MAX_DIAGNOSTIC_MASKS = 1024;
 
 /**
  * @param {string} content
@@ -54,30 +54,53 @@ function redactCliProxyDiagnostics(content, env, credentialPatterns = []) {
 }
 
 /**
- * @param {string} filePath
- * @returns {string}
+ * Drain startup output, discarding the entire capture on overflow.
+ * @param {NodeJS.ReadableStream} input
+ * @returns {Promise<string | null>}
  */
-function readCliProxyDiagnostics(filePath) {
-  try {
-    const stat = fs.statSync(filePath);
-    if (!stat.isFile() || stat.size > MAX_DIAGNOSTIC_BYTES) {
-      throw new Error("CLI proxy diagnostics exceed the input limit or are not a regular file");
+async function captureCliProxyDiagnostics(input) {
+  const chunks = [];
+  let size = 0;
+  let overflow = false;
+  for await (const chunk of input) {
+    if (overflow) continue;
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += bytes.length;
+    if (size > MAX_DIAGNOSTIC_BYTES) {
+      overflow = true;
+      chunks.length = 0;
+    } else {
+      chunks.push(bytes);
     }
-    return fs.readFileSync(filePath, "utf8");
-  } catch (error) {
-    throw new Error("Unable to read CLI proxy diagnostics", { cause: error });
   }
+  // Even an unterminated partial line is withheld when the capture overflows.
+  return overflow ? null : Buffer.concat(chunks, size).toString("utf8");
 }
 
-if (require.main === module) {
+async function main() {
   try {
-    const content = readCliProxyDiagnostics(process.argv[2]);
+    const content = await captureCliProxyDiagnostics(process.stdin);
+    if (content === null) {
+      process.exitCode = 2;
+      return;
+    }
+    const masks = collectAddMaskedValues(content.replaceAll("\0", ""));
+    if (masks.length > MAX_DIAGNOSTIC_MASKS || masks.reduce((size, value) => size + Buffer.byteLength(value), 0) > MAX_DIAGNOSTIC_BYTES) {
+      throw new Error("CLI proxy mask limit exceeded");
+    }
     const redacted = redactCliProxyDiagnostics(content, process.env);
-    process.stdout.write(redacted.trimEnd().split("\n").slice(-20).join("\n"));
+    const output = redacted.trimEnd().split("\n").slice(-20).join("\n");
+    if (Buffer.byteLength(output) > MAX_DIAGNOSTIC_BYTES) throw new Error("CLI proxy diagnostics exceed the output limit");
+    process.stdout.write(output);
   } catch {
     // The caller withholds both streams and emits a fixed, payload-free error.
     process.exitCode = 1;
   }
 }
 
-module.exports = { MAX_DIAGNOSTIC_BYTES, readCliProxyDiagnostics, redactCliProxyDiagnostics };
+if (require.main === module)
+  main().catch(() => {
+    process.exitCode = 1;
+  });
+
+module.exports = { MAX_DIAGNOSTIC_BYTES, redactCliProxyDiagnostics };

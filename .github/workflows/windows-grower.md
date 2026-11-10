@@ -17,8 +17,10 @@ concurrency:
   cancel-in-progress: false
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-5.6-terra
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 network: {}
 tools:
   cache-memory:

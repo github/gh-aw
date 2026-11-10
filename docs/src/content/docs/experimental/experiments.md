@@ -438,6 +438,10 @@ It runs independently of the agentic engine and defaults to `copilot/gpt-6-luna-
 Set `evals.model` to another Decisions-compatible model, or
 `openai/gpt-6-luna` to use `CODEX_API_KEY`/`OPENAI_API_KEY` instead of Copilot
 credentials. Configure the provider's actual model ID; model names are not remapped.
+OpenAI WIF configured under `engine.auth` applies only to Codex inference through
+the AWF API proxy; the evals job calls Decisions directly and does not inherit that
+authentication. OpenAI evals therefore still require `CODEX_API_KEY` or
+`OPENAI_API_KEY`; eval-specific WIF or proxy authentication is not currently supported.
 Per-question model overrides are not supported. Transport failures
 are recorded as `not_evaluated`, not as negative or unknown answers.
 
