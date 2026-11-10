@@ -608,6 +608,9 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 
 #### 9.2.7 REST setLabels Tests
 
+- **T-RL-037**: Verify that transient `setLabels` failures exhaust the retry policy and return a hard error.
+- **T-RL-046a**: Verify that an HTTP 404 response is rejected without retrying and logs a hard error.
+- **T-RL-046b**: Verify that HTTP 5xx and transport failures are retried and may succeed.
 - **T-RL-050**: Verify that `setLabels` is called with the correct `owner`, `repo`, `issue_number`, and `labels` array.
 - **T-RL-051**: Verify that the updated label list returned by `setLabels` is logged.
 - **T-RL-052**: Verify that a `setLabels` failure produces a hard error result with `success: false`.

@@ -514,6 +514,31 @@ describe("replace_label", () => {
     }
   });
 
+  it("T-RL-037 returns a hard error after transient retries are exhausted", async () => {
+    let setLabelsCalls = 0;
+    mockGithub.rest.issues.setLabels = async () => {
+      setLabelsCalls++;
+      const error = new Error("Service unavailable");
+      error.status = 503;
+      throw error;
+    };
+
+    vi.useFakeTimers();
+    try {
+      const handler = await main({});
+      const resultPromise = handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.success).toBe(false);
+      expect(setLabelsCalls).toBe(6);
+      expect(result.error).toContain("Original error: Service unavailable");
+      expect(mockCore.errors).toContain(`Failed to replace label: ${result.error}`);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("T-RL-046a rejects an HTTP 404 without retrying and logs a hard error", async () => {
     let setLabelsCalls = 0;
     mockGithub.rest.issues.setLabels = async () => {
@@ -566,31 +591,6 @@ describe("replace_label", () => {
 
       expect(result.success).toBe(true);
       expect(setLabelsCalls).toBe(3);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("T-RL-037 returns a hard error after transient retries are exhausted", async () => {
-    let setLabelsCalls = 0;
-    mockGithub.rest.issues.setLabels = async () => {
-      setLabelsCalls++;
-      const error = new Error("Service unavailable");
-      error.status = 503;
-      throw error;
-    };
-
-    vi.useFakeTimers();
-    try {
-      const handler = await main({});
-      const resultPromise = handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
-      await vi.runAllTimersAsync();
-      const result = await resultPromise;
-
-      expect(result.success).toBe(false);
-      expect(setLabelsCalls).toBe(6);
-      expect(result.error).toContain("Original error: Service unavailable");
-      expect(mockCore.errors).toContain(`Failed to replace label: ${result.error}`);
     } finally {
       vi.useRealTimers();
     }

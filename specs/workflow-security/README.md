@@ -887,8 +887,10 @@ The architecture review identified **contract distinctions, not confirmed
 exploitable bugs**. Preserve them rather than strengthening the model's
 assumptions until real behavior disappears:
 
-| Boundary not fully modeled | Evidence / required refinement |
-|---|---|
+Priority is sequencing, not a severity claim. P1 covers foundational actor,
+admission, credential, and data-flow trust boundaries; P2 covers follow-on
+operational and environmental refinements outside those core boundaries.
+
 | Boundary not fully modeled | Priority | Owner / tracking | Target TLA+ module | Evidence / required refinement |
 |---|---|---|---|---|
 | Pre-activation actor authorization, bots, replay | P1 | gh-aw maintainers · [#76553](https://github.com/github/gh-aw/issues/76553) | `CommentTriggeredPRCheckout.tla` | A:608–660,966–1012; CTR-027/029; model trusted event identity and separate membership/checkout gates. |

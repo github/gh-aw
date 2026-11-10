@@ -144,15 +144,16 @@ A **Complete Conforming Implementation** MUST satisfy Basic Conformance and:
 - Elevate content items from users in `trusted-users` to "approved" integrity regardless of author_association
 - Parse and validate `approval-labels` configuration field
 
+- Promote content items bearing a label in `approval-labels` to "approved" integrity level
+- Validate configuration at compilation time with actionable error messages
+- Enforce all access controls at runtime through gateway middleware
+- Support all configuration fields in combination
+
 These are normative target requirements, not a claim that the local `gh-aw`
 compiler implements every field. As verified on 2026-11-10, `roles` and
 `private-repos` remain normative but are deferred in the local compiler; the
 local implementation therefore does not claim Complete Conformance for those
 controls. Section 4.8 records each status explicitly.
-- Promote content items bearing a label in `approval-labels` to "approved" integrity level
-- Validate configuration at compilation time with actionable error messages
-- Enforce all access controls at runtime through gateway middleware
-- Support all configuration fields in combination
 
 ### 2.2 Requirements Notation
 
