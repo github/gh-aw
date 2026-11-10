@@ -280,7 +280,7 @@ func TestJobManager_WriteJobsYAML(t *testing.T) {
 func TestRenderStepForRunner(t *testing.T) {
 	windowsStep := "    steps:\n      - name: Run script\n        run: echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n"
 	got := renderStepForRunner(windowsStep, "runs-on: windows-latest", "agent")
-	if !strings.Contains(got, "        run: |\n") || !strings.Contains(got, "wsl.exe --exec bash --noprofile --norc -e -o pipefail") {
+	if !strings.Contains(got, "        run: |\n") || !strings.Contains(got, "wsl.exe --distribution Ubuntu --user root --exec bash --noprofile --norc -e -o pipefail") {
 		t.Fatalf("Windows step did not invoke the POSIX script through WSL:\n%s", got)
 	}
 	if !strings.Contains(got, "        shell: pwsh\n") {
@@ -296,11 +296,18 @@ func TestRenderStepForRunner(t *testing.T) {
 			t.Errorf("Windows step did not map %s into WSL:\n%s", pathVariable, got)
 		}
 	}
-	if !strings.Contains(got, "if ($pathVariableSet.Contains($_)) { \"$_/p\" }") {
+	if !strings.Contains(got, "$pathVariableSet.Contains($_) -or $value -match") || !strings.Contains(got, "\"$_/p\"") {
 		t.Fatalf("Windows step did not mark host paths for WSL conversion:\n%s", got)
 	}
-	if !strings.Contains(got, "& $wsl.Source --status") || !strings.Contains(got, "WSL is unavailable") {
-		t.Fatalf("Windows job did not include a fail-fast WSL availability check:\n%s", got)
+	for _, expected := range []string{
+		"& $wsl.Source --status",
+		"--install --web-download --distribution Ubuntu --no-launch",
+		"apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git jq nodejs npm xz-utils",
+		"WSL is unavailable",
+	} {
+		if !strings.Contains(got, expected) {
+			t.Errorf("Windows job lacks WSL bootstrap requirement %q:\n%s", expected, got)
+		}
 	}
 	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose" {
 		t.Fatalf("WSL adapter changed the POSIX script: %q", script)
@@ -316,6 +323,26 @@ func TestRenderStepForRunner(t *testing.T) {
 	got = renderStepForRunner(withShell, "runs-on: windows-latest", "agent")
 	if got != withShell {
 		t.Fatalf("Windows step changed its explicit shell:\n%s", got)
+	}
+
+	nodeSetup := `    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install runtime
+        run: npm install -g example
+`
+	got = renderStepForRunner(nodeSetup, "runs-on: windows-latest", "agent")
+	for _, expected := range []string{
+		"id: wsl_setup_node",
+		"name: Setup Node.js in WSL",
+		"${{ steps.wsl_setup_node.outputs.node-version }}",
+		"SHASUMS256.txt",
+	} {
+		if !strings.Contains(got, expected) {
+			t.Errorf("Windows job did not bootstrap the Linux Node.js runtime (%q):\n%s", expected, got)
+		}
 	}
 
 	ubuntuStep := "    steps:\n      - name: Run script\n        run: ./script.sh\n"

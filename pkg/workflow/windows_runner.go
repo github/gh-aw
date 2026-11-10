@@ -18,10 +18,32 @@ const windowsWSLBootstrapStep = `      - name: Initialize WSL runtime
           if (-not $wsl) { throw 'WSL is required for Windows agentic workflows, but wsl.exe was not found.' }
           & $wsl.Source --status *> $null
           if ($LASTEXITCODE -ne 0) { throw 'WSL is unavailable. Enable WSL2 and install a Linux distribution on this runner.' }
+          & $wsl.Source --set-default-version 2
+          if ($LASTEXITCODE -ne 0) { throw 'WSL2 is unavailable. Enable the Windows Virtual Machine Platform feature.' }
+          $distros = @(& $wsl.Source --list --quiet 2>$null) | ForEach-Object { ([string]$_).Replace([string][char]0, '').Trim() } | Where-Object { $_ }
+          if ($distros -notcontains 'Ubuntu') {
+            & $wsl.Source --install --web-download --distribution Ubuntu --no-launch
+            if ($LASTEXITCODE -ne 0) { throw 'WSL could not install the Ubuntu distribution required by Windows agentic workflows.' }
+          }
+          & $wsl.Source --set-default Ubuntu
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not select the Ubuntu distribution.' }
           $env:WSLENV = 'GITHUB_WORKSPACE/p:RUNNER_TEMP/p:RUNNER_TOOL_CACHE/p'
-          & $wsl.Source --exec bash -lc 'set -e; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi'
-          if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to map the workspace, runner temp, or /tmp/gh-aw paths.' }
+          & $wsl.Source --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi; export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git jq nodejs npm xz-utils; if ! pgrep -x dockerd >/dev/null; then nohup dockerd --host=unix:///var/run/docker.sock >"$RUNNER_TEMP/gh-aw/dockerd.log" 2>&1 </dev/null & fi; for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; echo "WSL Docker daemon did not become ready." >&2; tail -n 50 "$RUNNER_TEMP/gh-aw/dockerd.log"; exit 1'
+          if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to install Linux tools, start Docker, or map required paths.' }
 `
+
+func windowsWSLNodeBootstrapStep(nodeSetupID string) string {
+	return fmt.Sprintf(`      - name: Setup Node.js in WSL
+        shell: pwsh
+        env:
+          GH_AW_WSL_NODE_VERSION: ${{ steps.%s.outputs.node-version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:WSLENV = 'RUNNER_TEMP/p:GH_AW_WSL_NODE_VERSION'
+          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt" -o "$staging/SHASUMS256.txt"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not install the pinned Linux Node.js runtime.' }
+`, nodeSetupID)
+}
 
 func renderStepForRunner(jobYAML, runsOn, jobName string) string {
 	if strings.TrimSpace(strings.TrimPrefix(runsOn, "runs-on:")) != "windows-latest" {
@@ -77,9 +99,43 @@ func renderWindowsSteps(stepsYAML string) (string, bool) {
 	var renderedSteps strings.Builder
 	for _, step := range steps {
 		step = rewriteWindowsActionTempPath(step)
+		if isWindowsNodeSetupStep(step) {
+			step, nodeSetupID := addWindowsNodeSetupID(step)
+			renderedSteps.WriteString(step)
+			renderedSteps.WriteString(windowsWSLNodeBootstrapStep(nodeSetupID))
+			continue
+		}
 		renderedSteps.WriteString(renderWindowsPOSIXRunStep(step))
 	}
 	return renderedSteps.String(), true
+}
+
+func isWindowsNodeSetupStep(step string) bool {
+	fields, ok := parseWindowsStep(step)
+	if !ok {
+		return false
+	}
+	uses, _ := fields["uses"].(string)
+	return strings.HasPrefix(uses, "actions/setup-node@")
+}
+
+func addWindowsNodeSetupID(step string) (string, string) {
+	fields, _ := parseWindowsStep(step)
+	id, _ := fields["id"].(string)
+	if id != "" {
+		return step, id
+	}
+
+	const nodeSetupID = "wsl_setup_node"
+	lines := strings.SplitAfter(step, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "uses:") {
+			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+			lines = append(lines[:i], append([]string{indent + "id: " + nodeSetupID + "\n"}, lines[i:]...)...)
+			break
+		}
+	}
+	return strings.Join(lines, ""), nodeSetupID
 }
 
 func isWindowsPOSIXRunStep(step string) bool {
@@ -259,23 +315,24 @@ func windowsWSLRunWrapper(script string) []string {
 		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
 		"$pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)",
 		"foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }",
-		"$environmentNames = [System.Environment]::GetEnvironmentVariables('Process').Keys | Where-Object { $_ -notin @('PATH', 'WSLENV') }",
-		"$env:WSLENV = (($environmentNames | ForEach-Object { if ($pathVariableSet.Contains($_)) { \"$_/p\" } else { $_ } }) -join ':')",
+		"$processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')",
+		"$environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }",
+		"$env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\\\/]|\\\\\\\\)') { \"$_/p\" } else { $_ } }) -join ':')",
 		fmt.Sprintf("$compressedScript = [System.Convert]::FromBase64String('%s')", encodedScript),
 		"$compressedStream = [System.IO.MemoryStream]::new($compressedScript)",
 		"$decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)",
 		"$reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)",
 		"try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }",
-		`$scriptContent = 'cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent`,
+		`$scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent`,
 		"$scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'",
 		"New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null",
 		"$hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')",
 		"[System.IO.File]::WriteAllText($hostScriptPath, $scriptContent, [System.Text.UTF8Encoding]::new($false))",
-		"$wslScriptPath = (& wsl.exe --exec wslpath -u $hostScriptPath).Trim()",
+		"$wslScriptPath = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u $hostScriptPath).Trim()",
 		"if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the generated script path.' }",
 		"$exitCode = 0",
 		"try {",
-		"  & wsl.exe --exec bash --noprofile --norc -e -o pipefail $wslScriptPath",
+		"  & wsl.exe --distribution Ubuntu --user root --exec bash --noprofile --norc -e -o pipefail $wslScriptPath",
 		"  $exitCode = $LASTEXITCODE",
 		"} finally {",
 		"  Remove-Item -LiteralPath $hostScriptPath -Force -ErrorAction SilentlyContinue",

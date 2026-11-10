@@ -100,7 +100,7 @@ Inspect the repository.
 			expectedCommand := `        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.62 --checksums-sha256 ` + checksum + ` --rootless`
 			if runner == "windows-latest" {
 				if !strings.Contains(installStep, "shell: pwsh") ||
-					!strings.Contains(installStep, "wsl.exe --exec bash --noprofile --norc -e -o pipefail") {
+					!strings.Contains(installStep, "wsl.exe --distribution Ubuntu --user root --exec bash --noprofile --norc -e -o pipefail") {
 					t.Errorf("generated Windows install step does not launch Bash in WSL:\n%s", installStep)
 				}
 				if script := decodeWindowsWSLRunScript(t, installStep); !strings.Contains(script, strings.TrimPrefix(expectedCommand, "        run: ")) {

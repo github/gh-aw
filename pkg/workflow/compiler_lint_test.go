@@ -289,7 +289,7 @@ func TestCompilerLintGeneratedPRCheckoutTransformations(t *testing.T) {
 		{
 			name:              "Windows runner",
 			safeOutputsRunsOn: "  runs-on: windows-latest\n",
-			wantLockContent:   "wsl.exe --exec bash",
+			wantLockContent:   "wsl.exe --distribution Ubuntu --user root --exec bash",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
