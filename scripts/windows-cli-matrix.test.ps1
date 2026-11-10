@@ -26,12 +26,21 @@ Write-Output "Matrix regression checks passed: $($scenarios.Count) scenarios, $p
 
 # Compile the actual workflow helper and exercise stalled pipes without Win32.
 $workflow = Get-Content "$PSScriptRoot/../.github/workflows/windows-cli-integration.yml" -Raw
+$processFunction = $null
 foreach ($block in [regex]::Matches($workflow, '(?m)^        shell: pwsh\r?\n        run: \|\r?\n((?:          .*\r?\n|[ \t]*\r?\n)+)')) {
   $script = $block.Groups[1].Value -replace "(?m)^          ", ""
   $parseErrors = $null
-  [System.Management.Automation.Language.Parser]::ParseInput($script, [ref]$null, [ref]$parseErrors) | Out-Null
+  $scriptAst = [System.Management.Automation.Language.Parser]::ParseInput($script, [ref]$null, [ref]$parseErrors)
   if ($parseErrors.Count) { throw "Workflow PowerShell parse errors: $($parseErrors.Message -join '; ')" }
+  if ($null -eq $processFunction) {
+    $processFunction = $scriptAst.Find({
+      param($node)
+      $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq "Invoke-CliProcess"
+    }, $true)
+  }
 }
+if ($null -eq $processFunction) { throw "Invoke-CliProcess helper not found" }
+Invoke-Expression $processFunction.Extent.Text
 $source = [regex]::Match($workflow, '(?s)Add-Type -TypeDefinition @"\r?\n(.*?)\r?\n          "@').Groups[1].Value
 if (-not $source) { throw "ConPTY helper not found" }
 $source = $source -replace "(?m)^          ", "" -replace "class ConPtySmoke", "class ConPtySmokeRegression"
@@ -64,6 +73,59 @@ foreach ($case in @("stalled-reader", "stalled-close", "faulted-reader", "comple
   if ($watch.ElapsedMilliseconds -gt 2000) { throw "Unbounded timeout cleanup: $case" }
 }
 Write-Output "ConPTY regression checks passed: bounded read/close waits, original timeout and partial output preserved"
+
+$pwsh = (Get-Command pwsh).Source
+$ordinary = Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-Command", "Write-Output 'ordinary-exit-marker'; [Console]::Error.WriteLine('ordinary-stderr-marker')") -PostExitDrainTimeoutMs 1000
+if ($ordinary.ExitCode -ne 0 -or $ordinary.Output -notmatch "ordinary-exit-marker" -or $ordinary.Output -notmatch "ordinary-stderr-marker") { throw "Ordinary process exit lost output or exit status" }
+
+$large = Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-Command", "[Console]::Out.Write(('o' * 8MB)); [Console]::Error.Write(('e' * 8MB))") -TimeoutMs 15000
+if ($large.ExitCode -ne 0 -or $large.Output -cne (('o' * 8MB) + "`n" + ('e' * 8MB))) { throw "Large process output was truncated or corrupted" }
+
+$watch = [System.Diagnostics.Stopwatch]::StartNew()
+$processTimeoutRejected = $false
+try {
+  Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-Command", "Write-Output 'process-timeout-marker'; Start-Sleep -Seconds 30") -TimeoutMs 10000 | Out-Null
+} catch {
+  $message = $_.Exception.ToString()
+  if ($message -notmatch "TIMEOUT:.*$([regex]::Escape($pwsh))" -or $message -notmatch "elapsed \d+ms" -or $message -notmatch "Captured output:\r?\nprocess-timeout-marker") { throw }
+  $processTimeoutRejected = $true
+}
+if (-not $processTimeoutRejected) { throw "CLI process timeout was swallowed" }
+if ($watch.ElapsedMilliseconds -gt 15000) { throw "CLI process timeout cleanup exceeded its budget" }
+
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "gh-aw-cli-drain-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $tempDir | Out-Null
+$parentScript = Join-Path $tempDir "parent.ps1"
+$descendantPidPath = Join-Path $tempDir "descendant.pid"
+$quotedPwsh = "'" + $pwsh.Replace("'", "''") + "'"
+$quotedPidPath = "'" + $descendantPidPath.Replace("'", "''") + "'"
+@"
+`$startInfo = [System.Diagnostics.ProcessStartInfo]::new($quotedPwsh)
+`$startInfo.UseShellExecute = `$false
+[void]`$startInfo.ArgumentList.Add("-NoProfile")
+[void]`$startInfo.ArgumentList.Add("-Command")
+[void]`$startInfo.ArgumentList.Add("Start-Sleep -Seconds 30")
+`$descendant = [System.Diagnostics.Process]::Start(`$startInfo)
+Set-Content -Path $quotedPidPath -Value `$descendant.Id
+Write-Output "parent-drain-marker"
+"@ | Set-Content -Path $parentScript -Encoding utf8
+$watch = [System.Diagnostics.Stopwatch]::StartNew()
+$drainTimeoutRejected = $false
+try {
+  Invoke-CliProcess -FilePath $pwsh -ArgumentList @("-NoProfile", "-File", $parentScript) -TimeoutMs 10000 -PostExitDrainTimeoutMs 500 | Out-Null
+} catch {
+  $message = $_.Exception.ToString()
+  if ($message -notmatch "OUTPUT DRAIN TIMEOUT:.*$([regex]::Escape($pwsh))" -or $message -notmatch "elapsed \d+ms" -or $message -notmatch "parent-drain-marker") { throw }
+  $drainTimeoutRejected = $true
+} finally {
+  if (Test-Path $descendantPidPath) {
+    try { Stop-Process -Id ([int](Get-Content $descendantPidPath)) -Force -ErrorAction Stop } catch {}
+  }
+  Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+if (-not $drainTimeoutRejected) { throw "Post-exit output drain timeout was swallowed" }
+if ($watch.ElapsedMilliseconds -gt 5000) { throw "Post-exit output drain cleanup exceeded its budget" }
+Write-Output "CLI subprocess regression checks passed: ordinary exit, large output, bounded process timeout, and bounded post-exit drain with partial output"
 
 $dllInitFailurePattern = '(?i)(-1073741502|0xC0000142|STATUS_DLL_INIT_FAILED)'
 if (-not $workflow.Contains($dllInitFailurePattern)) { throw "ConPTY DLL-init handling differs from the hosted smoke probe" }
