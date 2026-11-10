@@ -318,7 +318,16 @@ describe("daily AIC retry deadlines", () => {
       const request = vi.fn().mockRejectedValue(apiError(429, { "x-ratelimit-remaining": String(remaining), "x-ratelimit-reset": String(start / 1000 + 120), "retry-after": "60" }, "Secondary rate limit"));
       const operation = vi
         .fn()
-        .mockImplementationOnce(() => createAPIBudget(reserve).request(request))
+        .mockImplementationOnce(async () => {
+          try {
+            return await createAPIBudget(reserve).request(request);
+          } catch (error) {
+            const deadline = new Date(start + delayMs - 1000).toISOString();
+            expect(getGitHubAPIDiagnostic(error, start).retryNotBefore).toBe(deadline);
+            expect(getGitHubAPIDiagnostic(new Error("artifact wrapper", { cause: error }), start).retryNotBefore).toBe(deadline);
+            throw error;
+          }
+        })
         .mockResolvedValue("verified");
       await expect(withQuotaResetRecovery(operation, recovery)).resolves.toBe("verified");
       expect(recovery.sleep).toHaveBeenCalledExactlyOnceWith(delayMs);
