@@ -37,6 +37,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httpnoctx"
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
+	ignoredlocalerror "github.com/github/gh-aw/pkg/linters/ignored-local-error"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
@@ -142,6 +143,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	hardcodedfilepath.Analyzer,
 	httpnoctx.Analyzer,
 	httprespbodyclose.Analyzer,
+	ignoredlocalerror.Analyzer,
 	ioutildeprecated.Analyzer,
 	httpstatuscode.Analyzer,
 	largefunc.Analyzer,
