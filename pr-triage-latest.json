@@ -1,90 +1,29 @@
 {
-  "run_id": "2026-11-10T00:41:43Z",
-  "run_date": "2026-11-10T00:41:43Z",
+  "run_id": "2026-11-10T06:25:33Z",
+  "run_date": "2026-11-10T06:25:33Z",
   "source": "pr-triage",
-  "eligible_total": 5,
-  "open_copilot_prs": 5,
-  "cooldown_skipped": 1,
-  "category_counts": {
-    "bug": 1,
-    "feature": 3,
-    "chore": 1
-  },
-  "risk_counts": {
-    "low": 1,
-    "medium": 4
-  },
-  "priority_counts": {
-    "low": 1,
-    "medium": 3,
-    "high": 1
-  },
-  "action_counts": {
-    "auto_merge": 1,
-    "fast_track": 2,
-    "batch_review": 2
-  },
-  "batches": [
+  "eligible_total": 0,
+  "open_copilot_prs": 3,
+  "cooldown_skipped": 3,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
+  "action_counts": {},
+  "batches": [],
+  "selected_candidates": [],
+  "skipped_prs": [
     {
-      "id": "model-routing",
-      "count": 4,
-      "pr_numbers": [
-        76313,
-        76323,
-        76319,
-        76330
-      ],
-      "category": "mixed",
-      "risk": "medium"
-    }
-  ],
-  "selected_candidates": [
-    {
-      "number": 76313,
-      "category": "feature",
-      "risk": "medium",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 65
+      "number": 76330,
+      "reason": "within 1-hour cooldown; last updated 2026-11-10T06:04:57Z"
     },
     {
       "number": 76323,
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "fast_track",
-      "score": 63
+      "reason": "within 1-hour cooldown; last updated 2026-11-10T06:24:14Z"
     },
     {
       "number": 76319,
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 53
-    },
-    {
-      "number": 76330,
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 48
-    },
-    {
-      "number": 76311,
-      "category": "chore",
-      "risk": "low",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 34
+      "reason": "within 1-hour cooldown; last updated 2026-11-10T06:04:41Z"
     }
   ],
-  "skipped_prs": [
-    {
-      "number": 76351,
-      "reason": "within 1-hour cooldown / draft"
-    }
-  ],
-  "summary": "Five eligible Copilot PRs remain after the 1-hour cooldown; the cluster is dominated by model-routing work and one low-risk dependency bump."
+  "summary": "No eligible app/github-copilot PRs remained after the 1-hour cooldown at the current run time; the three open PRs were all updated within the last hour and were deferred until they age out of the active-work window."
 }
