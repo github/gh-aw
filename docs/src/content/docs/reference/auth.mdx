@@ -381,6 +381,11 @@ is available. Inherited Codex threat detection and same-provider OpenAI fallback
 models use the same authentication. Other fallback providers still require
 their own credentials.
 
+OIDC-authenticated threat detection requires AWF `v0.25.3` or newer so that
+Actions OIDC request credentials are excluded from the detector container.
+The compiler rejects older versions before granting the detection job
+`id-token: write`.
+
 See also [AI Engines](/gh-aw/reference/engines/#built-in-ai-engines) for additional configuration needed when using Codex with GitHub MCP.
 
 ---
@@ -439,6 +444,10 @@ configuration supplies its own auth, including with a same-engine detector
 override. The generated detection job receives `id-token: write`. This does not
 apply to [evals](/gh-aw/experimental/experiments/#analyze-an-eval-backed-metric), which call Decisions
 directly and still require `CODEX_API_KEY` or `OPENAI_API_KEY` for OpenAI models.
+Complete OpenAI WIF settings supplied through `engine.env.AWF_AUTH_*` also
+produce a keyless Codex detector; setting only the auth type and provider does
+not grant OIDC permission. Detector validation checks the effective proxy image,
+including container-pin redirects from `aw.json`.
 
 ---
 

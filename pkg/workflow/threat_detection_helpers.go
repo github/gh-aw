@@ -193,6 +193,9 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 		d.EngineConfig.LLMProvider = LLMProviderOpenAI
 	}
 	d.EngineConfig.Env = mergeThreatDetectionEngineEnv(data, engineID, d.EngineConfig.Env)
+	if d.EngineConfig.Auth == nil && isOpenAIWIFWithAWF(d) {
+		d.EngineConfig.Auth = resolveOpenAIWIFAuth(d.EngineConfig)
+	}
 	if d.EngineConfig.APITarget == "" && data.EngineConfig != nil &&
 		ResolveEngineID(data) == engineID {
 		d.EngineConfig.APITarget = data.EngineConfig.APITarget

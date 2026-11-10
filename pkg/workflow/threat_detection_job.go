@@ -221,6 +221,13 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	if detectionAuthData.EngineConfig != nil &&
 		detectionAuthData.EngineConfig.Auth != nil &&
 		detectionAuthData.EngineConfig.Auth.Type == "github-oidc" {
+		if !awfSupportsExcludeEnv(getFirewallConfig(detectionAuthData)) {
+			return nil, fmt.Errorf(
+				"safe-outputs.threat-detection.engine.auth.type: github-oidc requires AWF %s or newer to keep Actions OIDC credentials out of the agent container. Set sandbox.agent.version to %s or newer",
+				constants.AWFExcludeEnvMinVersion,
+				constants.AWFExcludeEnvMinVersion,
+			)
+		}
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {

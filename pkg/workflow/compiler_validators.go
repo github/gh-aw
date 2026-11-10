@@ -772,15 +772,10 @@ func (c *Compiler) validateWIFEngineAuth(workflowData *WorkflowData) error {
 }
 
 func (c *Compiler) validateThreatDetectionOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
-	if workflowData == nil || workflowData.SafeOutputs == nil || workflowData.SafeOutputs.ThreatDetection == nil {
+	if workflowData == nil || workflowData.SafeOutputs == nil || workflowData.SafeOutputs.ThreatDetection == nil ||
+		workflowData.SafeOutputs.ThreatDetection.EngineDisabled {
 		return nil
 	}
-	detectionConfig := workflowData.SafeOutputs.ThreatDetection.EngineConfig
-	if detectionConfig == nil || detectionConfig.Auth == nil ||
-		detectionConfig.Auth.Type != "github-oidc" || detectionConfig.Auth.Provider != "openai" {
-		return nil
-	}
-
 	engineID := c.getThreatDetectionEngineID(workflowData)
 	detectionData := buildExternalDetectorWorkflowData(workflowData, engineID)
 	detectionData.Model = inheritedDetectionModel(workflowData, engineID)
@@ -797,22 +792,8 @@ func validateOpenAIWIFEngineAuthAtPath(workflowData *WorkflowData, engineConfigP
 	if workflowData == nil || workflowData.EngineConfig == nil {
 		return nil
 	}
-	auth := workflowData.EngineConfig.Auth
-	if auth == nil &&
-		workflowData.EngineConfig.Env["AWF_AUTH_TYPE"] == "github-oidc" &&
-		workflowData.EngineConfig.Env["AWF_AUTH_PROVIDER"] == "openai" {
-		auth = &EngineAuthConfig{
-			Type:                     "github-oidc",
-			Provider:                 "openai",
-			OpenAIIdentityProviderID: workflowData.EngineConfig.Env["AWF_AUTH_OPENAI_IDENTITY_PROVIDER_ID"],
-			ServiceAccountID:         workflowData.EngineConfig.Env["AWF_AUTH_OPENAI_SERVICE_ACCOUNT_ID"],
-			Audience:                 workflowData.EngineConfig.Env["AWF_AUTH_OIDC_AUDIENCE"],
-		}
-	}
+	auth := resolveOpenAIWIFAuth(workflowData.EngineConfig)
 	if auth == nil {
-		return nil
-	}
-	if auth.Type != "github-oidc" || auth.Provider != "openai" {
 		return nil
 	}
 
