@@ -85,7 +85,7 @@ function getGitHubAPIDiagnostic(error, now = Date.now()) {
   const details = quota
     ? `resource=${resource}; remaining=${remaining ?? "unknown"}; limit=${limit ?? "unknown"}; used=${used ?? "unknown"}; reset=${reset || "unknown"}; retry_not_before=${retryNotBefore || "unknown"}${quotaStopped && accessFailure ? "; quota reserve guard also stopped further reads" : ""}`
     : "Check the credential's access to this operation; quota exhaustion was not established.";
-  return { quota, classification, message: `GitHub API ${classification} (HTTP ${status >= 100 && status <= 599 && Number.isInteger(status) ? status : "unknown"}; ${details})` };
+  return { quota, classification, retryNotBefore, message: `GitHub API ${classification} (HTTP ${status >= 100 && status <= 599 && Number.isInteger(status) ? status : "unknown"}; ${details})` };
 }
 
 module.exports = { getGitHubAPIQuota, getGitHubAPIDiagnostic, getSanitizedGitHubAPICause };

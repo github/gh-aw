@@ -14,6 +14,7 @@ describe("failed-response GitHub API diagnostics", () => {
     expect(diagnostic).toEqual({
       quota: true,
       classification: "quota_exhausted",
+      retryNotBefore: "2026-10-14T10:06:00.000Z",
       message: "GitHub API quota_exhausted (HTTP 403; resource=core; remaining=0; limit=15000; used=15000; reset=2026-10-14T10:06:00.000Z; retry_not_before=2026-10-14T10:06:00.000Z)",
     });
   });

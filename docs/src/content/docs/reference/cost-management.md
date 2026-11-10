@@ -295,6 +295,12 @@ An incomplete history, permanent API failure, or quota restriction stops activat
 
 Activation logs identify artifact discovery and accounting failures with the underlying error and guidance to check Actions read permissions, artifact retention, and accounting coverage. The activation summary separates recorded usage, confirmed-zero runs, and conservative estimates. The exceeded-guardrail log also reports measured and assumed AIC separately. These totals are guardrail accounting, not provider billing; reconcile charges with the provider.
 
+When **Restore daily AIC scan observations** is blocked, its summary identifies the failed operation, observed response count, and earliest retry deadline when available. A `current_run` failure occurs before snapshot discovery, so it does not establish a cache miss or expensive cold scan. The response count belongs to this restore; `used` belongs to the credential's shared quota.
+
+Trace the restore step's `github-token` reference in the compiled workflow to the dedicated daily-AIC app, activation credential, or `github.token`. Compare concurrent consumers using the same user or app installation, including other workflows and repositories; separately minted tokens for the same installation do not isolate its quota. Record only credential reference names and validated quota metadata, never token values. Matching quota limits and reset times alone do not identify the credential or the consumer that depleted it.
+
+Before retrying, inspect existing scheduled runs after the later of the quota reset and `Retry-After` deadline for a successful restore and complete guardrail check. An expired deadline alone does not establish recovery. Avoid simultaneous reruns, preserve the fail-closed guard, and investigate snapshot reuse and API response counts before changing scan behavior.
+
 Cold scans check the compiler-owned `agent`, `detection`, and `evals` jobs independently. Every executed component needs valid accounting; empty collector placeholders and evaluation results alone do not prove zero usage. Raw token usage takes precedence over overlapping summaries. Invalid numeric fields make the accounting unknown. Failed-only reruns retain successful components from earlier attempts, but a rerun component needs a producer artifact from its own job execution. Missing carried-forward usage remains unknown. Older snapshots without component-coverage validation are not reused.
 
 #### Repo-Memory Bootstrap
