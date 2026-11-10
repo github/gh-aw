@@ -783,7 +783,7 @@ jobs:
         id: setup
         uses: ./actions/setup
         with:
-          destination: ${{ runner.temp }}/gh-aw/actions
+          destination: ${{ runner.temp }}/gh-aw-setup/actions
           job-name: ${{ github.job }}
           trace-id: ${{ needs.activation.outputs.setup-trace-id }}
           parent-span-id: ${{ needs.activation.outputs.setup-parent-span-id || needs.activation.outputs.setup-span-id }}
@@ -801,18 +801,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNNER_TOOL_CACHE', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('ykxTiFbQrVJQUqkOCvXzcw2KD/H394l3dnT2cLXSrVVSiLVWKMlIzeNSUEhNzshXUMJQZatS7e4R7xgejyFTq6RgZ6egpOLuGeIR6hTv6hemxJWWyVUNNwuiL9jRzTXePzQkIDQk2BbhDFffgFr99AzdxHL94sS01PzSkoLSkmJ9KK2XVZyfl6OEx6h4Z38/N0/3+ADHEA/Cxibn56VlpoNNxWsoyHfBRJpZkp+fUww1shYlKCCmKXEBBgA=')
+          $compressedScript = [System.Convert]::FromBase64String('nJDBSsNAEIbveYph2IMeYu5KCzFsswXdDc2uHkSGULLdSMgWdkvAkHcXrRakoOhpDjPzffx/Z+EJ0ldANm2MlHxDWqk7KvJC8Ot0Rni+gejaIQFot84Dnl0t2FQKyh/pbDMjLJeArFxrYW6JywdMbJdMJ9bxr85XnJTRldH1gl2Mod830UE6ArIvJr+vsp1LmzELjW39Ie4PMWSf8+ol+KHHS/wBTIWSq3VJVa7F3yRbP9hu9+H4RfGevP6HIXrfh5Ng/lbakY3J2wA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -831,18 +835,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9bPTSzOjs8vySmIz0hNTEktKtYrzlACDAA=')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9bPTSzOjs8vySmIz0hNTEktKtYrzlACDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -861,18 +869,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPzkhNzo7PL8kpiE9JTUsszSmJTy5KTUnNK8lMzCnWK85QAgwA')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzkhNzo7PL8kpiE9JTUsszSmJTy5KTUnNK8lMzCnWK85QAgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -895,18 +907,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           $compressedScript = [System.Convert]::FromBase64String('hM8xSwQxEAXgPr8iPE6uubvFNqCgKHqFIpLthBA24xolk5DMroL43wW3WW3shm948F56C7HqfdHoJJVufNn7dyiaYyAeyEkqZ6tP50dicfRBwyQx8+G1ZT5IKlClRpZnvf3ETLXFzDCnOww5lczEAoOfLHaoE7sYYE7acnsRSkUWaOKFYMBZXBNfhQK+nnirsbk52tv+0j329+54hd9wYe313YOFPtfYrNtDpfkv6f8WQX0PAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -925,18 +941,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPLkpNLEmNT8+ITyyPL8ktiE/JLNIrzlACDAA=')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPLkpNLEmNT8+ITyyPL8ktiE/JLNIrzlACDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -955,18 +975,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GH_TOKEN', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPzs9Ly0wvLUqNT8+IT8svik/PSNUrzlACDAA=')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzs9Ly0wvLUqNT8+IT8svik/PSNUrzlACDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -996,18 +1020,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_GIT_REPOSITORY', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_TOKEN', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPzs9Ly0wvLUqNT88siU8uSk1JzSvJTMwp1ivOUAIMAA==')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzs9Ly0wvLUqNT88siU8uSk1JzSvJTMwp1ivOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1032,11 +1060,9 @@ jobs:
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'checkout_pr_branch.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/checkout_pr_branch.cjs');
             await main();
       - name: Setup Node.js
         id: wsl_setup_node
@@ -1051,24 +1077,28 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $env:WSLENV = 'RUNNER_TEMP/p:GH_AW_WSL_NODE_VERSION'
-          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt" -o "$staging/SHASUMS256.txt"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
+          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt" -o "$staging/SHASUMS256.txt"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not install the pinned Linux Node.js runtime.' }
       - name: Install Codex CLI
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'NPM_CONFIG_IGNORE_SCRIPTS', 'NPM_CONFIG_MIN_RELEASE_AGE', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           $compressedScript = [System.Convert]::FromBase64String('yivIVcjMKy5JzMlR0E1XcMgvSM1LzNRPzk9JrXAw0DM0M9czAAwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1093,18 +1123,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GH_HOST', 'GH_TOKEN', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9bPzCsuSczJiU8sT4tPysxLLKrUK85QUigz0DOy1DM0VNDVLcrPL8lJLS4GDAA=')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9bPzCsuSczJiU8sT4tPysxLLKrUK85QUigz0DOy1DM0VNDVLcrPL8lJLS4GDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1127,9 +1161,7 @@ jobs:
           GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
+            const determineAutomaticLockdown = require('${{ runner.temp }}/gh-aw-setup/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
         if: steps.checkout-pr.outputs.checked_out == 'true'
@@ -1139,18 +1171,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_FILES', 'GH_AW_AGENT_FOLDERS', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9YvSi0uyS9KjU9KLE6NT88syShNik/Lz0lJLSrWK85QAgwA')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvSi0uyS9KjU9KLE6NT88syShNik/Lz0lJLSrWK85QAgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1172,18 +1208,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_SUB_AGENT_DIR', 'GH_AW_SUB_AGENT_EXT', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9YvSi0uyS9Kjc/My8nMS40vLk2KT0xPzSsp1ivOUAIMAA==')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvSi0uyS9Kjc/My8nMS40vLk2KT0xPzSsp1ivOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1204,18 +1244,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_SKILL_DIR', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9YvSi0uyS9Kjc/My8nMS40vzs7MySnWK85QAgwA')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvSi0uyS9Kjc/My8nMS40vzs7MySnWK85QAgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1234,18 +1278,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('hNG/bhRBDAbwV4ki2tuzPR7PzFU0KYlQBHXkGdt3K5LbcJs/IMS7o4AiikRK5cr62d/XdT2cnX/4dfX18vLi6vrLxafPv7f7w0aftjru5+W4bm15Ot4sate2jG9+up5vde/rtB7Oz/aHcZrmZbuf7w8P/d/eJuaTP+nNzVb3frzfwURtQvy4HpSy7GoprCWNlDG13BmN1ECDzTpLbQBlSDFPw6B2a8Gp96rgCUAa+Hvm3by5Oy0/fr5yq5GBJ8yaga2lMI5eK5cwCOklmKUFo0oMAS492WiSeWTRTuMdd/3+MNsrU7Ck5iMasRlZz56jSybrpFZJVcNQMAslasVM+6jPJyTpVLm8bd6Ou/3uEaY8yQuUmIYJsWNgadawO5kXRZYYHKkWaORCLqMqlwxipSVyxGSUEN+Gjov5/9pSZqqDjF2AokGp2BVGLjgYwGtES6O4Y4aqJVvBqMUTO2Mer+P7O55/2ax+evTT7pEmnODFC4EsMRB6RIxRR0UVxqLkbShShSpcvJoJcBMm5XBVcweHqPpnAA==')
+          $compressedScript = [System.Convert]::FromBase64String('hNExb1NBDAfwr1JVrHmxfT7fXSaWjlSogrnyne0kos0LeWkLQnx3VETF0EqdPFk/+//vuuwuLj/8uvl6fX11c/vl6tPn3+vtbqVPq8XPD8e1jvN+Pixrm58Od7Parc3jm59u9/e69WVadpcX2904Tft5vd2fdw/933bsT/6kd3dr3frhvIGJ2oT4cdkpZdnUUlhLGiljarkzGqmBBpt1ltoAypBinoZB7daCU+9VwROANPD3zON+dTzNP36+cquRgSfMmoGtpTCOXiuXMAjpJZilBaNKDAEuPdloknlk0U7jHXf5/rC3V6ZgSc1HNGIzsp49R5dM1kmtkqqGoWAWStSKmfZRn09I0qlyedu8H8ft5hGmPMkLlJiGCbFjYGnWsDuZF0WWGBypFmjkQi6jKpcMYqUlcsRklBDfhg6z+f/aUmaqg4xdgKJBqdgVRi44GMBrREujuGOGqiVbwajFEztjHq/j+zuef1ktfnr00+aRJpzgxQuBLDEQekSMUUdFFcai5G0oUoUqXLyaCXATJuVwVXMHh6j6ZwA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1264,18 +1312,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'CODEX_HOME', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_CODEX_CONFIG_JSON', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('tM1BroIwEADQPaeYNCz+X4ycgqXEEF03pTPUmtIhdACNencT7+AJXmEFFJjjzKOLqfJCfAfiYQ0wCXEqgDismRITvMDUf16myWUC3CAL8b8BUz/7S9e1vT23x9O7CVd0e+O8Rsml8ZI3XtQGp7y7h/WSxxjsFzr4WzGASHFhr6giqVQ/MgYRLbq4ufoMAA==')
+          $compressedScript = [System.Convert]::FromBase64String('tM1RboMwDADQf05hRXxsHx6n4HNoQut3FGKTpgpxRAy0anv3Sr1DT/AqK6BAiYVnF1PjhfgKxNMWYBHiVAFx2jIlJniAab+8LIvLBLhDFuJvA6a9j6dh6Ef73//+PbtwRndgZd1K57xGybXzknde1QanfLib9ZLnGOyb+/GXagCR4speUUVSbT4qTSJadXWleQ0A')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1297,18 +1349,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           $compressedScript = [System.Convert]::FromBase64String('ys1OySxS0C1QUFKpDgr183MNig9x9Q2o1U/P0E0s1y9OTEvNLy0pKC0pVuKCq9UvyS3AVIBVPje5QDcnP70YRSFgAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1331,11 +1387,9 @@ jobs:
           GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"labels\":[\"automation\",\"ai-generated\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[windows] \"},\"create_report_incomplete_issue\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'create_files.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/create_files.cjs');
             await main();
       - name: Generate Safe Outputs Tools
         env:
@@ -1468,11 +1522,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'generate_safe_outputs_tools.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/generate_safe_outputs_tools.cjs');
             await main();
       - name: Start MCP Gateway
         id: start-mcp-gateway
@@ -1495,18 +1547,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'CODEX_HOME', 'DEBUG', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_SINK_VISIBILITY', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_MCP_GUARD_MIN_INTEGRITY', 'GITHUB_MCP_GUARD_REPOS', 'GITHUB_MCP_SERVER_TOKEN', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_TOKEN', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('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')
+          $compressedScript = [System.Convert]::FromBase64String('lFltc6JKFv7ur+jipm7u7AbfYqJhr1tLtFUmCi7gZLIzU10EWuWOAtugmVTG/77VgNhAM2a/TIZznufh0HSfFwxxBETsg8AN8NJyN7Xtd8clQAyAcPGmL1QV6siEs/mhsVqL1ktjawei7XtLdyXU3CX4AkSPIseKOVncI/gJqiaay+ZEEg8C+AZ+/51CCBdCAf8A0Rp7NQDGEyQ/IkMeQW1hzhemwQD7/FBCa4n9XRTsorCxcqP17hnhPfai+l+h7wk1AOyg6r7U/IsbHigb/wh8EoESvX+evHRrtd8ATARWVoRfrFeAvb1LfG+LvQjsLeJazxscgqVPwGwwB8maAstzMkJoEzeIamkcs8EcjWUTPspPaK7pZl/oNXtNgeceajNZUfuC9bJdiVs7WHFRE80wM+jGt63N2g8jocZi5DF9KmXYv/jDD7AXhhtAaIjisxXi2w7o3ICfICJAdMBl4+/9yw81bK99IEiS5Tji1gq/S9LFG0/xwI3p6OU+tPw01eQhGip6X2hE24DZkYH1uvEtJxRy27eCzb/1EWAo/4HInOjQmGjTYV+4aXfavR4/2ulUe4RDNNMWqol0TTON/mnDPWr6gzGXB/AgkZcr3g6WiH91bmdTbsMPIoqlDx1f70LSeHa9xmotET8LLdmUcx1NoDxE97IB0b0uqwNmx3Kc9KD+QsGYyBV0YyKf4epwrlWQqesMe64jdTG7h3qFROY/G8WoMohRNZcfPD9uU9bH0IydyJguxide0VPmQnWsqLAv2L6Df+RP3yI+eK4DxB1o/7Ph4H3D22024OdPEB+zy+blhxxhnBFW1YTQ3xEb89O7GOJoFzQsO3J9L2wQHPqbPUaOb3/HBIX0T4RWrlMP1xWZZ/AAdTTQZjNZHfYvEyIgOw+ILhBFsgWi6OHoxSffwTNxnRWmZ7XV7tab9Wa9JV0Wj62mmwfhsspO1awtBlmmA6JIMw/NZID+U08iqLtehIlnbSRqFI8ZVhR3ISagKL5Qhrx7jmMzEMUV8XcBvU/MTJ/Z0AYPGWRf8iSV4VJq7C3SIDuvkQZG1xSIuJTei7YkURetx3xZUjhluypXPs9RVBourQv9nef+kBqNqmiH8H4xLipPtfHxhsnWps6SkRZNlFZNvhUNNHWkjOMlq0CYmjY1CoDiUTt5OFmvwmlM5AoPla1wZYmokjoqewp62lQZpAUFDXQomxDNF9Mp0uG/F9AwT0jt/iMc0EZj8IBm8md0/2RCo9qdXFcATGVG+xc0q/CPoDmYoCGcmxMGIRsGNI3SOqZmetN4az3cl3zHegk/JxEN4UheTE1WKimddOMYUP9Ek5P2ANWCa7yQ9SGaKSpSVBOOdcV84iLoGrN7TFEf0CfFUO6VaZ4SAxVT01ljGsBCn7LGicxcZSWesRUD1hdqekAZA7NfTkbZpJnYZKwftXvmSh6YisZKJz2nKs9gyZgdjYyq6cXrfFimrozHUFfUcQlNH3M01R45pmxzF8z5dcqDdDgqBk1N5tOcNaWnhCWyp4mpXeylpk3RQB5MYClTlns1dj0ekWbCKTJ1eQDz63J0zWWdLqwxl4/vMzbDzzRbQx1p5nQeBw31WHmgDeFnNNHoc+5BRb8qVdnJS8yijV/a/R1VpLQLPBaZUreZVi6e/cRiS79wyWk73wUiL2C1tknd9dMBLMHElVjaN+s39dt/hWurfXMrXXfatnPb7uDWstW9c+5az7jt4K7V6twu7c7yutdt3rXxbRvf2j2r071p3jrdu+s2brWunfZ1q3VZy7dNyfImlaJ/blRtxM1VepGOh7XfwBh7mFgRBh8NTT1OYMeBLO0RasntVG0I+xd/vKxdew0838HF/sr2t9t4Mtpz3XH7RR0farYVgT//ZEpkWu6wZbfb13et59ZN967V6SCojcBPIFycIhDe1bWFkUUitLUDlD5D3f4rFGpvNQCErR0YmOwxCQUJUAsAQvLqsmsABNv3Isv1MBEkIBTfcPyHvmIxjJWkfbveqjeFqyMbe3tGDAAh3YojKJsLHRpUdOnijROiwCLWVrgqQWkPQmEXpVzMAc+hbmiqPEXyYAANI8nALLtYTjgaOs02mjp9orwWBxB3HNCMg6fLg39EVwQHfnjlhuEOh1fBbrNBBP93h8MoFFL+IVuU1c4ijhj4G9d2cZhfH2uz8V9E39u85uz0dbmeSFvXFXGj1+IjccogEzgAQhwfnxVXPCEDH2rs3zRqgTnq794d8X6kG/148Hvd65tOu2e3nQ6+bbaXd81ur/VsNe2bbsvuNJu4t1zeXdtdjFs3zZ7VvXG6rWWvi687uNO6se3Tvtr6Oy+O5IvwlTdlf+WP3sIVOPv9SHrHGE51TumaydzU9y2L0iKrJEYxZvCCYtDYi8hr4LteRBczXAscj5wp2lQxXIOzn8OSFEAtKDXRfECntm/VxzRu6mkYXy/e4v8f2HOQb9YyGGvM4Ss7v5Ra6a9Wyd2a46lmMl0pj864ORrMGJMjM3YOi51XcjTWcYbHTkKVGizonN5pbqqWO2E4asUhKydTdHL45wadnN45ME+/POrlJcv+cyrGRK6WMCbyOT5djmoB6j2nkA2Y1TIZ5Hw0o18FM/oFv/JBys9QnE+OtKK9msXu0fIHfF4BP45wedbJzmMx7zYzHLjVP20pTsjYxMNmeT6PZ9I/w2HyeArPNd2ld8Ed/3MvhYt4h1Jy/WutFHNG7fRZoVLsBDmjxX6CqFRjQYf/r/V6IW6ExdD1vhdbL8u2cUCr8hfGCoDwN4G5/pbrt6iMuHdD99ndHPu1N+63h0Nl61VLIxfS3v3UptPhR5DARfFLYdqsOf7Wcr3knuUPh8dlFqwV9iLFKeNOP8ykyHQWHbqkDM79mnLsFmnPsQtMd0vbEEECrXYzddHfjiK8wVscEbbHFbDnZM3PxRtnoIbqcK4pKpPqhYhYNj4+QcX8zsDDwPIq0PmR/iCc3kDtUHvXfEanSOPVs+nwuMckwgQk/RaIfED3Fv2Rj/0UQKfLAR1Ga8LFH4WZ8cP7xrv0VsfhDiVzK4pH3HjSA6Jo+8FrOu7W/jcA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1531,28 +1587,30 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
-            const { main } = require(path.join(actionsDir, 'mount_mcp_as_cli.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/mount_mcp_as_cli.cjs');
             await main();
       - name: Clean credentials
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPzklNzItPzyyJTy5KTUnNK8lMzCnWK85Q4iJCc1lqUWZaJVbdgAEA')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzklNzItPzyyJTy5KTUnNK8lMzCnWK85Q4iLaiLLUosy0SqxmAAYA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1573,18 +1631,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPLE3JLIkvKEqNT0xPzSuJL88vyi4uSExO1SvOUAIMAA==')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPLE3JLIkvKEqNT0xPzSuJL88vyi4uSExO1SvOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1605,11 +1667,9 @@ jobs:
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { fetchAndLogRateLimit } = require(path.join(actionsDir, 'github_rate_limit_logger.cjs'));
+            const { fetchAndLogRateLimit } = require('${{ runner.temp }}/gh-aw-setup/actions/github_rate_limit_logger.cjs');
             await fetchAndLogRateLimit(github, 'agent_start', true);
       - name: Execute Codex CLI
         id: agentic_execution
@@ -1617,18 +1677,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('AWF_REFLECT_ENABLED', 'CI', 'CODEX_HOME', 'COPILOT_DUMMY_BYOK', 'COPILOT_GITHUB_TOKEN', 'DEFAULT_BRANCH', 'GH_AW_ADMISSION_MAX_AI_CREDITS', 'GH_AW_ADMISSION_RESULT', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_LLM_PROVIDER', 'GH_AW_LLM_PROVIDER_EXPLICIT', 'GH_AW_MAX_AI_CREDITS', 'GH_AW_MAX_TURNS', 'GH_AW_MCP_CONFIG', 'GH_AW_MCP_LOG_DIR', 'GH_AW_MODEL_AGENT_CODEX', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PHASE', 'GH_AW_PROJECT_UTC', 'GH_AW_PROMPT', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_VERSION', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_AW', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'GIT_AUTHOR_EMAIL', 'GIT_AUTHOR_NAME', 'GIT_COMMITTER_EMAIL', 'GIT_COMMITTER_NAME', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'RUST_LOG', 'TEMP', 'TMP', 'TMPDIR', 'TRACEPARENT')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('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')
+          $compressedScript = [System.Convert]::FromBase64String('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')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1676,11 +1740,9 @@ jobs:
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { fetchAndLogRateLimit } = require(path.join(actionsDir, 'github_rate_limit_logger.cjs'));
+            const { fetchAndLogRateLimit } = require('${{ runner.temp }}/gh-aw-setup/actions/github_rate_limit_logger.cjs');
             await fetchAndLogRateLimit(github, 'agent_end', true);
       - name: Detect agent errors
         if: always()
@@ -1689,15 +1751,13 @@ jobs:
         env:
           GH_AW_AGENTIC_EXECUTION_OUTCOME: ${{ steps.agentic_execution.outcome }}
           GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: 10
-          GH_AW_ENGINE_INTERNAL_LOGS_DIR: /tmp/gh-aw/mcp-config/logs
+          GH_AW_ENGINE_INTERNAL_LOGS_DIR: ${{ runner.temp }}/gh-aw/mcp-config/logs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'detect_agent_errors.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/detect_agent_errors.cjs');
             await main();
       - name: Configure Git credentials
         env:
@@ -1707,18 +1767,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_GIT_REPOSITORY', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_TOKEN', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPzs9Ly0wvLUqNT88siU8uSk1JzSvJTMwp1ivOUAIMAA==')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzs9Ly0wvLUqNT88siU8uSk1JzSvJTMwp1ivOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1743,18 +1807,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GATEWAY_PID', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'MCP_GATEWAY_AGENT_ID', 'MCP_GATEWAY_PORT', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9YvLskviM9NLohPTyxJLU+s1CvOUFJQUnF3DHENd4yMD/B0UeICDAA=')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvLskviM9NLohPTyxJLU+s1CvOUFJQUnF3DHENd4yMD/B0UeICDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1775,11 +1843,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/redact_secrets.cjs');
             await main();
         env:
           GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
@@ -1798,27 +1864,29 @@ jobs:
           GH_AW_RECOVERY_ADDITIONAL_ROOTS: '[]'
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/validate_recovery_envelopes.cjs');
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Append agent step summary
         if: always()
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9ZPLChIzUuJT0xPzSuJLy5JLYgvLs3NTSyq1CvOUAIMAA==')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPLChIzUuJT0xPzSuJLy5JLYgvLs3NTSyq1CvOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1840,18 +1908,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           $compressedScript = [System.Convert]::FromBase64String('ys1OySxS0C1Q0C/JLdBPz9BNLOdKLlBQUnH3iHcMjw92dHON9w8NCQgNCVZCUqNfnJiWml9aUlBaUqyXVZyfl6NgZKefklqmn1eak6NQU6NQUlSaygUYAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1877,25 +1949,21 @@ jobs:
           GH_AW_COMMANDS: "[\"windows\"]"
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'collect_ndjson_output.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/collect_ndjson_output.cjs');
             await main();
       - name: Parse agent logs for step summary
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_AGENT_OUTPUT: /tmp/gh-aw/agent-stdio.log
+          GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/agent-stdio.log
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'parse_codex_log.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/parse_codex_log.cjs');
             await main();
       - name: Parse MCP Gateway logs for step summary
         if: always()
@@ -1903,11 +1971,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'parse_mcp_gateway_log.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/parse_mcp_gateway_log.cjs');
             await main();
       - name: Print firewall logs
         if: always()
@@ -1917,18 +1983,22 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('AWF_LOGS_DIR', 'CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
-          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXT0wuyczPK9YvKMrMK4lPyyxKLU/MyYnPyU8v1ivOUFLQ1S3Kzy/JSS0uBgwA')
+          $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvKMrMK4lPyyxKLU/MyYnPyU8v1ivOUFLQ1S3Kzy/JSS0uBgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -1950,11 +2020,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'parse_token_usage.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/parse_token_usage.cjs');
             await main();
       - name: Print AWF reflect summary
         if: always()
@@ -1962,40 +2030,40 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'awf_reflect_summary.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/awf_reflect_summary.cjs');
             await main();
       - name: Generate observability summary
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw-setup/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'generate_observability_summary.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/generate_observability_summary.cjs');
             await main(core);
       - name: Write agent output placeholder if missing
         if: always()
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
+          $pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')
           $pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
           foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }
+          $allowedEnvironmentVariables = @('CI', 'DEFAULT_BRANCH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_ASSETS_ALLOWED_EXTS', 'GH_AW_ASSETS_BRANCH', 'GH_AW_ASSETS_MAX_SIZE_KB', 'GH_AW_MCP_LOG_DIR', 'GH_AW_OBJECT_PACK_FETCH_DEPTHS', 'GH_AW_OBJECT_PACK_MAX_BYTES', 'GH_AW_OBJECT_PACK_MAX_OBJECTS', 'GH_AW_OBJECT_PACK_TIMEOUT_MS', 'GH_AW_PROJECT_UTC', 'GH_AW_PR_HEAD_BASE_BRANCH', 'GH_AW_PR_HEAD_BASE_PR_NUMBER', 'GH_AW_PR_HEAD_BASE_REF', 'GH_AW_PR_HEAD_BASE_REPO', 'GH_AW_PR_HEAD_BASE_SHA', 'GH_AW_PR_HEAD_REPO', 'GH_AW_RUNTIME_FEATURES', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_TARGET_REPO_SLUG', 'GH_AW_WORKFLOW_ID_SANITIZED', 'GH_AW_WSL_WORKING_DIRECTORY', 'GITHUB_ACTION', 'GITHUB_ACTIONS', 'GITHUB_API_URL', 'GITHUB_BASE_REF', 'GITHUB_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_EVENT_PATH', 'GITHUB_JOB', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_OWNER', 'GITHUB_RUN_ATTEMPT', 'GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_SERVER_URL', 'GITHUB_SHA', 'GITHUB_STEP_SUMMARY', 'GITHUB_WORKFLOW', 'GITHUB_WORKSPACE', 'HOME', 'RUNNER_ARCH', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'TEMP', 'TMP', 'TMPDIR')
+          $workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }
+          $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
-          $environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }
+          $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
           $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
           $compressedScript = [System.Convert]::FromBase64String('ykxTiFZQVNBNU9AvyS3QT8/QTSzXT0xPzSuJzy8tKSgt0csqzs9TiLVWKMlIzeNSUEhNzshXUK9WyixJzS1WsoqOrVVXsMOrmSstkwswAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
           $reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)
           try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          $scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent
+          $scriptContent = 'unset GH_AW_NODE_BIN; export PATH="/usr/local/lib/nodejs/current/bin:$PATH"; cd "$GH_AW_WSL_WORKING_DIRECTORY"' + "`n" + $scriptContent
           $scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'
           New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
           $hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')
@@ -2019,12 +2087,10 @@ jobs:
           GH_AW_OBJECT_PACK_MAX_OBJECTS: ${{ vars.GH_AW_OBJECT_PACK_MAX_OBJECTS }}
           GH_AW_OBJECT_PACK_TIMEOUT_MS: ${{ vars.GH_AW_OBJECT_PACK_TIMEOUT_MS }}
           GH_AW_OBJECT_PACK_FETCH_DEPTHS: ${{ vars.GH_AW_OBJECT_PACK_FETCH_DEPTHS }}
-          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/mcp-config/logs/","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt","${{ runner.temp }}/gh-aw/agent_execution.json","${{ runner.temp }}/gh-aw/agent_execution_exit_code.txt","${{ runner.temp }}/gh-aw/agent-session.jsonl","${{ runner.temp }}/gh-aw/agent-errors.jsonl","${{ runner.temp }}/gh-aw/aw-prompts/user.txt","${{ runner.temp }}/gh-aw/aw-prompts/system.txt","${{ runner.temp }}/gh-aw/skill_inventory.json","${{ runner.temp }}/gh-aw/mcp-config/logs/","${{ runner.temp }}/gh-aw/redacted-urls.log","${{ runner.temp }}/gh-aw/mcp-logs/","${{ runner.temp }}/gh-aw/agent_usage.json","${{ runner.temp }}/gh-aw/agent/model-resolution.json","${{ runner.temp }}/gh-aw/agent-stdio.log","${{ runner.temp }}/gh-aw/agent/harness_retry.json","${{ runner.temp }}/gh-aw/pre-agent-audit.txt","${{ runner.temp }}/gh-aw/github_rate_limits.jsonl","${{ runner.temp }}/gh-aw/otel.jsonl","${{ runner.temp }}/gh-aw/otlp-export-errors.jsonl","${{ runner.temp }}/gh-aw/safeoutputs.jsonl","${{ runner.temp }}/gh-aw/agent_output.json","${{ runner.temp }}/gh-aw","${{ runner.temp }}/gh-aw","${{ runner.temp }}/gh-aw/awf-config.json","${{ runner.temp }}/gh-aw/awf-resolved-config.json","${{ runner.temp }}/gh-aw/sandbox/firewall/logs/","${{ runner.temp }}/gh-aw/sandbox/firewall/audit/","${{ runner.temp }}/gh-aw/sandbox/firewall/awf-reflect.json"]'
         with:
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/validate_recovery_envelopes.cjs');
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact

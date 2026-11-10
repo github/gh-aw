@@ -3,7 +3,7 @@ package workflow
 import (
 	"fmt"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -42,13 +42,20 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 		}
 	}
 	steps = append(steps, checkoutMgr.generateConfigureGitCredentialsStepsForRoot(prCheckoutToken, condition, rootRepo)...)
-	c.prCheckoutLintBlock = preparePRCheckoutLintBlock(steps, c.formatFrameworkJobRunsOn(data))
+	jobEnvironment := c.buildJobLevelSafeOutputEnvVars(data, GetWorkflowIDFromPath(c.markdownPath))
+	jobEnvironmentNames := make([]string, 0, len(jobEnvironment))
+	for name := range jobEnvironment {
+		jobEnvironmentNames = append(jobEnvironmentNames, name)
+	}
+	jobEnvironmentNames = append(jobEnvironmentNames, runtimeFeaturesEnvVarName)
+	slices.Sort(jobEnvironmentNames)
+	c.prCheckoutLintBlock = preparePRCheckoutLintBlock(steps, c.formatFrameworkJobRunsOn(data), jobEnvironmentNames)
 	consolidatedSafeOutputsStepsLog.Printf("Built shared PR checkout steps with condition: %s", condition.Render())
 	return steps
 }
 
-func preparePRCheckoutLintBlock(steps []string, runsOn string) string {
-	block := renderStepForRunner(strings.Join(steps, ""), runsOn, string(constants.SafeOutputsJobName))
+func preparePRCheckoutLintBlock(steps []string, runsOn string, jobEnvironmentVariables []string) string {
+	block := renderStepForRunnerWithEnvironment(strings.Join(steps, ""), runsOn, string(constants.SafeOutputsJobName), jobEnvironmentVariables)
 	finalized, err := finalizeRunnerTempSafety(block)
 	if err != nil {
 		return ""
@@ -269,7 +276,7 @@ func (c *Compiler) buildDispatchRepositoryAppTokenSteps(data *WorkflowData) []st
 		for toolKey := range data.SafeOutputs.DispatchRepository.Tools {
 			toolKeys = append(toolKeys, toolKey)
 		}
-		sort.Strings(toolKeys)
+		slices.Sort(toolKeys)
 		globalStaged := templatableBoolIsTrue(data.SafeOutputs.Staged)
 		for _, toolKey := range toolKeys {
 			tool := data.SafeOutputs.DispatchRepository.Tools[toolKey]
@@ -407,7 +414,7 @@ func generateSafeOutputScriptContent(scriptName string, scriptConfig *SafeScript
 				inputNames = append(inputNames, name)
 			}
 		}
-		sort.Strings(inputNames)
+		slices.Sort(inputNames)
 		sb.WriteString("  const { " + strings.Join(inputNames, ", ") + " } = config;\n")
 	}
 

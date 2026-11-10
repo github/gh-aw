@@ -291,6 +291,7 @@ func TestRenderStepForRunner(t *testing.T) {
 		"'RUNNER_TEMP'",
 		"'RUNNER_TOOL_CACHE'",
 		"'GITHUB_OUTPUT'",
+		"'GH_AW_WSL_WORKING_DIRECTORY'",
 	} {
 		if !strings.Contains(got, pathVariable) {
 			t.Errorf("Windows step did not map %s into WSL:\n%s", pathVariable, got)
@@ -298,6 +299,15 @@ func TestRenderStepForRunner(t *testing.T) {
 	}
 	if !strings.Contains(got, "$pathVariableSet.Contains($_) -or $value -match") || !strings.Contains(got, "\"$_/p\"") {
 		t.Fatalf("Windows step did not mark host paths for WSL conversion:\n%s", got)
+	}
+	if !strings.Contains(got, "$environmentNames = $allowedEnvironmentVariables | Where-Object") ||
+		strings.Contains(got, "$processEnvironment.Keys | Where-Object") {
+		t.Fatalf("Windows step did not restrict WSL environment forwarding:\n%s", got)
+	}
+	if !strings.Contains(got, `cd "$GH_AW_WSL_WORKING_DIRECTORY"`) ||
+		!strings.Contains(got, "+ \"`n\" +") ||
+		strings.Contains(got, "[System.Environment]::NewLine") {
+		t.Fatalf("Windows step did not preserve its working directory with LF line endings:\n%s", got)
 	}
 	for _, expected := range []string{
 		"& $wsl.Source --status",
@@ -309,7 +319,7 @@ func TestRenderStepForRunner(t *testing.T) {
 			t.Errorf("Windows job lacks WSL bootstrap requirement %q:\n%s", expected, got)
 		}
 	}
-	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose" {
+	if script := decodeWindowsWSLRunScript(t, got); script != "echo \"${RUNNER_TEMP}/gh-aw-setup/actions/setup.sh\" --verbose" {
 		t.Fatalf("WSL adapter changed the POSIX script: %q", script)
 	}
 
@@ -339,6 +349,7 @@ func TestRenderStepForRunner(t *testing.T) {
 		"name: Setup Node.js in WSL",
 		"${{ steps.wsl_setup_node.outputs.node-version }}",
 		"SHASUMS256.txt",
+		"ln -sfn \"$install_dir\" /usr/local/lib/nodejs/current",
 	} {
 		if !strings.Contains(got, expected) {
 			t.Errorf("Windows job did not bootstrap the Linux Node.js runtime (%q):\n%s", expected, got)
@@ -352,6 +363,35 @@ func TestRenderStepForRunner(t *testing.T) {
 
 	if got = renderStepForRunner(windowsStep, "runs-on: windows-latest", "release"); got != windowsStep {
 		t.Fatalf("Unrelated Windows job changed:\n%s", got)
+	}
+}
+
+func TestRenderStepForRunnerPreservesWorkingDirectoryAndExplicitEnvironment(t *testing.T) {
+	job := `  agent:
+    env:
+      JOB_SETTING: value
+    steps:
+      - name: Run framework
+        working-directory: ${{ github.workspace }}/subdirectory
+        env:
+          FRAMEWORK_TOKEN: ${{ secrets.FRAMEWORK_TOKEN }}
+        run: pwd
+`
+	got := renderStepForRunner(job, "runs-on: windows-latest", "agent")
+	for _, expected := range []string{
+		"'JOB_SETTING'",
+		"'FRAMEWORK_TOKEN'",
+		`cd "$GH_AW_WSL_WORKING_DIRECTORY"`,
+		"wslpath -u (Get-Location).Path",
+	} {
+		if !strings.Contains(got, expected) {
+			t.Errorf("Windows WSL wrapper lacks %q:\n%s", expected, got)
+		}
+	}
+	for _, excluded := range []string{"'GITHUB_TOKEN'", "UNRELATED_SECRET"} {
+		if strings.Contains(got, excluded) {
+			t.Errorf("Windows WSL wrapper unexpectedly forwards %q:\n%s", excluded, got)
+		}
 	}
 }
 
@@ -382,6 +422,15 @@ func decodeWindowsWSLRunScript(t *testing.T, rendered string) string {
 
 func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
 	job := `    steps:
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+      - name: Set runtime paths
+        run: |
+          echo "GH_AW_SAFE_OUTPUTS=${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl" >> "$GITHUB_OUTPUT"
+          echo "GH_AW_SAFE_OUTPUTS_CONFIG_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/config.json" >> "$GITHUB_OUTPUT"
+          echo "GH_AW_SAFE_OUTPUTS_TOOLS_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/tools.json" >> "$GITHUB_OUTPUT"
       - name: Upload generated data
         uses: actions/upload-artifact@v4
         with:
@@ -398,8 +447,48 @@ func TestRenderStepForRunnerMapsArtifactTempPaths(t *testing.T) {
 	if !strings.Contains(got, `ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw`) {
 		t.Fatalf("WSL bootstrap did not map /tmp/gh-aw to runner temp:\n%s", got)
 	}
+	if !strings.Contains(got, "destination: ${{ runner.temp }}/gh-aw-setup/actions") {
+		t.Fatalf("Windows setup scripts were not separated from writable runtime artifacts:\n%s", got)
+	}
 	if !strings.Contains(got, "uses: actions/upload-artifact@v4") {
 		t.Fatalf("Windows artifact action was not preserved:\n%s", got)
+	}
+	if script := decodeWindowsWSLRunScript(t, got); !strings.Contains(script, `GH_AW_SAFE_OUTPUTS=$(wslpath -w "${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl")`) {
+		t.Fatalf("Windows native helpers were not given host paths for runtime outputs:\n%s", script)
+	}
+}
+
+func TestRewriteWindowsActionTempPathMapsNativeEnvironmentPaths(t *testing.T) {
+	step := `      - name: Parse agent output
+        uses: actions/github-script@v7
+        env:
+          GH_AW_AGENT_OUTPUT: /tmp/gh-aw/agent-stdio.log
+          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+`
+	got := rewriteWindowsActionTempPath(step)
+	if !strings.Contains(got, `GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/agent-stdio.log`) {
+		t.Fatalf("Native helper output path was not mapped to runner temp:\n%s", got)
+	}
+	if strings.Contains(got, "/tmp/gh-aw") {
+		t.Fatalf("Native helper retained an incompatible POSIX path:\n%s", got)
+	}
+}
+
+func TestRewriteWindowsPathOutputs(t *testing.T) {
+	runtimePaths := rewriteWindowsPathOutputs(
+		"Set runtime paths",
+		`echo "GH_AW_SAFE_OUTPUTS=${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl" >> "$GITHUB_OUTPUT"`,
+	)
+	if !strings.Contains(runtimePaths, `GH_AW_SAFE_OUTPUTS=$(wslpath -w "${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl")`) {
+		t.Fatalf("Set runtime paths did not publish a Windows-native output path:\n%s", runtimePaths)
+	}
+
+	agentOutput := rewriteWindowsPathOutputs(
+		"Setup agent output environment variable",
+		"if [ -f \"/tmp/gh-aw/agent_output.json\" ]; then\n  echo \"GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json\" >> \"$GITHUB_OUTPUT\"\nfi\n",
+	)
+	if !strings.Contains(agentOutput, `GH_AW_AGENT_OUTPUT=$(wslpath -w "${RUNNER_TEMP}/gh-aw/agent_output.json")`) {
+		t.Fatalf("Agent output setup did not publish a Windows-native path:\n%s", agentOutput)
 	}
 }
 

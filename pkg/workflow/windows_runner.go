@@ -5,8 +5,11 @@ import (
 	"compress/flate"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -40,12 +43,16 @@ func windowsWSLNodeBootstrapStep(nodeSetupID string) string {
         run: |
           $ErrorActionPreference = 'Stop'
           $env:WSLENV = 'RUNNER_TEMP/p:GH_AW_WSL_NODE_VERSION'
-          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt" -o "$staging/SHASUMS256.txt"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
+          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt" -o "$staging/SHASUMS256.txt"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not install the pinned Linux Node.js runtime.' }
 `, nodeSetupID)
 }
 
 func renderStepForRunner(jobYAML, runsOn, jobName string) string {
+	return renderStepForRunnerWithEnvironment(jobYAML, runsOn, jobName, windowsJobEnvironmentVariableNames(jobYAML))
+}
+
+func renderStepForRunnerWithEnvironment(jobYAML, runsOn, jobName string, jobEnvironmentVariables []string) string {
 	if strings.TrimSpace(strings.TrimPrefix(runsOn, "runs-on:")) != "windows-latest" {
 		return jobYAML
 	}
@@ -56,7 +63,7 @@ func renderStepForRunner(jobYAML, runsOn, jobName string) string {
 	stepsHeader := "    steps:\n"
 	headerIndex := strings.Index(jobYAML, stepsHeader)
 	if headerIndex < 0 {
-		renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML)
+		renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML, jobEnvironmentVariables)
 		if !hasWSLRun {
 			return jobYAML
 		}
@@ -64,14 +71,14 @@ func renderStepForRunner(jobYAML, runsOn, jobName string) string {
 	}
 
 	headerEnd := headerIndex + len(stepsHeader)
-	renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML[headerEnd:])
+	renderedSteps, hasWSLRun := renderWindowsSteps(jobYAML[headerEnd:], jobEnvironmentVariables)
 	if !hasWSLRun {
 		return jobYAML
 	}
 	return jobYAML[:headerEnd] + windowsWSLBootstrapStep + renderedSteps
 }
 
-func renderWindowsSteps(stepsYAML string) (string, bool) {
+func renderWindowsSteps(stepsYAML string, jobEnvironmentVariables []string) (string, bool) {
 	var steps []string
 	var currentStep strings.Builder
 	for _, line := range strings.SplitAfter(stepsYAML, "\n") {
@@ -85,19 +92,14 @@ func renderWindowsSteps(stepsYAML string) (string, bool) {
 		steps = append(steps, currentStep.String())
 	}
 
-	hasWSLRun := false
-	for _, step := range steps {
-		if isWindowsPOSIXRunStep(step) {
-			hasWSLRun = true
-			break
-		}
-	}
+	hasWSLRun := slices.ContainsFunc(steps, isWindowsPOSIXRunStep)
 	if !hasWSLRun {
 		return stepsYAML, false
 	}
 
 	var renderedSteps strings.Builder
 	for _, step := range steps {
+		step = rewriteWindowsSetupActionPath(step)
 		step = rewriteWindowsActionTempPath(step)
 		if isWindowsNodeSetupStep(step) {
 			step, nodeSetupID := addWindowsNodeSetupID(step)
@@ -105,7 +107,7 @@ func renderWindowsSteps(stepsYAML string) (string, bool) {
 			renderedSteps.WriteString(windowsWSLNodeBootstrapStep(nodeSetupID))
 			continue
 		}
-		renderedSteps.WriteString(renderWindowsPOSIXRunStep(step))
+		renderedSteps.WriteString(renderWindowsPOSIXRunStep(step, jobEnvironmentVariables))
 	}
 	return renderedSteps.String(), true
 }
@@ -115,27 +117,33 @@ func isWindowsNodeSetupStep(step string) bool {
 	if !ok {
 		return false
 	}
-	uses, _ := fields["uses"].(string)
-	return strings.HasPrefix(uses, "actions/setup-node@")
+	uses, ok := fields["uses"].(string)
+	return ok && strings.HasPrefix(uses, "actions/setup-node@")
 }
 
 func addWindowsNodeSetupID(step string) (string, string) {
-	fields, _ := parseWindowsStep(step)
-	id, _ := fields["id"].(string)
-	if id != "" {
-		return step, id
+	fields, ok := parseWindowsStep(step)
+	if ok {
+		if id, ok := fields["id"].(string); ok && id != "" {
+			return step, id
+		}
 	}
 
 	const nodeSetupID = "wsl_setup_node"
-	lines := strings.SplitAfter(step, "\n")
-	for i, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "uses:") {
+	var rendered strings.Builder
+	inserted := false
+	for _, line := range strings.SplitAfter(step, "\n") {
+		if !inserted && strings.HasPrefix(strings.TrimSpace(line), "uses:") {
 			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
-			lines = append(lines[:i], append([]string{indent + "id: " + nodeSetupID + "\n"}, lines[i:]...)...)
-			break
+			rendered.WriteString(indent + "id: " + nodeSetupID + "\n")
+			inserted = true
 		}
+		rendered.WriteString(line)
 	}
-	return strings.Join(lines, ""), nodeSetupID
+	if !inserted {
+		return step, ""
+	}
+	return rendered.String(), nodeSetupID
 }
 
 func isWindowsPOSIXRunStep(step string) bool {
@@ -146,13 +154,73 @@ func isWindowsPOSIXRunStep(step string) bool {
 	if _, ok := fields["run"].(string); !ok {
 		return false
 	}
-	shell, _ := fields["shell"].(string)
+	shell, ok := fields["shell"].(string)
+	if !ok {
+		shell = ""
+	}
 	return isWindowsPOSIXShell(shell)
 }
 
 func isWindowsPOSIXShell(shell string) bool {
 	shell = strings.ToLower(strings.TrimSpace(shell))
 	return shell == "" || shell == "bash" || strings.HasPrefix(shell, "bash ") || shell == "sh" || strings.HasPrefix(shell, "sh ")
+}
+
+func windowsJobEnvironmentVariableNames(jobYAML string) []string {
+	var document map[string]any
+	if err := yaml.Unmarshal([]byte(jobYAML), &document); err != nil {
+		return nil
+	}
+	if environment, ok := document["env"].(map[string]any); ok {
+		return validWindowsEnvironmentVariableNames(environment)
+	}
+	for _, value := range document {
+		job, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		if environment, ok := job["env"].(map[string]any); ok {
+			return validWindowsEnvironmentVariableNames(environment)
+		}
+	}
+	return nil
+}
+
+func windowsStepEnvironmentVariableNames(fields map[string]any) []string {
+	environment, ok := fields["env"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return validWindowsEnvironmentVariableNames(environment)
+}
+
+func validWindowsEnvironmentVariableNames(environment map[string]any) []string {
+	names := make([]string, 0, len(environment))
+	for name := range environment {
+		if isWindowsEnvironmentVariableName(name) {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
+func isWindowsEnvironmentVariableName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for index, character := range name {
+		if index == 0 {
+			if character == '_' || character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z' {
+				continue
+			}
+			return false
+		}
+		if character != '_' && (character < 'A' || character > 'Z') && (character < 'a' || character > 'z') && (character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
 }
 
 func parseWindowsStep(step string) (map[string]any, bool) {
@@ -169,7 +237,10 @@ func parseWindowsStep(step string) (map[string]any, bool) {
 	if err := yaml.Unmarshal([]byte(yamlStep.String()), &parsed); err != nil || len(parsed.Steps) != 1 {
 		return nil, false
 	}
-	return parsed.Steps[0], true
+	for _, parsedStep := range parsed.Steps {
+		return parsedStep, true
+	}
+	return nil, false
 }
 
 func rewriteWindowsActionTempPath(step string) string {
@@ -180,45 +251,69 @@ func rewriteWindowsActionTempPath(step string) string {
 	if _, ok := fields["uses"].(string); !ok {
 		return step
 	}
-	with, ok := fields["with"].(map[string]any)
-	if !ok {
-		return step
+	pathValue := ""
+	if with, ok := fields["with"].(map[string]any); ok {
+		if path, ok := with["path"].(string); ok {
+			pathValue = path
+		}
 	}
-	path, ok := with["path"].(string)
-	if !ok || !strings.HasPrefix(path, "/tmp/gh-aw") {
+	rewriteActionPath := pathValue == constants.TmpGhAwDir || strings.HasPrefix(pathValue, constants.TmpGhAwDirSlash)
+	_, rewriteEnvironmentPaths := fields["env"].(map[string]any)
+	if !rewriteActionPath && !rewriteEnvironmentPaths {
 		return step
 	}
 
-	lines := strings.SplitAfter(step, "\n")
-	for i, line := range lines {
+	var rendered strings.Builder
+	pathBlockIndent := -1
+	environmentIndent := -1
+	for _, line := range strings.SplitAfter(step, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "path:") {
-			continue
-		}
-		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "path:"))
-		if strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">") {
-			pathIndent := len(line) - len(strings.TrimLeft(line, " "))
-			for j := i + 1; j < len(lines); j++ {
-				lineWithoutNewline := strings.TrimSuffix(lines[j], "\n")
-				if strings.TrimSpace(lineWithoutNewline) != "" &&
-					len(lineWithoutNewline)-len(strings.TrimLeft(lineWithoutNewline, " ")) <= pathIndent {
-					break
-				}
-				lines[j] = rewriteWindowsArtifactPathLine(lines[j])
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		if pathBlockIndent >= 0 {
+			if trimmed == "" || indent > pathBlockIndent {
+				rendered.WriteString(rewriteWindowsArtifactPathLine(line))
+				continue
 			}
-			break
+			pathBlockIndent = -1
 		}
-		newline := ""
-		if strings.HasSuffix(line, "\n") {
-			newline = "\n"
-			line = strings.TrimSuffix(line, "\n")
+		if rewriteActionPath && strings.HasPrefix(trimmed, "path:") {
+			value := strings.TrimSpace(strings.TrimPrefix(trimmed, "path:"))
+			if strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">") {
+				pathBlockIndent = indent
+				rendered.WriteString(line)
+				continue
+			}
+			path := strings.Trim(value, `"'`)
+			if path == constants.TmpGhAwDir || strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
+				newline := ""
+				if strings.HasSuffix(line, "\n") {
+					newline = "\n"
+					line = strings.TrimSuffix(line, "\n")
+				}
+				indentation := line[:len(line)-len(strings.TrimLeft(line, " "))]
+				replacement := constants.GhAwRootDir + strings.TrimPrefix(path, constants.TmpGhAwDir)
+				line = indentation + "path: " + replacement + newline
+			}
 		}
-		indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
-		replacement := "${{ runner.temp }}/gh-aw" + strings.TrimPrefix(strings.Trim(value, `"'`), "/tmp/gh-aw")
-		lines[i] = indent + "path: " + replacement + newline
-		break
+		if rewriteEnvironmentPaths {
+			if environmentIndent < 0 && trimmed == "env:" {
+				environmentIndent = indent
+			} else if environmentIndent >= 0 {
+				if trimmed != "" && indent <= environmentIndent {
+					environmentIndent = -1
+				} else {
+					line = strings.ReplaceAll(line, constants.TmpGhAwDir, constants.GhAwRootDir)
+				}
+			}
+		}
+		rendered.WriteString(line)
 	}
-	return strings.Join(lines, "")
+	return rendered.String()
+}
+
+func rewriteWindowsSetupActionPath(step string) string {
+	step = strings.ReplaceAll(step, "gh-aw/actions", "gh-aw-setup/actions")
+	return strings.ReplaceAll(step, "'gh-aw', 'actions'", "'gh-aw-setup', 'actions'")
 }
 
 func rewriteWindowsArtifactPathLine(line string) string {
@@ -229,13 +324,13 @@ func rewriteWindowsArtifactPathLine(line string) string {
 	}
 	indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
 	path := strings.TrimSpace(line)
-	if !strings.HasPrefix(path, "/tmp/gh-aw") {
+	if path != constants.TmpGhAwDir && !strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
 		return line + newline
 	}
-	return indent + "${{ runner.temp }}/gh-aw" + strings.TrimPrefix(path, "/tmp/gh-aw") + newline
+	return indent + constants.GhAwRootDir + strings.TrimPrefix(path, constants.TmpGhAwDir) + newline
 }
 
-func renderWindowsPOSIXRunStep(step string) string {
+func renderWindowsPOSIXRunStep(step string, jobEnvironmentVariables []string) string {
 	fields, ok := parseWindowsStep(step)
 	if !ok {
 		return step
@@ -244,12 +339,52 @@ func renderWindowsPOSIXRunStep(step string) string {
 	if !ok {
 		return step
 	}
-	shell, _ := fields["shell"].(string)
+	shell, ok := fields["shell"].(string)
+	if !ok {
+		shell = ""
+	}
 	if !isWindowsPOSIXShell(shell) {
 		return step
 	}
+	stepName, ok := fields["name"].(string)
+	if !ok {
+		stepName = ""
+	}
+	script = rewriteWindowsPathOutputs(stepName, script)
 
 	lines := strings.SplitAfter(step, "\n")
+	runLine, shellLine, runIndent, runEnd, found := windowsRunStepBounds(lines)
+	if !found {
+		return step
+	}
+
+	environmentVariables := append(jobEnvironmentVariables, windowsStepEnvironmentVariableNames(fields)...)
+	wrapper := windowsWSLRunWrapper(script, environmentVariables)
+	var rendered strings.Builder
+	for i, line := range lines {
+		if i > runLine && i < runEnd {
+			continue
+		}
+		switch i {
+		case shellLine:
+			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+			rendered.WriteString(indent + "shell: pwsh\n")
+		case runLine:
+			if shellLine < 0 {
+				rendered.WriteString(strings.Repeat(" ", runIndent) + "shell: pwsh\n")
+			}
+			rendered.WriteString(strings.Repeat(" ", runIndent) + "run: |\n")
+			for _, wrapperLine := range wrapper {
+				rendered.WriteString(strings.Repeat(" ", runIndent+2) + wrapperLine + "\n")
+			}
+		default:
+			rendered.WriteString(line)
+		}
+	}
+	return rendered.String()
+}
+
+func windowsRunStepBounds(lines []string) (int, int, int, int, bool) {
 	runLine := -1
 	shellLine := -1
 	runIndent := 0
@@ -267,63 +402,163 @@ func renderWindowsPOSIXRunStep(step string) string {
 		}
 	}
 	if runLine < 0 {
-		return step
+		return 0, 0, 0, 0, false
 	}
 
 	runEnd := runLine + 1
 	if blockRun {
-		for runEnd < len(lines) {
-			line := strings.TrimSuffix(lines[runEnd], "\n")
+		for i, line := range lines {
+			if i <= runLine {
+				continue
+			}
+			line = strings.TrimSuffix(line, "\n")
 			if strings.TrimSpace(line) != "" && len(line)-len(strings.TrimLeft(line, " ")) <= runIndent {
+				runEnd = i
 				break
 			}
-			runEnd++
+			runEnd = i + 1
 		}
 	}
-
-	wrapper := windowsWSLRunWrapper(script)
-	var rendered strings.Builder
-	for i := 0; i < len(lines); i++ {
-		switch {
-		case i == shellLine:
-			indent := lines[i][:len(lines[i])-len(strings.TrimLeft(lines[i], " "))]
-			rendered.WriteString(indent + "shell: pwsh\n")
-		case i == runLine:
-			if shellLine < 0 {
-				rendered.WriteString(strings.Repeat(" ", runIndent) + "shell: pwsh\n")
-			}
-			rendered.WriteString(strings.Repeat(" ", runIndent) + "run: |\n")
-			for _, wrapperLine := range wrapper {
-				rendered.WriteString(strings.Repeat(" ", runIndent+2) + wrapperLine + "\n")
-			}
-			i = runEnd - 1
-		default:
-			rendered.WriteString(lines[i])
-		}
-	}
-	return rendered.String()
+	return runLine, shellLine, runIndent, runEnd, true
 }
 
-func windowsWSLRunWrapper(script string) []string {
+func rewriteWindowsPathOutputs(stepName, script string) string {
+	switch stepName {
+	case "Set runtime paths":
+		for _, path := range []struct {
+			name string
+			file string
+		}{
+			{name: "GH_AW_SAFE_OUTPUTS", file: "outputs.jsonl"},
+			{name: "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", file: "config.json"},
+			{name: "GH_AW_SAFE_OUTPUTS_TOOLS_PATH", file: "tools.json"},
+		} {
+			source := `echo "` + path.name + `=` + constants.GhAwRootDirShell + `/safeoutputs/` + path.file + `"`
+			target := `echo "` + path.name + `=$(wslpath -w "` + constants.GhAwRootDirShell + `/safeoutputs/` + path.file + `")"`
+			script = strings.ReplaceAll(script, source, target)
+		}
+		return script
+	case "Setup agent output environment variable":
+		var updated strings.Builder
+		for _, line := range strings.SplitAfter(script, "\n") {
+			trimmed := strings.TrimSpace(line)
+			const prefix = `echo "GH_AW_AGENT_OUTPUT=`
+			const suffix = `" >> "$GITHUB_OUTPUT"`
+			if strings.HasPrefix(trimmed, prefix) && strings.HasSuffix(trimmed, suffix) {
+				path := strings.TrimSuffix(strings.TrimPrefix(trimmed, prefix), suffix)
+				if path == constants.TmpGhAwDir || strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
+					hostPath := `"` + constants.GhAwRootDirShell + strings.TrimPrefix(path, constants.TmpGhAwDir) + `"`
+					replacement := `echo "GH_AW_AGENT_OUTPUT=$(wslpath -w ` + hostPath + `)" >> "$GITHUB_OUTPUT"`
+					line = strings.Replace(line, trimmed, replacement, 1)
+				}
+			}
+			updated.WriteString(line)
+		}
+		return updated.String()
+	default:
+		return script
+	}
+}
+
+func windowsWSLRunWrapper(script string, environmentVariables []string) []string {
+	encodedScript, err := encodeWindowsWSLRunScript(script)
+	if err != nil {
+		message := strings.ReplaceAll(err.Error(), "'", "''")
+		return []string{"throw 'Failed to prepare WSL command: " + message + "'"}
+	}
+	wrapper := windowsWSLEnvironmentSetup(environmentVariables)
+	return append(wrapper, windowsWSLScriptSetup(encodedScript)...)
+}
+
+func encodeWindowsWSLRunScript(script string) (string, error) {
 	var compressedScript bytes.Buffer
-	compressor, _ := flate.NewWriter(&compressedScript, flate.BestCompression)
-	_, _ = compressor.Write([]byte(script))
-	_ = compressor.Close()
-	encodedScript := base64.StdEncoding.EncodeToString(compressedScript.Bytes())
+	compressor, err := flate.NewWriter(&compressedScript, flate.BestCompression)
+	if err != nil {
+		return "", err
+	}
+	_, writeErr := io.WriteString(compressor, script)
+	closeErr := compressor.Close()
+	if writeErr != nil {
+		return "", writeErr
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+	return base64.StdEncoding.EncodeToString(compressedScript.Bytes()), nil
+}
+
+func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
+	allowedEnvironmentVariables := append([]string{
+		"CI",
+		"GITHUB_ACTION",
+		"GITHUB_ACTIONS",
+		"GITHUB_API_URL",
+		"GITHUB_BASE_REF",
+		"GITHUB_EVENT_NAME",
+		"GITHUB_EVENT_PATH",
+		"GITHUB_JOB",
+		"GITHUB_REF",
+		"GITHUB_REF_NAME",
+		"GITHUB_REF_TYPE",
+		"GITHUB_REPOSITORY",
+		"GITHUB_REPOSITORY_OWNER",
+		"GITHUB_RUN_ATTEMPT",
+		"GITHUB_RUN_ID",
+		"GITHUB_RUN_NUMBER",
+		"GITHUB_SERVER_URL",
+		"GITHUB_SHA",
+		"GITHUB_WORKFLOW",
+		"GITHUB_WORKSPACE",
+		"RUNNER_ARCH",
+		"RUNNER_NAME",
+		"RUNNER_OS",
+		"RUNNER_TEMP",
+		"RUNNER_TOOL_CACHE",
+	}, environmentVariables...)
+	allowedEnvironmentVariables = append(allowedEnvironmentVariables,
+		"GITHUB_ENV",
+		"GITHUB_OUTPUT",
+		"GITHUB_PATH",
+		"GITHUB_STEP_SUMMARY",
+		"GH_AW_AGENT_OUTPUT",
+		"GH_AW_SAFE_OUTPUTS",
+		"GH_AW_SAFE_OUTPUTS_CONFIG_PATH",
+		"GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
+		"GH_AW_WSL_WORKING_DIRECTORY",
+		"HOME",
+		"TEMP",
+		"TMP",
+		"TMPDIR",
+	)
+	slices.Sort(allowedEnvironmentVariables)
+	allowedEnvironmentVariables = slices.Compact(allowedEnvironmentVariables)
+	powerShellAllowedVariables := make([]string, 0, len(allowedEnvironmentVariables))
+	for _, name := range allowedEnvironmentVariables {
+		powerShellAllowedVariables = append(powerShellAllowedVariables, "'"+name+"'")
+	}
 	return []string{
 		"$ErrorActionPreference = 'Stop'",
-		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
+		"$pathVariables = @('GITHUB_WORKSPACE', 'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH', 'GH_AW_AGENT_OUTPUT', 'GH_AW_SAFE_OUTPUTS', 'GH_AW_SAFE_OUTPUTS_CONFIG_PATH', 'GH_AW_SAFE_OUTPUTS_TOOLS_PATH', 'GH_AW_WSL_WORKING_DIRECTORY', 'HOME', 'TEMP', 'TMP', 'TMPDIR')",
 		"$pathVariableSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)",
 		"foreach ($name in $pathVariables) { [void]$pathVariableSet.Add($name) }",
+		"$allowedEnvironmentVariables = @(" + strings.Join(powerShellAllowedVariables, ", ") + ")",
+		"$workingDirectory = (& wsl.exe --distribution Ubuntu --user root --exec wslpath -u (Get-Location).Path).Trim()",
+		"if ($LASTEXITCODE -ne 0) { throw 'WSL could not map the step working directory.' }",
+		"$env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory",
 		"$processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')",
-		"$environmentNames = $processEnvironment.Keys | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' -and $_ -notin @('PATH', 'WSLENV') }",
+		"$environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }",
 		"$env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\\\/]|\\\\\\\\)') { \"$_/p\" } else { $_ } }) -join ':')",
+	}
+}
+
+func windowsWSLScriptSetup(encodedScript string) []string {
+	return []string{
 		fmt.Sprintf("$compressedScript = [System.Convert]::FromBase64String('%s')", encodedScript),
 		"$compressedStream = [System.IO.MemoryStream]::new($compressedScript)",
 		"$decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)",
 		"$reader = [System.IO.StreamReader]::new($decompressor, [System.Text.Encoding]::UTF8)",
 		"try { $scriptContent = $reader.ReadToEnd() } finally { $reader.Dispose() }",
-		`$scriptContent = 'unset GH_AW_NODE_BIN; cd "$GITHUB_WORKSPACE"' + [System.Environment]::NewLine + $scriptContent`,
+		"$scriptContent = 'unset GH_AW_NODE_BIN; export PATH=\"/usr/local/lib/nodejs/current/bin:$PATH\"; cd \"$GH_AW_WSL_WORKING_DIRECTORY\"' + \"`n\" + $scriptContent",
 		"$scriptDirectory = Join-Path $env:RUNNER_TEMP 'gh-aw'",
 		"New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null",
 		"$hostScriptPath = Join-Path $scriptDirectory ('wsl-' + [guid]::NewGuid().ToString('N') + '.sh')",
