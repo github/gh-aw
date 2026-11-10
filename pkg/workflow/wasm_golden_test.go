@@ -28,7 +28,7 @@ var testAWFConfigPayloadRE = regexp.MustCompile(`(printf '%s\\n' ")(\{.*\})(" > 
 var testDefaultAWFInfoVersionRE = regexp.MustCompile(`GH_AW_INFO_AWF_VERSION: "` + regexp.QuoteMeta(string(constants.DefaultFirewallVersion)) + `"`)
 var testDefaultAWFGatewayInfoVersionRE = regexp.MustCompile(`GH_AW_INFO_AWMG_VERSION: "` + regexp.QuoteMeta(string(constants.DefaultMCPGatewayVersion)) + `"`)
 var testDefaultAWFInstallVersionRE = regexp.MustCompile(`(install_awf_binary\.sh"\s+)` + regexp.QuoteMeta(string(constants.DefaultFirewallVersion)) + `\b`)
-var testDefaultAWFImageRE = regexp.MustCompile(`(ghcr\.io/github/gh-aw-firewall/(?:agent|api-proxy|cli-proxy|squid):)` + regexp.QuoteMeta(strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v")) + `\b`)
+var testDefaultAWFImageRE = regexp.MustCompile(`(ghcr\.io/github/gh-aw-firewall/(?:agent|api-proxy|cli-proxy|router|squid):)` + regexp.QuoteMeta(strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v")) + `\b`)
 var testDefaultAWFSchemaURLRE = regexp.MustCompile(`(releases/download/)` + regexp.QuoteMeta(string(constants.DefaultFirewallVersion)) + `(/awf-config\.schema\.json)`)
 var testDefaultAWFImageTagRE = regexp.MustCompile(`("imageTag"\s*:\s*")(?:v)?` + regexp.QuoteMeta(strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v")) + `"`)
 var testDefaultMCPGImageRE = regexp.MustCompile(`(ghcr\.io/github/gh-aw-mcpg:)` + regexp.QuoteMeta(string(constants.DefaultMCPGatewayVersion)) + `\b`)
@@ -103,12 +103,13 @@ func normalizeOutput(content string) string {
 }
 
 func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
-	pinnedRuntimeConfig := `{"pinnedAwf":"v0.5.0","pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.5.0","pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"}`
+	pinnedRuntimeConfig := `{"pinnedAwf":"v0.5.0","pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.5.0","pinnedRouterImage":"ghcr.io/github/gh-aw-firewall/router:0.5.0","pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"}`
 	input := strings.Join([]string{
 		`GH_AW_INFO_AWF_VERSION: "` + string(constants.DefaultFirewallVersion) + `"`,
 		`GH_AW_INFO_AWMG_VERSION: "` + string(constants.DefaultMCPGatewayVersion) + `"`,
 		`run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" ` + string(constants.DefaultFirewallVersion) + ` --rootless`,
 		`run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:` + strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v") + ` ghcr.io/github/gh-aw-firewall/api-proxy:` + strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v") + ` ghcr.io/github/gh-aw-mcpg:` + string(constants.DefaultMCPGatewayVersion),
+		`ghcr.io/github/gh-aw-firewall/router:` + strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v"),
 		`{"schema":"https://github.com/github/gh-aw-firewall/releases/download/` + string(constants.DefaultFirewallVersion) + `/awf-config.schema.json","imageTag":"` + string(constants.DefaultFirewallVersion) + `"}`,
 		`GH_AW_MODEL_DETECTION_CLAUDE: ${{ vars.GH_AW_MODEL_DETECTION_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'detection' }}`,
 		`GH_AW_INFO_VERSION: "` + string(constants.DefaultClaudeCodeVersion) + `"`,
@@ -136,6 +137,7 @@ func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
 	require.Contains(t, normalized, `install_awf_binary.sh" vAWF_VERSION --rootless`)
 	require.Contains(t, normalized, `ghcr.io/github/gh-aw-firewall/agent:AWF_VERSION`)
 	require.Contains(t, normalized, `ghcr.io/github/gh-aw-firewall/api-proxy:AWF_VERSION`)
+	require.Contains(t, normalized, `ghcr.io/github/gh-aw-firewall/router:AWF_VERSION`)
 	require.Contains(t, normalized, `ghcr.io/github/gh-aw-mcpg:MCPG_VERSION`)
 	require.Contains(t, normalized, `releases/download/vAWF_VERSION/awf-config.schema.json`)
 	require.Contains(t, normalized, `"imageTag":"AWF_VERSION"`)
@@ -158,6 +160,7 @@ func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
 	require.Contains(t, normalized, `@earendil-works/pi-coding-agent@PI_VERSION`)
 	require.Contains(t, normalized, `"pinnedAwf":"v0.5.0"`)
 	require.Contains(t, normalized, `"pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.5.0"`)
+	require.Contains(t, normalized, `"pinnedRouterImage":"ghcr.io/github/gh-aw-firewall/router:0.5.0"`)
 	require.Contains(t, normalized, `"pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"`)
 	normalizedWithoutPinnedRuntimeConfig := strings.Replace(normalized, pinnedRuntimeConfig, "", 1)
 	require.NotContains(t, normalizedWithoutPinnedRuntimeConfig, string(constants.DefaultFirewallVersion))

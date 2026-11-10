@@ -153,7 +153,9 @@ func TestCompileWorkflow_AgentTimeoutDockerRuntime(t *testing.T) {
 			markdown := `---
 on:
   workflow_dispatch:
-engine: copilot
+engine:
+  id: copilot
+  model-routing: false
 strict: false
 timeout-minutes: 45
 sandbox:

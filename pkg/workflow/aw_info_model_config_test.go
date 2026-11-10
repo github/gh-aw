@@ -66,7 +66,7 @@ func TestAwInfoRoutingAnalyticsMetadata(t *testing.T) {
 		},
 		{
 			name:        "unrouted-cli-frontmatter-budget",
-			frontmatter: "engine: copilot\nmax-ai-credits: 250\n",
+			frontmatter: "engine:\n  id: copilot\n  model-routing: false\nmax-ai-credits: 250\n",
 			harness:     "copilot-cli",
 			config: map[string]any{
 				"routing":               map[string]any{"enabled": false},

@@ -36,8 +36,8 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 			switch ResolveEngineID(data) {
 			case "claude":
 				assert.False(t, data.BashDisabled)
-				allowed := NewClaudeEngine().computeAllowedClaudeToolsString(
-					data.Tools, data.SafeOutputs, data.CacheMemoryConfig, data.DriveMemoryConfig, data.MCPScripts, data.SandboxConfig)
+				allowed := NewClaudeEngine().computeAllowedClaudeToolsStringWithDynamicWorkflows(
+					data.Tools, data.SafeOutputs, data.CacheMemoryConfig, data.DriveMemoryConfig, data.MCPScripts, data.SandboxConfig, false)
 				for _, grant := range tt.grants {
 					assert.Contains(t, strings.Split(allowed, ","), grant)
 				}
