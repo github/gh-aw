@@ -189,6 +189,11 @@ Line 2`,
 			expected: "Line 1\nLine 2\nLine 3",
 		},
 		{
+			name:     "normalizes CRLF line endings",
+			input:    "Line 1\r\n\r\n\r\nLine 2",
+			expected: "Line 1\n\nLine 2",
+		},
+		{
 			name: "handles empty lines at start",
 			input: `
 

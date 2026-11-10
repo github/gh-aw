@@ -385,7 +385,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: create_pull_request_review_comment(max:10), submit_pull_request_review, create_check_run, report_missing_tool, report_missing_data, noop(max:2)
+            Tools: create_pull_request_review_comment(max:10), submit_pull_request_review, create_check_run, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: |+

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -80,6 +81,53 @@ func TestPRCodeQualityReviewerWorkflowToolContract(t *testing.T) {
 	assert.Contains(t, mainAndSpecialist, "run exactly `wc -c /tmp/gh-aw/agent/pr-review-comments.json`")
 	assert.Contains(t, mainAndSpecialist, "Use `glob` to check whether")
 	assert.Contains(t, mainAndSpecialist, "do not execute repository code, tests, package managers, or build commands")
+}
+
+func TestPRCodeQualityReviewerWorkflowSafeOutputConsistency(t *testing.T) {
+	t.Parallel()
+	repoRoot, err := gitutil.FindGitRoot()
+	require.NoError(t, err)
+	workflowPath := filepath.Join(repoRoot, ".github", "workflows", "pr-code-quality-reviewer")
+	source, err := os.ReadFile(workflowPath + ".md")
+	require.NoError(t, err)
+	lock, err := os.ReadFile(workflowPath + ".lock.yml")
+	require.NoError(t, err)
+
+	_, toolsBlock, ok := strings.Cut(string(lock), "<safe-output-tools>")
+	require.True(t, ok)
+	toolsBlock, _, ok = strings.Cut(toolsBlock, "</safe-output-tools>")
+	require.True(t, ok)
+	toolsLine := regexp.MustCompile(`(?m)^\s*Tools: ([^\n]+)`).FindStringSubmatch(toolsBlock)
+	require.Len(t, toolsLine, 2)
+	var promptTools []string
+	for tool := range strings.SplitSeq(toolsLine[1], ", ") {
+		name, _, _ := strings.Cut(tool, "(")
+		promptTools = append(promptTools, name)
+	}
+
+	manifest, err := workflow.ExtractGHAWManifestFromLockFile(string(lock))
+	require.NoError(t, err)
+	require.NotNil(t, manifest)
+	var manifestTools []string
+	for _, server := range manifest.MCPServers {
+		if server.Name == "safeoutputs" {
+			manifestTools = server.Tools
+		}
+	}
+	require.NotEmpty(t, manifestTools)
+	assert.ElementsMatch(t, manifestTools, promptTools, "Manifest and prompt must grant the same safe-output tools")
+
+	_, publication, ok := strings.Cut(string(source), "## skill: `review-publication`")
+	require.True(t, ok)
+	invocationPattern := regexp.MustCompile("(?:safeoutputs[ \\t]+|(?:emit|call)[ \\t]+`)([a-z][a-z0-9_-]*)")
+	invocations := invocationPattern.FindAllStringSubmatch(publication, -1)
+	require.NotEmpty(t, invocations)
+	hyphenatedInvocation := invocationPattern.FindStringSubmatch("safeoutputs create-pull-request-review-comment")
+	require.Len(t, hyphenatedInvocation, 2)
+	for _, invocation := range append(invocations, hyphenatedInvocation) {
+		name := strings.ReplaceAll(invocation[1], "-", "_")
+		assert.Contains(t, promptTools, name, "Reviewer instruction references an ungranted safe-output tool")
+	}
 }
 
 func TestPRCodeQualityReviewerWorkflowReviewSequencingContract(t *testing.T) {

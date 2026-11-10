@@ -396,7 +396,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: add_comment(max:20), create_issue(max:75), create_pull_request(max:3), squad_implement_worker, report_missing_tool, report_missing_data, noop(max:2)
+            Tools: add_comment(max:20), create_issue(max:75), create_pull_request(max:3), squad_implement_worker, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
             Shared budgets: dispatch-workflow [squad_implement_worker](max:3 total)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
