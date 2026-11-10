@@ -105,7 +105,23 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       }
       return protectValue(value);
     };
+    /** @type {Record<string, string>} */
+    const variables = { ...deferredBindings };
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith("GH_AW_EXPR_")) {
+        variables[key] = deferredBindings[key] === value ? value : protectValue(value || "");
+      }
+    }
+    for (const binding of Object.values(authorExpressions)) {
+      if (/^__GH_AW_[A-Z0-9_]+__$/.test(binding)) continue;
+      if (!Object.prototype.hasOwnProperty.call(process.env, binding)) {
+        throw new Error(`${ERR_CONFIG}: Author expression environment variable is missing: ${binding}`);
+      }
+      const value = process.env[binding] || "";
+      variables[binding] = deferredBindings[binding] === value ? value : protectValue(value);
+    }
     const recordFile = (/** @type {string} */ opaque, /** @type {string} */ target, metadata = false) => {
+      if (metadata) opaque = transformMarkdownContent(opaque, text => interpolateVariables(text, variables));
       const rendered = metadata ? restoreInlineMetadata(opaque, restoreValues) : restoreValues(opaque);
       literalState.files[literalFileKey(promptPath, target)] = { opaque, rendered, metadata };
       return rendered;
@@ -225,22 +241,6 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
     core.info("\n========================================");
     core.info("[main] STEP 2: Variable Interpolation");
     core.info("========================================");
-    /** @type {Record<string, string>} */
-    const variables = {};
-    for (const [key, value] of Object.entries(process.env)) {
-      if (key.startsWith("GH_AW_EXPR_")) {
-        variables[key] = deferredBindings[key] === value ? value : protectValue(value || "");
-      }
-    }
-    for (const binding of Object.values(authorExpressions)) {
-      if (/^__GH_AW_[A-Z0-9_]+__$/.test(binding)) continue;
-      if (!Object.prototype.hasOwnProperty.call(process.env, binding)) {
-        throw new Error(`${ERR_CONFIG}: Author expression environment variable is missing: ${binding}`);
-      }
-      const value = process.env[binding] || "";
-      variables[binding] = deferredBindings[binding] === value ? value : protectValue(value);
-    }
-
     const varCount = Object.keys(variables).length;
     if (varCount > 0) {
       core.info(`Found ${varCount} expression variable(s) to interpolate`);

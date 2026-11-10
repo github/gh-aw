@@ -14,7 +14,7 @@ import (
 )
 
 var templateLog = logger.New("workflow:template")
-var inlineSubAgentPattern = regexp.MustCompile("(?m)^##[ \t]+agent:[ \t]+`[a-z][a-z0-9_-]*`[ \t]*$")
+var inlineSubAgentPattern = regexp.MustCompile("(?m)^##[ \t]+(?:agent|skill):[ \t]+`[a-z][a-z0-9_-]*`[ \t]*$")
 
 // wrapExpressionsInTemplateConditionals transforms template conditionals by wrapping
 // expressions in ${{ }}. For example:
@@ -104,9 +104,9 @@ func (c *Compiler) generateInterpolationAndTemplateStep(yaml *strings.Builder, e
 	hasExpressions := len(expressionMappings) > 0
 
 	// Check if we need template rendering
-	hasTemplatePattern := strings.Contains(data.MarkdownContent, "{{#if ")
+	hasTemplatePattern := strings.Contains(data.MarkdownContent+"\n"+data.PromptMarkdown, "{{#if ")
 	hasGitHubContext := hasGitHubTool(data.ParsedTools)
-	hasInlineSubAgents := inlineSubAgentPattern.MatchString(data.MarkdownContent)
+	hasInlineSubAgents := inlineSubAgentPattern.MatchString(data.MarkdownContent + "\n" + data.PromptMarkdown)
 	// hasRuntimeImports is true when the compiled prompt contains {{#runtime-import}} macros that
 	// must be resolved by interpolate_prompt.cjs. The compiler always emits a self-import macro in
 	// non-inline mode, so this is true even when the markdown source contains no explicit macros.

@@ -93,6 +93,22 @@ func TestGenerateInterpolationAndTemplateStep_WithInlineSubAgent(t *testing.T) {
 	assert.Contains(t, result, "interpolate_prompt.cjs", "interpolate_prompt script should run to extract inline sub-agents")
 }
 
+func TestGenerateInterpolationAndTemplateStep_WithPreservedDefinitions(t *testing.T) {
+	for _, kind := range []string{"agent", "skill"} {
+		t.Run(kind, func(t *testing.T) {
+			compiler := &Compiler{}
+			data := &WorkflowData{
+				MarkdownContent: "Main prompt",
+				PromptMarkdown:  "Main prompt\n\n## " + kind + ": `helper`\nHelp.",
+				ParsedTools:     NewTools(map[string]any{}),
+			}
+			var yaml strings.Builder
+			compiler.generateInterpolationAndTemplateStep(&yaml, nil, data, false)
+			assert.Contains(t, yaml.String(), "interpolate_prompt.cjs", "a preserved definition alone must trigger extraction")
+		})
+	}
+}
+
 // TestGenerateInterpolationAndTemplateStep_WithRuntimeImport ensures the interpolation step
 // is emitted whenever the compiled prompt contains a {{#runtime-import}} macro, even when
 // the markdown body has no expressions, no {{#if}} patterns, and github is disabled.
