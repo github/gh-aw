@@ -3,7 +3,7 @@
 This directory contains fixture stubs for the Section 11 compliance tests of the
 [GitHub MCP Access Control Specification](../../scratchpad/github-mcp-access-control-specification.md).
 
-**Spec version pinned at commit `34f03fba65c7bf34c1c03654b3c03900b7597a39`.**
+**Spec version pinned at commit `acc6a88801ea84b853bc7432f00f1343ae4b7fe3`.**
 
 ## Sync Guard: pinned spec drift check
 
@@ -15,7 +15,7 @@ CI fetches the full history so the comparison uses the latest commit that change
 `scratchpad/github-mcp-access-control-specification.md` and fails when it differs from the pin:
 
 ```bash
-PINNED="34f03fba65c7bf34c1c03654b3c03900b7597a39"
+PINNED="acc6a88801ea84b853bc7432f00f1343ae4b7fe3"
 CURRENT="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
 
 test "$CURRENT" = "$PINNED" || {
@@ -64,6 +64,15 @@ Where:
 - `P6_IntegrityMet`: integrity ordering is enforced as `none < unapproved < approved < merged`
 
 The denial code is selected by the first failing guard in the evaluation order above.
+
+## Local implementation status
+
+The local `pkg/workflow/` compiler has no `tools.github.roles` or
+`private-repos` fields. These controls remain normative in the specification but
+are deferred locally, so the abstract `P3_RoleAllow` and `P4_PrivateRepoAllow`
+fixtures test the specification model only and do not establish local Complete
+Conformance. The status was verified on 2026-11-10 in Section 4.8 of the
+[specification](../../scratchpad/github-mcp-access-control-specification.md).
 
 ## Behavioral Coverage Map
 

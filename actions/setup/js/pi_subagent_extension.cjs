@@ -207,7 +207,17 @@ function piSubagentExtension(pi) {
     description: `Delegate a task to a declared agent in an isolated Pi session. Available agents: ${agents.map(agent => agent.name).join("; ")}`,
     parameters: { type: "object", properties: { agent: { type: "string", enum: agents.map(agent => agent.name) }, task: { type: "string", minLength: 1 } }, required: ["agent", "task"], additionalProperties: false },
     async execute(_id, params, signal, _onUpdate, ctx) {
-      if (!params || typeof params !== "object" || Array.isArray(params) || typeof params.agent !== "string" || typeof params.task !== "string" || !params.task.trim())
+      if (
+        !params ||
+        typeof params !== "object" ||
+        Array.isArray(params) ||
+        Object.keys(params).length !== 2 ||
+        !Object.hasOwn(params, "agent") ||
+        !Object.hasOwn(params, "task") ||
+        typeof params.agent !== "string" ||
+        typeof params.task !== "string" ||
+        !params.task.trim()
+      )
         throw new Error("Choose a declared Pi sub-agent and provide a non-empty task");
       const agent = agents.find(candidate => candidate.name === params.agent);
       if (!agent) throw new Error("Choose a declared Pi sub-agent and provide a non-empty task");

@@ -204,7 +204,7 @@ func TestValidateOpenAIWIFEngineAuth(t *testing.T) {
 				EngineConfig:       &EngineConfig{ID: "codex", Auth: tt.auth},
 				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
 			}
-			err := validateOpenAIWIFEngineAuth(workflow)
+			err := validateOpenAIWIFEngineAuthAtPath(workflow, "engine")
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)

@@ -41,6 +41,31 @@ func TestStripANSI(t *testing.T) {
 			want:  "textmore",
 		},
 		{
+			name:  "CSI private parameter",
+			input: "\x1b[?25l",
+			want:  "",
+		},
+		{
+			name:  "CSI intermediate character",
+			input: "\x1b[1 q",
+			want:  "",
+		},
+		{
+			name:  "incomplete CSI parameters at end",
+			input: "text\x1b[31",
+			want:  "text",
+		},
+		{
+			name:  "invalid CSI character ends sequence",
+			input: "text\x1b[31\x01tail",
+			want:  "text\x01tail",
+		},
+		{
+			name:  "invalid two-character escape preserves following byte",
+			input: "before\x1b\x01after",
+			want:  "before\x01after",
+		},
+		{
 			name:  "multiple ANSI sequences",
 			input: "\x1b[31mdoes important\x1b[0m things\x1b[m",
 			want:  "does important things",
@@ -81,9 +106,24 @@ func TestStripANSI(t *testing.T) {
 			want:  "beforeafter",
 		},
 		{
+			name:  "unterminated OSC sequence",
+			input: "before\x1b]0;title",
+			want:  "before",
+		},
+		{
+			name:  "OSC ignores non-ST escape",
+			input: "before\x1b]title\x1bXmore\x07after",
+			want:  "beforeafter",
+		},
+		{
 			name:  "G0 character set selection",
 			input: "before\x1b(Bafter",
 			want:  "beforeafter",
+		},
+		{
+			name:  "incomplete character set selection",
+			input: "before\x1b(",
+			want:  "before",
 		},
 		{
 			name:  "G1 character set selection",
@@ -121,7 +161,7 @@ func TestStripANSI(t *testing.T) {
 			want:  "text",
 		},
 		{
-			name:  "ESC with no following character stripped",
+			name:  "incomplete CSI introducer at end",
 			input: "text\x1b[",
 			want:  "text",
 		},
@@ -161,7 +201,64 @@ func TestStripANSI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := StripANSI(tt.input)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want, got, "StripANSI(%q)", tt.input)
+			assert.NotContains(t, got, "\x1b", "StripANSI(%q) left an ESC byte", tt.input)
 		})
 	}
+}
+
+func TestIsFinalCSIChar(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		char byte
+		want bool
+	}{
+		{name: "before final range", char: 0x3F, want: false},
+		{name: "first final character", char: 0x40, want: true},
+		{name: "last final character", char: 0x7E, want: true},
+		{name: "after final range", char: 0x7F, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isFinalCSIChar(tt.char))
+		})
+	}
+}
+
+func TestIsCSIParameterChar(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		char byte
+		want bool
+	}{
+		{name: "below parameter range", char: 0x1F, want: false},
+		{name: "first intermediate character", char: 0x20, want: true},
+		{name: "last intermediate character", char: 0x2F, want: true},
+		{name: "first parameter character", char: 0x30, want: true},
+		{name: "after parameter range", char: 0x40, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isCSIParameterChar(tt.char))
+		})
+	}
+}
+
+func FuzzStripANSI(f *testing.F) {
+	f.Add("")
+	f.Add("plain text")
+	f.Add("\x1b[31mcolored\x1b[0m")
+	f.Add("\x1b]0;title\x07")
+	f.Add("incomplete\x1b[")
+	f.Fuzz(func(t *testing.T, input string) {
+		got := StripANSI(input)
+		assert.NotContains(t, got, "\x1b", "StripANSI(%q) left an ESC byte", input)
+		assert.Equal(t, got, StripANSI(got), "StripANSI is not idempotent for %q", input)
+	})
 }

@@ -29,15 +29,11 @@ type PromptSection struct {
 
 // removeConsecutiveEmptyLines removes consecutive empty lines, keeping only one
 func removeConsecutiveEmptyLines(content string) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) == 0 {
-		return content
-	}
-
+	content = strings.ReplaceAll(content, "\r\n", "\n")
 	var result []string
 	lastWasEmpty := false
 
-	for _, line := range lines {
+	for line := range strings.SplitSeq(content, "\n") {
 		isEmpty := strings.TrimSpace(line) == ""
 
 		if isEmpty {
@@ -700,6 +696,9 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	}
 	if safeOutputs.MissingData != nil {
 		tools = append(tools, toolWithMaxBudget("report_missing_data", safeOutputs.MissingData.Max))
+	}
+	if safeOutputs.ReportIncomplete != nil {
+		tools = append(tools, toolWithMaxBudget("report_incomplete", safeOutputs.ReportIncomplete.Max))
 	}
 	// noop is always included: it is auto-injected by extractSafeOutputsConfig and
 	// must always appear in the tools list so agents can signal no-op completion.

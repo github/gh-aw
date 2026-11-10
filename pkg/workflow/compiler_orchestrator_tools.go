@@ -29,6 +29,7 @@ type toolsProcessingResult struct {
 	importPaths             []string // Import paths for runtime-import macro generation (imports without inputs)
 	promptImports           []parser.PromptImportEntry
 	mainWorkflowMarkdown    string // main workflow markdown without imports (for runtime-import)
+	promptMarkdown          string // expanded main body preserving inline definitions for embedding
 	rawMainMarkdown         string // raw main markdown before include expansion, without inline sub-agent sections
 	allIncludedFiles        []string
 	workflowName            string
@@ -134,6 +135,7 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		importPaths:             markdownData.importPaths,
 		promptImports:           markdownData.promptImports,
 		mainWorkflowMarkdown:    markdownData.mainWorkflowMarkdown,
+		promptMarkdown:          markdownData.promptMarkdown,
 		rawMainMarkdown:         config.effectiveMarkdown,
 		allIncludedFiles:        markdownData.allIncludedFiles,
 		workflowName:            markdownData.workflowName,
@@ -172,6 +174,7 @@ type markdownArtifacts struct {
 	importPaths          []string
 	promptImports        []parser.PromptImportEntry
 	mainWorkflowMarkdown string
+	promptMarkdown       string
 	allIncludedFiles     []string
 	workflowName         string
 	frontmatterName      string
@@ -477,6 +480,15 @@ func (c *Compiler) resolveMarkdownArtifacts(
 		return nil, fmt.Errorf("failed to expand includes in markdown: %w", err)
 	}
 	mainWorkflowMarkdown := markdownContent
+	promptMarkdown := ""
+	if c.inlinePrompt || resolveInlinedImports(result.Frontmatter) {
+		var promptIncludedFiles []string
+		promptMarkdown, promptIncludedFiles, err = parser.ExpandIncludesWithManifest(result.Markdown, markdownDir, false, c.getSharedImportCache())
+		if err != nil {
+			return nil, fmt.Errorf("failed to expand includes in main workflow prompt: %w", err)
+		}
+		includedMarkdownFiles = append(includedMarkdownFiles, promptIncludedFiles...)
+	}
 	orchestratorToolsLog.Printf("Main workflow markdown: %d bytes", len(mainWorkflowMarkdown))
 	importPaths := append([]string{}, importsResult.ImportPaths...)
 	promptImports := append([]parser.PromptImportEntry(nil), importsResult.PromptImports...)
@@ -516,6 +528,7 @@ func (c *Compiler) resolveMarkdownArtifacts(
 		importPaths:          importPaths,
 		promptImports:        promptImports,
 		mainWorkflowMarkdown: mainWorkflowMarkdown,
+		promptMarkdown:       promptMarkdown,
 		allIncludedFiles:     mergeAndSortIncludedFiles(includedToolFiles, includedMarkdownFiles),
 		workflowName:         workflowName,
 		frontmatterName:      frontmatterName,

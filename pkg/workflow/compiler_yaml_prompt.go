@@ -65,7 +65,7 @@ func (c *Compiler) generatePrompt(output *strings.Builder, data *WorkflowData, p
 		return err
 	}
 	data.CompiledPromptMarkdown = append(data.CompiledPromptMarkdown, strings.Join(userPromptChunks, "\n"))
-	promptMarkdown := data.MarkdownContent + "\n" + data.ImportedMarkdown + "\n" + c.collectRuntimeImportMarkdownForCompilerAnalysis(data)
+	promptMarkdown := data.MarkdownContent + "\n" + data.PromptMarkdown + "\n" + data.ImportedMarkdown + "\n" + c.collectRuntimeImportMarkdownForPromptExpressions(data)
 	expressionMappings, data.DeferredPromptExpressions = rewriteDeferredPromptExpressions(expressionMappings, data.Jobs, beforeActivationJobs, promptMarkdown)
 	expressionMappings = filterPromptExpressionsForActivation(expressionMappings, data.Jobs, beforeActivationJobs, promptMarkdown)
 
@@ -122,7 +122,7 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 			expressionMappings = append(expressionMappings, mainExprMappings...)
 		}
 	}
-	if runtimeImportMarkdown := c.collectRuntimeImportMarkdownForCompilerAnalysis(data); runtimeImportMarkdown != "" {
+	if runtimeImportMarkdown := c.collectRuntimeImportMarkdownForPromptExpressions(data); runtimeImportMarkdown != "" {
 		runtimeImportExtractor := NewExpressionExtractor()
 		runtimeImportExprMappings, err := runtimeImportExtractor.ExtractExpressions(wrapExpressionsInTemplateConditionals(runtimeImportMarkdown))
 		if err != nil {
@@ -147,9 +147,13 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 func (c *Compiler) buildMainWorkflowPromptChunks(data *WorkflowData, userPromptChunks []string, expressionMappings []*ExpressionMapping) ([]string, []*ExpressionMapping, error) {
 	data.MainWorkflowPromptPath = ""
 	if c.inlinePrompt || data.InlinedImports {
-		if data.MainWorkflowMarkdown != "" {
-			compilerYamlPromptLog.Printf("Inlining main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
-			inlinedMarkdown := removeXMLComments(data.MainWorkflowMarkdown)
+		promptMarkdown := data.PromptMarkdown
+		if promptMarkdown == "" {
+			promptMarkdown = data.MainWorkflowMarkdown
+		}
+		if promptMarkdown != "" {
+			compilerYamlPromptLog.Printf("Inlining main workflow markdown (%d bytes)", len(promptMarkdown))
+			inlinedMarkdown := removeXMLComments(promptMarkdown)
 			inlinedMarkdown = wrapExpressionsInTemplateConditionals(inlinedMarkdown)
 			inlineExtractor := NewExpressionExtractor()
 			inlineExprMappings, err := inlineExtractor.ExtractExpressions(inlinedMarkdown)
@@ -380,6 +384,15 @@ func resolveWorkspaceRoot(markdownPath string) string {
 	}
 	// Fallback: use the directory containing the workflow file.
 	return filepath.Dir(markdownPath)
+}
+
+func (c *Compiler) collectRuntimeImportMarkdownForPromptExpressions(data *WorkflowData) string {
+	if data == nil {
+		return ""
+	}
+	promptData := *data
+	promptData.MainWorkflowMarkdown += "\n" + data.PromptMarkdown
+	return c.collectRuntimeImportMarkdownForCompilerAnalysis(&promptData)
 }
 
 func (c *Compiler) collectRuntimeImportMarkdownForCompilerAnalysis(data *WorkflowData) string {

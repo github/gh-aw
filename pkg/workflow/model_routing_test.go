@@ -592,28 +592,6 @@ func TestCompileModelRoutingProviderSupport(t *testing.T) {
 	}
 }
 
-func TestWarnRoutedModelOverrides(t *testing.T) {
-	compiler := NewCompiler()
-	output := testutil.CaptureStderr(t, func() {
-		compiler.warnRoutedModelOverrides(&WorkflowData{
-			Model: "fixed-model",
-			EngineConfig: &EngineConfig{
-				ID:           "pi",
-				ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "balanced"},
-				Env: map[string]string{
-					"GH_AW_PI_MODEL":             "fixed-model",
-					"GH_AW_CUSTOM_MODELING_FLAG": "value",
-					"CUSTOM_SETTING":             "value",
-				},
-				Config: `{"settings":{"defaultThinkingLevel":"high"}}`,
-			},
-		})
-	})
-	require.Contains(t, output, "model, engine.env.GH_AW_PI_MODEL, engine.config.settings.defaultThinkingLevel")
-	require.NotContains(t, output, "GH_AW_CUSTOM_MODELING_FLAG")
-	require.Equal(t, 1, compiler.GetWarningCount())
-}
-
 func TestGenerateModelRoutingConversationStep(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

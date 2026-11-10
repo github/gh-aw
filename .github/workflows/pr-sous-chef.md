@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   slash_command:
     strategy: centralized
-    name: souschef
+    name: [souschef, cook]
     events: [pull_request_comment]
   skip-if-no-match: "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli"
 permissions:
@@ -51,7 +51,7 @@ tools:
     toolsets: [pull_requests, repos, issues]
   bash:
     - "*"
-if: needs.prefilter.outputs.rate_limit_low == 'false' && (needs.prefilter.outputs.eligible_count > 0 || needs.activation.outputs.slash_command == 'souschef')
+if: needs.prefilter.outputs.rate_limit_low == 'false' && (needs.prefilter.outputs.eligible_count > 0 || needs.activation.outputs.slash_command == 'souschef' || needs.activation.outputs.slash_command == 'cook')
 jobs:
   prefilter:
     needs: [activation]
@@ -225,7 +225,7 @@ GraphQL and search budgets. At or below 10% remaining (minimum one request), it
 returns an empty queue with `rate_limit.low: true`, remaining counts and reset
 times. The workflow skips agent startup on low budgets and on empty queues;
 the prefilter step summary records the reason and reset times without using AI.
-Explicit `/souschef` invocations may start the agent for acknowledgement only
+Explicit `/souschef` or `/cook` invocations may start the agent for acknowledgement only
 when the API budgets are healthy. If a refresh finds this flag true, call `noop`
 with those budget/reset details and stop
 without any writes, including a slash-command acknowledgement or report issue.
@@ -275,7 +275,7 @@ new follow-ups publish the structured envelope instead.
 Short-running pending CI also blocks action.
 PRs that only need human approval or a maintainer CI re-trigger need no agent nudge.
 
-If invoked by `/souschef`, acknowledge the triggering PR exactly once via
+If invoked by `/souschef` or `/cook`, acknowledge the triggering PR exactly once via
 `add_comment`, without `@copilot` or a state fingerprint. An acknowledgement is
 not a nudge and may still be posted when that PR is ineligible, unless its latest
 conversation comment is already from PR Sous Chef. Before acknowledging, fetch

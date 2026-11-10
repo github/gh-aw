@@ -28,6 +28,11 @@ tools:
   bash: ["git diff *", "git show *"]
 ---
 
+<!-- Expected compile-only lock properties:
+checkout-token-count: 2
+github-app-safe-output-count: 1
+-->
+
 # Compile-only security model seed
 
 This fixture uses placeholder credentials and a fictitious private dependency.

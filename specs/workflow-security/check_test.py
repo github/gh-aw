@@ -348,6 +348,64 @@ class ResultContractTest(unittest.TestCase):
                 self.assertEqual(saved["failed"], 0 if outcome == "success" else 1)
 
 
+class CrossRepoSourceCompilationTest(unittest.TestCase):
+    def test_both_compiles_and_return_codes_are_recorded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            results = root / "results"
+            (results / "agent-write").mkdir(parents=True)
+            (results / "agent-write" / "source.md").write_text(
+                "---\npermissions:\n  contents: write\n---\n"
+            )
+            seed = root / "cross-repo.md"
+            seed.write_text("---\nname: seed\n---\n")
+            compiler = root / "gh-aw"
+            compiler.write_bytes(b"test compiler")
+            compile_reports = [
+                {"workflow": "cross-repo.md", "valid": True, "errors": []},
+                {"workflow": "source.md", "valid": False, "errors": [
+                    {"message": "strict mode: write permission 'contents: write' is not allowed"}
+                ]},
+            ]
+
+            def run(command, **_kwargs):
+                if command[1] == "version":
+                    return subprocess.CompletedProcess(command, 0, "test-version", "")
+                if "--no-emit" in command:
+                    return subprocess.CompletedProcess(command, 1, json.dumps(compile_reports), "")
+                Path(command[2]).with_suffix(".lock.yml").write_text(
+                    "\n".join([
+                        'GH_AW_CHECKOUT_MANIFEST_COUNT: "2"',
+                        'GH_AW_CHECKOUT_REPO_0: "github/gh-aw"',
+                        'GH_AW_CHECKOUT_REPO_1: "example/private-dependency"',
+                        'GH_AW_CHECKOUT_TOKEN_1: ${{ secrets.MODEL_DEPENDENCY_READ_TOKEN }}',
+                        "- name: Generate GitHub App token",
+                        "  uses: actions/create-github-app-token@sha",
+                        "  client-id: ${{ vars.MODEL_APP_ID }}",
+                        "  private-key: ${{ secrets.MODEL_APP_PRIVATE_KEY }}",
+                        "  repositories: gh-aw",
+                        "- name: Generate GitHub App token",
+                        "  uses: actions/create-github-app-token@sha",
+                        "  client-id: ${{ vars.MODEL_APP_ID }}",
+                        "  private-key: ${{ secrets.MODEL_APP_PRIVATE_KEY }}",
+                        "  repositories: gh-aw",
+                        "create_issue",
+                    ])
+                )
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+            with patch.object(check.subprocess, "run", side_effect=run):
+                check.check_sources(compiler, results)
+
+            evidence = json.loads((results / "source-compilation.json").read_text())
+            self.assertEqual(len(evidence["compilations"]), 2)
+            self.assertEqual([item["returncode"] for item in evidence["compilations"]], [1, 0])
+            self.assertIn("--no-emit", evidence["compilations"][0]["command"])
+            self.assertIn("--action-mode", evidence["compilations"][1]["command"])
+            self.assertTrue((results / "source-compilation.log").is_file())
+            self.assertTrue((results / "source-compilation-lock.log").is_file())
+
+
 class RuntimeCheckoutModelTest(unittest.TestCase):
     def test_controls_are_declared_and_check_configured_invariants(self):
         model = (check.ROOT / "RuntimeRepositoryCheckout.tla").read_text()
@@ -410,7 +468,8 @@ class RuntimeCheckoutModelTest(unittest.TestCase):
             report = json.loads((results / "results.json").read_text())
             self.assertEqual(report["additional_models"],
                              ["RuntimeRepositoryCheckout", "StatusOnlyJob", "MCPCompile",
-                              "ActivationAdmission", "AdmissionConclusion"])
+                              "ActivationAdmission", "AdmissionConclusion",
+                              "IssueRelationshipAuthorization"])
             cases = {case["case"] for case in report["cases"]
                      if case["model"] == "RuntimeRepositoryCheckout"}
             self.assertEqual(cases, {"secure-runtime-checkout"} |

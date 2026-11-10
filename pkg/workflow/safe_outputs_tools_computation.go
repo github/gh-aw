@@ -166,6 +166,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 		enabledTools["report_missing_data"] = struct {
 		}{}
 	}
+	if data.SafeOutputs.ReportIncomplete != nil {
+		enabledTools["report_incomplete"] = struct{}{}
+	}
 	if data.SafeOutputs.UpdateRelease != nil {
 		enabledTools["update_release"] = struct {
 		}{}

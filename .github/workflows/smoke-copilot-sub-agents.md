@@ -76,7 +76,7 @@ post-steps:
         const expected = [
           ["haiku-whoami", "claude-haiku-4.5", "exact", "/chat/completions"],
           ["gpt5-whoami", "gpt-5", "resolved", "/responses"],
-          ["terra-whoami", "gpt-5.6-terra", "exact", "/responses"],
+          ["luna-whoami", "gpt-6-luna", "exact", "/responses"],
         ];
         const expectedNames = new Set(expected.map(([agentName]) => agentName));
         const servedModel = model => String(model || "")
@@ -149,11 +149,11 @@ post-steps:
 These steps are mandatory in every run. Reporting an expected identity without actually executing the sub-agent through a `task` tool call does not satisfy this test.
 
 1. **Required first step:** your first action in this run must be a `task` tool call. Call `haiku-whoami` with exactly this prompt: `who am i?`. Do this before any other tool call, including skills and safe outputs.
-2. Then make exactly one `task` tool call each to `gpt5-whoami` and `terra-whoami`, each with exactly this prompt: `who am i?`. Do not call `haiku-whoami` again.
+2. Then make exactly one `task` tool call each to `gpt5-whoami` and `luna-whoami`, each with exactly this prompt: `who am i?`. Do not call `haiku-whoami` again.
 3. Check the exact responses:
    - `haiku-whoami` → `claude-haiku-4.5`
    - `gpt5-whoami` → `gpt-5`
-   - `terra-whoami` → `gpt-5.6-terra`
+   - `luna-whoami` → `gpt-6-luna`
 4. Do not use any other agent or any unnecessary tool calls.
 
 {{#if experiments.sub_agent_strategy == 'delegated_sequential' }}
@@ -198,13 +198,13 @@ When asked `who am i?`, reply with exactly:
 
 No extra words, punctuation, or formatting.
 
-## agent: `terra-whoami`
+## agent: `luna-whoami`
 ---
-description: Returns the GPT-5.6 Terra model identity for smoke testing
-model: gpt-5.6-terra
+description: Returns the GPT-6 Luna model identity for smoke testing
+model: gpt-6-luna
 ---
 When asked `who am i?`, reply with exactly:
 
-`gpt-5.6-terra`
+`gpt-6-luna`
 
 No extra words, punctuation, or formatting.

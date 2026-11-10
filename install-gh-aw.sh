@@ -48,6 +48,13 @@ for arg in "$@"; do
     esac
 done
 
+AUTH_CURL_ARGS=()
+if [ -n "${GH_TOKEN:-}" ]; then
+    AUTHORIZATION_HEADER="Authorization: Bearer "
+    AUTHORIZATION_HEADER+="$GH_TOKEN"
+    AUTH_CURL_ARGS=(-H "$AUTHORIZATION_HEADER")
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -223,11 +230,7 @@ if [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)$ ]]; then
     while :; do
         RELEASES_URL="https://api.github.com/repos/$REPO/releases?per_page=$PER_PAGE&page=$PAGE"
         RELEASES_CURL_ARGS=(-sLf --connect-timeout 15 --max-time 30 -H "Accept: application/vnd.github+json" -H "User-Agent: gh-aw-install-gh-aw.sh" -H "X-GitHub-Api-Version: 2022-11-28")
-        if [ -n "${GH_TOKEN:-}" ]; then
-            AUTHORIZATION_HEADER="Authorization: Bearer "
-            AUTHORIZATION_HEADER+="$GH_TOKEN"
-            RELEASES_CURL_ARGS+=(-H "$AUTHORIZATION_HEADER")
-        fi
+        RELEASES_CURL_ARGS+=("${AUTH_CURL_ARGS[@]}")
         if ! RELEASES_RESPONSE=$(curl "${RELEASES_CURL_ARGS[@]}" "$RELEASES_URL"); then
             print_error "Failed to resolve stable releases for version channel $VERSION from GitHub API."
             exit 1
@@ -439,7 +442,7 @@ LATEST_TAG=""
 FALLBACK_DOWNLOAD_URL=""
 FALLBACK_CHECKSUMS_URL=""
 if [ "$VERSION" = "latest" ]; then
-    if LATEST_RELEASE_RESPONSE=$(curl -sLf --connect-timeout 15 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest"); then
+    if LATEST_RELEASE_RESPONSE=$(curl -sLf --connect-timeout 15 --max-time 30 "${AUTH_CURL_ARGS[@]}" "https://api.github.com/repos/$REPO/releases/latest"); then
         LATEST_TAG=$(printf '%s' "$LATEST_RELEASE_RESPONSE" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
     else
         print_warning "Failed to resolve latest release tag from GitHub API."
@@ -492,7 +495,7 @@ download_binary_with_retry() {
     local delay="$RETRY_DELAY"
 
     for attempt in $(seq 1 $MAX_RETRIES); do
-        if curl -L -f --connect-timeout 15 --max-time 120 -o "$STAGED_BINARY_PATH" "$url"; then
+        if curl "${AUTH_CURL_ARGS[@]}" -L -f --connect-timeout 15 --max-time 120 -o "$STAGED_BINARY_PATH" "$url"; then
             print_success "Binary downloaded successfully"
             return 0
         fi
@@ -503,6 +506,14 @@ download_binary_with_retry() {
             delay=$((delay * 2))
         fi
     done
+
+    if [ "${#AUTH_CURL_ARGS[@]}" -gt 0 ]; then
+        print_warning "Authenticated download failed; retrying binary download without authentication."
+        if curl -L -f --connect-timeout 15 --max-time 120 -o "$STAGED_BINARY_PATH" "$url"; then
+            print_success "Binary downloaded successfully"
+            return 0
+        fi
+    fi
 
     return 1
 }
@@ -530,7 +541,7 @@ if [ "$SKIP_CHECKSUM" = false ]; then
     download_checksums_with_retry() {
         local url="$1"
         for attempt in $(seq 1 $MAX_RETRIES); do
-            if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$url" 2>/dev/null; then
+            if curl "${AUTH_CURL_ARGS[@]}" -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$url" 2>/dev/null; then
                 print_success "Checksums file downloaded successfully"
                 return 0
             fi
@@ -539,6 +550,13 @@ if [ "$SKIP_CHECKSUM" = false ]; then
                 sleep 2
             fi
         done
+        if [ "${#AUTH_CURL_ARGS[@]}" -gt 0 ]; then
+            print_warning "Authenticated download failed; retrying checksums download without authentication."
+            if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$url" 2>/dev/null; then
+                print_success "Checksums file downloaded successfully"
+                return 0
+            fi
+        fi
         return 1
     }
 

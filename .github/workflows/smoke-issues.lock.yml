@@ -336,7 +336,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: report_missing_tool, report_missing_data, noop(max:2), jira_add_comment, jira_add_label, jira_create_issue, jira_update_issue, linear_create_issue_in_project
+            Tools: report_missing_tool, report_missing_data, report_incomplete, noop(max:2), jira_add_comment, jira_add_label, jira_create_issue, jira_update_issue, linear_create_issue_in_project
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: |

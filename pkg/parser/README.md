@@ -40,6 +40,7 @@ Actions expressions use the native `actionslanguageservice` grammar and quote-aw
 | `FileReader` | func type | `func(filePath string) ([]byte, error)` — abstraction for file reading |
 | `InlineSubAgent` | struct | A single inline sub-agent definition extracted via the `## agent: \`name\`` syntax |
 | `InlineSkill` | struct | A single inline skill definition extracted via the `## skill: \`name\`` syntax |
+| `MarkdownMetadataBlock` | struct | Authored document or inline agent/skill metadata frontmatter, including its source and parse error |
 | `BodyLevelImport` | struct | A `{{#runtime-import}}` directive found in the markdown body, with `Path` (workspace-root-relative) and `Optional` flag |
 | `PromptImportEntry` | struct | A single import contribution to prompt assembly; either a runtime-import path or inlined markdown |
 | `ValidationError` | struct | Input validation error embedding `validationerror.Payload`; detectable via `errors.As(err, &validationerror.ValidationError)` |
@@ -56,6 +57,9 @@ Actions expressions use the native `actionslanguageservice` grammar and quote-aw
 | `ExtractMarkdownSection` | `func(content, sectionName string) (string, error)` | Extracts a named `##` section from markdown |
 | `ExtractWorkflowNameFromMarkdownBody` | `func(markdownBody, virtualPath string) (string, error)` | Derives the workflow name from the first `#` heading |
 | `ExtractWorkflowNameFromContent` | `func(content, virtualPath string) (string, error)` | Combines frontmatter extraction and name derivation |
+| `ExtractMarkdownMetadataBlocks` | `func(content string) []MarkdownMetadataBlock` | Extracts document-level and inline agent/skill metadata blocks, stopping at each first closing fence |
+| `CompileMarkdownMetadata` | `func(source string) (any, error)` | Parses bounded YAML metadata into JSON-compatible values without runtime YAML parsing |
+| `CompileAgentMetadata` | `func(source string) (any, error)` | Compiles agent metadata and retains only the supported `name`, `model`, and `tools` fields when the value is a mapping |
 
 #### Import Processing
 
@@ -64,6 +68,7 @@ Actions expressions use the native `actionslanguageservice` grammar and quote-aw
 | `ProcessImportsFromFrontmatterWithSource` | `func(frontmatter map[string]any, baseDir string, cache *ImportCache, ...) (*ImportsResult, error)` | Resolves all `@import` directives in frontmatter, merging imported configs |
 | `ParseImportDirective` | `func(line string) *ImportDirectiveMatch` | Parses a single `@import` or `@include` line |
 | `NewImportCache` | `func(repoRoot string) *ImportCache` | Creates a new import cache rooted at the repository |
+| `(*ImportCache).SetReadOnly` | `func(readOnly bool)` | Prevents cache writes and downloads while allowing existing cached content to be read |
 | `(*ImportCache).ReadFile` | `func(path string) ([]byte, error)` | Reads a cache path through confined directory handles; rejects symlinks and non-regular files |
 | `ExpandIncludesWithManifest` | `func(content, baseDir string, extractTools bool) (string, []string, error)` | Expands `@include` directives in markdown body and returns included file paths |
 | `ExpandIncludesForEngines` | `func(content, baseDir string) ([]string, error)` | Returns engine names referenced via `@include` |
@@ -394,7 +399,7 @@ This appendix is generated from the current non-test Go source files in this pac
 
 ## Source Synchronization
 
-Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented. Re-verified on 2026-09-13; no public-contract deltas since the last review. Re-verified on 2026-09-23; added the previously undocumented `ValidationError` type and `NewValidationError` constructor to the Public API section, added the three exported `Error() string` methods (`*ImportCycleError`, `*FormattedParserError`, `*ValidationError`) to the export-coverage appendix, and removed duplicate appendix rows for `ParseLinearToolsets`/`ValidateLinearAllowedForToolsets`/`IsSimpleSecretExpression` that were already documented above; corrected the export-coverage summary counts to match current source (26 types, 107 functions/methods, 22 additional appendix symbols). Re-verified on 2026-09-28; no public-contract deltas since the last review.
+Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented. Re-verified on 2026-09-13; no public-contract changes since the last review. Re-verified on 2026-09-23; added the previously undocumented `ValidationError` type and `NewValidationError` constructor to the Public API section, added the three exported `Error() string` methods (`*ImportCycleError`, `*FormattedParserError`, `*ValidationError`) to the export-coverage appendix, and removed duplicate appendix rows for `ParseLinearToolsets`/`ValidateLinearAllowedForToolsets`/`IsSimpleSecretExpression` that were already documented above; corrected the export-coverage summary counts to match current source (26 types, 107 functions/methods, 22 additional appendix symbols). Re-verified on 2026-09-28; no public-contract deltas since the last review. Re-verified on 2026-11-10; documented `MarkdownMetadataBlock`, metadata extraction/compilation functions, and `ImportCache.SetReadOnly`.
 
 ---
 

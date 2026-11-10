@@ -9,10 +9,9 @@ precedence.
 
 The finite input domains include four outcomes, three current-producer states,
 four prior-producer states, and two accounting states. `"verified"` prior
-producer represents a unique earlier executed job whose producer artifact is
-unexpired and timestamp-bound to that job. This bounded model checks the
-decision rules, not GitHub artifact APIs, timestamp parsing, or the JavaScript
-implementation.
+producer represents a unique earlier executed job. This bounded model checks
+the decision rules, not GitHub artifact APIs, timestamp parsing, or the
+JavaScript implementation.
 
 With Java and TLA+ Tools installed:
 
@@ -26,3 +25,22 @@ java -cp /path/to/tla2tools.jar tlc2.TLC \
 The concrete boundary tests are in
 `actions/setup/js/daily_aic_component_coverage.test.cjs` and include the
 T-AIC-DG-026 verified-carry-forward case.
+
+## Requirements
+
+`CancelledRerunAccounting.tla` must never accept carried-forward usage unless
+the component attempt was cancelled, no current producer is verified, exactly
+one prior producer is verified, and accounting is complete. A verified current
+producer takes precedence over any prior result.
+
+## Safeguards
+
+Missing accounting and ambiguous prior jobs fail closed; neither may be treated
+as evidence for carried-forward usage. These rejection paths are modeled in
+`CancelledRerunAccounting.tla`.
+
+## Norms
+
+A uniquely identified prior producer may supply usage for a cancelled rerun.
+Other outcomes require a verified current producer, as specified by
+`CancelledRerunAccounting.tla`.

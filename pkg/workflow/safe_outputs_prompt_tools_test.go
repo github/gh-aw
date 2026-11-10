@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -11,6 +12,34 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildSafeOutputsSectionsReportIncomplete(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		config   *ReportIncompleteConfig
+		expected string
+	}{
+		{name: "disabled"},
+		{name: "default budget", config: &ReportIncompleteConfig{}, expected: "report_incomplete"},
+		{name: "single report", config: &ReportIncompleteConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("1")}}, expected: "report_incomplete"},
+		{name: "multiple reports", config: &ReportIncompleteConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("3")}}, expected: "report_incomplete(max:3)"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &SafeOutputsConfig{NoOp: &NoOpConfig{}, ReportIncomplete: tt.config}
+			sections := buildSafeOutputsSections(config, nil, nil)
+			require.NotEmpty(t, sections)
+			manifestTools := collectSafeOutputsManifestTools(config)
+			assert.Equal(t, tt.config != nil, slices.Contains(manifestTools, "report_incomplete"))
+			_, enabled := computeEnabledToolNames(&WorkflowData{SafeOutputs: config})["report_incomplete"]
+			assert.Equal(t, tt.config != nil, enabled)
+			if tt.expected == "" {
+				assert.NotContains(t, sections[0].Content, "report_incomplete")
+			} else {
+				assert.Equal(t, "<safe-output-tools>\nTools: "+tt.expected+", noop", sections[0].Content)
+			}
+		})
+	}
+}
 
 func TestBuildSafeOutputsSectionsCodeCoverage(t *testing.T) {
 	for _, tt := range []struct {

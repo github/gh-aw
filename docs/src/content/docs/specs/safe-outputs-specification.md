@@ -5272,6 +5272,59 @@ The YAML configuration key is `report-missing-tool`. The legacy tool/output type
 **Cross-Repository Support**: N/A (logging only)  
 **Mandatory**: Yes (always enabled, cannot be disabled)
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "report_missing_tool",
+  "description": "Report that a tool or capability needed to complete the task is not available, or share any information you deem important about missing functionality or limitations.",
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "reason"
+    ],
+    "properties": {
+      "tool": {
+        "type": "string",
+        "description": "Optional: Name or description of the missing tool or capability (max 128 characters). Be specific about what functionality is needed."
+      },
+      "reason": {
+        "type": "string",
+        "description": "Explanation of why this tool is needed or what information you want to share about the limitation (max 256 characters)."
+      },
+      "alternatives": {
+        "type": "string",
+        "description": "Any workarounds, manual steps, or alternative approaches the user could take (max 256 characters)."
+      }
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+**Operational Semantics**:
+
+1. **Required Field**: The handler MUST reject a message without `reason` and return a failure result (`Missing required field: reason`).
+2. **Recording**: The handler records `tool` (or `null`), `reason`, `alternatives` (or `null`) and an ISO-8601 `timestamp`, logs them, and returns them in a success result.
+3. **Max Limit**: When `max` is set and already reached, further messages are skipped with a warning and a failure result.
+4. **No Terminal Output**: This type alone does not count as terminal output when determining whether the agent produced any safe output.
+5. **Issue Creation**: When `create-issue: true`, a separate step creates or updates a tracking issue from the collected reports.
+
+**Configuration Parameters**:
+
+- `create-issue`: When `true`, creates/updates a GitHub tracking issue for reported items (default: `false`)
+- `report-as-failure`: When `true`, the conclusion job surfaces the signal as an agent failure (default: `true`)
+- `title-prefix`: Prefix for tracking issue titles (default: `"[missing tool]"`)
+- `labels`: Labels to add to created issues (array of strings)
+- `max`: Maximum number of `report_missing_tool` signals processed per run (default: unlimited)
+- Setting the YAML key to `false` is accepted and disables the optional behavior
+
+**Security Requirements**:
+
+- All string fields MUST be sanitized by the standard safe-output content sanitization pipeline before processing
+- The handler MUST NOT make any GitHub API calls; GitHub writes occur only in the optional issue-creation step
+- The handler MUST NOT execute or interpret reported values; they are treated as untrusted text
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -5301,6 +5354,61 @@ The YAML configuration key is `report-missing-data`. The legacy tool/output type
 **Default Max**: unlimited  
 **Cross-Repository Support**: N/A (logging only)  
 **Mandatory**: Yes (always enabled, cannot be disabled)
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "report_missing_data",
+  "description": "Report that data or information needed to complete the task is not available.",
+  "inputSchema": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "data_type": {
+        "type": "string",
+        "description": "Type or description of the missing data or information (max 128 characters). Be specific about what data is needed."
+      },
+      "reason": {
+        "type": "string",
+        "description": "Explanation of why this data is needed to complete the task (max 256 characters)."
+      },
+      "context": {
+        "type": "string",
+        "description": "Additional context about the missing data or where it should come from (max 256 characters)."
+      },
+      "alternatives": {
+        "type": "string",
+        "description": "Any workarounds, manual steps, or alternative approaches the user could take (max 256 characters)."
+      }
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+**Operational Semantics**:
+
+1. **No Required Fields**: All fields are optional; the agent MAY emit the message with no fields.
+2. **Recording**: The handler records `data_type`, `reason`, `context`, `alternatives` (each `null` when absent) and an ISO-8601 `timestamp`, logs them, and returns them in a success result.
+3. **Max Limit**: When `max` is set and already reached, further messages are skipped with a warning and a failure result.
+4. **No Terminal Output**: This type alone does not count as terminal output when determining whether the agent produced any safe output.
+5. **Issue Creation**: When `create-issue: true`, a separate step creates or updates a tracking issue from the collected reports.
+
+**Configuration Parameters**:
+
+- `create-issue`: When `true`, creates/updates a GitHub tracking issue for reported items (default: `false`)
+- `report-as-failure`: When `true`, the conclusion job surfaces the signal as an agent failure (default: `true`)
+- `title-prefix`: Prefix for tracking issue titles (default: `"[missing data]"`)
+- `labels`: Labels to add to created issues (array of strings)
+- `max`: Maximum number of `report_missing_data` signals processed per run (default: unlimited)
+- Setting the YAML key to `false` is accepted and disables the optional behavior
+
+**Security Requirements**:
+
+- All string fields MUST be sanitized by the standard safe-output content sanitization pipeline before processing
+- The handler MUST NOT make any GitHub API calls; GitHub writes occur only in the optional issue-creation step
+- The handler MUST NOT execute or interpret reported values; they are treated as untrusted text
 
 **Required Permissions**:
 

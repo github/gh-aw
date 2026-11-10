@@ -53,13 +53,8 @@ jobs:
           entrypoint: /bin/bash
           # Keep Super-Linter's rules and file selection, replacing only its
           # bundled analyzer, which cannot read Go 1.27 export data.
-          args: >-
-            -euo pipefail -c
-            'export GOTOOLCHAIN="$(go env GOVERSION)";
-            export GOBIN=/tmp/gh-aw-super-linter-bin;
-            CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0;
-            export PATH="$GOBIN:$PATH";
-            exec /action/lib/linter.sh'
+          # Docker action args are not parsed by a shell; pass a script, not -c quotes.
+          args: /github/workspace/scripts/run_super_linter.sh
         id: super-linter
         # Findings must reach the reporting agent, not skip it via a failed dependency.
         continue-on-error: true
@@ -87,7 +82,7 @@ jobs:
         run: |
           printf 'super-linter outcome: %s\n' "$LINTER_OUTCOME" > /tmp/super-linter-result.txt
           if [ ! -s "super-linter.log" ]; then
-            echo "::error::Super-linter did not produce a nonempty log; analysis is unavailable."
+            echo "::error::Super-linter did not produce a nonempty log; analysis is unavailable. See super-linter-startup.log for the original error."
             exit 1
           fi
           if [ "$LINTER_OUTCOME" != "success" ]; then
@@ -100,15 +95,17 @@ jobs:
       - name: Prepare super-linter log for upload
         if: always()
         run: |
-          if [ -f "super-linter.log" ]; then
-            if sudo cp super-linter.log /tmp/super-linter.log 2>/dev/null || cp super-linter.log /tmp/super-linter.log; then
-              if ! (sudo chmod 644 /tmp/super-linter.log 2>/dev/null || chmod 644 /tmp/super-linter.log); then
-                echo "::warning::Unable to set permissions on /tmp/super-linter.log"
+          for log in super-linter.log super-linter-output/super-linter-startup.log; do
+            [ -f "$log" ] || continue
+            destination="/tmp/$(basename "$log")"
+            if sudo cp "$log" "$destination" 2>/dev/null || cp "$log" "$destination"; then
+              if ! (sudo chmod 644 "$destination" 2>/dev/null || chmod 644 "$destination"); then
+                echo "::warning::Unable to set permissions on $destination"
               fi
             else
-              echo "::warning::Unable to copy super-linter.log to /tmp for artifact upload"
+              echo "::warning::Unable to copy $log to /tmp for artifact upload"
             fi
-          fi
+          done
       
       - name: Upload super-linter log
         if: always()
@@ -117,6 +114,7 @@ jobs:
           name: super-linter-log
           path: |
             /tmp/super-linter.log
+            /tmp/super-linter-startup.log
             /tmp/super-linter-result.txt
             /tmp/super-linter-summary.json
           if-no-files-found: error
@@ -233,18 +231,13 @@ docker run --rm \
   --workdir /tmp/gh-aw/agent \
   -e DEFAULT_BRANCH=main \
   -e RUN_LOCAL=true \
+  -e GITHUB_WORKSPACE=/tmp/gh-aw/agent \
   -e VALIDATE_GO_MODULES=true \
   -e DEFAULT_WORKSPACE=/tmp/gh-aw/agent \
   -e 'FILTER_REGEX_EXCLUDE=(^|.*/)(super-linter-output/.*|pkg/linters/(.*/)?testdata(/.*|$)|[.]github/workflows/go[.]mod$)' \
   -v "$(pwd):/tmp/gh-aw/agent" \
   ghcr.io/super-linter/super-linter:v9.0.0@sha256:7620fb6f07a1908b0642d9ddc4f49da7d9f2b9497bcafee4d3d151d1e5567c0b \
-  -euo pipefail -c '
-    export GOTOOLCHAIN="$(go env GOVERSION)"
-    export GOBIN=/tmp/gh-aw-super-linter-bin
-    CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
-    export PATH="$GOBIN:$PATH"
-    exec /action/lib/linter.sh
-  '
+  /tmp/gh-aw/agent/scripts/run_super_linter.sh
 ```
 
 **Note**: The Docker command uses the same super-linter configuration as this workflow. Files are mounted from your current directory to `/tmp/gh-aw/agent` in the container.
