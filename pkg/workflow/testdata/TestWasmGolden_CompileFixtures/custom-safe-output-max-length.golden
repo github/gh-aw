@@ -265,7 +265,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: report_missing_tool, report_missing_data, noop(max:2), publish_report
+            Tools: report_missing_tool, report_missing_data, report_incomplete, noop(max:2), publish_report
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: |+

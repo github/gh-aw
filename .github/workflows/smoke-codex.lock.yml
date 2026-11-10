@@ -400,7 +400,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: add_comment(max:2), create_issue, add_labels, remove_labels, unassign_from_user, hide_comment(max:5), set_issue_field, report_missing_tool, report_missing_data, noop(max:2), add_smoked_label
+            Tools: add_comment(max:2), create_issue, add_labels, remove_labels, unassign_from_user, hide_comment(max:5), set_issue_field, report_missing_tool, report_missing_data, report_incomplete, noop(max:2), add_smoked_label
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: |+
