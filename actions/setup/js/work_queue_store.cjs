@@ -38,8 +38,9 @@ const WORK_QUEUE_BRANCH = "work-queue";
 const WORK_QUEUE_LOG_PATH = "work-queue.jsonl";
 const LEGACY_BRANCHES = ["dispatch-coordinator", "gh-aw-work-queue"];
 const LEGACY_LOGS = ["dispatch-work-coordinator.jsonl"];
-// Contended ledgers routinely need 10+ fast-forward attempts; exponential backoff caps at 1 s, so 33 attempts bound a publication to ~30 s of sleep.
+// Contended publications routinely need 10+ fast-forward attempts; exponential backoff caps at 1 s, so 33 attempts bound a publication to ~30 s of sleep.
 const DEFAULT_MAX_RETRIES = 32;
+const DEFAULT_COMPACTION_MAX_RETRIES = 5;
 /** @type {WeakMap<object, {scope: object, proofs: Set<string>}>} */
 const verifiedCheckpointHistory = new WeakMap();
 /** @type {WeakMap<object, {scope: object, repository: string, sha: string, treeSha: string, contents: string}>} */
@@ -555,7 +556,7 @@ async function compactWorkQueue(options) {
   return observeQueueOperation("compact", options, () => compactWorkQueueImpl(options));
 }
 
-async function compactWorkQueueImpl({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, maxRetries = DEFAULT_MAX_RETRIES, now = Date.now }) {
+async function compactWorkQueueImpl({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, maxRetries = DEFAULT_COMPACTION_MAX_RETRIES, now = Date.now }) {
   const actor = actorFromContext(context);
   validateTrustedContext(context, actor);
   if (actor.role !== "administrator" || actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "checkpoint requires an authenticated queue administrator");
