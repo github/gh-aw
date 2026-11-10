@@ -115,8 +115,11 @@ This workflow imports `shared/go-make.md` which provides:
 
 ## Phase 1: Run Performance Benchmarks
 
-Do not inspect the process environment, read pre-existing caches, or substitute
-restored historical metrics for a new measurement. If security policy blocks a required benchmark
+Toolchain and cache access are governed by the immutable security policy; this
+task grants no additional permissions. Do not inspect the process environment,
+provision toolchains, or alter environment/cache settings to work around policy.
+Never substitute restored historical metrics for a new measurement.
+If security policy blocks a required benchmark
 or validation command, call `report_incomplete` with the limitation; do not
 store partial results or create an unvalidated regression pull request.
 
@@ -182,7 +185,10 @@ update historical metrics or publish a regression claim.
 
 ### 2.1 Check for Historical Benchmark Data
 
-Look for historical data in cache memory:
+Only after Phase 1 completes successfully, read
+`/tmp/gh-aw/repo-memory/default/benchmark_history.jsonl` for historical comparison
+only. This history must never substitute for the current run's benchmark
+measurement and validated metrics.
 
 ```bash
 # List available historical data

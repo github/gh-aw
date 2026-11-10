@@ -1,7 +1,7 @@
 ---
 private: true
 name: Daily Go Test Parallelizer
-description: Adds t.Parallel to safe Go tests using daily round-robin analysis
+description: Adds t.Parallel to safe Go tests using bounded batch analysis
 on:
   schedule: every 2h
   workflow_dispatch:
@@ -36,6 +36,7 @@ tools:
   github:
     mode: gh-proxy
   cache-memory:
+    restore-only: true
     retention-days: 30
     allowed-extensions: [".json"]
   edit:
@@ -76,7 +77,7 @@ Analyze up to twenty-five Go test files per run and add `t.Parallel()` only wher
 2. Read `/tmp/gh-aw/cache-memory/go-test-parallelizer/state.json` when it exists. It has this shape:
    `{"last_file":"path/to/file_test.go"}`.
 3. Select up to 25 consecutive paths starting after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path.
-4. Analyze and modify only this selected batch (maximum 25 files). Keep the previous cursor unchanged until the outcome rules in "Persist and report" permit an advance; selection alone is not completed analysis.
+4. Analyze and modify only this selected batch (maximum 25 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
 5. Minimize token usage: avoid re-reading files you already analyzed, and do not paste full file contents into notes or outputs.
 
 ## Analyze safety
@@ -118,16 +119,23 @@ Do not create a pull request or use `noop` to imply validation succeeded.
 ## Persist and report
 
 Treat `state.json` as a completed-analysis cursor, not an attempted-batch cursor.
-Advance it to the last selected path only after all selected files have a
-completed safety assessment and either:
+A completed analysis requires all selected files to have a completed safety
+assessment and either:
 
 - No safe edit is available, so the completed analysis ends with `noop`; no test execution is claimed.
 - Candidate edits pass every required validation command and the diff check.
 
-Only then create `/tmp/gh-aw/cache-memory/go-test-parallelizer/` if needed and
-write `state.json`. Preserve the previous cursor byte-for-byte (or leave it
-absent) on blocked validation, failed tests, incomplete analysis, tool failure,
-or an invalid diff. Never advance the cursor immediately after selection.
+Cursor persistence is temporarily disabled: the compiler-enforced
+`restore-only: true` cache configuration restores existing state but never
+uploads or saves cache-memory changes. Do not write `state.json` or create its
+directory. Preserve the previous cursor byte-for-byte (or leave it absent) on
+every outcome, including successful validation and completed no-candidate
+analysis. Never advance the cursor immediately after selection.
+
+This deliberately suspends round-robin advancement until a trusted persistence
+gate can independently verify the terminal outcome and all required validation.
+An agent-written success flag is not validation evidence. Repeated runs may
+analyze the same batch; report that limitation rather than claim cursor progress.
 
 Use `###` or lower headings in any PR description or final report. Present a
 concise overview, selected files and results, collapsible detailed test evidence,
@@ -140,7 +148,8 @@ Before stopping, call exactly one terminal safe-output tool: create one draft
 pull request when validation succeeds with a change; use `noop` only for a
 completed analysis with no safe edit; use `report_incomplete` when analysis or
 required validation is blocked or fails. Include the selected batch and a short
-reason, and state whether the completed-analysis cursor advanced.
+reason, and state that the completed-analysis cursor did not advance
+(restore-only mode).
 
 Do not parallelize tests that use or may conflict through:
 

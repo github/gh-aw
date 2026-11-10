@@ -578,6 +578,7 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	python3 scripts/test_publish_safe_outputs_node.py
 	python3 scripts/test_pr_specification_reviewer.py
 	python3 scripts/test_archivx_analyzer.py
+	python3 scripts/test_parse_benchmark_results.py
 	bash actions/setup/sh/collect_usage_artifact_files_test.sh
 	bash actions/setup/sh/copy_gh_aw_binary_for_mcp_test.sh
 	bash actions/setup/sh/create_gh_aw_tmp_dir_test.sh

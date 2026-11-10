@@ -40,25 +40,30 @@ class BenchmarkResultsTests(unittest.TestCase):
             ("\n".join(lines + [lines[0]]), "Duplicate"),
             ("\n".join(lines + ["BenchmarkOther-2 1 1 ns/op 0 B/op 0 allocs/op"]), "Unexpected"),
             ("\n".join(lines + ["FAIL\tgithub.com/github/gh-aw/pkg/workflow"]), "Failed"),
+            ("\n".join(lines + ["diagnostic FAIL github.com/github/gh-aw/pkg/workflow"]), "Failed"),
         ]:
             with self.subTest(error=error, text=text):
                 with self.assertRaisesRegex(ValueError, error):
                     parse_results(text)
 
     def test_rejects_malformed_and_nonfinite_metrics(self):
-        for row in [
-            "100 12.75 ns/op",
-            "100 NaN ns/op 64 B/op 1 allocs/op",
-            "100 inf ns/op 64 B/op 1 allocs/op",
-            "100 0 ns/op 64 B/op 1 allocs/op",
-            "0 1 ns/op 64 B/op 1 allocs/op",
-            "100 1 ns/op -1 B/op 1 allocs/op",
-            "100 1 ns/op 64 B/op -1 allocs/op",
-            "100 invalid ns/op 64 B/op 1 allocs/op",
-            "100 1 us/op 64 B/op 1 allocs/op",
+        for row, error in [
+            ("100 12.75 ns/op", "Incomplete benchmark metrics"),
+            ("100 NaN ns/op 64 B/op 1 allocs/op", "Out-of-range benchmark metrics"),
+            ("100 inf ns/op 64 B/op 1 allocs/op", "Out-of-range benchmark metrics"),
+            ("100 0 ns/op 64 B/op 1 allocs/op", "Out-of-range benchmark metrics"),
+            ("0 1 ns/op 64 B/op 1 allocs/op", "Out-of-range benchmark metrics"),
+            ("100 1 ns/op -1 B/op 1 allocs/op", "Out-of-range benchmark metrics"),
+            ("100 1 ns/op 64 B/op -1 allocs/op", "Out-of-range benchmark metrics"),
+            ("100 invalid ns/op 64 B/op 1 allocs/op", "Invalid numeric benchmark metrics"),
+            ("100 1 us/op 64 B/op 1 allocs/op", "Incomplete benchmark metrics"),
         ]:
-            with self.subTest(row=row), self.assertRaises(ValueError):
-                parse_results(f"BenchmarkValidation-2 {row}")
+            lines = [
+                f"BenchmarkValidation-2 {row}" if line.startswith("BenchmarkValidation-") else line
+                for line in result_lines()
+            ]
+            with self.subTest(row=row), self.assertRaisesRegex(ValueError, f"^{error}: Validation$"):
+                parse_results("\n".join(lines))
 
     def test_cli_writes_only_complete_metrics(self):
         with tempfile.TemporaryDirectory() as directory:

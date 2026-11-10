@@ -28,7 +28,7 @@ def parse_results(text):
     benchmarks = {}
     for line in text.splitlines():
         fields = line.split()
-        if fields and fields[0] == "FAIL":
+        if "FAIL" in fields:
             raise ValueError(f"Failed benchmark command: {line}")
         if not fields or not fields[0].startswith("Benchmark"):
             continue
