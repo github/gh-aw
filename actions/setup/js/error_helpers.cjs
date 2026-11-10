@@ -40,6 +40,15 @@ function getErrorMessage(error) {
     return status != null ? `GitHub returned an unexpected HTML response (HTTP ${status})` : "GitHub returned an unexpected HTML response";
   }
 
+  if (!message.trim()) {
+    const status = errorAsAny?.status ?? errorAsAny?.response?.status;
+    const requestId = errorAsAny?.response?.headers?.["x-github-request-id"];
+    const context = [];
+    if (Number.isInteger(status) && status >= 100 && status <= 599) context.push(`HTTP ${status}`);
+    if (typeof requestId === "string" && /^[A-Za-z0-9:-]{1,128}$/.test(requestId)) context.push(`request ID ${requestId}`);
+    return context.length ? `GitHub API request failed (${context.join("; ")})` : "Unknown error";
+  }
+
   return message;
 }
 

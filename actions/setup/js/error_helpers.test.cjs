@@ -13,6 +13,22 @@ describe("error_helpers", () => {
   });
 
   describe("getErrorMessage", () => {
+    it("preserves HTTP and request identity when GitHub returns an empty message", () => {
+      const error = Object.assign(new Error(""), {
+        status: 500,
+        response: { headers: { "x-github-request-id": "0A40:E7329:1C84C:5A3DC:6AF34087", authorization: "not-for-logs" } },
+      });
+      expect(getErrorMessage(error)).toBe("GitHub API request failed (HTTP 500; request ID 0A40:E7329:1C84C:5A3DC:6AF34087)");
+    });
+
+    it("uses response status for whitespace messages without logging arbitrary headers", () => {
+      expect(getErrorMessage({ message: " \n", response: { status: 502, headers: { "x-github-request-id": "<secret>" } } })).toBe("GitHub API request failed (HTTP 502)");
+    });
+
+    it("provides a nonempty fallback without HTTP context", () => {
+      expect(getErrorMessage(new Error(""))).toBe("Unknown error");
+    });
+
     it("should extract message from Error instance", () => {
       const error = new Error("Test error message");
       expect(getErrorMessage(error)).toBe("Test error message");
