@@ -2,6 +2,9 @@
 
 const { isRateLimitError } = require("./error_helpers.cjs");
 
+// A synthetic quota stop can also represent a secondary limit above the reserve.
+const RESERVE_STOPS = new WeakSet();
+
 const HTTP_DATE =
   /^(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (?:0[1-9]|[12]\d|3[01]) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} (?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d GMT|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (?:0[1-9]|[12]\d|3[01])-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{2} (?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d GMT|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (?: [1-9]|0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d \d{4})$/;
 
@@ -74,7 +77,7 @@ function getGitHubAPIDiagnostic(error, now = Date.now()) {
   if (!error) return null;
 
   const quotaStopped = error?.code === "DAILY_AIC_QUOTA_STOP";
-  const metadata = getGitHubAPIQuota(error?.response?.headers, now, quotaStopped);
+  const metadata = getGitHubAPIQuota(error?.response?.headers, now, RESERVE_STOPS.has(error));
   const { resource, remaining, limit, used, reset, retryRestricted, retryNotBefore } = metadata;
   const status = Number(error?.status || error?.response?.status || 0);
   const secondary = typeof error?.message === "string" && /\bsecondary rate limit\b/i.test(error.message);
@@ -85,7 +88,7 @@ function getGitHubAPIDiagnostic(error, now = Date.now()) {
   const details = quota
     ? `resource=${resource}; remaining=${remaining ?? "unknown"}; limit=${limit ?? "unknown"}; used=${used ?? "unknown"}; reset=${reset || "unknown"}; retry_not_before=${retryNotBefore || "unknown"}${quotaStopped && accessFailure ? "; quota reserve guard also stopped further reads" : ""}`
     : "Check the credential's access to this operation; quota exhaustion was not established.";
-  return { quota, classification, message: `GitHub API ${classification} (HTTP ${status >= 100 && status <= 599 && Number.isInteger(status) ? status : "unknown"}; ${details})` };
+  return { quota, classification, retryNotBefore, message: `GitHub API ${classification} (HTTP ${status >= 100 && status <= 599 && Number.isInteger(status) ? status : "unknown"}; ${details})` };
 }
 
-module.exports = { getGitHubAPIQuota, getGitHubAPIDiagnostic, getSanitizedGitHubAPICause };
+module.exports = { RESERVE_STOPS, getGitHubAPIQuota, getGitHubAPIDiagnostic, getSanitizedGitHubAPICause };

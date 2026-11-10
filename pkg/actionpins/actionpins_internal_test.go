@@ -94,6 +94,35 @@ func TestResolveActionPin_GHESArtifactCompatibility(t *testing.T) {
 	}
 }
 
+func TestGHESArtifactPin(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		repo string
+		want ActionPin
+		ok   bool
+	}{
+		{
+			repo: "actions/upload-artifact",
+			want: ActionPin{
+				Repo:    "actions/upload-artifact",
+				Version: "v3.2.2",
+				SHA:     "c6a366c94c3e0affe28c06c8df20a878f24da3cf",
+			},
+			ok: true,
+		},
+		{repo: "unknown/action"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.repo, func(t *testing.T) {
+			got, ok := ghesArtifactPin(tt.repo)
+			assert.Equal(t, tt.ok, ok)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestResolveActionPin_GHESMappingTakesPrecedence(t *testing.T) {
 	t.Parallel()
 
