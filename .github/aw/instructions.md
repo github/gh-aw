@@ -8,16 +8,6 @@ Apply to workflow creation, editing, review, diagnosis, debugging, upgrades, and
 local SDLC issue preparation.
 These rules override conflicting upstream guidance.
 
-## Local SDLC with Squad
-
-When substantial issue work calls for a local, self-contained software development
-lifecycle (SDLC), follow [squad.md](squad.md) before choosing a gh-aw workflow
-architecture. Include its complete bootstrap `<details>` section verbatim in the
-generated issue body for a coding agent. Keep the issue's work
-description outside that section. Preparing the issue does not authorize running
-the embedded setup prompt, installing Squad, or creating a gh-aw workflow.
-Keep explicit GitHub Actions automation requests on the existing workflow routes.
-
 ## Repository Rules
 
 - After any `.github/workflows/*.md` edit, run one-shot `gh aw compile`; never `--watch`.
@@ -120,3 +110,8 @@ configure Drain3. Grouping never changes ranking and keeps structured outcomes
 separate. These optional run-local groups are distinct from
 fleet failure clusters and `audit --group` finding codes; relevance/anomaly scores
 never replace full-stream findings or establish threat absence.
+
+## Local SDLC with Squad
+
+For substantial local, self-contained SDLC issues, follow [squad.md](squad.md)
+and copy its bootstrap prompt verbatim into the issue; do not execute it.
