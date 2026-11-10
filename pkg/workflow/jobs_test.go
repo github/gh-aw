@@ -350,6 +350,7 @@ func TestRenderStepForRunner(t *testing.T) {
 		"${{ steps.wsl_setup_node.outputs.node-version }}",
 		"SHASUMS256.txt",
 		"ln -sfn \"$install_dir\" /usr/local/lib/nodejs/current",
+		`export PATH="/usr/local/lib/nodejs/current/bin:$PATH"`,
 	} {
 		if !strings.Contains(got, expected) {
 			t.Errorf("Windows job did not bootstrap the Linux Node.js runtime (%q):\n%s", expected, got)
@@ -464,10 +465,18 @@ func TestRewriteWindowsActionTempPathMapsNativeEnvironmentPaths(t *testing.T) {
         env:
           GH_AW_AGENT_OUTPUT: /tmp/gh-aw/agent-stdio.log
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["${{ runner.temp }}/gh-aw/agent_output.json","${{ runner.temp }}/gh-aw"]'
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw-setup/actions
 `
 	got := rewriteWindowsActionTempPath(step)
 	if !strings.Contains(got, `GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/agent-stdio.log`) {
 		t.Fatalf("Native helper output path was not mapped to runner temp:\n%s", got)
+	}
+	if !strings.Contains(got, `GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["${{ runner.temp }}/gh-aw/agent_output.json","${{ runner.temp }}/gh-aw"]'`) {
+		t.Fatalf("Recovery artifact paths were not kept on the Windows host:\n%s", got)
+	}
+	if !strings.Contains(got, `GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw-setup/actions`) {
+		t.Fatalf("Setup action path was unexpectedly rewritten:\n%s", got)
 	}
 	if strings.Contains(got, "/tmp/gh-aw") {
 		t.Fatalf("Native helper retained an incompatible POSIX path:\n%s", got)
@@ -489,6 +498,14 @@ func TestRewriteWindowsPathOutputs(t *testing.T) {
 	)
 	if !strings.Contains(agentOutput, `GH_AW_AGENT_OUTPUT=$(wslpath -w "${RUNNER_TEMP}/gh-aw/agent_output.json")`) {
 		t.Fatalf("Agent output setup did not publish a Windows-native path:\n%s", agentOutput)
+	}
+
+	configCopy := rewriteWindowsPathOutputs(
+		"Run agent",
+		`cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json`,
+	)
+	if !strings.Contains(configCopy, `if [ "${RUNNER_TEMP}/gh-aw/awf-config.json" -ef "/tmp/gh-aw/awf-config.json" ]; then :; else cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json; fi`) {
+		t.Fatalf("AWF config copy was not guarded against the WSL alias resolving to the same file:\n%s", configCopy)
 	}
 }
 

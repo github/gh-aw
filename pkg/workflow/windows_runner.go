@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"path"
 	"slices"
 	"strings"
 
@@ -296,19 +297,26 @@ func rewriteWindowsActionTempPath(step string) string {
 			}
 		}
 		if rewriteEnvironmentPaths {
-			if environmentIndent < 0 && trimmed == "env:" {
-				environmentIndent = indent
-			} else if environmentIndent >= 0 {
-				if trimmed != "" && indent <= environmentIndent {
-					environmentIndent = -1
-				} else {
-					line = strings.ReplaceAll(line, constants.TmpGhAwDir, constants.GhAwRootDir)
-				}
-			}
+			line = rewriteWindowsActionEnvironmentLine(line, &environmentIndent)
 		}
 		rendered.WriteString(line)
 	}
 	return rendered.String()
+}
+
+func rewriteWindowsActionEnvironmentLine(line string, environmentIndent *int) string {
+	trimmed := strings.TrimSpace(line)
+	indent := len(line) - len(strings.TrimLeft(line, " "))
+	if *environmentIndent < 0 && trimmed == "env:" {
+		*environmentIndent = indent
+	} else if *environmentIndent >= 0 {
+		if trimmed != "" && indent <= *environmentIndent {
+			*environmentIndent = -1
+		} else {
+			line = strings.ReplaceAll(line, constants.TmpGhAwDir, constants.GhAwRootDir)
+		}
+	}
+	return line
 }
 
 func rewriteWindowsSetupActionPath(step string) string {
@@ -423,9 +431,18 @@ func windowsRunStepBounds(lines []string) (int, int, int, int, bool) {
 }
 
 func rewriteWindowsPathOutputs(stepName, script string) string {
+	copyCommand := fmt.Sprintf("cp %q %s", awfConfigRuntimePathExpr, constants.AWFConfigFilePath)
+	guardedCopy := fmt.Sprintf(
+		"if [ %q -ef %q ]; then :; else %s; fi",
+		awfConfigRuntimePathExpr,
+		constants.AWFConfigFilePath,
+		copyCommand,
+	)
+	script = strings.ReplaceAll(script, copyCommand, guardedCopy)
+
 	switch stepName {
 	case "Set runtime paths":
-		for _, path := range []struct {
+		for _, outputPath := range []struct {
 			name string
 			file string
 		}{
@@ -433,8 +450,9 @@ func rewriteWindowsPathOutputs(stepName, script string) string {
 			{name: "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", file: "config.json"},
 			{name: "GH_AW_SAFE_OUTPUTS_TOOLS_PATH", file: "tools.json"},
 		} {
-			source := `echo "` + path.name + `=` + constants.GhAwRootDirShell + `/safeoutputs/` + path.file + `"`
-			target := `echo "` + path.name + `=$(wslpath -w "` + constants.GhAwRootDirShell + `/safeoutputs/` + path.file + `")"`
+			artifactPath := path.Join(constants.GhAwRootDirShell, "safeoutputs", outputPath.file)
+			source := fmt.Sprintf(`echo "%s=%s"`, outputPath.name, artifactPath)
+			target := fmt.Sprintf(`echo "%s=$(wslpath -w "%s")"`, outputPath.name, artifactPath)
 			script = strings.ReplaceAll(script, source, target)
 		}
 		return script
@@ -514,8 +532,6 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 		"RUNNER_OS",
 		"RUNNER_TEMP",
 		"RUNNER_TOOL_CACHE",
-	}, environmentVariables...)
-	allowedEnvironmentVariables = append(allowedEnvironmentVariables,
 		"GITHUB_ENV",
 		"GITHUB_OUTPUT",
 		"GITHUB_PATH",
@@ -529,7 +545,7 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 		"TEMP",
 		"TMP",
 		"TMPDIR",
-	)
+	}, environmentVariables...)
 	slices.Sort(allowedEnvironmentVariables)
 	allowedEnvironmentVariables = slices.Compact(allowedEnvironmentVariables)
 	powerShellAllowedVariables := make([]string, 0, len(allowedEnvironmentVariables))
