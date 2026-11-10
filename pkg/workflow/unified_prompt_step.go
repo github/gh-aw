@@ -717,6 +717,9 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	if safeOutputs.MissingData != nil {
 		tools = append(tools, toolWithMaxBudget("report_missing_data", safeOutputs.MissingData.Max))
 	}
+	if safeOutputs.ReportIncomplete != nil {
+		tools = append(tools, toolWithMaxBudget("report_incomplete", safeOutputs.ReportIncomplete.Max))
+	}
 	// noop is always included: it is auto-injected by extractSafeOutputsConfig and
 	// must always appear in the tools list so agents can signal no-op completion.
 	if safeOutputs.NoOp != nil {

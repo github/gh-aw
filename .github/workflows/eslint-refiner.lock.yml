@@ -324,7 +324,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: create_issue(max:3), create_discussion, report_missing_tool, report_missing_data, noop(max:2), persist_eslint_memory
+            Tools: create_issue(max:3), create_discussion, report_missing_tool, report_missing_data, report_incomplete, noop(max:2), persist_eslint_memory
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: |+

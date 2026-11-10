@@ -385,7 +385,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: smoke_workflow_call, report_missing_tool, report_missing_data, noop(max:2)
+            Tools: smoke_workflow_call, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
             Shared budgets: call-workflow [smoke_workflow_call](max:1 total)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
