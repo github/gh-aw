@@ -205,11 +205,11 @@ describe("awf_model_routing.cjs", () => {
   });
 
   it("codex_routing_effort_contract_requires_pin_review", () => {
-    // Reviewed pair: Codex 0.166.0 preserves all seven AWF routing-contract efforts unchanged
-    // (openai/codex rust-v0.166.0 codex-rs/protocol/src/openai_models.rs). Its additional parser
+    // Reviewed pair: Codex 0.167.0 preserves all seven AWF routing-contract efforts unchanged
+    // (openai/codex rust-v0.167.0 codex-rs/protocol/src/openai_models.rs). Its additional parser
     // values remain outside this contract. Both values are hard-coded on purpose; a pin bump must
     // re-review the Codex entry in mapAWFRoutingEffort.
-    const reviewedCodexVersion = "0.166.0";
+    const reviewedCodexVersion = "0.167.0";
     const reviewedCodexEfforts = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
     const versionConstants = fs.readFileSync(new URL("../../../pkg/constants/version_constants.go", import.meta.url), "utf8");
     const pinned = versionConstants.match(/^const DefaultCodexVersion Version = "([^"]+)"/m)?.[1];

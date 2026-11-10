@@ -42,12 +42,12 @@ func TestLocalScannerPathVersionSelection(t *testing.T) {
 		name, version string
 		want          bool
 	}{
-		{"zizmor", "zizmor 1.31.1", true},
+		{"zizmor", "zizmor 1.31.1", false},
 		{"zizmor", "zizmor 1.32.0", true},
 		{"zizmor", "zizmor 1.31.0", false},
 		{"zizmor", "zizmor 1.30.1", false},
 		{"zizmor", "zizmor 1.9.9", false},
-		{"zizmor", "zizmor 1.31.1-rc.1", false},
+		{"zizmor", "zizmor 1.32.0-rc.1", false},
 		{"zizmor", "zizmor unknown", false},
 		{"poutine", "poutine version v1.1.6", true},
 		{"poutine", "poutine 1.2.0", true},
@@ -87,7 +87,7 @@ func TestLocalScannerCommandsAndDockerFallback(t *testing.T) {
 		t.Skip("test binaries use a POSIX shell")
 	}
 	dir := t.TempDir()
-	zizmor := installTestScanner(t, dir, "zizmor", "zizmor 1.31.1")
+	zizmor := installTestScanner(t, dir, "zizmor", "zizmor 1.32.0")
 	poutine := installTestScanner(t, dir, "poutine", "poutine 1.1.6")
 	docker := installTestScanner(t, dir, "docker", "docker")
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -146,7 +146,7 @@ func TestPrepareDockerImagesUsesLocalScanners(t *testing.T) {
 		t.Skip("test binaries use a POSIX shell")
 	}
 	dir := t.TempDir()
-	installTestScanner(t, dir, "zizmor", "zizmor 1.31.1")
+	installTestScanner(t, dir, "zizmor", "zizmor 1.32.0")
 	installTestScanner(t, dir, "poutine", "poutine 1.1.6")
 	t.Setenv("PATH", dir)
 	ResetDockerPullState()
