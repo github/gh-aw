@@ -1,5 +1,6 @@
 """Documentation contract regressions, not an LLM or live workflow evaluation."""
 
+import hashlib
 import json
 from pathlib import Path
 import posixpath
@@ -42,6 +43,67 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_local_sdlc_routes_to_squad_alongside_workflow_creation(self):
+        for path, workflow_route in (
+            (".github/skills/agentic-workflows/SKILL.md", "- Design workflows from scratch"),
+            ("pkg/cli/data/agentic_workflows_skill.md", "- Design workflows from scratch"),
+            (".github/agents/agentic-workflows.md", "- **Creating new workflows**"),
+            ("pkg/cli/data/agentic_workflows_agent.md", "- **Creating new workflows**"),
+        ):
+            content = (ROOT / path).read_text()
+            route = next(line for line in content.splitlines() if line.startswith("- ") and "Local SDLC issue bootstrap" in line)
+            with self.subTest(router=path):
+                self.assertIn(".github/aw/squad.md", route)
+                self.assertLessEqual(len(route.split()), 12)
+                self.assertIn(workflow_route, content)
+
+    def test_agent_lists_squad_after_workflow_routes(self):
+        for path in (".github/agents/agentic-workflows.md", "pkg/cli/data/agentic_workflows_agent.md"):
+            content = (ROOT / path).read_text()
+            section = content.split("## What This Agent Does\n", 1)[1].split("\nWorkflows may optionally include:", 1)[0]
+            routes = [line for line in section.splitlines() if line.startswith("- ")]
+            with self.subTest(agent=path):
+                self.assertTrue(routes[0].startswith("- **Creating new workflows**"))
+                self.assertTrue(routes[-1].startswith("- **Local SDLC issue bootstrap"))
+
+    def test_squad_is_discoverable_from_instructions_and_pattern_router(self):
+        for path in (
+            ".github/aw/instructions.md",
+            ".github/aw/github-agentic-workflows.md",
+            ".github/aw/patterns.md",
+        ):
+            content = normalized((ROOT / path).read_text())
+            with self.subTest(instructions=path):
+                self.assertIn("squad.md", content)
+                self.assertIn("local", content.lower())
+        fallback = json.loads((ROOT / "pkg/cli/data/agentic_workflows_fallback_aw_files.json").read_text())
+        self.assertIn("squad.md", fallback)
+        skill = (SKILL / "SKILL.md").read_text()
+        self.assertIn("- `.github/aw/squad.md`", skill)
+
+    def test_squad_bootstrap_prompt_is_verbatim(self):
+        guide = (ROOT / ".github/aw/squad.md").read_bytes()
+        block = guide.split(b"```text\n", 1)[1].split(b"\n```", 1)[0]
+        self.assertEqual(
+            hashlib.sha256(block).hexdigest(),
+            "3a59b74939616d97b41ebb161fe302a2f329de031efd9422aabc829374407f11",
+        )
+
+    def test_squad_bootstrap_requires_local_intent_and_preserves_existing_teams(self):
+        guide = normalized((ROOT / ".github/aw/squad.md").read_text().split("```text", 1)[0])
+        for required in (
+            "Substantial work or a mention of Squad alone is not enough",
+            "Keep explicit GitHub Actions automation requests on the workflow routes",
+            "establish local SDLC intent before including setup authorization",
+            "If Squad is already initialized, use the existing team",
+            "unless the user explicitly requests reinitialization",
+            "for a coding agent",
+            "Copy the entire `<details>` section from the code block verbatim",
+            "do not paraphrase, customize, or execute the prompt while preparing the issue",
+        ):
+            with self.subTest(guard=required):
+                self.assertIn(required, guide)
+
     def test_creator_discovers_memory_reuse_before_selecting_persistence(self):
         designer = (ROOT / ".github/aw/designer.md").read_text()
         phase = designer.split("### Phase 4: Data Strategy\n", 1)[1].split("\n### Phase 5:", 1)[0]
