@@ -61,6 +61,14 @@ describe("CLI proxy console diagnostic sanitizer", () => {
     expect(result.stderr).toBe("");
   });
 
+  it("fails closed when many distinct small masks exceed the count budget", () => {
+    const commands = Array.from({ length: 1025 }, (_, index) => `::add-mask::mask-${index}\n`).join("");
+    const result = capture(`${commands}final line\n`);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+  });
+
   it("normalizes NUL bytes before matching environment credentials and collecting masks", () => {
     const secret = "synthetic-proxy-credential";
     const output = redactCliProxyDiagnostics(`synthetic-proxy-\0credential\n::add-\0mask::runtime-\0credential\nruntime-credential\nruntime-\0credential`, { GH_TOKEN: secret });

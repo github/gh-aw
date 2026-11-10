@@ -5,6 +5,7 @@ const { redactArtifactContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 
 const MAX_DIAGNOSTIC_BYTES = 1024 * 1024;
+const MAX_DIAGNOSTIC_MASKS = 1024;
 
 /**
  * @param {string} content
@@ -64,6 +65,14 @@ async function captureCliProxyDiagnostics(input) {
   let pending = "";
   let maskBytes = 0;
   const masks = new Set();
+  const collectMasks = line => {
+    for (const value of collectAddMaskedValues(line)) {
+      if (masks.has(value)) continue;
+      maskBytes += Buffer.byteLength(value);
+      if (maskBytes > MAX_DIAGNOSTIC_BYTES || masks.size >= MAX_DIAGNOSTIC_MASKS) throw new Error("CLI proxy mask limit exceeded");
+      masks.add(value);
+    }
+  };
   input.setEncoding("utf8");
   for await (const chunk of input) {
     const text = chunk.toString().replaceAll("\0", "");
@@ -72,27 +81,16 @@ async function captureCliProxyDiagnostics(input) {
     tail = Buffer.concat([tail, bytes]).subarray(-MAX_DIAGNOSTIC_BYTES);
     const lines = (pending + text).split("\n");
     pending = lines.pop() || "";
-    for (const line of lines) {
-      for (const value of collectAddMaskedValues(line)) {
-        if (masks.has(value)) continue;
-        maskBytes += Buffer.byteLength(value);
-        if (maskBytes > MAX_DIAGNOSTIC_BYTES) throw new Error("CLI proxy mask limit exceeded");
-        masks.add(value);
-      }
-    }
+    for (const line of lines) collectMasks(line);
     // Keep scanning giant lines for commands without retaining their full prefix.
     const command = pending.indexOf("::add-mask::");
     if (command !== -1) pending = pending.slice(command);
     if (Buffer.byteLength(pending) > MAX_DIAGNOSTIC_BYTES) {
       if (command !== -1) throw new Error("CLI proxy mask limit exceeded");
-      pending = pending.slice(-MAX_DIAGNOSTIC_BYTES);
+      pending = Buffer.from(pending).subarray(-MAX_DIAGNOSTIC_BYTES).toString("utf8");
     }
   }
-  for (const value of collectAddMaskedValues(pending)) {
-    maskBytes += Buffer.byteLength(value);
-    if (maskBytes > MAX_DIAGNOSTIC_BYTES) throw new Error("CLI proxy mask limit exceeded");
-    masks.add(value);
-  }
+  collectMasks(pending);
   // Never publish the first partial line: truncation could split a credential.
   const content = truncated ? tail.subarray(tail.indexOf(10) + 1).toString("utf8") : tail.toString("utf8");
   return { content: truncated && !tail.includes(10) ? "" : content, truncated, masks: [...masks] };
@@ -117,7 +115,7 @@ function readCliProxyDiagnostics(filePath) {
 async function main() {
   try {
     const captured = process.argv[2] === "--capture" ? await captureCliProxyDiagnostics(process.stdin) : null;
-    const content = captured ? captured.content : readCliProxyDiagnostics(process.argv[2]);
+    const content = captured ? captured.content.trimEnd().split("\n").slice(-20).join("\n") : readCliProxyDiagnostics(process.argv[2]);
     const redacted = redactCliProxyDiagnostics(content, process.env, [], captured?.masks);
     let output = redacted.trimEnd().split("\n").slice(-20).join("\n");
     // Escaping during redaction can expand the retained text beyond its byte cap.
