@@ -113,6 +113,9 @@ Pattern docs base path: `https://github.com/github/gh-aw/blob/main/docs/src/cont
 - **Load when:** The user needs native fair scheduling, Work DAGs, Claim-scoped effects, or queue deployment/inspection/recovery.
 - **Instructions:** [work-queue.md](work-queue.md)
 
+### Local SDLC
+- **Instructions:** [squad.md](squad.md)
+
 ## Notes
 
 - Prefer documented patterns over ad hoc architecture when a strong match exists.

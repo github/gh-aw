@@ -43,7 +43,11 @@ This is a **dispatcher agent** that routes your request to the appropriate speci
 - **Reducing token consumption / cost optimization**: Routes to `token-optimization` guide — consult this whenever the user asks how to reduce token usage, lower costs, speed up workflows, or measure the impact of prompt changes with experiments
 - **Choosing workflow architectures and design patterns**: Routes to `patterns` guide — consult this whenever the user asks for strategy, architecture, operating models, or pattern selection for agentic workflows
 - **Git-backed work queues**: Routes to `work-queue` instructions for producers, dispatchers, workers, observers, deployment and recovery
+<<<<<<< HEAD
 - **Third-party repository setup/configuration**: Routes to `connectors` instructions; inspect editable declarations, normal local/pinned imports, `import-schema`, credential/authentication XML and matching golden consumers. Use `gh aw connector <id> setup --file PATH` for phase-specific credential names/scopes and external acquisition/renewal guidance. Supply exact approved resources and secret names only through `with`; never secret values. Importing enables no capabilities, native methods, write credentials, broad grants or live webhook ingress. Select reads and staged safe outputs separately and derive network hosts from the contract, not a built-in provider catalog. Token acquisition/refresh and provider permissions remain external.
+=======
+- **Local SDLC issue bootstrap**: Follow `.github/aw/squad.md`.
+>>>>>>> origin/main
 
 Workflows may optionally include:
 

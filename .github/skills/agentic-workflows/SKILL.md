@@ -1,11 +1,11 @@
 ---
 name: agentic-workflows
-description: Route gh-aw design, creation, diagnosis, patching, active debugging, and upgrade requests to the right strategies.
+description: Route gh-aw design, creation, diagnosis, patching, active debugging, upgrades, and local SDLC issue requests to the right strategies.
 ---
 
 # Agentic Workflows Router
 
-Use this skill when a user asks to design, create, update, debug, or upgrade GitHub Agentic Workflows in this repository.
+Use this skill when a user asks to design, create, update, debug, or upgrade GitHub Agentic Workflows in this repository, or prepare a substantial issue for a local, self-contained SDLC.
 
 This skill is a dispatcher: identify the task type, load the matching workflow prompt/skill file, and follow it directly. Keep responses concise and ask a clarifying question if the correct prompt is unclear.
 
@@ -149,6 +149,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Advanced cost controls without native settings (custom AIC allowances by server size or shared organization budget policies): read `docs/src/content/docs/reference/cost-management.md#configure-advanced-cost-controls-with-admission` ([published guidance](https://github.github.com/gh-aw/reference/cost-management/#configure-advanced-cost-controls-with-admission)). Explain the external authority requirement and cooperative limits; do not invent frontmatter fields or promise hard caps, reservations, or mid-run cancellation.
 - Design long-running multi-agent research workflows: `.github/aw/multi-agent-research.md`
 - Add skills or agent plugins requested by the user (`skills:` / `plugins:` frontmatter, never on-the-fly installs): `.github/aw/skills.md`
+- Local SDLC issue bootstrap: `.github/aw/squad.md`
 
 When the task involves OTEL, OTLP, traces, observability backends, or telemetry-driven analysis, also read and follow `skills/otel-queries/SKILL.md` after loading the matching workflow prompt or skill.
 
