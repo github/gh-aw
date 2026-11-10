@@ -151,29 +151,60 @@ Skill says ` + message + `.
 func TestInlinedImports_ValidatesPreservedDefinitions(t *testing.T) {
 	for _, kind := range []string{"agent", "skill"} {
 		for _, expression := range []string{"${{ toJSON(github) }}", "${{ toJSON(secrets) }}"} {
-			for _, included := range []bool{false, true} {
-				t.Run(kind+"/"+expression+map[bool]string{true: "/include", false: "/body"}[included], func(t *testing.T) {
+			for _, source := range []string{"body", "include", "runtime-import"} {
+				t.Run(kind+"/"+expression+"/"+source, func(t *testing.T) {
 					tmpDir := t.TempDir()
 					body := expression
-					if included {
+					switch source {
+					case "include":
 						require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "definition.md"), []byte("## end "+kind+": `helper`\n"+expression), 0600))
 						body = "@include definition.md"
+					case "runtime-import":
+						require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".github", "workflows"), 0700))
+						require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".github", "workflows", "definition.md"), []byte(expression), 0600))
+						body = "{{#runtime-import .github/workflows/definition.md}}"
 					}
 					workflowPath := filepath.Join(tmpDir, "workflow.md")
-					source := "---\non: workflow_dispatch\nengine: copilot\ninlined-imports: true\n---\n# Main\n\n## " + kind + ": `helper`\n" + body + "\n"
-					require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0600))
+					workflowContent := "---\non: workflow_dispatch\nengine: copilot\ninlined-imports: true\n---\n# Main\n\n## " + kind + ": `helper`\n" + body + "\n"
+					require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0600))
 					compiler := NewCompiler()
 					compiler.SetQuiet(true)
 					err := compiler.CompileWorkflow(workflowPath)
 					require.Error(t, err)
-					if strings.Contains(expression, "secrets") {
+					if strings.Contains(expression, "secrets") && source != "runtime-import" {
 						assert.Contains(t, err.Error(), "secrets serialization")
 					} else {
-						assert.Contains(t, err.Error(), "toJSON(github)")
+						assert.Contains(t, err.Error(), strings.TrimSuffix(strings.TrimPrefix(expression, "${{ "), " }}"))
 					}
 				})
 			}
 		}
+	}
+}
+
+func TestInlinedImports_RuntimeImportExpressionsInDefinitions(t *testing.T) {
+	for _, kind := range []string{"agent", "skill"} {
+		t.Run(kind, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			workflowDir := filepath.Join(tmpDir, ".github", "workflows")
+			require.NoError(t, os.MkdirAll(workflowDir, 0700))
+			imported := "Say ${{ inputs.message }}.\nUse github(get_issue)."
+			require.NoError(t, os.WriteFile(filepath.Join(workflowDir, "definition.md"), []byte(imported), 0600))
+			workflowPath := filepath.Join(workflowDir, "workflow.md")
+			source := "---\non: workflow_dispatch\nengine: copilot\nstrict: false\ntools:\n  github: false\ninlined-imports: true\n---\n# Main\n\n## " + kind + ": `helper`\n{{#runtime-import .github/workflows/definition.md}}\n"
+			require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0600))
+			compiler := NewCompiler()
+			compiler.SetQuiet(true)
+			data, err := compiler.ParseWorkflowFile(workflowPath)
+			require.NoError(t, err)
+			compiler.markdownPath = workflowPath
+			assert.NotContains(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data), imported)
+			assert.Contains(t, compiler.collectRuntimeImportMarkdownForPromptExpressions(data), imported)
+			require.NoError(t, compiler.CompileWorkflow(workflowPath))
+			lockContent, err := os.ReadFile(filepath.Join(workflowDir, "workflow.lock.yml"))
+			require.NoError(t, err)
+			assert.Contains(t, string(lockContent), "GH_AW_INPUTS_MESSAGE: ${{ inputs.message }}")
+		})
 	}
 }
 

@@ -106,7 +106,7 @@ async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
       return protectValue(value);
     };
     /** @type {Record<string, string>} */
-    const variables = {};
+    const variables = { ...deferredBindings };
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("GH_AW_EXPR_")) {
         variables[key] = deferredBindings[key] === value ? value : protectValue(value || "");

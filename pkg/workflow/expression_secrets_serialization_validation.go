@@ -161,7 +161,6 @@ func (c *Compiler) validateSecretsSerializationExpressions(workflowData *Workflo
 	)
 
 	allFound := findSecretsSerializationExpressions(workflowData.MarkdownContent)
-	allFound = append(allFound, findSecretsSerializationExpressions(workflowData.PromptMarkdown)...)
 	allFound = append(allFound, findFrontmatterSecretsSerializationExpressions(workflowData.RawFrontmatter)...)
 
 	if len(allFound) == 0 {
