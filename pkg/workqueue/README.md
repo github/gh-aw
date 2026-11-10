@@ -48,6 +48,7 @@ Other exported types represent typed operation parameters, dependencies and exte
 | `ReplayForHost` | `func ReplayForHost(commits []QueueCommit, host string) (Projection, error)` | Replays commits while validating resource references against an explicit GitHub host. |
 | `BuildCandidate` | `func BuildCandidate(commits []QueueCommit, actor Actor, request Request, at int64) ([]QueueCommit, *QueueCommit, Decision, error)` | Builds a candidate ledger update and scheduling decision for a request. |
 | `PlanNext` | `func PlanNext(state Projection, pool string, at int64) (Selection, error)` | Plans the next eligible Work without changing scheduler state. |
+| `ObsoleteWorkIDs` | `func ObsoleteWorkIDs(state Projection, at int64, limit int) ([]string, error)` | Selects a bounded, byte-ordered batch of unclaimed available Work whose worker revision is incompatible; publication must still validate each cancellation. |
 | `PlanDispatch` | `func PlanDispatch(state Projection, params DispatchParameters, requestID, commitID string, at int64) (Decision, error)` | Plans scheduler-selected assignments within the supplied dispatch bounds. |
 | `ValidatePolicy` | `func ValidatePolicy(policy Policy) error` | Validates policy structure and semantic limits. |
 | `ParseSettings` | `func ParseSettings(data []byte) (Settings, error)` | Parses the `work_queue` settings object. |

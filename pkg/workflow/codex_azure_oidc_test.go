@@ -215,7 +215,7 @@ func TestValidateOpenAIWIFEngineAuth(t *testing.T) {
 					awfImageRoleAPIProxy: tt.apiProxy,
 				}}}
 			}
-			err := validateOpenAIWIFEngineAuth(workflow)
+			err := validateOpenAIWIFEngineAuthAtPath(workflow, "engine")
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)

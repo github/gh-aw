@@ -793,10 +793,6 @@ func (c *Compiler) validateThreatDetectionOpenAIWIFEngineAuth(workflowData *Work
 	return nil
 }
 
-func validateOpenAIWIFEngineAuth(workflowData *WorkflowData) error {
-	return validateOpenAIWIFEngineAuthAtPath(workflowData, "engine")
-}
-
 func validateOpenAIWIFEngineAuthAtPath(workflowData *WorkflowData, engineConfigPath string) error {
 	if workflowData == nil || workflowData.EngineConfig == nil {
 		return nil

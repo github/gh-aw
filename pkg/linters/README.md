@@ -64,7 +64,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `panic-in-library-code` — reports `panic()` calls in library packages (`pkg/*`) where errors should be returned instead.
 - `rawloginlib` — reports direct usage of the standard `log` package in library packages, where `pkg/logger` should be used.
 - `readerstringconv` — reports `strings.NewReader(string(b))` where `b` is `[]byte` and `bytes.NewReader([]byte(s))` where `s` is a string; prefer `bytes.NewReader(b)` or `strings.NewReader(s)` to avoid copying data only to change reader type. No automatic fix is offered: review concrete reader types and any reliance on a defensive copy of `b`. Named string arguments still need a `string(s)` conversion.
-- `reflectdeepequalusage` — reports `reflect.DeepEqual()` calls, including calls through local function-value aliases, that should use typed equality operators or type-specific comparison functions. Alias resolution is conservative: aliases must have a declaration initializer and no reassignment or address escape; package-level aliases are not resolved.
+- `reflect-deepequal-usage` (Go package `reflectdeepequalusage`) — reports `reflect.DeepEqual()` calls, including calls through local function-value aliases, that should use typed equality operators or type-specific comparison functions. Alias resolution is conservative: aliases must have a declaration initializer and no reassignment or address escape; package-level aliases are not resolved.
 - `regexpcompileinfunction` — reports `regexp.Compile` / `regexp.MustCompile` and their POSIX variants called inside functions that should be package-level.
 - `regexpdynamicpattern` — reports regexp compile calls whose pattern is not a compile-time constant string.
 - `seenmapbool` — reports `map[string]bool` used as a set (values always `true`) that should use `map[string]struct{}` instead.
@@ -94,14 +94,16 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `trimleftright` — reports `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended.
 - `typeassertionnil` — reports single-value type assertions to pointer types and recommends the two-value form.
 - `typeassertionokdiscarded` — reports two-value type assertions whose `ok` result is discarded.
-- `uncheckedsliceindex` — reports slice and string indexes without proven bounds checks.
-- `unchecked_deferredclose` — reports deferred `Close()` calls that ignore error return values.
+- `unchecked-deferred-close` (Go package `unchecked_deferredclose`) — reports deferred `Close()` calls that discard the returned error.
+- `unchecked-slice-index` (Go package `uncheckedsliceindex`) — reports slice and string indexing without a proven bounds check.
 - `uncheckedtypeassertion` — reports single-value type assertions where unchecked panics are possible.
 - `uncheckedflushreturn` — reports `Flush()` method calls where the error return is discarded, which silently drops buffered data on failure.
 - `walkdirignoredeerror` — reports `filepath.Walk` and `filepath.WalkDir` calls where the error return is discarded, hiding traversal failures. The analyzer lives in `walk-dir-ignored-error`.
 - `wgdonenotdeferred` — reports non-deferred `sync.WaitGroup.Done()` calls that can deadlock on panics or early returns.
 - `writebytestring` — reports `w.Write([]byte(s))` calls where `s` is a string, which can be replaced with `io.WriteString` to avoid an unnecessary `[]byte` allocation.
 - `internal` — shared helper packages for analyzers (file checks, `nolint` handling, and coverage-aware perf gating).
+
+Analyzer leaf packages expose one analyzer each and are specified centrally in this README rather than through repetitive per-analyzer READMEs. The shared helper packages under `internal/` are documented in [`internal/README.md`](internal/README.md); they are implementation details, not separately supported public APIs.
 
 ## Close error policy
 
@@ -196,7 +198,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `contextcancelnotdeferred` | Custom `go/analysis` analyzer that flags context cancel functions called directly instead of deferred |
 | `ctxbackground` | Custom `go/analysis` analyzer that flags `context.Background()` calls inside functions that already receive a context parameter |
 | `deferinloop` | Custom `go/analysis` analyzer that flags `defer` statements inside `for`/`range` loop bodies that execute when the enclosing function returns rather than each iteration |
-| `deferrerrorunchecked` | Custom `go/analysis` analyzer that flags deferred calls discarding errors, except zero-argument `Close()` methods |
+| `deferred-error-unchecked` (`deferrerrorunchecked`) | Custom `go/analysis` analyzer that flags deferred calls discarding errors, except zero-argument `Close()` methods |
 | `errorfwrapv` | Custom `go/analysis` analyzer that flags `fmt.Errorf` calls that pass error arguments without `%w` wrapping |
 | `excessivefuncparams` | Custom `go/analysis` analyzer that flags function declarations with too many positional parameters |
 | `errormessage` | Custom `go/analysis` analyzer that flags non-actionable error message patterns in changed files (or all files with `-errormessage.full-repo`) |
@@ -239,7 +241,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
 | `rawloginlib` | Custom `go/analysis` analyzer that flags standard-library `log` package calls in library packages |
 | `readerstringconv` | Custom `go/analysis` analyzer that flags `strings.NewReader(string(b))` and `bytes.NewReader([]byte(s))` conversions and recommends the reader matching the original data |
-| `reflectdeepequalusage` | Custom `go/analysis` analyzer that flags `reflect.DeepEqual()` calls that should use typed equality operators or type-specific comparison functions |
+| `reflect-deepequal-usage` (`reflectdeepequalusage`) | Custom `go/analysis` analyzer that flags `reflect.DeepEqual()` calls that should use typed equality operators or type-specific comparison functions |
 | `regexpcompileinfunction` | Custom `go/analysis` analyzer that flags regexp compilation inside function bodies |
 | `regexpdynamicpattern` | Custom `go/analysis` analyzer that flags regexp compile calls with non-constant patterns |
 | `seenmapbool` | Custom `go/analysis` analyzer that flags `map[string]bool` used as a set that should use `map[string]struct{}` |
@@ -269,11 +271,11 @@ environment variable and gates findings on the recorded execution hit count for 
 | `trimleftright` | Custom `go/analysis` analyzer that flags `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended |
 | `typeassertionnil` | Custom `go/analysis` analyzer that flags single-value type assertions to pointer types and recommends the two-value form |
 | `typeassertionokdiscarded` | Custom `go/analysis` analyzer that flags two-value type assertions whose `ok` result is discarded |
-| `uncheckedsliceindex` | Custom `go/analysis` analyzer that reports slice and string indexes without proven bounds checks |
-| `unchecked_deferredclose` | Custom `go/analysis` analyzer that flags deferred `Close()` calls whose error return is ignored |
+| `unchecked-slice-index` (`uncheckedsliceindex`) | Custom `go/analysis` analyzer that reports slice and string indexes without proven bounds checks |
+| `unchecked-deferred-close` (`unchecked_deferredclose`) | Custom `go/analysis` analyzer that flags deferred `Close()` calls whose error return is ignored |
 | `uncheckedtypeassertion` | Custom `go/analysis` analyzer that flags unchecked single-value type assertions |
 | `uncheckedflushreturn` | Custom `go/analysis` analyzer that flags `Flush()` method calls where the error return is discarded |
-| `walkdirignoredeerror` | Custom `go/analysis` analyzer in `walk-dir-ignored-error` that flags `filepath.Walk`/`filepath.WalkDir` calls where the error return is discarded |
+| `walk-dir-ignored-error` (`walkdirignoredeerror`) | Custom `go/analysis` analyzer that flags `filepath.Walk`/`filepath.WalkDir` calls where the error return is discarded |
 | `walkfuncerrshadow` | Custom `go/analysis` analyzer that flags `filepath.Walk`/`filepath.WalkDir` callbacks whose `err` parameter shadows an outer `err` variable assigned from the walk call |
 | `wgdonenotdeferred` | Custom `go/analysis` analyzer that flags non-deferred `sync.WaitGroup.Done()` calls |
 | `writebytestring` | Custom `go/analysis` analyzer that flags `w.Write([]byte(s))` calls where `s` is a string that can be replaced with `io.WriteString` |
