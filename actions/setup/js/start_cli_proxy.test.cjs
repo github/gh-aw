@@ -2,7 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { MAX_DIAGNOSTIC_BYTES, redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
+const { redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
 
 describe("CLI proxy diagnostic redaction", () => {
   let root;
@@ -270,24 +270,25 @@ exec /bin/rm "$@"`
     expect(result.calls).toBe("");
   });
 
-  it.each([false, true])("publishes a bounded redacted tail and the failure reason for oversized logs (upstream=%s)", upstreamFailure => {
+  it.each([false, true])("withholds oversized logs while preserving the failure reason (upstream=%s)", upstreamFailure => {
     const result = runProxy({ oversized: true, ready: upstreamFailure, upstreamFailure });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(upstreamFailure ? "CLI proxy could not reach the upstream GitHub API" : "CLI proxy failed to start within 30s");
-    expect(result.output).toContain("CLI proxy diagnostics truncated");
-    expect(result.output).toContain("final diagnostic: *** ***");
-    expect(result.output).not.toContain("runtime-overflow-secret");
-    expect(result.output).not.toContain("diagnostics withheld");
-    expect(result.captureSize).toBeLessThanOrEqual(MAX_DIAGNOSTIC_BYTES);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe(
+      (upstreamFailure ? "::error::CLI proxy could not reach the upstream GitHub API. Check runner connectivity and HTTP(S)_PROXY/NO_PROXY settings.\n" : "::error::CLI proxy failed to start within 30s\n") +
+        "::error::CLI proxy diagnostics withheld because capture exceeded the byte limit\n"
+    );
+    expect(result.captureSize).toBe(0);
     expect(result.calls.match(/rm -f awmg-cli-proxy/g)).toHaveLength(2);
   });
 
   it("bounds diagnostics emitted before readiness checks too", () => {
     const result = runProxy({ ready: true, oversizedRun: true });
-    expect(result.status).toBe(0);
-    expect(result.output).toContain("CLI proxy diagnostics truncated");
-    expect(result.output).toContain("CLI proxy ready on port 18443");
-    expect(result.captureSize).toBeLessThanOrEqual(MAX_DIAGNOSTIC_BYTES);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("::error::CLI proxy diagnostics withheld because capture exceeded the byte limit\n");
+    expect(result.captureSize).toBe(0);
     expect(result.calls).not.toContain("logs awmg-cli-proxy");
   });
 
@@ -334,22 +335,22 @@ exec /bin/rm "$@"`
   it.each([false, true])("withholds partial sanitizer output on failure, even when ready=%s", ready => {
     const result = runProxy({ ready, sanitizerFailure: true });
     expect(result.status).toBe(1);
-    expect(result.output).toContain("::error::CLI proxy diagnostics withheld because secret redaction failed\n");
-    if (!ready) expect(result.stderr).toContain("CLI proxy failed to start within 30s");
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe((ready ? "" : "::error::CLI proxy failed to start within 30s\n") + "::error::CLI proxy diagnostics withheld because secret redaction failed\n");
   });
 
   it("withholds diagnostics when the shared redactor throws a secret-bearing exception", () => {
     const result = runProxy({ redactorThrows: true });
     expect(result.status).toBe(1);
-    expect(result.output).toContain("::error::CLI proxy diagnostics withheld because secret redaction failed\n");
-    expect(result.stderr).toContain("CLI proxy failed to start within 30s");
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("::error::CLI proxy failed to start within 30s\n::error::CLI proxy diagnostics withheld because secret redaction failed\n");
   });
 
   it("withholds diagnostics when the sanitizer cannot be loaded", () => {
     const result = runProxy({ missingSanitizer: true });
     expect(result.status).toBe(1);
-    expect(result.output).toContain("::error::CLI proxy diagnostics withheld because secret redaction failed\n");
-    expect(result.stderr).toContain("CLI proxy failed to start within 30s");
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("::error::CLI proxy failed to start within 30s\n::error::CLI proxy diagnostics withheld because secret redaction failed\n");
   });
 
   it("fails closed before starting Docker if private capture cannot be created", () => {

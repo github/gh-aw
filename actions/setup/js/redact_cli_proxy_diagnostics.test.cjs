@@ -1,26 +1,11 @@
 // @ts-check
-const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { PROXY_ENV_NAMES } = require("./constants.cjs");
-const { MAX_DIAGNOSTIC_BYTES, readCliProxyDiagnostics, redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
+const { MAX_DIAGNOSTIC_BYTES, redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
 
 describe("CLI proxy console diagnostic sanitizer", () => {
-  const root = path.join(__dirname, `.redact-cli-proxy-diagnostics-${process.pid}`);
-  const input = path.join(root, "diagnostics.log");
   const script = path.join(__dirname, "redact_cli_proxy_diagnostics.cjs");
-
-  beforeAll(() => fs.mkdirSync(root));
-  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
-  afterEach(() => vi.restoreAllMocks());
-
-  function publish(content, env = {}) {
-    fs.writeFileSync(input, content);
-    return spawnSync(process.execPath, [script, input], {
-      encoding: "utf8",
-      env: { PATH: process.env.PATH, ...env },
-    });
-  }
 
   function capture(content, env = {}) {
     return spawnSync(process.execPath, [script, "--capture"], {
@@ -30,33 +15,31 @@ describe("CLI proxy console diagnostic sanitizer", () => {
     });
   }
 
-  it("retains final lines and masks from both sides of an overflowing capture", () => {
+  it("withholds the entire overflowing capture, including complete final lines", () => {
     const result = capture(`::add-mask::early-secret\n${"x".repeat(2 * MAX_DIAGNOSTIC_BYTES)}\nearly-secret late-secret\n::add-mask::late-secret\nfinal line\n`);
     expect(result.status).toBe(2);
     expect(result.stderr).toBe("");
-    expect(result.stdout).toContain("*** ***");
-    expect(result.stdout).toContain("final line");
-    for (const secret of ["early-secret", "late-secret", "::add-mask::"]) expect(result.stdout).not.toContain(secret);
-    expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(MAX_DIAGNOSTIC_BYTES);
+    expect(result.stdout).toBe("");
   });
 
-  it("drops a partial first line rather than publishing a split credential", () => {
+  it("withholds both a split credential and the rest of an overflowing capture", () => {
     const secret = "synthetic-credential";
     const result = capture(`${"x".repeat(MAX_DIAGNOSTIC_BYTES)}${secret}\n${"y".repeat(MAX_DIAGNOSTIC_BYTES - secret.length)}\n`, { GH_TOKEN: secret });
     expect(result.status).toBe(2);
-    expect(result.stdout).not.toContain("credential");
-    expect(result.stdout).toBe("y".repeat(MAX_DIAGNOSTIC_BYTES - secret.length));
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
   });
 
   it("does not publish a giant unterminated partial line", () => {
     const result = capture("x".repeat(2 * MAX_DIAGNOSTIC_BYTES));
     expect(result.status).toBe(2);
     expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
   });
 
   it("fails closed when mask metadata exceeds the capture budget", () => {
     const result = capture(`::add-mask::${"x".repeat(MAX_DIAGNOSTIC_BYTES + 1)}\nfinal line\n`);
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(2);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe("");
   });
@@ -90,7 +73,7 @@ describe("CLI proxy console diagnostic sanitizer", () => {
     expect(redacted.trimEnd().split("\n")).toHaveLength(32);
     expect(redacted).not.toContain(secret);
     expect(redacted).not.toContain("password");
-    const result = publish(content, { GH_TOKEN: secret });
+    const result = capture(content, { GH_TOKEN: secret });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout.split("\n")).toHaveLength(20);
@@ -103,7 +86,7 @@ describe("CLI proxy console diagnostic sanitizer", () => {
   it("collects masks before truncation and preserves built-in and supplied arbitrary-secret coverage", () => {
     const builtin = `ghs_${"a".repeat(40)}`;
     const content = `::add-mask::runtime-secret\n${"safe line\n".repeat(30)}runtime-secret ${builtin} x$ first-line second-line custom-value\n`;
-    const result = publish(content, {
+    const result = capture(content, {
       GITHUB_TOKEN: "x$",
       GH_AW_SECRET_NAMES: "CUSTOM, MULTILINE",
       SECRET_CUSTOM: "custom-value",
@@ -123,35 +106,43 @@ describe("CLI proxy console diagnostic sanitizer", () => {
     }
   });
 
+  it("redacts the complete capture before trailing mask commands can evict diagnostics", () => {
+    const result = capture(`connection refused: runtime-secret\n${"::add-mask::runtime-secret\n".repeat(20)}`);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toBe("connection refused: ***");
+  });
+
   it("accepts the exact byte limit", () => {
-    const result = publish("a".repeat(MAX_DIAGNOSTIC_BYTES));
+    const result = capture("a".repeat(MAX_DIAGNOSTIC_BYTES));
     expect(result.status).toBe(0);
     expect(result.stdout).toHaveLength(MAX_DIAGNOSTIC_BYTES);
     expect(result.stderr).toBe("");
   });
 
-  it("rejects an oversized file before reading it", () => {
-    fs.writeFileSync(input, "a".repeat(MAX_DIAGNOSTIC_BYTES + 1));
-    const read = vi.spyOn(fs, "readFileSync");
-    expect(() => readCliProxyDiagnostics(input)).toThrow("Unable to read CLI proxy diagnostics");
-    expect(read).not.toHaveBeenCalled();
-  });
-
-  it("counts UTF-8 bytes rather than characters and emits no partial diagnostics on failure", () => {
-    const result = publish("é".repeat(MAX_DIAGNOSTIC_BYTES / 2 + 1));
-    expect(result.status).toBe(1);
+  it("rejects one byte over the capture limit without publishing diagnostics", () => {
+    const result = capture("a".repeat(MAX_DIAGNOSTIC_BYTES + 1));
+    expect(result.status).toBe(2);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe("");
   });
 
-  it("rejects non-regular files before reading", () => {
-    const read = vi.spyOn(fs, "readFileSync");
-    expect(() => readCliProxyDiagnostics(root)).toThrow("Unable to read CLI proxy diagnostics");
-    expect(read).not.toHaveBeenCalled();
+  it("counts UTF-8 bytes rather than characters and emits no partial diagnostics on failure", () => {
+    const result = capture("é".repeat(MAX_DIAGNOSTIC_BYTES / 2 + 1));
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
   });
 
-  it("fails closed without leaking a missing input path", () => {
-    const result = spawnSync(process.execPath, [script, path.join(root, "synthetic-credential")], { encoding: "utf8" });
+  it("counts NUL bytes against the raw capture limit", () => {
+    const result = capture("\0".repeat(MAX_DIAGNOSTIC_BYTES + 1));
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+  });
+
+  it("withholds the entire output when redaction expands it beyond the byte cap", () => {
+    const result = capture(`${"a".repeat(MAX_DIAGNOSTIC_BYTES - 6)}\nx x`, { GH_TOKEN: "x" });
     expect(result.status).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe("");

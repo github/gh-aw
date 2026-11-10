@@ -70,15 +70,15 @@ publish_diagnostics() {
   local capture_status=0
   exec 1>&3 2>&4
   wait "$CAPTURE_PID" || capture_status=$?
-  if [ "$capture_status" -eq 0 ] || [ "$capture_status" -eq 2 ]; then
-    if [ "$capture_status" -eq 2 ]; then
-      echo "::warning::CLI proxy diagnostics truncated to the bounded log tail" >&4
-    fi
+  if [ "$capture_status" -eq 0 ]; then
     cat "$DIAGNOSTIC_DIR/startup.log" >&3
     printf '\n' >&3
     if [ "$status" -ne 0 ]; then
       echo "::error::CLI proxy startup failed (exit status $status)" >&4
     fi
+  elif [ "$capture_status" -eq 2 ]; then
+    echo "::error::CLI proxy diagnostics withheld because capture exceeded the byte limit" >&4
+    status=1
   else
     echo "::error::CLI proxy diagnostics withheld because secret redaction failed" >&4
     status=1

@@ -1,5 +1,4 @@
 // @ts-check
-const fs = require("node:fs");
 const { PROXY_ENV_NAMES } = require("./constants.cjs");
 const { redactArtifactContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
@@ -12,7 +11,7 @@ const MAX_DIAGNOSTIC_MASKS = 1024;
  * @param {NodeJS.ProcessEnv} env
  * @returns {string}
  */
-function redactCliProxyDiagnostics(content, env, credentialPatterns = [], maskedValues = []) {
+function redactCliProxyDiagnostics(content, env, credentialPatterns = []) {
   // Bash command substitution removes NUL bytes; normalize before matching.
   content = content.replaceAll("\0", "");
   const names = new Set(["GH_TOKEN", "GITHUB_TOKEN", ...PROXY_ENV_NAMES, ...Object.keys(env).filter(name => name.startsWith("SECRET_"))]);
@@ -23,7 +22,7 @@ function redactCliProxyDiagnostics(content, env, credentialPatterns = [], masked
     names.add(name);
     names.add(`SECRET_${name}`);
   }
-  const values = [...maskedValues, ...collectAddMaskedValues(content)];
+  const values = collectAddMaskedValues(content);
   for (const name of names) {
     const value = env[name];
     if (!value) continue;
@@ -55,77 +54,44 @@ function redactCliProxyDiagnostics(content, env, credentialPatterns = [], masked
 }
 
 /**
- * Drain startup output while retaining a bounded tail and masks from all lines.
+ * Drain startup output, discarding the entire capture on overflow.
  * @param {NodeJS.ReadableStream} input
- * @returns {Promise<{content: string, truncated: boolean, masks: string[]}>}
+ * @returns {Promise<string | null>}
  */
 async function captureCliProxyDiagnostics(input) {
-  let tail = Buffer.alloc(0);
-  let truncated = false;
-  let pending = "";
-  let maskBytes = 0;
-  const masks = new Set();
-  const collectMasks = line => {
-    for (const value of collectAddMaskedValues(line)) {
-      if (masks.has(value)) continue;
-      maskBytes += Buffer.byteLength(value);
-      if (maskBytes > MAX_DIAGNOSTIC_BYTES || masks.size >= MAX_DIAGNOSTIC_MASKS) throw new Error("CLI proxy mask limit exceeded");
-      masks.add(value);
-    }
-  };
-  input.setEncoding("utf8");
+  const chunks = [];
+  let size = 0;
+  let overflow = false;
   for await (const chunk of input) {
-    const text = chunk.toString().replaceAll("\0", "");
-    const bytes = Buffer.from(text);
-    truncated ||= tail.length + bytes.length > MAX_DIAGNOSTIC_BYTES;
-    tail = Buffer.concat([tail, bytes]).subarray(-MAX_DIAGNOSTIC_BYTES);
-    const lines = (pending + text).split("\n");
-    pending = lines.pop() || "";
-    for (const line of lines) collectMasks(line);
-    // Keep scanning giant lines for commands without retaining their full prefix.
-    const command = pending.indexOf("::add-mask::");
-    if (command !== -1) pending = pending.slice(command);
-    if (Buffer.byteLength(pending) > MAX_DIAGNOSTIC_BYTES) {
-      if (command !== -1) throw new Error("CLI proxy mask limit exceeded");
-      pending = Buffer.from(pending).subarray(-MAX_DIAGNOSTIC_BYTES).toString("utf8");
+    if (overflow) continue;
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += bytes.length;
+    if (size > MAX_DIAGNOSTIC_BYTES) {
+      overflow = true;
+      chunks.length = 0;
+    } else {
+      chunks.push(bytes);
     }
   }
-  collectMasks(pending);
-  // Never publish the first partial line: truncation could split a credential.
-  const content = truncated ? tail.subarray(tail.indexOf(10) + 1).toString("utf8") : tail.toString("utf8");
-  return { content: truncated && !tail.includes(10) ? "" : content, truncated, masks: [...masks] };
-}
-
-/**
- * @param {string} filePath
- * @returns {string}
- */
-function readCliProxyDiagnostics(filePath) {
-  try {
-    const stat = fs.statSync(filePath);
-    if (!stat.isFile() || stat.size > MAX_DIAGNOSTIC_BYTES) {
-      throw new Error("CLI proxy diagnostics exceed the input limit or are not a regular file");
-    }
-    return fs.readFileSync(filePath, "utf8");
-  } catch (error) {
-    throw new Error("Unable to read CLI proxy diagnostics", { cause: error });
-  }
+  // Even an unterminated partial line is withheld when the capture overflows.
+  return overflow ? null : Buffer.concat(chunks, size).toString("utf8");
 }
 
 async function main() {
   try {
-    const captured = process.argv[2] === "--capture" ? await captureCliProxyDiagnostics(process.stdin) : null;
-    const content = captured ? captured.content.trimEnd().split("\n").slice(-20).join("\n") : readCliProxyDiagnostics(process.argv[2]);
-    const redacted = redactCliProxyDiagnostics(content, process.env, [], captured?.masks);
-    let output = redacted.trimEnd().split("\n").slice(-20).join("\n");
-    // Escaping during redaction can expand the retained text beyond its byte cap.
-    if (captured && Buffer.byteLength(output) > MAX_DIAGNOSTIC_BYTES) {
-      const tail = Buffer.from(output).subarray(-MAX_DIAGNOSTIC_BYTES);
-      output = tail.includes(10) ? tail.subarray(tail.indexOf(10) + 1).toString("utf8") : "";
-      captured.truncated = true;
+    const content = await captureCliProxyDiagnostics(process.stdin);
+    if (content === null) {
+      process.exitCode = 2;
+      return;
     }
+    const masks = collectAddMaskedValues(content.replaceAll("\0", ""));
+    if (masks.length > MAX_DIAGNOSTIC_MASKS || masks.reduce((size, value) => size + Buffer.byteLength(value), 0) > MAX_DIAGNOSTIC_BYTES) {
+      throw new Error("CLI proxy mask limit exceeded");
+    }
+    const redacted = redactCliProxyDiagnostics(content, process.env);
+    const output = redacted.trimEnd().split("\n").slice(-20).join("\n");
+    if (Buffer.byteLength(output) > MAX_DIAGNOSTIC_BYTES) throw new Error("CLI proxy diagnostics exceed the output limit");
     process.stdout.write(output);
-    if (captured?.truncated) process.exitCode = 2;
   } catch {
     // The caller withholds both streams and emits a fixed, payload-free error.
     process.exitCode = 1;
@@ -137,4 +103,4 @@ if (require.main === module)
     process.exitCode = 1;
   });
 
-module.exports = { MAX_DIAGNOSTIC_BYTES, readCliProxyDiagnostics, redactCliProxyDiagnostics };
+module.exports = { MAX_DIAGNOSTIC_BYTES, redactCliProxyDiagnostics };
