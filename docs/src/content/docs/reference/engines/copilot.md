@@ -13,7 +13,7 @@ The default CLI pin is `1.0.103`. The compiler embeds this version and its revie
 
 ### Default model routing
 
-Without a `model`, `engine.model`, or `engine.model-routing`, a Copilot workflow on GitHub Copilot inference uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: balanced` for its main agent, instead of the `auto` model. A nonempty `GH_AW_MODEL_AGENT_COPILOT` or `GH_AW_DEFAULT_MODEL_COPILOT` variable bypasses routing at run time, with the agent variable winning. Set `engine.model-routing: false` to opt out without pinning a model. BYOK providers aren't routed by default.
+Without a `model`, `engine.model`, or `engine.model-routing`, a Copilot workflow on GitHub Copilot inference uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: auto` for its main agent, instead of the `auto` model. A nonempty `GH_AW_MODEL_AGENT_COPILOT` or `GH_AW_DEFAULT_MODEL_COPILOT` variable bypasses routing at run time, with the agent variable winning. Set `engine.model-routing: false` to opt out without pinning a model. BYOK providers aren't routed by default.
 
 ## Capabilities and limitations
 

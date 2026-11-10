@@ -65,7 +65,7 @@ func (c *Compiler) CopilotRequestsTipNeeded() bool {
 }
 
 // DefaultModelRoutingWorkflowCount returns how many workflows compiled in batch
-// mode received the implicit cost/balanced model-routing default.
+// mode received the implicit cost/auto model-routing default.
 func (c *Compiler) DefaultModelRoutingWorkflowCount() int {
 	return c.defaultRoutingCount
 }

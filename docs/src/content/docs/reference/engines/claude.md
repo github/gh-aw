@@ -24,7 +24,7 @@ permissions:
 
 The `copilot/` prefix selects the provider and is removed from the model ID passed to Claude. An explicit `engine.model-provider` overrides provider selection. For a fully dynamic model expression whose provider cannot be inferred at compile time, set `engine.model-provider: github`.
 
-With `engine.model-provider: github` and no `model`, `engine.model`, or `engine.model-routing`, the main agent uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: balanced`, limited to Claude models. A nonempty `GH_AW_MODEL_AGENT_CLAUDE` or `GH_AW_DEFAULT_MODEL_CLAUDE` variable bypasses routing at run time; `engine.model-routing: false` opts out. The native Anthropic route, including `copilot-requests: write` without `model-provider: github`, isn't routed by default.
+With `engine.model-provider: github` and no `model`, `engine.model`, or `engine.model-routing`, the main agent uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: auto`, limited to Claude models. A nonempty `GH_AW_MODEL_AGENT_CLAUDE` or `GH_AW_DEFAULT_MODEL_CLAUDE` variable bypasses routing at run time; `engine.model-routing: false` opts out. The native Anthropic route, including `copilot-requests: write` without `model-provider: github`, isn't routed by default.
 
 Native `tools.web-fetch` and `tools.web-search` are unavailable on GitHub Copilot inference because the proxy sets `COPILOT_OFFLINE=true`, even for allowlisted domains. The compiler rejects these tools on this provider. Use `engine.model-provider: anthropic`, or configure an MCP fetch server for `web-fetch` or an MCP search server for `web-search`.
 

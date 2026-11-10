@@ -969,13 +969,14 @@ Report a finding.
 	require.NoError(t, compiled.err)
 	require.Zero(t, compiled.warnings, "the implicit default must not add warnings")
 	require.Equal(t, 1, strings.Count(compiled.stderr, defaultRoutingNoticeMarker), "one informational notice per workflow")
-	require.Contains(t, compiled.stderr, "goal cost and mode balanced")
+	require.Contains(t, compiled.stderr, "goal cost and mode auto")
+	require.Contains(t, DefaultModelRoutingBatchNotice(2), "goal cost and mode auto", "batch compilation reports the same default")
 	require.Contains(t, compiled.stderr, "vars.GH_AW_MODEL_AGENT_COPILOT")
 	require.Contains(t, compiled.stderr, "vars.GH_AW_DEFAULT_MODEL_COPILOT")
 
 	require.True(t, isModelRoutingImplicit(compiled.data))
 	require.Equal(t, "cost", compiled.data.EngineConfig.ModelRouting.Goal)
-	require.Equal(t, "balanced", compiled.data.EngineConfig.ModelRouting.Mode)
+	require.Equal(t, "auto", compiled.data.EngineConfig.ModelRouting.Mode)
 	require.Empty(t, compiled.data.EngineConfig.ModelRouting.AllowedModels)
 
 	configs := compiled.awfConfigs(t)
@@ -983,7 +984,7 @@ Report a finding.
 	routed := configs[0]
 	require.Equal(t, true, routed["experimental"].(map[string]any)["modelRouting"])
 	routing := routed["apiProxy"].(map[string]any)["routing"].(map[string]any)
-	require.Equal(t, map[string]any{"goal": "cost", "mode": "balanced"}, routing["objective"])
+	require.Equal(t, map[string]any{"goal": "cost", "mode": "auto"}, routing["objective"])
 	require.Equal(t, map[string]any{"conversationFile": modelRoutingConversationFile}, routing["task"])
 	routerImage, ok := routed["container"].(map[string]any)["images"].(map[string]any)[awfImageRoleRouter].(string)
 	require.True(t, ok, "routed config must pin the router image")
@@ -1168,7 +1169,7 @@ func TestCompileDefaultModelRouting_ProviderMatrix(t *testing.T) {
 			require.Equal(t, 1, strings.Count(compiled.stderr, defaultRoutingNoticeMarker))
 			require.True(t, isModelRoutingImplicit(compiled.data))
 			routing := compiled.awfConfigs(t)[0]["apiProxy"].(map[string]any)["routing"].(map[string]any)
-			require.Equal(t, map[string]any{"goal": "cost", "mode": "balanced"}, routing["objective"])
+			require.Equal(t, map[string]any{"goal": "cost", "mode": "auto"}, routing["objective"])
 			if tc.candidates != nil {
 				require.Equal(t, tc.candidates, routing["candidateModels"], "model-family restriction must be kept")
 			}

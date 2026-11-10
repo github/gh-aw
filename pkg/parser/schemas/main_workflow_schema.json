@@ -15926,7 +15926,7 @@
               "description": "Ordered alternative models after model-specific failures, supported by engines with a built-in retry harness. Each model receives its own harness retry budget. Cannot be combined with model-routing or a custom driver or harness."
             },
             "model-routing": {
-              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. Eligible workflows that choose no model or routing on GitHub Copilot inference default to goal cost and mode balanced; set false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. Eligible workflows that choose no model or routing on GitHub Copilot inference default to goal cost and mode auto; set false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.",
               "oneOf": [
                 {
                   "type": "object",
@@ -15967,7 +15967,7 @@
                 {
                   "type": "boolean",
                   "const": false,
-                  "description": "Disable the implicit cost/balanced model-routing default without pinning a model; the existing model variables and fallback model apply."
+                  "description": "Disable the implicit cost/auto model-routing default without pinning a model; the existing model variables and fallback model apply."
                 }
               ]
             },
