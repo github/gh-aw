@@ -6,6 +6,8 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
 const { parseLockFileHeaders, parseMarkdownJSON } = require("./lock_file_headers.cjs");
+const { withRetry, RATE_LIMIT_RETRY_CONFIG, isRateLimitError } = require("./error_recovery.cjs");
+const MARKDOWN_METADATA_RETRY_CONFIG = { ...RATE_LIMIT_RETRY_CONFIG, shouldRetry: isRateLimitError };
 
 /** @typedef {{sha256: string, kind: string, value: any, error?: string}} MetadataRecord */
 /** @typedef {{version: number, records: MetadataRecord[]}} MetadataCatalog */
@@ -283,7 +285,7 @@ function readLocalMarkdownMetadata(file, workspace) {
 /** @param {any} githubClient @param {{owner: string, repo: string, path: string, ref: string}} identity */
 async function readRemoteMarkdownMetadata(githubClient, identity) {
   if (!githubClient?.rest?.repos?.getContent) throw new Error("Compiler Markdown metadata requires the source repository's GitHub client");
-  const { data } = await githubClient.rest.repos.getContent(identity);
+  const { data } = await withRetry(() => githubClient.rest.repos.getContent(identity), MARKDOWN_METADATA_RETRY_CONFIG, `read compiler Markdown metadata for ${identity.owner}/${identity.repo}`);
   if (!data || data.type !== "file" || data.path !== identity.path || data.encoding !== "base64" || typeof data.content !== "string") throw new Error("Executing workflow lock manifest is not a regular source file");
   if (data.content.length > Math.ceil((4 * 1024 * 1024) / 3) * 4 + 65536) throw new Error("Executing workflow lock manifest exceeds the bounded input limit");
   const encoded = data.content.replace(/[\r\n]/g, "");

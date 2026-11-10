@@ -20,7 +20,7 @@ describe("compiler metadata source acquisition", () => {
   let originalCore;
   beforeEach(() => {
     originalCore = global.core;
-    global.core = { debug: vi.fn(), warning: vi.fn() };
+    global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn() };
     additionalPaths = [];
     workspace = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-metadata-sources-"));
     fs.mkdirSync(path.join(workspace, ".github/workflows"), { recursive: true });
@@ -164,9 +164,40 @@ describe("compiler metadata source acquisition", () => {
     fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
     const failure = Object.assign(new Error("Forbidden"), { status: 403 });
     const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(failure) } } };
-    await expect(metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient })).rejects.toBe(failure);
+    await expect(metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient })).rejects.toMatchObject({ originalError: failure });
     expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(1);
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
+  });
+
+  it("retries remote metadata reads after GitHub reports an exhausted API rate limit", async () => {
+    const file = ".github/workflows/main.lock.yml";
+    const rateLimitError = Object.assign(new Error("API rate limit exceeded"), {
+      status: 403,
+      response: { status: 403, headers: { "x-ratelimit-remaining": "0" } },
+    });
+    const githubClient = {
+      rest: {
+        repos: {
+          getContent: vi
+            .fn()
+            .mockRejectedValueOnce(rateLimitError)
+            .mockResolvedValue(remoteFile(file, [record({ model: "small" })])),
+        },
+      },
+    };
+
+    vi.useFakeTimers();
+    try {
+      const request = metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient });
+      await vi.runAllTimersAsync();
+      const result = await request;
+
+      expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(2);
+      expect(result.records).toEqual(decodedCatalog([record({ model: "small" })]).records);
+      expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("merges matching caller checkout records for reusable workflows and preserves cache transport", async () => {
