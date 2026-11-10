@@ -90,27 +90,76 @@ jobs:
             const stateFile = path.join(cache, 'checkpoint.json');
             const end = new Date().toISOString();
             const bootstrap = !fs.existsSync(stateFile);
-            const state = fs.existsSync(stateFile) ? read(stateFile) : {
-              version: 1, repository: context.repo.owner + '/' + context.repo.repo,
-              checkpoint: new Date(Date.parse(end) - 3600000).toISOString(), seen: [], backlog: [], pending: []
-            };
             const repository = context.repo.owner + '/' + context.repo.repo;
-            if (state.version !== 1 || state.repository !== repository ||
-                !Number.isFinite(Date.parse(state.checkpoint)) || Date.parse(state.checkpoint) > Date.parse(end) ||
-                !Array.isArray(state.seen) || !Array.isArray(state.backlog) ||
-                (state.pending !== undefined && !Array.isArray(state.pending))) {
-              throw new Error('Invalid collection checkpoint; refusing to reset it silently');
-            }
             core.setOutput('has_new_failures', 'false');
-            if (Date.parse(end) - Date.parse(state.checkpoint) > 86400000) {
-              throw new Error('Collection checkpoint gap exceeds 24 hours; refusing to reset it silently');
-            }
-            const retentionStart = new Date(Date.parse(end) - 86400000).toISOString();
             let requests = 0;
             const request = async (method, params) => {
               if (++requests > 1025) throw new Error('Metadata request budget exceeded');
               return method({...context.repo, ...params});
             };
+            if (bootstrap) {
+              const attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+              const prior = await request(github.rest.actions.listWorkflowRuns, {
+                workflow_id: 'auditor.lock.yml', per_page: 2
+              });
+              if (!Array.isArray(prior.data.workflow_runs) ||
+                  !Number.isSafeInteger(prior.data.total_count) || prior.data.total_count < 0 ||
+                  prior.data.total_count < prior.data.workflow_runs.length ||
+                  (prior.data.total_count > 0) !== (prior.data.workflow_runs.length > 0) ||
+                  !Number.isSafeInteger(context.runId) || !Number.isSafeInteger(attempt) || attempt < 1 ||
+                  prior.data.workflow_runs.some(run => !Number.isSafeInteger(run.id))) {
+                throw new Error('Invalid prior collection history; refusing to initialize checkpoint');
+              }
+              if (attempt > 1 || prior.data.total_count > prior.data.workflow_runs.length ||
+                  prior.data.workflow_runs.some(run => run.id !== context.runId)) {
+                throw new Error('Collection checkpoint cache is missing with prior Auditor execution history; ' +
+                  'restore the previous checkpoint and recovery files before resuming; history is not reset');
+              }
+            }
+            const state = fs.existsSync(stateFile) ? read(stateFile) : {
+              version: 1, repository: context.repo.owner + '/' + context.repo.repo,
+              checkpoint: new Date(Date.parse(end) - 3600000).toISOString(), seen: [], backlog: [], pending: []
+            };
+            if (state.version !== 1 || state.repository !== repository ||
+                !Number.isFinite(Date.parse(state.checkpoint)) || Date.parse(state.checkpoint) > Date.parse(end) ||
+                !Array.isArray(state.seen) || !Array.isArray(state.backlog) ||
+                (state.pending !== undefined && !Array.isArray(state.pending)) ||
+                (state.sampling_gaps !== undefined && !Array.isArray(state.sampling_gaps))) {
+              throw new Error('Invalid collection checkpoint; refusing to reset it silently');
+            }
+            const retentionStart = new Date(Date.parse(end) - 86400000).toISOString();
+            const samplingGaps = [...(state.sampling_gaps || [])];
+            for (const gap of samplingGaps) {
+              if (!gap || !Number.isFinite(Date.parse(gap.start)) ||
+                  !Number.isFinite(Date.parse(gap.end)) ||
+                  !Number.isFinite(Date.parse(gap.observed_at)) ||
+                  Date.parse(gap.start) >= Date.parse(gap.end) ||
+                  Date.parse(gap.end) > Date.parse(gap.observed_at) ||
+                  Date.parse(gap.observed_at) > Date.parse(end) ||
+                  !/^checkpoint-[a-f0-9]{64}\.json$/.test(gap.state_file)) {
+                throw new Error('Invalid sampling gap record; checkpoint unchanged');
+              }
+            }
+            // This checkpoint records a bounded health sample, not a census cursor.
+            // Preserve missed intervals and their full state instead of claiming backfill.
+            const previousState = JSON.stringify(state);
+            const missedSample = Date.parse(state.checkpoint) < Date.parse(retentionStart);
+            let newSnapshot;
+            if (missedSample) {
+              const reports = {};
+              for (const item of state.backlog) {
+                if (!item || typeof item.report_file !== 'string' ||
+                    !/^queries\/[a-zA-Z0-9][a-zA-Z0-9._-]*\/report\.json$/.test(item.report_file)) {
+                  throw new Error('Invalid prior report reference; checkpoint unchanged');
+                }
+                reports[item.report_file] = read(path.join(cache, item.report_file));
+              }
+              newSnapshot = JSON.stringify({state: JSON.parse(previousState), reports});
+              samplingGaps.push({
+                start: state.checkpoint, end: retentionStart, observed_at: end,
+                state_file: `checkpoint-${crypto.createHash('sha256').update(newSnapshot).digest('hex')}.json`
+              });
+            }
             const health = JSON.parse(execFileSync('gh', ['aw', 'health',
               '--repo', repository, '--start-date', retentionStart, '--end-date', end,
               '--logs-dir', path.join(cache, 'health'), '--timeout', '2m', '--json'], {
@@ -123,7 +172,10 @@ jobs:
                 (discovery.partial === false &&
                   (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) ||
                 (discovery.potential_issues !== undefined && !Array.isArray(discovery.potential_issues))) {
-              throw new Error('Incomplete or invalid health discovery; checkpoint unchanged');
+              throw new Error('Incomplete or invalid health discovery; checkpoint unchanged: ' +
+                JSON.stringify({partial: discovery?.partial, reason: discovery?.reason,
+                  failure_listing_complete: discovery?.failure_listing_complete,
+                  failure_pass_complete: discovery?.failure_pass_complete}));
             }
             // Health is a bounded current-revision sample, not an all-run census.
             // Only verified representatives can activate collection, even when
@@ -320,7 +372,7 @@ jobs:
             const manifest = {
               complete: true, repository, window_start: retentionStart, window_end: end,
               retention_start: retentionStart, bootstrap, cli_version: cliVersion,
-              discovery,
+              discovery, sampling_gaps: samplingGaps,
               new_failures: newFailures,
               evidence_complete: deferred === 0, pending_runs: pending.length, deferred_failures: deferred,
               open_prs_complete: true, open_prs: openPRs, clusters: ranked,
@@ -344,17 +396,36 @@ jobs:
             if (finalRate.used > ceiling || finalRate.reset !== rate.reset) {
               throw new Error('Shared API budget exceeded or reset; checkpoint unchanged');
             }
+            const recoveryDir = path.join(cache, 'recovery');
+            for (const [index, gap] of samplingGaps.entries()) {
+              const isNew = missedSample && index === samplingGaps.length - 1;
+              const snapshot = isNew ? newSnapshot :
+                fs.readFileSync(path.join(recoveryDir, gap.state_file), 'utf8');
+              const expected = `checkpoint-${crypto.createHash('sha256').update(snapshot).digest('hex')}.json`;
+              if (gap.state_file !== expected) {
+                throw new Error('Sampling gap snapshot changed; checkpoint unchanged');
+              }
+              fs.mkdirSync(recoveryDir, {recursive: true});
+              fs.mkdirSync(path.join(data, 'recovery'), {recursive: true});
+              if (isNew) fs.writeFileSync(path.join(recoveryDir, gap.state_file), snapshot);
+              fs.writeFileSync(path.join(data, 'recovery', gap.state_file), snapshot);
+            }
             write(path.join(data, 'manifest.json'), manifest);
             // Verified health sample and complete PR scope; evidence may be a FIFO batch.
             // Never mark deferred attempts seen. Cache save must also succeed.
-            write(stateFile, {...state, checkpoint: end,
+            write(stateFile, {...state, checkpoint: end, sampling_gaps: samplingGaps,
               seen: eligible.filter(r => Date.parse(r.updated_at) >= Date.parse(retentionStart))
                 .map(identity).filter(key => seen.has(key)), backlog, pending});
+            if (samplingGaps.length) {
+              core.warning(`${samplingGaps.length} historical sampling gap(s) remain unresolved. ` +
+                'Previous checkpoint states are preserved in recovery/; current health evidence does not backfill them.');
+            }
             core.setOutput('has_new_failures',
               manifest.new_failures > 0 && manifest.evidence_complete ? 'true' : 'false');
             await core.summary.addRaw(`Collected ${manifest.new_failures} new non-intentional failures; ` +
               `${ranked.length} symptom clusters; ${pending.length} deferred runs. Health window ${retentionStart} to ${end}. ` +
               `Discovery is a bounded sample (partial=${discovery.partial}). ` +
+              `${samplingGaps.length} unresolved historical sampling gaps; prior states preserved in recovery/. ` +
               'No new failures means no agent, not proof that the backlog is healthy.').write();
       - name: Upload compact collection
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -391,6 +462,10 @@ Read `/tmp/gh-aw/auditor/manifest.json` first. Stop with `noop` if it is missing
 invalid, incomplete, has no **new** non-intentional failures, or lacks a complete
 open-PR listing. “Bail out” means no NEW failures, not no historical failures.
 Collection failure must never be interpreted as an empty result.
+Read `sampling_gaps` separately from current-sample completeness. A recorded gap
+does not invalidate current run evidence, but it is never evidence of historical
+coverage or recovery. Preserved `recovery/` checkpoint snapshots retain the
+previous seen/backlog/pending state for separately authorized reconciliation.
 If `evidence_complete` is false, `noop`: the checkpoint retains deferred failures
 for later batches; cluster rankings are not yet scope-complete. Unfinished runs
 are tracked separately and do not block ranking completed failures.
@@ -492,7 +567,15 @@ rate. Its collection metadata is included as `discovery` in the manifest.
 The documented `failure_listing_limit` may leave the inventory partial; verified
 representatives remain actionable, but rankings cover only the collected sample.
 Other partial/invalid health results fail closed without advancing the checkpoint.
-Checkpoint gaps over 24 hours also fail closed. Retained pending/backlog IDs are
+The checkpoint is a last-successful-sample timestamp, not an all-run census cursor.
+After a gap over 24 hours, collection resumes the same bounded current health
+sample and explicitly records the interval outside that window in `sampling_gaps`.
+The original state and referenced compact query reports are content-addressed in `recovery/`, retained in the cache and
+uploaded with every compact collection. Gap records persist across subsequent
+samples and emit warnings; no history is silently reset, backfilled or declared
+healthy. Separately authorized complete backfill or an explicit acknowledged-gap
+decision is required to reconcile them. Invalid/missing/changed snapshots fail
+closed without advancing the checkpoint. Retained pending/backlog IDs are
 refreshed only while included in health's current-revision cohorts.
 Fail closed at 1,000 selected metadata runs, 1,025 metadata requests, ten PR
 pages, incomplete evidence results, or exhausted API reserve.
@@ -503,6 +586,13 @@ start. Rankings cover retained sampled failures updated in that period plus this
 do not activate the agent while failures remain unprocessed. Refresh retained
 processed runs outside discovery too, preserving seen identities until retention
 expires and removing superseded attempts without needlessly re-auditing identical runs.
+When no checkpoint is restored, the collector checks all Auditor run
+history before initializing state. Any prior run or retry makes missing cache a
+recovery-required error, never a fresh bootstrap: restore the checkpoint and
+recovery files from retained cache/artifacts or reconcile the loss explicitly.
+Only the current first attempt without any earlier execution may bootstrap;
+overall workflow failure does not prove that collection saved no state.
+Recovery bundles contain compact reports, not the full original raw artifacts.
 The checkpoint records a successful **collection**, independently of whether
 the agent later fixes anything; unresolved failures stay in the backlog and
 are reconsidered only when another new failure activates the agent. Cache loss
