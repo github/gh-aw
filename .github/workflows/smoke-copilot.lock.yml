@@ -460,7 +460,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: add_comment(max:2), create_issue, create_discussion, create_pull_request_review_comment(max:5), submit_pull_request_review, reply_to_pull_request_review_comment(max:5), add_labels, remove_labels, create_check_run, set_issue_type, haiku_printer, report_missing_tool, report_missing_data, noop(max:2), send_slack_message
+            Tools: add_comment(max:2), create_issue, create_discussion, create_pull_request_review_comment(max:5), submit_pull_request_review, reply_to_pull_request_review_comment(max:5), add_labels, remove_labels, create_check_run, set_issue_type, haiku_printer, report_missing_tool, report_missing_data, report_incomplete, noop(max:2), send_slack_message
             Shared budgets: dispatch-workflow [haiku_printer](max:1 total)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>

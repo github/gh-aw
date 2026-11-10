@@ -326,7 +326,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: daily_compiler_quality, daily_evals_report, daily_firewall_report, daily_issues_report, daily_observability_report, daily_regulatory, daily_repo_chronicle, daily_secrets_analysis, daily_team_evolution_insights, daily_token_consumption_report, deep_report, artifacts_summary, repo_tree_map, report_missing_tool, report_missing_data, noop(max:2)
+            Tools: daily_compiler_quality, daily_evals_report, daily_firewall_report, daily_issues_report, daily_observability_report, daily_regulatory, daily_repo_chronicle, daily_secrets_analysis, daily_team_evolution_insights, daily_token_consumption_report, deep_report, artifacts_summary, repo_tree_map, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
             Shared budgets: dispatch-workflow [daily_compiler_quality, daily_evals_report, daily_firewall_report, daily_issues_report, daily_observability_report, daily_regulatory, daily_repo_chronicle, daily_secrets_analysis, daily_team_evolution_insights, daily_token_consumption_report, deep_report, artifacts_summary, repo_tree_map](max:3 total)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>

@@ -323,7 +323,7 @@ jobs:
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
             <safe-output-tools>
-            Tools: create_issue(max:3), close_issue(max:10), update_issue(max:10), create_discussion, assign_to_agent(max:3), report_missing_tool, report_missing_data, noop(max:2)
+            Tools: create_issue(max:3), close_issue(max:10), update_issue(max:10), create_discussion, assign_to_agent(max:3), report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
           GH_AW_PROMPT_CONTENT_0003: |+

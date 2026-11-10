@@ -8,7 +8,7 @@ inputs:
     required: false
     default: latest
   github-token:
-    description: 'GitHub token for authentication (used for gh CLI and API calls)'
+    description: 'GitHub token for gh CLI operations, API calls, and release downloads'
     required: false
     default: ${{ github.token }}
 
