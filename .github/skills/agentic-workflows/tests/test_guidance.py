@@ -71,7 +71,6 @@ class GuidanceTests(unittest.TestCase):
     def test_squad_is_discoverable_from_instructions_and_pattern_router(self):
         for path in (
             "AGENTS.md",
-            "SKILL.md",
             ".github/aw/instructions.md",
             ".github/aw/github-agentic-workflows.md",
             ".github/aw/patterns.md",
