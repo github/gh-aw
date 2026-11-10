@@ -23,6 +23,7 @@ describe("restricted workflow operation contracts", () => {
     const { workflow, prompt, config, permission } = readWorkflow("daily-formal-spec-verifier");
     expect(workflow.tools.bash).toContain("go test:*");
     expect(workflow.tools.bash).toContain("gofmt -w:*");
+    expect(workflow.sandbox.agent.mounts).toContain("/opt/gh-aw/formal-check:/opt/gh-aw/formal-check:ro");
     expect(config.permissions.allowedTools).toContain("read");
     const handler = buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));
     expect(handler({ kind: "read", path: "/tmp/gh-aw/agent/formal-spec-verifier/replace-label-spec/sany-example/evidence.json" }).kind).toBe("approve-once");
@@ -36,9 +37,9 @@ describe("restricted workflow operation contracts", () => {
       'find specs -type f -name "*.md" | sort',
       'gh pr list --state open --search "replace-label formal" --json number,title',
       "cat /tmp/gh-aw/repo-memory/default/formal-spec-verifier/notes-index.json",
-      "node .github/scripts/formal_spec_check.cjs sany specs/replace-label-spec.md Model.tla",
-      "node .github/scripts/formal_spec_check.cjs tlc specs/replace-label-spec.md Model.tla Model.cfg",
-      "node .github/scripts/formal_spec_check.cjs koka specs/replace-label-spec.md main.kk",
+      "node /opt/gh-aw/formal-check/formal_spec_check.cjs sany specs/replace-label-spec.md Model.tla",
+      "node /opt/gh-aw/formal-check/formal_spec_check.cjs tlc specs/replace-label-spec.md Model.tla Model.cfg",
+      "node /opt/gh-aw/formal-check/formal_spec_check.cjs koka specs/replace-label-spec.md main.kk",
     ]) {
       expect(permission(command), command).toBe("approve-once");
     }
@@ -49,6 +50,7 @@ describe("restricted workflow operation contracts", () => {
       "go test ./pkg/workflow; python3 -c 'print(1)'",
       "gofmt -w pkg/workflow/replace_label_formal_test.go && go version",
       "node -e 'console.log(1)'",
+      "node .github/scripts/formal_spec_check.cjs sany specs/replace-label-spec.md Model.tla",
       "cd specs/formal/replace-label-spec",
       "timeout 2m /tmp/gh-aw/agent/koka/bin/koka main.kk",
     ]) {
@@ -56,15 +58,18 @@ describe("restricted workflow operation contracts", () => {
     }
   });
 
-  it("allows only finite Delight help commands without discovery probes", () => {
+  it("reads prepared Delight help without granting agent binary execution", () => {
     const { workflow, prompt, permission } = readWorkflow("delight");
     expect(workflow.tools.bash).not.toContain("./gh-aw * --help");
-    for (const command of ["./gh-aw --help", "./gh-aw compile --help", "./gh-aw run --help"]) {
-      expect(workflow.tools.bash).toContain(command);
+    for (const file of ["main", "compile", "run"]) {
+      const command = `cat /tmp/gh-aw/agent/help-output/${file}.txt`;
       expect(prompt).toContain(command);
       expect(permission(command), command).toBe("approve-once");
     }
     for (const command of [
+      "./gh-aw --help",
+      "./gh-aw compile --help",
+      "./gh-aw run --help",
       "./gh-aw run daily-formal-spec-verifier",
       "./gh-aw compile --help && ./gh-aw run daily-formal-spec-verifier",
       "which gh-aw",
@@ -96,8 +101,11 @@ describe("restricted workflow operation contracts", () => {
   it("uses the actual restored memory directory throughout Delight setup and persistence", () => {
     const { workflow, prompt } = readWorkflow("delight");
     const setup = workflow["pre-agent-steps"].find(step => step.name === "Sample files and load memory").run;
-    expect(setup).toContain("cat /tmp/gh-aw/repo-memory/default/previous-findings.json");
-    expect(setup).toContain("cat /tmp/gh-aw/repo-memory/default/improvement-themes.json");
+    expect(setup).toContain("memory_dir=/tmp/gh-aw/repo-memory/default");
+    expect(setup).toContain('findings_files=("$memory_dir"/findings-????-??-??.json)');
+    expect(setup).toContain('cat "$memory_dir/improvements.json"');
+    expect(setup).not.toContain("improvement-themes.json");
+    expect(prompt).toContain("cat /tmp/gh-aw/agent/improvements.json");
     expect(setup).not.toContain("cat memory/delight/");
     expect(prompt).not.toContain("cat > memory/delight/");
     expect(prompt).toContain("/tmp/gh-aw/repo-memory/default/findings-<YYYY-MM-DD>.json");

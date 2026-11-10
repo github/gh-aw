@@ -47,9 +47,30 @@ engine:
 max-tool-denials: 3
 name: Delight
 pre-agent-steps:
+- name: Setup Go
+  uses: actions/setup-go@v7.0.0
+  with:
+    go-version-file: go.mod
+    cache: true
+- name: Build CLI and pre-collect help output
+  run: |
+    set -euo pipefail
+    go build -o ./gh-aw ./cmd/gh-aw
+    output_dir=/tmp/gh-aw/agent/help-output
+    mkdir -p "$output_dir"
+    ./gh-aw --help > "$output_dir/main.txt" 2>&1
+    ./gh-aw compile --help > "$output_dir/compile.txt" 2>&1
+    ./gh-aw run --help > "$output_dir/run.txt" 2>&1
+    for command in main compile run; do
+      if [[ ! -s "$output_dir/$command.txt" ]]; then
+        echo "Missing CLI help output: $command" >&2
+        exit 1
+      fi
+    done
 - name: Sample files and load memory
   run: |
     set -euo pipefail
+    export LC_ALL=C
     mkdir -p /tmp/gh-aw/agent
     sample_files() {
       local count="$1" output="$2" status
@@ -73,17 +94,26 @@ pre-agent-steps:
     # Sample validation files
     sample_files 1 /tmp/gh-aw/agent/validation-sample.txt find pkg -name '*validation*.go'
     # Load historical memory (eliminates agent memory-read turns)
-    if [[ -f /tmp/gh-aw/repo-memory/default/previous-findings.json ]]; then
-      cat /tmp/gh-aw/repo-memory/default/previous-findings.json > /tmp/gh-aw/agent/previous-findings.json
+    memory_dir=/tmp/gh-aw/repo-memory/default
+    if [[ -e "$memory_dir" || -L "$memory_dir" ]]; then
+      if [[ ! -d "$memory_dir" || ! -r "$memory_dir" || ! -x "$memory_dir" ]]; then
+        echo "Cannot read restored memory directory: $memory_dir" >&2
+        exit 1
+      fi
+    fi
+    shopt -s nullglob
+    findings_files=("$memory_dir"/findings-????-??-??.json)
+    if [[ "${#findings_files[@]}" -gt 0 ]]; then
+      cat "${findings_files[${#findings_files[@]}-1]}" > /tmp/gh-aw/agent/previous-findings.json
     else
-      echo "No previous-findings.json history; starting fresh"
+      echo "No dated findings history; starting fresh"
       printf '[]\n' > /tmp/gh-aw/agent/previous-findings.json
     fi
-    if [[ -f /tmp/gh-aw/repo-memory/default/improvement-themes.json ]]; then
-      cat /tmp/gh-aw/repo-memory/default/improvement-themes.json > /tmp/gh-aw/agent/improvement-themes.json
+    if [[ -e "$memory_dir/improvements.json" || -L "$memory_dir/improvements.json" ]]; then
+      cat "$memory_dir/improvements.json" > /tmp/gh-aw/agent/improvements.json
     else
-      echo "No improvement-themes.json history; starting fresh"
-      printf '[]\n' > /tmp/gh-aw/agent/improvement-themes.json
+      echo "No improvements.json history; starting fresh"
+      printf '[]\n' > /tmp/gh-aw/agent/improvements.json
     fi
     # Pre-read file contents (eliminates view/read tool denials)
     for sample in doc-samples workflow-samples validation-sample; do
@@ -97,10 +127,8 @@ tools:
   bash:
   - find docs/src/content/docs -name "*.md" -o -name "*.mdx"
   - find .github/workflows -name "*.md"
-  - ./gh-aw --help
-  - ./gh-aw compile --help
-  - ./gh-aw run --help
   - cat /tmp/gh-aw/agent/*
+  - cat /tmp/gh-aw/agent/help-output/*
   - cat docs/src/content/docs/*.md
   - cat docs/src/content/docs/*.mdx
   - cat .github/workflows/*.md
@@ -233,18 +261,19 @@ cat /tmp/gh-aw/agent/doc-samples-content.txt
 
 ### 2. CLI Experience (1-2 Commands)
 
-**Select 1-2 high-impact CLI commands:**
+**Review pre-collected help for 1-2 high-impact CLI commands:**
 
 ```bash
-./gh-aw --help
+cat /tmp/gh-aw/agent/help-output/main.txt
 ```
 
-Choose one or both of the permitted help invocations below, each in a separate
-call. Do not discover the binary with `which` or run arbitrary subcommands:
+Choose one or both of the prepared help files below, each in a separate call.
+The CLI was built and its help collected before agent execution; do not discover
+or execute the binary:
 
 ```bash
-./gh-aw compile --help
-./gh-aw run --help
+cat /tmp/gh-aw/agent/help-output/compile.txt
+cat /tmp/gh-aw/agent/help-output/run.txt
 ```
 
 Evaluate the selected help output:
@@ -323,11 +352,12 @@ Review error messages in the selected file:
 
 ### Step 1: Load Historical Memory
 
-Historical memory has been pre-loaded for this run:
+The latest dated findings (by filename) and `improvements.json` from Step 7 have
+been pre-loaded for this run. Empty arrays indicate a normal cold start:
 
 ```bash
 cat /tmp/gh-aw/agent/previous-findings.json
-cat /tmp/gh-aw/agent/improvement-themes.json
+cat /tmp/gh-aw/agent/improvements.json
 ```
 
 ### Step 2: Targeted Selection

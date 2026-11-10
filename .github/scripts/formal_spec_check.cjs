@@ -11,6 +11,89 @@ const JAR = "/tmp/gh-aw/agent/tla-tools/tla2tools.jar";
 const KOKA = "/tmp/gh-aw/agent/koka/bin/koka";
 const BUDGET_MS = 8 * 60 * 1000;
 const OUTPUT_LIMIT = 8192;
+const TLA_MODULES = new Set(["Naturals", "Integers", "Reals", "Sequences", "FiniteSets", "Bags", "TLC", "TLCExt", "Randomization"]);
+
+function validateDependencies(action, source) {
+  if (action === "koka") {
+    if (/\b(?:import|extern|include)\b/.test(source)) throw new Error("Unsupported Koka dependency: use a single file without imports, extern declarations, or includes");
+    return;
+  }
+  const tokens = [];
+  let depth = 0;
+  for (let offset = 0; offset < source.length;) {
+    const rest = source.slice(offset);
+    if (rest.startsWith("(*")) {
+      depth++;
+      offset += 2;
+    } else if (depth && rest.startsWith("*)")) {
+      depth--;
+      offset += 2;
+    } else if (depth || /^\s/.test(rest)) {
+      offset++;
+    } else if (rest.startsWith("\\*")) {
+      const end = rest.search(/[\r\n]/);
+      offset += end < 0 ? rest.length : end;
+    } else {
+      const token = rest.match(/^"(?:\\.|[^"\\])*"|^[A-Za-z_][A-Za-z0-9_]*|^\S/)[0];
+      tokens.push(token);
+      offset += token.length;
+    }
+  }
+  if (depth) throw new Error("Unterminated TLA+ block comment");
+  if (tokens.includes("INSTANCE")) throw new Error("Unsupported TLA+ dependency: INSTANCE is not supported");
+  for (let index = 0; index < tokens.length; index++) {
+    if (tokens[index] !== "EXTENDS") continue;
+    do {
+      if (!TLA_MODULES.has(tokens[++index])) throw new Error("Unsupported TLA+ dependency: EXTENDS accepts only the documented pinned standard modules");
+    } while (tokens[index + 1] === "," && ++index);
+  }
+}
+
+function processIdentity(pid) {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    if (["Z", "X"].includes(fields[0])) return null;
+    return `${fs.readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim()}:${fields[19]}`;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function writeBudget(file, elapsed) {
+  const pending = `${file}.${crypto.randomUUID()}`;
+  fs.writeFileSync(pending, JSON.stringify({ elapsed_ms: elapsed }) + "\n", { flag: "wx" });
+  fs.renameSync(pending, file);
+}
+
+function acquireBudgetLock(root, identity = processIdentity) {
+  const owner = identity(process.pid);
+  if (!owner) throw new Error("Cannot identify the formal-check budget owner");
+  // Completed/dead generations are never unlinked: competing recoverers cannot
+  // accidentally delete a newly acquired live lock (including after PID reuse).
+  for (let generation = 0; ; generation++) {
+    const file = path.join(root, `budget.lock${generation ? `.${generation}` : ""}`);
+    const candidate = path.join(root, `budget-owner-${crypto.randomUUID()}`);
+    fs.writeFileSync(candidate, JSON.stringify({ pid: process.pid, identity: owner }), { flag: "wx" });
+    try {
+      fs.linkSync(candidate, file);
+      return () => fs.writeFileSync(`${file}.done`, "", { flag: "wx" });
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    } finally {
+      fs.unlinkSync(candidate);
+    }
+    confinedPath(root, path.basename(file));
+    const previous = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!Number.isSafeInteger(previous.pid) || previous.pid <= 0 || typeof previous.identity !== "string" || !previous.identity) {
+      throw new Error("Invalid formal-check budget lock owner");
+    }
+    if (!fs.existsSync(`${file}.done`) && identity(previous.pid) === previous.identity) {
+      throw new Error(`Formal check is still running; wait for its owner to finish before retrying: ${file}`);
+    }
+  }
+}
 
 function specSlug(relative) {
   return relative.slice(0, -".md".length).replaceAll("/", "-");
@@ -81,6 +164,8 @@ function runFormalCheck(args, options = {}) {
   const extension = action === "koka" ? "kk" : "tla";
   if (!new RegExp(`^[A-Za-z][A-Za-z0-9_-]*\\.${extension}$`).test(model)) throw new Error(`Expected a ${extension} model basename`);
   const modelPath = confinedPath(modelDirectory, model);
+  const modelBytes = fs.readFileSync(modelPath);
+  validateDependencies(action, modelBytes.toString("utf8"));
   let configPath;
   if (action === "tlc") {
     if (!/^[A-Za-z][A-Za-z0-9_-]*\.cfg$/.test(config)) throw new Error("Expected a cfg basename");
@@ -88,25 +173,19 @@ function runFormalCheck(args, options = {}) {
   }
   const resultsRoot = options.resultsRoot || path.join(fs.realpathSync("/tmp"), path.relative("/tmp", RESULTS_ROOT));
   createDirectory(resultsRoot);
-  const lockPath = path.join(resultsRoot, "budget.lock");
-  let lock;
-  try {
-    lock = fs.openSync(lockPath, "wx");
-  } catch (error) {
-    if (error.code === "EEXIST") {
-      throw new Error(`Formal-check budget lock already exists: ${lockPath}. Another check may still be running; remove this lock only after confirming no formal check is active.`);
-    }
-    throw error;
-  }
+  const release = acquireBudgetLock(resultsRoot, options.processIdentity);
+  const budgetPath = path.join(resultsRoot, "budget.json");
+  let spent;
+  let reserved = false;
+  let refundable = true;
   try {
     return runChecks();
   } finally {
-    fs.closeSync(lock);
-    fs.unlinkSync(lockPath);
+    if (reserved && refundable) writeBudget(budgetPath, spent);
+    release();
   }
   function runChecks() {
-    const budgetPath = path.join(resultsRoot, "budget.json");
-    let spent = 0;
+    spent = 0;
     if (fs.existsSync(budgetPath)) {
       confinedPath(resultsRoot, "budget.json");
       spent = JSON.parse(fs.readFileSync(budgetPath, "utf8")).elapsed_ms;
@@ -116,10 +195,12 @@ function runFormalCheck(args, options = {}) {
     const slugDirectory = path.join(resultsRoot, slug);
     createDirectory(slugDirectory);
     const results = fs.mkdtempSync(path.join(slugDirectory, `${action}-`));
+    const inputs = path.join(results, "inputs");
     const home = path.join(results, "home");
     const tmp = path.join(results, "tmp");
     createDirectory(home);
     createDirectory(tmp);
+    createDirectory(inputs);
     const env = {
       PATH: "/usr/local/bin:/usr/bin:/bin",
       HOME: home,
@@ -137,10 +218,17 @@ function runFormalCheck(args, options = {}) {
     const java = options.java || JAVA;
     const jar = options.jar || JAR;
     const koka = options.koka || KOKA;
-    const sources = [specPath, modelPath, ...(configPath ? [configPath] : [])].map(file => ({
+    const sourceFiles = [[specPath, fs.readFileSync(specPath)], [modelPath, modelBytes], ...(configPath ? [[configPath, fs.readFileSync(configPath)]] : [])];
+    const sources = sourceFiles.map(([file, bytes]) => ({
       path: path.relative(workspace, file),
-      sha256: crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"),
+      sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
     }));
+    for (const [file, bytes] of sourceFiles.slice(1)) fs.writeFileSync(path.join(inputs, path.basename(file)), bytes, { flag: "wx" });
+    // Reserve the entire remaining allowance before any child can start.
+    // A killed owner (or uncertain child termination) forfeits this reservation;
+    // only a normally reaped set of children can refund unused elapsed time.
+    writeBudget(budgetPath, BUDGET_MS);
+    reserved = true;
     function run(name, executable, argv, maxMs) {
       const remaining = BUDGET_MS - spent;
       if (remaining < 1000) throw new Error("The shared eight-minute formal-check budget is exhausted");
@@ -149,7 +237,7 @@ function runFormalCheck(args, options = {}) {
       let result;
       try {
         result = execute("timeout", ["--kill-after=30s", `${seconds}s`, executable, ...argv], {
-          cwd: modelDirectory,
+          cwd: inputs,
           env,
           stdio: ["ignore", "pipe", "pipe"],
           maxBuffer: 65536,
@@ -159,8 +247,10 @@ function runFormalCheck(args, options = {}) {
         result = { status: null, signal: null, error };
       } finally {
         spent += Date.now() - start;
-        fs.writeFileSync(budgetPath, JSON.stringify({ elapsed_ms: spent }) + "\n");
       }
+      if (result.error || result.status === null) refundable = false;
+      const diagnostics = `${result.stdout || ""}\n${result.stderr || ""}`;
+      const validationStatus = name === "sany" && result.status === 0 && /(?:\*{3}\s*(?:Errors|Fatal errors|Abort messages):\s*[1-9]\d*|\b(?:Semantic|Level) errors:|\*{3}\s*Parse Error\s*\*{3})/i.test(diagnostics) ? 1 : result.status;
       const stdout = outputPreview(result.stdout, secrets);
       const stderr = outputPreview(result.stderr, secrets);
       const error = result.error ? outputPreview(result.error.message, secrets).text : undefined;
@@ -169,6 +259,7 @@ function runFormalCheck(args, options = {}) {
         command: [executable, ...argv],
         timeout_seconds: seconds,
         status: result.status,
+        validation_status: validationStatus,
         signal: result.signal,
         error,
         stdout: stdout.text,
@@ -179,14 +270,14 @@ function runFormalCheck(args, options = {}) {
       fs.writeFileSync(path.join(results, "evidence.json"), JSON.stringify({ action, sources, records }, null, 2) + "\n");
       if (result.error) throw new Error(error);
       if (result.status === null) throw new Error(`${name} terminated by ${result.signal || "unknown signal"}`);
-      return result.status;
+      return validationStatus;
     }
     let status = run("version", action === "koka" ? koka : java, [action === "koka" ? "--version" : "-version"], 30000);
     if (status !== 0) return { status, results };
     if (action === "sany") {
       status = run("sany", java, ["-Xmx2g", "-cp", jar, "tla2sany.SANY", model], 120000);
     } else if (action === "tlc") {
-      status = run("tlc", java, ["-Xmx2g", "-cp", jar, "tlc2.TLC", "-workers", "2", "-config", config, "-metadir", path.join(results, "states"), model], 120000);
+      status = run("tlc", java, ["-Xmx2g", "-cp", jar, "tlc2.TLC", "-noGenerateSpecTE", "-workers", "2", "-config", config, "-metadir", path.join(results, "states"), model], 120000);
     } else {
       const executable = path.join(results, "model");
       status = run("compile", koka, [`--builddir=${path.join(results, "build")}`, "-o", executable, model], 120000);
@@ -203,7 +294,8 @@ module.exports = { runFormalCheck };
 
 if (require.main === module) {
   try {
-    const result = runFormalCheck(process.argv.slice(2));
+    const settings = JSON.parse(fs.readFileSync(path.join(__dirname, "workspace.json"), "utf8"));
+    const result = runFormalCheck(process.argv.slice(2), { workspace: settings.workspace });
     console.log(`Formal-check exit ${result.status}; evidence: ${path.join(result.results, "evidence.json")}`);
     process.exitCode = result.status;
   } catch (error) {
