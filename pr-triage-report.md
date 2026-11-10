@@ -1,29 +1,29 @@
 ### Executive totals
-- Eligible Copilot PRs: 5
-- Category mix: chore 1, test 1, refactor 1, bug 2
-- Risk mix: low 2, medium 3
-- Priority mix: low 2, medium 3
-- Recommended actions: auto_merge 2, batch_review 2, defer 1
+- Eligible Copilot PRs: 11
+- Category mix: bug 7, feature 3, test 1
+- Risk mix: low 1, medium 8, high 2
+- Priority mix: low 1, medium 8, high 2
+- Recommended actions: batch_review 8, fast_track 2, defer 1
 
 ### Top-priority PRs
-- #75843 — Bump gh-aw-firewall to v0.29.10 — score 59 — batch_review
-- #75807 — Extract shared work-queue worker target resolution — score 47 — batch_review
-- #75806 — Exclude vendored YAML from ESLint custom rules — score 48 — defer
+- #76427 — Harden OpenAI WIF version, detection, and egress handling — score 68 — fast_track
+- #76422 — Harden Pi sub-agent invocation validation — score 68 — fast_track
+- #76428 — Authenticate setup-cli release downloads with GH_TOKEN — score 59 — batch_review
 
 ### Auto-merge candidates
-- #75821 — Improve safe-output helper test coverage — score 35 — auto_merge
-- #75793 — Normalize blocked labels and cover run-step sanitization — score 42 — auto_merge
-
-### Fast-track items
 - None.
 
+### Fast-track items
+- #76427 — Harden OpenAI WIF version, detection, and egress handling
+- #76422 — Harden Pi sub-agent invocation validation
+
 ### Batch opportunities
-- pr-batch:quality-copilot — #75821, #75807, #75806, #75793
+- pr-batch:model-routing — #76330, #76323, #76319
 
 ### Close candidates
 - None.
 
 ### Key trends and next actions
-- The majority of eligible Copilot PRs are low-risk quality and infrastructure changes.
-- A four-PR quality batch should be reviewed together to reduce churn.
-- The deferred bug fix should remain queued until CI health and claim validation are complete.
+- The portfolio is dominated by workflow hardening and model-routing work, with several medium-risk fixes clustered around dependency and runtime validation changes.
+- The highest-risk items concern WIF/egress handling and Pi invocation validation and should be reviewed before merging.
+- The model-routing PRs form a clear 3-PR batch and should be reviewed together to reduce churn and avoid partial migration states.

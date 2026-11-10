@@ -1,18 +1,195 @@
 {
-  "run_id": "42509022113",
-  "run_date": "2026-11-08T18:17:19Z",
+  "run_id": "42873398149",
+  "run_date": "2026-11-10T18:18:44Z",
   "source": "pr-triage",
-  "eligible_total": 5,
-  "category_counts": {"chore": 1, "test": 1, "refactor": 1, "bug": 2},
-  "risk_counts": {"low": 2, "medium": 3},
-  "priority_counts": {"low": 2, "medium": 3},
-  "action_counts": {"auto_merge": 2, "batch_review": 2, "defer": 1},
-  "batches": [{"id": "pr-batch:quality-copilot", "prs": [75821, 75807, 75806, 75793]}],
+  "eligible_total": 11,
+  "open_copilot_prs": 11,
+  "cooldown_skipped": 0,
+  "category_counts": {
+    "test": 1,
+    "bug": 7,
+    "feature": 3
+  },
+  "risk_counts": {
+    "low": 1,
+    "medium": 8,
+    "high": 2
+  },
+  "priority_counts": {
+    "low": 1,
+    "medium": 8,
+    "high": 2
+  },
+  "action_counts": {
+    "batch_review": 8,
+    "fast_track": 2,
+    "defer": 1
+  },
+  "batches": [
+    {
+      "id": "pr-batch:model-routing",
+      "prs": [
+        76330,
+        76323,
+        76319
+      ]
+    }
+  ],
   "selected_candidates": [
-    {"number": 75843, "title": "Bump gh-aw-firewall to v0.29.10", "category": "chore", "risk": "medium", "priority": "medium", "action": "batch_review", "score": 59, "score_breakdown": {"impact": 32, "urgency": 15, "quality": 12}},
-    {"number": 75821, "title": "Improve safe-output helper test coverage", "category": "test", "risk": "low", "priority": "low", "action": "auto_merge", "score": 35, "score_breakdown": {"impact": 14, "urgency": 6, "quality": 15}},
-    {"number": 75807, "title": "Extract shared work-queue worker target resolution", "category": "refactor", "risk": "medium", "priority": "medium", "action": "batch_review", "score": 47, "score_breakdown": {"impact": 26, "urgency": 10, "quality": 11}},
-    {"number": 75806, "title": "Exclude vendored YAML from ESLint custom rules", "category": "bug", "risk": "medium", "priority": "medium", "action": "defer", "score": 48, "score_breakdown": {"impact": 22, "urgency": 18, "quality": 8}},
-    {"number": 75793, "title": "Normalize blocked labels and cover run-step sanitization", "category": "bug", "risk": "low", "priority": "low", "action": "auto_merge", "score": 42, "score_breakdown": {"impact": 20, "urgency": 8, "quality": 14}}
-  ]
+    {
+      "number": 76434,
+      "title": "Verify ZIP extraction bounds and scanning status",
+      "category": "test",
+      "risk": "low",
+      "priority": "low",
+      "action": "defer",
+      "score": 32,
+      "score_breakdown": {
+        "impact": 12,
+        "urgency": 6,
+        "quality": 14
+      }
+    },
+    {
+      "number": 76433,
+      "title": "Clarify daily AIC restore quota blocks and recovery guidance",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 56,
+      "score_breakdown": {
+        "impact": 28,
+        "urgency": 16,
+        "quality": 12
+      }
+    },
+    {
+      "number": 76432,
+      "title": "Fix Super-Linter startup quoting and preserve failure logs",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 56,
+      "score_breakdown": {
+        "impact": 26,
+        "urgency": 18,
+        "quality": 12
+      }
+    },
+    {
+      "number": 76430,
+      "title": "Propagate 404s for declared workflow imports",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 52,
+      "score_breakdown": {
+        "impact": 25,
+        "urgency": 15,
+        "quality": 12
+      }
+    },
+    {
+      "number": 76429,
+      "title": "Preserve inline agents and skills in embedded prompts",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 55,
+      "score_breakdown": {
+        "impact": 27,
+        "urgency": 16,
+        "quality": 12
+      }
+    },
+    {
+      "number": 76428,
+      "title": "Authenticate setup-cli release downloads with GH_TOKEN",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 59,
+      "score_breakdown": {
+        "impact": 29,
+        "urgency": 18,
+        "quality": 12
+      }
+    },
+    {
+      "number": 76427,
+      "title": "Harden OpenAI WIF version, detection, and egress handling",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 68,
+      "score_breakdown": {
+        "impact": 35,
+        "urgency": 20,
+        "quality": 13
+      }
+    },
+    {
+      "number": 76422,
+      "title": "Harden Pi sub-agent invocation validation",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 68,
+      "score_breakdown": {
+        "impact": 36,
+        "urgency": 18,
+        "quality": 14
+      }
+    },
+    {
+      "number": 76330,
+      "title": "Route four Copilot-backed Codex workflows to cost model routing instead of fixed GPT pins",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 56,
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 12,
+        "quality": 12
+      }
+    },
+    {
+      "number": 76323,
+      "title": "Route nine pinned Codex workflows through GitHub Copilot model routing",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 58,
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 14,
+        "quality": 12
+      }
+    },
+    {
+      "number": 76319,
+      "title": "Migrate remaining Copilot GPT-5.6 Terra pins before 16 November 2026 retirement",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 58,
+      "score_breakdown": {
+        "impact": 31,
+        "urgency": 15,
+        "quality": 12
+      }
+    }
+  ],
+  "summary": "Eleven eligible Copilot-authored PRs aged past the one-hour cooldown and were triaged. The portfolio is dominated by workflow hardening and model-routing changes, with the highest-risk work focused on OpenAI WIF and Pi sub-agent validation. The only low-risk item is a verification-only draft; the three model-routing PRs form a clear batch cluster."
 }
