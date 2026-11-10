@@ -43,7 +43,7 @@ safe-outputs:
 Find the likely cause of issue #${{ github.event.issue.number }} and comment with a suggested fix.
 ```
 
-This explicit configuration is a good starting point for most workflows. Eligible workflows that set no model at all are already routed with `goal: cost` and `mode: balanced`; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). `goal: cost` prefers the cheapest choice that is likely to succeed, and `mode: auto` lets the router judge how demanding each task is. Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
+This explicit configuration is a good starting point for most workflows. Eligible workflows that set no model at all are already routed with `goal: cost` and `mode: auto`; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). `goal: cost` prefers the cheapest choice that is likely to succeed, and `mode: auto` lets the router judge how demanding each task is. Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
 
 This example routes models served through GitHub Copilot, so the workflow needs Copilot authentication, here through the [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) permission. Claude and Codex can instead route on their own provider, Anthropic or OpenAI, with the same API key they use without routing; see [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi). Routing also needs the AWF firewall, which is enabled by default.
 
@@ -53,11 +53,13 @@ If the workflow already sets `engine.model`, or another fixed model or reasoning
 
 ## Default routing for workflows without a model
 
-A workflow that chooses neither a model nor routing settings is routed by default with `goal: cost` and `mode: balanced`, when all of the following hold:
+A workflow that chooses neither a model nor routing settings is routed by default with `goal: cost` and `mode: auto`, when all of the following hold:
 
 - The engine is `copilot`, `claude`, `codex`, or `pi`, and inference runs on GitHub Copilot. For Claude and Codex that means `model-provider: github`; a `copilot-requests: write` permission alone doesn't switch the provider. Claude and Codex keep their model family, as in [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi).
 - Neither the workflow nor its imports set a top-level `model`, `engine.model` (including aliases, `auto`, and expressions), `engine.model-routing`, `engine.fallback-models`, or an `engine.env` model variable such as `COPILOT_MODEL` or `GH_AW_DEFAULT_MODEL_COPILOT`.
 - The workflow uses the AWF firewall with a version and images that support routing, and doesn't customize model selection or inference in other ways, such as a custom engine command, model or effort arguments in `engine.args`, a custom agent, sub-agent models, a custom API target, or custom sandbox images.
+
+With `mode: auto`, each run uses the mode the classifier recommends for its task, falling back to `balanced` when classification is unavailable or recommends `unknown`.
 
 The default applies only to the main agent. Threat detection, evals, and sub-agents keep their models. When any condition isn't met, or eligibility is uncertain, the workflow compiles as before. When the default applies, compilation prints an informational notice; it doesn't add a warning.
 
@@ -95,7 +97,7 @@ The **goal** decides which of the choices that meet the target the router prefer
 | `cost` | The cheapest model and effort that meet the target. |
 | `cost-speed` | The fastest model and effort that meet the target, even when a slower choice would cost less. |
 
-When you configure routing explicitly and are unsure, start with `goal: cost` and `mode: auto`. Workflows without a model already get `goal: cost` and `mode: balanced` by default; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). Set a fixed mode when you know what kind of tasks the workflow gets, for example `economy` for a labeling workflow. Choose `cost-speed` when someone is waiting on the result, such as a workflow that replies to a comment.
+When you configure routing explicitly and are unsure, start with `goal: cost` and `mode: auto`. Workflows without a model already get `goal: cost` and `mode: auto` by default; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). Set a fixed mode when you know what kind of tasks the workflow gets, for example `economy` for a labeling workflow. Choose `cost-speed` when someone is waiting on the result, such as a workflow that replies to a comment.
 
 Targets are success rates estimated from benchmark results on similar tasks, not guarantees for a particular repository. The router can choose below the target when no candidate meets it or, with `goal: cost`, when a choice just below the target costs much less.
 
