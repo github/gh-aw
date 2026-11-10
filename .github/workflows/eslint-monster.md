@@ -15,10 +15,12 @@ features:
   gh-aw-detection: true
 
 tracker-id: eslint-monster
-model: copilot/gpt-6-astra
 engine:
   id: codex
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 concurrency:
   job-discriminator: ${{ github.run_id }}
