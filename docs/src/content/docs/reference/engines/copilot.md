@@ -11,6 +11,10 @@ Copilot is the default engine. Grant [`copilot-requests: write`](/gh-aw/referenc
 
 The default CLI pin is `1.0.103`. The compiler embeds this version and its reviewed checksum-manifest digest in the generated workflow. Installation prefers that exact version from the trusted runner toolcache; a cache miss downloads and verifies the pinned release instead of selecting a version from the live compatibility matrix. `engine.version` overrides the default. CLI-only execution is the default. `engine.copilot-sdk: true` or `engine.driver` selects SDK mode.
 
+### Default model routing
+
+Without a `model`, `engine.model`, or `engine.model-routing`, a Copilot workflow on GitHub Copilot inference uses [model routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) with `goal: cost` and `mode: balanced` for its main agent, instead of the `auto` model. A nonempty `GH_AW_MODEL_AGENT_COPILOT` or `GH_AW_DEFAULT_MODEL_COPILOT` variable bypasses routing at run time, with the agent variable winning. Set `engine.model-routing: false` to opt out without pinning a model. BYOK providers aren't routed by default.
+
 ## Capabilities and limitations
 
 Copilot supports `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlists. Compilation rejects native `tools.web-search` and CLI-mode `tools.web-fetch`; use MCP instead. SDK mode provides a proxy-aware `web-fetch` tool. Offline BYOK disables native web tools.

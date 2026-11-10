@@ -43,13 +43,37 @@ safe-outputs:
 Find the likely cause of issue #${{ github.event.issue.number }} and comment with a suggested fix.
 ```
 
-This configuration is a good starting point for most workflows. `goal: cost` prefers the cheapest choice that is likely to succeed, and `mode: auto` lets the router judge how demanding each task is. Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
+This explicit configuration is a good starting point for most workflows. Eligible workflows that set no model at all are already routed with `goal: cost` and `mode: balanced`; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). `goal: cost` prefers the cheapest choice that is likely to succeed, and `mode: auto` lets the router judge how demanding each task is. Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
 
 This example routes models served through GitHub Copilot, so the workflow needs Copilot authentication, here through the [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) permission. Claude and Codex can instead route on their own provider, Anthropic or OpenAI, with the same API key they use without routing; see [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi). Routing also needs the AWF firewall, which is enabled by default.
 
 Compile and run the workflow as usual. To see which model a run used, see [Check which model was used](#check-which-model-was-used).
 
 If the workflow already sets `engine.model`, or another fixed model or reasoning effort setting, routing overrides it and the compiler warns. Remove the fixed setting once routing is enabled.
+
+## Default routing for workflows without a model
+
+A workflow that chooses neither a model nor routing settings is routed by default with `goal: cost` and `mode: balanced`, when all of the following hold:
+
+- The engine is `copilot`, `claude`, `codex`, or `pi`, and inference runs on GitHub Copilot. For Claude and Codex that means `model-provider: github`; a `copilot-requests: write` permission alone doesn't switch the provider. Claude and Codex keep their model family, as in [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi).
+- Neither the workflow nor its imports set a top-level `model`, `engine.model` (including aliases, `auto`, and expressions), `engine.model-routing`, `engine.fallback-models`, or an `engine.env` model variable such as `COPILOT_MODEL` or `GH_AW_DEFAULT_MODEL_COPILOT`.
+- The workflow uses the AWF firewall with a version and images that support routing, and doesn't customize model selection or inference in other ways, such as a custom engine command, model or effort arguments in `engine.args`, a custom agent, sub-agent models, a custom API target, or custom sandbox images.
+
+The default applies only to the main agent. Threat detection, evals, and sub-agents keep their models. When any condition isn't met, or eligibility is uncertain, the workflow compiles as before. When the default applies, compilation prints an informational notice; it doesn't add a warning.
+
+**Model variables bypass the default at run time.** For the `copilot`, `claude`, and `codex` engines, the activation job checks the repository or organization variables `GH_AW_MODEL_AGENT_<ENGINE>` and `GH_AW_DEFAULT_MODEL_<ENGINE>`, for example `GH_AW_MODEL_AGENT_COPILOT`, before the firewall starts. If either is set, the run uses that model without routing, with the agent variable winning over the default one. The variables aren't read at compile time. The `pi` engine has no such variables, so its default routing always applies.
+
+**Opt out** with `model-routing: false` under `engine`. The workflow then runs without routing and without pinning a model, and the model variables apply as usual:
+
+```aw wrap
+engine:
+  id: copilot
+  model-routing: false
+```
+
+Setting a model or an explicit `model-routing` block also replaces the default. Explicit routing settings keep their own goal, mode, and shortlist, and model variables don't disable them.
+
+Routing can choose a different model than the engine's previous default, so cost and output can differ from earlier runs, and between runs. Check routed runs with `gh aw audit`; see [Check which model was used](#check-which-model-was-used).
 
 ## Choose a goal and mode
 
@@ -71,7 +95,7 @@ The **goal** decides which of the choices that meet the target the router prefer
 | `cost` | The cheapest model and effort that meet the target. |
 | `cost-speed` | The fastest model and effort that meet the target, even when a slower choice would cost less. |
 
-If you're unsure, start with `goal: cost` and `mode: auto`. Set a fixed mode when you know what kind of tasks the workflow gets, for example `economy` for a labeling workflow. Choose `cost-speed` when someone is waiting on the result, such as a workflow that replies to a comment.
+When you configure routing explicitly and are unsure, start with `goal: cost` and `mode: auto`. Workflows without a model already get `goal: cost` and `mode: balanced` by default; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). Set a fixed mode when you know what kind of tasks the workflow gets, for example `economy` for a labeling workflow. Choose `cost-speed` when someone is waiting on the result, such as a workflow that replies to a comment.
 
 Targets are success rates estimated from benchmark results on similar tasks, not guarantees for a particular repository. The router can choose below the target when no candidate meets it or, with `goal: cost`, when a choice just below the target costs much less.
 
@@ -337,7 +361,7 @@ inference routing: mode=awf-routed model=gpt-5.6-sol effort=high
 
 ### Supported providers and engines
 
-Routing runs on GitHub Copilot, or natively on Anthropic for Claude and on OpenAI for Codex. The compiler rejects routing on other providers, such as Claude on OpenAI, Codex on Anthropic, or the Copilot and pi engines on a provider other than GitHub Copilot; on custom targets, BYOK gateways, or Azure OpenAI; and on engines other than `copilot`, `claude`, `codex`, and `pi`. See [Native Anthropic and OpenAI routing](#native-anthropic-and-openai-routing).
+Routing runs on GitHub Copilot, or natively on Anthropic for Claude and on OpenAI for Codex. The [default routing](#default-routing-for-workflows-without-a-model) for workflows without a model applies only on GitHub Copilot; native Anthropic and OpenAI routing must be configured explicitly. The compiler rejects routing on other providers, such as Claude on OpenAI, Codex on Anthropic, or the Copilot and pi engines on a provider other than GitHub Copilot; on custom targets, BYOK gateways, or Azure OpenAI; and on engines other than `copilot`, `claude`, `codex`, and `pi`. See [Native Anthropic and OpenAI routing](#native-anthropic-and-openai-routing).
 
 ### Selection varies between runs
 
@@ -370,4 +394,5 @@ Sub-agents from a different model family than the selected main model fail. See 
 | The agent step fails and `gh aw audit` reports a routing failure | Routing couldn't produce a usable selection: no candidate was available to the organization, the router failed (exit code `78`), or the engine can't use the selected model or effort. The audit's Model Routing section shows the failure code and details. |
 | A sub-agent's requests fail with HTTP 400 in Copilot CLI mode | The sub-agent's model family differs from the selected main model. See [Sub-agents](#sub-agents). |
 | `gh aw audit` reports deviated requests | Requests used a model other than the selected one, usually from sub-agents or built-in agents. This is expected and isn't a policy violation. |
+| A workflow without a model is routed and you want a fixed model | The [default routing](#default-routing-for-workflows-without-a-model) applies. Set `engine.model-routing: false`, set a model, or set the `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable. |
 | `gh aw audit` reports degraded classification | Classification failed, so routing continued without it; with `mode: auto`, the router used `balanced`. |

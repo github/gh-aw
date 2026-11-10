@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -16,11 +15,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
-
-// awfConfigWritePattern matches the printf that writes the compiled AWF config file.
-var awfConfigWritePattern = regexp.MustCompile(`printf '%s\\n' "(\{(?:[^"\\]|\\.)*)" > "\$\{RUNNER_TEMP\}/gh-aw/awf-config\.json"`)
-
-var shellEscapePattern = regexp.MustCompile(`\\(.)`)
 
 type routedAliasCompilation struct {
 	err       error

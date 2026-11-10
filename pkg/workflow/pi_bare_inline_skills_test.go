@@ -331,7 +331,8 @@ on: workflow_dispatch
 permissions:
   contents: read
 engine:
-  id: pi`+bare+`
+  id: pi
+  model-routing: false`+bare+`
 imports:
   - shared/reporting.md
 tools:
@@ -366,6 +367,7 @@ permissions:
   contents: read
 engine:
   id: pi
+  model-routing: false
   bare: true
 tools:
   bash: false

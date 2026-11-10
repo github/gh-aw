@@ -20,6 +20,9 @@ type CopilotModelRoutingConfig struct {
 	Goal          string
 	Mode          string
 	AllowedModels []string
+	// implicit marks the compiler's cost/balanced default, as opposed to an
+	// authored or imported engine.model-routing block. It is never emitted.
+	implicit bool
 }
 
 func isModelRoutingEnabled(data *WorkflowData) bool {
@@ -28,7 +31,7 @@ func isModelRoutingEnabled(data *WorkflowData) bool {
 
 func applyModelRoutingEnv(env map[string]string, data *WorkflowData) {
 	if isModelRoutingEnabled(data) {
-		env["GH_AW_MODEL_ROUTING"] = "1"
+		env["GH_AW_MODEL_ROUTING"] = modelRoutingRuntimeFlag(data)
 	}
 }
 
@@ -132,55 +135,63 @@ func walkModelPatterns(request string, aliases map[string][]string, defaultProvi
 }
 
 func (c *Compiler) warnRoutedSubAgentModels(data *WorkflowData) {
-	if !isModelRoutingEnabled(data) {
-		return
+	for _, warning := range modelRoutingCompileWarnings(data) {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
+		c.IncrementWarningCount()
 	}
-	c.warnRoutedModelOverrides(data)
+}
+
+// modelRoutingCompileWarnings returns the compile-time warnings for a routed
+// main agent: fixed model overrides, allowed-models excluded by policy, and
+// sub-agent model compatibility.
+func modelRoutingCompileWarnings(data *WorkflowData) []string {
+	if !isModelRoutingEnabled(data) {
+		return nil
+	}
+	var warnings []string
+	if warning := modelRoutingOverrideWarning(data); warning != "" {
+		warnings = append(warnings, warning)
+	}
 	allowed, blocked := resolveModelPolicyForAWFConfig(data)
 	if groups, err := resolveModelRoutingCandidateGroups(data, data.EngineConfig.ID); err == nil && len(groups) > 0 {
 		_, excluded, err := intersectModelRoutingPolicy(groups, allowed, blocked, !apiProxySupportsRoutingCandidateModels(data))
 		if err == nil && len(excluded) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
-				"engine.model-routing.allowed-models entries excluded by models.allowed or models.blocked will not be selected: "+strings.Join(excluded, ", ")))
-			c.IncrementWarningCount()
+			warnings = append(warnings, "engine.model-routing.allowed-models entries excluded by models.allowed or models.blocked will not be selected: "+strings.Join(excluded, ", "))
 		}
 	}
 	if len(data.SubAgentModels) == 0 {
-		return
+		return warnings
 	}
 	namespace := modelRoutingNamespace(data, data.EngineConfig.ID)
 	for _, agent := range data.SubAgentModels {
 		for _, model := range expandSubagentModelPatterns(agent.Model, data, namespace) {
 			if !modelRoutingEngineSupportsModel(data.EngineConfig.ID, model) {
-				warning := fmt.Sprintf("sub-agent %q model %q may be incompatible with the %s engine's model-routing API", agent.Name, agent.Model, data.EngineConfig.ID)
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
-				c.IncrementWarningCount()
+				warnings = append(warnings, fmt.Sprintf("sub-agent %q model %q may be incompatible with the %s engine's model-routing API", agent.Name, agent.Model, data.EngineConfig.ID))
 				break
 			}
 		}
 	}
 	firewall := getFirewallConfig(data)
 	if !awfVersionAtLeast(firewall, constants.AWFRoutingCandidateModelsMinVersion) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
-			fmt.Sprintf("sub-agent models are limited to engine.model-routing.allowed-models with AWF %s; use AWF %s or newer to apply models.allowed and models.blocked instead",
-				getAWFImageTag(firewall), constants.AWFRoutingCandidateModelsMinVersion)))
-		c.IncrementWarningCount()
-		return
+		return append(warnings, fmt.Sprintf("sub-agent models are limited to engine.model-routing.allowed-models with AWF %s; use AWF %s or newer to apply models.allowed and models.blocked instead",
+			getAWFImageTag(firewall), constants.AWFRoutingCandidateModelsMinVersion))
 	}
 	if !apiProxySupportsRoutingCandidateModels(data) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
-			"sub-agent model routing requires an AWF apiProxy image with routing.candidateModels support (v0.28.33+); the configured image is older or its version is unknown. Pin a compatible image in sandbox.agent.images."))
-		c.IncrementWarningCount()
+		warnings = append(warnings, "sub-agent model routing requires an AWF apiProxy image with routing.candidateModels support (v0.28.33+); the configured image is older or its version is unknown. Pin a compatible image in sandbox.agent.images.")
 	}
-	for _, warning := range subAgentModelPolicyWarnings(data, allowed, blocked) {
+	return append(warnings, subAgentModelPolicyWarnings(data, allowed, blocked)...)
+}
+
+func (c *Compiler) warnRoutedModelOverrides(data *WorkflowData) {
+	if warning := modelRoutingOverrideWarning(data); warning != "" {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
 		c.IncrementWarningCount()
 	}
 }
 
-func (c *Compiler) warnRoutedModelOverrides(data *WorkflowData) {
+func modelRoutingOverrideWarning(data *WorkflowData) string {
 	if !isModelRoutingEnabled(data) {
-		return
+		return ""
 	}
 	var warnings []string
 	if data.Model != "" {
@@ -204,11 +215,9 @@ func (c *Compiler) warnRoutedModelOverrides(data *WorkflowData) {
 		}
 	}
 	if len(warnings) == 0 {
-		return
+		return ""
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
-		"model-routing selection overrides fixed model or effort settings: "+strings.Join(warnings, ", ")))
-	c.IncrementWarningCount()
+	return "model-routing selection overrides fixed model or effort settings: " + strings.Join(warnings, ", ")
 }
 
 func isModelRoutingOverrideEnvKey(key string) bool {
@@ -469,6 +478,9 @@ func generateModelRoutingConversationStep(yaml *strings.Builder, data *WorkflowD
 	promptFilePath := constants.AwPromptsUserFile
 	fallbackFilePath := constants.AwPromptsFile
 	yaml.WriteString("      - name: Prepare model-routing conversation\n")
+	if isModelRoutingRuntimeGuarded(data) {
+		yaml.WriteString("        if: " + modelRoutingActiveDownstream + "\n")
+	}
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_ROUTING_PROMPT: " + promptFilePath + "\n")
 	yaml.WriteString("          GH_AW_ROUTING_PROMPT_FALLBACK: " + fallbackFilePath + "\n")

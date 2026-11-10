@@ -81,6 +81,7 @@ type Compiler struct {
 	ownerTypeCache          map[string]string        // Cached GitHub owner type ("User"/"Organization"/"") keyed by owner login; not goroutine-safe (Compiler is used sequentially)
 	tipsShown               map[string]bool          // Tracks tip messages already emitted across workflows in this compiler instance
 	copilotTipNeeded        bool                     // Tracks whether batch output should include the copilot-requests enable tip
+	defaultRoutingCount     int                      // Counts workflows given the implicit model-routing default in batch mode
 	featureUsage            map[string]int           // Counts experimental feature usage across workflows in batch mode
 	permissionWarningShown  map[string]string        // Tracks markdown paths and last warning fingerprint (frontmatter hash when available, otherwise formatted warning text)
 	allowedDomainsCache     map[string]allowedDomain // Cached allowed-domains per markdown path with the frontmatter hash that produced it
