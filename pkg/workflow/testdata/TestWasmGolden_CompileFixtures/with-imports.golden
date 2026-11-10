@@ -659,7 +659,7 @@ jobs:
           GH_AW_SKILL_DIR: ".github/skills"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_inline_skills.sh"
       - name: Download container images
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-mcpg:MCPG_VERSION ghcr.io/github/gh-aw-node ghcr.io/github/github-mcp-server:GH_MCP_VERSION ghcr.io/github/gh-aw-firewall/agent:AWF_VERSION ghcr.io/github/gh-aw-firewall/api-proxy:AWF_VERSION ghcr.io/github/gh-aw-firewall/router:0.29.10 ghcr.io/github/gh-aw-firewall/squid:AWF_VERSION
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-mcpg:MCPG_VERSION ghcr.io/github/gh-aw-node ghcr.io/github/github-mcp-server:GH_MCP_VERSION ghcr.io/github/gh-aw-firewall/agent:AWF_VERSION ghcr.io/github/gh-aw-firewall/api-proxy:AWF_VERSION ghcr.io/github/gh-aw-firewall/router:AWF_VERSION ghcr.io/github/gh-aw-firewall/squid:AWF_VERSION
       - name: Prepare Safe Outputs Directories
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/safeoutputs"
