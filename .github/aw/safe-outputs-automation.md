@@ -18,8 +18,11 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
       target-repo: "owner/repo"       # Optional: cross-repository
   ```
 
-- `create-security-advisory:` - Create draft security advisories in the workflow repository. Requires an external `github-token` or `github-app` (per-output or global) with Repository security advisories write permission; `GITHUB_TOKEN` is not supported. The agent supplies `summary`, `description`, and `vulnerabilities`, plus optional `severity` and `cwe_ids`. Never publishes or creates private forks. Use a private workflow repository for confidential findings because payloads may appear in run logs and artifacts.
-- `add-security-advisory-comment:` - Comment on an existing advisory in the workflow repository using `ghsa_id` and `body`. Requires an external token or GitHub App with Repository security advisories write permission. Supports `max`, `footer`, and `staged`; never publishes or falls back to a public issue comment. The comments API is in public preview for public GitHub cloud repositories; comments follow advisory visibility.
+- `create-security-advisory:` - Create draft security advisories in the workflow repository. Requires an external `github-token` or `github-app` (per-output or global) with Repository security advisories write permission; `GITHUB_TOKEN` is not supported. The agent supplies `summary`, `description`, and `vulnerabilities`, plus optional `severity` and `cwe_ids`. Descriptions include standard attribution, detection warnings, execution metadata, and global body-footer policy within the 65000-character limit. Never publishes or creates private forks. Use a private workflow repository for confidential findings because payloads may appear in run logs and artifacts.
+- `add-security-advisory-comment:` - Comment on an existing advisory in the workflow repository using `ghsa_id` and `body`. Requires an external token or GitHub App with Repository security advisories write permission. Supports `max`, `footer`, and `staged`; never publishes or falls back to a public issue comment. Verify endpoint availability on the target installation; comments follow advisory visibility.
+
+  Both advisory outputs preview complete prepared requests in staged-mode logs and step summaries, with secret values redacted and no credentials or API writes. Their `max` defaults to 1 (literal range 1–10); expressions resolving to `-1` remain unlimited. Failed API attempts consume the limit and are not retried automatically.
+
 - `update-release:` - Update GitHub release descriptions. Agent-generated release notes and release-description changes must use this safe output; never perform those mutations directly with `gh`, the GitHub API, or a GitHub write tool.
 
   ```yaml

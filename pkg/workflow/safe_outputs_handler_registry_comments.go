@@ -9,6 +9,9 @@ var commentHandlerRegistry = map[string]handlerBuilder{
 		c := cfg.AddSecurityAdvisoryComment
 		return newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
+			AddDefault("inputs", map[string]any{
+				"body": map[string]any{"maxLength": 65000},
+			}).
 			AddIfNotEmpty("github-token", resolveSecurityAdvisoryGitHubToken(cfg, "add-security-advisory-comment", &c.BaseSafeOutputConfig)).
 			AddTemplatableBool("footer", getEffectiveFooterForTemplatable(c.Footer, cfg.Footer)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).

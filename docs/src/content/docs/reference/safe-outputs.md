@@ -163,8 +163,8 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | [Update Project](#project-board-updates-update-project) | `update-project` | Manage GitHub Projects boards (max: 10, same-repo only) |
 | [Create Project Status Update](#project-status-updates-create-project-status-update) | `create-project-status-update` | Create project status updates |
 | [Update Release](#release-updates-update-release) | `update-release` | Update GitHub release descriptions; requires an existing GitHub Release, not just a Git tag (max: 1) |
-| [Create Security Advisory](#security-advisory-drafts-create-security-advisory) | `create-security-advisory` | Create draft repository security advisories with an external token (max: 1) |
-| [Add Security Advisory Comment](#security-advisory-comments-add-security-advisory-comment) | `add-security-advisory-comment` | Comment on an existing repository security advisory with an external token (max: 1) |
+| [Create Security Advisory](#security-advisory-drafts-create-security-advisory) | `create-security-advisory` | Create draft repository security advisories with an external token or GitHub App (max: 1) |
+| [Add Security Advisory Comment](#security-advisory-comments-add-security-advisory-comment) | `add-security-advisory-comment` | Comment on an existing repository security advisory with an external token or GitHub App (max: 1) |
 | [Upload Artifact](#artifact-uploads-upload-artifact) | `upload-artifact` | Upload files as run-scoped GitHub Actions artifacts (max: 1 by default) |
 | [Upload Assets](#asset-uploads-upload-asset) | `upload-asset` | Upload files to orphaned git branch (max: 10, same-repo only). **Prefer `upload-artifact` with `skip-archive` instead.** |
 
@@ -1346,9 +1346,21 @@ safe-outputs:
     max: 1
 ```
 
-`GITHUB_TOKEN` cannot create draft advisories. Configure an external `github-token` on this output or globally under `safe-outputs` (use a per-output token when a global `github-app` is also configured). The pinned GitHub App token action does not expose a Repository security advisories permission input, so `github-app` cannot mint a token with the required permission for these outputs. Fine-grained tokens need **Repository security advisories: write** access; classic personal access tokens need the `repo` or `repository_advisories:write` scope. The authenticated user must be a repository administrator or security manager. See [GitHub's advisory creation API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-security-advisory).
+`GITHUB_TOKEN` cannot create draft advisories. Configure `github-token` or `github-app` on this output or globally under `safe-outputs`. Fine-grained tokens and GitHub App installations need **Repository security advisories: write** access to the repository. Classic personal access tokens need the `repo` or `repository_advisories:write` scope, and the authenticated user must be a repository administrator or security manager. See [GitHub's advisory creation API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-security-advisory).
 
-Agent calls `create_security_advisory` with required `summary` (1–1024 characters), `description` (1–65000 characters), and `vulnerabilities` (1–100 entries). Each vulnerability requires `package.ecosystem` and optionally accepts `package.name`, `vulnerable_version_range`, `patched_versions`, and `vulnerable_functions`. Optional top-level fields are `severity` (`critical`, `high`, `medium`, `low`) and `cwe_ids` (for example `["CWE-79"]`). The result contains the created advisory's `ghsa_id` and URL. `max` defaults to 1 (maximum 10); `staged: true` previews the complete sanitized request without credentials or API writes.
+```yaml wrap
+safe-outputs:
+  create-security-advisory:
+    github-app:
+      client-id: ${{ vars.ADVISORY_APP_ID }}
+      private-key: ${{ secrets.ADVISORY_APP_PRIVATE_KEY }}
+```
+
+The compiler scopes the App token to `repository-advisories: write` in the trusted safe-output job; it does not grant this permission to the agent or the Actions token.
+
+Agent calls `create_security_advisory` with required `summary` (1–1024 characters), `description` (1–65000 characters), and `vulnerabilities` (1–100 entries). Each vulnerability requires `package.ecosystem` and optionally accepts `package.name`, `vulnerable_version_range`, `patched_versions`, and `vulnerable_functions`. Optional top-level fields are `severity` (`critical`, `high`, `medium`, `low`) and `cwe_ids` (for example `["CWE-79"]`). The result contains the created advisory's `ghsa_id` and URL. The sanitized description includes standard AI attribution, detection warnings, execution metadata, and global `safe-outputs.body-footer` policy text; the complete description is fitted to 65000 characters while preserving required framework content.
+
+`max` defaults to 1 (literal range 1–10); expressions resolving to `-1` retain the standard unlimited behavior. Each attempted API write consumes the limit, including failed requests; the handler does not retry automatically. `staged: true` previews the complete prepared request in logs and the step summary, with secret values redacted, without credentials or API writes.
 
 > [!CAUTION]
 > A private draft does not make the workflow run private. Agent prompts, safe-output payloads, logs, and artifacts may contain advisory details. Use a private workflow repository and restrict access to its runs and artifacts when processing confidential findings.
@@ -1364,12 +1376,12 @@ safe-outputs:
     max: 1
 ```
 
-Authentication follows [security advisory drafts](#security-advisory-drafts-create-security-advisory): an external token with **Repository security advisories: write** is required, configured per-output or globally. `github-app` and `GITHUB_TOKEN` are not supported. The authenticated user must be an advisory collaborator, repository administrator, or security manager.
+Authentication follows [security advisory drafts](#security-advisory-drafts-create-security-advisory): an external token or GitHub App with **Repository security advisories: write** is required, configured per-output or globally. `GITHUB_TOKEN` is not supported. The authenticated user must be an advisory collaborator, repository administrator, or security manager.
 
-`max` defaults to 1 (maximum 10). `footer: false` disables visible AI attribution; required metadata remains. `staged: true` previews the complete sanitized request, including the rendered body, without credentials or API writes. Global `safe-outputs.body-footer` policy text also applies.
+`max` defaults to 1 (literal range 1–10); expressions resolving to `-1` retain the standard unlimited behavior. Each attempted API write consumes the limit, including failed requests; the handler does not retry automatically. `footer: false` disables visible AI attribution; detection warnings and required metadata remain. `staged: true` previews the complete prepared request in logs and the step summary, with secret values redacted, without credentials or API writes. Global `safe-outputs.body-footer` policy text also applies.
 
 > [!IMPORTANT]
-> The [advisory comments API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-advisory-comment) is in public preview for public repositories on supported GitHub cloud plans. Availability on private repositories or GitHub Enterprise Server is not assumed. Comments follow the advisory's visibility, and workflow logs and artifacts may contain their contents.
+> The [advisory comments API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-advisory-comment) requires access to the advisory and advisory-write permission. Verify endpoint availability on the target installation, particularly GitHub Enterprise Server versions. Comments follow the advisory's visibility, and workflow logs and artifacts may contain their contents.
 
 ### Release Updates (`update-release:`)
 

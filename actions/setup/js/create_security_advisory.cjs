@@ -4,9 +4,12 @@
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { sanitizeTitle } = require("./sanitize_title.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { buildIssueBodyReport } = require("./issue_body.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
+const { parseBoolTemplatable } = require("./templatable.cjs");
 const { validateValueAgainstSchema } = require("./schema-validation.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { logStagedPreviewInfo } = require("./staged_preview.cjs");
+const { previewSecurityAdvisory } = require("./security_advisory_preview.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const tools = require("./safe_outputs_tools.json");
 
@@ -53,32 +56,40 @@ function advisoryPayload(message) {
 /** @type {import('./types/handler-factory').HandlerFactoryFunction} */
 async function main(config = {}) {
   const staged = isStagedMode(config);
-  const max = Number(config.max ?? 1);
-  if (!Number.isSafeInteger(max) || max < 1) {
-    throw new Error(`${ERR_CONFIG}: create_security_advisory max must be a positive integer`);
-  }
   if (!staged && (typeof config["github-token"] !== "string" || !config["github-token"].trim())) {
-    throw new Error(`${ERR_CONFIG}: create_security_advisory requires an external github-token with Repository security advisories write permission; GITHUB_TOKEN is not supported`);
+    throw new Error(`${ERR_CONFIG}: create_security_advisory requires an external github-token or GitHub App token with Repository security advisories write permission; GITHUB_TOKEN is not supported`);
   }
   const githubClient = staged ? null : await createAuthenticatedGitHubClient(config);
+  const configuredMax = Number(config.max ?? 1);
+  if (!Number.isSafeInteger(configuredMax) || (configuredMax !== -1 && configuredMax < 1)) {
+    throw new Error(`${ERR_CONFIG}: create_security_advisory max must be a positive integer or -1`);
+  }
+  const max = configuredMax === -1 ? Infinity : configuredMax;
   let processedCount = 0;
 
   return async function handleCreateSecurityAdvisory(message) {
-    const payload = advisoryPayload(message);
     if (processedCount >= max) {
       return { success: false, skipped: true, reasonCode: "MAX_COUNT_REACHED", error: `Max count of ${max} reached` };
     }
-    const request = { ...context.repo, ...payload, private_fork: false };
+    const payload = advisoryPayload(message);
+    const report = buildIssueBodyReport("Security advisory draft", payload.description, {
+      repo: context.repo,
+      footer: parseBoolTemplatable(config.footer, true),
+      bodyFooter: config.body_footer,
+      workflowIdMarker: false,
+    });
+    payload.description = renderSizedReport(report, 65000).body;
+    // The create endpoint always creates a draft. Never forward state, repository,
+    // or private-fork controls from the agent.
+    const request = { ...context.repo, ...payload, start_private_fork: false };
+    // Reserve each attempted write, even if its response fails or is malformed.
+    processedCount++;
     if (staged) {
-      processedCount++;
-      logStagedPreviewInfo(`Would create a draft security advisory with request:\n${JSON.stringify(request, null, 2)}`);
+      await previewSecurityAdvisory("Create Security Advisory", "The following draft security advisory would be created if staged mode was disabled (secrets redacted):", request);
       return { success: true, staged: true };
     }
     try {
-      // The create endpoint always creates a draft. Never forward state, repository,
-      // or private-fork controls from the agent.
       const { data } = await githubClient.rest.securityAdvisories.createRepositoryAdvisory(request);
-      processedCount++;
       if (data.state !== "draft" || typeof data.ghsa_id !== "string" || typeof data.html_url !== "string") {
         throw new Error(`${ERR_API}: GitHub did not return a draft security advisory`);
       }
