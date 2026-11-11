@@ -2,7 +2,7 @@
 // @safe-outputs-exempt SEC-004
 /// <reference types="@actions/github-script" />
 
-const { getErrorMessage } = require("./error_helpers.cjs");
+const { getErrorMessage, getErrorStatus } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { getBaseBranch } = require("./get_base_branch.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
@@ -131,11 +131,13 @@ async function main(config = {}) {
       return { success: true, id: taskId, url: taskUrl };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+      const errorStatus = getErrorStatus(error);
+      const isAuthError = errorStatus === 401 || errorStatus === 403 || (errorStatus == null && (errorMessage.includes("authentication") || errorMessage.includes("permission") || errorMessage.includes("forbidden")));
 
       // Check for authentication/permission errors
       if (isTokenBrokerEnabled()) {
         core.error(`Error creating agent session: ${errorMessage}`);
-      } else if (errorMessage.includes("authentication") || errorMessage.includes("permission") || errorMessage.includes("forbidden") || errorMessage.includes("401") || errorMessage.includes("403")) {
+      } else if (isAuthError) {
         core.error(`Failed to create agent session due to authentication/permission error.`);
         core.error(`The default GITHUB_TOKEN may not have permission to create agent sessions.`);
         core.error(`Configure a Personal Access Token (PAT) using the handler's github-token setting or GH_AW_AGENT_SESSION_TOKEN.`);

@@ -47,31 +47,88 @@ engine:
 max-tool-denials: 3
 name: Delight
 pre-agent-steps:
+- name: Setup Go
+  uses: actions/setup-go@v7.0.0
+  with:
+    go-version-file: go.mod
+    cache: true
+- name: Build CLI and pre-collect help output
+  run: |
+    set -euo pipefail
+    go build -o ./gh-aw ./cmd/gh-aw
+    output_dir=/tmp/gh-aw/agent/help-output
+    mkdir -p "$output_dir"
+    ./gh-aw --help > "$output_dir/main.txt" 2>&1
+    ./gh-aw compile --help > "$output_dir/compile.txt" 2>&1
+    ./gh-aw run --help > "$output_dir/run.txt" 2>&1
+    for command in main compile run; do
+      if [[ ! -s "$output_dir/$command.txt" ]]; then
+        echo "Missing CLI help output: $command" >&2
+        exit 1
+      fi
+    done
 - name: Sample files and load memory
   run: |
+    set -euo pipefail
+    export LC_ALL=C
     mkdir -p /tmp/gh-aw/agent
+    sample_files() {
+      local count="$1" output="$2" status
+      shift 2
+      # Materialize candidates to avoid SIGPIPE and preserve producer errors.
+      if "$@" > "${output}.candidates"; then
+        :
+      else
+        status=$?
+        # grep returns 1 for an empty match set, not an I/O failure.
+        if [[ "$1" != grep || "$status" -ne 1 ]]; then
+          return "$status"
+        fi
+      fi
+      shuf -n "$count" "${output}.candidates" > "$output"
+    }
     # Sample documentation files (eliminates agent exploratory find turns)
-    find docs/src/content/docs \( -name '*.md' -o -name '*.mdx' \) | shuf -n 2 > /tmp/gh-aw/agent/doc-samples.txt
+    sample_files 2 /tmp/gh-aw/agent/doc-samples.txt find docs/src/content/docs \( -name '*.md' -o -name '*.mdx' \)
     # Sample workflows with messages (pre-compute instead of agent grep)
-    grep -rl "messages:" .github/workflows/ --include="*.md" | shuf -n 2 > /tmp/gh-aw/agent/workflow-samples.txt
+    sample_files 2 /tmp/gh-aw/agent/workflow-samples.txt grep -rl "messages:" .github/workflows/ --include="*.md"
     # Sample validation files
-    find pkg -name '*validation*.go' | shuf -n 1 > /tmp/gh-aw/agent/validation-sample.txt || echo "No validation files found" > /tmp/gh-aw/agent/validation-sample.txt
+    sample_files 1 /tmp/gh-aw/agent/validation-sample.txt find pkg -name '*validation*.go'
     # Load historical memory (eliminates agent memory-read turns)
-    cat memory/delight/previous-findings.json 2>/dev/null > /tmp/gh-aw/agent/previous-findings.json || echo "[]" > /tmp/gh-aw/agent/previous-findings.json
-    cat memory/delight/improvement-themes.json 2>/dev/null > /tmp/gh-aw/agent/improvement-themes.json || echo "[]" > /tmp/gh-aw/agent/improvement-themes.json
+    memory_dir=/tmp/gh-aw/repo-memory/default
+    if [[ -e "$memory_dir" || -L "$memory_dir" ]]; then
+      if [[ ! -d "$memory_dir" || ! -r "$memory_dir" || ! -x "$memory_dir" ]]; then
+        echo "Cannot read restored memory directory: $memory_dir" >&2
+        exit 1
+      fi
+    fi
+    shopt -s nullglob
+    findings_files=("$memory_dir"/findings-????-??-??.json)
+    if [[ "${#findings_files[@]}" -gt 0 ]]; then
+      cat "${findings_files[${#findings_files[@]}-1]}" > /tmp/gh-aw/agent/previous-findings.json
+    else
+      echo "No dated findings history; starting fresh"
+      printf '[]\n' > /tmp/gh-aw/agent/previous-findings.json
+    fi
+    if [[ -e "$memory_dir/improvements.json" || -L "$memory_dir/improvements.json" ]]; then
+      cat "$memory_dir/improvements.json" > /tmp/gh-aw/agent/improvements.json
+    else
+      echo "No improvements.json history; starting fresh"
+      printf '[]\n' > /tmp/gh-aw/agent/improvements.json
+    fi
     # Pre-read file contents (eliminates view/read tool denials)
-    xargs -a /tmp/gh-aw/agent/doc-samples.txt cat > /tmp/gh-aw/agent/doc-samples-content.txt 2>/dev/null || echo "(no doc samples found)" > /tmp/gh-aw/agent/doc-samples-content.txt
-    xargs -a /tmp/gh-aw/agent/workflow-samples.txt cat > /tmp/gh-aw/agent/workflow-samples-content.txt 2>/dev/null || echo "(no workflow samples found)" > /tmp/gh-aw/agent/workflow-samples-content.txt
-    xargs -a /tmp/gh-aw/agent/validation-sample.txt cat > /tmp/gh-aw/agent/validation-sample-content.txt 2>/dev/null || echo "(no validation sample found)" > /tmp/gh-aw/agent/validation-sample-content.txt
+    for sample in doc-samples workflow-samples validation-sample; do
+      while IFS= read -r file; do
+        cat "$file"
+      done < "/tmp/gh-aw/agent/$sample.txt" > "/tmp/gh-aw/agent/$sample-content.txt"
+    done
 strict: true
 timeout-minutes: 30
 tools:
   bash:
   - find docs/src/content/docs -name "*.md" -o -name "*.mdx"
   - find .github/workflows -name "*.md"
-  - ./gh-aw --help
-  - ./gh-aw * --help
   - cat /tmp/gh-aw/agent/*
+  - cat /tmp/gh-aw/agent/help-output/*
   - cat docs/src/content/docs/*.md
   - cat docs/src/content/docs/*.mdx
   - cat .github/workflows/*.md
@@ -100,6 +157,17 @@ features:
 {{#runtime-import? .github/shared-instructions.md}}
 
 # Delight Agent 📊
+
+Use one standalone command per call. Do not prepend `cd` or append commands,
+redirections, or pipelines to the commands shown below. Use built-in file
+inspection tools to read source and historical memory; the effective shell
+defaults also permit standalone `cat`, `ls`, `grep`, and `head`.
+
+On the first tool denial, stop that operation and switch to a known permitted
+alternative. Do not probe with `which`, Python, or another directory-changing
+command. A workflow tool denial is not a GitHub authentication error; do not
+request new credentials or broader permissions. If required work is blocked,
+call `report_incomplete` before exhausting the three-denial budget.
 
 You are the Delight Agent - a user experience specialist focused on improving clarity, usability, and professionalism in **enterprise software** context. While "delight" traditionally evokes consumer-focused experiences, in enterprise software it means: **clear documentation, efficient workflows, predictable behavior, and professional communication**.
 
@@ -193,14 +261,22 @@ cat /tmp/gh-aw/agent/doc-samples-content.txt
 
 ### 2. CLI Experience (1-2 Commands)
 
-**Select 1-2 high-impact CLI commands:**
+**Review pre-collected help for 1-2 high-impact CLI commands:**
 
 ```bash
-# Get help output for commonly used commands
-./gh-aw --help | grep -E "^  [a-z]" | shuf -n 2
+cat /tmp/gh-aw/agent/help-output/main.txt
 ```
 
-For each selected command, run `./gh-aw [command] --help` and evaluate:
+Choose one or both of the prepared help files below, each in a separate call.
+The CLI was built and its help collected before agent execution; do not discover
+or execute the binary:
+
+```bash
+cat /tmp/gh-aw/agent/help-output/compile.txt
+cat /tmp/gh-aw/agent/help-output/run.txt
+```
+
+Evaluate the selected help output:
 
 #### Quality Factors
 - ✅ **Clear purpose**: Is the description precise and informative?
@@ -276,11 +352,12 @@ Review error messages in the selected file:
 
 ### Step 1: Load Historical Memory
 
-Historical memory has been pre-loaded for this run:
+The latest dated findings (by filename) and `improvements.json` from Step 7 have
+been pre-loaded for this run. Empty arrays indicate a normal cold start:
 
 ```bash
 cat /tmp/gh-aw/agent/previous-findings.json
-cat /tmp/gh-aw/agent/improvement-themes.json
+cat /tmp/gh-aw/agent/improvements.json
 ```
 
 ### Step 2: Targeted Selection
@@ -441,13 +518,16 @@ Here are 1-2 targeted improvement tasks, each affecting a single file:
 
 ### Step 7: Update Memory
 
-Save findings to repo-memory:
+Save findings with built-in edit tools, using the actual restored repo-memory
+directory, not the branch name `memory/delight`. Do not use `cd`, shell
+redirection, or Python to write or validate memory JSON. Use concrete UTC date
+strings and valid JSON values, not the illustrative placeholders below.
 
-```bash
-# Update findings log
-cat > memory/delight/findings-$(date +%Y-%m-%d).json << 'EOF'
+Write `/tmp/gh-aw/repo-memory/default/findings-<YYYY-MM-DD>.json`:
+
+```json
 {
-  "date": "$(date -I)",
+  "date": "<YYYY-MM-DD>",
   "files_analyzed": {
     "documentation": [...],
     "cli": [...],
@@ -464,12 +544,13 @@ cat > memory/delight/findings-$(date +%Y-%m-%d).json << 'EOF'
     }
   ]
 }
-EOF
+```
 
-# Update improvement tracking
-cat > memory/delight/improvements.json << 'EOF'
+Update `/tmp/gh-aw/repo-memory/default/improvements.json`:
+
+```json
 {
-  "last_updated": "$(date -I)",
+  "last_updated": "<YYYY-MM-DD>",
   "pending_tasks": [
     {
       "file": "path/to/file.ext",
@@ -478,7 +559,6 @@ cat > memory/delight/improvements.json << 'EOF'
     }
   ]
 }
-EOF
 ```
 
 ## Important Guidelines
