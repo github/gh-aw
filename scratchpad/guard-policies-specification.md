@@ -1,7 +1,7 @@
 ---
 title: Guard Policies Integration Specification
 description: Formal specification for the guard policies framework in the MCP Gateway
-version: 0.1.0
+version: 0.2.0
 status: Implemented (compiler-side)
 sidebar:
   order: 1450
@@ -13,7 +13,7 @@ sidebar:
 
 This document specifies the implemented compiler-side guard-policy integration for the MCP Gateway, starting with GitHub-specific policies. The compiler validates GitHub policy fields and derives gateway and safe-output configuration; runtime enforcement is provided by the external MCP Gateway and is not implemented in this repository.
 
-**Version**: 0.1.0  
+**Version**: 0.2.0<br>
 **Status**: Implemented (compiler-side; runtime enforcement is external)
 **Date**: 2026-06-21
 
@@ -141,11 +141,11 @@ Runtime precedence is defined by the canonical [Evaluation Order](#41-evaluation
 
 The MCP Gateway MUST evaluate access in this order:
 
-1. `lockdown: true` takes absolute precedence and denies the invocation; `allowed-repos` and `min-integrity` MUST NOT be evaluated.
+1. `lockdown: true` takes absolute precedence and restricts access to the triggering repository. Guard-policy fields MUST NOT be evaluated for authorization while lockdown is active.
 2. When lockdown is not enabled, `allowed-repos` determines whether the target repository is in scope.
 3. When the repository is in scope, `min-integrity` determines whether the content meets the required integrity level. Both checks MUST pass to allow the invocation.
 
-Lockdown is an emergency security stop and MUST NOT be weakened by guard policies; those policies narrow access in an otherwise-open tool session but never grant access revoked by lockdown.
+Lockdown is an emergency scope restriction and MUST NOT be weakened by guard policies. Its presence does not by itself deny an invocation to the triggering repository. The compiler still validates configured guard-policy fields and warns when lockdown and those fields are combined.
 
 ### 5. Safe Outputs Integration
 
@@ -294,8 +294,9 @@ Workflow frontmatter is parsed into `GitHubToolConfig`, validated in `pkg/workfl
 - Case-sensitive
 
 **Required Fields:**
-- `min-integrity` is required when using GitHub guard policies
-- `allowed-repos` defaults to `"all"` if not specified
+- `min-integrity` is required when `allowed-repos` is explicitly configured. If only `min-integrity` is set, `allowed-repos` defaults to `"all"`.
+- `blocked-users`, `trusted-users`, and `approval-labels` also require `min-integrity`.
+- Validation is implemented in `pkg/workflow/tools_validation_github.go` (`validateGitHubGuardPolicy`).
 
 ## Error Messages
 
@@ -367,7 +368,7 @@ tools:
 
 1. **Unit Tests** (Complete):
    - `TestValidateGitHubGuardPolicy`: 14 cases covering valid/invalid repos values, invalid min-integrity, missing fields
-   - `TestValidateReposScopeWithStringSlice`: 4 cases covering `[]string` and `[]any` input types
+   - `TestValidateReposScope`: 4 cases covering `[]string` repo scopes
    - Tests live in `pkg/workflow/tools_validation_test.go`
 
 2. **Integration Tests** (Complete):
@@ -480,7 +481,7 @@ Any value outside the four literals above MUST be rejected with a compilation er
 |---|---|---|---|---|
 | `AllowedRepos` | `allowed-repos` | `GitHubReposScope` | No | Repository access scope. Defaults to `"all"` when `min-integrity` is present. |
 | `Repos` | `repos` | `GitHubReposScope` | No | **Deprecated** alias for `allowed-repos`. |
-| `MinIntegrity` | `min-integrity` | `GitHubIntegrityLevel` | Conditionally | Required whenever `allowed-repos` is explicitly configured, including `allowed-repos: "all"`. |
+| `MinIntegrity` | `min-integrity` | `GitHubIntegrityLevel` | Conditionally | Required when `allowed-repos` is explicitly configured, including `allowed-repos: "all"`; also required by `blocked-users`, `trusted-users`, and `approval-labels`. |
 
 Implementations MUST ensure `AllowedRepos` and `Repos` are not both set simultaneously; if both are present, implementations SHOULD error or use `AllowedRepos` and warn.
 
@@ -518,9 +519,9 @@ A conforming implementation of the guard policies framework **MUST** satisfy all
 
 **GP-09**: Implementations SHOULD emit a debug-level log message when a guard policy is derived, identifying the source `allowed-repos` value and the resulting `accept` list.
 
-**GP-10**: When `lockdown: true` is set in the same workflow, implementations MUST treat `lockdown` as taking absolute precedence. Guard policy fields (`allowed-repos`, `min-integrity`) MUST NOT widen access beyond the single triggering repository when lockdown is active. The compiler SHOULD emit a warning when both `lockdown: true` and guard policy fields are present.
+**GP-10**: When `lockdown: true` is set in the same workflow, the MCP Gateway MUST restrict access to the triggering repository and MUST ignore guard-policy fields (`allowed-repos`, `min-integrity`) for authorization. Those fields MUST NOT widen access or independently deny an invocation to the triggering repository. The compiler MUST continue validating configured fields and SHOULD emit a warning when lockdown and guard-policy fields are both present. Compiler validation and warning behavior are implemented in `pkg/workflow/tools_validation_github.go`.
 
-**GP-11**: When `allowed-repos` is configured explicitly, implementations MUST require `min-integrity` to be present. This requirement applies to every explicit repository scope, including `allowed-repos: "all"`, `allowed-repos: "public"`, the expression `"${{ github.repository }}"`, and explicit pattern arrays. Implementations MUST NOT accept any explicit `allowed-repos` value without `min-integrity`.
+**GP-11**: When `allowed-repos` is configured explicitly, implementations MUST require `min-integrity` to be present. This requirement applies to every explicit repository scope, including `allowed-repos: "all"`, `allowed-repos: "public"`, the expression `"${{ github.repository }}"`, and explicit pattern arrays. Implementations MUST NOT accept any explicit `allowed-repos` value without `min-integrity`. When `allowed-repos` is omitted but `min-integrity` is set, implementations MUST default `allowed-repos` to `"all"`. `blocked-users`, `trusted-users`, and `approval-labels` also require `min-integrity`. These rules are implemented by `validateGitHubGuardPolicy()` in `pkg/workflow/tools_validation_github.go` and covered by `TestValidateGitHubGuardPolicy` in `pkg/workflow/tools_validation_test.go`.
 
 ---
 
@@ -534,13 +535,12 @@ Implementations MUST reject an empty `allowed-repos` array (`allowed-repos: []`)
 
 ### GP-S002: Lockdown Supremacy
 
-When `lockdown: true` is present on the same workflow, guard policy fields (`allowed-repos`, `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels`) MUST NOT be evaluated for access-widening purposes. Implementations MUST treat lockdown as taking absolute precedence and MUST NOT combine lockdown with guard policies in any way that permits access beyond the single triggering repository.
+When `lockdown: true` is present on the same workflow, the MCP Gateway MUST restrict access to the triggering repository and MUST ignore guard-policy fields (`allowed-repos`, `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels`) for authorization. Those fields MUST NOT widen access or independently deny an invocation to the triggering repository. The compiler MUST continue validating configured fields.
 
-**Shared precedence rule**: `lockdown: true` takes absolute precedence over `allowed-repos`, including non-empty allowlists, and over `min-integrity`; implementations MUST ignore those guard-policy fields for authorization while lockdown is active and MUST NOT allow them to widen access beyond the triggering repository.
+The compiler MUST emit a warning when lockdown and guard-policy fields are both configured. `validateGitHubGuardPolicy()` implements the validation and warning behavior in `pkg/workflow/tools_validation_github.go`.
 
 See also: [github-mcp-access-control-specification.md §9.5.1](github-mcp-access-control-specification.md#951-precedence-rule).
 
-Implementations MUST emit a compilation warning when both `lockdown: true` and any guard-policy field are present simultaneously, because the combination is almost certainly a misconfiguration (the guard-policy fields become inert).
 
 ### GP-S003: Cross-Field Consistency
 
@@ -643,6 +643,10 @@ When the extensibility model for future MCP servers (Jira, WorkIQ) changes:
 3. Document the new policy type in this specification under a new `### Entity:` subsection in [§Entities](#entities).
 
 ## Change Log
+
+### Version 0.2.0
+
+- Records `repos` as a deprecated alias for `allowed-repos`; issue [#44357](https://github.com/github/gh-aw/issues/44357) tracks removal.
 
 ### 2026-11-04
 
