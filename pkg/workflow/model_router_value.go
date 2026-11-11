@@ -74,7 +74,7 @@ func routerModelMode(field, model string) (string, error) {
 		}
 		return entry.mode, nil
 	}
-	return "", NewValidationError(field, model, "unknown router value",
+	return "", NewValidationError(field, model, "unknown router value (router values are case-sensitive)",
 		"Use one of: "+validRouterModelValues()+".")
 }
 
@@ -157,8 +157,8 @@ func validateRouterModelValuePlacement(data *WorkflowData) error {
 	}
 	slices.Sort(keys)
 	for _, key := range keys {
-		if strings.EqualFold(key, "router") {
-			return NewValidationError("models."+key, key, "router is reserved and cannot be defined as a model alias",
+		if isReservedRouterModelName(key) {
+			return NewValidationError("models."+key, key, "router and the router/* namespace are reserved and cannot be defined as model aliases",
 				"Rename the alias. To route the main agent, set model: router (or router/economy, router/balanced, router/robust).")
 		}
 		for _, entry := range data.ModelMappings[key] {

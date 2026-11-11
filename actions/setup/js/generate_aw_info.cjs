@@ -15,20 +15,6 @@ const { normalizeWebhookContext } = require("./webhook_context.cjs");
 const { isRouterModelValue, normalizeEngineHarness, parseCompiledModelConfig, ROUTER_MODEL_VALUES } = require("./routing_analytics.cjs");
 
 /**
- * Whether the compiled model configuration routes the main agent for this run.
- * @param {string | undefined} rawConfig GH_AW_INFO_MODEL_CONFIG
- * @returns {boolean}
- */
-function compiledRoutingEnabled(rawConfig) {
-  if (!rawConfig) return false;
-  try {
-    return JSON.parse(rawConfig)?.routing?.enabled === true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Generate aw_info.json with workflow run metadata.
  * Reads compile-time values from environment variables (GH_AW_INFO_*) and
  * runtime values from the GitHub Actions context. Validates required context
@@ -91,6 +77,8 @@ async function main(core, ctx, githubClient) {
     throw new Error(message);
   }
 
+  const modelConfig = parseCompiledModelConfig(process.env.GH_AW_INFO_MODEL_CONFIG, process.env.GH_AW_INFO_MAX_AI_CREDITS, message => core.warning(message));
+
   // A router value (router, router/economy, ...) chooses model routing; it is not a
   // model name. Router values are accepted only when written in the workflow, where
   // the compiler turns them into routing. When the main agent's model is not routed
@@ -99,7 +87,7 @@ async function main(core, ctx, githubClient) {
   // expression resolves empty, the harness uses the model-variable fallback
   // (GH_AW_INFO_MODEL_FALLBACK mirrors GH_AW_MODEL_FALLBACK), so check that value.
   const effectiveModel = model.trim() || (process.env.GH_AW_INFO_MODEL_FALLBACK || "").trim();
-  if (isRouterModelValue(effectiveModel) && !compiledRoutingEnabled(process.env.GH_AW_INFO_MODEL_CONFIG)) {
+  if (isRouterModelValue(effectiveModel) && modelConfig?.routing?.enabled !== true) {
     const message =
       `${ERR_CONFIG}: the main agent's model resolved to the router value ${JSON.stringify(effectiveModel)} at run time. ` +
       `Router values (${[...ROUTER_MODEL_VALUES].join(", ")}) must be written in the workflow's model or engine.model and are not accepted from expressions or variables such as vars.GH_AW_MODEL_AGENT_<ENGINE> or vars.GH_AW_DEFAULT_MODEL_<ENGINE>. ` +
@@ -235,7 +223,6 @@ async function main(core, ctx, githubClient) {
     awInfo.server_url = serverUrl;
   }
   // Configured routing, model policy and budget, published even when routing is disabled or later fails.
-  const modelConfig = parseCompiledModelConfig(process.env.GH_AW_INFO_MODEL_CONFIG, process.env.GH_AW_INFO_MAX_AI_CREDITS, message => core.warning(message));
   if (modelConfig) {
     awInfo.model_config = modelConfig;
   }

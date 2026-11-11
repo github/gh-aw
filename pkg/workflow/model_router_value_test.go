@@ -166,7 +166,7 @@ func TestCompileRouterModelValue_Rejected(t *testing.T) {
 		{name: "router/auto", files: map[string]string{"main.md": routerValueBase + "model: router/auto\nengine: copilot\n---\nReport.\n"},
 			wantError: []string{"unknown router value", "router, router/economy, router/balanced, router/robust"}},
 		{name: "router/Economy", files: map[string]string{"main.md": routerValueBase + "model: router/Economy\nengine: copilot\n---\nReport.\n"},
-			wantError: []string{"unknown router value", "router, router/economy, router/balanced, router/robust"}},
+			wantError: []string{"unknown router value", "router values are case-sensitive", "router, router/economy, router/balanced, router/robust"}},
 		{name: "unknown router value in engine.model", files: map[string]string{"main.md": routerValueBase + "engine:\n  id: copilot\n  model: router/fast\n---\nReport.\n"},
 			wantError: []string{"unknown router value"}},
 		{name: "effort parameter", files: map[string]string{"main.md": routerValueBase + "model: router/economy?effort=high\nengine: copilot\n---\nReport.\n"},
@@ -200,7 +200,9 @@ func TestCompileRouterModelValue_Rejected(t *testing.T) {
 		{name: "models alias entry", files: map[string]string{"main.md": routerValueBase + "engine: copilot\nmodels:\n  cheap: [router/economy]\n---\nReport.\n"},
 			wantError: []string{"router values are not models", "models.cheap"}},
 		{name: "models alias named router", files: map[string]string{"main.md": routerValueBase + "engine: copilot\nmodels:\n  router: [gpt-5.6-luna]\n---\nReport.\n"},
-			wantError: []string{"router is reserved and cannot be defined as a model alias"}},
+			wantError: []string{"router and the router/* namespace are reserved and cannot be defined as model aliases"}},
+		{name: "mixed-case models alias named router", files: map[string]string{"main.md": routerValueBase + "engine: copilot\nmodels:\n  Router: [gpt-5.6-luna]\n---\nReport.\n"},
+			wantError: []string{"router and the router/* namespace are reserved and cannot be defined as model aliases"}},
 		{name: "gemini", files: map[string]string{"main.md": routerValueBase + "model: router\nengine: gemini\n---\nReport.\n"},
 			wantError: []string{"supported only by Copilot, Claude, Codex, and pi"}},
 		{name: "sandbox.agent false", files: map[string]string{"main.md": "---\non: workflow_dispatch\nstrict: false\npermissions:\n  contents: read\nfeatures:\n  dangerously-disable-sandbox-agent: true\nsandbox:\n  agent: false\nmodel: router\nengine: copilot\n---\nReport.\n"},
@@ -216,6 +218,17 @@ func TestCompileRouterModelValue_Rejected(t *testing.T) {
 			for _, want := range tc.wantError {
 				require.ErrorContains(t, compiled.err, want)
 			}
+		})
+	}
+}
+
+func TestValidateRouterModelValuePlacement_ReservedAliasNamespace(t *testing.T) {
+	for _, alias := range []string{"router/economy", "Router/Economy"} {
+		t.Run(alias, func(t *testing.T) {
+			err := validateRouterModelValuePlacement(&WorkflowData{
+				ModelMappings: map[string][]string{alias: {}},
+			})
+			require.ErrorContains(t, err, "router and the router/* namespace are reserved and cannot be defined as model aliases")
 		})
 	}
 }
