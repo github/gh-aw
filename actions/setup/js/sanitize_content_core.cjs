@@ -608,14 +608,24 @@ function sanitizeUrlDomains(s, allowed) {
   const authorityUserinfoAt = new Uint8Array(s.length + 1);
   const htmlTagAt = new Uint8Array(s.length);
   const htmlTagQuotedAt = new Uint8Array(s.length);
+  const maxHtmlTagLength = 4096;
   let inHtmlTag = false;
   let htmlQuote = "";
+  let htmlTagStart = -1;
   for (let i = 0; i < s.length; i++) {
     const character = s[i];
+    if (inHtmlTag && ((/\r|\n/.test(character) && htmlQuote) || i - htmlTagStart >= maxHtmlTagLength)) {
+      inHtmlTag = false;
+      htmlQuote = "";
+      htmlTagStart = -1;
+    }
     if (!inHtmlTag && character === "<" && /[a-z]/i.test(s[i + 1] || "")) {
       let tagNameEnd = i + 2;
       while (/[a-z0-9:-]/i.test(s[tagNameEnd] || "")) tagNameEnd++;
-      if (/[\s/>]/.test(s[tagNameEnd] || "")) inHtmlTag = true;
+      if (/[\s/>]/.test(s[tagNameEnd] || "")) {
+        inHtmlTag = true;
+        htmlTagStart = i;
+      }
     }
     if (!inHtmlTag) continue;
     htmlTagAt[i] = 1;
@@ -626,6 +636,7 @@ function sanitizeUrlDomains(s, allowed) {
       htmlQuote = character;
     } else if (character === ">") {
       inHtmlTag = false;
+      htmlTagStart = -1;
     }
   }
   let hasAuthorityUserinfo = false;
@@ -681,7 +692,7 @@ function sanitizeUrlDomains(s, allowed) {
         // must stop there even when later prose contains "@".
         if (
           /[\s|\[\]]/.test(character) ||
-          (isHtmlTagCandidate && /["']/.test(character)) ||
+          (isHtmlTagCandidate && /["']/.test(character) && !hasAuthorityUserinfo) ||
           (/[<>]/.test(character) && (isHtmlTagCandidate ? !htmlTagQuotedAt[end] : !inAuthority || !hasAuthorityUserinfo)) ||
           (/["']/.test(character) && (!inAuthority || !hasAuthorityUserinfo))
         ) {

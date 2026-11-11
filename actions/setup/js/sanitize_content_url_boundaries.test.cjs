@@ -108,6 +108,25 @@ describe("URL matcher structural delimiters", () => {
     expect(sanitizeUrlDomains(input, ["github.com"])).toBe(expected);
   });
 
+  it.each([
+    ['<img alt="www.github.com"@evil.example/x">', '<img alt="(evil.example/redacted)">'],
+    ['<b www.github.com"@evil.invalid/x', "<b (evil.invalid/redacted)"],
+    ['<b www.github.com"@-evil.invalid/x', "<b (evil.invalid/redacted)"],
+    ["a <b www.github.com'@_evil.invalid/x", "a <b (evil.invalid/redacted)"],
+  ])("validates the full www authority inside tag-like input: %s", (input, expected) => {
+    expect(sanitizeUrlDomains(input, ["github.com"])).toBe(expected);
+  });
+
+  it("recovers from an unterminated HTML quote before filtering later prose", () => {
+    const input = "<b don't\n www.outside.invalid/path>tail";
+    expect(sanitizeUrlDomains(input, ["github.com"])).toBe("<b don't\n (www[.]outside.invalid/redacted)>tail");
+  });
+
+  it("bounds scanner state for an excessively long unterminated tag", () => {
+    const prefix = `<b "${"x".repeat(4092)}`;
+    expect(sanitizeUrlDomains(`${prefix} www.outside.invalid/path>tail`, ["github.com"])).toBe(`${prefix} (www[.]outside.invalid/redacted)>tail`);
+  });
+
   it.each(["", " ", "\n"])("does not consume an image boundary when userinfo-like prose follows an attribute with %j spacing", spacing => {
     for (const [url, expected] of [
       ["www.github.com", "www.github.com"],
