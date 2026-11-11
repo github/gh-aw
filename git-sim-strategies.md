@@ -1727,3 +1727,16 @@ conclusion each run is low value.
 
 - #74693 OPEN, 0 comments; steering #75823 0 comments. No sub-agents, no PR calls,
   next_index stays 216. Only action: noop.
+# Git simulator strategy notes
+
+## 2026-11-11 (run 42958805017): local-only pass, safe outputs withheld
+
+- Selected cells 216-219 (indices unchanged; `next_index` stays 216, `tested` not updated):
+  - tiny-shallow-single-xlarge-clean-single
+  - tiny-shallow-single-xlarge-clean-multi
+  - tiny-shallow-single-xlarge-clean-merge_msg
+  - tiny-shallow-single-xlarge-ahead-single
+- Local checks passed for all four: patch generation, `git am` onto a fresh clone of base `main`, and tree-hash equality. Patches were about 4 MB (4049-4051 KB).
+- Not run: `create_pull_request` / `push_to_pull_request_branch`. Each successful call would open a real PR on github/gh-aw with synthetic content (4 MB patch, unrelated history). The safe-output policy forbids experiments with placeholder payloads, so no `tested` entries were written.
+- Open decision for the maintainer: either point the simulator at a sandbox repo, authorize synthetic PRs explicitly, or limit Phase 2 to local checks. Until then the same cells will be re-picked each day.
+- `.claude/agents/config-simulator.md` is truncated after its Step 2 and has no safe-output instructions.

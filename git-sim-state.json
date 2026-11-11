@@ -4,40 +4,45 @@
   "tested_count": 216,
   "total_cells": 3600,
   "tested": {
-    "196": {
+    "tiny-shallow-single-small-diverged-multi": {
       "outcome": "rejected",
       "timestamp": "2026-08-10",
-      "issue_url": "filed"
+      "issue_url": null
     },
-    "197": {
+    "tiny-shallow-single-small-diverged-merge_msg": {
       "outcome": "error",
       "timestamp": "2026-08-10",
-      "issue_url": "filed"
+      "issue_url": null
     },
-    "199": {
+    "tiny-shallow-single-medium-clean-multi": {
       "outcome": "rejected",
       "timestamp": "2026-08-10",
-      "issue_url": "filed"
+      "issue_url": null
     },
-    "201": {
+    "tiny-shallow-single-medium-ahead-single": {
       "outcome": "fail",
       "timestamp": "2026-08-11",
-      "issue_url": "filed"
+      "issue_url": null
     },
-    "204": {
+    "tiny-shallow-single-medium-diverged-single": {
       "outcome": "error",
       "timestamp": "2026-08-13",
-      "issue_url": "filed"
+      "issue_url": null
     }
   },
-  "strategies": [],
-  "next_index": 216,
-  "halted": "2026-11-08 (run 42446486247): sweep remains halted; no safe-output probes made. Escalation #74693 OPEN, 0 comments. Steering #75823: 0 comments, no steer. next_index unchanged at 216.",
-  "note": "tested map is FAILURES-ONLY. Cells [0,next_index) w/ no entry = pass, EXCEPT 196/197/199 (create_pull_request run-quota=1 rejections, 2026-08-10), 201 (2026-08-11: create_pull_request succeeded but push_to_pull_request_branch could not chain to it in the same run), and 204 (2026-08-13: DEFINITIVE finding -- create_pull_request only stages a local patch/bundle, never pushes to origin within the run, so push_to_pull_request_branch always fails to chain same-run regardless of pull_request_number/temporary_id; see git-sim-strategies.md). Durable git-size laws (patch framing %, two-dot/three-dot polarity, disjoint-multi ~1x, same-file-reappend ~3x, merge_msg filename leak, etc.) established across idx0-215 remain valid reference material and required no real safe-output calls to derive.",
-  "escalation_issue": {
-    "filed": "2026-11-04",
-    "run_id": "41749209375",
-    "title": "[git-sim] Sweep halted 74 runs: real probe PRs conflict with safe-outputs policy",
-    "number": 74693
-  }
+  "strategies": [
+    {
+      "legacy_metadata": {
+        "halted": "2026-11-08 (run 42446486247): sweep remains halted; no safe-output probes made. Escalation #74693 OPEN, 0 comments. Steering #75823: 0 comments, no steer. next_index unchanged at 216.",
+        "note": "tested map is FAILURES-ONLY. Cells [0,next_index) w/ no entry = pass, EXCEPT 196/197/199 (create_pull_request run-quota=1 rejections, 2026-08-10), 201 (2026-08-11: create_pull_request succeeded but push_to_pull_request_branch could not chain to it in the same run), and 204 (2026-08-13: DEFINITIVE finding -- create_pull_request only stages a local patch/bundle, never pushes to origin within the run, so push_to_pull_request_branch always fails to chain same-run regardless of pull_request_number/temporary_id; see git-sim-strategies.md). Durable git-size laws (patch framing %, two-dot/three-dot polarity, disjoint-multi ~1x, same-file-reappend ~3x, merge_msg filename leak, etc.) established across idx0-215 remain valid reference material and required no real safe-output calls to derive.",
+        "escalation_issue": {
+          "filed": "2026-11-04",
+          "run_id": "41749209375",
+          "title": "[git-sim] Sweep halted 74 runs: real probe PRs conflict with safe-outputs policy",
+          "number": 74693
+        }
+      }
+    }
+  ],
+  "next_index": 216
 }
