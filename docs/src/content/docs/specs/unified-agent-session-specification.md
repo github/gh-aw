@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.8.0"
+version: "2.9.0"
 status: Draft
-publication_date: "2026-11-09"
+publication_date: "2026-11-11"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.8.0<br>
+**Version**: 2.9.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-09<br>
+**Publication Date**: 2026-11-11<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -1398,7 +1398,7 @@ be replaced with attempts inferred from messages, session IDs, or continuations.
 | `attemptId` | Bounded local correlation key, scoped by run, phase, layer, and source invocation; not a native session ID. |
 | `startupAttemptId` | Optional enclosing startup invocation for a harness attempt. |
 | `exitCode` | Observed process status, or `null` when completion was not observed. |
-| `failureClasses` | Existing allowlisted failure identifiers; never raw exception text. |
+| `failureClasses` | Existing allowlisted failure identifiers, including `rate_limit_wait_exceeded`; never raw exception text. |
 | `startedAt`, `finishedAt` | Optional observed Unix milliseconds; missing completion MUST NOT acquire an invented end time. |
 | `strategy` | Optional observed `restart` or `resume`; a resume retry is not a new task continuation. |
 | `backoffMs` | Optional delay before this attempt; not a usage measurement. |
@@ -1459,6 +1459,17 @@ Telemetry failures MUST NOT change retry decisions. Existing mask collection,
 redaction, symlink rejection, protected-session capture, and trusted execution
 evidence boundaries MUST remain in effect. Compact sessions MAY retain the
 bounded attempt fields but remain subject to their existing loss budgets.
+
+**T-UAS-090 — Copilot terminal rate-limit waits.** When the Copilot harness
+observes terminal HTTP 429 evidence, it MUST inspect `Retry-After` only from
+`error`, `session.error`, or `turn.failed` events and from stderr. Assistant and
+tool events MUST NOT be used as `Retry-After` evidence. A valid numeric-seconds
+value or a valid non-expired HTTP-date value MUST determine the requested wait
+duration. The harness MUST wait for that duration unless it exceeds the
+configured `max-delay-ms` limit or the remaining soft-timeout budget, including
+the shutdown buffer. In either exceeded case, the attempt MUST terminate with
+the allowlisted failure identifier `rate_limit_wait_exceeded`. Missing, invalid,
+or expired `Retry-After` values MUST preserve the existing retry behavior.
 
 The deterministic conformance suite is
 `actions/setup/js/harness_retry_session.test.cjs`, together with the harness,
@@ -2697,6 +2708,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.9.0 - Draft (2026-11-11)
+
+- Added Copilot terminal HTTP 429 `Retry-After` handling to Section 6.4 and requirement T-UAS-090.
+- Defined accepted numeric-seconds and non-expired HTTP-date values, restricted evidence sources, bounded waiting, soft-timeout/shutdown-buffer enforcement, and the `rate_limit_wait_exceeded` allowlisted failure identifier.
+- Retained serialization-format version 1.
 
 ### Version 2.8.0 - Draft (2026-11-09)
 
