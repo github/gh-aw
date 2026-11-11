@@ -76,7 +76,16 @@ function withCompilerFixtures(api) {
             if (!["node_modules", ".git"].includes(name)) collect(path.join(value, name), sources);
           }
         } else if (value.endsWith(".md")) {
-          sources.push(fs.readFileSync(value, "utf8"));
+          if (fs.constants.O_NOFOLLOW === undefined || fs.constants.O_NONBLOCK === undefined) {
+            throw new Error("O_NOFOLLOW and O_NONBLOCK are required to read Markdown fixtures safely on this platform");
+          }
+          // Protect the leaf file; parent directories must remain trusted.
+          const descriptor = fs.openSync(value, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+          try {
+            if (fs.fstatSync(descriptor).isFile()) sources.push(fs.readFileSync(descriptor, "utf8"));
+          } finally {
+            fs.closeSync(descriptor);
+          }
         }
       }
     } else if (Array.isArray(value)) {
