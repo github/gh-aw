@@ -244,6 +244,8 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
       allowed-repos: [owner/other]    # Optional: additional repos agent can target (agent uses `repo` field in output)
   ```
 
+  **Target Scope**: Avoid `target: "*"` when a workflow needs to act on the triggering issue/PR and one known tracker: `*` lets the agent choose any issue/PR, not only those two. Keep triggering-item operations at the default `target: "triggering"` and configure tracker-specific operations with the tracker's explicit issue/PR number. Because each `target` constrains an output to one item, use separate workflows when both scopes need the same output type rather than treating `*` as a two-item allowlist.
+
   **Hide Older Comments**: Set `hide-older-comments: true` to minimize previous comments from the same workflow before posting new ones. Useful for status updates. Allowed reasons: `spam`, `abuse`, `off_topic`, `outdated` (default), `resolved`.
 
   **Discussion Thread Replies**: Agents can include `reply_to_id` in their output to post a threaded reply within a GitHub Discussion (requires `discussions: true`):

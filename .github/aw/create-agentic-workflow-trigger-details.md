@@ -27,16 +27,18 @@ Base persona-to-trigger/tool/output facts are canonical in the [Persona-to-Patte
 Coordination-style requests (for example "tell me when a milestone is slipping" or "flag blocked cross-team dependencies") are often ambiguous between a recurring digest and an event-driven alert. Use this decision order:
 
 1. **Default to `schedule` (+ `workflow_dispatch`)** when the request is about ongoing visibility into milestone health or dependency status over time (a digest), not a single triggering event. Follow the [Recurring Digest Defaults](report.md#recurring-digest-defaults) for window, grouping, and dedup key.
-2. **Use `issues` (`types: [labeled, milestoned, demilestoned]`)** only when the requester explicitly wants an immediate reaction to a specific state change (for example the moment an issue is relabeled `blocked` or moved off a milestone), not a periodic summary.
+2. **Use `issues` (`types: [labeled, milestoned, demilestoned, opened]`)** only when the requester explicitly wants an immediate reaction to a specific state change (for example the moment an issue is relabeled `blocked` or moved off a milestone), not a periodic summary. For milestone checks, include `opened` and guard it as described below; `milestoned` alone may miss creation-time assignment.
 3. **Combine both** only when the requester explicitly asks for both an immediate alert and a periodic rollup; keep them as two distinct trigger blocks (or two workflows) rather than one ambiguous trigger, so each has its own dedup key.
 
 | Signal in the request | Trigger | Grouping dimension | Dedup key example |
 |---|---|---|---|
 | "weekly/daily view of milestones at risk" | `schedule` + `workflow_dispatch` | milestone, owning team | `milestone-risk:<milestone>:<window-id>` |
-| "let me know the moment a milestone slips" | `issues` (`milestoned`/`demilestoned`) or `workflow_run` if computed by CI | milestone | `milestone-slip:<milestone>:<issue-number>` |
+| "let me know the moment a milestone slips" | `issues` (`opened`/`milestoned`/`demilestoned`) or `workflow_run` if computed by CI | milestone | `milestone-slip:<milestone>:<issue-number>` |
 | "flag blocked dependencies across teams" (ongoing) | `schedule` + `workflow_dispatch` | dependency, blocking team, severity | `dependency-escalation:<dependency>:<window-id>` |
 
 Call `noop` when the window has no slipped milestones or newly blocked dependencies, and search for an existing open issue with the same dedup key before creating a new one.
+
+GitHub's [issue trigger documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#issues) describes `milestoned` for when an issue is added to a milestone, but does not specify that creating an issue already assigned to a milestone emits that activity. Do not rely on `milestoned` alone: include `opened` and process that event only when `github.event.issue.milestone != null`. Continue using `milestoned` for later assignments and `demilestoned` for removals.
 
 ## Backend review guidance
 
