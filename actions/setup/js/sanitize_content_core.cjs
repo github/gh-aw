@@ -409,7 +409,7 @@ function sanitizeUrlProtocols(s) {
   // For schemes that do not use "//", a targeted blocklist is used because a
   // fully general single-colon pattern produces too many false positives
   // (e.g. "key:value" in YAML, "std::vector" in C++, "C:\path" on Windows).
-  return result.replace(/(?:data|javascript|vbscript|about|mailto|tel|magnet):[^\s"'<>]+/gi, match => {
+  return result.replace(/(?:data|javascript|vbscript|about|mailto|tel|magnet):(?=[^\s])[^\s"'<>]*/gi, match => {
     const protocolMatch = match.match(/^([^:]+):/);
     if (protocolMatch) {
       const protocol = protocolMatch[1] + ":";
@@ -606,6 +606,28 @@ function sanitizeUrlDomains(s, allowed) {
   const urlOrWwwRegex = /https:\/\/|(^|[^a-z0-9])(www\.)/gi;
   const parts = [];
   const authorityUserinfoAt = new Uint8Array(s.length + 1);
+  const htmlTagAt = new Uint8Array(s.length);
+  const htmlTagQuotedAt = new Uint8Array(s.length);
+  let inHtmlTag = false;
+  let htmlQuote = "";
+  for (let i = 0; i < s.length; i++) {
+    const character = s[i];
+    if (!inHtmlTag && character === "<" && /[a-z]/i.test(s[i + 1] || "")) {
+      let tagNameEnd = i + 2;
+      while (/[a-z0-9:-]/i.test(s[tagNameEnd] || "")) tagNameEnd++;
+      if (/[\s/>]/.test(s[tagNameEnd] || "")) inHtmlTag = true;
+    }
+    if (!inHtmlTag) continue;
+    htmlTagAt[i] = 1;
+    htmlTagQuotedAt[i] = htmlQuote ? 1 : 0;
+    if (htmlQuote) {
+      if (character === htmlQuote) htmlQuote = "";
+    } else if (character === '"' || character === "'") {
+      htmlQuote = character;
+    } else if (character === ">") {
+      inHtmlTag = false;
+    }
+  }
   let hasAuthorityUserinfo = false;
   for (let i = s.length - 1; i >= 0; i--) {
     const character = s[i];
@@ -649,17 +671,20 @@ function sanitizeUrlDomains(s, allowed) {
       const prefix = match[1];
       const candidateStart = match.index + match[0].length - match[2].length;
       const hasAuthorityUserinfo = authorityUserinfoAt[candidateStart] === 1;
-      let beforeCandidate = candidateStart - 1;
-      while (beforeCandidate >= 0 && /\s/.test(s[beforeCandidate])) beforeCandidate--;
-      const isAttributeCandidate = /["'=]/.test(s[beforeCandidate] || "");
+      const isHtmlTagCandidate = htmlTagAt[candidateStart] === 1;
       let end = candidateStart;
       let depth = 0;
       let inAuthority = true;
       for (; end < s.length; end++) {
         const character = s[end];
-        // GFM permits ">" inside a userinfo authority, but HTML attribute
-        // candidates must stop there even when later prose contains "@".
-        if (/[\s"'|\[\]]/.test(character) || (/[<>]/.test(character) && (!inAuthority || !hasAuthorityUserinfo || isAttributeCandidate))) {
+        // GFM permits ">" inside a userinfo authority, but HTML tag candidates
+        // must stop there even when later prose contains "@".
+        if (
+          /[\s|\[\]]/.test(character) ||
+          (isHtmlTagCandidate && /["']/.test(character)) ||
+          (/[<>]/.test(character) && (isHtmlTagCandidate ? !htmlTagQuotedAt[end] : !inAuthority || !hasAuthorityUserinfo)) ||
+          (/["']/.test(character) && (!inAuthority || !hasAuthorityUserinfo))
+        ) {
           break;
         } else if (character === "\\" && end + 1 < s.length && !/["'<>]/.test(s[end + 1])) {
           end++;

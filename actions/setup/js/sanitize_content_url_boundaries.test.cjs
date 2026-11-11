@@ -69,6 +69,16 @@ describe("URL matcher structural delimiters", () => {
     expect(sanitizeContentCore('<img src="data:image/png;base64,AAAA=="> text "onerror=alert(1)>')).toBe('<img src="(redacted)"> text "onerror=alert(1)>');
   });
 
+  it.each(["javascript", "vbscript", "about"])("redacts %s when a quote or angle bracket immediately follows the scheme", scheme => {
+    for (const delimiter of ['"', "'", "<", ">"]) {
+      expect(sanitizeUrlProtocols(`${scheme}:${delimiter}payload${delimiter}`)).toBe(`(redacted)${delimiter}payload${delimiter}`);
+    }
+  });
+
+  it("does not redact blocked-scheme prose when a space follows the colon", () => {
+    expect(sanitizeUrlProtocols("about: blank")).toBe("about: blank");
+  });
+
   it.each(urls)("does not consume delimiters after %s", (url, redacted) => {
     const filter = /^(?:https:|[/\\]|www\.)/.test(url) ? text => sanitizeUrlDomains(text, ["github.com"]) : sanitizeUrlProtocols;
     for (const delimiter of ['"', "'", ">", "<"]) {
@@ -82,6 +92,20 @@ describe("URL matcher structural delimiters", () => {
 
   it("does not treat a backslash as escaping an HTML attribute quote", () => {
     expect(sanitizeUrlDomains('www.outside.invalid/path\\"tail', [])).toBe('(www[.]outside.invalid/redacted)"tail');
+  });
+
+  it("keeps a bare www attribute candidate inside its HTML tag", () => {
+    const input = '<img src="safe" width=10 www.outside.invalid>text@outside.invalid/path';
+    const expected = '<img src="safe" width=10 (www[.]outside.invalid/redacted)>text@outside.invalid/path';
+    expect(sanitizeUrlDomains(input, ["github.com"])).toBe(expected);
+    expect(sanitizeContent(input)).toBe(expected);
+  });
+
+  it.each([
+    ['"www.github.com"@outside.invalid/path', '"(outside.invalid/redacted)'],
+    ['command=www.github.com"@outside.invalid/path', "command=(outside.invalid/redacted)"],
+  ])("validates the full www authority in prose: %s", (input, expected) => {
+    expect(sanitizeUrlDomains(input, ["github.com"])).toBe(expected);
   });
 
   it.each(["", " ", "\n"])("does not consume an image boundary when userinfo-like prose follows an attribute with %j spacing", spacing => {
