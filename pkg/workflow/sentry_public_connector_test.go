@@ -53,6 +53,93 @@ func sentryPublicSource(selection string) string {
 ` + selection + "---\nInspect approved metadata only.\n"
 }
 
+func TestSentryPublicAlertGatewayNumericProject(t *testing.T) {
+	compiler, root := awConnectorCompiler(t)
+	compiler.repoConfig, compiler.repoConfigLoaded = &RepoConfig{GatewayDispatch: true}, true
+	source, err := os.ReadFile("../../.github/workflows/connectors/sentry.md")
+	require.NoError(t, err)
+	path := filepath.Join(root, ".github", "workflows", "sentry-gateway.md")
+	declaration := filepath.Join(filepath.Dir(path), "connectors", "sentry.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(declaration), 0700))
+	require.NoError(t, os.WriteFile(declaration, source, 0600))
+	consumer := strings.Replace(sentryPublicSource(""), "on: workflow_dispatch",
+		"on:\n  gateway-dispatch:\n    sentry: [issue-alert-triggered]", 1)
+	require.NoError(t, os.WriteFile(path, []byte(consumer), 0600))
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+	require.Len(t, data.WebhookSubscriptions, 1)
+	require.Nil(t, data.Connectors["sentry"].Agent)
+	require.Nil(t, data.Connectors["sentry"].SafeOutputs)
+	output, err := compiler.CompileToYAML(data, path)
+	require.NoError(t, err)
+	require.Contains(t, output, "gateway_provenance:")
+	require.Contains(t, output, "gateway_admission:")
+	require.Contains(t, output, "needs.gateway_provenance.outputs.verified == 'true'")
+	require.Contains(t, output, "needs.gateway_admission.outputs.verified == 'true'")
+	var compiled map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(output), &compiled))
+	activation := compiled["jobs"].(map[string]any)["activation"].(map[string]any)
+	subscriptions := ""
+	for _, raw := range activation["steps"].([]any) {
+		step := raw.(map[string]any)
+		if step["id"] == "validate-webhook" {
+			subscriptions = step["env"].(map[string]any)["GH_AW_WEBHOOK_SUBSCRIPTIONS"].(string)
+		}
+	}
+	require.NotEmpty(t, subscriptions)
+	require.NoFileExists(t, strings.TrimSuffix(path, ".md")+".lock.yml")
+	fixture, err := os.ReadFile("../connectors/testdata/providers/sentry/alert-triggered.json")
+	require.NoError(t, err)
+	input, err := json.Marshal(map[string]any{
+		"subscriptions": json.RawMessage(subscriptions),
+		"fixture":       json.RawMessage(fixture),
+	})
+	require.NoError(t, err)
+	assets, err := filepath.Abs("../../actions/setup/js")
+	require.NoError(t, err)
+	node, err := exec.LookPath("node")
+	require.NoError(t, err)
+	driver := `
+const assert = require("node:assert/strict");
+const {validateWebhook} = require(process.argv[1] + "/validate_webhook.cjs");
+const input = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const subscription = input.subscriptions[0];
+const projectCondition = subscription.conditions.find(condition => condition.path.join("/") === "data/event/project");
+assert(projectCondition);
+const project = input.fixture.data.event.project;
+assert.equal(typeof project, "number");
+const filters = Object.fromEntries(subscription.conditions.map(condition => [
+  condition.filter, [condition.path.reduce((value, key) => value[key], input.fixture)]
+]));
+const event = {
+  action: subscription.dispatch.event_type,
+  client_payload: {schema_version:2, aw_context:{webhook:{
+    event:subscription.event, deliveries:[{
+      delivery_id:"offline-sentry-alert-fixture",
+      payload:{
+        url:"https://sentry.io/organizations/example-org/issues/1234567890/",
+        type:[subscription.connector.trigger], filters
+      }
+    }]
+  }}}
+};
+const env = {GITHUB_EVENT_NAME:"repository_dispatch", GH_AW_WEBHOOK_SUBSCRIPTIONS:JSON.stringify(input.subscriptions)};
+assert.equal(validateWebhook(event, env).skipped, false);
+assert.equal(projectCondition.value_type, "integer");
+assert.deepEqual(projectCondition.values, [project]);
+for (const value of [String(project), project + 1]) {
+  const invalid = structuredClone(event);
+  invalid.client_payload.aw_context.webhook.deliveries[0].payload.filters[projectCondition.filter] = [value];
+  assert.throws(() => validateWebhook(invalid, env), /webhook payload filters/);
+}
+`
+	command := exec.CommandContext(t.Context(), node, "-e", driver, assets)
+	command.Env = []string{}
+	command.Stdin = strings.NewReader(string(input))
+	result, err := command.CombinedOutput()
+	require.NoError(t, err, "%s", result)
+}
+
 func TestSentryPublicDocumentationConsumer(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/connectors/sentry.md")
 	require.NoError(t, err)

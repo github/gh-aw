@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -25,7 +26,8 @@ func (p *Plan) CallMCP(ctx context.Context, runtime Runtime, registration, tool 
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
-	client.Transport = &mcpTransport{base: transport, plan: p, runtime: runtime, server: server}
+	proxy := &mcpTransport{base: transport, plan: p, runtime: runtime, server: server}
+	client.Transport = proxy
 	ctx, cancel := context.WithTimeout(ctx, client.Timeout)
 	defer cancel()
 	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "gh-aw-connector", Version: "v1"}, nil)
@@ -34,7 +36,7 @@ func (p *Plan) CallMCP(ctx context.Context, runtime Runtime, registration, tool 
 		DisableStandaloneSSE: true, MaxEventSize: server.MaxResponseBytes,
 	}, nil)
 	if err != nil {
-		return nil, errors.New("connector HTTP MCP connection failed; no credential fallback performed")
+		return nil, proxy.sanitizedError("connector HTTP MCP connection failed; no credential fallback performed")
 	}
 	defer func() {
 		if err := session.Close(); err != nil {
@@ -43,7 +45,7 @@ func (p *Plan) CallMCP(ctx context.Context, runtime Runtime, registration, tool 
 	}()
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: tool, Arguments: args})
 	if err != nil {
-		return nil, errors.New("connector HTTP MCP tool request failed")
+		return nil, proxy.sanitizedError("connector HTTP MCP tool request failed")
 	}
 	if result == nil || result.IsError || result.NeedsInput() {
 		return nil, errors.New("connector HTTP MCP tool returned an error or requires unsupported interactive input")
@@ -77,10 +79,27 @@ func (p *Plan) authorizeMCP(runtime Runtime, registration, tool string, args map
 }
 
 type mcpTransport struct {
-	base    http.RoundTripper
-	plan    *Plan
-	runtime Runtime
-	server  HTTPMCP
+	base          http.RoundTripper
+	plan          *Plan
+	runtime       Runtime
+	server        HTTPMCP
+	failureStatus atomic.Int32
+}
+
+type mcpHTTPError struct {
+	message string
+	status  int
+}
+
+func (failure *mcpHTTPError) Error() string {
+	return fmt.Sprintf("%s (HTTP status %d)", failure.message, failure.status)
+}
+
+func (transport *mcpTransport) sanitizedError(message string) error {
+	if status := transport.failureStatus.Load(); status != 0 {
+		return &mcpHTTPError{message: message, status: int(status)}
+	}
+	return errors.New(message)
 }
 
 func (transport *mcpTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -99,6 +118,9 @@ func (transport *mcpTransport) RoundTrip(request *http.Request) (*http.Response,
 	response, err := transport.base.RoundTrip(request)
 	if err != nil {
 		return nil, errors.New("HTTP MCP transport failed")
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		transport.failureStatus.CompareAndSwap(0, int32(response.StatusCode))
 	}
 	response.Body = http.MaxBytesReader(nil, response.Body, int64(transport.server.MaxResponseBytes))
 	return response, nil
@@ -182,7 +204,12 @@ func decodeToolArguments(request *mcp.CallToolRequest) (map[string]any, error) {
 }
 
 func toolError(err error) *mcp.CallToolResult {
-	return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}
+	result := &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}
+	var failure *mcpHTTPError
+	if errors.As(err, &failure) {
+		result.StructuredContent = map[string]int{"httpStatus": failure.status}
+	}
+	return result
 }
 
 func inputSchema(inputs map[string]Input) map[string]any {

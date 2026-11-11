@@ -432,7 +432,7 @@ connectors:
             minLength: 1
             maxLength: 32767
             pattern: \S
-            sanitize: body
+            sanitize: body-plain
         resources:
           issue: issues
         createdResources:
@@ -447,7 +447,7 @@ connectors:
             body:
               encoding: jira-adf
               input: text
-        maxResponseBytes: 16384
+        maxResponseBytes: 1048576
         responseRequired:
           - /id
         responseTypes:
@@ -494,7 +494,7 @@ connectors:
             minLength: 1
             maxLength: 32767
             pattern: \S
-            sanitize: body
+            sanitize: body-plain
           issue-type:
             type: string
             required: true
@@ -709,10 +709,12 @@ import-schema:
     does not install or approve that receiver; unsupported profiles remain inactive.
   </gateway-routing>
   <runtime-policies>
-    Human text inputs marked sanitize title or body use the shared publisher's
+    Human text inputs marked sanitize title, body or body-plain use the shared publisher's
     built-in sanitizers. Titles require at least 20 Unicode code points after
     sanitization. Body limits include protected generated attribution and any
-    configured body footer. Fixed authored request literals are trusted content,
+    configured body footer. Jira ADF uses body-plain so literal text is not
+    Markdown-escaped and protected attribution is represented as plain text.
+    Fixed authored request literals are trusted content,
     not agent-controlled text inputs.
     Consumer safe-output options support max from 1 to 100, default 1, and staged
     booleans or expressions. Global or compiler-forced staging always wins.
@@ -743,9 +745,9 @@ import-schema:
     <credential id="mcp-personal" phase="agent" scheme="basic" secret-input="mcp-personal-secret" default-secret="JIRA_MCP_PERSONAL_BASIC_AUTH">
       Create a personal scoped API token at https://id.atlassian.com/manage-profile/security/api-tokens
       for the Atlassian MCP app. Select read:jira:agent-interface and search:jira:agent-interface.
-      Prepare the account-email:api-token pair in HTTP Basic credential format
-      (RFC 7617), without its scheme prefix or a newline, as the named Actions secret.
-      The mcp-personal-secret input description specifies the exact stored format.
+      Store the RFC 4648 Base-64 encoding of the UTF-8 account-email:scoped-MCP-api-token pair,
+      without the "Basic " prefix or a newline, as the named Actions secret. This is the RFC 7617
+      credential encoding, not the raw token.
       An organization administrator must enable MCP API-token authentication and the read_jira
       and search_jira permission groups. Jira account permissions and IP allowlists still apply.
     </credential>
@@ -755,10 +757,21 @@ import-schema:
       and search:jira:agent-interface. Store the raw key. Organization MCP API-token policy and
       permission groups must allow these operations; a REST API token is not automatically an MCP key.
     </credential>
+    <credential id="rest-reader" phase="agent" scheme="basic" secret-input="rest-reader-secret" default-secret="JIRA_REST_READ_BASIC_AUTH">
+      Create a separate unscoped account API token for the direct Jira site REST route.
+      Store the RFC 4648 Base-64 encoding of the UTF-8 account-email:unscoped-api-token pair,
+      without the "Basic " prefix or a newline, as the named Actions secret.
+      This reader is independent of hosted MCP credentials.
+      Grant Browse projects and the required issue-security access. Account lookup also
+      requires Browse users and groups. The declared read:jira-work and read:jira-user
+      classic OAuth scopes are metadata, not permission grants. Scoped REST tokens require
+      api.atlassian.com/ex/jira/{cloudId} and cannot use this declaration's direct-site route.
+    </credential>
     <credential id="rest-writer" phase="safe-output" scheme="basic" secret-input="rest-writer-secret" default-secret="JIRA_REST_BASIC_AUTH">
       Create a separate unscoped account API token for the direct Jira site REST route.
-      Prepare its account-email:api-token pair in HTTP Basic credential format
-      (RFC 7617), without its scheme prefix or a newline, as specified by rest-writer-secret.
+      Store the RFC 4648 Base-64 encoding of the UTF-8 account-email:unscoped-api-token pair,
+      without the "Basic " prefix or a newline, as the named Actions secret.
+      Do not reuse the reader or hosted MCP identity.
       Grant Browse projects plus Create issues
       for creation, Edit issues for update and label addition, and Add comments for commenting;
       issue security and editable field screens also apply. The declaration records write:jira-work,
@@ -1005,9 +1018,13 @@ import-schema:
       description is rejected, not a clear operation. A successful response may be
       empty (HTTP 204).
     </operation>
-    <operation selection="jira-add-comment" tool="jira_add_comment" method="POST" path="/rest/api/3/issue/{issue}/comment">
+    <operation selection="jira-add-comment" tool="jira_add_comment" method="POST" path="/rest/api/3/issue/{issue}/comment" max-response-bytes="1048576">
       Required inputs: issue and nonblank text (at most 32767 characters). Creates a new comment,
       not an edit or upsert. Requires response string id and projects it to comment-id.
+      Unlike the other writes' 16384-byte responses, the Comment response may echo the full ADF
+      body. Its bounded 1 MiB budget accommodates allowed Unicode text, JSON escaping, ADF nodes,
+      and provider metadata before projecting only the ID. An over-budget response still fails
+      without retrying the possibly accepted append.
     </operation>
     <operation selection="jira-add-label" tool="jira_add_label" method="PUT" path="/rest/api/3/issue/{issue}">
       Required inputs: issue and label, at most 255 characters matching ^[A-Za-z0-9_.-]+$.
@@ -1052,6 +1069,9 @@ import-schema:
     attachment fetching, or tenant discovery are exposed. Transition/type/field discovery
     is read-only and independently selected. These declarations are experimental. Local fixture and
     compilation success or HTTP 200 MCP initialization does not establish read authorization.
+    Adapter failures preserve transport-observed HTTP status but redact provider error bodies.
+    Tool-level errors delivered over HTTP 200 remain generic; neither those errors nor a status
+    alone establish whether organization policy, scope claims, or issue permissions caused denial.
     A tool-level error saying "You don't have permission to connect via API token. Please ask
     your organization admin for access." identifies an organization MCP API-token policy denial,
     even when initialization succeeds. An organization administrator must enable that access;

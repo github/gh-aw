@@ -386,6 +386,8 @@ on: workflow_dispatch
 engine: copilot
 permissions:
   contents: read
+network:
+  allowed: [defaults, api.datadoghq.com]
 imports:
   - uses: ".github/workflows/connectors/datadog.md"
     with:

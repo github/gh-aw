@@ -215,8 +215,8 @@ func validateInputs(inputs map[string]Input) error {
 		if input.MinLength < 0 || input.MinLength > input.MaxLength {
 			return fmt.Errorf("input %q minLength must be between 0 and maxLength", key)
 		}
-		if input.Sanitize != "" && input.Sanitize != "title" && input.Sanitize != "body" {
-			return fmt.Errorf("input %q sanitize must be title or body", key)
+		if input.Sanitize != "" && input.Sanitize != "title" && input.Sanitize != "body" && input.Sanitize != "body-plain" && input.Sanitize != "body-plain-compact" {
+			return fmt.Errorf("input %q sanitize must be title, body, body-plain or body-plain-compact", key)
 		}
 		if input.Sanitize == "title" && input.MaxLength < 20 {
 			return fmt.Errorf("title input %q maxLength must allow at least 20 characters", key)

@@ -91,7 +91,7 @@ connectors:
             minLength: 1
             maxLength: 4000
             pattern: ^[^{}]*[^{} \t\r\n\f\x0B][^{}]*$
-            sanitize: body
+            sanitize: body-plain-compact
         resources:
           subdomain: subdomains
           ticket: tickets
@@ -160,10 +160,14 @@ import-schema:
 <connector-documentation id="zendesk" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
   <runtime-policies>
-    Human text inputs marked sanitize title or body use the shared publisher's
+    Human text inputs marked sanitize title, body or body-plain use the shared publisher's
     built-in sanitizers. Titles require at least 20 Unicode code points after
     sanitization. Body limits include protected generated attribution and any
-    configured body footer. Fixed authored request literals are trusted content,
+    configured body footer. This literal-text API uses body-plain-compact, preserving
+    protected attribution as text instead of HTML comments that Zendesk strips.
+    Consecutive ASCII spaces and newlines are compacted before staging and sending,
+    matching the provider's documented normalization without relaxing exact echoes.
+    Fixed authored request literals are trusted content,
     not agent-controlled text inputs.
     Consumer safe-output options support max from 1 to 100, default 1, and staged
     booleans or expressions. Global or compiler-forced staging always wins.
@@ -323,6 +327,8 @@ import-schema:
     ticket before any manual retry to avoid duplicate notes.
   </privacy-and-delivery>
   <limitations>
+    Notes use sanitized compact plain-text publication, including plain-text provenance;
+    no Markdown entity escapes or hidden attribution comments are submitted.
     Audit evidence is checked in the immediate update response only. Generic
     primitives cannot search an audit array for one correlated private Comment;
     this conservative contract requires that event at index zero. A valid update

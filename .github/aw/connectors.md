@@ -376,6 +376,14 @@ The compiler freezes selected plans and uses the Node runtime shipped by
 runtime configuration loader, or native provider handler. Internal versioned
 YAML fixtures are compatibility tests, not the public authoring interface.
 
+Use `sanitize: body-plain` for literal provider text and ADF text nodes.
+It preserves sanitizer/redaction rules and footer-inclusive code-point limits,
+but emits plain-text attribution instead of Markdown escapes or HTML metadata
+comments. Use `body` for Markdown APIs. Exact response identity and text evidence
+remain required; never retry a write solely because verification failed.
+For APIs that document whitespace compaction, `body-plain-compact` additionally
+collapses repeated ASCII spaces and newlines before staging and delivery.
+
 ## Write self-contained agent documentation
 
 Put exactly one matching XML documentation block inside an XML/HTML comment in

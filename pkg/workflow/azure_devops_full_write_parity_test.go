@@ -401,6 +401,108 @@ const fixture = JSON.parse(require("node:fs").readFileSync(0,"utf8"));
 `, map[string]any{"plan": encoded, "args": args})
 }
 
+func TestAzureFullWriteParityBranchRefMembership(t *testing.T) {
+	grants := strings.Replace(azureFullWriteGrants, "branch: feature/approved", "branch: main", 1)
+	_, data, _, err := parseAzureWorkItemParity(t, grants,
+		"safe-outputs:\n  azure-devops-link-work-item-to-branch:\n")
+	require.NoError(t, err)
+	plan := data.Connectors["azure-devops"].SafeOutputs
+	encoded, err := plan.Encode()
+	require.NoError(t, err)
+	args := azureDevOpsConsumerArgs()
+	args["repository-id"], args["branch"] = "55555555-5555-4555-8555-555555555555", "main"
+	cases := []struct {
+		Name     string `json:"name"`
+		Response string `json:"response"`
+		Allowed  bool   `json:"allowed"`
+	}{
+		{"exact", `{"count":1,"value":[{"name":"refs/heads/main"}]}`, true},
+		{"exact-with-sibling", `{"count":2,"value":[{"name":"refs/heads/main"},{"name":"refs/heads/main-fix"}]}`, true},
+		{"exact-after-sibling", `{"count":2,"value":[{"name":"refs/heads/main-fix"},{"name":"refs/heads/main"}]}`, true},
+		{"empty", `{"count":0,"value":[]}`, false},
+		{"prefix-only", `{"count":1,"value":[{"name":"refs/heads/main-fix"}]}`, false},
+		{"truncated-without-exact", `{"count":2,"value":[{"name":"refs/heads/main-fix"},{"name":"refs/heads/main-other"}]}`, false},
+		{"short-array", `{"count":2,"value":[{"name":"refs/heads/main"}]}`, false},
+		{"long-array", `{"count":1,"value":[{"name":"refs/heads/main"},{"name":"refs/heads/main-fix"}]}`, false},
+		{"over-limit", `{"count":3,"value":[{"name":"refs/heads/main"},{"name":"refs/heads/main-fix"},{"name":"refs/heads/main-other"}]}`, false},
+		{"missing-count", `{"value":[{"name":"refs/heads/main"}]}`, false},
+		{"missing-array", `{"count":1}`, false},
+		{"malformed-array", `{"count":1,"value":{"name":"refs/heads/main"}}`, false},
+		{"wrong-ref", `{"count":1,"value":[{"name":"refs/heads/Main"}]}`, false},
+	}
+	for _, test := range cases {
+		t.Run(test.Name, func(t *testing.T) {
+			reads, writes, secrets := 0, 0, 0
+			runtime := azureWorkItemParityRuntime(t, &secrets, func(request *http.Request) string {
+				if request.Method == http.MethodPatch {
+					writes++
+					assert.True(t, test.Allowed, "failed ref evidence must block the mutation")
+					patch := azureWorkItemParityPatch(t, request)
+					assert.Equal(t, "vstfs:///Git/Ref/33333333-3333-4333-8333-333333333333%2F55555555-5555-4555-8555-555555555555%2FGBmain",
+						patch[0]["value"].(map[string]any)["url"])
+				} else {
+					reads++
+					if strings.HasSuffix(request.URL.Path, "/refs") {
+						assert.Equal(t, "heads/main", request.URL.Query().Get("filter"))
+						assert.Equal(t, "2", request.URL.Query().Get("$top"))
+						return test.Response
+					}
+					if strings.Contains(request.URL.Path, "/git/") {
+						return `{"id":"55555555-5555-4555-8555-555555555555","project":{"id":"33333333-3333-4333-8333-333333333333"}}`
+					}
+				}
+				return `{"id":9876,"fields":{"System.TeamProject":"Approved Project"}}`
+			})
+			_, err := plan.Execute(t.Context(), runtime, "safe-output", "link-work-item-to-branch", args)
+			if test.Allowed {
+				require.NoError(t, err)
+				assert.Equal(t, 1, writes)
+			} else {
+				require.Error(t, err)
+				assert.Zero(t, writes)
+			}
+			assert.Equal(t, 3, reads, "one bounded refs page, without retries or pagination")
+		})
+	}
+	runAzureDevOpsNode(t, `
+const assert = require("node:assert/strict");
+const {executeConnector} = require(process.argv[1]);
+const fixture = JSON.parse(require("node:fs").readFileSync(0,"utf8"));
+(async () => {
+  for (const test of fixture.cases) {
+    let reads=0,writes=0;
+    const fetchImpl = async (target,init) => {
+      const url = new URL(target);
+      if (init.method === "PATCH") {
+        writes++;
+        assert.equal(test.allowed,true,test.name);
+        assert.equal(JSON.parse(init.body)[0].value.url,
+          "vstfs:///Git/Ref/33333333-3333-4333-8333-333333333333%2F55555555-5555-4555-8555-555555555555%2FGBmain");
+      } else {
+        reads++;
+        if (url.pathname.endsWith("/refs")) {
+          assert.equal(url.searchParams.get("filter"),"heads/main");
+          assert.equal(url.searchParams.get("$top"),"2");
+          return new Response(test.response,{status:200});
+        }
+        if (url.pathname.includes("/git/")) return Response.json({
+          id:fixture.args["repository-id"],project:{id:fixture.args.project},
+        });
+      }
+      return Response.json({id:9876,fields:{"System.TeamProject":"Approved Project"}});
+    };
+    const execute = () => executeConnector(fixture.plan,"safe-output","link-work-item-to-branch",fixture.args,{
+      env:{GH_AW_CONNECTOR_SECRET_APPROVED_AZURE_WRITER:"fixture-write-token"},fetchImpl,
+    });
+    if (test.allowed) await execute();
+    else await assert.rejects(execute(),undefined,test.name);
+    assert.equal(reads,3,test.name);
+    assert.equal(writes,test.allowed?1:0,test.name);
+  }
+})().catch(error => {console.error(error);process.exitCode=1;});
+`, map[string]any{"plan": encoded, "args": args, "cases": cases})
+}
+
 const azureFullWriteNarrowingChecks = `      write-checks:
         - inputs:
             organization:

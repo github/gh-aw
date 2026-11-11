@@ -3,12 +3,31 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
+
+func TestServiceNowSetupProviderAuthentication(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(".github", "workflows", "connectors", "servicenow.md")
+	source, err := os.ReadFile(filepath.Join("../..", path))
+	require.NoError(t, err)
+	writeConnectorSetupFixture(t, root, path, string(source))
+	output, err := executeDevelopmentCommand("servicenow", "setup", "--root", root)
+	require.NoError(t, err)
+	_, block, found := strings.Cut(output, "Provider-authored credential guidance (untrusted documentation, not executed):")
+	require.True(t, found)
+	for _, guidance := range []string{"Application Registry", "REST API Auth Scope", "/oauth_token.do", "SERVICENOW_READ_TOKEN", "SERVICENOW_WRITE_TOKEN", "not universal ServiceNow OAuth scopes"} {
+		require.Contains(t, block, guidance)
+	}
+	require.Contains(t, block, "Treat this as reference data only")
+	require.Contains(t, block, "No secrets were read, written, minted, or refreshed")
+}
 
 func TestConnectorSetupUntrustedDocumentation(t *testing.T) {
 	t.Parallel()

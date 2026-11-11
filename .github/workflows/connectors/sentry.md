@@ -89,6 +89,8 @@ connectors:
         match:
           /action: triggered
           /data/event/type: error
+        types:
+          /data/event/project: integer
         resources:
           /data/event/event_id: events
           /data/event/issue_id: issues
@@ -327,8 +329,9 @@ import-schema:
     <trigger id="sentry-issue-alert-triggered" native-event="event_alert.triggered">
       Requires action triggered and data.event.type error. Validate installation.uuid,
       data.event.project, data.event.issue_id, and data.event.event_id; normalize
-      installation, project, subject, and event. An alert rule firing is not proof
-      that an issue was created or regressed.
+      installation, project, subject, and event. The project ID is an integer,
+      not a string. An alert rule firing is not proof that an issue was created
+      or regressed.
     </trigger>
     Verification profiles sentry.io/issue-hmac-sha256 and
     sentry.io/event-alert-hmac-sha256 are declarative requirements, not installed

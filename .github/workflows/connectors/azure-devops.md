@@ -1696,13 +1696,24 @@ connectors:
                   prefix: heads/
                 "$top": { literal: "2" }
             maxResponseBytes: 131072
-            responseChecks:
-              /count: 1
-              /value/0/name: refs/heads/${{ github.aw.import-inputs.branch }}
-            responseRequired: [ /count, /value/0/name ]
+            responseWhen:
+              all:
+                - path: /value
+                  op: any-item
+                  items:
+                    path: /name
+                    op: equals
+                    value: refs/heads/${{ github.aw.import-inputs.branch }}
+                - any:
+                    - all:
+                        - { path: /count, op: equals, value: 1 }
+                        - { path: /value, op: length, value: 1 }
+                    - all:
+                        - { path: /count, op: equals, value: 2 }
+                        - { path: /value, op: length, value: 2 }
+            responseRequired: [ /count ]
             responseTypes:
               /count: integer
-              /value/0/name: string
         createdResources: *azure-work-item-created-resources
         request:
           endpoint: api
@@ -2377,8 +2388,11 @@ import-schema:
     <effect id="azure-devops-link-work-item-to-branch" tool="azure_devops_link_work_item_to_branch" inputs="organization, project, work-item, repository-id, branch">
       Three writer GET preflights check the source ID/project, exact repository
       ID/project and exact refs/heads/branch. Refs uses filter=heads/branch and
-      top=2, requiring count=1 and the exact full ref name, not merely a prefix
-      match. Appends ArtifactLink with name Branch and the fixed reviewed
+      top=2, requiring the exact full ref name anywhere in a one- or two-entry
+      page whose count matches its array length. A prefix sibling does not
+      invalidate an exact match; a page without the exact ref fails closed,
+      with no pagination or ordering assumption. Appends ArtifactLink with
+      name Branch and the fixed reviewed
       vstfs:///Git/Ref/project%2Frepository%2FGBbranch URL. Repository UUID and
       branch inputs must equal the import bindings and exact grants. Branches
       are bounded to 200 ASCII letters, digits, underscores, hyphens and slashes,

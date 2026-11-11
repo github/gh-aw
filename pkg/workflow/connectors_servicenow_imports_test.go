@@ -56,13 +56,13 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 		ID             string   `xml:"id,attr"`
 		Version        string   `xml:"version,attr"`
 		Purpose        string   `xml:"purpose"`
-		Administration struct {
+		Authentication struct {
 			Setup         string `xml:"setup"`
 			Scopes        string `xml:"scopes"`
 			Acquisition   string `xml:"token-acquisition"`
 			Storage       string `xml:"storage"`
 			Compatibility string `xml:"authentication-compatibility"`
-		} `xml:"administration"`
+		} `xml:"authentication"`
 		Configuration struct {
 			Import     string `xml:"import"`
 			Parameters string `xml:"parameters"`
@@ -93,8 +93,8 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	assert.Equal(t, "servicenow", doc.ID)
 	assert.Equal(t, "1", doc.Version)
 	for _, section := range []string{
-		doc.Purpose, doc.Administration.Setup, doc.Administration.Scopes,
-		doc.Administration.Acquisition, doc.Administration.Storage, doc.Administration.Compatibility,
+		doc.Purpose, doc.Authentication.Setup, doc.Authentication.Scopes,
+		doc.Authentication.Acquisition, doc.Authentication.Storage, doc.Authentication.Compatibility,
 		doc.Configuration.Import, doc.Configuration.Parameters, doc.Configuration.Resources,
 		doc.Activation.Triggers, doc.Capabilities.Reads, doc.Capabilities.Effects,
 		doc.Boundaries, doc.Verification, doc.Example.Instructions, doc.Example.YAML, doc.Example.Prompt,
@@ -102,7 +102,7 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 		assert.NotEmpty(t, strings.TrimSpace(section))
 	}
 	assert.GreaterOrEqual(t, len(doc.Sources.Entries), 4)
-	assert.Contains(t, doc.Administration.Scopes, "not universal ServiceNow OAuth scopes")
+	assert.Contains(t, doc.Authentication.Scopes, "not universal ServiceNow OAuth scopes")
 	assert.Contains(t, doc.Verification, "not that")
 	assert.Contains(t, doc.Verification, "persisted durably")
 	require.Contains(t, comment, "<frontmatter><![CDATA[")

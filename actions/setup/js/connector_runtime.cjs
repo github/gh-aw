@@ -68,7 +68,7 @@ const readFields = [
 class ConnectorError extends Error {}
 class ConnectorHTTPError extends ConnectorError {
   constructor(status, retryAfter = "") {
-    super("Connector HTTP request returned a non-success status; no retry performed");
+    super(`Connector HTTP request returned a non-success status (HTTP status ${status}); no retry performed`);
     this.status = status;
     this.retryAfter = retryAfter;
   }
@@ -251,7 +251,7 @@ function validateInputs(inputs) {
     if (input.type === "string") {
       assert(Number.isInteger(input.maxLength) && input.maxLength >= 1 && input.maxLength <= 65536);
       assert(input.minLength === undefined || (Number.isInteger(input.minLength) && input.minLength >= 0 && input.minLength <= input.maxLength));
-      assert(input.sanitize === undefined || ["title", "body"].includes(input.sanitize));
+      assert(input.sanitize === undefined || ["title", "body", "body-plain", "body-plain-compact"].includes(input.sanitize));
       assert(input.sanitize !== "title" || input.maxLength >= 20);
       assert(input.enum === undefined || (Array.isArray(input.enum) && input.enum.every(item => typeof item === "string")));
       assert(input.pattern === undefined || boundedString(input.pattern, 1024));
@@ -1427,7 +1427,11 @@ async function serve(encoded, input = process.stdin, output = process.stdout, op
         const data = await tools.get(message.params.name).call(args);
         result = { content: [{ type: "text", text: goJSON(data) }] };
       } catch (cause) {
-        result = { isError: true, content: [{ type: "text", text: cause instanceof ConnectorError ? cause.message : "Connector MCP request failed" }] };
+        result = {
+          isError: true,
+          content: [{ type: "text", text: cause instanceof ConnectorError ? cause.message : "Connector MCP request failed" }],
+          ...(cause instanceof ConnectorHTTPError ? { structuredContent: { httpStatus: cause.status } } : {}),
+        };
       }
     } else error = { code: -32601, message: "Method not found" };
     output.write(goJSON({ jsonrpc: "2.0", id: message.id, ...(error ? { error } : { result }) }) + "\n");

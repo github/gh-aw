@@ -293,7 +293,7 @@ import-schema:
     This is an ordinary AW Markdown import, not a separately installed provider
     integration. Importing alone enables no reads, writes, or event receiver.
   </purpose>
-  <administration>
+  <authentication>
     <setup>
       An instance administrator must enable inbound REST and OAuth as supported
       by the deployed release. In System OAuth &gt; Application Registry, create
@@ -353,7 +353,7 @@ import-schema:
       authentication and instance-specific remote MCP authorization are not
       configured by this declaration.
     </authentication-compatibility>
-  </administration>
+  </authentication>
   <configuration>
     <import>
       Import a reviewed editable local .github/workflows/connectors/servicenow.md or

@@ -8,7 +8,7 @@ const { getFooterMessageParts, buildFooterBlocks, getBodyFooterBlocks, getAgenti
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
-const { renderReport } = require("./report_ast.cjs");
+const { renderReport, redactReportForRendering, assertRedactedReport } = require("./report_ast.cjs");
 
 /**
  * Formatting belongs to the trusted publisher, before transport validation and
@@ -38,14 +38,84 @@ function formatConnectorArguments(plan, operation, args, { config = {} } = {}) {
         .trimEnd();
       assertMinimum(name, title, Math.max(20, minimum));
       formatted[name] = title;
-    } else if (input.sanitize === "body") {
+    } else if (["body", "body-plain", "body-plain-compact"].includes(input.sanitize)) {
       const body = sanitizeContent(args[name], { maxLength: Number.MAX_SAFE_INTEGER, maxLines: Number.MAX_SAFE_INTEGER });
-      formatted[name] = formatBody(name, body, input.maxLength, minimum, config);
+      formatted[name] = formatBody(name, body, input.maxLength, minimum, config, input.sanitize);
     } else {
       throw new TypeError(`Connector content input ${name} has an unsupported sanitization policy`);
     }
   }
   return formatted;
+}
+
+/** @param {(import("./report_ast.cjs").ReportBlock | import("./report_ast.cjs").ReportInline)[]} nodes @param {string} separator @returns {string} */
+function plainNodes(nodes, separator) {
+  return nodes.map(plainNode).join(separator);
+}
+
+/** @param {import("./report_ast.cjs").ReportBlock | import("./report_ast.cjs").ReportInline} node @returns {string} */
+function plainNode(node) {
+  switch (node.type) {
+    case "text":
+    case "code":
+    case "code_block":
+      return node.value;
+    case "soft_break":
+    case "hard_break":
+      return "\n";
+    case "paragraph":
+    case "heading":
+    case "strong":
+    case "emphasis":
+    case "strike":
+    case "subscript":
+      return plainNodes(node.children, "");
+    case "task":
+      return `[${node.checked ? "x" : " "}] ${plainNodes(node.children, "")}`;
+    case "link":
+      return `${plainNodes(node.children, "")} (${node.url})`;
+    case "image":
+      return `${node.alt} (${node.url})`;
+    case "mention":
+      return `@${node.login}`;
+    case "issue_reference":
+      return `#${node.number}`;
+    case "closing_reference":
+      return node.enabled ? `${node.action} ${node.target.repository || ""}#${node.target.number}` : "";
+    case "quote":
+    case "alert":
+      return plainNodes(node.children, "\n\n");
+    case "details":
+      return `${typeof node.summary === "string" ? node.summary : plainNodes(node.summary, "")}\n${plainNodes(node.children, "\n\n")}`;
+    case "list":
+      return node.items.map((item, index) => `${node.ordered ? `${index + 1}.` : "-"} ${plainNodes(item, "\n\n")}`).join("\n");
+    case "table":
+      return [node.headers, ...node.rows].map(row => row.map(cell => plainNodes(cell, "")).join(" | ")).join("\n");
+    case "structured_data":
+      return JSON.stringify(node.data);
+    case "xml_marker":
+      return `${node.name}${node.value === undefined ? "" : `: ${node.value}`}${node.fields?.map(field => `, ${field.key}: ${field.value}`).join("") || ""}`;
+    case "json_marker":
+      return `${node.name}: ${JSON.stringify(node.data)}`;
+    case "review_marker":
+      return `gh-aw-workflow-call-id: ${node.workflowCallId}`;
+    case "marker":
+      return node.name;
+    case "expiration":
+      return `Expires: ${node.expiresAt}`;
+    case "separator":
+      return "---";
+    default:
+      throw new TypeError("Unsupported connector plain-text report node");
+  }
+}
+
+/** @param {import("./report_ast.cjs").Report} report @param {boolean} compact */
+function renderPlainReport(report, compact) {
+  const redacted = redactReportForRendering(report);
+  assertRedactedReport(redacted);
+  const text = [plainNodes(redacted.children, "\n\n"), redacted.footer ? plainNodes(redacted.footer.children, "\n\n") : "", redacted.footer ? plainNodes(redacted.footer.markers, "\n") : ""].filter(Boolean).join("\n\n").trim();
+  return compact ? text.replace(/ {2,}/g, " ").replace(/\n{2,}/g, "\n") : text;
 }
 
 /** @param {string} name @param {string} text @param {number} minimum */
@@ -94,13 +164,16 @@ function buildConnectorFooter(config) {
  * @param {number} maximum
  * @param {number} minimum
  * @param {{footer?: boolean|string, body_footer?: string}} config
+ * @param {string} format
  */
-function formatBody(name, body, maximum, minimum, config) {
+function formatBody(name, body, maximum, minimum, config, format = "body") {
   const footer = buildConnectorFooter(config);
   /** @param {string} text */
   const children = text => parseReportMarkdown(text, { minimumHeadingLevel: 2, agentTainted: true });
+  /** @type {(report: import("./report_ast.cjs").Report) => string} */
+  const serialize = format === "body" ? report => renderReport(report).body.trimEnd() : report => renderPlainReport(report, format === "body-plain-compact");
   /** @param {string} text */
-  const render = text => renderReport({ type: "report", title: "Connector content", children: children(text), footer }).body.trimEnd();
+  const render = text => serialize({ type: "report", title: "Connector content", children: children(text), footer });
   const protectedLength = Array.from(render("")).length;
   if (protectedLength > maximum) throw new Error(`Connector content input ${name}: generated footer alone exceeds maxLength ${maximum} Unicode code points`);
   const points = Array.from(body);
@@ -114,7 +187,7 @@ function formatBody(name, body, maximum, minimum, config) {
     output = render(candidate);
     length = Array.from(output).length;
   }
-  const sizedBody = renderReport({ type: "report", title: "Connector content", children: children(candidate) }).body.trimEnd();
+  const sizedBody = serialize({ type: "report", title: "Connector content", children: children(candidate) });
   assertMinimum(name, sizedBody, minimum);
   return output;
 }

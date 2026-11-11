@@ -1,9 +1,12 @@
 package connectors
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -155,6 +158,69 @@ func TestJiraProviderMCPPolicyFailure(t *testing.T) {
 	_, err := plan.CallMCP(t.Context(), jiraRuntime(server.Client(), server.URL, "agent"), "service-account", "getJiraIssue", jiraMCPArguments("getJiraIssue"))
 	if err == nil || !strings.Contains(err.Error(), "no credential fallback") || requests < 1 || requests > 2 {
 		t.Fatalf("policy failure must terminate bounded protocol initialization without credential fallback: %v requests=%d", err, requests)
+	}
+}
+
+func TestJiraProviderMCPHTTPStatusDiagnostics(t *testing.T) {
+	for _, test := range []struct {
+		method string
+		status int
+	}{
+		{"initialize", 401}, {"initialize", 403}, {"initialize", 429}, {"initialize", 503},
+		{"tools/call", 401}, {"tools/call", 403}, {"tools/call", 429}, {"tools/call", 503},
+	} {
+		t.Run(test.method+"/"+http.StatusText(test.status), func(t *testing.T) {
+			failures := 0
+			upstream := mcp.NewServer(&mcp.Implementation{Name: "jira-fixture", Version: "1"}, nil)
+			handler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return upstream }, nil)
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodPost {
+					body, err := io.ReadAll(request.Body)
+					if err != nil {
+						t.Error(err)
+						http.Error(w, "fixture read failed", http.StatusInternalServerError)
+						return
+					}
+					request.Body = io.NopCloser(bytes.NewReader(body))
+					var rpc struct{ Method string }
+					if err := json.Unmarshal(body, &rpc); err != nil {
+						t.Error(err)
+					}
+					if rpc.Method == test.method {
+						failures++
+						http.Error(w, "private provider diagnostic: fixture-secret", test.status)
+						return
+					}
+				}
+				handler.ServeHTTP(w, request)
+			}))
+			defer server.Close()
+			plan := jiraPlan(t, server.URL, "personal")
+			args, err := json.Marshal(jiraMCPArguments("getJiraIssue"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := plan.remoteToolHandler(jiraRuntime(server.Client(), server.URL, "agent"), "personal", "getJiraIssue")(
+				t.Context(), &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: args}},
+			)
+			if err != nil || !result.IsError {
+				t.Fatalf("expected a safe MCP error, got %+v %v", result, err)
+			}
+			encoded, err := json.Marshal(result)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(encoded), fmt.Sprintf(`"httpStatus":%d`, test.status)) ||
+				!strings.Contains(string(encoded), fmt.Sprintf("HTTP status %d", test.status)) {
+				t.Fatalf("missing transport status: %s", encoded)
+			}
+			if strings.Contains(string(encoded), "private provider diagnostic") || strings.Contains(string(encoded), "fixture-secret") {
+				t.Fatalf("raw provider diagnostics were reflected: %s", encoded)
+			}
+			if failures != 1 {
+				t.Fatalf("failed HTTP requests must not retry: %d", failures)
+			}
+		})
 	}
 }
 

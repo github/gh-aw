@@ -46,6 +46,19 @@ func TestConnectorJiraSetupExampleUsesDeclaredInput(t *testing.T) {
 	command.SetArgs([]string{"jira", "setup", "--root", repository, "--input", `mcp-personal-secret="JIRA_DEV_BASIC_AUTH"`})
 	require.NoError(t, command.Execute())
 	require.Contains(t, output.String(), "JIRA_DEV_BASIC_AUTH")
+	_, guidance, found := strings.Cut(output.String(), "```text\n")
+	require.True(t, found)
+	guidance, _, found = strings.Cut(guidance, "\n```")
+	require.True(t, found)
+	for _, expected := range []string{
+		"credential id=rest-reader", "RFC 4648 Base-64 encoding of the UTF-8 account-email:unscoped-api-token pair",
+		"account-email:scoped-MCP-api-token pair", `without the "Basic " prefix or a newline`,
+		"Browse users and groups", "read:jira:agent-interface", "search:jira:agent-interface",
+		"raw key", "api.atlassian.com/ex/jira/{cloudId}",
+	} {
+		require.Contains(t, guidance, expected, "setup must print the complete credential recipe, not refer to omitted descriptions")
+	}
+	require.NotContains(t, guidance, "input description specifies")
 }
 
 func TestConnectorsSchemaCommand(t *testing.T) {

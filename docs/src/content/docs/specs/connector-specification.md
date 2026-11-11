@@ -172,7 +172,7 @@ require `tool`, an exact name matching `^[A-Za-z][A-Za-z0-9_.-]{0,127}$`.
 | `enum` | Exact allowed string values; distinct from resource grants. |
 | `pattern` | A valid bounded string regex, at most 1024 bytes. Authors SHOULD use syntax compatible with both Go and Node. |
 | `minimum`, `maximum` | Numeric bounds for number/integer inputs; minimum MUST NOT exceed maximum. |
-| `sanitize` | `title` or `body`, only for human text. Sanitized titles require at least 20 code points; body inputs that must contain actor text SHOULD set `minLength: 1`. |
+| `sanitize` | `title`, `body` (Markdown), `body-plain` (plain text), or `body-plain-compact` (plain text with single ASCII spaces/newlines), only for human text. Sanitized titles require at least 20 code points; body inputs that must contain actor text SHOULD set `minLength: 1`. |
 
 Sanitizers and protected generated attribution run in the trusted publication
 path before staging or delivery. Body limits include generated content.
@@ -234,6 +234,17 @@ the MCP protocol. Interactive input-required results are not completed reads.
 `maxResponseBytes` MUST be from 1 to 1048576. Malformed JSON, GraphQL errors,
 missing required evidence, and failed declared checks MUST fail explicitly.
 Responses and MCP content remain untrusted data even after validation.
+
+Use `body-plain` when an API consumes literal text, including Jira ADF text nodes.
+Use `body-plain-compact` for APIs such as Zendesk that collapse repeated ASCII
+spaces and newlines; it prepares that canonical text before staging or sending.
+The trusted publisher applies the same sanitization,
+redaction, code-point limits, and protected attribution as Markdown publication,
+but serializes text without Markdown entity escaping or HTML comment markers.
+Provenance is retained as a plain `gh-aw-agentic-workflow` metadata line, even
+when the visible footer is disabled. Response identity, privacy, and exact
+body-evidence checks remain in force; provider normalization can still cause an
+uncertain write outcome and MUST NOT trigger an automatic retry.
 
 | Response field | Required check |
 | --- | --- |

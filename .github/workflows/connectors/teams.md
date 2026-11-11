@@ -423,7 +423,8 @@ import-schema:
       Every selected operation requires its referenced grants to be nonempty.
       Read arguments team, channel, thread use teams, channels, threads.
       Write arguments conversation, activity use conversations, activities.
-      tenants, subscriptions, notification-resources, and threads constrain
+      threads constrain root-message reads, reply-parent paths, and trigger
+      subjects. tenants, subscriptions, and notification-resources constrain
       only the unavailable trigger projection; tenants is not a Graph token
       tenant check or a Bot Connector conversation tenant check.
     </inputs>

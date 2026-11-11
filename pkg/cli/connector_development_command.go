@@ -50,7 +50,8 @@ to, its declaration's grants. --args accepts one JSON object. No IDs are inferre
 Go validates the frozen phase plan and provider response checks. --node-runtime
 additionally validates that same plan with a trusted local shared Node runtime;
 safe-output staging is then checked by both runtimes without provider access.
-Safe-output inputs annotated sanitize: title/body require --node-runtime and its
+Safe-output inputs annotated sanitize: title/body/body-plain/body-plain-compact
+require --node-runtime and its
 matching sibling connector_content.cjs plus dependencies. The shared publisher
 formats these inputs once before both Node staging and Go revalidation, including
 the default generated footer and honest local attribution without an Actions run URL.

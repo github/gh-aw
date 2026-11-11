@@ -59,7 +59,11 @@ names rather than renaming them for style. Query/body values use
 Resource inputs are required strings checked against exact grants before secrets.
 Correlate the returned ID with the requested ID, not merely some allowed ID.
 Reject partial pages when completeness matters. Project only needed evidence.
-Mark human text with `sanitize: title/body`; do not sanitize IDs as body text.
+Mark human text with `sanitize: title/body`; use `body-plain` for literal API text
+or ADF text nodes so publisher markup is not sent as content. Both body formats
+retain protected attribution and sizing. Do not sanitize IDs as body text.
+Use `body-plain-compact` only for APIs whose documented representation collapses
+consecutive ASCII spaces and newlines, so exact echoed-text checks stay intact.
 
 Do not add per-provider runtime code, checkout/build/install hooks, dynamic
 URLs/queries/scripts, automatic pagination, arbitrary patches, credential

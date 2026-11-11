@@ -188,6 +188,9 @@ func TestDatadogConnectorXMLDocumentation(t *testing.T) {
 	require.Equal(t, datadogFixture(t, "workflow.md"), consumer)
 	compiler, dataParsed, path, err := parseDatadogConsumer(t, consumer)
 	require.NoError(t, err)
+	require.Contains(t, GetAllowedDomains(dataParsed.NetworkPermissions),
+		strings.TrimPrefix(dataParsed.Connectors["datadog"].Agent.Origins()[0], "https://"),
+		"documented consumer must approve its selected API host")
 	output, err := compiler.CompileToYAML(dataParsed, path)
 	require.NoError(t, err)
 	require.NotContains(t, output, "${{ secrets.DATADOG_INCIDENT_WRITE_OAUTH_TOKEN }}", "staged example must not inject writer credentials")
