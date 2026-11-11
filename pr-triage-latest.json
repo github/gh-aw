@@ -1,191 +1,377 @@
 {
-  "run_id": "20261111T122855Z",
-  "run_date": "2026-11-11T12:28:55.098473Z",
-  "source": "pr-triage",
-  "eligible_total": 10,
-  "open_copilot_prs": 10,
-  "cooldown_skipped": 0,
-  "category_counts": {
-    "bug": 9,
-    "feature": 1
-  },
-  "risk_counts": {
-    "low": 1,
-    "medium": 7,
-    "high": 2
-  },
-  "priority_counts": {
-    "medium": 8,
-    "high": 2
-  },
   "action_counts": {
-    "auto_merge": 2,
-    "fast_track": 2,
-    "batch_review": 6
+    "auto_merge": 3,
+    "batch_review": 18,
+    "defer": 0,
+    "fast_track": 0
   },
   "batches": [
     {
-      "id": "pr-batch:copilot-runtime",
+      "id": "pr-batch:runtime-safety",
       "prs": [
-        76807,
-        76806,
         76805,
-        76804,
-        76803
+        76718,
+        76425
       ]
     },
     {
-      "id": "pr-batch:copilot-platform",
+      "id": "pr-batch:dependency-bumps",
       "prs": [
-        76801,
-        76800,
-        76776,
-        76731,
+        76615,
+        76614,
+        76494,
+        76492,
+        76491,
+        76490,
+        76489,
+        76488,
+        76487,
+        76486,
+        76485,
+        76484,
+        76483,
+        76482,
+        76481,
+        76480,
+        76479,
+        76477
+      ]
+    },
+    {
+      "id": "pr-batch:copilot-ops",
+      "prs": [
         76617
       ]
     }
   ],
+  "category_counts": {
+    "bug": 4,
+    "chore": 17,
+    "feature": 1
+  },
+  "cooldown_skipped": 2,
+  "eligible_total": 22,
+  "open_copilot_prs": 24,
+  "priority_counts": {
+    "low": 18,
+    "medium": 4
+  },
+  "risk_counts": {
+    "low": 18,
+    "medium": 4
+  },
+  "run_date": "2026-11-11T18:23:49.827745Z",
+  "run_id": "20261111T182349Z",
   "selected_candidates": [
     {
-      "number": 76807,
-      "title": "Honor Retry-After in Copilot harness HTTP 429 retries",
+      "action": "batch_review",
       "category": "bug",
-      "risk": "medium",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 83,
-      "score_breakdown": {
-        "impact": 41,
-        "urgency": 27,
-        "quality": 15
-      }
-    },
-    {
-      "number": 76806,
-      "title": "Add per-checkout data-only acknowledgement for ref warnings",
-      "category": "bug",
-      "risk": "medium",
+      "number": 76425,
       "priority": "medium",
-      "action": "auto_merge",
-      "score": 69,
-      "score_breakdown": {
-        "impact": 33,
-        "urgency": 20,
-        "quality": 16
-      }
-    },
-    {
-      "number": 76805,
-      "title": "Preserve hidden reference markers in PR review bodies",
-      "category": "bug",
       "risk": "medium",
-      "priority": "medium",
-      "action": "auto_merge",
-      "score": 67,
+      "score": 63,
       "score_breakdown": {
         "impact": 34,
-        "urgency": 18,
-        "quality": 15
-      }
+        "quality": 12,
+        "urgency": 17
+      },
+      "title": "#76425"
     },
     {
-      "number": 76804,
-      "title": "Fail closed on contradictory empty daily AIC history",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 88,
-      "score_breakdown": {
-        "impact": 46,
-        "urgency": 27,
-        "quality": 15
-      }
-    },
-    {
-      "number": 76803,
-      "title": "Honor Node runtime pins in agent engine-install steps",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
       "action": "batch_review",
-      "score": 73,
-      "score_breakdown": {
-        "impact": 39,
-        "urgency": 19,
-        "quality": 15
-      }
-    },
-    {
-      "number": 76801,
-      "title": "Diagnose CGO govulncheck failure",
-      "category": "bug",
+      "category": "chore",
+      "number": 76477,
+      "priority": "low",
       "risk": "low",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 60,
+      "score": 35,
       "score_breakdown": {
-        "impact": 24,
-        "urgency": 21,
-        "quality": 15
-      }
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76477"
     },
     {
-      "number": 76800,
-      "title": "Keep Go probe tests from enumerating process environment",
-      "category": "bug",
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76479,
+      "priority": "low",
       "risk": "low",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 62,
+      "score": 35,
       "score_breakdown": {
-        "impact": 26,
-        "urgency": 21,
-        "quality": 15
-      }
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76479"
     },
     {
-      "number": 76776,
-      "title": "Sync the CI spec pin and extend Auditor health collection",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
       "action": "batch_review",
-      "score": 68,
+      "category": "chore",
+      "number": 76480,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
       "score_breakdown": {
-        "impact": 35,
-        "urgency": 18,
-        "quality": 15
-      }
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76480"
     },
     {
-      "number": 76731,
-      "title": "Harden Windows WSL runtime setup",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
       "action": "batch_review",
-      "score": 71,
+      "category": "chore",
+      "number": 76481,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
       "score_breakdown": {
-        "impact": 38,
-        "urgency": 18,
-        "quality": 15
-      }
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76481"
     },
     {
-      "number": 76617,
-      "title": "Choose model routing with `model: router` and `router/economy|balanced|robust`",
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76482,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76482"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76483,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76483"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76484,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76484"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76485,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76485"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76486,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76486"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76487,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76487"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76488,
+      "priority": "low",
+      "risk": "low",
+      "score": 35,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 10
+      },
+      "title": "#76488"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76489,
+      "priority": "low",
+      "risk": "low",
+      "score": 36,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 11
+      },
+      "title": "#76489"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76490,
+      "priority": "low",
+      "risk": "low",
+      "score": 36,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 11
+      },
+      "title": "#76490"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76491,
+      "priority": "low",
+      "risk": "low",
+      "score": 36,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 11
+      },
+      "title": "#76491"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76492,
+      "priority": "low",
+      "risk": "low",
+      "score": 36,
+      "score_breakdown": {
+        "impact": 15,
+        "quality": 10,
+        "urgency": 11
+      },
+      "title": "#76492"
+    },
+    {
+      "action": "batch_review",
+      "category": "chore",
+      "number": 76494,
+      "priority": "low",
+      "risk": "low",
+      "score": 38,
+      "score_breakdown": {
+        "impact": 16,
+        "quality": 11,
+        "urgency": 11
+      },
+      "title": "#76494"
+    },
+    {
+      "action": "auto_merge",
+      "category": "chore",
+      "number": 76614,
+      "priority": "low",
+      "risk": "low",
+      "score": 40,
+      "score_breakdown": {
+        "impact": 17,
+        "quality": 11,
+        "urgency": 12
+      },
+      "title": "#76614"
+    },
+    {
+      "action": "auto_merge",
+      "category": "chore",
+      "number": 76615,
+      "priority": "low",
+      "risk": "low",
+      "score": 41,
+      "score_breakdown": {
+        "impact": 18,
+        "quality": 11,
+        "urgency": 12
+      },
+      "title": "#76615"
+    },
+    {
+      "action": "batch_review",
       "category": "feature",
-      "risk": "medium",
+      "number": 76617,
       "priority": "medium",
-      "action": "batch_review",
+      "risk": "medium",
       "score": 76,
       "score_breakdown": {
         "impact": 40,
-        "urgency": 21,
-        "quality": 15
-      }
+        "quality": 15,
+        "urgency": 21
+      },
+      "title": "#76617"
+    },
+    {
+      "action": "batch_review",
+      "category": "bug",
+      "number": 76718,
+      "priority": "medium",
+      "risk": "medium",
+      "score": 65,
+      "score_breakdown": {
+        "impact": 35,
+        "quality": 13,
+        "urgency": 17
+      },
+      "title": "#76718"
+    },
+    {
+      "action": "auto_merge",
+      "category": "bug",
+      "number": 76805,
+      "priority": "medium",
+      "risk": "medium",
+      "score": 67,
+      "score_breakdown": {
+        "impact": 34,
+        "quality": 15,
+        "urgency": 18
+      },
+      "title": "#76805"
     }
   ],
-  "summary": "Ten active Copilot PRs were reviewed without any cooldown skips. The set is dominated by safety and runtime fixes, with two high-value fast-track items and two grouped review batches around runtime and platform hardening."
+  "source": "pr-triage",
+  "summary": "Twenty-two eligible Copilot PRs were triaged after the 1-hour cooldown. The set skews toward dependency maintenance and runtime safety, with a single feature PR and four medium-risk behavioral changes."
 }
