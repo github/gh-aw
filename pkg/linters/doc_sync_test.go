@@ -19,7 +19,7 @@ import (
 
 var (
 	docBulletRe   = regexp.MustCompile(`^//\s+-\s+([a-z0-9_-]+)\s+—`)
-	readmeTableRe = regexp.MustCompile(`^\|\s+` + "`" + `([a-z0-9_-]+)` + "`" + `\s+\|`)
+	readmeTableRe = regexp.MustCompile(`^\|\s+` + "`" + `([a-z0-9_-]+)` + "`" + `(?:\s+\(` + "`" + `([a-z0-9_-]+)` + "`" + `\))?\s+\|`)
 	linterFlagsRe = regexp.MustCompile(`LINTER_FLAGS=["']([^"']+)["']`)
 )
 
@@ -273,10 +273,14 @@ func parseReadmeSubpackageSet(t *testing.T) map[string]struct{} {
 		if m == nil {
 			continue
 		}
-		if m[1] == "internal" {
+		label := m[1]
+		if m[2] != "" {
+			label = m[2]
+		}
+		if label == "internal" {
 			continue
 		}
-		readmeSet[m[1]] = struct{}{}
+		readmeSet[label] = struct{}{}
 	}
 
 	return readmeSet

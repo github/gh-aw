@@ -459,6 +459,7 @@ _ = typeassertionnil.Analyzer
 - `typeassertionnil` is registered but excluded from CI enforcement pending a cross-platform enforcement-readiness audit.
 - `unchecked_deferredclose` is registered but excluded from CI enforcement until existing deferred `Close()` findings are remediated.
 - `walkdirignoredeerror` is registered but excluded from CI enforcement until existing discarded `WalkDir` errors in `pkg/cli/audit_threat_detection.go` and `pkg/cli/model_routing.go` are remediated.
+- `ignoredlocalerror` is registered but excluded from CI enforcement until existing ignored local errors are reviewed.
 - `excessivefuncparams` exposes a `-max-params` analyzer flag and defaults to `8` parameters (`DefaultMaxParams`).
 - `largefunc` exposes a `-max-lines` analyzer flag, defaults to `60` lines (`DefaultMaxLines`), and skips `_test.go` files.
 - `osexitinlibrary` helps enforce separation between library logic and process-level termination.

@@ -26,7 +26,13 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil)}
+	nodeFilter := []ast.Node{
+		(*ast.AssignStmt)(nil),
+		(*ast.ValueSpec)(nil),
+		(*ast.ExprStmt)(nil),
+		(*ast.DeferStmt)(nil),
+		(*ast.GoStmt)(nil),
+	}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		analyzeStmt(pass, n, generatedFiles, nolintIndex)
 	})
@@ -44,10 +50,32 @@ func analyzeStmt(pass *analysis.Pass, node ast.Node, generatedFiles filecheck.Ge
 				reportIfNotSkipped(pass, call, generatedFiles, nolintIndex)
 			}
 		}
+	case *ast.ValueSpec:
+		lhs := make([]ast.Expr, len(stmt.Names))
+		for i, name := range stmt.Names {
+			lhs[i] = name
+		}
+		for i, rhs := range stmt.Values {
+			call, ok := astutil.UnwrapParenExpr(rhs).(*ast.CallExpr)
+			if !ok {
+				continue
+			}
+			if discardedErrorResult(pass, call, lhs, stmt.Values, i) {
+				reportIfNotSkipped(pass, call, generatedFiles, nolintIndex)
+			}
+		}
 	case *ast.ExprStmt:
 		call, ok := astutil.UnwrapParenExpr(stmt.X).(*ast.CallExpr)
 		if ok && hasErrorResult(pass, call) {
 			reportIfNotSkipped(pass, call, generatedFiles, nolintIndex)
+		}
+	case *ast.DeferStmt:
+		if hasErrorResult(pass, stmt.Call) {
+			reportIfNotSkipped(pass, stmt.Call, generatedFiles, nolintIndex)
+		}
+	case *ast.GoStmt:
+		if hasErrorResult(pass, stmt.Call) {
+			reportIfNotSkipped(pass, stmt.Call, generatedFiles, nolintIndex)
 		}
 	}
 }
@@ -96,9 +124,11 @@ func hasErrorResult(pass *analysis.Pass, call *ast.CallExpr) bool {
 }
 
 func callSignature(pass *analysis.Pass, call *ast.CallExpr) (*types.Signature, bool) {
-	pkgPath, _, ok := astutil.PackageCall(pass, call)
+	packageCall := *call
+	packageCall.Fun = unwrapTypeInstantiation(call.Fun)
+	pkgPath, _, ok := astutil.PackageCall(pass, &packageCall)
 	if !ok {
-		if selector, isSelector := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr); isSelector {
+		if selector, isSelector := astutil.UnwrapParenExpr(packageCall.Fun).(*ast.SelectorExpr); isSelector {
 			if fn, isFunc := pass.TypesInfo.Uses[selector.Sel].(*types.Func); isFunc && fn.Pkg() != nil {
 				pkgPath = fn.Pkg().Path()
 				ok = true
@@ -109,21 +139,27 @@ func callSignature(pass *analysis.Pass, call *ast.CallExpr) (*types.Signature, b
 		return nil, false
 	}
 
-	var callType types.Type
-	if selector, isSelector := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr); isSelector {
-		if fn, isFunc := pass.TypesInfo.Uses[selector.Sel].(*types.Func); isFunc {
-			callType = fn.Type()
-		}
-	}
-	if callType == nil {
-		callType = pass.TypesInfo.TypeOf(astutil.UnwrapParenExpr(call.Fun))
-	}
+	callType := pass.TypesInfo.TypeOf(astutil.UnwrapParenExpr(call.Fun))
 	signature, ok := callType.(*types.Signature)
 	return signature, ok
 }
 
+func unwrapTypeInstantiation(expr ast.Expr) ast.Expr {
+	for {
+		expr = astutil.UnwrapParenExpr(expr)
+		switch instantiated := expr.(type) {
+		case *ast.IndexExpr:
+			expr = instantiated.X
+		case *ast.IndexListExpr:
+			expr = instantiated.X
+		default:
+			return expr
+		}
+	}
+}
+
 func isErrorType(t types.Type) bool {
-	return types.Identical(t, types.Universe.Lookup("error").Type())
+	return nolint.ImplementsError(t)
 }
 
 func isBlank(expr ast.Expr) bool {
