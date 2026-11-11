@@ -766,11 +766,38 @@ func configureRootCommand() {
 	rootCmd.SetOut(os.Stderr)
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
+	rootCmd.Args = rootCommandArgs
 	rootCmd.InitDefaultHelpFlag()
 	if f := rootCmd.Flags().Lookup("help"); f != nil {
 		f.Usage = "Show help for " + string(constants.CLIExtensionPrefix)
 	}
 	rootCmd.SetUsageFunc(rootUsageFunc)
+}
+
+func rootCommandArgs(cmd *cobra.Command, args []string) error {
+	arg, hasArg := firstCommandArgument(args)
+	if !hasArg {
+		return nil
+	}
+
+	suggestion := ""
+	if !cmd.DisableSuggestions {
+		if cmd.SuggestionsMinimumDistance <= 0 {
+			cmd.SuggestionsMinimumDistance = 2
+		}
+		if suggestions := cmd.SuggestionsFor(arg); len(suggestions) > 0 {
+			suggestion = "\n\nDid you mean this?\n\t" + strings.Join(suggestions, "\n\t") + "\n"
+		}
+	}
+
+	return fmt.Errorf("unknown command %q for %q%s", arg, constants.CLIExtensionPrefix, suggestion)
+}
+
+func firstCommandArgument(args []string) (string, bool) {
+	for _, arg := range args {
+		return arg, true
+	}
+	return "", false
 }
 
 func createCommandSet() commandSet {

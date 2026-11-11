@@ -707,7 +707,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().Int("timeout-seconds", 0, "Download timeout in seconds (0 = use --timeout)")
 	_ = logsCmd.Flags().MarkHidden("timeout-seconds")
 	logsCmd.Flags().Int("max-github-api-rate-limit", 0, "Maximum used GitHub core API requests before pausing one target or stopping multiple targets (positive = absolute, negative = reserve from API limit; e.g. 12000 or -2000)")
-	logsCmd.Flags().Int("max-storage", defaultLogsMaxStorageMB, "Maximum logs storage in MB after pruning non-essential cache data (default: 1 GB; 0 = unlimited)")
+	logsCmd.Flags().Int("max-storage", defaultLogsMaxStorageMB, "Maximum logs storage in MB after pruning non-essential cache data (0 = unlimited)")
 	logsCmd.Flags().Bool("prune-older-runs", false, "Remove oldest completed runs when non-essential cache pruning cannot satisfy --max-storage")
 	logsCmd.Flags().String("summary-file", "summary.json", "Path to write the summary JSON file relative to output directory (use empty string to disable)")
 	logsCmd.Flags().Bool("train", false, "Analyze log patterns across downloaded runs and save pattern weights to drain3_weights.json in the output directory")

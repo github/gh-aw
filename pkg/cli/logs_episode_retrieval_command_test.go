@@ -315,3 +315,9 @@ func TestEpisodeRetrievalRejectsInvalidViewBeforeRetrieval(t *testing.T) {
 		require.NotEqual(t, "explain", child.Name())
 	}
 }
+
+func TestEpisodeRetrievalJSONFlagHasShortAlias(t *testing.T) {
+	flag := newLogsEpisodeCommand().Flags().Lookup("json")
+	require.NotNil(t, flag)
+	require.Equal(t, "j", flag.Shorthand)
+}

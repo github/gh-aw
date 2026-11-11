@@ -106,6 +106,8 @@ func TestNewLogsCommand(t *testing.T) {
 	require.NotNil(t, maxRateLimitFlag, "Should have 'max-github-api-rate-limit' flag")
 	maxStorageFlag := flags.Lookup("max-storage")
 	require.NotNil(t, maxStorageFlag, "Should have 'max-storage' flag")
+	assert.NotContains(t, maxStorageFlag.Usage, "default:")
+	assert.Contains(t, maxStorageFlag.Usage, "0 = unlimited")
 	pruneOlderRunsFlag := flags.Lookup("prune-older-runs")
 	require.NotNil(t, pruneOlderRunsFlag, "Should have 'prune-older-runs' flag")
 	cachedJSONLFlag := flags.Lookup("cached-jsonl")

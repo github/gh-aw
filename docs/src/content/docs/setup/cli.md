@@ -849,7 +849,7 @@ gh aw logs episode 1234567890 --repo owner/repo \
 | `--max-api-requests` | `500` | REST requests initiated by the collector, including metadata, discovery pages, artifact inventories, and archive downloads. Artifact-storage redirect transfers are excluded. |
 | `--timeout` | `5m` | Collection deadline, expressed as a duration. |
 | `--output/-o` | `.github/aw/logs` | Compact artifacts, isolated by host, repository, run, attempt, and immutable artifact ID. |
-| `--json` | Disabled | Standard logs JSON plus `episode_retrieval` bounds, counters, stop reasons, and evidence gaps. |
+| `--json/-j` | Disabled | Standard logs JSON plus `episode_retrieval` bounds, counters, stop reasons, and evidence gaps. |
 | `--view` | `summary` | Display `summary` or recorded `hops`; JSON includes both views' data. |
 | `--refresh` | Disabled | Recollect instead of reading the cached episode snapshot; immutable artifact downloads are still reused. |
 
@@ -1415,7 +1415,7 @@ gh aw connector linear setup --repo owner/repo --phase agent
 gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
 ```
 
-`setup` displays binding types, endpoints, credential names, scopes, and provisioning guidance without reading or writing secret values. It is offline by default. With `--repo OWNER/REPO`, it checks repository secret and variable names and prints suggested provisioning commands; it does not run them. Missing settings are informational, while an inventory failure returns an error. Setup does not select capabilities or establish provider authorization.
+`setup` displays binding types, endpoints, credential names, scopes, and provisioning guidance without reading or writing secret values. It is offline by default. Unlike other commands' repository-targeting `--repo` flags, connector setup's `--repo/-r OWNER/REPO` is a read-only check of repository secret and variable names; it prints suggested provisioning commands but does not run them. Missing settings are informational, while an inventory failure returns an error. Setup does not select capabilities or establish provider authorization.
 
 `test` requires `--phase` and `--capability`. Agent/context read tests contact the declared provider with that phase's configured credentials. Safe-output tests always stage without credentials or provider requests. Trigger tests project native fixture JSON offline without deploying or enrolling a receiver. Test arguments must satisfy the declaration's types and exact resource grants.
 
