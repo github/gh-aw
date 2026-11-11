@@ -39,6 +39,10 @@ REST and GraphQL field values remain bounded readback expectations. Derive
 queue-control request IDs from authenticated worker authority, not raw Actions
 context. Validate controls against a fresh checked same-Claim ledger inventory.
 These are protocol constants, not Policy limits, so no Policy epoch changes.
+Configured adapter objects are persisted in evidence by design only after
+closed-key validation and the 8 KiB bound. Any future adapter field that could
+carry credentials or personal data must be reviewed before it is permitted into
+durable evidence.
 
 Keep the WeakMap verification path for the original process. Refactor native
 creations, builtins, assets, code scanning, coverage, artifacts and configured

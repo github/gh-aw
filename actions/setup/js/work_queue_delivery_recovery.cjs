@@ -39,6 +39,7 @@ function createDurableDeliveryVerifier(options) {
             effectChannel: closeClaimEffectChannel(),
             requireControlInventory: true,
             readControlInventory: async () => {
+              if (evidence.outputs.some(entry => entry.verifier === "queue_control") && evidence.controls_digest === undefined) throw new Error("work_queue_control_inventory_digest_missing");
               const inventory = await readDeliveryControlInventory({ ...options, assignment, claim_handle: member.handle });
               if (evidence.controls_digest !== undefined && inventory.controls_digest !== evidence.controls_digest) throw new Error("work_queue_control_inventory_changed");
               return inventory;

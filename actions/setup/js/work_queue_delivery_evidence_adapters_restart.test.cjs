@@ -284,4 +284,41 @@ describe("durable adapter and queue-control delivery across process restart", ()
       h.dispose();
     }
   });
+
+  it("rejects queue-control evidence without a controls digest after restart", async () => {
+    const h = createHarness({
+      type: "work_queue_dispatch_next",
+      messages: [],
+      config: {},
+      contract: {
+        version: 1,
+        outputs: [
+          { type: "work_queue_submit", min: 1, max: 1 },
+          { type: "work_queue_dispatch_next", min: 1, max: 1 },
+        ],
+      },
+    });
+    try {
+      await publishControls(h, false);
+      const binding = require("./work_queue_binding.cjs");
+      const publishOperations = binding.publishOperations;
+      binding.publishOperations = (options, context, purpose, kind, operations, validatePrefix) => {
+        const publishedOperations = kind === "delivery_evidence" ? operations.map(({ controls_digest: _controlsDigest, ...operation }) => operation) : operations;
+        return publishOperations(options, context, purpose, kind, publishedOperations, validatePrefix);
+      };
+      await h.workerPass({
+        readControlInventory: async () => {
+          throw Object.assign(new Error("queue-control readback unavailable"), { status: 503 });
+        },
+      });
+      const evidence = pendingEvidence(h, "queue_control");
+      expect(evidence).not.toHaveProperty("controls_digest");
+
+      h.restartForMaintenance();
+      const result = await h.maintenance({ maxReconciliations: 1 });
+      assertSettlement(h, result, true, 0);
+    } finally {
+      h.dispose();
+    }
+  });
 });

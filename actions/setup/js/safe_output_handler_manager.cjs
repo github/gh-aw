@@ -2062,7 +2062,7 @@ async function settleClaimDelivery(scope, messages, results, options = {}) {
       if (evidence.unsupported) core.info(`Claim ${handle}: durable delivery evidence not published (${evidence.unsupported})`);
       else await publishDeliveryEvidence({ assignment: scope.assignment, claim_handle: handle, ...evidence, github: options.queueClient || github, context: verificationContext, core });
     } catch (error) {
-      core.warning(`Claim ${handle}: durable delivery evidence publication failed: ${getErrorMessage(error)}`);
+      core.error(`Claim ${handle}: durable delivery evidence publication failed: ${getErrorMessage(error)}`);
     }
   }
   const controlProofs = new Map();

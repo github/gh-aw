@@ -24,6 +24,27 @@ describe("worker durable delivery publication", () => {
     }
   });
 
+  it("reports evidence publication failures and expires the unverified claim without a Result", async () => {
+    const h = createHarness();
+    try {
+      const evidenceModule = require("./work_queue_delivery_evidence.cjs");
+      evidenceModule.publishDeliveryEvidence = async () => {
+        throw new Error("injected evidence publication failure");
+      };
+      await h.workerPass();
+      expect(h.logs.error).toContain("Claim h1: durable delivery evidence publication failed: injected evidence publication failure");
+      expect(h.operations("DeliveryEvidence")).toHaveLength(0);
+
+      const member = h.fixture.assignment.claims[0];
+      const deadline = h.projection.works.get(member.work_id).completion_at + h.projection.policy.pools.default.reconciliation.deadline_ms;
+      h.restartForMaintenance();
+      await h.maintenance({ now: deadline + 1 });
+      expect(h.settlement(member)).toEqual({ barrier: "failed", evidenceRetained: false, results: 0, failures: 1, writes: 1 });
+    } finally {
+      h.dispose();
+    }
+  });
+
   it("publishes an empty inventory for a zero-message no-write contract", async () => {
     const h = createHarness({ contract: { kind: "none" }, messages: [] });
     try {
