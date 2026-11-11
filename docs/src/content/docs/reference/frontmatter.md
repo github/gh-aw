@@ -492,7 +492,15 @@ timeout-minutes: 30                  # Agentic step timeout, defaults to 20 minu
 | `ubuntu-24.04` / `ubuntu-22.04` | ✅ Supported. |
 | `ubuntu-24.04-arm` | ✅ Supported. Linux ARM64 runner. |
 | `macos-*` | ❌ Not supported. Docker is unavailable on macOS runners (no nested virtualization). See [FAQ](/gh-aw/reference/faq/). |
-| `windows-*` | ❌ Not supported. AWF requires Linux. |
+| `windows-latest` | Framework Bash steps execute in Ubuntu WSL; see [Windows runner execution](#windows-runner-execution). |
+
+#### Windows runner execution
+
+For the literal `runs-on: windows-latest`, the compiler wraps POSIX steps in built-in framework jobs, including the agent job, with PowerShell launchers that execute Bash in Ubuntu WSL. Native Windows Actions remain on the host. Unrelated custom jobs and other Windows runner labels do not receive this adapter.
+
+The runner must provide working WSL2. Generated setup selects or installs Ubuntu, installs Linux tools and Docker, and installs the Linux Node.js version selected by `actions/setup-node`. Setup fails if WSL2 or the required runtime cannot be initialized. Workspace, runner temporary paths, and GitHub command files are mapped into WSL; `/tmp/gh-aw` is shared through the runner's temporary directory for artifact collection.
+
+This adapter provides a Linux execution environment for framework commands; it does not make the agent a native Windows process. Linux remains the recommended runner, and this compiler behavior does not establish end-to-end availability for every Windows configuration.
 
 ### Workflow Concurrency Control (`concurrency:`)
 

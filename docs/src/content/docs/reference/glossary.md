@@ -169,9 +169,13 @@ safe-outputs:
     repositories: ["*"]
 ```
 
-### Jira Connector (`jira:`)
+### Declarative Connector (`connectors:`)
 
-An editable Markdown declaration imported with exact approved Jira resources and independently selected read tools and safe outputs. Read access uses Atlassian's hosted MCP service with the declaration's phase-specific credentials; importing alone grants no capabilities or provider permissions. See [Jira connector](/gh-aw/reference/connectors/#jira).
+An editable Markdown declaration that defines provider endpoints, phase-specific credentials, resource grants, and capabilities. Workflows import declarations through ordinary `imports` and independently select read tools, safe outputs, and protected gateway triggers. Importing alone selects no capabilities and grants no provider access. See [Connectors](/gh-aw/reference/connectors/).
+
+### Jira Connector
+
+An experimental declarative connector for bounded Jira REST reads, explicitly selected Atlassian hosted MCP methods, safe outputs, and protected gateway triggers. Credentials and exact resource grants are configured through the imported declaration. Receiver deployment and provider authorization remain separate requirements. See [Jira connector](/gh-aw/reference/connectors/#jira).
 
 ## Security and Outputs
 
@@ -495,21 +499,18 @@ A workflow-scoped identifier (format: `aw_` followed by 3–8 alphanumeric chara
 
 ### Jira Safe Outputs (`jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`)
 
-Independently selected effects from the shared [Jira connector](/gh-aw/reference/connectors/#jira). Import its embedded declaration and grant exact resources; REST credentials remain in the privileged safe-output phase. Native Jira handlers and automatic email/token environment injection are no longer supported.
+Independently selected effects from the editable [Jira connector](/gh-aw/reference/connectors/#jira). Import its declaration and grant exact resources; REST credentials remain in the privileged safe-output phase. Native Jira handlers and automatic email/token environment injection are no longer supported.
 
 ### Linear Safe Outputs (`linear-create-issue`, `linear-add-comment`, `linear-update-issue`)
 
-:::caution[Experimental]
-Linear Safe Outputs are experimental. Compiling a workflow that enables any Linear safe output emits `Using experimental feature: Linear safe outputs`.
-:::
-
-A set of safe outputs that call Linear's public GraphQL API from the isolated safe-output job, using a personal API key configured via `safe-outputs.linear-token` (a secret expression not available to the agent). `linear-create-issue` requires a `team-id`, which accepts a Linear team model UUID, team key such as `ENG`, or team name; comment and update targets accept either a Linear issue model UUID or a shorthand identifier such as `ENG-123`, and are fixed trusted configuration. `linear-update-issue` replaces only the enabled `title` and `body` fields. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#linear-safe-outputs).
+Independently selected effects from the experimental [Linear connector](/gh-aw/reference/connectors/#linear). Import its editable declaration, grant exact resources, and bind a separate writer credential. Targets are typed arguments checked against those grants; read results do not authorize writes. The former native handlers, `safe-outputs.linear-token`, and selection options such as `team-id` and `target` are removed. See [Migration from built-in Linear](/gh-aw/reference/connectors/#migration-from-built-in-linear).
 
 ### Azure DevOps Connector
 
-An embedded Markdown declaration with independently selected project-metadata
-reads and scoped work-item safe outputs. It has no PAT fallback, automatic
-work-item hydration, temporary-ID chaining, or operational ingress. See
+An experimental editable Markdown declaration with independently selected
+bounded reads, scoped work-item safe outputs, and protected gateway triggers.
+Exact resource grants and phase-specific credentials are required; importing
+does not fetch work-item context or deploy a webhook receiver. See
 [Connectors](/gh-aw/reference/connectors/#azure-devops).
 
 ### Approve Workflow Run (`approve-workflow-run:`)
