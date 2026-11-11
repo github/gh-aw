@@ -95,11 +95,13 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 | 1.0.33 | Audit-only review; issue #59894's `close_issue.cjs` command-injection claim is a false positive (no `exec`/subprocess call exists in the file). |
 | 1.0.32 | Audit-only review; #675–677 and #667–669/#674 are not new threat classes. |
 | 1.0.31 | Audit-only review; #672 is not a new threat class. |
-| 1.0.30–1.0.27 | CTR-001, CTR-004, and CTR-006 mapping synchronization. |
+| 1.0.30 | CTR-001 status-function guard mapping update only. |
+| 1.0.29 | CTR-004 Playwright renderer mapping update only. |
+| 1.0.28–1.0.27 | CTR-004 enclave and CTR-006 guard-renderer mapping updates only. |
 | 1.0.26 | Added CTR-026 timeout-expression rejection. |
 | 1.0.25–1.0.23 | Added CTR-025 and mapping-only audit updates. |
 | 1.0.22 | Added suppression and optimizer-failure requirements. |
-| 1.0.21–1.0.15 | Added CTR-022, CTR-023, and CTR-021. |
+| 1.0.21–1.0.15 (including 1.0.20) | Added CTR-022, CTR-023, and CTR-021. |
 | 1.0.14–1.0.8 | Added CTR-020, CTR-019, CTR-018, CTR-017, and CTR-016. |
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
