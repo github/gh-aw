@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"maps"
 )
 
 // ========================================
@@ -23,6 +24,22 @@ import (
 // hasNonBuiltinSafeOutputsEnabled for the performance-critical direct-field versions.
 var safeOutputFieldMapping = buildSafeOutputFieldMapping()
 
+func defaultReportIncompleteCreateIssue(config *SafeOutputsConfig) string {
+	withoutConnectors := *config
+	withoutConnectors.Scripts = maps.Clone(config.Scripts)
+	hasConnector := false
+	for name, script := range withoutConnectors.Scripts {
+		if script != nil && script.connectorInputSchema != nil {
+			hasConnector = true
+			delete(withoutConnectors.Scripts, name)
+		}
+	}
+	if hasConnector && !hasNonBuiltinSafeOutputsEnabled(&withoutConnectors) {
+		return "false"
+	}
+	return "true"
+}
+
 // hasAnySafeOutputEnabled reports whether any safe output field is non-nil.
 // It uses direct struct-field nil checks instead of reflection for performance;
 // this function is called on every compilation and is on the hot path.
@@ -43,13 +60,6 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 	return safeOutputs.CreateIssues != nil ||
 		safeOutputs.CreateSecurityAdvisory != nil ||
 		safeOutputs.AddSecurityAdvisoryComment != nil ||
-		safeOutputs.CreateWorkItems != nil ||
-		safeOutputs.UpdateWorkItems != nil ||
-		safeOutputs.CommentOnWorkItems != nil ||
-		safeOutputs.AssignWorkItems != nil ||
-		safeOutputs.LinkWorkItems != nil ||
-		safeOutputs.UploadWorkItemAttachments != nil ||
-		hasAnyJiraSafeOutputEnabled(safeOutputs) ||
 		safeOutputs.CreateAgentSessions != nil ||
 		safeOutputs.CreateDiscussions != nil ||
 		safeOutputs.UpdateDiscussions != nil ||
@@ -97,8 +107,7 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 		safeOutputs.ReportIncomplete != nil ||
 		safeOutputs.SetIssueType != nil ||
 		safeOutputs.SetIssueField != nil ||
-		safeOutputs.NoOp != nil ||
-		hasLinearSafeOutputs(safeOutputs)
+		safeOutputs.NoOp != nil
 }
 
 // The builtin types (noop, missing-data, missing-tool) are excluded from this check
@@ -120,13 +129,6 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 	return safeOutputs.CreateIssues != nil ||
 		safeOutputs.CreateSecurityAdvisory != nil ||
 		safeOutputs.AddSecurityAdvisoryComment != nil ||
-		safeOutputs.CreateWorkItems != nil ||
-		safeOutputs.UpdateWorkItems != nil ||
-		safeOutputs.CommentOnWorkItems != nil ||
-		safeOutputs.AssignWorkItems != nil ||
-		safeOutputs.LinkWorkItems != nil ||
-		safeOutputs.UploadWorkItemAttachments != nil ||
-		hasAnyJiraSafeOutputEnabled(safeOutputs) ||
 		safeOutputs.CreateAgentSessions != nil ||
 		safeOutputs.CreateDiscussions != nil ||
 		safeOutputs.UpdateDiscussions != nil ||
@@ -170,15 +172,7 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 		safeOutputs.DispatchRepository != nil ||
 		safeOutputs.CallWorkflow != nil ||
 		safeOutputs.SetIssueType != nil ||
-		safeOutputs.SetIssueField != nil || // non-builtin safe output field
-		hasLinearSafeOutputs(safeOutputs)
-}
-
-func hasLinearSafeOutputs(safeOutputs *SafeOutputsConfig) bool {
-	return safeOutputs != nil &&
-		(safeOutputs.LinearCreateIssue != nil ||
-			safeOutputs.LinearAddComment != nil ||
-			safeOutputs.LinearUpdateIssue != nil)
+		safeOutputs.SetIssueField != nil // non-builtin safe output field
 }
 
 // HasSafeOutputsEnabled checks if any safe-outputs are enabled

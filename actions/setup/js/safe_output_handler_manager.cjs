@@ -76,14 +76,7 @@ const GITHUB_TOKEN_CONFIG_KEY = "github-token";
 const HANDLER_MAP = {
   add_security_advisory_comment: "./add_security_advisory_comment.cjs",
   create_security_advisory: "./create_security_advisory.cjs",
-  linear_create_issue: "./linear_create_issue.cjs",
-  linear_add_comment: "./linear_add_comment.cjs",
-  linear_update_issue: "./linear_update_issue.cjs",
   create_issue: "./create_issue.cjs",
-  jira_create_issue: "./jira_create_issue.cjs",
-  jira_update_issue: "./jira_update_issue.cjs",
-  jira_add_comment: "./jira_add_comment.cjs",
-  jira_add_label: "./jira_add_label.cjs",
   add_comment: "./add_comment.cjs",
   comment_memory: "./comment_memory.cjs",
   create_discussion: "./create_discussion.cjs",
@@ -134,12 +127,6 @@ const HANDLER_MAP = {
   report_incomplete: "./report_incomplete_handler.cjs",
   create_report_incomplete_issue: "./create_report_incomplete_issue.cjs",
   create_project: "./create_project.cjs",
-  ado_create_work_item: "./create_work_item.cjs",
-  ado_update_work_item: "./update_work_item.cjs",
-  ado_comment_on_work_item: "./comment_on_work_item.cjs",
-  ado_assign_work_item: "./assign_work_item.cjs",
-  ado_link_work_items: "./link_work_items.cjs",
-  ado_upload_workitem_attachment: "./upload_workitem_attachment.cjs",
   create_project_status_update: "./create_project_status_update.cjs",
   update_project: "./update_project.cjs",
   upload_artifact: "./upload_artifact.cjs",
@@ -185,12 +172,7 @@ const WTD3_REQUIREMENT_ID = "WTD3";
 const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
   "add_security_advisory_comment",
   "create_security_advisory",
-  "linear_create_issue",
-  "linear_add_comment",
   "create_issue",
-  "jira_create_issue",
-  "jira_update_issue",
-  "jira_add_comment",
   "add_comment",
   "create_pull_request",
   "comment_memory",
@@ -214,8 +196,6 @@ const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
   "ledger_mutation",
   "create_report_incomplete_issue",
   "report_incomplete",
-  "ado_create_work_item",
-  "ado_comment_on_work_item",
 ]);
 
 /**
@@ -234,7 +214,6 @@ const THREAT_WARNING_CONVERTIBLE_TYPES = new Map([["push_to_pull_request_branch"
  * @type {Set<string>}
  */
 const THREAT_WARNING_ABORT_TYPES = new Set([
-  "linear_update_issue",
   "noop",
   "close_issue",
   "link_sub_issue",
@@ -246,7 +225,6 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "resolve_pull_request_review_thread",
   "dismiss_pull_request_review",
   "add_labels",
-  "jira_add_label",
   "remove_labels",
   "replace_label",
   "add_reviewer",
@@ -268,19 +246,16 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "call_workflow",
   "autofix_code_scanning_alert",
   "create_agent_session",
-  "ado_update_work_item",
-  "ado_assign_work_item",
-  "ado_link_work_items",
-  "ado_upload_workitem_attachment",
 ]);
 
 /**
  * Resolve threat warning policy for a safe output type.
  * @param {string} messageType
+ * @param {Map<string, Function>} messageHandlers
  * @returns {{policy: "reviewable" | "convertible" | "abort" | "none", mappedType?: string}}
  */
-function getThreatWarningPolicy(messageType) {
-  if (THREAT_WARNING_ABORT_TYPES.has(messageType)) {
+function getThreatWarningPolicy(messageType, messageHandlers) {
+  if (THREAT_WARNING_ABORT_TYPES.has(messageType) || handlerThreatWarningAbortTypes.get(messageHandlers)?.has(messageType)) {
     return { policy: "abort" };
   }
   const mappedType = THREAT_WARNING_CONVERTIBLE_TYPES.get(messageType);
@@ -378,6 +353,12 @@ const PR_REVIEW_HANDLER_TYPES = new Set(["create_pull_request_review_comment", "
  */
 const handlerLoadErrorsByHandlerMap = new WeakMap();
 
+/** @type {WeakMap<Map<string, Function>, Set<string>>} Compiler-owned warning policies, never message payloads. */
+const handlerThreatWarningAbortTypes = new WeakMap();
+
+/** @type {WeakMap<Map<string, Function>, Map<string, {max: number, attempted: number}>>} Trusted connector proposal budgets, scoped to a handler factory. */
+const connectorBudgetsByHandlerMap = new WeakMap();
+
 /** @type {WeakSet<Function>} Only built-in local diagnostics may bypass publication checks. */
 const localDiagnosticHandlers = new WeakSet();
 
@@ -461,6 +442,16 @@ function bindHandlerToFactoryScope(handler) {
 async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMentionAliases, activationCommentLinks = []) {
   config = normalizeSafeOutputConfig(config);
   const messageHandlers = new Map();
+  handlerThreatWarningAbortTypes.set(messageHandlers, new Set(Object.keys(config).filter(type => config[type]?.threat_warning_policy === "abort")));
+  const connectorBudgets = new Map();
+  for (const [type, options] of Object.entries(config)) {
+    if (options?.connector_operation !== true) continue;
+    if (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100) {
+      throw new Error(`Invalid trusted connector budget for "${type}": max must be an integer from 1 to 100`);
+    }
+    connectorBudgets.set(type, { max: options.max, attempted: 0 });
+  }
+  connectorBudgetsByHandlerMap.set(messageHandlers, connectorBudgets);
 
   /** @type {Map<string, string>} */
   const handlerLoadErrors = new Map();
@@ -1133,7 +1124,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     }
 
     if (detectionConclusion === "warning") {
-      const threatPolicy = getThreatWarningPolicy(messageType);
+      const threatPolicy = getThreatWarningPolicy(messageType, messageHandlers);
       if (threatPolicy.policy === "abort") {
         const errorCode = "threat_detected_abort_policy";
         const error = `Threat-detection warn policy aborted "${messageType}" (Requirement ${WTD3_REQUIREMENT_ID}): non-reviewable outputs must not be applied when detection conclusion is warning.`;
@@ -1233,6 +1224,22 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     }
 
     try {
+      const budget = connectorBudgetsByHandlerMap.get(messageHandlers)?.get(messageType);
+      if (budget) {
+        if (budget.attempted >= budget.max) {
+          results.push({
+            type: messageType,
+            messageIndex: i,
+            success: false,
+            errorCode: "connector_budget_exceeded",
+            error: `Connector operation "${messageType}" exceeded its max of ${budget.max} attempted invocation(s)`,
+          });
+          return;
+        }
+        // Reserve synchronously before invoking the credentialed handler. Failed
+        // proposals consume budget too; HTTP retries stay inside that invocation.
+        budget.attempted++;
+      }
       core.info(`Processing message ${i + 1}/${messages.length}: ${messageType}`);
 
       // Convert Map to plain object for handler

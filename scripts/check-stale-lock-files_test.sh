@@ -285,6 +285,32 @@ else
     fail "unknown --base-ref fallback output did not name the stale file" "$(cat "$T13_OUT")"
 fi
 
+echo "Test 14: connector declarations do not require standalone locks..."
+T14="$TMP_ROOT/t14"
+mkdir -p "$T14"
+create_fixture_repo "$T14" "consumer"
+mkdir -p "$T14/.github/workflows/connectors"
+printf '%s\n' "---" "connectors:" "  example:" "    experimental: true" "---" > "$T14/.github/workflows/connectors/example.md"
+git -C "$T14" add .
+git -C "$T14" commit -q -m "add connector declaration"
+printf '%s\n' "# declaration documentation" >> "$T14/.github/workflows/connectors/example.md"
+T14_OUT="$TMP_ROOT/t14-output.txt"
+if (cd "$T14" && bash "$STALE_SCRIPT" >"$T14_OUT" 2>&1); then
+    pass "connectors/ declarations are excluded"
+else
+    fail "connector declarations should not need standalone locks" "$(cat "$T14_OUT")"
+fi
+
+echo "Test 15: a changed connector does not hide a stale consumer workflow..."
+printf '%s\n' "# consumer (edited)" > "$T14/.github/workflows/consumer.md"
+if (cd "$T14" && bash "$STALE_SCRIPT" >"$T14_OUT" 2>&1); then
+    fail "stale consumer should still fail" "$(cat "$T14_OUT")"
+elif grep -q "consumer.md" "$T14_OUT" && ! grep -q "connectors/example.md" "$T14_OUT"; then
+    pass "stale consumer is still reported"
+else
+    fail "stale consumer output named unexpected files" "$(cat "$T14_OUT")"
+fi
+
 echo
 echo "Tests passed: $TESTS_PASSED"
 echo "Tests failed: $TESTS_FAILED"

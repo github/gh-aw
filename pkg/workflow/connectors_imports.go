@@ -1,0 +1,284 @@
+package workflow
+
+import (
+	"errors"
+	"fmt"
+	"maps"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/sliceutil"
+)
+
+func (c *Compiler) normalizeWorkflowConnectors(result *parser.FrontmatterResult, path, content string, validateEngineOnError bool) error {
+	err := c.normalizeImportedConnectors(result.Frontmatter, path, content)
+	// Connector discovery must not let a broken import hide a main workflow's engine typo.
+	if err != nil && validateEngineOnError {
+		if engineErr := c.validateEngineBeforeSchema(path, []byte(content), result, result.Frontmatter); engineErr != nil {
+			return engineErr
+		}
+	}
+	return err
+}
+
+// Resolve registrations through the existing import pipeline before native schema
+// validation. The normal engine import pass reuses the same confined import cache.
+func (c *Compiler) normalizeImportedConnectors(frontmatter map[string]any, path, content string) error {
+	var imported []parser.ConnectorImport
+	if frontmatterDeclaresImports(frontmatter) {
+		imports, err := parser.ProcessImportsFromFrontmatterWithSource(frontmatter, filepath.Dir(path), c.getSharedImportCache(), path, content)
+		if err != nil {
+			return err
+		}
+		imported = imports.Connectors
+	}
+	registrations, err := importedConnectorRegistrations(frontmatter, imported)
+	if err != nil {
+		return err
+	}
+	if len(registrations) != 0 {
+		frontmatter["connectors"] = registrations
+	}
+	return nil
+}
+
+func importedConnectorRegistrations(frontmatter map[string]any, imports []parser.ConnectorImport) (map[string]any, error) {
+	registrations := map[string]any{}
+	configs := map[string]map[string]any{}
+	var declarations []string
+	if existing, present := frontmatter["connectors"]; present {
+		values, ok := existing.(map[string]any)
+		if !ok {
+			return nil, errors.New("connectors must be an object")
+		}
+		for _, alias := range sliceutil.SortedKeys(values) {
+			config, declaration, err := normalizeConnectorDeclaration(alias, values[alias])
+			if err != nil {
+				return nil, err
+			}
+			registrations[alias] = config
+			if declaration {
+				declarations = append(declarations, alias)
+				configs[alias] = config
+			}
+		}
+	}
+	for _, imported := range imports {
+		for _, alias := range sliceutil.SortedKeys(imported.Registrations) {
+			if _, duplicate := registrations[alias]; duplicate {
+				return nil, fmt.Errorf("import %q: connector %q is already registered; use distinct aliases instead of overriding service authority", imported.Source, alias)
+			}
+			value, declaration, err := normalizeConnectorDeclaration(alias, imported.Registrations[alias])
+			if err != nil {
+				return nil, fmt.Errorf("import %q: %w", imported.Source, err)
+			}
+			config := maps.Clone(value)
+			if declaration {
+				declarations = append(declarations, alias)
+			}
+			registrations[alias] = config
+			configs[alias] = config
+		}
+	}
+	if contextSelections, ok := frontmatter["context"].(map[string]any); ok {
+		for _, alias := range declarations {
+			if _, configured := contextSelections[alias]; configured {
+				return nil, fmt.Errorf("context.%s is unsupported; select tools.%s to read content using approved event references", alias, alias)
+			}
+		}
+	}
+	if len(configs) != 0 {
+		if err := applyImportedConnectorSelections(frontmatter, configs); err != nil {
+			return nil, err
+		}
+	}
+	if err := connectorGatewaySelections(frontmatter, registrations); err != nil {
+		return nil, err
+	}
+	if err := normalizeConnectorGatewayOn(frontmatter, registrations); err != nil {
+		return nil, err
+	}
+	return registrations, nil
+}
+
+func applyImportedConnectorSelections(frontmatter map[string]any, configs map[string]map[string]any) error {
+	aliases := sliceutil.SortedKeys(configs)
+	if err := normalizeImportedTriggerNames(frontmatter, aliases); err != nil {
+		return err
+	}
+	if err := validateQualifiedConnectorNames(frontmatter, aliases); err != nil {
+		return err
+	}
+	for _, alias := range aliases {
+		for _, section := range []string{"tools", "context"} {
+			if err := consumeImportedConnectorSection(frontmatter, configs[alias], section, alias); err != nil {
+				return err
+			}
+		}
+		for _, section := range []string{"on", "safe-outputs"} {
+			if err := consumeQualifiedConnectorSection(frontmatter, configs[alias], section, alias); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func normalizeImportedTriggerNames(frontmatter map[string]any, aliases []string) error {
+	var names []string
+	switch value := frontmatter["on"].(type) {
+	case string:
+		names = []string{value}
+	case []string:
+		names = value
+	case []any:
+		for _, item := range value {
+			name, ok := item.(string)
+			if !ok {
+				return errors.New("on trigger lists must contain event names")
+			}
+			names = append(names, name)
+		}
+	default:
+		return nil
+	}
+	hasConnector := false
+	for _, name := range names {
+		for _, alias := range aliases {
+			hasConnector = hasConnector || strings.HasPrefix(name, alias+"-")
+		}
+	}
+	if !hasConnector {
+		return nil
+	}
+	events := map[string]any{}
+	for _, name := range names {
+		if _, duplicate := events[name]; duplicate {
+			return fmt.Errorf("duplicate trigger selection %q", name)
+		}
+		events[name] = nil
+	}
+	frontmatter["on"] = events
+	return nil
+}
+
+func validateQualifiedConnectorNames(frontmatter map[string]any, aliases []string) error {
+	builtins, err := parser.GetSafeOutputFieldKeys()
+	if err != nil {
+		return err
+	}
+	for _, section := range []string{"on", "safe-outputs"} {
+		values, ok := frontmatter[section].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, name := range sliceutil.SortedKeys(values) {
+			var owner string
+			for _, alias := range aliases {
+				if !strings.HasPrefix(name, alias+"-") {
+					continue
+				}
+				if owner != "" {
+					return fmt.Errorf("%s.%s has ambiguous connector prefixes %q and %q; use unambiguous connector ids", section, name, owner, alias)
+				}
+				owner = alias
+			}
+			if owner == "" {
+				continue
+			}
+			if section == "on" && (slices.Contains(validGitHubEventTypes, name) || ghAwOnSectionKeys[name]) {
+				return fmt.Errorf("connector %q cannot shadow built-in trigger field %q", owner, name)
+			}
+			if section == "safe-outputs" && slices.Contains(builtins, name) {
+				return fmt.Errorf("connector %q cannot shadow built-in GitHub safe output %q", owner, name)
+			}
+		}
+	}
+	return nil
+}
+
+func consumeQualifiedConnectorSection(frontmatter, config map[string]any, section, alias string) error {
+	values, ok := frontmatter[section].(map[string]any)
+	if !ok {
+		return nil
+	}
+	remaining := maps.Clone(values)
+	var names []string
+	operationOptions := map[string]any{}
+	for _, key := range sliceutil.SortedKeys(values) {
+		operation, qualified := strings.CutPrefix(key, alias+"-")
+		if !qualified {
+			continue
+		}
+		if section == "safe-outputs" {
+			options, err := parseConnectorOperationOptions(values[key])
+			if err != nil {
+				return fmt.Errorf("%s.%s: %w", section, key, err)
+			}
+			normalized := map[string]any{"max": options.Max}
+			if len(options.Samples) > 0 {
+				normalized["samples"] = options.Samples
+			}
+			if options.Staged != nil {
+				if isExpression(options.Staged.String()) {
+					normalized["staged"] = options.Staged.String()
+				} else {
+					normalized["staged"] = templatableBoolIsTrue(options.Staged)
+				}
+			}
+			operationOptions[operation] = normalized
+		} else {
+			options, object := values[key].(map[string]any)
+			if values[key] != nil && !object {
+				return fmt.Errorf("%s.%s accepts null or a mapping of declared trigger filters", section, key)
+			}
+			if len(options) != 0 {
+				if _, err := connectorGatewayTriggerNames(map[string]any{operation: options}, config); err != nil {
+					return fmt.Errorf("%s.%s: %w", section, key, err)
+				}
+			}
+		}
+		names = append(names, operation)
+		delete(remaining, key)
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	config[section] = names
+	if len(operationOptions) > 0 {
+		config["safe-output-options"] = operationOptions
+	}
+	if len(remaining) == 0 {
+		delete(frontmatter, section)
+	} else {
+		frontmatter[section] = remaining
+	}
+	return nil
+}
+
+func consumeImportedConnectorSection(frontmatter, config map[string]any, section, alias string) error {
+	values, ok := frontmatter[section].(map[string]any)
+	if !ok {
+		return nil
+	}
+	if selected, exists := values[alias]; exists {
+		if targeted, ok := selected.(map[string]any); ok && section == "tools" {
+			names, err := narrowConnectorMCPSelection(config, targeted)
+			if err != nil {
+				return fmt.Errorf("tools.%s: %w", alias, err)
+			}
+			selected = names
+		}
+		config[section] = selected
+		values = maps.Clone(values)
+		delete(values, alias)
+		if len(values) == 0 {
+			delete(frontmatter, section)
+		} else {
+			frontmatter[section] = values
+		}
+	}
+	return nil
+}

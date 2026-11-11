@@ -2,12 +2,20 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 )
 
 func (c *Compiler) processWebhookTriggers(frontmatter map[string]any, data *WorkflowData) (map[string]any, error) {
-	subscriptions, err := ParseWebhookSubscriptions(frontmatter["on"], data.WorkflowID)
+	if on, ok := frontmatter["on"].(map[string]any); ok {
+		if _, gateway := on["gateway-dispatch"]; gateway {
+			if err := c.requireWebhookTriggers(c.extractRoles(frontmatter)); err != nil {
+				return nil, err
+			}
+		}
+	}
+	connectorSubscriptions, err := connectorWebhookSubscriptions(data.Connectors, data.WorkflowID)
 	if err != nil {
 		return nil, err
 	}
@@ -15,6 +23,18 @@ func (c *Compiler) processWebhookTriggers(frontmatter map[string]any, data *Work
 	if !ok {
 		return frontmatter, nil
 	}
+	nativeOn := any(on)
+	if len(connectorSubscriptions) > 0 {
+		nativeOn, err = withoutConnectorGatewaySelections(on, data.Connectors)
+		if err != nil {
+			return nil, err
+		}
+	}
+	subscriptions, err := ParseWebhookSubscriptions(nativeOn, data.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	subscriptions = append(subscriptions, connectorSubscriptions...)
 	if len(subscriptions) == 0 {
 		return frontmatter, nil
 	}
@@ -36,6 +56,29 @@ func (c *Compiler) processWebhookTriggers(frontmatter map[string]any, data *Work
 	return frontmatter, nil
 }
 
+func withoutConnectorGatewaySelections(on map[string]any, connectors map[string]*WorkflowConnector) (map[string]any, error) {
+	if err := validateGatewayDispatchExclusive(on); err != nil {
+		return nil, err
+	}
+	gateway, ok := on["gateway-dispatch"].(map[string]any)
+	if !ok {
+		return nil, errors.New("connector triggers require on.gateway-dispatch")
+	}
+	on = maps.Clone(on)
+	gateway = maps.Clone(gateway)
+	for alias := range connectors {
+		if !reservedConnectorGatewayName(alias) {
+			delete(gateway, alias)
+		}
+	}
+	if len(gateway) == 0 {
+		delete(on, "gateway-dispatch")
+	} else {
+		on["gateway-dispatch"] = gateway
+	}
+	return on, nil
+}
+
 func buildWebhookValidationStep(data *WorkflowData) ([]string, error) {
 	if len(data.WebhookSubscriptions) == 0 {
 		return nil, nil
@@ -43,6 +86,9 @@ func buildWebhookValidationStep(data *WorkflowData) ([]string, error) {
 	subscriptions, err := json.Marshal(data.WebhookSubscriptions)
 	if err != nil {
 		return nil, fmt.Errorf("marshal webhook subscriptions: %w", err)
+	}
+	if len(subscriptions) > 65536 {
+		return nil, errors.New("compiled webhook subscriptions exceed 65536 bytes; reduce selected triggers or resource grants")
 	}
 	return []string{
 		"      - name: Validate webhook relay\n",
