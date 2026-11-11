@@ -43,6 +43,19 @@ def checklist(text):
 
 
 class GuidanceTests(unittest.TestCase):
+    def test_ad_hoc_recommendations_name_defaults_and_bound_targets(self):
+        creator = normalized((ROOT / ".github/aw/create-agentic-workflow.md").read_text())
+        self.assertIn("For each material undefined term, propose and clearly label a reasonable `Default:`", creator)
+
+        safe_outputs = normalized((ROOT / ".github/aw/safe-outputs-content.md").read_text())
+        self.assertIn('Avoid `target: "*"` when a workflow needs to act on the triggering issue/PR and one known tracker', safe_outputs)
+        self.assertIn('`target: "triggering"`', safe_outputs)
+        self.assertIn("tracker's explicit issue/PR number", safe_outputs)
+
+        triggers = normalized((ROOT / ".github/aw/create-agentic-workflow-trigger-details.md").read_text())
+        self.assertIn("`opened` and process that event only when `github.event.issue.milestone != null`", triggers)
+        self.assertIn("events-that-trigger-workflows#issues", triggers)
+
     def test_local_sdlc_routes_to_squad_alongside_workflow_creation(self):
         for path, workflow_route in (
             (".github/skills/agentic-workflows/SKILL.md", "- Design workflows from scratch"),

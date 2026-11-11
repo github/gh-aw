@@ -2252,6 +2252,8 @@ Validation rules:
 
 The text output by AI agents is automatically sanitized to prevent injection of malicious content and ensure safe rendering on GitHub. The auto-sanitization applied is: XML escaped, HTTPS only, domain allowlist (GitHub by default), 0.5MB/65k line limits, control char stripping.
 
+The domain allowlist also covers scheme-less `www.` autolinks recognized by GitHub-flavored Markdown. Disallowed URLs are replaced with non-linking redaction markers, including when a hostname starts with `www.`. These URLs follow the configured URL policy: `allowed-only` filters code regions too, while `allowed-or-code-region` preserves fenced and inline code examples.
+
 HTML/XML comments (`<!-- ... -->`) are removed from sanitized body fields.
 
 #### Structured Data (`data:`)

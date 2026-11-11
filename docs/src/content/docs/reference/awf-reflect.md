@@ -5,10 +5,6 @@ sidebar:
   order: 1355
 ---
 
-:::caution[Experimental]
-The AWF `/reflect` route and its response shape are currently experimental and subject to change. Do not rely on this API for production use or in shared workflow logic.
-:::
-
 Inside the AWF runtime network, the AWF API proxy exposes `GET /reflect` at `http://api-proxy:10000/reflect`.
 
 Use this route when building shared workflows, tools, or extensions that need runtime model routing.
