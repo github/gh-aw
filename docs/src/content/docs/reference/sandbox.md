@@ -112,12 +112,6 @@ sandbox:
 
 AWF is the default coding agent sandbox that provides network egress control through domain-based access controls. Network permissions are configured through the top-level [`network`](/gh-aw/reference/network/) field.
 
-#### Custom CA certificate for the API proxy
-
-Set `sandbox.agent.ca-cert` to a host path containing a PEM CA certificate to trust it when verifying upstream TLS connections through AWF's API proxy. The file is bind-mounted read-only into the API proxy sidecar. This setting requires AWF v0.28.10 or later.
-
-This setting applies to the agent job. The detection job runs separately; see [Private CA certificates in Threat detection](/gh-aw/reference/threat-detection/#private-ca-certificates) for its CA inheritance and provisioning behavior.
-
 ```yaml wrap
 sandbox:
   agent: awf
@@ -129,6 +123,12 @@ network:
     - python
     - "api.example.com"
 ```
+
+#### Custom CA certificate for the API proxy
+
+Set `sandbox.agent.ca-cert` to a host path containing a PEM CA certificate to trust it when verifying upstream TLS connections through AWF's API proxy. The file is bind-mounted read-only into the API proxy sidecar. This setting requires AWF v0.28.10 or later.
+
+This setting applies to the agent job. The detection job runs separately; see [Private CA certificates in Threat detection](/gh-aw/reference/threat-detection/#private-ca-certificates) for its CA inheritance and provisioning behavior.
 
 #### Filesystem Access
 
