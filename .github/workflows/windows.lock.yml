@@ -771,7 +771,7 @@ jobs:
           & $wsl.Source --set-default Ubuntu
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not select the Ubuntu distribution.' }
           $env:WSLENV = 'GITHUB_WORKSPACE/p:RUNNER_TEMP/p:RUNNER_TOOL_CACHE/p'
-          & $wsl.Source --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi; export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git jq nodejs npm xz-utils; if ! pgrep -x dockerd >/dev/null; then nohup dockerd --host=unix:///var/run/docker.sock >"$RUNNER_TEMP/gh-aw/dockerd.log" 2>&1 </dev/null & fi; for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; echo "WSL Docker daemon did not become ready." >&2; tail -n 50 "$RUNNER_TEMP/gh-aw/dockerd.log"; exit 1'
+          & $wsl.Source --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi; export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git gpgv jq nodejs npm xz-utils; if ! pgrep -x dockerd >/dev/null; then nohup dockerd --host=unix:///var/run/docker.sock >"$RUNNER_TEMP/gh-aw/dockerd.log" 2>&1 </dev/null & fi; for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; echo "WSL Docker daemon did not become ready." >&2; tail -n 50 "$RUNNER_TEMP/gh-aw/dockerd.log"; exit 1'
           if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to install Linux tools, start Docker, or map required paths.' }
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -813,7 +813,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('ykxTiFbQrVJQUqkOCvXzcw2KD/H394l3dnT2cLXSrVVSiLVWKMlIzeNSUEhNzshXUMJQZatS7e4R7xgejyFTq6RgZ6egpOLuGeIR6hTv6hemxJWWyVUNNwuiL9jRzTXePzQkIDQk2FZFo7w4pyCxJENBtxzZUa6+AbX66Rm6ieX6xYlpqfmlJQWlJcX6UFovqzg/L0dJUwmP0fHO/n5unu7xAY4hHqRak5yfl5aZDraFgCUg3weTZUdJfn5OMdyKWpSgg5iuxAUYAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -847,7 +848,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9bPTSzOjs8vySmIz0hNTEktKtYrzlACDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -881,7 +883,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzkhNzo7PL8kpiE9JTUsszSmJTy5KTUnNK8lMzCnWK85QAgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -919,7 +922,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('hM8xSwQxEAXgPr8iPE6uubvFNqCgKHqFIpLthBA24xolk5DMroL43wW3WW3shm948F56C7HqfdHoJJVufNn7dyiaYyAeyEkqZ6tP50dicfRBwyQx8+G1ZT5IKlClRpZnvf3ETLXFzDCnOww5lczEAoOfLHaoE7sYYE7acnsRSkUWaOKFYMBZXBNfhQK+nnirsbk52tv+0j329+54hd9wYe313YOFPtfYrNtDpfkv6f8WQX0PAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -953,7 +957,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPLkpNLEmNT8+ITyyPL8ktiE/JLNIrzlACDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -987,7 +992,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzs9Ly0wvLUqNT8+IT8svik/PSNUrzlACDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1032,7 +1038,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzs9Ly0wvLUqNT88siU8uSk1JzSvJTMwp1ivOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1080,7 +1087,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $env:WSLENV = 'RUNNER_TEMP/p:GH_AW_WSL_NODE_VERSION'
-          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt" -o "$staging/SHASUMS256.txt"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
+          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt.asc" -o "$staging/SHASUMS256.txt.asc"; curl -fsSL "https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg/pubring.kbx" -o "$staging/nodejs-release-keyring.kbx"; gpgv --keyring "$staging/nodejs-release-keyring.kbx" --output "$staging/SHASUMS256.txt" "$staging/SHASUMS256.txt.asc"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not install the pinned Linux Node.js runtime.' }
       - name: Install Codex CLI
         shell: pwsh
@@ -1095,7 +1102,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('yivIVcjMKy5JzMlR0E1XcMgvSM1LzNRPzk9JrXAw0DM0M9czAAwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1135,7 +1143,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9bPzCsuSczJiU8sT4tPysxLLKrUK85QUigz0DOy1DM0VNDVLcrPL8lJLS4GDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1183,7 +1192,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvSi0uyS9KjU9KLE6NT88syShNik/Lz0lJLSrWK85QAgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1220,7 +1230,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvSi0uyS9Kjc/My8nMS40vLk2KT0xPzSsp1ivOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1256,7 +1267,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvSi0uyS9Kjc/My8nMS40vzs7MySnWK85QAgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1290,7 +1302,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('hNExb1NBDAfwr1JVrHmxfT7fXSaWjlSogrnyne0kos0LeWkLQnx3VETF0EqdPFk/+//vuuwuLj/8uvl6fX11c/vl6tPn3+vtbqVPq8XPD8e1jvN+Pixrm58Od7Parc3jm59u9/e69WVadpcX2904Tft5vd2fdw/933bsT/6kd3dr3frhvIGJ2oT4cdkpZdnUUlhLGiljarkzGqmBBpt1ltoAypBinoZB7daCU+9VwROANPD3zON+dTzNP36+cquRgSfMmoGtpTCOXiuXMAjpJZilBaNKDAEuPdloknlk0U7jHXf5/rC3V6ZgSc1HNGIzsp49R5dM1kmtkqqGoWAWStSKmfZRn09I0qlyedu8H8ft5hGmPMkLlJiGCbFjYGnWsDuZF0WWGBypFmjkQi6jKpcMYqUlcsRklBDfhg6z+f/aUmaqg4xdgKJBqdgVRi44GMBrREujuGOGqiVbwajFEztjHq/j+zuef1ktfnr00+aRJpzgxQuBLDEQekSMUUdFFcai5G0oUoUqXLyaCXATJuVwVXMHh6j6ZwA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1324,7 +1337,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('tM1RboMwDADQf05hRXxsHx6n4HNoQut3FGKTpgpxRAy0anv3Sr1DT/AqK6BAiYVnF1PjhfgKxNMWYBHiVAFx2jIlJniAab+8LIvLBLhDFuJvA6a9j6dh6Ef73//+PbtwRndgZd1K57xGybXzknde1QanfLib9ZLnGOyb+/GXagCR4speUUVSbT4qTSJadXWleQ0A')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1361,7 +1375,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('ys1OySxS0C1QUFKpDgr183MNig9x9Q2o1U/P0E0s1y9OTEvNLy0pKC0pVuKCq9UvyS3AVIBVPje5QDcnP70YRSFgAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1559,7 +1574,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('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')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1607,7 +1623,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzklNzItPzyyJTy5KTUnNK8lMzCnWK85Q4iLaiLLUosy0SqxmAAYA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1643,7 +1660,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPLE3JLIkvKEqNT0xPzSuJL88vyi4uSExO1SvOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1689,7 +1707,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('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')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1779,7 +1798,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPzs9Ly0wvLUqNT88siU8uSk1JzSvJTMwp1ivOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1819,7 +1839,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvLskviM9NLohPTyxJLU+s1CvOUFJQUnF3DHENd4yMD/B0UeICDAA=')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1883,7 +1904,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9ZPLChIzUuJT0xPzSuJLy5JLYgvLs3NTSyq1CvOUAIMAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1920,7 +1942,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('ys1OySxS0C1Q0C/JLdBPz9BNLOdKLlBQUnH3iHcMjw92dHON9w8NCQgNCVZCUqNfnJiWml9aUlBaUqyXVZyfl6NgZKefklqmn1eak6NQU6NQUlSaygUYAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -1995,7 +2018,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('SkoszlBQUqkOCvXzcw2KD3H1DajVT8/QTSzXLU4tKS3QT0wuyczPK9YvKMrMK4lPyyxKLU/MyYnPyU8v1ivOUFLQ1S3Kzy/JSS0uBgwA')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)
@@ -2060,7 +2084,8 @@ jobs:
           $env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory
           $processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')
           $environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }
-          $env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          $wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\/]|\\\\)') { "$_/p" } else { $_ } }) -join ':')
+          if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment
           $compressedScript = [System.Convert]::FromBase64String('ykxTiFZQVNBNU9AvyS3QT8/QTSzXT0xPzSuJzy8tKSgt0csqzs9TiLVWKMlIzeNSUEhNzshXUK9WyixJzS1WsoqOrVVXsMOrmSstkwswAA==')
           $compressedStream = [System.IO.MemoryStream]::new($compressedScript)
           $decompressor = [System.IO.Compression.DeflateStream]::new($compressedStream, [System.IO.Compression.CompressionMode]::Decompress)

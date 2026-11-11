@@ -32,10 +32,12 @@ const windowsWSLBootstrapStep = `      - name: Initialize WSL runtime
           & $wsl.Source --set-default Ubuntu
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not select the Ubuntu distribution.' }
           $env:WSLENV = 'GITHUB_WORKSPACE/p:RUNNER_TEMP/p:RUNNER_TOOL_CACHE/p'
-          & $wsl.Source --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi; export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git jq nodejs npm xz-utils; if ! pgrep -x dockerd >/dev/null; then nohup dockerd --host=unix:///var/run/docker.sock >"$RUNNER_TEMP/gh-aw/dockerd.log" 2>&1 </dev/null & fi; for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; echo "WSL Docker daemon did not become ready." >&2; tail -n 50 "$RUNNER_TEMP/gh-aw/dockerd.log"; exit 1'
+          & $wsl.Source --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; test -d "$GITHUB_WORKSPACE"; test -d "$RUNNER_TEMP"; mkdir -p "$RUNNER_TEMP/gh-aw"; if [ -L /tmp/gh-aw ]; then [ "$(readlink -f /tmp/gh-aw)" = "$(readlink -f "$RUNNER_TEMP/gh-aw")" ]; elif [ -e /tmp/gh-aw ]; then echo "WSL bootstrap cannot map /tmp/gh-aw: the path already exists."; exit 1; else ln -s "$RUNNER_TEMP/gh-aw" /tmp/gh-aw; fi; export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git gpgv jq nodejs npm xz-utils; if ! pgrep -x dockerd >/dev/null; then nohup dockerd --host=unix:///var/run/docker.sock >"$RUNNER_TEMP/gh-aw/dockerd.log" 2>&1 </dev/null & fi; for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; echo "WSL Docker daemon did not become ready." >&2; tail -n 50 "$RUNNER_TEMP/gh-aw/dockerd.log"; exit 1'
           if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to install Linux tools, start Docker, or map required paths.' }
 `
 
+// When updating this pin, select an audited nodejs/release-keys commit and use
+// gpg/pubring.kbx so signatures from retired release keys remain verifiable.
 func windowsWSLNodeBootstrapStep(nodeSetupID string) string {
 	return fmt.Sprintf(`      - name: Setup Node.js in WSL
         shell: pwsh
@@ -44,7 +46,7 @@ func windowsWSLNodeBootstrapStep(nodeSetupID string) string {
         run: |
           $ErrorActionPreference = 'Stop'
           $env:WSLENV = 'RUNNER_TEMP/p:GH_AW_WSL_NODE_VERSION'
-          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt" -o "$staging/SHASUMS256.txt"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
+          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt.asc" -o "$staging/SHASUMS256.txt.asc"; curl -fsSL "https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg/pubring.kbx" -o "$staging/nodejs-release-keyring.kbx"; gpgv --keyring "$staging/nodejs-release-keyring.kbx" --output "$staging/SHASUMS256.txt" "$staging/SHASUMS256.txt.asc"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not install the pinned Linux Node.js runtime.' }
 `, nodeSetupID)
 }
@@ -563,7 +565,8 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 		"$env:GH_AW_WSL_WORKING_DIRECTORY = $workingDirectory",
 		"$processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')",
 		"$environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }",
-		"$env:WSLENV = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\\\/]|\\\\\\\\)') { \"$_/p\" } else { $_ } }) -join ':')",
+		"$wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\\\/]|\\\\\\\\)') { \"$_/p\" } else { $_ } }) -join ':')",
+		"if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment",
 	}
 }
 
