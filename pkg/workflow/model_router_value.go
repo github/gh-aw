@@ -151,21 +151,8 @@ func validateRouterModelValuePlacement(data *WorkflowData) error {
 			return modelList("models.blocked", model)
 		}
 	}
-	keys := make([]string, 0, len(data.ModelMappings))
-	for key := range data.ModelMappings {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	for _, key := range keys {
-		if isReservedRouterModelName(key) {
-			return NewValidationError("models."+key, key, "router and the router/* namespace are reserved and cannot be defined as model aliases",
-				"Rename the alias. To route the main agent, set model: router (or router/economy, router/balanced, router/robust).")
-		}
-		for _, entry := range data.ModelMappings[key] {
-			if isReservedRouterModelName(entry) {
-				return modelList("models."+displayKey(key), entry)
-			}
-		}
+	if err := validateRouterModelAliases(data, modelList); err != nil {
+		return err
 	}
 	for _, agent := range data.SubAgentModels {
 		if isReservedRouterModelName(agent.Model) {
@@ -181,6 +168,26 @@ func validateRouterModelValuePlacement(data *WorkflowData) error {
 	for i, enclave := range data.Enclaves {
 		if enclave != nil && enclave.Agent != nil && isReservedRouterModelName(enclave.Agent.Model) {
 			return otherJob(fmt.Sprintf("enclaves[%d].agent.model", i), enclave.Agent.Model)
+		}
+	}
+	return nil
+}
+
+func validateRouterModelAliases(data *WorkflowData, modelList func(string, string) error) error {
+	keys := make([]string, 0, len(data.ModelMappings))
+	for key := range data.ModelMappings {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		if isReservedRouterModelName(key) {
+			return NewValidationError("models."+key, key, "router and the router/* namespace are reserved and cannot be defined as model aliases",
+				"Rename the alias. To route the main agent, set model: router (or router/economy, router/balanced, router/robust).")
+		}
+		for _, entry := range data.ModelMappings[key] {
+			if isReservedRouterModelName(entry) {
+				return modelList("models."+displayKey(key), entry)
+			}
 		}
 	}
 	return nil
