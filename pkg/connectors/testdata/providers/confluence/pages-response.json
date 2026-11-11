@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "id": "456",
+      "status": "current",
+      "title": "Deployment runbook",
+      "spaceId": "123",
+      "version": {
+        "number": 1
+      },
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<p>Review the workflow result before taking action.</p>"
+        }
+      }
+    }
+  ]
+}

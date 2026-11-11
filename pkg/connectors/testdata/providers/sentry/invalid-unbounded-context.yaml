@@ -1,0 +1,19 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: sentry.io/issues
+endpoints:
+  api: https://sentry.io
+credentials:
+  context-reader:
+    phase: context
+    header: Authorization
+    scheme: bearer
+    scopes: [event:read]
+context:
+  unsafe-event:
+    credential: context-reader
+    request:
+      endpoint: api
+      method: GET
+      path: /api/0/organizations/example-org/issues/1234567890/events/latest/
+    maxResponseBytes: 1048577

@@ -12,17 +12,6 @@ on:
     dependabot-alerts:
       types: [dismissed]
       severity: critical
-    jira-issue:
-      project: APP
-      types: [opened, closed]
-    linear-issue:
-      organization-id: organization-uuid
-      team-id: team-uuid
-      types: [opened, closed]
-    azure-devops-issue:
-      project_id: project-uuid
-      types: [closed, reopened]
-      closed-states: [Done, Closed]
 permissions:
   contents: read
 engine: copilot

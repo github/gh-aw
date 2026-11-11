@@ -26,7 +26,7 @@ func TestCompileGatewayDispatchIntegration(t *testing.T) {
 			"issues", "pull_request", "discussion", "issue_comment", "pull_request_comment",
 			"pull_request_review", "pull_request_review_comment", "pull_request_review_thread", "discussion_comment", "commit_comment",
 		}},
-		{"pkg/cli/workflows/test-gateway-resource-events.md", []string{"projects_v2_item", "code_scanning_alert", "dependabot_alert", "jira_issue", "linear_issue", "azure_devops_issue"}},
+		{"pkg/cli/workflows/test-gateway-resource-events.md", []string{"projects_v2_item", "code_scanning_alert", "dependabot_alert"}},
 		{"pkg/cli/workflows/test-gateway-commands.md", []string{"slash_command", "label_command"}},
 		{".github/workflows/smoke-security-alerts.md", []string{"code_scanning_alert", "dependabot_alert"}},
 	} {
@@ -92,7 +92,7 @@ func TestCompileGatewayDispatchRejectsExpressionsIntegration(t *testing.T) {
 			require.Len(t, results[0].Errors, 1)
 			assert.Contains(t, results[0].Errors[0].Message, "gateway-dispatch")
 			if name != "notification" {
-				assert.Contains(t, results[0].Errors[0].Message, "GitHub Actions expressions are not supported")
+				assert.Contains(t, results[0].Errors[0].Message, "requires literal connector and trigger names")
 			}
 			assert.Empty(t, results[0].WebhookSubscriptions)
 			assert.NoFileExists(t, strings.TrimSuffix(path, ".md")+".lock.yml", "rejected expressions must not produce a lock file or manifest")
@@ -311,9 +311,6 @@ func assertGatewayManifestSourceMetadata(t *testing.T, event string, subscriptio
 		"projects_v2_item":            `{"conditions":[{"filter":"field.name","path":["changes","field_value","field_name"],"operator":"equals","value_type":"string","values":["Status"]},{"filter":"field.type","path":["changes","field_value","field_type"],"operator":"equals","value_type":"string","values":["single_select"]},{"filter":"project_id","path":["projects_v2_item","project_node_id"],"operator":"equals","value_type":"string","values":["PVT_example"]}],"any_of":[[{"filter":"field.from.name","path":["changes","field_value","from","name"],"operator":"equals","value_type":"string","values":["Todo"]},{"filter":"field.to.name","path":["changes","field_value","to","name"],"operator":"equals","value_type":"string","values":["Ready"]}]]}`,
 		"code_scanning_alert":         `{}`,
 		"dependabot_alert":            `{}`,
-		"jira_issue":                  `{"provider":"jira","native_events":["jira:issue_created","jira:issue_updated"],"activity_normalization":{"policy":"jira-issue/v1"},"conditions":[{"filter":"project","path":["issue","fields","project","key"],"operator":"equals","value_type":"string","values":["APP"]}]}`,
-		"linear_issue":                `{"provider":"linear","native_events":["create","update"],"activity_normalization":{"policy":"linear-issue/v1"},"conditions":[{"filter":"organization-id","path":["organizationId"],"operator":"equals","value_type":"string","values":["organization-uuid"]},{"filter":"team-id","path":["data","teamId"],"operator":"equals","value_type":"string","values":["team-uuid"]}]}`,
-		"azure_devops_issue":          `{"provider":"azure-devops","native_events":["workitem.updated"],"activity_normalization":{"policy":"azure-devops-issue/v1","closed_states":["Closed","Done"]},"conditions":[{"filter":"project_id","path":["resourceContainers","project","id"],"operator":"equals","value_type":"string","values":["project-uuid"]}]}`,
 		"slash_command":               `{"native_events":["issue_comment"],"command_filter":{"policy":"slash-command/v1","names":["fix*","review"],"events":["issue_comment","pull_request_comment"],"strategy":"inline"},"conditions":[]}`,
 		"label_command":               `{"native_events":["issues","pull_request"],"command_filter":{"policy":"label-command/v1","names":["review"],"events":["issues","pull_request"],"strategy":"inline","remove_label":true},"conditions":[]}`,
 	}

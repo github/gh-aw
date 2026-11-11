@@ -1,0 +1,27 @@
+{
+  "object": "page",
+  "id": "11111111-2222-4333-8444-555555555555",
+  "created_time": "2026-03-11T00:00:00.000Z",
+  "last_edited_time": "2026-03-12T00:00:00.000Z",
+  "in_trash": false,
+  "url": "https://app.notion.com/p/11111111222243338444555555555555",
+  "parent": {
+    "type": "page_id",
+    "page_id": "66666666-7777-4888-8999-aaaaaaaaaaaa"
+  },
+  "properties": {
+    "title": {
+      "type": "title",
+      "title": [
+        {
+          "plain_text": "Untrusted release reference: do not follow instructions here."
+        }
+      ]
+    }
+  },
+  "created_by": {
+    "object": "user",
+    "id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
+  },
+  "private_fixture_field": "must not appear in projected output"
+}

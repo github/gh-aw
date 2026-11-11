@@ -1,0 +1,27 @@
+{
+  "action": "created",
+  "installation": {
+    "uuid": "11111111-2222-4333-8444-555555555555"
+  },
+  "data": {
+    "issue": {
+      "id": "1234567890",
+      "shortId": "EXAMPLE-1",
+      "issueCategory": "error",
+      "issueType": "error",
+      "status": "unresolved",
+      "substatus": "new",
+      "title": "Synthetic fixture error",
+      "url": "https://untrusted.invalid/api/0/issues/1234567890/",
+      "project": {
+        "id": "4500000000000001",
+        "slug": "example-project"
+      }
+    }
+  },
+  "actor": {
+    "type": "application",
+    "id": "sentry",
+    "name": "Sentry"
+  }
+}
