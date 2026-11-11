@@ -190,6 +190,7 @@ describe("sub_issue_helpers.cjs", () => {
       expect(result).toEqual({
         parentNodeId: "I_parent_100",
         subIssueNodeId: "I_sub_50",
+        effectId: expect.any(String),
       });
       expect(mockGithub.graphql).toHaveBeenCalledTimes(3);
       expect(mockGithub.graphql).toHaveBeenLastCalledWith(expect.stringContaining("mutation AddSubIssue"), {
@@ -218,6 +219,7 @@ describe("sub_issue_helpers.cjs", () => {
       expect(result).toEqual({
         parentNodeId: "I_parent_100",
         subIssueNodeId: "I_sub_50",
+        effectId: expect.any(String),
       });
       expect(mockGithub.graphql).toHaveBeenCalledTimes(1);
       expect(mockGithub.graphql).toHaveBeenCalledWith(expect.stringContaining("mutation AddSubIssue"), {

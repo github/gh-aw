@@ -2965,11 +2965,6 @@ async function main(config = {}) {
             branch: branchName,
             baseBranch,
             transportBaseBranch: defaultBaseBranch,
-            title,
-            body,
-            draft,
-            labels,
-            assignees: configAssignees || [],
           },
           githubClient
         );

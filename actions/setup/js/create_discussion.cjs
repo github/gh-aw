@@ -761,7 +761,7 @@ async function main(config = {}) {
           body,
         },
         message,
-        { id: discussion.id, number: discussion.number, url: discussion.url, repository: qualifiedItemRepo, repositoryNodeId: repoInfo.repositoryId, category: categoryId, title, body, labels: discussionLabels, effectIds, cleanup }
+        { id: discussion.id, number: discussion.number, url: discussion.url, repository: qualifiedItemRepo, repositoryNodeId: repoInfo.repositoryId, effectIds, cleanup }
       );
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -806,10 +806,6 @@ async function main(config = {}) {
             url: resolvedDiscussion.url,
             repository: qualifiedItemRepo,
             repositoryNodeId: repoInfo.repositoryId,
-            category: categoryId,
-            title,
-            body,
-            labels: discussionLabels,
             effectIds,
             cleanup,
           }

@@ -10,11 +10,12 @@ const { queueFixture, REPOSITORY, WORKFLOW, REF } = require("./work_queue_lifecy
 const { withClaimExecution, closeClaimEffectChannel, recordClaimEffect } = require("./work_queue_claim_scope.cjs");
 const { authorizeWorkerClaim, finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
 const { readDeliveryControlInventory, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
-const { captureDiscussionDelivery, preparePullRequestDelivery, capturePullRequestDelivery } = require("./work_queue_native_creation_delivery.cjs");
+const { captureIssueDelivery, captureDiscussionDelivery, preparePullRequestDelivery, capturePullRequestDelivery } = require("./work_queue_native_creation_delivery.cjs");
 const { settleClaimDelivery } = require("./safe_output_handler_manager.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { addDiscussionComment, closeDiscussionAsOutdated } = require("./close_older_discussions.cjs");
 const { MAX_CLOSE_COUNT } = require("./close_older_entities.cjs");
+const { linkSubIssue } = require("./sub_issue_helpers.cjs");
 
 const TREE = "b".repeat(40);
 const COMMIT = "c".repeat(40);
@@ -65,7 +66,7 @@ function fixture(type) {
   process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ [type]: {} });
   const effects = [];
   const message = { type, claim_handle: member.handle, title: "Requested title", body: "Requested body", ...(type === "create_pull_request" ? { branch: "approved" } : {}) };
-  const result = { success: true, repo: REPOSITORY, number: 19, id: "190", url: `https://github.com/${REPOSITORY}/${type === "create_discussion" ? "discussions" : "pull"}/19` };
+  const result = { success: true, repo: REPOSITORY, number: 19, id: "190", url: `https://github.com/${REPOSITORY}/${type === "create_discussion" ? "discussions" : type === "create_issue" ? "issues" : "pull"}/19` };
   const discussion = {
     __typename: "Discussion",
     id: "D_19",
@@ -109,10 +110,6 @@ function fixture(type) {
         id: discussion.id,
         number: 19,
         url: result.url,
-        category: "C_1",
-        title: "Final title",
-        body: "Final body",
-        labels: [],
         effectIds: ["discussion-effect"],
         ...(cleanup === undefined ? {} : { cleanup }),
       });
@@ -127,12 +124,7 @@ function fixture(type) {
       }),
     };
     const prepared = await preparePullRequestDelivery(exec, baseBranch, transportBaseBranch);
-    return capturePullRequestDelivery(
-      result,
-      message,
-      { prepared, repository: REPOSITORY, headRepository: REPOSITORY, id: "190", number: 19, url: result.url, branch: "approved", baseBranch, transportBaseBranch, title: pull.title, body: pull.body, draft: true, labels: [], assignees: [] },
-      wrapped
-    );
+    return capturePullRequestDelivery(result, message, { prepared, repository: REPOSITORY, headRepository: REPOSITORY, id: "190", number: 19, url: result.url, branch: "approved", baseBranch, transportBaseBranch }, wrapped);
   };
   const settle = () =>
     settleClaimDelivery({ assignment }, [message], [{ messageIndex: 0, success: true, result }], {
@@ -224,7 +216,6 @@ describe("native creation Claim delivery", () => {
     { type: "invalid" },
     ...["id", "discussionId"].flatMap(field => [undefined, null, 7, "", "x".repeat(257), "private\nid"].map(value => ({ type: "close", id: "D_old", discussionId: "D_old", effectId: "a".repeat(64), [field]: value }))),
     ...[undefined, null, 7, "", "a".repeat(63), "a".repeat(65), "A".repeat(64), "g".repeat(64)].map(effectId => ({ type: "close", id: "D_old", discussionId: "D_old", effectId })),
-    { type: "comment", id: "DC_old", discussionId: "D_old", effectId: "a".repeat(64) },
   ])("rejects malformed private cleanup entries before readback: %j", async entry => {
     const f = fixture("create_discussion");
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
@@ -243,9 +234,6 @@ describe("native creation Claim delivery", () => {
   it.each([
     ["verified"],
     ["missing_receipts"],
-    ["comment_changed"],
-    ["reopened"],
-    ["reason_changed"],
     ["foreign_repository"],
     ["repository_node_changed"],
     ["repository_id_changed"],
@@ -256,8 +244,6 @@ describe("native creation Claim delivery", () => {
     ["unavailable"],
   ])("replays Refiner's close-older effects with %s evidence (%j)", async (evidence, number) => {
     const f = fixture("create_discussion");
-    const stderr = evidence === "comment_changed" ? vi.spyOn(process.stderr, "write").mockReturnValue(true) : null;
-    if (stderr) delete process.env.DEBUG;
     const oldDiscussion = {
       __typename: "Discussion",
       id: "D_old",
@@ -286,9 +272,6 @@ describe("native creation Claim delivery", () => {
       await closeDiscussionAsOutdated(wrapped, "owner", "repo", oldDiscussion.id, cleanup);
       expect(cleanup).toHaveLength(2);
       await f.capture({ cleanup: evidence === "missing_receipts" ? [] : cleanup });
-      if (evidence === "comment_changed") comment.body = "Changed after publication";
-      if (evidence === "reopened") oldDiscussion.closed = false;
-      if (evidence === "reason_changed") oldDiscussion.stateReason = "RESOLVED";
       if (evidence === "foreign_repository") oldDiscussion.repository.nameWithOwner = "foreign/repo";
       if (evidence === "repository_node_changed") oldDiscussion.repository.id = "R_8";
       if (evidence === "repository_id_changed") oldDiscussion.repository.databaseId = 8;
@@ -300,12 +283,6 @@ describe("native creation Claim delivery", () => {
     });
     const mutationCount = f.client.graphql.mock.calls.filter(([query]) => /\bmutation\b/.test(query)).length;
     expect(mutationCount).toBe(2);
-    if (stderr) {
-      const output = stderr.mock.calls.map(call => call[0]).join("");
-      expect(output).toContain("discussion.cleanup.readback.mismatch comment=true resource_present=true");
-      expect(output).not.toContain("Superseded by this run");
-      expect(output).not.toContain("Changed after publication");
-    }
     if (evidence === "verified") {
       const result = await f.finalize();
       expect(result.claims.h1).toMatchObject({ state: "result", effects: "partial" });
@@ -331,39 +308,9 @@ describe("native creation Claim delivery", () => {
   });
 
   it.each([
-    ["labels_matches", "labels", { nodes: [{ name: "private-label" }], pageInfo: { hasNextPage: false } }],
-    ["url_matches", "url", "https://github.com/private-repository/discussions/987654321"],
-  ])("diagnoses independent Discussion %s failures without values", async (flag, field, value) => {
-    const f = fixture("create_discussion");
-    process.env.DEBUG = "work-queue:native_delivery";
-    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    await f.execute(async () => {
-      await f.capture();
-      f.discussion[field] = value;
-      expect((await f.settle()).verification).toBe("unknown");
-    });
-    const output = stderr.mock.calls.map(call => call[0]).join("");
-    const mismatch = output.split("\n").find(line => line.includes("discussion.readback.mismatch"));
-    expect(mismatch).toContain(`${flag}=false`);
-    for (const other of ["discussion_present", "identity_matches", "repository_matches", "category_matches", "title_matches", "body_matches", "labels_complete", "labels_matches", "url_matches"]) {
-      if (other !== flag) expect(mismatch).toContain(`${other}=true`);
-    }
-    expect(output).not.toContain("creation.readback.unverified");
-    for (const secret of ["private-label", "private-repository", "987654321", REPOSITORY, f.discussion.id, f.member.claim_id, f.member.work_id, f.assignment.dispatch_id, "Final title", "Final body"]) {
-      expect(output).not.toContain(secret);
-    }
-  });
-
-  it.each([
-    ["labels_matches", ["labels"], [{ name: "private-label" }]],
-    ["assignees_matches", ["assignees"], [{ login: "private-assignee" }]],
-    ["url_matches", ["html_url"], "https://github.com/private-repository/pull/987654321"],
     ["repository_id_matches", ["base", "repo", "id"], 987654321],
-    ["head_repository_id_matches", ["head", "repo", "id"], "987654321"],
     ["repository_id_matches", ["base", "repo", "id"], undefined],
-    ["head_repository_id_matches", ["head", "repo", "id"], undefined],
     ["repository_id_matches", ["base", "repo", "id"], "private-invalid-identity"],
-    ["head_repository_id_matches", ["head", "repo", "id"], "private-invalid-identity"],
     ["repository_id_matches", ["base", "repo", "id"], null],
     ["repository_id_matches", ["base", "repo", "id"], {}],
     ["repository_id_matches", ["base", "repo", "id"], []],
@@ -387,21 +334,7 @@ describe("native creation Claim delivery", () => {
     const output = stderr.mock.calls.map(call => call[0]).join("");
     const mismatch = output.split("\n").find(line => line.includes("pull_request.readback.mismatch"));
     expect(mismatch).toContain(`${flag}=false`);
-    for (const other of [
-      "resource_present",
-      "identity_matches",
-      "title_matches",
-      "body_matches",
-      "open",
-      "draft_matches",
-      "head_matches",
-      "base_matches",
-      "labels_matches",
-      "assignees_matches",
-      "url_matches",
-      "repository_id_matches",
-      "head_repository_id_matches",
-    ]) {
+    for (const other of ["resource_present", "identity_matches", "repository_id_matches"]) {
       if (other !== flag) expect(mismatch).toContain(`${other}=true`);
     }
     expect(output).not.toContain("creation.readback.unverified");
@@ -424,51 +357,6 @@ describe("native creation Claim delivery", () => {
     }
   });
 
-  describe.each([
-    ["create_discussion", "labels", "labels_matches"],
-    ["create_pull_request", "labels", "labels_matches"],
-    ["create_pull_request", "assignees", "assignees_matches"],
-  ])("%s malformed %s diagnostics", (type, field, flag) => {
-    it.each([{}, [null], [undefined], [{ name: { toString: null } }], [{ login: ["private-invalid-name"] }]])("does not introduce exceptions after an earlier rejection: %j", async value => {
-      const f = fixture(type);
-      process.env.DEBUG = "work-queue:native_delivery";
-      const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-      await f.execute(async () => {
-        await f.capture();
-        const resource = type === "create_discussion" ? f.discussion : f.pull;
-        resource.body = "private-body-mismatch";
-        resource[field] = type === "create_discussion" ? { nodes: value, pageInfo: { hasNextPage: false } } : value;
-        expect((await f.settle()).verification).toBe("unknown");
-      });
-      const output = stderr.mock.calls.map(call => call[0]).join("");
-      expect(output).toContain(`${type === "create_discussion" ? "discussion" : "pull_request"}.readback.mismatch`);
-      expect(output).toContain(`${flag}=false`);
-      expect(output).toContain("body_matches=false");
-      expect(output).not.toContain("creation.readback.unverified");
-      expect(output).not.toContain("private-");
-    });
-  });
-
-  it.each(["create_discussion", "create_pull_request"])("diagnoses %s content mismatches without logging identities or content", async type => {
-    const f = fixture(type);
-    process.env.DEBUG = "work-queue:delivery,work-queue:native_delivery";
-    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const secret = "private-delivery-content-and-token";
-    await f.execute(async () => {
-      await f.capture();
-      if (type === "create_discussion") f.discussion.body = secret;
-      else f.pull.body = secret;
-      const delivery = await f.settle();
-      expect(delivery.verification).toBe("unknown");
-      expect(delivery.disposition).not.toBe("none");
-    });
-    const output = stderr.mock.calls.map(call => call[0]).join("");
-    expect(output).toContain(type === "create_discussion" ? "discussion.readback.mismatch" : "pull_request.readback.mismatch");
-    expect(output).toContain("body_matches=false");
-    expect(output).toContain("delivery.output.proof_invalid index=0");
-    for (const value of [secret, REPOSITORY, f.member.claim_id, f.member.work_id, f.assignment.dispatch_id, COMMIT, TREE, "Final body", "Requested body"]) expect(output).not.toContain(value);
-  });
-
   it("logs sanitized readback HTTP failures without provider bodies", async () => {
     const f = fixture("create_pull_request");
     process.env.DEBUG = "work-queue:native_delivery";
@@ -476,7 +364,7 @@ describe("native creation Claim delivery", () => {
     const secret = "private-provider-body-and-credentials";
     await f.execute(async () => {
       await f.capture();
-      f.client.rest.git.getCommit.mockRejectedValue(Object.assign(new Error(secret), { status: 403, response: { data: { message: secret }, headers: { authorization: secret } } }));
+      f.client.rest.pulls.get.mockRejectedValue(Object.assign(new Error(secret), { status: 403, response: { data: { message: secret }, headers: { authorization: secret } } }));
       expect((await f.settle()).verification).toBe("unknown");
     });
     const output = stderr.mock.calls.map(call => call[0]).join("");
@@ -492,7 +380,7 @@ describe("native creation Claim delivery", () => {
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     await f.execute(async () => {
       await f.capture();
-      f.pull.body = "private-changed-body";
+      f.pull.id = 191;
     });
     f.client.rest.actions.getWorkflowRun = async () => ({ status: 200, data: { ...f.queue.nativeRun(), status: "completed", conclusion: "success" } });
     const finalized = await f.finalize();
@@ -502,7 +390,7 @@ describe("native creation Claim delivery", () => {
     expect(output).toContain("delivery.failure.persisted attempts=");
     expect(output).toContain("contract_supported=true receipt_present=false");
     expect(output).toContain("DEBUG=work-queue:claims,work-queue:delivery,work-queue:native_delivery");
-    for (const value of ["private-changed-body", REPOSITORY, f.member.claim_id, f.assignment.dispatch_id, COMMIT, TREE]) expect(output).not.toContain(value);
+    for (const value of [REPOSITORY, f.member.claim_id, f.assignment.dispatch_id, COMMIT, TREE]) expect(output).not.toContain(value);
   });
 
   it("pins the committed nonempty patch tree at the real PR handler preparation boundary", async () => {
@@ -629,6 +517,26 @@ describe("native creation Claim delivery", () => {
     expect(f.queue.state.works.get(f.member.work_id).barrier).toBe("verified");
   });
 
+  it.each(["create_discussion", "create_pull_request"])("settles %s despite post-creation user edits", async type => {
+    const f = fixture(type);
+    await f.execute(async () => {
+      await f.capture();
+      if (type === "create_discussion") {
+        Object.assign(f.discussion, { title: "Edited title", body: "Edited body", url: "https://github.com/changed/discussions/19" });
+        f.discussion.category.id = "C_other";
+        f.discussion.labels.nodes = [{ name: "later" }];
+      } else {
+        Object.assign(f.pull, { title: "Edited title", body: "Edited body", html_url: "https://github.com/changed/pull/19", state: "closed", draft: false, labels: [{ name: "later" }], assignees: [{ login: "later" }] });
+        f.pull.head.sha = REF;
+        f.pull.base.ref = "other";
+        f.pull.head.repo = null;
+        f.client.rest.git.getRef.mockResolvedValue({ data: { ref: "refs/heads/approved", object: { type: "commit", sha: REF } } });
+      }
+      expect((await f.settle()).verification).toBe("verified");
+    });
+    expect((await f.finalize()).claims.h1.state).toBe("result");
+  });
+
   it.each(["create_discussion", "create_pull_request"])("rejects undeclared %s fields even with submission metadata", async type => {
     const f = fixture(type);
     Object.assign(f.message, { output_id: "so_xbzi2dhGSY-3", "depends-on": "so_priorOutput1", unexpected_transport_field: "untrusted" });
@@ -713,8 +621,8 @@ describe("native creation Claim delivery", () => {
       await f.capture();
       expect((await verifyBuiltinDeliveryOutput({ claim: f.member, message: f.message, result: structuredClone(f.result), github: f.client })).verified).toBe(false);
     });
-    f.discussion.body = "Tampered";
-    f.pull.head.sha = BASE;
+    f.discussion.id = "D_other";
+    f.pull.id = 191;
     const finalized = await f.finalize();
     expect(finalized.claims.h1.state).toBe("pending");
     expect(f.queue.state.works.get(f.member.work_id).barrier).not.toBe("verified");
@@ -750,32 +658,24 @@ describe("native creation Claim delivery", () => {
     expect(f.client.rest.pulls.create).toHaveBeenCalledTimes(type === "create_pull_request" ? 1 : 0);
   });
 
-  it.each(["id", "repository", "category", "title", "body", "labels", "unavailable"])("rejects mismatched discussion %s evidence", async mismatch => {
+  it.each(["id", "repository", "unavailable"])("rejects mismatched discussion %s evidence", async mismatch => {
     const f = fixture("create_discussion");
     await f.execute(async () => {
       await f.capture();
       if (mismatch === "repository") f.discussion.repository.id = "R_foreign";
-      else if (mismatch === "category") f.discussion.category.id = "C_foreign";
-      else if (mismatch === "labels") f.discussion.labels.pageInfo.hasNextPage = true;
       else if (mismatch === "unavailable") f.client.graphql.mockRejectedValue(new Error("Unavailable"));
       else f.discussion[mismatch] = "Different";
       expect((await f.settle()).verification).toBe("unknown");
     });
   });
 
-  it.each(["identity", "repository", "head", "base", "tree", "commit", "ancestry", "ref", "unavailable"])("rejects mismatched PR %s evidence without deriving no effects", async mismatch => {
+  it.each(["identity", "repository", "unavailable"])("rejects mismatched PR %s evidence without deriving no effects", async mismatch => {
     const f = fixture("create_pull_request");
     await f.execute(async () => {
       await f.capture();
       if (mismatch === "identity") f.pull.id = 191;
-      if (mismatch === "repository") f.pull.head.repo.id = 8;
-      if (mismatch === "head") f.pull.head.ref = "foreign";
-      if (mismatch === "base") f.pull.base.ref = "foreign";
-      if (mismatch === "tree") f.client.rest.git.getTree.mockResolvedValue({ data: { sha: BASE, tree: [], truncated: false } });
-      if (mismatch === "commit") f.client.rest.git.getCommit.mockResolvedValue({ data: { sha: COMMIT, tree: { sha: BASE }, parents: [{ sha: BASE }] } });
-      if (mismatch === "ancestry") f.client.rest.repos.compareCommits.mockResolvedValue({ data: { base_commit: { sha: BASE }, merge_base_commit: { sha: REF }, status: "diverged", ahead_by: 1, behind_by: 1 } });
-      if (mismatch === "ref") f.client.rest.git.getRef.mockResolvedValue({ data: { ref: "refs/heads/approved", object: { type: "commit", sha: BASE } } });
-      if (mismatch === "unavailable") f.client.rest.git.getCommit.mockRejectedValue(new Error("Unavailable"));
+      if (mismatch === "repository") f.pull.base.repo.id = 8;
+      if (mismatch === "unavailable") f.client.rest.pulls.get.mockRejectedValue(new Error("Unavailable"));
       const delivery = await f.settle();
       expect(delivery.verification).toBe("unknown");
       expect(delivery.disposition).not.toBe("none");
@@ -834,7 +734,7 @@ describe("native creation Claim delivery", () => {
     expect(f.client.rest.pulls.create).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["missing_selector", "foreign_ref", "foreign_repository", "foreign_claim", "unknown", "invalid_commit", "response_mismatch", "unrelated_commit", "moved_ref", "unavailable"])(
+  it.each(["missing_selector", "foreign_ref", "foreign_repository", "foreign_claim", "unknown", "invalid_commit", "response_mismatch", "unrelated_commit", "unavailable"])(
     "keeps a signed PR branch effect unverified for %s",
     async mismatch => {
       const f = fixture("create_pull_request");
@@ -854,7 +754,6 @@ describe("native creation Claim delivery", () => {
             data: { base_commit: { sha: base }, merge_base_commit: { sha: BASE }, status: base === REF ? "diverged" : "ahead", ahead_by: 1, behind_by: base === REF ? 1 : 0 },
           }));
         }
-        if (mismatch === "moved_ref") f.client.rest.git.getRef.mockResolvedValue({ data: { ref: "refs/heads/approved", object: { type: "commit", sha: REF } } });
         if (mismatch === "unavailable") f.client.rest.repos.compareCommits.mockRejectedValue(new Error("Unavailable"));
         const delivery = await f.settle();
         expect(delivery.verification).toBe("unknown");
@@ -887,5 +786,110 @@ describe("native creation Claim delivery", () => {
         expect(proof.verified).toBe(false);
       }
     });
+  });
+});
+
+describe("grouped create_issue Claim delivery", () => {
+  const LINK = "a".repeat(64);
+  function groupedFixture() {
+    const f = fixture("create_issue");
+    f.client.rest.issues = {
+      get: vi.fn(async ({ issue_number }) => ({ data: { id: issue_number === 19 ? 190 : 200, number: issue_number, html_url: `https://github.com/${REPOSITORY}/issues/${issue_number}` } })),
+      getComment: vi.fn(async () => ({ data: { id: 300, issue_url: `https://api.github.com/repos/${REPOSITORY}/issues/18` } })),
+    };
+    const record = (auxiliary = { kind: "graphql", id: LINK }) => {
+      for (const effect of [{ kind: "issue", id: "190", number: 19 }, { kind: "issue", id: "200", number: 18 }, auxiliary]) {
+        recordClaimEffect({ repository: REPOSITORY, outcome: "succeeded", ...effect });
+      }
+    };
+    const capture = (overrides = {}) => captureIssueDelivery(f.result, { repository: REPOSITORY, parent: { number: 18 }, effectIds: [LINK], comments: [], ...overrides });
+    return { ...f, record, capture };
+  }
+
+  it("covers parent, link and child", async () => {
+    const f = groupedFixture();
+    await f.execute(async () => {
+      f.record();
+      f.capture();
+      expect((await f.settle()).verification).toBe("verified");
+    });
+    expect((await f.finalize()).claims.h1.state).toBe("result");
+  });
+
+  it("still fails without a receipt", async () => {
+    const f = groupedFixture();
+    await f.execute(async () => {
+      f.record();
+      const delivery = await f.settle();
+      expect(delivery.verification).toBe("unknown");
+      expect(delivery.reason).toBe("An auxiliary or ambiguous effect has no independently verified declared resource receipt");
+    });
+  });
+
+  it("covers the fallback comment", async () => {
+    const f = groupedFixture();
+    await f.execute(async () => {
+      f.record({ kind: "comment", id: "300", number: 18 });
+      f.capture({ effectIds: [], comments: [{ id: "300", number: 18 }] });
+      expect((await f.settle()).verification).toBe("verified");
+    });
+    expect((await f.finalize()).claims.h1.state).toBe("result");
+  });
+
+  it("rejects a parent readback mismatch", async () => {
+    const f = groupedFixture();
+    await f.execute(async () => {
+      f.record();
+      f.capture();
+      f.client.rest.issues.get.mockImplementation(async ({ issue_number }) => ({ data: issue_number === 18 ? { id: 201, number: 17 } : { id: 190, number: 19, html_url: f.result.url } }));
+      expect((await f.settle()).verification).toBe("unknown");
+    });
+  });
+
+  it("binds the sub-issue effect identity", async () => {
+    const f = groupedFixture();
+    const [owner, repo] = REPOSITORY.split("/");
+    f.client.graphql.mockImplementation(async query =>
+      query.includes("WorkQueueEffectTargets")
+        ? { nodes: [18, 19].map(number => ({ __typename: "Issue", id: number === 18 ? "P" : "C", number, repository: { id: "R_7", databaseId: 7, nameWithOwner: REPOSITORY } })) }
+        : { addSubIssue: { issue: { id: "P", number: 18 }, subIssue: { id: "C", number: 19 } } }
+    );
+    await f.execute(async () => {
+      const wrapped = wrapClaimEffectClient(f.client, { claim_handle: f.member.handle, authorize: f.authorize, context: f.context });
+      const { effectId } = await linkSubIssue({ owner, repo, parentIssueNumber: 18, subIssueNumber: 19, parentNodeId: "P", subIssueNodeId: "C" }, wrapped);
+      expect(f.effects.at(-1)).toMatchObject({ kind: "graphql", id: effectId, outcome: "succeeded" });
+    });
+  });
+
+  it("does not cover a mutation with an unknown outcome using a fallback comment", async () => {
+    const f = groupedFixture();
+    await f.execute(async () => {
+      f.record({ kind: "comment", id: "300", number: 18 });
+      recordClaimEffect({ repository: REPOSITORY, kind: "graphql", id: LINK, outcome: "unknown" });
+      f.capture({ effectIds: [], comments: [{ id: "300", number: 18 }] });
+      expect((await f.settle()).verification).toBe("unknown");
+    });
+  });
+
+  it.each([
+    { effectIds: null },
+    { effectIds: Array(17).fill(LINK) },
+    { effectIds: ["invalid"] },
+    { comments: null },
+    { comments: Array(17).fill({ id: "300", number: 18 }) },
+    { comments: [{ id: "0300", number: 18 }] },
+    { comments: [{ id: "300", number: 0 }] },
+    { parent: { number: 0 } },
+    { parent: null },
+    { parent: null, effectIds: [], comments: [{ id: "300", number: 18 }] },
+  ])("rejects malformed or unbounded group receipts: %j", async overrides => {
+    const f = groupedFixture();
+    await f.execute(async () => {
+      f.record();
+      f.capture(overrides);
+      expect((await f.settle()).verification).toBe("unknown");
+    });
+    expect(f.client.rest.issues.get.mock.calls.every(([request]) => request.issue_number === 19)).toBe(true);
+    expect(f.client.rest.issues.getComment).not.toHaveBeenCalled();
   });
 });

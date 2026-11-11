@@ -21,6 +21,7 @@ const { ERR_API, ERR_VALIDATION } = require("./error_codes.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { renderTemplateFromFile } = require("./messages_core.cjs");
 const { MAX_SUB_ISSUES, getSubIssueCount, linkSubIssue } = require("./sub_issue_helpers.cjs");
+const { captureIssueDelivery } = require("./work_queue_native_creation_delivery.cjs");
 const { closeOlderIssues, searchOlderIssues } = require("./close_older_issues.cjs");
 const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
 const { tryEnforceArrayLimit } = require("./limit_enforcement_helpers.cjs");
@@ -1407,6 +1408,10 @@ async function main(config = {}) {
           core.warning("Close older issues enabled but GH_AW_WORKFLOW_ID environment variable not set - skipping");
         }
       }
+      /** @type {{number: number} | null} */
+      let linkedParent = null;
+      const linkEffectIds = [];
+      const parentComments = [];
       if (groupEnabled && !effectiveParentIssueNumber) {
         // Use workflow name as the group ID
         const groupId = workflowName;
@@ -1448,9 +1453,10 @@ async function main(config = {}) {
 
       // Sub-issue linking only works within the same repository
       if (effectiveParentIssueNumber && effectiveParentRepo === qualifiedItemRepo) {
+        linkedParent = { number: effectiveParentIssueNumber };
         core.info(`Attempting to link issue #${issue.number} as sub-issue of #${effectiveParentIssueNumber}`);
         try {
-          const { parentNodeId, subIssueNodeId } = await linkSubIssue(
+          const { parentNodeId, subIssueNodeId, effectId } = await linkSubIssue(
             {
               owner: repoParts.owner,
               repo: repoParts.repo,
@@ -1459,6 +1465,7 @@ async function main(config = {}) {
             },
             githubClient
           );
+          linkEffectIds.push(effectId);
           core.info(`Parent issue node ID: ${parentNodeId}`);
           core.info(`Child issue node ID: ${subIssueNodeId}`);
 
@@ -1466,10 +1473,12 @@ async function main(config = {}) {
         } catch (error) {
           core.info(`Warning: Could not link sub-issue to parent: ${getErrorMessage(error)}`);
           core.info(`Error details: ${error instanceof Error && error.stack ? error.stack : getErrorMessage(error)}`);
+          // A mutation failure after dispatch remains an unknown Claim effect; only a
+          // pre-mutation lookup failure followed by a successful comment is verifiable.
           // Fallback: add a comment if sub-issue linking fails
           try {
             core.info(`Attempting fallback: adding comment to parent issue #${effectiveParentIssueNumber}...`);
-            await githubClient.rest.issues.createComment({
+            const { data: comment } = await githubClient.rest.issues.createComment({
               owner: repoParts.owner,
               repo: repoParts.repo,
               issue_number: effectiveParentIssueNumber,
@@ -1489,6 +1498,7 @@ async function main(config = {}) {
                 ],
               }).body,
             });
+            parentComments.push({ id: String(comment.id), number: effectiveParentIssueNumber });
             core.info("✓ Added comment to parent issue #" + effectiveParentIssueNumber + " (sub-issue linking not available)");
           } catch (commentError) {
             core.info(`Warning: Could not add comment to parent issue: ${getErrorMessage(commentError)}`);
@@ -1503,19 +1513,22 @@ async function main(config = {}) {
       }
 
       // Return result with temporary ID mapping info
-      return {
-        success: true,
-        repo: qualifiedItemRepo,
-        number: issue.number,
-        url: issue.html_url,
-        body,
-        id: issue.id,
-        metadata: { node_id: issue.node_id },
-        temporaryId: temporaryId,
-        ...(createdArtifacts.length > 0 ? { artifacts: createdArtifacts } : {}),
-        ...(blockedByFailures.length > 0 ? { blocked_by_errors: blockedByFailures } : {}),
-        _repo: qualifiedItemRepo, // For tracking in the closure
-      };
+      return captureIssueDelivery(
+        {
+          success: true,
+          repo: qualifiedItemRepo,
+          number: issue.number,
+          url: issue.html_url,
+          body,
+          id: issue.id,
+          metadata: { node_id: issue.node_id },
+          temporaryId: temporaryId,
+          ...(createdArtifacts.length > 0 ? { artifacts: createdArtifacts } : {}),
+          ...(blockedByFailures.length > 0 ? { blocked_by_errors: blockedByFailures } : {}),
+          _repo: qualifiedItemRepo, // For tracking in the closure
+        },
+        { repository: qualifiedItemRepo, parent: linkedParent, effectIds: linkEffectIds, comments: parentComments }
+      );
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       if (artifactFailure) {

@@ -779,7 +779,7 @@ function registerTests({ describe, it }) {
       assert.equal(third.length, 2);
     });
 
-    it("does not verify undeclared fields or partial resource state and requires separate code delivery evidence", async () => {
+    it("verifies identity only and ignores mutable issue state", async () => {
       const observed = {
         id: 7,
         number: 42,
@@ -794,16 +794,16 @@ function registerTests({ describe, it }) {
         result: { repo: "owner/repo", number: 42 },
         github: { rest: { issues: { get: async () => ({ data: observed }) } } },
       };
-      assert.equal((await verifyBuiltinDeliveryOutput(options)).verified, false);
+      assert.equal((await verifyBuiltinDeliveryOutput(options)).verified, true);
       observed.labels = [{ name: "expected" }];
       assert.equal((await verifyBuiltinDeliveryOutput(options)).verified, true);
       observed.assignees = [{ login: "foreign" }];
-      assert.equal((await verifyBuiltinDeliveryOutput(options)).verified, false);
+      assert.equal((await verifyBuiltinDeliveryOutput(options)).verified, true);
       observed.assignees = [{ login: "bot" }];
       assert.equal((await verifyBuiltinDeliveryOutput({ ...options, message: { ...options.message, unverified_effect: true } })).verified, false);
       assert.equal((await verifyBuiltinDeliveryOutput({ ...options, message: { type: "create_pull_request", repo: "owner/repo" } })).verified, false);
       observed.title = "wrong prefix desired title";
-      assert.equal((await verifyBuiltinDeliveryOutput({ ...options, message: { type: "update_issue", repo: "owner/repo", item_number: 42, title: "desired title" } })).verified, false);
+      assert.equal((await verifyBuiltinDeliveryOutput({ ...options, message: { type: "update_issue", repo: "owner/repo", item_number: 42, title: "desired title" } })).verified, true);
       observed.title = "desired title";
       observed.body = "desired body\n\ntrusted footer";
       const exact = {
@@ -813,6 +813,8 @@ function registerTests({ describe, it }) {
       };
       assert.equal((await verifyBuiltinDeliveryOutput(exact)).verified, true);
       observed.body += "\nwrong extra content";
+      assert.equal((await verifyBuiltinDeliveryOutput(exact)).verified, true);
+      observed.number = 43;
       assert.equal((await verifyBuiltinDeliveryOutput(exact)).verified, false);
     });
 

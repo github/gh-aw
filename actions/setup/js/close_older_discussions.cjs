@@ -110,7 +110,7 @@ async function addDiscussionComment(github, owner, repo, discussionId, message, 
     }`;
   const variables = { dId: discussionId, body: sanitizeContent(message) };
   const result = await github.graphql(query, variables);
-  if (currentClaimHandle()) deliveryReceipts.push({ type: "comment", discussionId, id: result.addDiscussionComment.comment.id, body: variables.body, effectId: graphEffectIdentity(query, variables, result) });
+  if (currentClaimHandle()) deliveryReceipts.push({ type: "comment", discussionId, id: result.addDiscussionComment.comment.id, effectId: graphEffectIdentity(query, variables, result) });
 
   return result.addDiscussionComment.comment;
 }

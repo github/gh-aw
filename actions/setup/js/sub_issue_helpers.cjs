@@ -2,9 +2,25 @@
 /// <reference types="@actions/github-script" />
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { graphEffectIdentity } = require("./work_queue_effect_client.cjs");
 
 // Maximum number of sub-issues per parent issue
 const MAX_SUB_ISSUES = 64;
+
+const ADD_SUB_ISSUE_MUTATION = `
+      mutation AddSubIssue($parentId: ID!, $subIssueId: ID!) {
+        addSubIssue(input: { issueId: $parentId, subIssueId: $subIssueId }) {
+          issue {
+            id
+            number
+          }
+          subIssue {
+            id
+            number
+          }
+        }
+      }
+    `;
 
 /**
  * Resolve the GitHub client to use for GraphQL requests
@@ -85,29 +101,12 @@ async function getIssueNodeId({ owner, repo, issueNumber }, githubClient = undef
  * @param {string} params.parentNodeId - GraphQL node ID of the parent issue
  * @param {string} params.subIssueNodeId - GraphQL node ID of the child issue
  * @param {any} [githubClient] - Optional authenticated client
- * @returns {Promise<void>}
+ * @returns {Promise<{effectId: string}>}
  */
 async function addSubIssue({ parentNodeId, subIssueNodeId }, githubClient = undefined) {
-  await getGitHubClient(githubClient).graphql(
-    `
-      mutation AddSubIssue($parentId: ID!, $subIssueId: ID!) {
-        addSubIssue(input: { issueId: $parentId, subIssueId: $subIssueId }) {
-          issue {
-            id
-            number
-          }
-          subIssue {
-            id
-            number
-          }
-        }
-      }
-    `,
-    {
-      parentId: parentNodeId,
-      subIssueId: subIssueNodeId,
-    }
-  );
+  const variables = { parentId: parentNodeId, subIssueId: subIssueNodeId };
+  const response = await getGitHubClient(githubClient).graphql(ADD_SUB_ISSUE_MUTATION, variables);
+  return { effectId: graphEffectIdentity(ADD_SUB_ISSUE_MUTATION, variables, response) };
 }
 
 /**
@@ -120,13 +119,13 @@ async function addSubIssue({ parentNodeId, subIssueNodeId }, githubClient = unde
  * @param {string} [params.parentNodeId] - Optional parent GraphQL node ID
  * @param {string} [params.subIssueNodeId] - Optional child GraphQL node ID
  * @param {any} [githubClient] - Optional authenticated client
- * @returns {Promise<{parentNodeId: string, subIssueNodeId: string}>}
+ * @returns {Promise<{parentNodeId: string, subIssueNodeId: string, effectId: string}>}
  */
 async function linkSubIssue({ owner, repo, parentIssueNumber, subIssueNumber, parentNodeId, subIssueNodeId }, githubClient = undefined) {
   const resolvedParentNodeId = parentNodeId || (await getIssueNodeId({ owner, repo, issueNumber: parentIssueNumber }, githubClient));
   const resolvedSubIssueNodeId = subIssueNodeId || (await getIssueNodeId({ owner, repo, issueNumber: subIssueNumber }, githubClient));
 
-  await addSubIssue(
+  const { effectId } = await addSubIssue(
     {
       parentNodeId: resolvedParentNodeId,
       subIssueNodeId: resolvedSubIssueNodeId,
@@ -137,6 +136,7 @@ async function linkSubIssue({ owner, repo, parentIssueNumber, subIssueNumber, pa
   return {
     parentNodeId: resolvedParentNodeId,
     subIssueNodeId: resolvedSubIssueNodeId,
+    effectId,
   };
 }
 

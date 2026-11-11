@@ -2333,15 +2333,19 @@ may append the same immutable Result even after native release. Completion,
 agent statements, and an overall successful worker conclusion alone do not
 prove delivery.
 
-Built-in resource creation needs independent native readback, not just a
-successful handler response or an agent-supplied URL. Discussion delivery must
-verify the created discussion's immutable identity, permitted repository,
-category, and expected content. Pull-request delivery must additionally verify
-the permitted base/head repositories and refs, the expected head commit, and
-its independently read commit/tree evidence against trusted prepared mutation
-evidence. A PR number alone is not proof that the intended changes were
-published. Missing, mismatched, foreign, or unavailable evidence leaves delivery
-unverified; it must not be promoted to Result to make aggregate reporting pass.
+Built-in resource creation needs independent native identity readback, not just a
+successful handler response or an agent-supplied URL. Delivery verifies the
+created resource's immutable identity (native ID and number) and permitted
+repository, plus private in-process receipts for auxiliary writes (discussion
+cleanup, pull-request branch pushes and signed commits, grouped issue parents,
+sub-issue links, and fallback parent comments). Mutable state—title, body,
+labels, assignees, draft, open/closed state, category, URL, and the live branch
+head—is never compared: created resources reflect the queue's work and users
+may change them afterwards. Pull-request transport fields `head_repo`,
+`base_branch`, and `base_commit` must still agree with the private creation
+receipt and prepared base. Missing, foreign, or unavailable identity evidence
+leaves delivery unverified; it must not be promoted to Result to make aggregate
+reporting pass.
 
 Native PR transport may include `head_repo`, `base_branch`, and `base_commit`.
 The closed supported-field set MUST accept these fields only with independent

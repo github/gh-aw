@@ -518,21 +518,6 @@ async function verifyBuiltinDeliveryOutput(options) {
   if (!data || !data.id || !data.html_url || (data.number !== undefined && data.number !== number))
     return unverified("delivery.builtin.resource_mismatch", { resource_present: !!data, identity_present: !!data?.id, url_present: !!data?.html_url, number_matches: data?.number === number });
   if (typeof data.id === "number" ? !Number.isSafeInteger(data.id) || data.id < 1 : typeof data.id !== "string" || !/^[1-9][0-9]{0,255}$/.test(data.id)) return unverified("delivery.builtin.resource_identity_invalid");
-  const expected = {};
-  for (const effect of options.effects || []) {
-    if (effect.claim_handle === claim.handle && effect.outcome === "succeeded" && effect.kind === kind && effect.repository === repository && (effect.id ? effect.id === String(data.id) : effect.number === number)) {
-      Object.assign(expected, effect.expected || {});
-    }
-  }
-  for (const field of ["title", "body"]) {
-    const value = Object.prototype.hasOwnProperty.call(expected, field) ? expected[field] : message[field];
-    if (value !== undefined && data[field] !== value) return unverified("delivery.builtin.content_mismatch", { title: field === "title", body: field === "body" });
-  }
-  for (const field of ["state", "state_reason"])
-    if (expected[field] !== undefined && data[field] !== expected[field]) return unverified("delivery.builtin.expected_state_mismatch", { state: field === "state", state_reason: field === "state_reason" });
-  if (expected.milestone !== undefined && (expected.milestone === null ? data.milestone != null : data.milestone?.number !== Number(expected.milestone))) return unverified("delivery.builtin.milestone_mismatch");
-  if ((message.state || message.status) && data.state !== (message.state || message.status)) return unverified("delivery.builtin.state_mismatch");
-  if (message.state_reason && data.state_reason !== message.state_reason) return unverified("delivery.builtin.state_reason_mismatch");
   if (message.type.startsWith("close_") && data.state !== "closed") return unverified("delivery.builtin.close_not_observed");
   if (message.type === "merge_pull_request" && data.merged !== true) return unverified("delivery.builtin.merge_not_observed");
   if (message.type === "mark_pull_request_as_ready_for_review" && data.draft !== false) return unverified("delivery.builtin.ready_not_observed");
@@ -544,23 +529,6 @@ async function verifyBuiltinDeliveryOutput(options) {
     }
   }
   const names = values => values.map(value => (typeof value === "string" ? value : value.name || value.login).toLowerCase()).sort();
-  const desiredLabels = Object.hasOwn(expected, "labels") ? expected.labels : message.labels;
-  if (desiredLabels !== undefined && ["create_issue", "update_issue"].includes(message.type)) {
-    const desired = names(desiredLabels);
-    const actual = names(data.labels || []);
-    const exact = Object.hasOwn(expected, "labels") || options.verification !== undefined || message.type === "update_issue";
-    if (!desired.every(value => actual.includes(value)) || (exact && JSON.stringify(desired) !== JSON.stringify(actual))) return unverified("delivery.builtin.labels_mismatch", { expected: desired.length, actual: actual.length, exact });
-  }
-  const desiredAssignees = Object.hasOwn(expected, "assignees") ? expected.assignees : message.assignees;
-  if (desiredAssignees !== undefined) {
-    const desired = names(desiredAssignees);
-    const actual = names(data.assignees || []);
-    const exact = Object.hasOwn(expected, "assignees") || options.verification !== undefined || message.type === "update_issue";
-    if (!desired.every(value => actual.includes(value)) || (exact && JSON.stringify(desired) !== JSON.stringify(actual))) return unverified("delivery.builtin.assignees_mismatch", { expected: desired.length, actual: actual.length, exact });
-  }
-  if (message.milestone !== undefined) {
-    if (message.milestone === null ? data.milestone != null : !Number.isSafeInteger(Number(message.milestone)) || data.milestone?.number !== Number(message.milestone)) return unverified("delivery.builtin.milestone_mismatch");
-  }
   if (message.type === "replace_label") {
     const actual = new Set(names(data.labels || []));
     if (message.label_to_remove && actual.has(String(message.label_to_remove).trim().toLowerCase())) return unverified("delivery.builtin.label_removal_not_observed");
@@ -574,6 +542,8 @@ async function verifyBuiltinDeliveryOutput(options) {
     if (!parent || parent.number !== number) return unverified("delivery.builtin.parent_mismatch");
     authorityResource = { ...authorityResource, ...(await resolveParentResourceTarget(github, { repository, kind: "issue", number }, parent)) };
   }
+  const group = message.type === "create_issue" ? await require("./work_queue_native_creation_delivery.cjs").verifyIssueGroupDelivery({ ...options, repository }) : null;
+  if (group && group.verified !== true) return unverified("delivery.builtin.group_unverified");
   const observed = {
     id: resource.id,
     number: resource.number,
@@ -592,6 +562,7 @@ async function verifyBuiltinDeliveryOutput(options) {
     claim_handle: claim.handle,
     resource,
     authority_resource: authorityResource,
+    ...(group ? { authority_resources: [authorityResource, ...group.authorities], effect_resources: group.effects } : {}),
     evidence: { source: "github_api", observed_at: Date.now(), digest: digest(observed) },
   };
   return currentClaimHandle() ? createClaimResourceVerification(proof) : proof;

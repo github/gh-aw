@@ -253,13 +253,13 @@ function registerTests({ describe, it }) {
 
     for (const transport of ["prepared", "native"])
       for (const test of [
-        { type: "create_issue", fields: { title: "approved", body: "delivered", labels: ["approved"], assignees: ["bot"], milestone: 3 }, mismatch: "title", methods: ["create"], tamper: "labels", writes: 1 },
-        { type: "update_issue", fields: { item_number: 42, title: "approved", body: "delivered" }, mismatch: "title", methods: ["update"], tamper: "title", writes: 1 },
-        { type: "close_issue", fields: { item_number: 42, state_reason: "completed" }, mismatch: "state_reason", methods: ["update"], tamper: "state", writes: 1 },
-        { type: "add_comment", fields: { item_number: 42, body: "delivered" }, mismatch: "body", methods: ["createComment"], tamper: "body", writes: 1 },
-        { type: "add_labels", fields: { item_number: 42, labels: ["approved"] }, mismatch: "labels", methods: ["addLabels"], tamper: "labels", writes: 1 },
-        { type: "remove_labels", fields: { item_number: 42, labels: ["removed"] }, mismatch: "labels", methods: ["removeLabel"], tamper: "labels", writes: 1 },
-        { type: "replace_label", fields: { item_number: 42, label_to_add: "added", label_to_remove: "removed" }, mismatch: "label_to_add", methods: ["removeLabel", "addLabels"], tamper: "labels", writes: 2 },
+        { type: "create_issue", fields: { title: "approved", body: "delivered", labels: ["approved"], assignees: ["bot"], milestone: 3 }, mismatch: "title", methods: ["create"], tamper: "labels", writes: 1, drift: "verified" },
+        { type: "update_issue", fields: { item_number: 42, title: "approved", body: "delivered" }, mismatch: "title", methods: ["update"], tamper: "title", writes: 1, drift: "verified" },
+        { type: "close_issue", fields: { item_number: 42, state_reason: "completed" }, mismatch: "state_reason", methods: ["update"], tamper: "state", writes: 1, drift: "unknown" },
+        { type: "add_comment", fields: { item_number: 42, body: "delivered" }, mismatch: "body", methods: ["createComment"], tamper: "body", writes: 1, drift: "verified" },
+        { type: "add_labels", fields: { item_number: 42, labels: ["approved"] }, mismatch: "labels", methods: ["addLabels"], tamper: "labels", writes: 1, drift: "unknown" },
+        { type: "remove_labels", fields: { item_number: 42, labels: ["removed"] }, mismatch: "labels", methods: ["removeLabel"], tamper: "labels", writes: 1, drift: "unknown" },
+        { type: "replace_label", fields: { item_number: 42, label_to_add: "added", label_to_remove: "removed" }, mismatch: "label_to_add", methods: ["removeLabel", "addLabels"], tamper: "labels", writes: 2, drift: "unknown" },
       ]) {
         it(`verifies declared ${transport} ${test.type} through native readback while isolating sibling expectations`, async () => {
           const expected = test.fields;
@@ -384,15 +384,8 @@ function registerTests({ describe, it }) {
               assert.equal((await recheck(member, record)).verification, "verified");
               assert.equal(writes, test.writes);
               const delivered = structuredClone(observed);
-              if (test.type === "create_issue") {
-                observed = { ...observed, labels: [...observed.labels, "unexpected"] };
-                assert.equal((await recheck(member, record)).verification, "unknown");
-                observed = { ...delivered, assignees: [...delivered.assignees, { login: "unexpected" }] };
-                assert.equal((await recheck(member, record)).verification, "unknown");
-                observed = delivered;
-              }
               observed = { ...observed, [test.tamper]: test.tamper === "labels" ? (test.type === "remove_labels" ? ["removed"] : []) : "tampered" };
-              assert.equal((await recheck(member, record)).verification, "unknown");
+              assert.equal((await recheck(member, record)).verification, test.drift);
               observed = delivered;
               record.results[0].result.number = 43;
               assert.equal((await recheck(member, record)).verification, "unknown");
