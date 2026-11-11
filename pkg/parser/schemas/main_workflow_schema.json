@@ -8581,10 +8581,21 @@
                     {
                       "type": "array",
                       "description": "Array of label names",
-                      "items": {
-                        "type": "string",
-                        "maxLength": 50
-                      }
+                      "anyOf": [
+                        {
+                          "items": {
+                            "type": "string",
+                            "maxLength": 50
+                          }
+                        },
+                        {
+                          "maxItems": 1,
+                          "items": {
+                            "type": "string",
+                            "pattern": "^\\$\\{\\{.*\\}\\}$"
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "string",

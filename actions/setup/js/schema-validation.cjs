@@ -59,38 +59,46 @@ function validateStringInputLengths(args, inputSchema, maxBytes) {
   const violations = [];
 
   function visit(value, schema, field, applyDefaultLimit = false) {
-    if (!schema || typeof schema !== "object") return;
+    const nodeViolations = [];
+    if (!schema || typeof schema !== "object") return nodeViolations;
     if (schema.type === "string") {
       if (typeof value === "string") {
         if (typeof schema.maxLength === "number") {
           const characterLength = Array.from(value).length;
           if (characterLength > schema.maxLength) {
-            violations.push({ field, actualLength: characterLength, limit: schema.maxLength, unit: "characters" });
+            nodeViolations.push({ field, actualLength: characterLength, limit: schema.maxLength, unit: "characters" });
           }
         } else if (applyDefaultLimit) {
           const byteLength = Buffer.byteLength(value, "utf8");
           if (byteLength > limit) {
-            violations.push({ field, actualLength: byteLength, limit, unit: "bytes" });
+            nodeViolations.push({ field, actualLength: byteLength, limit, unit: "bytes" });
           }
         }
       }
     }
     if (isPlainObject(value) && isPlainObject(schema.properties)) {
       for (const [key, propertySchema] of Object.entries(schema.properties)) {
-        if (Object.hasOwn(value, key)) visit(value[key], propertySchema, formatPath(field, key));
+        if (Object.hasOwn(value, key)) nodeViolations.push(...visit(value[key], propertySchema, formatPath(field, key)));
       }
     }
     if (Array.isArray(value) && schema.items) {
-      value.forEach((item, index) => visit(item, schema.items, formatPath(field, index)));
+      value.forEach((item, index) => nodeViolations.push(...visit(item, schema.items, formatPath(field, index))));
     }
-    for (const alternative of schema.oneOf || schema.anyOf || []) {
-      const types = Array.isArray(alternative.type) ? alternative.type : [alternative.type];
-      if (types.some(type => schemaTypeMatches(value, type))) visit(value, alternative, field);
+    for (const alternatives of [schema.oneOf, schema.anyOf]) {
+      if (!Array.isArray(alternatives)) continue;
+      const applicable = alternatives.filter(alternative => !validateSchemaNode(value, alternative, field));
+      const alternativeViolations = applicable.map(alternative => visit(value, alternative, field));
+      // Shape and oneOf cardinality errors are handled by the schema validator.
+      // A length failure matters only when every applicable alternative fails.
+      if (alternativeViolations.length > 0 && alternativeViolations.every(errors => errors.length > 0)) {
+        nodeViolations.push(...alternativeViolations.flat());
+      }
     }
+    return nodeViolations;
   }
 
   for (const [field, schema] of Object.entries(properties)) {
-    visit(args[field], schema, field, true);
+    violations.push(...visit(args[field], schema, field, true));
   }
 
   return violations;
@@ -177,17 +185,31 @@ function validateSchemaNode(value, schema, path, options = {}) {
     return null;
   }
 
+  if (options.checkStringLengths && schema.type === "string" && typeof value === "string" && typeof schema.maxLength === "number" && Array.from(value).length > schema.maxLength) {
+    return { path, message: `must not exceed ${schema.maxLength} characters` };
+  }
+
   if (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
     let successCount = 0;
+    let lengthFailureCount = 0;
     /** @type {Array<{path: string, message: string, expected?: string, received?: string}>} */
     const errors = [];
     for (const subSchema of schema.oneOf) {
       const error = validateSchemaNode(value, subSchema, path, { ...options, skipRequiredAtRoot: false });
       if (!error) {
+        if (!options.checkStringLengths && validateSchemaNode(value, subSchema, path, { ...options, skipRequiredAtRoot: false, checkStringLengths: true })) {
+          lengthFailureCount += 1;
+          continue;
+        }
         successCount += 1;
         continue;
       }
       errors.push(error);
+    }
+    // Let the dedicated length validator retain E006 and precise field paths when
+    // otherwise-applicable alternatives all fail their explicit length limits.
+    if (successCount === 0 && lengthFailureCount > 0) {
+      return null;
     }
     if (successCount !== 1) {
       if (errors.length > 0) {

@@ -75,6 +75,16 @@ func TestLabelNameLengthSchemaPreservesDynamicAndNonLabelValues(t *testing.T) {
 			},
 		},
 		{
+			"label expression array",
+			map[string]any{
+				"safe-outputs": map[string]any{
+					"create-pull-request": map[string]any{
+						"labels": []any{"${{ inputs.a_long_input_name_that_resolves_to_short_label_names }}"},
+					},
+				},
+			},
+		},
+		{
 			"allowed label glob",
 			map[string]any{
 				"safe-outputs": map[string]any{
@@ -92,6 +102,31 @@ func TestLabelNameLengthSchemaPreservesDynamicAndNonLabelValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.frontmatter["on"] = "workflow_dispatch"
 			require.NoError(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(tt.frontmatter, "workflow.md"))
+		})
+	}
+}
+
+func TestLabelNameLengthSchemaRejectsUnsupportedExpressionArrays(t *testing.T) {
+	expression := "${{ inputs.a_long_input_name_that_resolves_to_short_label_names }}"
+	for _, field := range []struct {
+		handler string
+		field   string
+		labels  []any
+	}{
+		{"create-pull-request", "labels", []any{"bug", expression}},
+		{"create-pull-request", "fallback-labels", []any{expression}},
+		{"create-issue", "labels", []any{expression}},
+	} {
+		t.Run(field.handler+"/"+field.field, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "workflow_dispatch",
+				"safe-outputs": map[string]any{
+					field.handler: map[string]any{field.field: field.labels},
+				},
+			}
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md")
+			require.Error(t, err)
+			require.ErrorContains(t, err, "maxLength:")
 		})
 	}
 }

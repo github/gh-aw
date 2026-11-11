@@ -373,6 +373,171 @@ describe("schema-validation.cjs", () => {
       ]);
     });
 
+    it.each(["oneOf", "anyOf"])("checks only the enum-selected %s object branch", async keyword => {
+      const { validateStringInputLengths } = await import("./schema-validation.cjs");
+      const schema = {
+        properties: {
+          labels: {
+            type: "array",
+            items: {
+              [keyword]: [
+                { type: "object", properties: { kind: { enum: ["short"] }, name: { type: "string", maxLength: 5 } } },
+                { type: "object", properties: { kind: { enum: ["long"] }, name: { type: "string", maxLength: 50 } } },
+              ],
+            },
+          },
+        },
+      };
+
+      expect(validateStringInputLengths({ labels: [{ kind: "long", name: "abcdefghij" }] }, schema)).toEqual([]);
+      expect(validateStringInputLengths({ labels: [{ kind: "short", name: "abcdefghij" }] }, schema)).toEqual([{ field: "labels[0].name", actualLength: 10, limit: 5, unit: "characters" }]);
+      expect(validateStringInputLengths({ labels: [{ kind: "long", name: "a".repeat(51) }] }, schema)).toEqual([{ field: "labels[0].name", actualLength: 51, limit: 50, unit: "characters" }]);
+    });
+
+    it("accepts anyOf when one applicable branch satisfies its length constraints", async () => {
+      const { validateStringInputLengths } = await import("./schema-validation.cjs");
+      const schema = {
+        properties: {
+          name: {
+            anyOf: [
+              { type: "string", maxLength: 5 },
+              { type: "string", maxLength: 50 },
+            ],
+          },
+        },
+      };
+
+      expect(validateStringInputLengths({ name: "abcdefghij" }, schema)).toEqual([]);
+      expect(validateStringInputLengths({ name: "a".repeat(51) }, schema)).toEqual([
+        { field: "name", actualLength: 51, limit: 5, unit: "characters" },
+        { field: "name", actualLength: 51, limit: 50, unit: "characters" },
+      ]);
+      schema.properties.name.anyOf.push({ type: "string" });
+      expect(validateStringInputLengths({ name: "a".repeat(51) }, schema)).toEqual([]);
+    });
+
+    it.each(["oneOf", "anyOf"])("ignores %s branches with missing required fields, including nested alternatives", async keyword => {
+      const { validateStringInputLengths } = await import("./schema-validation.cjs");
+      const schema = {
+        properties: {
+          label: {
+            [keyword]: [
+              { required: ["short"], properties: { name: { type: "string", maxLength: 5 } } },
+              {
+                required: ["long"],
+                properties: {
+                  name: {
+                    anyOf: [
+                      { type: "string", maxLength: 10 },
+                      { type: "string", maxLength: 50 },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      expect(validateStringInputLengths({ label: { long: true, name: "a".repeat(20) } }, schema)).toEqual([]);
+      expect(validateStringInputLengths({ label: { long: true, name: "a".repeat(51) } }, schema)).toEqual([
+        { field: "label.name", actualLength: 51, limit: 10, unit: "characters" },
+        { field: "label.name", actualLength: 51, limit: 50, unit: "characters" },
+      ]);
+    });
+
+    it("requires a complete anyOf branch to satisfy all its length constraints", async () => {
+      const { validateStringInputLengths } = await import("./schema-validation.cjs");
+      const schema = {
+        properties: {
+          label: {
+            anyOf: [{ properties: { name: { type: "string", maxLength: 5 }, notes: { type: "string", maxLength: 50 } } }, { properties: { name: { type: "string", maxLength: 50 }, notes: { type: "string", maxLength: 5 } } }],
+          },
+        },
+      };
+
+      expect(validateStringInputLengths({ label: { name: "abcdefghij", notes: "abcdefghij" } }, schema)).toEqual([
+        { field: "label.name", actualLength: 10, limit: 5, unit: "characters" },
+        { field: "label.notes", actualLength: 10, limit: 5, unit: "characters" },
+      ]);
+    });
+
+    it("does not suppress parent or sibling limits when an alternative passes", async () => {
+      const { validateStringInputLengths } = await import("./schema-validation.cjs");
+      const schema = {
+        properties: {
+          name: { type: "string", maxLength: 5, anyOf: [{ type: "string", maxLength: 50 }] },
+          message: { type: "string" },
+        },
+      };
+
+      expect(validateStringInputLengths({ name: "abcdefghij", message: "abcdef" }, schema, 5)).toEqual([
+        { field: "name", actualLength: 10, limit: 5, unit: "characters" },
+        { field: "message", actualLength: 6, limit: 5, unit: "bytes" },
+      ]);
+    });
+
+    it.each(["string", "object", "nested", "nested-anyOf"])("uses explicit lengths to resolve %s oneOf branches through the MCP core", async shape => {
+      const { validateArgumentsAgainstSchema } = await import("./schema-validation.cjs");
+      const { registerTool, handleRequest } = await import("./mcp_server_core.cjs");
+      const stringAlternatives = {
+        oneOf: [
+          { type: "string", maxLength: 5 },
+          { type: "string", maxLength: 50 },
+        ],
+      };
+      const itemSchema =
+        shape === "object"
+          ? {
+              oneOf: [
+                { type: "object", properties: { name: { type: "string", maxLength: 5 } } },
+                { type: "object", properties: { name: { type: "string", maxLength: 50 } } },
+              ],
+            }
+          : shape === "nested"
+            ? { anyOf: [stringAlternatives, { type: "boolean" }] }
+            : shape === "nested-anyOf"
+              ? { oneOf: [{ anyOf: stringAlternatives.oneOf }, { type: "string", maxLength: 5 }] }
+              : stringAlternatives;
+      const inputSchema = { type: "object", properties: { labels: { type: "array", items: itemSchema } } };
+      const server = { tools: {}, debug() {} };
+      let handlerCalls = 0;
+      registerTool(server, {
+        name: "length_options",
+        inputSchema,
+        handler() {
+          handlerCalls += 1;
+          return { content: [{ type: "text", text: "ok" }] };
+        },
+      });
+
+      const call = async length => {
+        const name = "a".repeat(length);
+        const args = { labels: [shape === "object" ? { name } : name] };
+        const response = await handleRequest(server, {
+          jsonrpc: "2.0",
+          id: length,
+          method: "tools/call",
+          params: { name: "length_options", arguments: args },
+        });
+        return { args, response };
+      };
+
+      const accepted = await call(10);
+      expect(validateArgumentsAgainstSchema(accepted.args, inputSchema)).toBeNull();
+      expect(accepted.response.result).toEqual({ content: [{ type: "text", text: "ok" }], isError: false });
+
+      const ambiguous = await call(3);
+      expect(validateArgumentsAgainstSchema(ambiguous.args, inputSchema)).toMatchObject({ path: "labels[0]", message: "must match exactly one schema option" });
+      expect(ambiguous.response.error.code).toBe(-32602);
+
+      const oversized = await call(51);
+      expect(oversized.response.error.code).toBe(-32602);
+      expect(oversized.response.error.message).toContain("E006:");
+      expect(oversized.response.error.message).toContain(`'${shape === "object" ? "labels[0].name" : "labels[0]"}' exceeds maximum length`);
+      expect(handlerCalls).toBe(1);
+    });
+
     it("should allow update_issue body above 10KB when schema declares maxLength", async () => {
       const { validateStringInputLengths, MAX_STRING_INPUT_BYTES } = await import("./schema-validation.cjs");
       const updateIssueSchema = loadUpdateIssueToolSchema();
