@@ -124,6 +124,12 @@ network:
     - "api.example.com"
 ```
 
+#### Custom CA certificate for the API proxy
+
+Set `sandbox.agent.ca-cert` to a host path containing a PEM CA certificate to trust it when verifying upstream TLS connections through AWF's API proxy. The file is bind-mounted read-only into the API proxy sidecar. This setting requires AWF v0.28.10 or later.
+
+This setting applies to the agent job. The detection job runs separately; see [Private CA certificates in Threat detection](/gh-aw/reference/threat-detection/#private-ca-certificates) for its CA inheritance and provisioning behavior.
+
 #### Filesystem Access
 
 AWF makes the host filesystem visible inside the container with appropriate permissions:
