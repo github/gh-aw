@@ -2,7 +2,9 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"slices"
 	"strings"
@@ -85,7 +87,14 @@ func ExtractMetadataFromLockFile(content string) (*LockMetadata, bool, error) {
 	if len(matches) >= 2 {
 		jsonStr := matches[1] //nolint:uncheckedsliceindex // The length check above guarantees this capture exists.
 		var metadata LockMetadata
-		if err := json.Unmarshal([]byte(jsonStr), &metadata); err != nil {
+		decoder := json.NewDecoder(strings.NewReader(jsonStr))
+		if err := decoder.Decode(&metadata); err != nil {
+			return nil, false, fmt.Errorf("lock metadata JSON should be a single valid JSON object; recompile the workflow with gh aw compile to regenerate the lock file: %w", err)
+		}
+		if err := decoder.Decode(new(any)); err != io.EOF {
+			if err == nil {
+				err = errors.New("unexpected trailing JSON value")
+			}
 			return nil, false, fmt.Errorf("lock metadata JSON should be a single valid JSON object; recompile the workflow with gh aw compile to regenerate the lock file: %w", err)
 		}
 		lockSchemaLog.Printf("Extracted metadata from lock file: schema=%s", metadata.SchemaVersion)

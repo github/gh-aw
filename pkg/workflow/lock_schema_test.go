@@ -95,6 +95,15 @@ name: test
 			expectError:    true,
 		},
 		{
+			name: "trailing JSON metadata",
+			content: `# gh-aw-metadata: {"schema_version":"v1"} {"schema_version":"v2"}
+name: test
+`,
+			expectMetadata: nil,
+			expectLegacy:   false,
+			expectError:    true,
+		},
+		{
 			name: "v2 with strict field",
 			content: `# gh-aw-metadata: {"schema_version":"v2","frontmatter_hash":"abc","strict":true}
 name: test
