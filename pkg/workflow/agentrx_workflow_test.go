@@ -59,6 +59,8 @@ func TestAgentRxSetupUsesHashedDependencyLock(t *testing.T) {
 	require.Contains(t, string(lock), "pydantic==2.14.1")
 	require.Contains(t, string(lock), "pydantic-core==2.50.1 \\\n    --hash=sha256:93ba4e9d8210d941c200431a56b2c0400b131865947903937ed3ec5404307d2e")
 	require.NotContains(t, string(lock), "pydantic-core==2.50.2")
+	require.Contains(t, string(lock), "httpx2==2.16.0")
+	require.Contains(t, string(lock), "httpcore2==2.16.0 \\\n    --hash=sha256:5c4358319f2602d984ad93182c9fee5160f22e9da7babdda870a5e7c4e2dc34f")
 	revision := regexp.MustCompile(`fetch --depth 1 origin ([0-9a-f]{40})`).FindStringSubmatch(setup)
 	require.Len(t, revision, 2, "AgentRx source must remain pinned to an immutable commit")
 	require.Contains(t, string(lock), "# AgentRx "+revision[1]+" runtime dependencies.")
