@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 )
@@ -17,7 +16,7 @@ func (acc *importAccumulator) appendModelsField(fm map[string]any, importPath st
 		return
 	}
 	var rawModels map[string]any
-	if jsonErr := json.Unmarshal([]byte(modelsContent), &rawModels); jsonErr != nil {
+	if jsonErr := unmarshalJSONFromString(modelsContent, &rawModels); jsonErr != nil {
 		acc.warnings = append(acc.warnings, fmt.Sprintf("import %q: models field is not a valid object; skipping invalid value", importPath))
 		return
 	}
