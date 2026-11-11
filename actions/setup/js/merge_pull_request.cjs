@@ -11,6 +11,7 @@ const { selectLatestRelevantChecks, isDeploymentCheck } = require("./check_runs_
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
+const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { getEffectiveDetectionConclusion, getThreatDetectedMarker, getThreatEngineErrorMarker } = require("./threat_detection_warning.cjs");
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
@@ -276,6 +277,7 @@ function policySnapshot(pr) {
     state: pr.state,
     merged: pr.merged,
     draft: pr.draft,
+    changed_files: pr.changed_files,
     head: [pr.head?.sha, pr.head?.ref, pr.head?.repo?.full_name],
     base: [pr.base?.sha, pr.base?.ref, pr.base?.repo?.full_name],
     author: pr.user?.login,
@@ -285,6 +287,46 @@ function policySnapshot(pr) {
     reviewers: (pr.requested_reviewers || []).map(user => user.login).sort(),
     teams: (pr.requested_teams || []).map(team => team.slug).sort(),
   };
+}
+
+/**
+ * @param {any} githubClient
+ * @param {string} owner
+ * @param {string} repo
+ * @param {any} pr
+ * @param {import('./types/handler-factory').HandlerConfig} config
+ * @returns {Promise<ReturnType<typeof checkFileProtectionPostApply>>}
+ */
+async function evaluateProtectedFiles(githubClient, owner, repo, pr, config) {
+  if (config.protected_files_policy === "allowed") return { action: "allow" };
+
+  // GitHub caps this endpoint at 3000 files; never authorize a partial diff.
+  if (!Number.isSafeInteger(pr.changed_files) || pr.changed_files < 0 || pr.changed_files > 3000) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Missing or unsupported pull request changed-file count; cannot verify protected files`);
+  }
+  const files = await githubClient.paginate(githubClient.rest.pulls.listFiles, {
+    owner,
+    repo,
+    pull_number: pr.number,
+    per_page: 100,
+  });
+  if (
+    !Array.isArray(files) ||
+    files.length !== pr.changed_files ||
+    files.some(
+      file =>
+        typeof file?.filename !== "string" ||
+        !file.filename ||
+        !["added", "removed", "modified", "renamed", "copied", "changed", "unchanged"].includes(file.status) ||
+        (file.previous_filename !== undefined && (typeof file.previous_filename !== "string" || !file.previous_filename)) ||
+        (["renamed", "copied"].includes(file.status) && !file.previous_filename)
+    ) ||
+    new Set(files.map(file => file.filename)).size !== files.length
+  ) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Incomplete or malformed pull request file evidence; cannot verify protected files`);
+  }
+  const paths = [...new Set(files.flatMap(file => (file.previous_filename ? [file.filename, file.previous_filename] : [file.filename])))];
+  return checkFileProtectionPostApply(paths, config);
 }
 
 /**
@@ -767,6 +809,16 @@ async function main(config = {}) {
         core.info(`Allowed branch patterns: ${allowedBranches.length}`);
       }
 
+      phase = "protected_files";
+      const fileProtection = await evaluateProtectedFiles(githubClient, owner, repo, pr, config);
+      if (fileProtection.action !== "allow") {
+        failureReasons.push({
+          code: "protected_files_modified",
+          message: "Pull request modifies protected files; independently review and merge manually or change the trusted protected-files configuration",
+          details: { file_count: Array.isArray(fileProtection.files) ? fileProtection.files.length : 0 },
+        });
+      }
+
       /** @type {{isProtected: boolean, isDefault: boolean, defaultBranch: string|null, requiredChecks: string[]}} */
       let branchPolicy = { isProtected: false, isDefault: false, defaultBranch: null, requiredChecks: [] };
       phase = "branch_policy";
@@ -907,6 +959,11 @@ async function main(config = {}) {
       const currentReviews = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
       const currentApprovals = await getApprovalEvidence(githubClient, owner, repo, currentPR, requiredApprovers);
       const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
+      const currentFileProtection = await evaluateProtectedFiles(githubClient, owner, repo, currentPR, config);
+      if (currentFileProtection.action !== "allow") {
+        failureReasons.push({ code: "protected_files_modified", message: "Pull request modifies protected files at final revalidation" });
+        throw new Error(`${SAFE_OUTPUT_E007}: Protected files changed before merging; fresh evaluation required`);
+      }
       evidence.revalidation = {
         branch_policy: currentPolicy,
         upstream_pull_request: upstreamPR?.number || null,

@@ -31,6 +31,9 @@ safe-outputs:
   push-to-pull-request-branch:
     protected-files:
       exclude: [AGENTS.md, /pyproject.toml]
+  merge-pull-request:
+    protected-files:
+      exclude: [AGENTS.md, /pyproject.toml]
   approve-workflow-run:
     github-token: ${{ secrets.APPROVE_WORKFLOW_RUN_TOKEN }}
     allowed-workflows: [ci.yml]
@@ -59,7 +62,7 @@ Update changesets.
 	require.NoError(t, err)
 	var runtimeConfig map[string]map[string]any
 	require.NoError(t, json.Unmarshal([]byte(handlerJSON), &runtimeConfig))
-	for _, name := range []string{"create_pull_request", "push_to_pull_request_branch", "approve_workflow_run"} {
+	for _, name := range []string{"create_pull_request", "push_to_pull_request_branch", "merge_pull_request", "approve_workflow_run"} {
 		t.Run(name, func(t *testing.T) {
 			cfg := mcpConfig[name]
 			require.NotNil(t, cfg)
@@ -69,6 +72,10 @@ Update changesets.
 			assert.NotContains(t, ParseStringArrayFromConfig(cfg, "protected_files", nil), "AGENTS.md")
 			assert.Contains(t, ParseStringArrayFromConfig(cfg, "protected_files", nil), "README.md", "repo paths must not remove matching basenames globally")
 			assert.Contains(t, ParseStringArrayFromConfig(cfg, "protected_files", nil), "package.json")
+			if name == "merge_pull_request" {
+				assert.Equal(t, mcpConfig["create_pull_request"]["protected_files"], cfg["protected_files"])
+				assert.Equal(t, mcpConfig["create_pull_request"]["protected_dot_folder_excludes"], cfg["protected_dot_folder_excludes"])
+			}
 			assert.Equal(t, true, cfg["protect_top_level_dot_folders"])
 			assert.NotContains(t, cfg, "_protected_files_exclude")
 		})

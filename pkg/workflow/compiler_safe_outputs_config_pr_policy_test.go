@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -233,6 +234,67 @@ func TestPRPolicyFieldsExpressionsPassThrough(t *testing.T) {
 			patchFmt, ok := handlerConfig["patch_format"]
 			require.True(t, ok, "should have patch_format field")
 			assert.Equal(t, tt.wantFormat, patchFmt, "patch_format should contain the expression")
+		})
+	}
+}
+
+func TestMergePullRequestProtectedFilesExpressionSerialization(t *testing.T) {
+	t.Parallel()
+
+	for _, expression := range []string{
+		"${{ inputs.policy }}",
+		"${{ needs.prepare.outputs.policy }}",
+		"${{ toJSON(inputs.policy) }}",
+	} {
+		t.Run(expression, func(t *testing.T) {
+			data := &WorkflowData{
+				Name: "Test",
+				SafeOutputs: &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{
+					ProtectedFilesPolicy: expression,
+					RequiredChecks:       []string{"ci"},
+					RequiredCheckApps:    map[string]int64{"ci": 123},
+					RequiredApprovers:    []string{"maintainer"},
+					RequiredLabels:       []string{"ready"},
+					RequiredTitlePrefix:  "fix:",
+					AllowedBranches:      []string{"main"},
+				}},
+			}
+			mcpConfig, err := generateSafeOutputsConfig(data)
+			require.NoError(t, err)
+			var steps []string
+			NewCompiler().addHandlerManagerConfigEnvVar(&steps, data)
+			require.Len(t, steps, 1)
+			_, quoted, ok := strings.Cut(steps[0], "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: ")
+			require.True(t, ok)
+			handlerConfig, err := strconv.Unquote(strings.TrimSpace(quoted))
+			require.NoError(t, err)
+
+			wrappedExpression := wrapExpressionWithToJSON(expression)
+			for name, configJSON := range map[string]string{"handler manager": handlerConfig, "MCP": mcpConfig} {
+				t.Run(name, func(t *testing.T) {
+					require.Contains(t, configJSON, `"protected_files_policy":`+wrappedExpression)
+					for _, policy := range []string{
+						"allowed", "blocked", "", "unexpected",
+						"allowed\",\n\"required_checks\":[],\"required_approvers\":[],\"required_labels\":[],\"allowed_branches\":[],\"protected_files_policy\":\"allowed",
+					} {
+						serializedPolicy, err := json.Marshal(policy)
+						require.NoError(t, err)
+						runtimeJSON := strings.ReplaceAll(configJSON, wrappedExpression, string(serializedPolicy))
+						var config map[string]map[string]any
+						require.NoError(t, json.Unmarshal([]byte(runtimeJSON), &config))
+						handler := config["merge_pull_request"]
+						assert.Equal(t, policy, handler["protected_files_policy"])
+						assert.Equal(t, []any{"ci"}, handler["required_checks"])
+						assert.Equal(t, map[string]any{"ci": float64(123)}, handler["required_check_apps"])
+						assert.Equal(t, []any{"maintainer"}, handler["required_approvers"])
+						assert.Equal(t, []any{"ready"}, handler["required_labels"])
+						assert.Equal(t, "fix:", handler["required_title_prefix"])
+						assert.Equal(t, []any{"main"}, handler["allowed_branches"])
+						assert.Equal(t, true, handler["protect_top_level_dot_folders"])
+						assert.Contains(t, handler["protected_files"], "package.json")
+					}
+				})
+			}
 		})
 	}
 }
