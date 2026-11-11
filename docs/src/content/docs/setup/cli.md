@@ -1405,6 +1405,28 @@ For repository scope, `--repo` currently accepts `owner/repo` only. To target Gi
 
 ### Advanced
 
+#### `connector`
+
+Configure or test an experimental declarative connector using `gh aw connector <id> setup` or `gh aw connector <id> test`. Declarations are discovered at `.github/workflows/connectors/<id>.md`; `--file` selects a repository-owned declaration or import wrapper. There is no built-in provider catalog or fallback.
+
+```bash wrap
+gh aw connector linear setup
+gh aw connector linear setup --repo owner/repo --phase agent
+gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
+```
+
+`setup` displays binding types, endpoints, credential names, scopes, and provisioning guidance without reading or writing secret values. It is offline by default. With `--repo OWNER/REPO`, it checks repository secret and variable names and prints suggested provisioning commands; it does not run them. Missing settings are informational, while an inventory failure returns an error. Setup does not select capabilities or establish provider authorization.
+
+`test` requires `--phase` and `--capability`. Agent/context read tests contact the declared provider with that phase's configured credentials. Safe-output tests always stage without credentials or provider requests. Trigger tests project native fixture JSON offline without deploying or enrolling a receiver. Test arguments must satisfy the declaration's types and exact resource grants.
+
+**Binding options:** `--root`, `--file`, repeatable `--input name=JSON`, repeatable `--grant resource=JSON-array`. Each `--grant` replaces that resource's declared allowlist.
+
+**Setup options:** `--repo` (setup only), `--phase` (optional credential-phase filter).
+
+**Test options:** `--phase` (`agent`, `context`, `safe-output`, or `trigger`), `--capability`, `--args` (JSON object; default `{}`), `--remote-tool` (exact hosted MCP method), `--native-event` (trigger discriminator), `--node-runtime` (trusted matching shared Node runtime; required for annotated safe-output content), `--timeout` (duration greater than zero and at most `20s`; default `20s`).
+
+See [Local setup and conformance](/gh-aw/reference/connectors/#local-setup-and-conformance) for complete test examples and provisioning limits. The separate plural `gh aw connectors` command validates and inspects raw connector definitions and runs compiler-frozen plans in trusted hosts; use `gh aw connectors --help` and subcommand help for those low-level options.
+
 #### `mcp`
 
 Manage MCP (Model Context Protocol) servers in workflows. `mcp inspect` auto-detects mcp-scripts.
