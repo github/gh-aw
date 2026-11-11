@@ -1,6 +1,6 @@
 ---
 title: Safe Output Outcome Evaluation Specification
-version: 1.0.3
+version: 1.0.4
 status: Working Draft
 date: 2026-05-15
 last_updated: 2026-11-05
