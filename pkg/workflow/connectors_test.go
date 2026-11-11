@@ -167,6 +167,15 @@ func TestConnectorDryRunRejectsLiveParsedHandlers(t *testing.T) {
 	require.ErrorContains(t, err, "safe-outputs.scripts")
 }
 
+func TestConnectorPlanEnvironmentCollision(t *testing.T) {
+	t.Parallel()
+	compiler, root := connectorCompiler(t)
+	_, err := compiler.ParseWorkflowString(connectorWorkflow(
+		"    safe-outputs: [add-comment]\nsafe-outputs:\n  env:\n    GH_AW_CONNECTOR_7_TRACKER_PLAN: forged\n",
+	), filepath.Join(root, "collision.md"))
+	require.ErrorContains(t, err, "GH_AW_CONNECTOR_7_TRACKER_PLAN conflicts with a compiler-owned connector plan")
+}
+
 func TestConnectorGeneratedSafeOutputHost(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("node"); err != nil {
@@ -181,7 +190,7 @@ func TestConnectorGeneratedSafeOutputHost(t *testing.T) {
 		{"runtime-staged", false, true},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			source, err := json.Marshal(connectorSafeOutputScript("frozen", "add-comment", "PREFIX_", []string{"WRITER"}, mode.compiled, false))
+			source, err := json.Marshal(connectorSafeOutputScript("PLAN", "add-comment", "PREFIX_", []string{"WRITER"}, mode.compiled, false))
 			require.NoError(t, err)
 			driver := fmt.Sprintf(`
 const assert = require('node:assert/strict');
@@ -204,7 +213,7 @@ const adaptedRequire = name => {
 const result = new Function('item', 'require', 'process', 'temporaryIdMap', %s)(
   {type: 'connector_effect', issue: 'ISSUE-1', text: 'safe'},
   adaptedRequire,
-  {execPath: process.execPath, env: {RUNNER_TEMP: '/trusted', PREFIX_WRITER: 'test-token', OTHER: 'not-inherited'}},
+  {execPath: process.execPath, env: {RUNNER_TEMP: '/trusted', PLAN:'frozen', PREFIX_WRITER: 'test-token', OTHER: 'not-inherited'}},
   new Map()
 );
 const staged = %t;

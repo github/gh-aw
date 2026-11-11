@@ -136,8 +136,7 @@ func TestZendeskConnectorStagedHostDoesNotReadSecrets(t *testing.T) {
 	source, err := json.Marshal(script)
 	require.NoError(t, err)
 	plan := data.Connectors["zendesk"].SafeOutputs
-	encoded, err := plan.EncodeJSON()
-	require.NoError(t, err)
+	encoded := data.Connectors["zendesk"].SafeOutputPlan
 	encodedJSON, err := json.Marshal(encoded)
 	require.NoError(t, err)
 	proposal, err := plan.PrepareSafeOutput("add-internal-note", zendeskNoteArgs())
@@ -163,7 +162,7 @@ const adaptedRequire = name => {
     calls++;
     assert.equal(binary, process.execPath);
     assert.deepEqual(args, [require('node:path').join(runnerTemp,'gh-aw','actions','connector_runtime.cjs'),'invoke','safe-output','add-internal-note','--stage']);
-    assert.deepEqual(options.env, {GH_AW_CONNECTOR_PLAN: encoded.replace(/\n[ \t]*/g, '')});
+    assert.deepEqual(options.env, {GH_AW_CONNECTOR_PLAN: encoded});
     assert.deepEqual(JSON.parse(options.input), proposal.arguments);
     assert.equal(options.shell, undefined);
     assert.equal(options.timeout, 25000);
@@ -179,6 +178,7 @@ const adaptedRequire = name => {
 };
 const env = new Proxy({}, {get: (_, key) => {
   if (key === 'RUNNER_TEMP') return runnerTemp;
+  if (key === 'GH_AW_CONNECTOR_7_ZENDESK_PLAN') return encoded;
   throw new Error('staging must not read provider credentials: ' + key);
 }});
 const result = new Function('item','require','process','temporaryIdMap', %s)(

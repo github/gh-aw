@@ -38,14 +38,31 @@ func TestConnectorPlanHumanReadable(t *testing.T) {
 	decoded, err := connectors.DecodePlan(snapshot)
 	require.NoError(t, err)
 	require.Equal(t, config.Agent.Digest, decoded.Digest)
+	planEnvName := "GH_AW_CONNECTOR_7_TRACKER_PLAN"
+	compiled, err := compiler.CompileToYAML(data, filepath.Join(root, "readable.md"))
+	require.NoError(t, err)
+	_, effects := connectorPhaseJobJSON(t, compiled)
+	var job struct {
+		Env map[string]string `json:"env"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(effects), &job))
+	planJSON := job.Env[planEnvName]
+	require.True(t, json.Valid([]byte(planJSON)), "the workflow environment must contain plain JSON")
+	require.Equal(t, 1, strings.Count(compiled, planEnvName+":"))
+	decoded, err = connectors.DecodePlan(planJSON)
+	require.NoError(t, err)
+	require.Equal(t, config.SafeOutputs.Digest, decoded.Digest)
 	script := generateSafeOutputScriptContent("tracker-add-comment", data.SafeOutputs.Scripts["tracker-add-comment"])
-	require.Contains(t, script, "GH_AW_CONNECTOR_PLAN: String.raw`{\n")
-	require.Contains(t, script, `"api": "https://api.example.com"`)
+	require.Contains(t, script, `process.env["GH_AW_CONNECTOR_7_TRACKER_PLAN"]`)
+	require.NotContains(t, script, "String.raw")
+	require.NotContains(t, script, `"api":`)
 	require.NotContains(t, script, literal)
 	require.NotContains(t, script, "${")
 	assets, err := filepath.Abs("../../actions/setup/js")
 	require.NoError(t, err)
-	options, err := json.Marshal(map[string]string{"source": script, "assets": assets, "literal": literal})
+	options, err := json.Marshal(map[string]string{
+		"source": script, "assets": assets, "literal": literal, "plan": planJSON, "planEnv": planEnvName,
+	})
 	require.NoError(t, err)
 	node, err := exec.LookPath("node")
 	require.NoError(t, err)
@@ -63,10 +80,13 @@ const adaptedRequire = name => {
   return name.startsWith("./") ? require(path.join(options.assets, name)) : require(name);
 };
 const module_ = {exports:{}};
-new Function("require", "module", "process", options.source)(adaptedRequire, module_, {env:{RUNNER_TEMP:"runner"}, execPath:process.execPath});
+const env = {RUNNER_TEMP:"runner", [options.planEnv]:options.plan};
+new Function("require", "module", "process", options.source)(adaptedRequire, module_, {env, execPath:process.execPath});
 (async () => {
   const handler = await module_.exports.main({staged:true});
   assert.equal((await handler({type:"tracker_add_comment", issue:"ISSUE-1", text:"body"}, {}, new Map())).staged, true);
+  delete env[options.planEnv];
+  await assert.rejects(() => handler({issue:"ISSUE-1", text:"body"}, {}, new Map()), /plan environment variable.*missing/);
 })().catch(error => {console.error(error); process.exitCode = 1;});
 `, options)
 	output, err := exec.CommandContext(t.Context(), node, "-e", driver).CombinedOutput()
@@ -110,7 +130,7 @@ func TestConnectorContentGeneratedFactory(t *testing.T) {
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			source := generateSafeOutputScriptContent("connector-publish", &SafeScriptConfig{
-				Script: connectorSafeOutputScript("frozen", "publish", "PREFIX_", []string{"WRITER"}, mode.compiled, false),
+				Script: connectorSafeOutputScript("PLAN", "publish", "PREFIX_", []string{"WRITER"}, mode.compiled, false),
 			})
 			options, err := json.Marshal(map[string]any{
 				"source": source, "assets": assets, "global": mode.global, "staged": mode.staged,
@@ -128,7 +148,7 @@ process.env = {
   GITHUB_RUN_ID: "123",
 };
 let bindings = 0, records = 0, secrets = 0, calls = 0;
-const env = {RUNNER_TEMP: "runner"};
+const env = {RUNNER_TEMP: "runner", PLAN:"frozen"};
 Object.defineProperty(env, "PREFIX_WRITER", {get() {
   secrets++;
   assert.equal(options.staged, false, "staging must not access writer credentials");
@@ -206,6 +226,10 @@ func TestConnectorSmokeIssuesMessageMetadata(t *testing.T) {
 	compiler.SetWorkflowIdentifier("smoke-issues.md")
 	data, err := compiler.ParseWorkflowString(string(source), filepath.Join(root, ".github/workflows/smoke-issues.md"))
 	require.NoError(t, err)
+	plans := map[string]string{}
+	for alias, config := range data.Connectors {
+		plans[connectorEnvPrefix(alias)+"PLAN"] = config.SafeOutputPlan
+	}
 	for _, test := range []struct {
 		name string
 		args map[string]any
@@ -224,6 +248,7 @@ func TestConnectorSmokeIssuesMessageMetadata(t *testing.T) {
 				"assets": assets,
 				"args":   test.args,
 				"type":   strings.ReplaceAll(test.name, "-", "_"),
+				"env":    plans,
 			})
 			require.NoError(t, err)
 			driver := fmt.Sprintf(`
@@ -241,8 +266,8 @@ const adaptedRequire = name => {
   return name.startsWith("./") ? require(path.join(options.assets, name)) : require(name);
 };
 const module_ = {exports:{}};
-const env = new Proxy({RUNNER_TEMP:"runner"}, {get(target, key) {
-  assert.equal(key, "RUNNER_TEMP", "staging must not access credentials");
+const env = new Proxy({RUNNER_TEMP:"runner", ...options.env}, {get(target, key) {
+  assert.ok(Object.hasOwn(target, key), "staging must not access credentials");
   return target[key];
 }});
 new Function("require", "module", "process", options.source)(adaptedRequire, module_, {env, execPath:process.execPath});

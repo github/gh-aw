@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -70,14 +71,22 @@ func connectorSafeOutputName(alias, operation string) string {
 	return alias + "-" + operation
 }
 
+func connectorEnvPrefix(alias string) string {
+	return "GH_AW_CONNECTOR_" + strconv.Itoa(len(alias)) + "_" + strings.ToUpper(strings.ReplaceAll(alias, "-", "_")) + "_"
+}
+
 func connectorCredentialEnvPrefix(alias string) string {
-	return "GH_AW_CONNECTOR_" + strconv.Itoa(len(alias)) + "_" + strings.ToUpper(strings.ReplaceAll(alias, "-", "_")) + "_SECRET_"
+	return connectorEnvPrefix(alias) + "SECRET_"
 }
 
 func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias string, config *WorkflowConnector) error {
 	safeOutputs := connectorMap(frontmatter, "safe-outputs")
 	scripts := connectorMap(safeOutputs, "scripts")
 	env := connectorMap(safeOutputs, "env")
+	planEnvName := connectorEnvPrefix(alias) + "PLAN"
+	if _, exists := env[planEnvName]; exists {
+		return fmt.Errorf("safe-outputs.env.%s conflicts with a compiler-owned connector plan", planEnvName)
+	}
 	prefix := connectorCredentialEnvPrefix(alias)
 	for _, secret := range config.SafeOutputs.Secrets() {
 		name := prefix + secret
@@ -101,6 +110,11 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 	if err != nil {
 		return err
 	}
+	var planJSON bytes.Buffer
+	if err := json.Compact(&planJSON, []byte(encoded)); err != nil {
+		return fmt.Errorf("serialize connector plan environment: %w", err)
+	}
+	config.SafeOutputPlan = planJSON.String()
 	for _, operation := range config.SafeOutputs.SafeOutputNames() {
 		name := connectorSafeOutputName(alias, operation)
 		if len(name) > 128 {
@@ -116,7 +130,7 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 		scripts[name] = map[string]any{
 			"description": fmt.Sprintf("Request %s/%s; validated and executed outside the agent credential boundary.", alias, operation),
 			"inputs":      connectorSafeOutputInputs(inputs),
-			"script":      connectorSafeOutputScript(encoded, operation, prefix, config.SafeOutputs.Secrets(), c.dryRun || c.trialMode || c.forceStaged, config.SafeOutputs.UsesStagedFile(operation)),
+			"script":      connectorSafeOutputScript(planEnvName, operation, prefix, config.SafeOutputs.Secrets(), c.dryRun || c.trialMode || c.forceStaged, config.SafeOutputs.UsesStagedFile(operation)),
 		}
 	}
 	return nil
@@ -204,7 +218,7 @@ func connectorSafeOutputInputs(inputs map[string]connectors.Input) map[string]an
 	return result
 }
 
-func connectorSafeOutputScript(encoded, operation, prefix string, secrets []string, staged, binary bool) string {
+func connectorSafeOutputScript(planEnvName, operation, prefix string, secrets []string, staged, binary bool) string {
 	var script strings.Builder
 	script.WriteString("const { spawnSync } = require('node:child_process');\n")
 	script.WriteString("const { join } = require('node:path');\n")
@@ -214,8 +228,9 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	script.WriteString("const { formatConnectorArguments } = require('./connector_content.cjs');\n")
 	fmt.Fprintf(&script, "const staged = %t || isStagedMode(typeof config === 'undefined' ? undefined : config);\n", staged) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("const input = Object.fromEntries(Object.entries(item).filter(([key]) => !['type', 'output_id', 'depends-on', 'depends_on'].includes(key)));\n")
-	// Strip formatting newlines so generated JavaScript indentation cannot inflate the environment byte bound.
-	fmt.Fprintf(&script, "const env = { GH_AW_CONNECTOR_PLAN: String.raw`%s`.replace(/\\n[ \\t]*/g, '') };\n", encoded) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	fmt.Fprintf(&script, "const plan = process.env[%q];\n", planEnvName)                                                                   //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	fmt.Fprintf(&script, "if (!plan) throw new Error('Compiler-owned connector plan environment variable %s is missing');\n", planEnvName) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	script.WriteString("const env = { GH_AW_CONNECTOR_PLAN: plan };\n")
 	script.WriteString("const contentConfig = { ...(typeof connectorContentDefaults === 'undefined' ? {} : connectorContentDefaults), ...(typeof config === 'undefined' ? {} : config) };\n")
 	if binary {
 		script.WriteString("if (!staged) env.GH_AW_CONNECTOR_FILE_ROOT = join(process.env.RUNNER_TEMP, 'gh-aw', 'safeoutputs', 'upload-artifacts');\n")

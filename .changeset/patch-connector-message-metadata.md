@@ -4,4 +4,4 @@
 
 Exclude safe-output message IDs and dependency metadata from connector arguments so Linear, Jira, and other connector effects pass strict input validation.
 
-Emit connector plans as indented, human-reviewable JSON instead of base64 in generated workflow environments. Preserve digest verification, expression safety, and compatibility with legacy snapshots.
+Store connector plans as human-reviewable JSON instead of base64 in workflow environment variables, and load them from JavaScript rather than embedding them in executable source. Preserve digest verification, expression safety, and compatibility with legacy snapshots.

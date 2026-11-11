@@ -228,6 +228,10 @@ evaluation. `DecodePlan` accepts these snapshots and the legacy base64 format
 emitted by `Plan.Encode`. Digest verification preserves field order and numeric
 tokens while normalizing JSON formatting and string escapes. A digest is not a
 signature: only the trusted compiler/lock file may supply runtime plans.
+The compiler stores each safe-output snapshot as compact JSON in a
+connector-specific job environment variable. Generated handlers load it from
+`process.env` and forward only their own plan as `GH_AW_CONNECTOR_PLAN`; plan data
+is never interpolated into the executable handler source.
 
 `Plan.CallMCP` calls a real remote SDK endpoint under local tool/argument gates.
 `Plan.MCPServer(runtime)` registers selected REST-backed and remote MCP tools
