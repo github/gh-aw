@@ -298,6 +298,10 @@ After completing your analysis, if any spam labels were applied:
 
 If no spam was detected, you may still update the log to remove stale entries, but do not add a new entry.
 
+## Success Rubric and Final Self-Check
+
+A successful review uses the supplied context, takes only high-confidence actions supported by that context, and emits at least one valid safe output. Before the final safe output, verify the target, allowed action and labels, rationale and confidence fields, spam-only hide reason, and that spam-log entries are added only when spam labels were applied.
+
 ## Important Guidelines
 
 - Be conservative with detections to avoid false positives
