@@ -14,12 +14,33 @@ and mixed edits continue to require write-or-higher repository permission.
 ### Breaking changes
 
 Eligible workflows that select neither a model nor routing now default to
-`goal: cost`, `mode: balanced` model routing on GitHub Copilot inference.
-After recompilation, the selected model, output, and cost may differ. To retain
-the previous non-routed model selection, set `engine.model-routing: false` and
-recompile; to keep a stable model, configure it explicitly. Explicit routing
-configurations are unchanged. Review generated locks and audit model and cost
-changes after recompilation.
+`goal: cost`, `mode: auto` model routing on GitHub Copilot inference. If task
+classification is unavailable or returns `unknown`, `auto` falls back to
+`balanced`. After recompilation, the selected model, output, and cost may
+differ. To retain the previous non-routed model selection, set
+`engine.model-routing: false` and recompile; to keep a stable model, configure
+it explicitly. Explicit routing configurations are unchanged. Review generated
+locks and audit model and cost changes after recompilation.
+
+Native Jira, Linear, and Azure DevOps tools, safe-output handlers, and gateway
+issue triggers have been replaced by the declarative connector runtime. Legacy
+`auth` and `allowed` settings and the old `connectors` gateway wrapper are
+rejected, and seven native read methods are no longer exposed. Migrate by
+importing the provider declaration from
+`.github/workflows/connectors/<provider>.md`, selecting read profiles and write
+effects explicitly, configuring the required credentials, and recompiling.
+Native integrations are not retained as a compatibility path; imports do not
+install provider webhooks, and unsupported operations may require workflow
+changes.
+
+`merge-pull-request` now blocks merges when the target PR changes protected
+files. Existing workflows that merged such changes will refuse those merges
+unless configured otherwise. Keep the default and merge those PRs manually,
+configure scoped exceptions with
+`safe-outputs.merge-pull-request.protected-files.exclude`, or set
+`safe-outputs.merge-pull-request.protected-files: allowed` when protected-file
+merges are intentional, then recompile. The opt-out does not bypass other merge
+gates.
 
 `pull_request_target` workflows now default to same-repository PRs only in both
 strict and non-strict mode. Omitting `forks` is equivalent to `forks: []`; no

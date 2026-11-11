@@ -3,7 +3,8 @@
 ---
 
 Default eligible workflows with no model or routing choice to `goal: cost`,
-`mode: balanced` model routing on GitHub Copilot inference.
+`mode: auto` model routing on GitHub Copilot inference. If classification is
+unavailable or returns `unknown`, `auto` falls back to `balanced`.
 
 **⚠️ Breaking Change**: After recompilation, eligible workflows may select a
 different model, changing their output and cost.
