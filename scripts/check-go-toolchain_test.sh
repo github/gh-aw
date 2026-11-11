@@ -10,7 +10,7 @@ cat >"$TEMP_DIR/go" <<'EOF'
 printf '%s\n' "$TEST_GO_VERSION"
 EOF
 chmod +x "$TEMP_DIR/go"
-for version in go1.27.4 go1.28.0; do
+for version in go1.27.4 go1.27.5 go1.28.0; do
   TEST_GO_VERSION="$version" PATH="$TEMP_DIR:$PATH" bash "$SCRIPT_DIR/check-go-toolchain.sh" >/dev/null
 done
 for version in go1.25.20 go1.26.9 go1.26.10 go1.26.11 go1.27.0 go1.27.1 go1.27.2 go1.27.3 go1.28rc1 devel; do
