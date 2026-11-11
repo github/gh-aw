@@ -137,6 +137,38 @@ func TestMergePullRequestExplicitPolicies(t *testing.T) {
 	require.ErrorContains(t, validateMergePullRequestPolicies(config, "Test Workflow"), "invalid GitHub username")
 }
 
+func TestMergePullRequestProtectedFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		config any
+		policy string
+	}{
+		{"defaults", nil, "blocked"},
+		{"blocked", map[string]any{"protected-files": "blocked"}, "blocked"},
+		{"allowed", map[string]any{"protected-files": "allowed"}, "allowed"},
+		{"expression", map[string]any{"protected-files": "${{ inputs.policy }}"}, "${{ inputs.policy }}"},
+		{"exclusions", map[string]any{"protected-files": map[string]any{"exclude": []any{"AGENTS.md", "/pyproject.toml"}}}, "blocked"},
+		{"object policy", map[string]any{"protected-files": map[string]any{"policy": "allowed"}}, "allowed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := NewCompiler().parseMergePullRequestConfig(map[string]any{"merge-pull-request": tc.config})
+			require.NotNil(t, cfg)
+			config := &SafeOutputsConfig{MergePullRequest: cfg}
+			require.NoError(t, validateMergePullRequestPolicies(config, "Test"))
+			handler := pullRequestHandlerRegistry["merge_pull_request"](config)
+			assert.Equal(t, tc.policy, handler["protected_files_policy"])
+			assert.Contains(t, handler["protected_files"], "package.json")
+			assert.Equal(t, true, handler["protect_top_level_dot_folders"])
+			assert.Contains(t, handler["_protected_files_exclude"], "CHANGELOG.md")
+			if tc.name == "exclusions" {
+				assert.Equal(t, []string{"AGENTS.md", "/pyproject.toml"}, cfg.ProtectedFilesExclude)
+			}
+		})
+	}
+	cfg := &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{ProtectedFilesPolicy: "request-review"}}
+	require.ErrorContains(t, validateMergePullRequestPolicies(cfg, "Test"), "protected-files")
+}
+
 func TestMergePullRequestCheckProducers(t *testing.T) {
 	for _, tt := range []struct {
 		name    string

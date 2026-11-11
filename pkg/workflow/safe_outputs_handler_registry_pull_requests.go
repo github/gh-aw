@@ -83,6 +83,12 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 		handler := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
 			AddIfNotEmpty("target", c.Target).
+			AddDefault("protected_files_policy", "blocked").
+			AddIfNotEmpty("protected_files_policy", c.ProtectedFilesPolicy).
+			AddStringSlice("protected_files", getAllManifestFiles()).
+			AddStringSlice("protected_path_prefixes", getProtectedPathPrefixes()).
+			AddDefault("protect_top_level_dot_folders", true).
+			AddStringSlice("_protected_files_exclude", defaultProtectedFilesExclude(c.ProtectedFilesExclude)).
 			AddStringSlice("required_checks", c.RequiredChecks).
 			AddStringSlice("required_approvers", c.RequiredApprovers).
 			AddStringSlice("required_labels", c.RequiredLabels).AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).AddStringSlice("allowed_branches", c.AllowedBranches).

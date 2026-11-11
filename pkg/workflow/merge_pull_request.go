@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -22,6 +23,8 @@ type MergePullRequestConfig struct {
 	RequiredChecks                []string         `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
 	RequiredCheckApps             map[string]int64 `yaml:"required-check-apps,omitempty"`   // Expected GitHub App IDs by required check name
 	RequiredApprovers             []string         `yaml:"required-approvers,omitempty"`    // At least one independent human from this allowlist must approve the head
+	ProtectedFilesPolicy          string           `yaml:"protected-files,omitempty"`       // blocked (default) or allowed
+	ProtectedFilesExclude         []string         `yaml:"-"`
 }
 
 // parseMergePullRequestConfig handles merge-pull-request configuration.
@@ -34,6 +37,8 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 	mergePullRequestLog.Print("Parsing merge-pull-request config")
 	cfg := &MergePullRequestConfig{}
 	if configMap, ok := configData.(map[string]any); ok {
+		cfg.ProtectedFilesExclude = preprocessProtectedFilesField(configMap, mergePullRequestLog)
+		cfg.ProtectedFilesPolicy = extractStringFromMap(configMap, "protected-files", mergePullRequestLog)
 		cfg.RequiredLabels = ParseStringArrayFromConfig(configMap, "required-labels", mergePullRequestLog)
 		if len(cfg.RequiredLabels) == 0 {
 			// Deprecated: allowed-labels is migrated to required-labels by the codemod
@@ -85,6 +90,9 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 		return nil
 	}
 	cfg := config.MergePullRequest
+	if policy := cfg.ProtectedFilesPolicy; policy != "" && policy != "blocked" && policy != "allowed" && !strings.HasPrefix(policy, "${{") {
+		return errors.New("safe-outputs.merge-pull-request.protected-files must be 'blocked', 'allowed', or a GitHub Actions expression. Use 'blocked' to refuse protected-file changes")
+	}
 	for name, appID := range cfg.RequiredCheckApps {
 		if !slices.Contains(cfg.RequiredChecks, name) {
 			return fmt.Errorf("safe-outputs.merge-pull-request.required-check-apps contains check %q not listed in required-checks. Add the check to required-checks", name)
