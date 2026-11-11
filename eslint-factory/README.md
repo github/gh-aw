@@ -111,6 +111,7 @@ negative controls and validated readable traces without live effects.
 | [`prefer-actions-exec-over-child-process`](#prefer-actions-exec-over-child-process) | Prefer `@actions/exec` over `child_process` to spawn processes that run to completion |
 | [`no-unguarded-async-timer-callback`](#no-unguarded-async-timer-callback) | Require async timer callbacks to wrap their entire body in try/catch |
 | [`require-finite-check-before-date-toisostring`](#require-finite-check-before-date-toisostring) | Validate dynamic dates before calling `toISOString()` or `toJSON()` |
+| [`require-null-check-with-typeof-object`](#require-null-check-with-typeof-object) | Require a null check for the same value alongside `typeof value === "object"` |
 | [`require-per-page-on-github-list-call`](#require-per-page-on-github-list-call) | Require explicit `per_page` values on paginated Octokit REST list calls |
 
 ### `no-ad-hoc-jsonl-parser`
@@ -1334,3 +1335,24 @@ const comments = await github.rest.issues.listComments({ owner, repo, issue_numb
 const page = await github.rest.issues.listComments({ owner, repo, issue_number: 1, per_page: 100 });
 const allComments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: 1, per_page: 100 });
 ```
+
+### `require-null-check-with-typeof-object`
+
+Require a null check for the same value whenever `typeof value === "object"` (or `!==`, `==`, `!=`) is used. `typeof null` is `"object"`, so a `null` value passes the check and later property access (for example `value.counts` or `Object.values(value)`) throws a `TypeError`. In `actions/setup/js` this shows up when parsing state files and API payloads where `null` is a valid JSON value.
+
+**Flagged forms:**
+```js
+const ok = !!parsed && typeof parsed.counts === "object"; // parsed.counts may be null
+const states = typeof result === "object" ? Object.values(result.claims || {}) : [];
+```
+
+**Safe alternatives:**
+```js
+const ok = !!parsed && parsed.counts !== null && typeof parsed.counts === "object";
+const states = result && typeof result === "object" ? Object.values(result.claims || {}) : [];
+```
+
+**Not flagged:**
+- The same value is checked against `null`/`undefined` or tested for truthiness (`value &&`, `value != null`, `!value ||`, `Boolean(value)`) in the same logical expression, or earlier in the same function.
+- `typeof` operands that are not a plain identifier or non-computed member chain (calls, computed access).
+- Other `typeof` comparisons such as `"string"` or `"function"`.
