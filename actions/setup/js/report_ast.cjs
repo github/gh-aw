@@ -163,11 +163,10 @@ function isReportReferenceDefinition(value) {
   return REPORT_REFERENCE_DEFINITION.test(value);
 }
 
-/** @param {string} value */
+/** @param {string} value @returns {string | undefined} */
 function normalizeReportReferenceDefinition(value) {
-  const normalized = normalizeReportText(value);
-  if (!isReportReferenceDefinition(normalized)) throw new TypeError("Invalid report reference definition");
-  return normalized;
+  if (!isReportReferenceDefinition(value)) throw new TypeError("Invalid report reference definition");
+  return normalizeReportText(value, { redact: false }) === normalizeReportText(value) ? value : undefined;
 }
 
 /** @param {string} value */
@@ -450,7 +449,15 @@ function normalizeBlocks(nodes, depth) {
         result.push({ type: "review_marker", workflowCallId: normalizeReportText(node.workflowCallId) });
         break;
       case "reference_definition":
-        result.push({ type: "reference_definition", value: normalizeReportReferenceDefinition(node.value) });
+        {
+          const value = normalizeReportReferenceDefinition(node.value);
+          if (value === undefined) {
+            result.push({
+              type: "paragraph",
+              children: [{ type: "text", value: normalizeReportText(node.value), ...provenance }],
+            });
+          } else result.push({ type: "reference_definition", value });
+        }
         break;
       case "structured_data": {
         result.push({ type: "structured_data", data: normalizeReportData(node.data, depth + 1) });

@@ -726,6 +726,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       const body = mockGithub.rest.pulls.createReview.mock.calls[0][0].body;
 
       expect(result.success).toBe(true);
+      expect(body).toBe("Body text.\n\n[my-marker]: #score=85,run_id=1,run_attempt=1\n\n[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi");
       expect(body).toContain("[my-marker]: #score=85,run_id=1,run_attempt=1");
       expect(body).toContain("[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi");
       expect(body).not.toContain("\\[my-marker\\]");

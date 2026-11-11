@@ -63,7 +63,6 @@ describe("automatic report size redaction", () => {
       { type: "xml_marker", name: "custom", value: "MARKER-INTACT" },
       { type: "json_marker", name: "evidence", data: { payload: "METADATA-INTACT" } },
       { type: "review_marker", workflowCallId: "owner/repo/CALLER-INTACT" },
-      { type: "reference_definition", value: "[review-state]: #PAYLOAD-INTACT" },
       { type: "marker", name: "gh-aw-threat-detected" },
       { type: "expiration", expiresAt: "2030-01-01T00:00:00.000Z" },
       { type: "paragraph", children: [{ type: "closing_reference", action: "fixes", target: { number: "42" }, enabled: true }] },
@@ -81,6 +80,22 @@ describe("automatic report size redaction", () => {
       expect(body.match(/<\/details>/g)).toHaveLength(1);
       expect(input).toEqual(copy);
       expect(() => renderSizedReport(input, protectedBody.length)).toThrow("cannot be reduced");
+    });
+
+    it("fits oversized agent reference definitions while preserving framework markers", () => {
+      const agentDefinitions = Array.from({ length: 3000 }, (_, index) => ({
+        type: "reference_definition",
+        value: `[agent-${index}]: #${"payload".repeat(8)}`,
+        agentTainted: true,
+      }));
+      const frameworkDefinition = { type: "reference_definition", value: "[framework-state]: #required", agentTainted: false };
+      const body = renderSizedReport(report([...agentDefinitions, frameworkDefinition]), 65536).body;
+
+      expect(body.length).toBeLessThanOrEqual(65536);
+      expect(body).toContain(SIZE_NOTICE);
+      expect(body).toContain("[framework-state]: #required");
+      expect((body.match(/\[agent-/g) ?? []).length).toBeLessThan(agentDefinitions.length);
+      expect(() => renderSizedReport(report([frameworkDefinition]), renderReport(report([frameworkDefinition])).body.trimEnd().length - 1)).toThrow("cannot be reduced");
     });
 
     it.each(["paragraph", "table", "list", "details"])("preserves protected inline siblings through %s normalization and fitting", kind => {
