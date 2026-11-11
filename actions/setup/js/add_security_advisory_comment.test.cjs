@@ -5,6 +5,8 @@ import { expectExecutionProvenance, useExecutionProvenanceFixture } from "./test
 useExecutionProvenanceFixture();
 
 const request = vi.fn();
+const reportSize = require("./report_size.cjs");
+const renderSizedReport = vi.spyOn(reportSize, "renderSizedReport");
 const main = require("./add_security_advisory_comment.cjs").main;
 const tokenConfig = { "github-token": "external-token" };
 const comment = { ghsa_id: "GHSA-2345-6789-cfgh", body: "The proposed fix is ready for maintainer review." };
@@ -47,7 +49,7 @@ describe("add_security_advisory_comment", () => {
   });
 
   it("rejects missing credentials rather than using the ambient Actions token", async () => {
-    await expect(main()).rejects.toThrow("requires an external github-token or GitHub App token");
+    await expect(main()).rejects.toThrow("requires an external github-token");
     expect(request).not.toHaveBeenCalled();
   });
 
@@ -81,11 +83,21 @@ describe("add_security_advisory_comment", () => {
     expect(output).toContain("***");
   });
 
-  it("enforces max without creating another comment", async () => {
+  it("checks max before rendering a capped comment", async () => {
     const handler = await main(tokenConfig);
     await handler(comment);
     // Missing provenance would throw during report building if a capped item rendered.
     vi.stubEnv("GITHUB_REPOSITORY_ID", undefined);
+    renderSizedReport.mockClear();
+    expect(await handler(comment)).toMatchObject({ success: false, skipped: true, reasonCode: "MAX_COUNT_REACHED" });
+    expect(renderSizedReport).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("consumes the max budget after a failed comment request to avoid duplicate retries", async () => {
+    request.mockRejectedValueOnce(Object.assign(new Error("confidential body"), { status: 500 }));
+    const handler = await main({ ...tokenConfig, max: 1 });
+    expect(await handler(comment)).toMatchObject({ success: false });
     expect(await handler(comment)).toMatchObject({ success: false, skipped: true, reasonCode: "MAX_COUNT_REACHED" });
     expect(request).toHaveBeenCalledTimes(1);
   });
@@ -108,6 +120,14 @@ describe("add_security_advisory_comment", () => {
     expect(await handler(comment)).toMatchObject({ success: false, skipped: true, reasonCode: "MAX_COUNT_REACHED" });
     expect(global.core.summary.write).toHaveBeenCalledTimes(1);
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it("normalizes positive expression-valued max strings", async () => {
+    const handler = await main({ ...tokenConfig, max: "2" });
+    expect(await handler(comment)).toMatchObject({ success: true });
+    expect(await handler(comment)).toMatchObject({ success: true });
+    expect(await handler(comment)).toMatchObject({ skipped: true });
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it.each([{ ghsa_id: "" }, { ghsa_id: "../issues/123" }, { ghsa_id: "CVE-2026-1234" }, { ghsa_id: 17 }, { body: "" }, { body: " " }, { body: "x".repeat(65001) }])("rejects invalid advisory comments: %j", async fields => {

@@ -44,7 +44,7 @@ describe("create_security_advisory", () => {
   });
 
   it("rejects missing credentials rather than using the ambient Actions client", async () => {
-    await expect(main()).rejects.toThrow("requires an external github-token or GitHub App token");
+    await expect(main()).rejects.toThrow("requires an external github-token");
     await expect(main({ "github-token": " " })).rejects.toThrow("requires an external");
     expect(createRepositoryAdvisory).not.toHaveBeenCalled();
   });
@@ -95,6 +95,14 @@ describe("create_security_advisory", () => {
     const handler = await main({ ...tokenConfig, max });
     expect(await handler(advisory)).toMatchObject({ success: true });
     expect(await handler(advisory)).toMatchObject({ success: true });
+    expect(createRepositoryAdvisory).toHaveBeenCalledTimes(2);
+  });
+
+  it("normalizes positive expression-valued max strings", async () => {
+    const handler = await main({ ...tokenConfig, max: "2" });
+    expect(await handler(advisory)).toMatchObject({ success: true });
+    expect(await handler(advisory)).toMatchObject({ success: true });
+    expect(await handler(advisory)).toMatchObject({ skipped: true });
     expect(createRepositoryAdvisory).toHaveBeenCalledTimes(2);
   });
 

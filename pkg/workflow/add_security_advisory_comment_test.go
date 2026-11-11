@@ -20,7 +20,7 @@ func TestAddSecurityAdvisoryCommentCompile(t *testing.T) {
 		wantToken string
 		appStep   string
 	}{
-		{name: "requires credentials", config: "  add-security-advisory-comment:\n", wantError: "requires an external github-token or github-app"},
+		{name: "requires credentials", config: "  add-security-advisory-comment:\n", wantError: "requires an external github-token"},
 		{name: "rejects Actions token", config: "  add-security-advisory-comment:\n    github-token: ${{ secrets.GITHUB_TOKEN }}\n", wantError: "requires an external"},
 		{name: "handler token", config: "  add-security-advisory-comment:\n    max: 2\n    footer: false\n    github-token: ${{ secrets.ADVISORY_TOKEN }}\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "global token", config: "  github-token: ${{ secrets.ADVISORY_TOKEN }}\n  add-security-advisory-comment:\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},

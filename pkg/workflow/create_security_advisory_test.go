@@ -45,7 +45,7 @@ func TestCreateSecurityAdvisoryAuthentication(t *testing.T) {
 			}
 			err := validateSafeOutputsCreateSecurityAdvisory(config)
 			if tt.wantError {
-				require.ErrorContains(t, err, "requires an external github-token or github-app")
+				require.ErrorContains(t, err, "requires an external github-token")
 				return
 			}
 			require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestCreateSecurityAdvisoryCompile(t *testing.T) {
 		wantToken string
 		appStep   string
 	}{
-		{name: "requires credentials", config: "  create-security-advisory:\n", wantError: "requires an external github-token or github-app"},
+		{name: "requires credentials", config: "  create-security-advisory:\n", wantError: "requires an external github-token"},
 		{name: "rejects Actions token", config: "  create-security-advisory:\n    github-token: ${{ secrets.GITHUB_TOKEN }}\n", wantError: "requires an external"},
 		{name: "handler token", config: "  create-security-advisory:\n    max: 2\n    github-token: ${{ secrets.ADVISORY_TOKEN }}\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "global token", config: "  github-token: ${{ secrets.ADVISORY_TOKEN }}\n  create-security-advisory:\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
