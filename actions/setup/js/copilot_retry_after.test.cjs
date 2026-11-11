@@ -15,11 +15,14 @@ const now = Date.parse("Wed, 11 Nov 2026 08:43:00 GMT");
 describe("Copilot Retry-After parsing", () => {
   it.each([
     ["HTTP 429\nretry-after: 245", 245000],
+    ["CAPIError: Too Many Requests\nretry-after: 245", 245000],
     ['CAPIError: 429 Too Many Requests\nheaders: { "Retry-After": "245" }', 245000],
     ["HTTP 429\n{ 'retry-after': '245', 'x-ratelimit-exceeded': 'global-chat:model:userID' }", 245000],
     ['{"status":429,"headers":{"retry-after":245}}', 245000],
     [JSON.stringify({ type: "session.error", data: { message: 'HTTP 429\nheaders: {"retry-after":"245"}' } }), 245000],
     ["HTTP 429\nRetry-After: Wed, 11 Nov 2026 08:47:05 GMT", 245000],
+    ["HTTP 429\nRetry-After: Wednesday, 11-Nov-26 08:47:05 GMT", 245000],
+    ["HTTP 429\nRetry-After: Wed Nov 11 08:47:05 2026", 245000],
     ['HTTP 429\n{"Retry-After":"Wed, 11 Nov 2026 08:47:05 GMT"}', 245000],
     [JSON.stringify({ type: "session.error", data: { message: "HTTP 429\nRetry-After: Wed, 11 Nov 2026 08:47:05 GMT" } }), 245000],
     ["HTTP 429\nRetry-After: 10\nRetry-After: 245", 245000],
@@ -30,6 +33,8 @@ describe("Copilot Retry-After parsing", () => {
 
   it.each([
     "HTTP 503\nretry-after: 245",
+    "HTTP 503\nretry-after: 429",
+    '{"status":503,"headers":{"retry-after":429}}',
     "HTTP 429",
     "HTTP 429\nx-retry-after: 245",
     "HTTP 429\nretry-after: invalid",
@@ -39,6 +44,7 @@ describe("Copilot Retry-After parsing", () => {
     "HTTP 429\nretry-after: 1e3",
     "HTTP 429\nretry-after: 245 seconds",
     "HTTP 429\nretry-after: Wed, 11 Nov 2026 08:42:00 GMT",
+    "HTTP 429\nRetry-After: Sunday, 06-Nov-77 08:47:05 GMT",
   ])("preserves existing policy for %s", text => {
     expect(parseCopilotRetryAfterMs(text, now)).toBeNull();
   });
@@ -50,11 +56,18 @@ describe("Copilot Retry-After harness integration", () => {
     ["session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["stderr:session.error", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["error", "1", "1000", "", 0, 2, "rate_limit_error"],
+    ["stderr-long-output", "1", "2000", "", 0, 2, "rate_limit_error"],
+    ["stderr:incomplete-tool-call-stream", "1", "2000", "", 0, 2, "rate_limit_error"],
+    ["stderr:incomplete-tool-call-stream", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
+    ["stderr:capi-too-many", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["turn.failed", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "245", "300000", "2", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "2147484", "3000000000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "999999999999999999999999", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
+    ["stderr:quota", "1", "2000", "", 1, 1, "capi_quota_exceeded"],
+    ["stderr:503", "429", "2000", "", 0, 2, "partial_execution"],
+    ["stderr:unscoped", "1", "2000", "", 0, 2, "partial_execution"],
     ["stderr", "invalid", "2000", "", 1, 1, "capi_quota_exceeded"],
     ["stderr", "", "2000", "", 1, 1, "capi_quota_exceeded"],
     ["assistant.message", "245", "1", "", 0, 2, "partial_execution"],
@@ -67,15 +80,36 @@ describe("Copilot Retry-After harness integration", () => {
     const callsPath = path.join(directory, "calls.jsonl");
     const stubPath = path.join(directory, "stub.cjs");
     const eventType = source.replace(/^stderr:/, "");
-    const error = source === "invocation-cap" ? "CAPIError: 429 Maximum LLM invocations exceeded (20/20)" : ["assistant.message", "tool.execution_complete"].includes(eventType) ? "HTTP 429" : "CAPIError: 429 Too Many Requests";
-    const message = `${error}${retryAfter ? `\nretry-after: ${retryAfter}` : ""}`;
+    const error =
+      source === "invocation-cap"
+        ? "CAPIError: 429 Maximum LLM invocations exceeded (20/20)"
+        : source === "stderr:quota"
+          ? "CAPIError: 429 429 quota exceeded"
+          : source === "stderr:capi-too-many"
+            ? "CAPIError: Too Many Requests"
+            : source === "stderr:503"
+              ? "HTTP 503"
+              : source === "stderr:unscoped"
+                ? "Diagnostic mentions 429 without a response status"
+                : source === "stderr:incomplete-tool-call-stream"
+                  ? "Failed to finalize chat-completions stream: missing choices[0].tool_calls[0].id\nHTTP 429"
+                  : failureClass === "capi_quota_exceeded"
+                    ? "CAPIError: 429 Too Many Requests"
+                    : failureClass === "rate_limit_error" || failureClass === "rate_limit_wait_exceeded"
+                      ? "HTTP 429"
+                      : ["assistant.message", "tool.execution_complete"].includes(eventType)
+                        ? "HTTP 429"
+                        : "CAPIError: 429 Too Many Requests";
+    const trailingOutput = source === "stderr-long-output" ? `\n${"x".repeat(70 * 1024)}` : "";
+    const message = `${error}${retryAfter ? `\nretry-after: ${retryAfter}` : ""}${trailingOutput}`;
+    const plainStderr = ["stderr", "invocation-cap"].includes(source) || (source.startsWith("stderr") && !["session.error", "assistant.message", "tool.execution_complete"].includes(eventType));
     fs.writeFileSync(
       stubPath,
       `const fs = require("fs");
 const callsPath = ${JSON.stringify(callsPath)};
 fs.appendFileSync(callsPath, JSON.stringify({ time: Date.now(), args: process.argv.slice(2) }) + "\\n");
 if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
-  console.${source.startsWith("stderr") || source === "invocation-cap" ? "error" : "log"}(${["stderr", "invocation-cap"].includes(source) ? JSON.stringify(message) : `JSON.stringify({ type: ${JSON.stringify(eventType)}, data: { message: ${JSON.stringify(message)} } })`});
+  console.${source.startsWith("stderr") || source === "invocation-cap" ? "error" : "log"}(${plainStderr ? JSON.stringify(message) : `JSON.stringify({ type: ${JSON.stringify(eventType)}, data: { message: ${JSON.stringify(message)} } })`});
   process.exitCode = 1;
 }`
     );
@@ -114,7 +148,11 @@ if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
       if (failureClass === "rate_limit_error") {
         expect(calls[1].time - calls[0].time).toBeGreaterThanOrEqual(1000);
         expect(telemetry.attempt_results[1].backoff_ms).toBe(1000);
-        expect(calls[1].args).toContain("--continue");
+        if (source === "stderr:incomplete-tool-call-stream") {
+          expect(calls[1].args).not.toContain("--continue");
+        } else {
+          expect(calls[1].args).toContain("--continue");
+        }
       }
       if (failureClass === "rate_limit_wait_exceeded") {
         expect(result.stderr).toContain("not retrying");

@@ -72,7 +72,7 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
-const { parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { hasCopilotResponseStatus, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
 const {
   captureExecutionEvidenceConfiguration,
@@ -2105,16 +2105,41 @@ async function main() {
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
           let nativeTerminalRateLimitError = false;
-          let retryAfterOutput = "";
+          let retryAfterMs = null;
+          let pendingStderrResponse = "";
+          let pendingStderrHeaderLines = 0;
           /** @param {string} line */
           const observeRetryAfter = line => {
+            if (!hasCopilotResponseStatus(line)) return;
+            retryAfterMs = parseCopilotRetryAfterMs(line);
+          };
+          /** @param {string} line */
+          const observeStderrRetryAfter = line => {
+            let event = null;
             try {
-              const event = JSON.parse(line);
+              event = JSON.parse(line);
               if (event?.type && !["error", "session.error", "turn.failed"].includes(event.type)) return;
             } catch {
-              // Ignore JSON parsing failures: native CLI errors and header dumps are plain text.
+              event = null;
             }
-            retryAfterOutput = (retryAfterOutput + "\n" + line).slice(-64 * 1024);
+            if (hasCopilotResponseStatus(line)) {
+              pendingStderrResponse = line;
+              pendingStderrHeaderLines = 0;
+              retryAfterMs = parseCopilotRetryAfterMs(line);
+              return;
+            }
+            if (!pendingStderrResponse) return;
+            const isHeaderLine = /(?:^|[\s{,])["']?retry-after["']?\s*:/i.test(line);
+            const isHeaderContainer = /^\s*(?:headers?\s*[:=]\s*\{?|\{|\}|\s*[,}])\s*$/.test(line);
+            if ((!isHeaderLine && !isHeaderContainer) || pendingStderrHeaderLines >= 8) {
+              pendingStderrResponse = "";
+              pendingStderrHeaderLines = 0;
+              return;
+            }
+            pendingStderrResponse += `\n${line}`;
+            pendingStderrHeaderLines += 1;
+            const delay = parseCopilotRetryAfterMs(pendingStderrResponse);
+            if (delay !== null) retryAfterMs = delay;
           };
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
           // already started the sidecar; the driver only opens an SDK client connection.
@@ -2142,7 +2167,7 @@ async function main() {
               }
             },
             onStderrLine: line => {
-              observeRetryAfter(line);
+              observeStderrRetryAfter(line);
               if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(line)) nativeTerminalRateLimitError = true;
             },
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
@@ -2168,9 +2193,29 @@ async function main() {
           detectedCopilotErrors.agenticEngineTimeout ||= attemptDetections.agenticEngineTimeout;
           detectedCopilotErrors.modelNotSupportedError ||= attemptDetections.modelNotSupportedError;
           detectedCopilotErrors.http400ResponseError ||= attemptDetections.http400ResponseError;
-          return { ...result, strategy, nativeTerminalRateLimitError, retryAfterMs: parseCopilotRetryAfterMs(retryAfterOutput) };
+          return { ...result, strategy, nativeTerminalRateLimitError, retryAfterMs };
         },
         handleFailure: async ({ attempt, result }) => {
+          const retryAfterDecision = () => {
+            if (result.retryAfterMs == null) return null;
+            const exceedsDelayCap = result.retryAfterMs > Math.min(maxDelayMs, 2147483647);
+            const exceedsTimeout = softTimeoutGuard && Date.now() + result.retryAfterMs >= softTimeoutGuard.softDeadlineMs;
+            if (exceedsDelayCap || exceedsTimeout) {
+              result.failureClasses = ["rate_limit_wait_exceeded"];
+              const reason = exceedsDelayCap ? `max-delay-ms=${maxDelayMs}` : "remaining job timeout budget";
+              log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 Retry-After=${result.retryAfterMs}ms exceeds ${reason}; not retrying`);
+              emitInfrastructureIncomplete(`Copilot HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`);
+              return { action: "stop" };
+            }
+            result.failureClasses = ["rate_limit_error"];
+            log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${result.retryAfterMs}ms before next attempt`);
+            return { action: "retry", nextDelayMs: result.retryAfterMs };
+          };
+          const retryDecision = (nextDelayMs = undefined) => {
+            const rateLimitDecision = retryAfterDecision();
+            if (rateLimitDecision) return rateLimitDecision;
+            return { action: "retry", ...(nextDelayMs === undefined ? {} : { nextDelayMs }) };
+          };
           if (result.runtimeGuardReason === "copilot_model_verification") {
             result.failureClasses = ["copilot_model_verification"];
             return { action: "stop" };
@@ -2406,12 +2451,17 @@ async function main() {
             return { action: "stop" };
           }
 
+          if (isQuotaExceeded && (result.retryAfterMs == null || /\bquota exceeded\b/i.test(result.output))) {
+            log(`attempt ${attempt + 1}: Copilot quota exceeded — not retrying`);
+            return { action: "stop" };
+          }
+
           // attempt === 0 makes this a one-time fresh-run recovery path.
           if (attempt === 0 && retryableProxyAuthenticationFailure) {
             useContinueOnRetry = false;
             continueDisabledPermanently = true;
             log(`attempt ${attempt + 1}: provider authentication failed after partial execution - will retry once as fresh run to avoid losing completed agent work`);
-            return { action: "retry" };
+            return retryDecision();
           }
 
           if (isAuthenticationFailed) {
@@ -2442,7 +2492,7 @@ async function main() {
                 useContinueOnRetry = false;
                 continueDisabledPermanently = true;
                 log(`attempt ${attempt + 1}: refreshed awf-reflect now includes model '${configuredModel}' — retrying once as fresh run`);
-                return { action: "retry" };
+                return retryDecision();
               }
               log(`attempt ${attempt + 1}: refreshed awf-reflect does not include model '${configuredModel || "(none)"}' — treating as non-retryable`);
             }
@@ -2460,7 +2510,7 @@ async function main() {
               useContinueOnRetry = false;
               continueDisabledPermanently = true;
               log(`attempt ${attempt + 1}: incomplete tool-call stream — restarting fresh (--continue disabled permanently)`);
-              return { action: "retry" };
+              return retryDecision();
             }
             log(`attempt ${attempt + 1}: incomplete tool-call stream — no retry budget remains; detection or task completion is unverified`);
             return { action: "stop" };
@@ -2471,7 +2521,7 @@ async function main() {
               useContinueOnRetry = false;
               continueDisabledPermanently = true;
               log(`attempt ${attempt + 1}: HTTP 400 response error on --continue — retrying once as fresh run (request/state may be stale; --continue disabled permanently)`);
-              return { action: "retry" };
+              return retryDecision();
             }
             log(`attempt ${attempt + 1}: HTTP 400 response error — not retrying (persistent request validation/state failure)`);
             return { action: "stop" };
@@ -2482,7 +2532,7 @@ async function main() {
               useContinueOnRetry = false;
               continueDisabledPermanently = true;
               log(`attempt ${attempt + 1}: auth error on --continue — retrying as fresh run (session credential may be corrupted; context will be lost)`);
-              return { action: "retry" };
+              return retryDecision();
             }
             log(`attempt ${attempt + 1}: no authentication information found — not retrying (COPILOT_GITHUB_TOKEN, GH_TOKEN, and GITHUB_TOKEN are all absent or invalid)`);
             return { action: "stop" };
@@ -2494,7 +2544,7 @@ async function main() {
               useContinueOnRetry = false;
               continueDisabledPermanently = true;
               log(`attempt ${attempt + 1}: null-type tool_call error (${priorMode}) — restarting fresh (poisoned history discarded; --continue disabled permanently)`);
-              return { action: "retry" };
+              return retryDecision();
             }
           }
 
@@ -2506,7 +2556,7 @@ async function main() {
           if (shouldRetryFirstConnectionRefused({ copilotSDKMode, attempt, isConnectionRefused, maxRetries })) {
             useContinueOnRetry = false;
             log(`attempt ${attempt + 1}: connection refused on first request path — retrying as fresh run with short backoff (${FIRST_CONNECTION_REFUSED_RETRY_DELAY_MS}ms) (attempt ${attempt + 2}/${maxRetries + 1})`);
-            return { action: "retry", nextDelayMs: FIRST_CONNECTION_REFUSED_RETRY_DELAY_MS };
+            return retryDecision(FIRST_CONNECTION_REFUSED_RETRY_DELAY_MS);
           }
 
           if (isStartupRetryEligible && isStartupNoOutputRetryCandidate(result) && scheduledExit2Retries < MAX_SCHEDULED_EXIT2_RETRIES && attempt < maxRetries) {
@@ -2515,24 +2565,15 @@ async function main() {
             useContinueOnRetry = false;
             const triggerLabel = isScheduledRun ? "scheduled" : "push";
             log(`attempt ${attempt + 1}: ${triggerLabel} startup interruption (exit code 2, no output — driver-handoff Turns=0)` + ` — retrying once as fresh run (startupRetry=${scheduledExit2Retries}/${MAX_SCHEDULED_EXIT2_RETRIES})`);
-            return { action: "retry" };
+            return retryDecision();
           }
           if (isStartupRetryEligible && isStartupNoOutputRetryCandidate(result) && scheduledExit2Retries < MAX_SCHEDULED_EXIT2_RETRIES && attempt >= maxRetries) {
             log(`attempt ${attempt + 1}: startup interruption detected (driver-handoff Turns=0) but retry budget exhausted — no attempts remain`);
           }
 
           if (result.retryAfterMs != null) {
-            // Node timers overflow above 2^31-1 ms and would otherwise retry immediately.
-            const exceedsDelayCap = result.retryAfterMs > Math.min(maxDelayMs, 2147483647);
-            const exceedsTimeout = softTimeoutGuard && Date.now() + result.retryAfterMs >= softTimeoutGuard.softDeadlineMs;
-            if (exceedsDelayCap || exceedsTimeout) {
-              result.failureClasses = ["rate_limit_wait_exceeded"];
-              const reason = exceedsDelayCap ? `max-delay-ms=${maxDelayMs}` : "remaining job timeout budget";
-              log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 Retry-After=${result.retryAfterMs}ms exceeds ${reason}; not retrying`);
-              emitInfrastructureIncomplete(`Copilot HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`);
-              return { action: "stop" };
-            }
-            result.failureClasses = ["rate_limit_error"];
+            const decision = retryAfterDecision();
+            if (decision?.action === "stop") return decision;
             if (attempt >= maxRetries) {
               log(`all ${maxRetries} retries exhausted after HTTP 429 — not retrying`);
               return { action: "stop" };
@@ -2543,13 +2584,7 @@ async function main() {
               hasOutput: result.hasOutput,
               hasCAPIServerError,
             });
-            log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${result.retryAfterMs}ms before next attempt`);
-            return { action: "retry", nextDelayMs: result.retryAfterMs };
-          }
-
-          if (isQuotaExceeded) {
-            log(`attempt ${attempt + 1}: Copilot quota exceeded — not retrying`);
-            return { action: "stop" };
+            return decision;
           }
 
           if (shouldRetryFailedExecution({ ...result, isModelRoutingFailure, attempt, maxRetries })) {
@@ -2569,7 +2604,7 @@ async function main() {
             const retryMode = useContinueOnRetry ? "--continue" : copilotSDKMode ? "fresh run" : "fresh run (--continue permanently disabled)";
             const crashSuffix = isCrashSignal ? ` crashSignal=${crashSignalName}` : "";
             log(`attempt ${attempt + 1}: ${reason} — will retry with ${retryMode} (attempt ${attempt + 2}/${maxRetries + 1})${crashSuffix}`);
-            return { action: "retry" };
+            return retryDecision();
           }
 
           if (attempt >= maxRetries) {
