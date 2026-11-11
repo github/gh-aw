@@ -139,6 +139,10 @@ function generateMarkdown() {
   lines.push("");
   lines.push("For details on the alias syntax, fallback resolution algorithm, and how to define your own aliases in workflow frontmatter, see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).");
   lines.push("");
+  lines.push(
+    "`router` and `router/*` are reserved and are not aliases. `model: router`, `router/economy`, `router/balanced`, and `router/robust` choose [model routing](/gh-aw/reference/model-routing/) for the main agent; they can't be defined in `models:` or used in `models.allowed`, `models.blocked`, or `fallback-models`."
+  );
+  lines.push("");
 
   lines.push("### Vendor Aliases");
   lines.push("");

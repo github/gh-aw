@@ -70,7 +70,9 @@ engine:
   model-routing:
     goal: cost
     mode: auto
-``` Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
+```
+
+Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
 
 This example routes models served through GitHub Copilot, so the workflow needs Copilot authentication, here through the [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) permission. Claude and Codex can instead route on their own provider, Anthropic or OpenAI, with the same API key they use without routing; see [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi). Routing also needs the AWF firewall, which is enabled by default.
 

@@ -62,15 +62,17 @@ func isReservedRouterModelName(model string) bool {
 // routerModelMode returns the model-routing mode for a router value, or an error
 // naming the problem for reserved names that are not router values.
 func routerModelMode(field, model string) (string, error) {
-	if base, params, hasParams := strings.Cut(model, "?"); hasParams {
-		return "", NewValidationError(field, model,
-			fmt.Sprintf("router values do not take parameters (got %q)", "?"+params),
-			fmt.Sprintf("The router chooses the model and effort. Use %s, or pin a model to set the effort, for example model: gpt-6.1-sol?effort=high.", base))
-	}
+	base, params, hasParams := strings.Cut(model, "?")
 	for _, entry := range routerModelValues {
-		if model == entry.value {
-			return entry.mode, nil
+		if base != entry.value {
+			continue
 		}
+		if hasParams {
+			return "", NewValidationError(field, model,
+				fmt.Sprintf("router values do not take parameters (got %q)", "?"+params),
+				fmt.Sprintf("The router chooses the model and effort. Use %s, or pin a model to set the effort, for example model: gpt-6.1-sol?effort=high.", base))
+		}
+		return entry.mode, nil
 	}
 	return "", NewValidationError(field, model, "unknown router value",
 		"Use one of: "+validRouterModelValues()+".")

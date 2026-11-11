@@ -191,6 +191,9 @@ func mergeSessionModelRoutingAwInfo(runDir string, info *AwInfo) *AwInfo {
 	if modelRouting := sessionRouting.modelRouting(); modelRouting != nil {
 		sessionInfo.ModelRouting = modelRouting
 	}
+	if sessionRouting.ModelConfig != nil {
+		sessionInfo.ModelConfig = sessionRouting.ModelConfig
+	}
 	return &sessionInfo
 }
 

@@ -171,6 +171,8 @@ func TestCompileRouterModelValue_Rejected(t *testing.T) {
 			wantError: []string{"unknown router value"}},
 		{name: "effort parameter", files: map[string]string{"main.md": routerValueBase + "model: router/economy?effort=high\nengine: copilot\n---\nReport.\n"},
 			wantError: []string{"router values do not take parameters", "pin a model to set the effort"}},
+		{name: "unknown router value with parameters", files: map[string]string{"main.md": routerValueBase + "model: router/fast?effort=high\nengine: copilot\n---\nReport.\n"},
+			wantError: []string{"unknown router value", "router, router/economy, router/balanced, router/robust"}},
 		{name: "with engine.model-routing", files: map[string]string{"main.md": routerValueBase + "model: router/economy\nengine:\n  id: copilot\n" + routingBlock + "---\nReport.\n"},
 			wantError: []string{"a router value and engine.model-routing both choose model routing"}},
 		{name: "with imported engine.model-routing", files: map[string]string{
@@ -235,4 +237,29 @@ func TestIsReservedRouterModelName(t *testing.T) {
 	} {
 		require.Equal(t, want, isReservedRouterModelName(model), model)
 	}
+}
+
+// The activation router-value guard must check the model the harness uses, so it
+// receives the same model-variable fallback the engine applies when a model
+// expression resolves empty.
+func TestCompileModelExpressionPublishesHarnessFallbackToActivation(t *testing.T) {
+	infoFallback := regexp.MustCompile(`(?m)^\s+GH_AW_INFO_MODEL_FALLBACK: (.+)$`)
+	engineFallback := regexp.MustCompile(`(?m)^\s+GH_AW_MODEL_FALLBACK: (.+)$`)
+	for _, engine := range []string{"copilot", "claude", "codex"} {
+		t.Run(engine, func(t *testing.T) {
+			compiled := compileDefaultRoutingSource(t, "---\non:\n  workflow_dispatch:\n    inputs:\n      model:\n        type: string\npermissions:\n  contents: read\nmodel: ${{ inputs.model }}\nengine: "+engine+"\n---\nReport.\n")
+			require.NoError(t, compiled.err)
+			info := infoFallback.FindStringSubmatch(compiled.lock)
+			require.NotNil(t, info, "activation must publish GH_AW_INFO_MODEL_FALLBACK")
+			harness := engineFallback.FindAllStringSubmatch(compiled.lock, -1)
+			require.NotEmpty(t, harness, "the engine step must set GH_AW_MODEL_FALLBACK")
+			require.Equal(t, harness[0][1], info[1])
+			require.Contains(t, info[1], "vars.GH_AW_MODEL_AGENT_")
+		})
+	}
+	t.Run("literal model", func(t *testing.T) {
+		compiled := compileDefaultRoutingSource(t, routerValueBase+"model: gpt-5.6-luna\nengine: copilot\n---\nReport.\n")
+		require.NoError(t, compiled.err)
+		require.NotContains(t, compiled.lock, "GH_AW_INFO_MODEL_FALLBACK")
+	})
 }

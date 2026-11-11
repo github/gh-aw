@@ -469,6 +469,47 @@ describe("generate_aw_info.cjs", () => {
     await expect(main(mockCore, mockContext)).rejects.toThrow("ERR_CONFIG");
   });
 
+  it("fails when an empty model expression falls back to a router value from the model variables", async () => {
+    // model: ${{ inputs.model }} resolved empty; the harness would use GH_AW_MODEL_FALLBACK,
+    // here vars.GH_AW_DEFAULT_MODEL_COPILOT=router/economy.
+    process.env.GH_AW_INFO_MODEL = "";
+    process.env.GH_AW_INFO_MODEL_FALLBACK = "router/economy";
+    process.env.GH_AW_INFO_MODEL_CONFIG = '{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}';
+    try {
+      await expect(main(mockCore, mockContext)).rejects.toThrow("ERR_CONFIG");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('resolved to the router value "router/economy" at run time'));
+      expect(fs.existsSync(awInfoPath)).toBe(false);
+    } finally {
+      delete process.env.GH_AW_INFO_MODEL_FALLBACK;
+      delete process.env.GH_AW_INFO_MODEL_CONFIG;
+    }
+  });
+
+  it("checks the resolved model expression rather than the fallback when the expression is nonempty", async () => {
+    process.env.GH_AW_INFO_MODEL = "gpt-6.1-sol";
+    process.env.GH_AW_INFO_MODEL_FALLBACK = "router/economy";
+    try {
+      await main(mockCore, mockContext);
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.GH_AW_INFO_MODEL_FALLBACK;
+    }
+  });
+
+  it("fails when vars.GH_AW_MODEL_AGENT_<ENGINE> disables implicit routing and resolves to a router value", async () => {
+    // Without a model, GH_AW_INFO_MODEL is vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto',
+    // and a nonempty agent variable makes the activation decision disable implicit routing.
+    process.env.GH_AW_INFO_MODEL = "router/robust";
+    process.env.GH_AW_INFO_MODEL_CONFIG = '{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}';
+    try {
+      await expect(main(mockCore, mockContext)).rejects.toThrow("ERR_CONFIG");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('resolved to the router value "router/robust" at run time'));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("vars.GH_AW_MODEL_AGENT_<ENGINE>"));
+    } finally {
+      delete process.env.GH_AW_INFO_MODEL_CONFIG;
+    }
+  });
+
   it("does not fail on a router-like model variable when the compiled config routes the run", async () => {
     // Explicit routing ignores the model variables, so their value is never passed to the engine.
     process.env.GH_AW_INFO_MODEL = "router/economy";
