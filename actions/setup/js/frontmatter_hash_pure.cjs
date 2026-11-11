@@ -591,19 +591,25 @@ function runtimeImportHashCandidatePaths(importPath, baseDir) {
  * @param {string} baseDir
  * @returns {string}
  */
+function findGitHubFolder(baseDir) {
+  let directory = path.normalize(baseDir);
+  while (!directory.endsWith(".github")) {
+    const parent = path.dirname(directory);
+    if (parent === directory || parent === "." || parent === "/") {
+      return baseDir;
+    }
+    directory = parent;
+  }
+  return directory;
+}
+
+/**
+ * @param {string} baseDir
+ * @returns {string}
+ */
 function runtimeImportHashWorkspaceRoot(baseDir) {
-  const normalized = path.normalize(baseDir).replace(/\\/g, "/");
-  if (normalized === ".github" || normalized.startsWith(".github/")) {
-    return ".";
-  }
-  const markerIndex = normalized.indexOf("/.github/");
-  if (markerIndex >= 0) {
-    return normalized.substring(0, markerIndex);
-  }
-  if (normalized.endsWith("/.github")) {
-    return path.dirname(baseDir);
-  }
-  return baseDir;
+  const githubFolder = findGitHubFolder(baseDir);
+  return githubFolder.endsWith(".github") ? path.dirname(githubFolder) : baseDir;
 }
 
 /**
@@ -714,16 +720,43 @@ function isWorkflowSpecImport(importPath) {
 }
 
 /**
- * Mirrors the compiler's nested local import resolution: bare names and ./ paths
- * are file-relative; qualified paths are relative to the root workflow directory.
+ * Mirrors native imports' base selection, allowed roots, and containment checks.
  * @param {string} importPath
  * @param {string} baseDir
  * @param {string} rootDir
  * @returns {string}
  */
 function resolveHashImportPath(importPath, baseDir, rootDir) {
+  importPath = importPath.split("#", 1)[0];
   const fileRelative = !importPath.includes("/") || importPath.startsWith("./");
-  return path.join(fileRelative ? baseDir : rootDir, importPath);
+  let resolveBase = fileRelative ? baseDir : rootDir;
+  const githubFolder = findGitHubFolder(resolveBase);
+  let securityBase = githubFolder;
+  let filePath = importPath;
+  let filePathSlash = filePath.split(path.sep).join("/");
+  if (githubFolder.endsWith(".github")) {
+    const repoRoot = path.dirname(githubFolder);
+    if (filePathSlash.startsWith(".github/")) {
+      resolveBase = repoRoot;
+    } else if (filePathSlash.startsWith("/")) {
+      filePath = filePathSlash.substring(1);
+      filePathSlash = filePath;
+      if (!filePath.startsWith(".github/") && !filePath.startsWith(".agents/")) {
+        throw new Error(`${ERR_VALIDATION}: security: path ${importPath} must be within .github or .agents folder`);
+      }
+      resolveBase = repoRoot;
+      if (filePath.startsWith(".agents/")) securityBase = path.join(repoRoot, ".agents");
+    }
+  }
+  if (filePathSlash.startsWith("/") && !filePathSlash.substring(1).startsWith(".github/") && !filePathSlash.substring(1).startsWith(".agents/")) {
+    throw new Error(`${ERR_VALIDATION}: security: path ${importPath} must be within .github or .agents folder`);
+  }
+  const fullPath = path.join(resolveBase, filePath);
+  const relativePath = path.relative(securityBase, fullPath);
+  if (relativePath === ".." || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+    throw new Error(`${ERR_VALIDATION}: security: path ${importPath} must be within ${path.basename(securityBase)} folder (resolves to: ${relativePath})`);
+  }
+  return fullPath;
 }
 
 /**

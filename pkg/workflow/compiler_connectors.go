@@ -122,7 +122,7 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 	return nil
 }
 
-func attachConnectorInputSchemas(data *WorkflowData) error {
+func (c *Compiler) attachConnectorInputSchemas(data *WorkflowData) error {
 	for alias, config := range data.Connectors {
 		if config.SafeOutputs == nil {
 			continue
@@ -137,6 +137,7 @@ func attachConnectorInputSchemas(data *WorkflowData) error {
 				return err
 			}
 			data.SafeOutputs.Scripts[name].connectorInputSchema = schema
+			data.SafeOutputs.Scripts[name].connectorDryRun = c.dryRun
 			options := config.operationOptions(operation)
 			data.SafeOutputs.Scripts[name].Max = options.Max
 			data.SafeOutputs.Scripts[name].connectorOptions = &options

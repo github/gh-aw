@@ -132,21 +132,39 @@ func TestConnectorCompilationStaysStaged(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []string{"staged", "trial", "dry-run"} {
 		t.Run(mode, func(t *testing.T) {
-			c, root := connectorCompiler(t)
+			c, root := awConnectorCompiler(t)
 			c.forceStaged = mode == "staged"
 			c.trialMode = mode == "trial"
 			c.dryRun = mode == "dry-run"
-			data, err := c.ParseWorkflowString(connectorWorkflow("    safe-outputs: [add-comment]\n"), filepath.Join(root, "proof.md"))
+			source := awConnectorHeader + awConnectorSource(t) + "safe-outputs:\n  tracker-add-comment:\n    staged: false\n---\nReview.\n"
+			data, err := c.ParseWorkflowString(source, filepath.Join(root, "proof.md"))
 			require.NoError(t, err)
 			script := data.SafeOutputs.Scripts["tracker-add-comment"]
 			assert.Contains(t, script.Script, "const staged = true || isStagedMode(typeof config === 'undefined' ? undefined : config);")
 			assert.Contains(t, script.Script, "staged ? '--stage' : '--allow-writes'")
 			if mode == "dry-run" {
-				_, err := c.CompileToYAML(data, filepath.Join(root, "proof.md"))
-				require.ErrorContains(t, err, "--dry-run cannot safely execute")
+				yaml, err := c.CompileToYAML(data, filepath.Join(root, "proof.md"))
+				require.NoError(t, err)
+				assert.Contains(t, yaml, `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
+				assert.Contains(t, yaml, "tracker_add_comment")
+				assert.NotContains(t, yaml, "secrets.EXAMPLE_WRITE_TOKEN")
+				assert.NotContains(t, data.SafeOutputs.Env, connectorCredentialEnvPrefix("tracker")+"EXAMPLE_WRITE_TOKEN")
+				data.SafeOutputs.Scripts["authored"] = &SafeScriptConfig{Script: "return { success: true };"}
+				_, err = c.CompileToYAML(data, filepath.Join(root, "proof.md"))
+				require.ErrorContains(t, err, "safe-outputs.scripts")
 			}
 		})
 	}
+}
+
+func TestConnectorDryRunRejectsLiveParsedHandlers(t *testing.T) {
+	t.Parallel()
+	c, root := connectorCompiler(t)
+	data, err := c.ParseWorkflowString(connectorWorkflow("    safe-outputs: [add-comment]\n"), filepath.Join(root, "proof.md"))
+	require.NoError(t, err)
+	c.SetDryRun(true)
+	_, err = c.CompileToYAML(data, filepath.Join(root, "proof.md"))
+	require.ErrorContains(t, err, "safe-outputs.scripts")
 }
 
 func TestConnectorGeneratedSafeOutputHost(t *testing.T) {
