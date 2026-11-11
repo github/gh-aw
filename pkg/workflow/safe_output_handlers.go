@@ -22,6 +22,20 @@ type safeOutputHandlerDescriptor struct {
 
 var safeOutputHandlers = []safeOutputHandlerDescriptor{
 	{
+		Key:         "create-security-advisory",
+		StructField: "CreateSecurityAdvisory",
+		ToolName:    "create_security_advisory",
+		NewConfig:   func() any { return &CreateSecurityAdvisoryConfig{} },
+		PermissionBuilder: func(safeOutputs *SafeOutputsConfig) *Permissions {
+			if !isSafeOutputHandlerEnabledAndUnstaged(safeOutputs, "CreateSecurityAdvisory") {
+				return nil
+			}
+			return NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+				PermissionRepositoryAdvisories: PermissionWrite,
+			})
+		},
+	},
+	{
 		Key:         "ado-create-work-item",
 		StructField: "CreateWorkItems",
 		ToolName:    "ado_create_work_item",

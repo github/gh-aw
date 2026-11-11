@@ -9,6 +9,10 @@ interface SafeOutputConfig {
 
 // === Specific Safe Output Configuration Interfaces ===
 
+interface CreateSecurityAdvisoryConfig extends SafeOutputConfig {
+  staged?: boolean;
+}
+
 /**
  * Configuration for creating GitHub issues
  */
@@ -381,6 +385,7 @@ interface SafeJobConfig {
 
 // Union type of all specific safe output configurations
 type SpecificSafeOutputConfig =
+  | CreateSecurityAdvisoryConfig
   | CreateIssueConfig
   | CreateDiscussionConfig
   | UpdateDiscussionConfig
@@ -417,6 +422,7 @@ type SpecificSafeOutputConfig =
 type SafeOutputConfigs = Record<string, SafeOutputConfig | SpecificSafeOutputConfig>;
 
 export {
+  CreateSecurityAdvisoryConfig,
   SafeOutputConfig,
   SafeOutputConfigs,
   // Specific configuration types

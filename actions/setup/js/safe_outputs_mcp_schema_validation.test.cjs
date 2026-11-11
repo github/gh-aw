@@ -23,6 +23,23 @@ describe("Safe Outputs MCP Schema Validation", () => {
   const toolsContent = fs.readFileSync(toolsPath, "utf8");
   tools = JSON.parse(toolsContent);
 
+  describe("Draft security advisories", () => {
+    const schema = tools.find(tool => tool.name === "create_security_advisory").inputSchema;
+    const validate = new Ajv({ strict: false }).compile(schema);
+    const advisory = { summary: "Unsafe input handling", description: "Impact and remediation details.", vulnerabilities: [{ package: { ecosystem: "npm", name: "example" } }] };
+
+    it("accepts draft content and optional advisory metadata", () => {
+      expect(validate({ ...advisory, severity: "high", cwe_ids: ["CWE-79"] })).toBe(true);
+    });
+
+    it.each([{ state: "published" }, { start_private_fork: true }, { repo: "other/public" }, { "github-token": "agent-token" }, { vulnerabilities: [] }, { cwe_ids: ["invalid"] }])(
+      "rejects unsupported controls and invalid advisory metadata: %j",
+      fields => {
+        expect(validate({ ...advisory, ...fields })).toBe(false);
+      }
+    );
+  });
+
   describe("Issue artifact content sources", () => {
     const schema = tools.find(tool => tool.name === "create_issue").inputSchema;
     const validate = new Ajv({ strict: false }).compile(schema);

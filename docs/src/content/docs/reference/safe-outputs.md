@@ -163,6 +163,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | [Update Project](#project-board-updates-update-project) | `update-project` | Manage GitHub Projects boards (max: 10, same-repo only) |
 | [Create Project Status Update](#project-status-updates-create-project-status-update) | `create-project-status-update` | Create project status updates |
 | [Update Release](#release-updates-update-release) | `update-release` | Update GitHub release descriptions; requires an existing GitHub Release, not just a Git tag (max: 1) |
+| [Create Security Advisory](#security-advisory-drafts-create-security-advisory) | `create-security-advisory` | Create draft repository security advisories with an external token or GitHub App (max: 1) |
 | [Upload Artifact](#artifact-uploads-upload-artifact) | `upload-artifact` | Upload files as run-scoped GitHub Actions artifacts (max: 1 by default) |
 | [Upload Assets](#asset-uploads-upload-asset) | `upload-asset` | Upload files to orphaned git branch (max: 10, same-repo only). **Prefer `upload-artifact` with `skip-archive` instead.** |
 
@@ -1332,6 +1333,34 @@ safe-outputs:
 When `push-to-pull-request-branch` is configured, git commands (`checkout`, `branch`, `switch`, `add`, `rm`, `commit`, `merge`) are automatically enabled.
 
 For multi-checkout workflows, if one checkout is marked `current: true` and the PR tool targets that repository, patch generation for both `create-pull-request` and `push-to-pull-request-branch` uses that checkout directory.
+
+### Security Advisory Drafts (`create-security-advisory:`)
+
+Creates a **draft** security advisory in the workflow repository for maintainer review. This output never publishes advisories, creates private forks, or accepts an agent-selected repository.
+
+```yaml wrap
+safe-outputs:
+  create-security-advisory:
+    github-token: ${{ secrets.SECURITY_ADVISORY_TOKEN }}
+    max: 1
+```
+
+`GITHUB_TOKEN` cannot create draft advisories. Configure `github-token` or `github-app` on this output or globally under `safe-outputs`. Fine-grained tokens and GitHub App installations need **Repository security advisories: write** access to the repository. Classic personal access tokens need the `repo` or `repository_advisories:write` scope, and the authenticated user must be a repository administrator or security manager. See [GitHub's advisory creation API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-security-advisory).
+
+```yaml wrap
+safe-outputs:
+  create-security-advisory:
+    github-app:
+      client-id: ${{ vars.ADVISORY_APP_ID }}
+      private-key: ${{ secrets.ADVISORY_APP_PRIVATE_KEY }}
+```
+
+The compiler scopes the App token to `repository-advisories: write` in the trusted safe-output job; it does not grant this permission to the agent or the Actions token.
+
+Agent calls `create_security_advisory` with required `summary` (1–1024 characters), `description` (1–65000 characters), and `vulnerabilities` (1–100 entries). Each vulnerability requires `package.ecosystem` and optionally accepts `package.name`, `vulnerable_version_range`, `patched_versions`, and `vulnerable_functions`. Optional top-level fields are `severity` (`critical`, `high`, `medium`, `low`) and `cwe_ids` (for example `["CWE-79"]`). The result contains the created advisory's `ghsa_id` and URL. `max` defaults to 1 (maximum 10); `staged: true` previews without credentials or API writes.
+
+> [!CAUTION]
+> A private draft does not make the workflow run private. Agent prompts, safe-output payloads, logs, and artifacts may contain advisory details. Use a private workflow repository and restrict access to its runs and artifacts when processing confidential findings.
 
 ### Release Updates (`update-release:`)
 

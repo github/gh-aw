@@ -25,6 +25,23 @@ interface BaseSafeOutputItem {
 
 type IssueArtifactType = "generic" | "link" | "plan" | "embedded_html";
 
+interface CreateSecurityAdvisoryItem extends BaseSafeOutputItem {
+  type: "create_security_advisory";
+  summary: string;
+  description: string;
+  severity?: "critical" | "high" | "medium" | "low";
+  cwe_ids?: string[];
+  vulnerabilities: Array<{
+    package: {
+      ecosystem: "rubygems" | "npm" | "pip" | "maven" | "nuget" | "composer" | "go" | "rust" | "erlang" | "actions" | "pub" | "other" | "swift";
+      name?: string | null;
+    };
+    vulnerable_version_range?: string | null;
+    patched_versions?: string | null;
+    vulnerable_functions?: string[] | null;
+  }>;
+}
+
 interface IssueArtifactMetadata {
   /** Artifact format; defaults to "generic" when omitted. */
   type?: IssueArtifactType;
@@ -549,6 +566,7 @@ interface ResolvePullRequestReviewThreadItem extends BaseSafeOutputItem {
  * Union type of all possible safe output items
  */
 type SafeOutputItem =
+  | CreateSecurityAdvisoryItem
   | CreateIssueItem
   | CreateDiscussionItem
   | UpdateDiscussionItem
@@ -595,6 +613,7 @@ interface SafeOutputItems {
 
 // === Export JSONL types ===
 export {
+  CreateSecurityAdvisoryItem,
   // JSONL item types
   BaseSafeOutputItem,
   IssueArtifactType,

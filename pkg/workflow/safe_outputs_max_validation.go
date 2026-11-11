@@ -201,6 +201,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.CreateSecurityAdvisory != nil {
+		if err := checkMaxField("create_security_advisory", config.CreateSecurityAdvisory.Max); err != nil {
+			return err
+		}
+	}
 	if config.DispatchWorkflow != nil {
 		if err := checkMaxField("dispatch_workflow", config.DispatchWorkflow.Max); err != nil {
 			return err

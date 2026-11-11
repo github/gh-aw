@@ -68,6 +68,16 @@ const (
 // ValidationConfig contains all safe output type validation rules
 // This is the single source of truth for validation rules
 var ValidationConfig = map[string]TypeValidationConfig{
+	"create_security_advisory": {
+		DefaultMax: 1,
+		Fields: map[string]FieldValidation{
+			"summary":         {Required: true, Type: "string", Sanitize: true, MinLength: 1, MaxLength: 1024, RejectIfOversized: true},
+			"description":     {Required: true, Type: "string", Sanitize: true, MinLength: 1, MaxLength: MaxBodyLength, RejectIfOversized: true},
+			"vulnerabilities": {Required: true, Type: "array"},
+			"severity":        {Type: "string", Enum: []string{"critical", "high", "medium", "low"}},
+			"cwe_ids":         {Type: "array", ItemType: "string"},
+		},
+	},
 	"ado_create_work_item": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

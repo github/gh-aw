@@ -2276,6 +2276,44 @@ jobs:
                   "type": "object"
                 }
               },
+              "create_security_advisory": {
+                "defaultMax": 1,
+                "fields": {
+                  "cwe_ids": {
+                    "type": "array",
+                    "itemType": "string"
+                  },
+                  "description": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 65000,
+                    "minLength": 1,
+                    "rejectIfOversized": true
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "critical",
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "summary": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 1024,
+                    "minLength": 1,
+                    "rejectIfOversized": true
+                  },
+                  "vulnerabilities": {
+                    "required": true,
+                    "type": "array"
+                  }
+                }
+              },
               "dismiss_pull_request_review": {
                 "defaultMax": 10,
                 "fields": {

@@ -30,6 +30,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 		enabledTools["create_issue"] = struct {
 		}{}
 	}
+	if data.SafeOutputs.CreateSecurityAdvisory != nil {
+		enabledTools["create_security_advisory"] = struct{}{}
+	}
 	if data.SafeOutputs.CreateWorkItems != nil {
 		enabledTools["ado_create_work_item"] = struct {
 		}{}
