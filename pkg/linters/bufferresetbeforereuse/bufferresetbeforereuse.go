@@ -12,6 +12,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -297,12 +298,12 @@ func collectEvents(pass *analysis.Pass, root ast.Node, events *[]*event) {
 }
 
 func appendCallEvent(pass *analysis.Pass, call *ast.CallExpr, events *[]*event) {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return
 	}
 
-	ident, ok := sel.X.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(sel.X).(*ast.Ident)
 	if !ok {
 		return
 	}
