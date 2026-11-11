@@ -354,13 +354,18 @@ func TestRenderStepForRunner(t *testing.T) {
 		"${{ steps.wsl_setup_node.outputs.node-version }}",
 		"SHASUMS256.txt.asc",
 		"gpgv --keyring",
-		"https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg-only-active-keys/pubring.kbx",
+		"https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg/pubring.kbx",
 		"ln -sfn \"$install_dir\" /usr/local/lib/nodejs/current",
 		`export PATH="/usr/local/lib/nodejs/current/bin:$PATH"`,
 	} {
 		if !strings.Contains(got, expected) {
 			t.Errorf("Windows job did not bootstrap the Linux Node.js runtime (%q):\n%s", expected, got)
 		}
+	}
+	verifyIndex := strings.Index(got, `gpgv --keyring "$staging/nodejs-release-keyring.kbx" --output "$staging/SHASUMS256.txt" "$staging/SHASUMS256.txt.asc"`)
+	checksumIndex := strings.Index(got, `grep -F "  $archive" SHASUMS256.txt | sha256sum -c -`)
+	if verifyIndex < 0 || checksumIndex < 0 || verifyIndex >= checksumIndex {
+		t.Fatalf("Node.js signature verification must produce the manifest before checksum verification:\n%s", got)
 	}
 
 	ubuntuStep := "    steps:\n      - name: Run script\n        run: ./script.sh\n"

@@ -36,6 +36,8 @@ const windowsWSLBootstrapStep = `      - name: Initialize WSL runtime
           if ($LASTEXITCODE -ne 0) { throw 'WSL bootstrap failed to install Linux tools, start Docker, or map required paths.' }
 `
 
+// When updating this pin, select an audited nodejs/release-keys commit and use
+// gpg/pubring.kbx so signatures from retired release keys remain verifiable.
 func windowsWSLNodeBootstrapStep(nodeSetupID string) string {
 	return fmt.Sprintf(`      - name: Setup Node.js in WSL
         shell: pwsh
@@ -44,7 +46,7 @@ func windowsWSLNodeBootstrapStep(nodeSetupID string) string {
         run: |
           $ErrorActionPreference = 'Stop'
           $env:WSLENV = 'RUNNER_TEMP/p:GH_AW_WSL_NODE_VERSION'
-          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt.asc" -o "$staging/SHASUMS256.txt.asc"; curl -fsSL "https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg-only-active-keys/pubring.kbx" -o "$staging/nodejs-release-keyring.kbx"; gpgv --keyring "$staging/nodejs-release-keyring.kbx" --output "$staging/SHASUMS256.txt" "$staging/SHASUMS256.txt.asc"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
+          & wsl.exe --distribution Ubuntu --user root --exec bash -lc 'set -euo pipefail; version="${GH_AW_WSL_NODE_VERSION#v}"; if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid WSL Node.js version." >&2; exit 1; fi; archive="node-v${version}-linux-x64.tar.xz"; staging="$(mktemp -d)"; trap ''rm -rf "$staging"'' EXIT; curl -fsSL "https://nodejs.org/dist/v${version}/$archive" -o "$staging/$archive"; curl -fsSL "https://nodejs.org/dist/v${version}/SHASUMS256.txt.asc" -o "$staging/SHASUMS256.txt.asc"; curl -fsSL "https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg/pubring.kbx" -o "$staging/nodejs-release-keyring.kbx"; gpgv --keyring "$staging/nodejs-release-keyring.kbx" --output "$staging/SHASUMS256.txt" "$staging/SHASUMS256.txt.asc"; cd "$staging"; grep -F "  $archive" SHASUMS256.txt | sha256sum -c -; install_dir="/usr/local/lib/nodejs/node-v${version}-linux-x64"; mkdir -p "$install_dir"; tar -xJf "$archive" -C "$install_dir" --strip-components=1; ln -sfn "$install_dir" /usr/local/lib/nodejs/current; ln -sfn "$install_dir/bin/node" /usr/local/bin/node; ln -sfn "$install_dir/bin/npm" /usr/local/bin/npm; ln -sfn "$install_dir/bin/npx" /usr/local/bin/npx'
           if ($LASTEXITCODE -ne 0) { throw 'WSL could not install the pinned Linux Node.js runtime.' }
 `, nodeSetupID)
 }
