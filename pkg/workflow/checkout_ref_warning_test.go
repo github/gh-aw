@@ -18,6 +18,7 @@ func TestCheckoutRefWithStepsWarning(t *testing.T) {
 	tests := []struct {
 		name             string
 		ref              string
+		checkout         string
 		steps            string
 		preAgentSteps    string
 		imports          bool
@@ -49,6 +50,36 @@ func TestCheckoutRefWithStepsWarning(t *testing.T) {
 		{name: "trusted base ref", ref: "${{ github.event.pull_request.base.ref }}", imports: true},
 		{name: "literal expression", ref: "${{ 'inputs.branch' }}", imports: true},
 		{name: "no ref", imports: true},
+		{
+			name: "trusted tooling and data-only target",
+			checkout: `checkout:
+  - path: tooling
+    ref: ${{ github.event.repository.default_branch }}
+  - repository: example-org/content
+    ref: ${{ needs.plan.outputs.branch }}
+    path: target
+    data-only: true
+`,
+			steps: "steps:\n  - working-directory: tooling\n    run: ./scripts/validate-content ../target",
+		},
+		{
+			name:     "data-only does not suppress default workspace checkout",
+			checkout: "checkout:\n  ref: ${{ needs.plan.outputs.branch }}\n  data-only: true\n",
+			imports:  true,
+			warn:     true,
+		},
+		{
+			name:          "data-only target with pre-agent steps",
+			checkout:      "checkout:\n  - repository: example-org/content\n    path: target\n    ref: ${{ needs.plan.outputs.branch }}\n    data-only: true\n",
+			preAgentSteps: "pre-agent-steps:\n  - run: echo inspect target",
+		},
+		{
+			name:     "explicit false still warns",
+			ref:      "${{ needs.plan.outputs.branch }}",
+			checkout: "checkout:\n  ref: ${{ needs.plan.outputs.branch }}\n  data-only: false\n",
+			imports:  true,
+			warn:     true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -64,6 +95,9 @@ func TestCheckoutRefWithStepsWarning(t *testing.T) {
 			checkout := ""
 			if tt.ref != "" {
 				checkout = "checkout:\n  ref: " + tt.ref + "\n"
+			}
+			if tt.checkout != "" {
+				checkout = tt.checkout
 			}
 			imports := ""
 			if tt.imports {
@@ -109,6 +143,37 @@ Inspect the repository.
 	}
 }
 
+func TestCheckoutRefWarningAfterDerivedCheckoutPaths(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "checkout-ref-warning-derived-path-test")
+	content := `---
+on: workflow_dispatch
+engine: claude
+strict: false
+permissions:
+  contents: read
+checkout:
+  - repository: example-org/content
+    ref: ${{ needs.plan.outputs.branch }}
+    data-only: true
+  - repository: example-org/content
+    path: content
+steps:
+  - run: ./scripts/validate-content content
+---
+# Checkout ref warning
+Inspect the repository.
+`
+	testFile := filepath.Join(tmpDir, "workflow.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(content), 0644))
+	compiler := NewCompiler()
+	output := captureStderrOutput(t, func() {
+		require.NoError(t, compiler.CompileWorkflow(testFile))
+	})
+
+	assert.Contains(t, output, `uses checkout.ref "${{ needs.plan.outputs.branch }}"`)
+	assert.Contains(t, output, "do not check them out or run their scripts on the host")
+}
+
 func TestCheckoutRefWithStepsWarningMergedCheckouts(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -120,6 +185,49 @@ func TestCheckoutRefWithStepsWarningMergedCheckouts(t *testing.T) {
 		wantName      string
 		wantRef       string
 	}{
+		{
+			name: "data-only entry does not hide another checkout warning",
+			configs: []*CheckoutConfig{
+				{Repository: "org/data", Path: "data", Ref: "${{ inputs.branch }}", DataOnly: true},
+				{Path: "tooling", Ref: "${{ inputs.tooling }}"},
+			},
+			warn:     true,
+			wantName: "tooling",
+			wantRef:  "${{ inputs.tooling }}",
+		},
+		{
+			name: "all merged entries acknowledge data-only use",
+			configs: []*CheckoutConfig{
+				{Repository: "org/data", Path: "data", Ref: "${{ inputs.branch }}", DataOnly: true},
+				{Repository: "org/data", Path: "data", DataOnly: true},
+			},
+		},
+		{
+			name: "later merged request does not acknowledge data-only use",
+			configs: []*CheckoutConfig{
+				{Repository: "org/data", Path: "data", Ref: "${{ inputs.branch }}", DataOnly: true},
+				{Repository: "org/data", Path: "data"},
+			},
+			warn: true,
+		},
+		{
+			name: "later acknowledgement cannot hide earlier request",
+			configs: []*CheckoutConfig{
+				{Repository: "org/data", Path: "data", Ref: "${{ inputs.branch }}"},
+				{Repository: "org/data", Path: "data", DataOnly: true},
+			},
+			warn: true,
+		},
+		{
+			name:    "data-only does not suppress default workspace checkout",
+			configs: []*CheckoutConfig{{Ref: "${{ inputs.branch }}", DataOnly: true}},
+			warn:    true,
+		},
+		{
+			name:    "data-only does not suppress explicit workspace-root checkout",
+			configs: []*CheckoutConfig{{Repository: "org/data", Path: ".", Ref: "${{ inputs.branch }}", DataOnly: true}},
+			warn:    true,
+		},
 		{
 			name:    "first expression takes precedence",
 			configs: []*CheckoutConfig{{Ref: "${{ inputs.branch }}"}, {Ref: "main"}},
@@ -173,6 +281,7 @@ func TestCheckoutRefWithStepsWarningMergedCheckouts(t *testing.T) {
 			wantRef:  "${{ github.event.repository.default_branch }}",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			steps := tt.customSteps
@@ -193,4 +302,37 @@ func TestCheckoutRefWithStepsWarningMergedCheckouts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckoutDataOnly(t *testing.T) {
+	for _, value := range []bool{false, true} {
+		for _, list := range []bool{false, true} {
+			t.Run(fmt.Sprintf("value=%t/list=%t", value, list), func(t *testing.T) {
+				var raw any = map[string]any{"data-only": value}
+				if list {
+					raw = []any{raw}
+				}
+				configs, err := ParseCheckoutConfigs(raw)
+				require.NoError(t, err)
+				require.Len(t, configs, 1)
+				assert.Equal(t, value, configs[0].DataOnly)
+			})
+		}
+	}
+	for _, value := range []any{"true", "${{ inputs.data_only }}", 1, nil} {
+		_, err := ParseCheckoutConfigs(map[string]any{"data-only": value})
+		require.ErrorContains(t, err, "checkout.data-only must be a literal boolean")
+	}
+	configs, err := ParseCheckoutConfigs(map[string]any{})
+	require.NoError(t, err)
+	assert.False(t, configs[0].DataOnly)
+}
+
+func TestCheckoutDataOnlyPreservesCheckoutSteps(t *testing.T) {
+	cfg := &CheckoutConfig{Repository: "org/content", Path: "target", Ref: "${{ inputs.branch }}"}
+	resolveAction := func(s string) string { return s }
+	before := NewCheckoutManager([]*CheckoutConfig{cfg}).GenerateAdditionalCheckoutSteps(resolveAction)
+	cfg.DataOnly = true
+	after := NewCheckoutManager([]*CheckoutConfig{cfg}).GenerateAdditionalCheckoutSteps(resolveAction)
+	assert.Equal(t, before, after)
 }

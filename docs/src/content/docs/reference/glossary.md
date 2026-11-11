@@ -169,9 +169,13 @@ safe-outputs:
     repositories: ["*"]
 ```
 
-### Jira Connector (`jira:`)
+### Declarative Connector (`connectors:`)
 
-An editable Markdown declaration imported with exact approved Jira resources and independently selected read tools and safe outputs. Read access uses Atlassian's hosted MCP service with the declaration's phase-specific credentials; importing alone grants no capabilities or provider permissions. See [Jira connector](/gh-aw/reference/connectors/#jira).
+An editable Markdown declaration that defines provider endpoints, phase-specific credentials, resource grants, and capabilities. Workflows import declarations through ordinary `imports` and independently select read tools, safe outputs, and protected gateway triggers. Importing alone selects no capabilities and grants no provider access. See [Connectors](/gh-aw/reference/connectors/).
+
+### Jira Connector
+
+An experimental declarative connector for bounded Jira REST reads, explicitly selected Atlassian hosted MCP methods, safe outputs, and protected gateway triggers. Credentials and exact resource grants are configured through the imported declaration. Receiver deployment and provider authorization remain separate requirements. See [Jira connector](/gh-aw/reference/connectors/#jira).
 
 ## Security and Outputs
 
@@ -495,21 +499,18 @@ A workflow-scoped identifier (format: `aw_` followed by 3–8 alphanumeric chara
 
 ### Jira Safe Outputs (`jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`)
 
-Independently selected effects from the shared [Jira connector](/gh-aw/reference/connectors/#jira). Import its embedded declaration and grant exact resources; REST credentials remain in the privileged safe-output phase. Native Jira handlers and automatic email/token environment injection are no longer supported.
+Independently selected effects from the editable [Jira connector](/gh-aw/reference/connectors/#jira). Import its declaration and grant exact resources; REST credentials remain in the privileged safe-output phase. Native Jira handlers and automatic email/token environment injection are no longer supported.
 
 ### Linear Safe Outputs (`linear-create-issue`, `linear-add-comment`, `linear-update-issue`)
 
-:::caution[Experimental]
-Linear Safe Outputs are experimental. Compiling a workflow that enables any Linear safe output emits `Using experimental feature: Linear safe outputs`.
-:::
-
-A set of safe outputs that call Linear's public GraphQL API from the isolated safe-output job, using a personal API key configured via `safe-outputs.linear-token` (a secret expression not available to the agent). `linear-create-issue` requires a `team-id`, which accepts a Linear team model UUID, team key such as `ENG`, or team name; comment and update targets accept either a Linear issue model UUID or a shorthand identifier such as `ENG-123`, and are fixed trusted configuration. `linear-update-issue` replaces only the enabled `title` and `body` fields. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#linear-safe-outputs).
+Independently selected effects from the experimental [Linear connector](/gh-aw/reference/connectors/#linear). Import its editable declaration, grant exact resources, and bind a separate writer credential. Targets are typed arguments checked against those grants; read results do not authorize writes. The former native handlers, `safe-outputs.linear-token`, and selection options such as `team-id` and `target` are removed. See [Migration from built-in Linear](/gh-aw/reference/connectors/#migration-from-built-in-linear).
 
 ### Azure DevOps Connector
 
-An embedded Markdown declaration with independently selected project-metadata
-reads and scoped work-item safe outputs. It has no PAT fallback, automatic
-work-item hydration, temporary-ID chaining, or operational ingress. See
+An experimental editable Markdown declaration with independently selected
+bounded reads, scoped work-item safe outputs, and protected gateway triggers.
+Exact resource grants and phase-specific credentials are required; importing
+does not fetch work-item context or deploy a webhook receiver. See
 [Connectors](/gh-aw/reference/connectors/#azure-devops).
 
 ### Approve Workflow Run (`approve-workflow-run:`)
@@ -518,7 +519,7 @@ A safe output capability that approves a GitHub Actions workflow run in the "act
 
 ### Merge Pull Request (`merge-pull-request:`)
 
-An experimental safe output capability for merging pull requests after policy-driven gate checks pass. Validates status checks, required approvals, resolved review threads, label and branch constraints, and GitHub mergeability before applying the merge. Merges to the repository default branch are always refused. Supports `merge`, `squash`, and `rebase` methods, cross-repository targets, and `staged: true` for dry-run gate evaluation without calling the GitHub merge API. Compiling a workflow with `merge-pull-request` emits an experimental feature warning. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request) and the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/#type-merge_pull_request).
+An experimental safe output capability for merging pull requests after policy-driven gate checks pass. Validates status checks, required approvals, resolved review threads, label and branch constraints, and GitHub mergeability before applying the merge. Merges to the repository default branch are always refused. Supports `merge`, `squash`, and `rebase` methods, cross-repository targets, and `staged: true` for dry-run gate evaluation without calling the GitHub merge API. Blocks merging when the PR changes protected files by default; `protected-files: allowed` disables only this file gate. The merge output supports `blocked` and `allowed` policies, not `fallback-to-issue`, and blocks merging when detection or caution notices are present. Compiling a workflow with `merge-pull-request` emits an experimental feature warning. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request) and the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/#type-merge_pull_request).
 
 ### Close Pull Request (`close-pull-request:`)
 
@@ -534,7 +535,11 @@ A safe output capability for modifying a pull request's `title` or `body`. Title
 
 ### Protected Files
 
-A security mechanism on `create-pull-request` and `push-to-pull-request-branch` safe outputs that prevents AI agents from modifying sensitive repository files. By default, protects dependency manifests (e.g., `package.json`, `go.mod`), GitHub Actions workflow files, and lock files. Configured via `protected-files:` with three policies: `blocked` (default — fails with error), `allowed` (no restriction), or `fallback-to-issue` (creates a review issue for human inspection instead of applying changes). Also accepts an object form `{ policy: string, exclude: [...] }` to remove specific files or path prefixes from the default protected set while keeping protection active for the remaining files. Repository-wide exceptions can be set with `protected_files.exclude` in `.github/workflows/aw.json` using root-relative path globs (e.g., `.changeset/*.md`); catch-all patterns such as `**` are rejected, and these exceptions never bypass `allowed-files`. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#protected-files).
+A security mechanism on `create-pull-request` and `push-to-pull-request-branch` that prevents changes to sensitive repository files, and on `merge-pull-request` that blocks merging a PR which changes those files. By default, protects dependency manifests (e.g., `package.json`, `go.mod`), GitHub Actions workflow files, and lock files. The creation and push outputs support three `protected-files:` policies: `blocked` (default — fails with an error), `allowed` (no restriction), or `fallback-to-issue` (creates a review issue for human inspection instead of applying changes). The merge output supports only `blocked` and `allowed`. All three outputs also accept an object form `{ policy: string, exclude: [...] }` to remove specific files or path prefixes from the default protected set while keeping protection active for the remaining files. Repository-wide exceptions can be set with `protected_files.exclude` in `.github/workflows/aw.json` using root-relative path globs (e.g., `.changeset/*.md`); catch-all patterns such as `**` are rejected, and these exceptions never bypass `allowed-files`. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#protected-files).
+
+### Security Advisory Outputs (`create-security-advisory:`, `add-security-advisory-comment:`)
+
+Safe output capabilities that create a draft repository security advisory or comment on an existing one. Both require an external `github-token` or `github-app` because `GITHUB_TOKEN` cannot manage advisories; neither publishes advisories or accepts an agent-selected repository. See [Safe Outputs](/gh-aw/reference/safe-outputs/#security-advisory-drafts-create-security-advisory).
 
 ### Allow Workflows (`allow-workflows:`)
 

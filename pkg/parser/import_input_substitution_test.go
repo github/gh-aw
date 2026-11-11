@@ -297,18 +297,11 @@ func TestImportInputParserDiagnosticsDoNotLogSource(t *testing.T) {
 	}
 
 	cmd := exec.Command(os.Args[0], "-test.run=^TestImportInputParserDiagnosticsDoNotLogSource$")
-	env := make([]string, 0, len(os.Environ())+3)
-	for _, entry := range os.Environ() {
-		key, _, _ := strings.Cut(entry, "=")
-		if key != "GH_AW_TEST_IMPORT_LOG_REDACTION" && key != "DEBUG" && key != "DEBUG_COLORS" {
-			env = append(env, entry)
-		}
-	}
-	cmd.Env = append(env,
+	cmd.Env = []string{
 		"GH_AW_TEST_IMPORT_LOG_REDACTION=1",
 		"DEBUG=parser:import_processor",
 		"DEBUG_COLORS=0",
-	)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("debug-log subprocess failed: %v\n%s", err, output)

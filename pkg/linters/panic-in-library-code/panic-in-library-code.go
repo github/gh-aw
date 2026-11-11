@@ -55,7 +55,7 @@ func analyzePanicCalls(pass *analysis.Pass) (any, error) {
 		}
 
 		// Check if this is a call to the builtin panic function
-		ident, ok := call.Fun.(*ast.Ident)
+		ident, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.Ident)
 		if !ok || ident.Name != "panic" {
 			continue
 		}
@@ -112,14 +112,14 @@ func isInSyncOnceFuncLit(pass *analysis.Pass, cur inspector.Cursor) bool {
 }
 
 func selectorExprFromCallFun(fun ast.Expr) (*ast.SelectorExpr, bool) {
-	switch f := fun.(type) {
+	switch f := astutil.UnwrapParenExpr(fun).(type) {
 	case *ast.SelectorExpr:
 		return f, true
 	case *ast.IndexExpr:
-		sel, ok := f.X.(*ast.SelectorExpr)
+		sel, ok := astutil.UnwrapParenExpr(f.X).(*ast.SelectorExpr)
 		return sel, ok
 	case *ast.IndexListExpr:
-		sel, ok := f.X.(*ast.SelectorExpr)
+		sel, ok := astutil.UnwrapParenExpr(f.X).(*ast.SelectorExpr)
 		return sel, ok
 	default:
 		return nil, false
@@ -170,7 +170,7 @@ func panicMessageStartsWithBUG(pass *analysis.Pass, call *ast.CallExpr) bool {
 		return false
 	}
 
-	prefix, ok := extractConstantStringPrefix(pass, call.Args[0])
+	prefix, ok := extractConstantStringPrefix(pass, call.Args[0]) //nolint:uncheckedsliceindex // len(call.Args) is checked above.
 	if !ok {
 		return false
 	}
@@ -184,6 +184,8 @@ func extractConstantStringPrefix(pass *analysis.Pass, expr ast.Expr) (string, bo
 	}
 
 	switch e := expr.(type) {
+	case *ast.ParenExpr:
+		return extractConstantStringPrefix(pass, e.X)
 	case *ast.BinaryExpr:
 		if e.Op != token.ADD {
 			return "", false
@@ -198,7 +200,7 @@ func extractConstantStringPrefix(pass *analysis.Pass, expr ast.Expr) (string, bo
 		if !isFmtSprintf(pass, e) {
 			return "", false
 		}
-		return extractConstantStringPrefix(pass, e.Args[0])
+		return extractConstantStringPrefix(pass, e.Args[0]) //nolint:uncheckedsliceindex // len(e.Args) is checked above.
 	default:
 		return "", false
 	}
@@ -206,7 +208,7 @@ func extractConstantStringPrefix(pass *analysis.Pass, expr ast.Expr) (string, bo
 
 // isFmtSprintf reports whether call is an invocation of the fmt.Sprintf function.
 func isFmtSprintf(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Sprintf" {
 		return false
 	}

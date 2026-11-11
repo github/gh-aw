@@ -1469,7 +1469,7 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
   });
 
-  it("publishes downloaded Kiro activation metadata without expanding session.init", () => {
+  it("publishes downloaded Kiro activation metadata and preserves observed session.init fields", () => {
     // Synthetic transport regression, not native Kiro structured-stream evidence.
     write("aw_info.json", {
       engine_id: "kiro",
@@ -1500,7 +1500,7 @@ describe("Unified conclusion session", () => {
       },
       provenance: { component: "workflow", phase: "activation", path: "aw_info.json", index: 0 },
     });
-    expect(events.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "kiro" });
+    expect(events.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "kiro", agentVersion: "2.31.1" });
     const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
     expect(persisted.trim().split("\n").map(JSON.parse)).toEqual(events);
     expect(validateSession(persisted)).toBe(events.length);

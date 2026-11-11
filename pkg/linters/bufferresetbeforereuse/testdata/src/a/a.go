@@ -33,6 +33,26 @@ func notOkReuseWithoutReset() {
 	_ = buf.String()
 }
 
+// notOkParenthesizedCalls is NOT OK - parentheses around the method value and
+// receiver must not hide the reuse.
+func notOkParenthesizedCalls() {
+	var buf bytes.Buffer
+	(buf.WriteString)("first")
+	_ = (buf).String()
+	(buf).WriteString("second") // want "buf is reused without calling Reset"
+	_ = buf.String()
+}
+
+// okParenthesizedReset is OK - a parenthesized Reset still resets the buffer.
+func okParenthesizedReset() {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	_ = buf.String()
+	(buf).Reset()
+	buf.WriteString("second")
+	_ = buf.String()
+}
+
 // okDifferentBuffers is OK - different variables
 func okDifferentBuffers() {
 	var buf1 bytes.Buffer

@@ -27,12 +27,12 @@ func TestValidateDockerImage_SkipsWhenDockerUnavailable(t *testing.T) {
 	// If docker is not installed or daemon not running, validation should
 	// silently pass — no error, no warning.
 	if _, lookErr := exec.LookPath("docker"); lookErr != nil {
-		err := validateDockerImage("ghcr.io/some/image:latest", false, false)
+		err := validateDockerImageWithMode("ghcr.io/some/image:latest", false, false, false)
 		assert.NoError(t, err, "should silently skip when Docker is not installed")
 		return
 	}
 	if !isDockerDaemonRunning() {
-		err := validateDockerImage("ghcr.io/some/image:latest", false, false)
+		err := validateDockerImageWithMode("ghcr.io/some/image:latest", false, false, false)
 		assert.NoError(t, err, "should silently skip when Docker daemon is not running")
 		return
 	}
@@ -45,7 +45,7 @@ func TestValidateDockerImage_SkipsWhenDockerUnavailable(t *testing.T) {
 func TestValidateDockerImage_StillRejectsHyphenWithoutDocker(t *testing.T) {
 	// The hyphen-prefix guard runs before the Docker availability check,
 	// so it should always reject invalid names regardless of Docker state.
-	err := validateDockerImage("-malicious", false, false)
+	err := validateDockerImageWithMode("-malicious", false, false, false)
 	require.Error(t, err, "should reject image names starting with hyphen regardless of Docker availability")
 	require.ErrorContains(t, err, "names must not start with '-'",
 		"error should explain why the name is invalid")
@@ -78,7 +78,7 @@ func TestValidateContainerImages_NoWarningWithoutDocker(t *testing.T) {
 // of silently skipping when Docker is not installed or the daemon is not running.
 func TestValidateDockerImage_RequireDockerFailsWhenUnavailable(t *testing.T) {
 	if _, lookErr := exec.LookPath("docker"); lookErr != nil {
-		err := validateDockerImage("ghcr.io/some/image:latest", false, true)
+		err := validateDockerImageWithMode("ghcr.io/some/image:latest", false, true, false)
 		require.Error(t, err, "should fail when Docker is not installed and requireDocker is true")
 		require.ErrorContains(t, err, "docker not installed",
 			"error should mention Docker is not installed")
@@ -87,7 +87,7 @@ func TestValidateDockerImage_RequireDockerFailsWhenUnavailable(t *testing.T) {
 		return
 	}
 	if !isDockerDaemonRunning() {
-		err := validateDockerImage("ghcr.io/some/image:latest", false, true)
+		err := validateDockerImageWithMode("ghcr.io/some/image:latest", false, true, false)
 		require.Error(t, err, "should fail when Docker daemon is not running and requireDocker is true")
 		require.ErrorContains(t, err, "docker daemon not running",
 			"error should mention Docker daemon is not running")
@@ -150,6 +150,6 @@ func TestMarkDockerDaemonUnavailable_SkipsSubsequentValidation(t *testing.T) {
 	dockerDaemonLoader.Override(false, nil)
 
 	// Subsequent validation of any image (even a clearly non-existent one) should return nil, not an error.
-	err := validateDockerImage("ghcr.io/github/serena-mcp-server:latest", false, false)
+	err := validateDockerImageWithMode("ghcr.io/github/serena-mcp-server:latest", false, false, false)
 	assert.NoError(t, err, "should skip validation when daemon is already marked unavailable")
 }

@@ -274,7 +274,38 @@ func TestSpec_PublicAPI_GetLatestActionPinByRepo(t *testing.T) {
 		pin, ok := actionpins.GetLatestActionPinByRepo(known)
 		require.True(t, ok, "should return true for a known repo")
 		assert.Equal(t, known, pin.Repo, "returned pin should belong to the queried repo")
+		pins := actionpins.GetActionPinsByRepo(known)
+		require.NotEmpty(t, pins, "the documented example repository should have embedded pins")
+		assert.Equal(t, pins[0], pin, "latest pin should be the first entry in the documented version-descending list")
 	})
+}
+
+// TestSpec_PublicAPI_ApplyResolvedActionPinPrefix validates Public API /
+// Functions: a repository mapping retains an already-resolved SHA and label.
+// SPEC_AMBIGUITY: The README names repository mapping but omits the
+// PrefixMappings field from its PinContext field table.
+func TestSpec_PublicAPI_ApplyResolvedActionPinPrefix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		version string
+	}{
+		{name: "documented checkout version", version: "v5"},
+		{name: "mapped checkout example version", version: "v4"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := &actionpins.PinContext{
+				Warnings:       make(map[string]bool),
+				PrefixMappings: map[string]string{"actions/checkout": "acme-corp/checkout"},
+			}
+			pinned := "actions/checkout@" + testResolvedSHA + " # " + tt.version
+			got := actionpins.ApplyResolvedActionPinPrefix("actions/checkout", pinned, ctx)
+			assert.Equal(t, "acme-corp/checkout@"+testResolvedSHA+" # "+tt.version, got,
+				"repository remapping should retain the resolved SHA and version label")
+		})
+	}
 }
 
 // TestSpec_PublicAPI_ResolveActionPin validates resolution behavior.
@@ -1037,6 +1068,8 @@ func TestResolveActionPinPrefixMapping(t *testing.T) {
 }
 
 // TestSpec_PublicAPI_ApplyContainerPinMapping validates the exported ApplyContainerPinMapping function.
+// SPEC_MISMATCH: The README says this function applies PinContext.Mappings;
+// this legacy test instead exercises the separate ContainerMappings field.
 // Spec: ApplyContainerPinMapping redirects container image references via ctx.ContainerMappings,
 // requiring a valid @sha256:<64-hex-char> digest in the mapped value.
 func TestSpec_PublicAPI_ApplyContainerPinMapping(t *testing.T) {

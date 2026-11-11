@@ -18,7 +18,7 @@ func checkSteps(t *testing.T, steps string) Result {
 	require.NoError(t, err)
 	before, err := actions.Emit(workflow)
 	require.NoError(t, err)
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	after, err := actions.Emit(workflow)
 	require.NoError(t, err)
@@ -38,7 +38,7 @@ jobs:
 `))
 	require.NoError(t, err)
 
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	require.Len(t, result.Findings, 1)
 	assert.Equal(t, OTLPAttribute, result.Findings[0].Site.Kind)
@@ -274,7 +274,7 @@ jobs:
       - run: echo "$COPY"
 `))
 	require.NoError(t, err)
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	require.Empty(t, result.Gaps)
 	require.Len(t, result.Findings, 5, "%+v", result.Findings)
@@ -304,7 +304,7 @@ jobs:
         run: echo "$FORWARDED"
 `))
 	require.NoError(t, err)
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	require.Empty(t, result.Gaps)
 	require.Len(t, result.Findings, 2, "%+v", result.Findings)
@@ -353,7 +353,7 @@ jobs:
       token: ${{ secrets.TOKEN }}
 `))
 	require.NoError(t, err)
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	require.Len(t, result.Findings, 1)
 	assert.Equal(t, WorkflowInput, result.Findings[0].Site.Kind)
@@ -415,7 +415,7 @@ jobs:
           path: %q
 `, tt.patterns)))
 			require.NoError(t, err)
-			result, err := CheckSecretLeaks(workflow)
+			result, err := Analyze(workflow, SecretLeakRule())
 			require.NoError(t, err)
 			require.Empty(t, result.Gaps)
 			if tt.wantArtifact {
@@ -439,7 +439,7 @@ jobs:
         run: Write-Output $env:TOKEN
 `))
 	require.NoError(t, err)
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	require.Empty(t, result.Findings)
 	require.Len(t, result.Gaps, 1)
@@ -467,7 +467,7 @@ jobs:
         run: Write-Output $env:TOKEN
 `))
 	require.NoError(t, err)
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	require.Len(t, result.Findings, 1)
 	assert.Equal(t, Log, result.Findings[0].Site.Kind)
@@ -502,7 +502,7 @@ jobs:
           path: step-dir/token.txt
 `))
 	require.NoError(t, err)
-	result, err := CheckSecretLeaks(workflow)
+	result, err := Analyze(workflow, SecretLeakRule())
 	require.NoError(t, err)
 	require.Empty(t, result.Gaps)
 	require.Len(t, result.Findings, 2, "%+v", result.Findings)

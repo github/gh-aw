@@ -111,3 +111,25 @@ func panicIgnoredByPreviousLineNolint() {
 func panicIgnoredBySameLineNolint() {
 	panic("intentional panic for compatibility") //nolint:panicinlibrarycode
 }
+
+// bad: a parenthesized builtin callee must still be flagged.
+func parenthesizedPanicCallee() {
+	(panic)("parenthesized callee") // want `avoid panic in library code; return an error instead`
+}
+
+// ok: parenthesized fmt.Sprintf and BUG: operands are still recognized.
+func parenthesizedBUGSprintf(n int) {
+	panic((fmt.Sprintf)("BUG: unreachable: %d", n)) // should not be flagged
+}
+
+// ok: parenthesized concatenation whose first operand is a BUG: prefix.
+func parenthesizedBUGConcat(n int) {
+	panic(("BUG: " + fmt.Sprint(n))) // should not be flagged
+}
+
+// ok: parenthesized sync.Once.Do callee.
+func parenthesizedOnceDo() {
+	(once.Do)(func() {
+		panic("lazy init failure") // should not be flagged
+	})
+}

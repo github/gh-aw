@@ -177,6 +177,14 @@ func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) { //nolint
 		cfg.Ref = s
 	}
 
+	if v, ok := m["data-only"]; ok {
+		b, ok := v.(bool)
+		if !ok {
+			return nil, errors.New("checkout.data-only must be a literal boolean; use true or false")
+		}
+		cfg.DataOnly = b
+	}
+
 	if v, ok := m["path"]; ok {
 		s, ok := v.(string)
 		if !ok {

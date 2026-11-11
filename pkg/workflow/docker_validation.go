@@ -10,7 +10,7 @@
 //
 // # Validation Functions
 //
-//   - validateDockerImage() - Validates a single Docker image exists and is accessible
+//   - validateDockerImageWithMode() - Validates a single Docker image exists and is accessible
 //
 // # Validation Pattern: Graceful Degradation
 //
@@ -99,17 +99,13 @@ func markDockerDaemonUnavailable() {
 	dockerDaemonLoader.Override(false, nil)
 }
 
-// validateDockerImage checks if a Docker image exists and is accessible.
+// validateDockerImageWithMode checks if a Docker image exists and is accessible.
 // When Docker is not installed or the daemon is not running, validation is
 // silently skipped (returns nil) so that compile-time validation does not
 // depend on Docker availability. If requireDocker is true, returns an error
 // instead of skipping when Docker is unavailable. Returns an error only when
 // Docker is available and the image cannot be found. The caller treats these
 // as warnings.
-func validateDockerImage(image string, verbose bool, requireDocker bool) error {
-	return validateDockerImageWithMode(image, verbose, requireDocker, false)
-}
-
 func validateDockerImageWithMode(image string, verbose bool, requireDocker bool, readOnly bool) error {
 	dockerValidationLog.Printf("Validating Docker image: %s", image)
 

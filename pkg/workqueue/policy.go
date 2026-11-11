@@ -94,10 +94,6 @@ func validatePolicyForHost(policy Policy, host string) error {
 	return validatePolicyWithHost(policy, host)
 }
 
-func validatePolicy(policy Policy) error {
-	return validatePolicyWithHost(policy, "")
-}
-
 func validatePolicyWithHost(policy Policy, host string) error {
 	if policy.Authorization != "" && policy.Authorization != "aw" {
 		return queueError("policy_invalid", "authorization must be aw or absent for historical policies")

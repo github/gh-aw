@@ -81,7 +81,7 @@ func TestValidateDockerImage(t *testing.T) {
 
 	// Missing-image failures use fake Docker in docker_validation_readonly_test.go
 	// so registry throttling cannot replace the expected manifest error.
-	if err := validateDockerImage(validationAlpineImage, false, false); err != nil {
+	if err := validateDockerImageWithMode(validationAlpineImage, false, false, false); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

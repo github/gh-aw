@@ -197,7 +197,6 @@ func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdow
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	c.warnLegacyBehaviorInstallationCooldown(workflowData, markdownPath)
-	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
 	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ThreatDetection != nil {
 		if err := validateEngineCooldown(workflowData.SafeOutputs.ThreatDetection.EngineConfig, strict); err != nil {
 			return formatCompilerError(markdownPath, "error", "safe-outputs.threat-detection: "+err.Error(), err)
@@ -321,6 +320,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 	}
 	workflowLog.Printf("Validating cross-repo checkout paths")
 	c.deriveAndWarnCrossRepoCheckoutPaths(workflowData.CheckoutConfigs, markdownPath)
+	c.warnCheckoutRefWithSteps(workflowData, markdownPath)
 	workflowLog.Printf("Validating push-to-pull-request-branch configuration")
 	c.validatePushToPullRequestBranchWarnings(workflowData.SafeOutputs, workflowData.CheckoutConfigs)
 	for _, validation := range validations {

@@ -264,7 +264,7 @@ func TestHealthOnlyNoJobFailuresRemainInsufficient(t *testing.T) {
 		}
 	}
 	output := captureAuditGroupStdout(t, func() {
-		require.NoError(t, RunHealth(HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
+		require.NoError(t, runHealth(context.Background(), HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
 	})
 	var report HealthSummary
 	require.NoError(t, json.Unmarshal([]byte(output), &report))

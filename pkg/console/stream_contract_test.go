@@ -115,16 +115,7 @@ func probeFormatterStreams(t *testing.T, stdoutTTY, stderrTTY, noColor bool) map
 }
 
 func streamProbeEnviron(noColor bool) []string {
-	var environ []string
-	for _, entry := range os.Environ() {
-		key, _, _ := strings.Cut(entry, "=")
-		switch key {
-		case "NO_COLOR", "TERM", "COLORTERM", "CLICOLOR", "CLICOLOR_FORCE", "GH_AW_CONSOLE_STREAM_TEST":
-			continue
-		}
-		environ = append(environ, entry)
-	}
-	environ = append(environ, "TERM=xterm-256color", "COLORTERM=truecolor", "GH_AW_CONSOLE_STREAM_TEST=1")
+	environ := []string{"TERM=xterm-256color", "COLORTERM=truecolor", "GH_AW_CONSOLE_STREAM_TEST=1"}
 	if noColor {
 		environ = append(environ, "NO_COLOR=1")
 	}
