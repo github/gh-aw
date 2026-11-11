@@ -282,7 +282,23 @@ engine:
         const { isSessionEvent } = require("./agent_session.cjs");
         const { normalizeEngineLogEntries } = require("./engine_log_parser.cjs");
         const AWF_INFRA_RE = /^\[(INFO|WARN|SUCCESS|ERROR|entrypoint|health-check|crush-harness)\]|^ (?:Container|Network|Volume) |^Process exiting with code:/;
-        const lines = logContent.split("\n").filter(line => !AWF_INFRA_RE.test(line));
+        const executionStart = logContent.match(/^\[crush-harness\] starting Crush CLI\r?\n/m);
+        const preamble = executionStart ? logContent.slice(executionStart.index + executionStart[0].length).match(/^((?:(?:INFO|WARN|ERROR) {2}[^\r\n]*(?:\r?\n|$))*)/) : undefined;
+        const startupText = preamble?.[1] ?? "";
+        const startupLines = startupText.split(/\r?\n/).filter(Boolean);
+        const modelProviderIndex = startupLines.findIndex(line => /^INFO {2}ModelProvider called\b/.test(line));
+        let nativePreambleEnd = modelProviderIndex < 0 ? startupText.length : startupText.indexOf(startupLines[modelProviderIndex]) + startupLines[modelProviderIndex].length;
+        if (modelProviderIndex >= 0) nativePreambleEnd += startupText.slice(nativePreambleEnd).match(/^\r?\n/)?.[0].length ?? 0;
+        const nativePreambleText = startupText.slice(0, nativePreambleEnd);
+        const nativePreamble = nativePreambleText.split(/\r?\n/).filter(Boolean).join("\n");
+        const provider = nativePreamble.match(/^INFO {2}[^\r\n]*\bprovider=(\S+)/m)?.[1];
+        const model = nativePreamble.match(/^INFO {2}[^\r\n]*\bmodel=(\S+)/m)?.[1];
+        const sessionId = nativePreamble.match(/^INFO {2}[^\r\n]*\bsession_id=(\S+)/m)?.[1];
+        const nativeInit = executionStart && startupLines.length
+          ? { sourceEngine: "crush", ...(provider ? { provider } : {}), ...(model ? { model } : {}), ...(sessionId ? { sessionId } : {}) }
+          : undefined;
+        const source = executionStart ? logContent.slice(0, executionStart.index) + logContent.slice(executionStart.index + executionStart[0].length + nativePreambleEnd) : logContent;
+        const lines = source.split("\n").filter(line => !AWF_INFRA_RE.test(line));
         // Historical gh-aw logs may append an explicit result; quiet CLI text
         // itself contains no tool identities, token usage, or turn counters.
         let terminalIndex = lines.length - 1;
@@ -308,15 +324,19 @@ engine:
             try { return JSON.parse(line); } catch { return null; }
           });
         }
-        if (records && records.every(isSessionEvent)) {
+        const logEntries = [];
+        if (nativeInit) {
+          logEntries.push({ type: "session.init", data: nativeInit });
+          if (nativePreamble) logEntries.push({ type: "crush.diagnostic", data: { content: nativePreamble } });
+        }
+        if (!nativeInit && records && records.every(isSessionEvent)) {
           return {
             markdown: "Crush saved session events",
-            logEntries: [...records, ...(terminal ? normalizeEngineLogEntries([terminal], "crush") : [])],
+            logEntries: [...logEntries, ...records, ...(terminal ? normalizeEngineLogEntries([terminal], "crush") : [])],
             mcpFailures: [], maxTurnsHit: false,
           };
         }
 
-        const logEntries = [];
         if (text.trim()) logEntries.push({ type: "assistant.message", data: { content: text } });
         if (terminal) logEntries.push(...normalizeEngineLogEntries([terminal], "crush"));
         return {
@@ -348,8 +368,13 @@ Copilot inference uses the workflow's `copilot-requests: write` permission.
 JSON configuration and native HTTP/stdio MCP remain supported. CLI-mounted
 servers are excluded from the native MCP config. `run --quiet` emits plain
 text, so unified sessions preserve the answer without inventing tool calls,
-turn counts, model/session identifiers, token usage, MCP failures, or turn-limit
-failures from answer prose. Saved canonical JSON arrays/JSONL and explicit
+turn counts, token usage, MCP failures, or turn-limit failures from answer prose.
+The harness-framed verbose startup preamble supplies observed model, local
+provider, and session identifiers; its diagnostics remain separate from the
+answer and are retained before saved canonical session events. This mapping is
+covered by a sanitized excerpt from
+[smoke run 42930955037](https://github.com/github/gh-aw/actions/runs/42930955037).
+Saved canonical JSON arrays/JSONL and explicit
 historical terminal records retain their observed fields.
 Native verbose logging and harness startup/exit milestones are written to
 stderr for timeout diagnosis. The harness logs prompt size, never prompt contents,

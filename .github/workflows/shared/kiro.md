@@ -321,6 +321,7 @@ compatibility checks, not captured 2.31.1 inference output. Native V2/V3
 plaintext adapter. A V3 or structured-output migration requires release-specific
 event fixtures before changing the parser; existing canonical round-trip tests
 do not establish native event-schema support.
-The canonical `session.init` retains the CLI version; the current shared unified
-`session.init` projection omits `agentVersion`.
+Both canonical and unified `session.init` retain the observed CLI version as
+`agentVersion`, including the 2.31.1 banner in
+[conformance run 42594356852](https://github.com/github/gh-aw/actions/runs/42594356852).
 -->

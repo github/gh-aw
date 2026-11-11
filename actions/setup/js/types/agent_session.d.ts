@@ -36,6 +36,8 @@ export interface EventMetadata {
 
 export interface SessionInitData {
   sourceEngine?: string;
+  agentVersion?: string;
+  provider?: string;
   model?: string;
   reasoningEffort?: string;
   sessionId?: string | null;

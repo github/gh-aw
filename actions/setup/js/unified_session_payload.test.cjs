@@ -882,6 +882,8 @@ describe("essential unified session payloads", () => {
     ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, result: false, isError: true, durationMs: 0, exitCode: 1 }],
     ["tool.execution_complete", { toolCallId: "declined", status: "declined", exit_code: null }, { toolCallId: "declined", status: "declined", exitCode: null }],
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
+    ["session.init", { sourceEngine: "kiro", agent_version: "2.31.1", provider: "github", credentials: "omit" }, { sourceEngine: "kiro", agentVersion: "2.31.1", provider: "github" }],
+    ["session.start", { agentVersion: "2.31.1", provider: "github", model: "auto", headers: "omit" }, { agentVersion: "2.31.1", provider: "github", model: "auto" }],
     ["firewall.http_access", { domain: "example.com", http_status: 0, squid_request_status: "DENIED", credentials: "omit" }, { host: "example.com", status: 0, decision: "DENIED" }],
     ["firewall.steering", { eventName: "token_steering", message: "budget warning", reason: null, body: "omit" }, { event: "token_steering", message: "budget warning", reason: null }],
     [
@@ -908,6 +910,15 @@ describe("essential unified session payloads", () => {
     expect(compact).toEqual({ type, data: expected });
     expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
     expect(data).toEqual(original);
+  });
+
+  it.each(["session.init", "session.start"])("omits non-string initialization version and provider fields for %s", type => {
+    expect(
+      normalizeUnifiedSessionEvent({
+        type,
+        data: { agentVersion: 2, agent_version: "ignored", provider: { name: "invalid" }, model: "fixture" },
+      })
+    ).toEqual({ type, data: { model: "fixture" } });
   });
 
   it("flattens RPC metadata but excludes arguments, response bodies, and error context", () => {

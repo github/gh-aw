@@ -69,10 +69,7 @@ describe("Kiro canonical session artifact pipeline", () => {
     expect(readEvents(path.join(root, "agent-session.jsonl")).find(event => event.type === "session.init").data.agentVersion).toBe("2.31.1");
     const unified = writeUnifiedSession({ rootDir: root, engine: "kiro", warn: vi.fn() });
     const agent = unified.filter(event => event.provenance?.component === "agent" && event.type !== "agent.execution");
-    const expected = parseKiroLog(kiroCI.success).logEntries.map(event => ({
-      ...event,
-      data: event.type === "session.init" ? { sourceEngine: "kiro" } : event.data,
-    }));
+    const expected = parseKiroLog(raw).logEntries;
     expect(agent.map(({ type, data }) => ({ type, data }))).toEqual(expected.map(({ type, data }) => ({ type, data })));
     expect(agent.some(event => event.type === "session.result")).toBe(false);
     expect(global.core.setFailed).not.toHaveBeenCalled();
@@ -96,6 +93,7 @@ describe("Kiro canonical session artifact pipeline", () => {
     expect(readEvents(unifiedPath)).toEqual(unified);
     const agent = unified.filter(event => event.provenance?.component === "agent" && event.provenance.path === "agent-session.jsonl");
     expect(agent.map(event => event.type)).toEqual(canonical.filter(event => event.type !== "agent.execution").map(event => event.type));
+    expect(agent.find(event => event.type === "session.init").data).toEqual(canonical.find(event => event.type === "session.init").data);
     expect(agent.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(canonical.filter(event => event.type === "assistant.message").map(event => event.data.content));
     expect(agent.filter(event => event.type === "tool.execution_start").map(event => event.data.input)).toEqual(canonical.filter(event => event.type === "tool.execution_start").map(event => event.data.input));
     expect(agent.filter(event => event.type === "tool.execution_complete").map(event => event.data)).toEqual(canonical.filter(event => event.type === "tool.execution_complete").map(event => event.data));

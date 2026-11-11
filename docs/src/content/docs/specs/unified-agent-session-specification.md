@@ -243,7 +243,7 @@ opaque because its essential fields are not defined by this specification.
 
 | Payload family | Essential fields |
 | --- | --- |
-| Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
+| Agent initialization | Engine, observed CLI version, provider, model, session ID, working directory; no tool inventories or duplicated provider envelopes. |
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
 | Agent session errors | Observed diagnostic fields, including `errorType`, `code`, and `statusCode`; absent status codes remain absent, and unrelated native error context is omitted. |
 | Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
@@ -708,6 +708,8 @@ The following tables describe the common fields in `data`. Optional native and p
 | Field | Value and availability |
 | --- | --- |
 | `sourceEngine` | String naming the originating integration, such as `claude`, `copilot`, `codex`, `gemini`, `pi`, `opencode`, `goose`, a named plaintext sample, or `custom`. A custom delegation can retain the detected parser's engine label as described in 7.6. |
+| `agentVersion` | Source-dependent CLI version string, retained in canonical and full unified sessions. |
+| `provider` | Source-dependent provider identifier, retained in canonical and full unified sessions; a local proxy name does not identify its upstream provider. |
 | `model` | Source-dependent model string. |
 | `sessionId` | Source-dependent native session or thread identifier. |
 | `cwd` | Source-dependent working-directory string, unchanged. |

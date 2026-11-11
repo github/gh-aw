@@ -80,6 +80,8 @@
       "type": "object",
       "properties": {
         "sourceEngine": { "type": "string" },
+        "agentVersion": { "type": "string" },
+        "provider": { "type": "string" },
         "model": { "type": "string" },
         "reasoningEffort": { "type": "string" },
         "sessionId": { "type": ["string", "null"] },

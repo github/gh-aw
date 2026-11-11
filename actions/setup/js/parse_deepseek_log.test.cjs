@@ -8,7 +8,7 @@ import { parseDeepSeekLog, isDeepSeekLog } from "./parse_deepseek_log.cjs";
 import { startupFailure, timedOut } from "./fixtures/deepseek_ci_logs.cjs";
 import { projectSessionResult } from "./agent_session.cjs";
 import { serializeSessionArtifact, writeSessionArtifact } from "./session_artifact.cjs";
-import { collectUnifiedSession, parseEngineSession, writeUnifiedSession } from "./unified_session.cjs";
+import { collectUnifiedSession, mergeSessionSources, parseEngineSession, writeUnifiedSession } from "./unified_session.cjs";
 import { parseCustomLog } from "./parse_custom_log.cjs";
 
 // Verified against agent artifact 9781648195 from existing successful Actions
@@ -136,6 +136,8 @@ describe("parseDeepSeekLog", () => {
     expect(projectSessionResult(result.logEntries)).toBeUndefined();
     expect(parseCustomLog(timedOut).logEntries).toEqual(result.logEntries);
     expect(parseEngineSession(timedOut, "deepseek-harness")).toEqual(result.logEntries);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: result.logEntries }]);
+    expect(unified.find(event => event.type === "session.init").data).toEqual(result.logEntries[0].data);
   });
 
   it("preserves the actual startup error and observed exit as standard session observations", () => {
@@ -273,7 +275,7 @@ describe("parseDeepSeekLog", () => {
         expect(event.provenance.path).toBe("agent-stdio.log");
         expect(event.provenance.phase).toBe("agent");
       }
-      expect(persisted.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "deepseek-harness", model: parsed[0].data.model });
+      expect(persisted.find(event => event.type === "session.init").data).toEqual(parsed[0].data);
       expect(persisted.some(event => event.type === "session.result" || event.type === "assistant.refusal" || event.type.startsWith("tool.") || event.type === "assistant.reasoning")).toBe(false);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
