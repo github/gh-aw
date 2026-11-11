@@ -1,27 +1,28 @@
 {
-  "last_run_date": "2026-11-10",
+  "last_run_date": "2026-11-11",
   "last_window": {
-    "start": "2026-11-09T07:55:41Z",
-    "end": "2026-11-10T07:55:41Z"
+    "start": "2026-11-10T07:52:48Z",
+    "end": "2026-11-11T07:52:48Z"
   },
   "observed_window": {
-    "coverage": "Partial: 286 cached run records from 2026-11-09T20:27:39Z through 2026-11-10T07:52:54Z; 2026-11-09T07:55:41Z through 2026-11-09T20:27:06Z missing after count limit",
+    "coverage": "Partial: 285 cached records with timestamps 2026-11-10T22:19:58Z through 2026-11-11T07:52:48Z; earlier requested period not represented following count limit; collector continuation starts at 07:55:52Z, ends 22:19:04Z",
     "representative_audits": [
-      42751663439,
-      42775479108,
-      42755401610
+      42979709763,
+      42959490175,
+      42959539382,
+      42965914786,
+      42958805017
     ]
   },
   "key_themes": [
-    "49 activation metadata failures across 35 workflows, followed by lock regeneration",
-    "Auditor evidence collection failed in 10 runs; two further Auditor runs failed activation",
-    "Simulator memory validation failure followed by merged compatibility fix",
-    "Human reviewer directed bounded retry on separate metadata read PR"
+    "Human-triggered review loop improved PR #76719 before merge",
+    "Ten cached Auditor evidence-collection failures; optimizer raised issue #76773, failures continued",
+    "Simulator repo-memory publication succeeded after #76401 but overall run failed in conclusion"
   ],
   "carry_forward_questions": [
-    "Does activation remain healthy beyond the cached post-merge slice?",
-    "What exact error keeps Auditor evidence collection from running?",
-    "Did PR #76401 restore the next simulator run?",
-    "What occurred in the missing 2026-11-09 07:55:41 to 20:27:06 UTC interval?"
+    "What exact guard or error causes Auditor collection to fail, and did issue #76773 lead to a validated repair?",
+    "What caused simulator run 42958805017 to fail in conclusion despite successful agent and publication jobs?",
+    "Do review fixes in #76719 hold in later validation?",
+    "What occurred in the uncollected first part of the window?"
   ]
 }
