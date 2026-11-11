@@ -102,6 +102,13 @@ required/default availability, endpoints, phase credentials/scopes and
 with `--input name=JSON`; for example, Zendesk requires both `subdomain` and a
 string `ticket`. No secret values are read or provisioned.
 
+Setup remains offline without `--repo OWNER/REPO`. With that explicit target,
+it lists repository secret/variable names and prints missing declared settings
+with targeted provisioning commands; it never runs those commands. `--phase`
+limits the report, not a workflow's capability selection. Provision only selected
+routes. Organization/environment settings, provider access, App installation and
+OIDC trust are not verified; inventory errors leave missing status unknown.
+
 `gh aw edit --add-import` and `--remove-import` accept ordinary YAML
 `{uses: ..., with: {...}}` objects. Adding an import still selects nothing.
 Secrets bootstrap checks engine/system prerequisites only: its success does

@@ -19,6 +19,7 @@ import (
 type connectorDevelopmentOptions struct {
 	root, file, phase, capability, arguments, remoteTool, nodeRuntime string
 	nativeEvent                                                       string
+	repo                                                              string
 	inputs, grants                                                    []string
 	timeout                                                           time.Duration
 }
@@ -41,6 +42,9 @@ Declarations and their imports must be trusted, just as when compiling a workflo
 Documentation references are displayed only, never fetched.
 Setup includes credentials/authentication metadata from normal wrapper imports,
 typed binding names, declared endpoints, and matching local golden consumers.
+Setup --repo OWNER/REPO checks only repository secret/variable names and prints
+missing requirements with targeted provisioning commands. Without --repo, setup
+remains offline. Neither mode reads secret values or changes repository settings.
 Endpoint guidance does not widen network access. Setup does not install connectors,
 select capabilities/native methods, provision write credentials or activate ingress.
 
@@ -60,6 +64,7 @@ is never printed. This command does not load a workflow's custom footer settings
 Node remains optional for operations without content annotations.`
 
 const connectorDevelopmentExamples = `  ` + string(constants.CLIExtensionPrefix) + ` connector slack setup
+  ` + string(constants.CLIExtensionPrefix) + ` connector slack setup --repo owner/repo --phase agent
   ` + string(constants.CLIExtensionPrefix) + ` connector jira setup --input 'mcp-personal-secret="JIRA_DEV_BASIC_AUTH"'
   ` + string(constants.CLIExtensionPrefix) + ` connector slack test --phase agent --capability read-thread \
     --grant 'channels=["C123ABC456"]' --grant 'threads=["1515449522.000016"]' \
@@ -91,6 +96,7 @@ func NewConnectorCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&options.root, "root", "", "Repository root (default: detected Git root, otherwise current directory)")
 	cmd.Flags().StringVar(&options.file, "file", "", "Explicit repository-owned AW Markdown declaration or normal-import wrapper within --root")
+	cmd.Flags().StringVar(&options.repo, "repo", "", "Check missing setup secret/variable names in OWNER/REPO (read-only; setup only; omit for offline guidance)")
 	cmd.Flags().StringArrayVar(&options.inputs, "input", nil, "Import-schema binding name=JSON, e.g. 'reader-secret=\"DEV_READ_TOKEN\"' (repeatable)")
 	cmd.Flags().StringArrayVar(&options.grants, "grant", nil, "Exact resource allowlist resource=JSON-array, e.g. 'issues=[\"ISSUE-1\"]' (repeatable)")
 	cmd.Flags().StringVar(&options.phase, "phase", "", "Test phase: agent, context, safe-output, or offline trigger (required for test; credential phase for setup)")
@@ -120,6 +126,14 @@ func runDevelopmentConnector(cmd *cobra.Command, args []string, options *connect
 	id, action, err := parseDevelopmentConnectorInvocation(args)
 	if err != nil {
 		return err
+	}
+	if cmd.Flags().Changed("repo") {
+		if action != "setup" {
+			return errors.New("--repo applies only to connector setup")
+		}
+		if err := validateConnectorSetupRepository(options.repo); err != nil {
+			return err
+		}
 	}
 	inputs, grants, err := connectorDevelopmentBindings(options)
 	if err != nil {
@@ -151,7 +165,13 @@ func runDevelopmentConnector(cmd *cobra.Command, args []string, options *connect
 		if err := setupDevelopmentConnector(cmd.OutOrStdout(), id, declaration, options.phase); err != nil {
 			return err
 		}
-		return writeConnectorSetupExamples(cmd.OutOrStdout(), root, id)
+		if err := writeConnectorSetupExamples(cmd.OutOrStdout(), root, id); err != nil {
+			return err
+		}
+		if options.repo != "" {
+			return checkConnectorSetupRequirements(cmd.Context(), cmd.OutOrStdout(), declaration.Registration, options.phase, options.repo)
+		}
+		return nil
 	}
 	return testDevelopmentConnector(cmd.Context(), cmd.OutOrStdout(), declaration, options, os.Getenv, nil)
 }

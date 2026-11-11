@@ -401,6 +401,27 @@ gh aw connector linear setup
 gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
 ```
 
+Setup is offline unless `--repo OWNER/REPO` is supplied:
+
+```bash
+gh aw connector linear setup --repo owner/repo --phase agent
+```
+
+With `--repo`, setup uses the configured `gh` host/account to list repository
+secret and variable names. It reports missing declared token secrets, trusted
+resource secrets, and GitHub App client-ID/private-key references, with
+targeted `gh secret set` or `gh variable set` commands. It displays the App's
+declared installation repositories and permissions. Literal App IDs and OIDC
+routes do not require invented static secrets.
+
+The report covers all declared routes in the requested `--phase`, or all phases
+when omitted; it does not determine a consumer workflow's selected capabilities.
+Only provision selected routes. Organization/environment settings are not
+checked. An inventory failure returns an error, not an all-missing report.
+Missing settings are informational, so a successful inventory still exits zero.
+Setup never runs the printed provisioning commands, displays values, installs
+Apps, or validates provider authorization, App installation, or OIDC trust.
+
 Extracted provider text and XML attributes are labeled as untrusted reference
 data and displayed in a plain-text code block whose fence cannot be closed by
 embedded backticks. This presentation cue is not a guarantee against LLM prompt

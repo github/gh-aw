@@ -119,6 +119,17 @@ func writeConnectorCredentialGuidance(text *strings.Builder, registration workfl
 		case "GitHub App":
 			app := registration.GitHubApps[row.Credential]
 			text.WriteString("  Install the GitHub App on the exact declared owner/repositories with its declared permissions.\n")
+			if app.Owner != "" {
+				fmt.Fprintf(text, "  Declared installation owner: %s\n", app.Owner) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+			}
+			if len(app.Repositories) > 0 {
+				fmt.Fprintf(text, "  Declared installation repositories: %s\n", strings.Join(app.Repositories, ", ")) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+			} else {
+				text.WriteString("  Installation is limited to the workflow repository.\n")
+			}
+			for _, permission := range slices.Sorted(maps.Keys(app.Permissions)) {
+				fmt.Fprintf(text, "  Required GitHub App permission %s: %s\n", permission, app.Permissions[permission]) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+			}
 			writeConnectorIdentityGuidance(text, app.AppID, false)
 			writeConnectorIdentityGuidance(text, app.PrivateKey, true)
 			text.WriteString("  Local read tests cannot mint installation tokens; a token environment fallback is not accepted.\n")

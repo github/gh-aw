@@ -511,7 +511,13 @@ The following evidence is required before claiming connector conformance:
 | Distribution | Local and pinned imports compile; complete consumer/XML examples compile; deployed runtime includes transitive dependencies. |
 | Trigger, if declared | Offline native fixtures establish matching/nonmatching evidence and Go/Node predicate parity; result states `operational: false`. |
 
-`gh aw connector <id> setup` is offline metadata discovery.
+`gh aw connector <id> setup` is offline metadata discovery by default.
+An explicit `--repo OWNER/REPO` permits read-only repository secret/variable
+name inventory for the declared phase requirements. Missing settings produce
+provisioning commands, not credential collection or writes. Inventory failures
+MUST remain errors with unknown status, not fabricated missing/present results.
+Name presence MUST NOT be reported as proof of provider access, App installation,
+OIDC trust, or availability of organization/environment settings.
 `gh aw connector <id> test --phase safe-output` always stages; annotated text
 requires a trusted matching `--node-runtime`.
 `--phase trigger` projects fixture JSON offline.
