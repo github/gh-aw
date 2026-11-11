@@ -5,7 +5,9 @@ description: Troubleshoot npm registry, proxy, and certificate failures on the M
 
 # npm on the Microsoft network or VPN
 
-Use this skill when npm downloads are blocked by the Microsoft corporate network or VPN. Run commands in the affected package directory. Prefer `npm ci` with the existing lockfile and default registry when access works; do not change dependency versions to solve a network failure.
+Use this skill when npm downloads are blocked by the Microsoft corporate network or VPN. Run commands in the affected package directory. Prefer `npm ci` with the existing lockfile and configured registry when access works; do not change dependency versions to solve a network failure.
+
+This repository configures the Microsoft-approved `https://packagefeedproxy.microsoft.io/npm/` registry in the root and each npm project's `.npmrc`, following [githubnext.com](https://github.com/githubnext/githubnext.com/blob/main/.npmrc). Keep the per-project settings: npm does not inherit the root `.npmrc` when a nested package is the project root. npm's default `replace-registry-host=npmjs` routes existing npmjs lockfile URLs through the configured registry without rewriting lockfiles.
 
 ## Use the 1ES public npm feed
 
