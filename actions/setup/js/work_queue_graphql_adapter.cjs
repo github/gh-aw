@@ -147,22 +147,24 @@ function createGraphqlEffectHandler(adapter, github) {
 
 async function verifyGraphqlAdapterDelivery(options) {
   const { adapter, result, claim, github } = options;
+  const unverified = field_index => ({ verified: false, diagnostics: { event: "graphql.readback.mismatch", field_index } });
   validateGraphqlAdapter(adapter);
   const receipt = result && receipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
-  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return { verified: false };
+  if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return unverified(-1);
+  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return unverified(-1);
   const config = adapter.graphql;
   const typed = ["Issue", "PullRequest"].includes(config["resource-type"]);
   const nativeSelection = config["resource-type"] === "Repository" ? "databaseId" : `${typed ? "databaseId number " : ""}repository { databaseId }`;
   const query = `query ClaimAdapterReadback($id:ID!) { node(id:$id) { id __typename ... on ${config["resource-type"]} { ${readbackSelection(config)} ${nativeSelection} } } }`;
   const response = await github.graphql(query, { id: receipt.id });
   const node = response?.node;
-  if (!node || nodeIdentity(node.id) !== receipt.id || node.__typename !== config["resource-type"] || observedField(node, config["repository-field"]) !== adapter["target-repo"]) return { verified: false };
-  for (const [desired, observed] of Object.entries(config.fields)) {
-    if (canonical(observedField(node, observed)) !== canonical(receipt.fields[desired])) return { verified: false };
+  if (!node || nodeIdentity(node.id) !== receipt.id || node.__typename !== config["resource-type"] || observedField(node, config["repository-field"]) !== adapter["target-repo"]) return unverified(-1);
+  const verifiedFields = Object.entries(config.fields);
+  for (const [index, [desired, observed]] of verifiedFields.entries()) {
+    if (canonical(observedField(node, observed)) !== canonical(receipt.fields[desired])) return unverified(index);
   }
   const number = config["number-field"] === undefined ? undefined : observedField(node, config["number-field"]);
-  if (number !== undefined && (!Number.isSafeInteger(number) || number < 1)) return { verified: false };
+  if (number !== undefined && (!Number.isSafeInteger(number) || number < 1)) return unverified(verifiedFields.length);
   const authorityResource = await resolveRepositoryTarget(github, {
     repository: adapter["target-repo"],
     ...(typed ? { kind: config["resource-type"] === "Issue" ? "issue" : "pull_request", resource_id: node.databaseId } : {}),
