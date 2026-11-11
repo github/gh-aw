@@ -101,19 +101,7 @@ func configureCredentialFreePromptAction(step *WorkflowStep) error {
 	if !ok || !strings.HasPrefix(step.Uses, "actions/github-script@") {
 		return fmt.Errorf("prompt step %q requires an unsupported action", step.Name)
 	}
-	keys := map[string]string{
-		"PATH": "", "RUNNER_TEMP": "", "RUNNER_OS": "", "RUNNER_ARCH": "",
-		"GITHUB_WORKSPACE": "", "GITHUB_EVENT_PATH": "", "GITHUB_EVENT_NAME": "",
-		"GITHUB_REPOSITORY": "", "GITHUB_ACTOR": "", "GITHUB_SHA": "", "GITHUB_REF": "",
-		"GITHUB_RUN_ID": "", "GITHUB_RUN_NUMBER": "", "GITHUB_RUN_ATTEMPT": "",
-		"GITHUB_WORKFLOW": "", "GITHUB_JOB": "", "GITHUB_ACTION": "",
-		"GITHUB_SERVER_URL": "", "GITHUB_API_URL": "", "GITHUB_GRAPHQL_URL": "",
-		"GITHUB_STEP_SUMMARY": "", "GITHUB_OUTPUT": "", "GH_AW_ACTIONS_DIR": "",
-	}
-	for key := range step.Env {
-		keys[key] = ""
-	}
-	encoded, err := json.Marshal(sliceutil.SortedKeys(keys))
+	encoded, err := json.Marshal(sliceutil.SortedKeys(step.Env))
 	if err != nil {
 		return fmt.Errorf("encode prompt environment allowlist: %w", err)
 	}
@@ -128,11 +116,10 @@ func configureCredentialFreePromptAction(step *WorkflowStep) error {
 	script = strings.Join(lines, "\n")
 	script = strings.ReplaceAll(script, "'"+SetupActionDestination+"/", "process.env.GH_AW_ACTIONS_DIR + '/")
 	step.Env["GH_AW_ACTIONS_DIR"] = SetupActionDestination
+	step.Env["GH_AW_PROMPT_ENV"] = string(encoded)
 	step.With["github-token"] = promptGitHubScriptToken
-	step.With["script"] = "const promptEnvironment = new Set(" + string(encoded) + ");\n" +
-		"for (const name of Object.keys(process.env)) {\n" +
-		"  if (!promptEnvironment.has(name)) delete process.env[name];\n" +
-		"}\nglobal.core = core;\nglobal.context = context;\n" + script
+	step.With["script"] = "const { setupPromptGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_prompt_globals.cjs');\n" +
+		"setupPromptGlobals(core, context);\n" + script
 	return nil
 }
 
