@@ -142,6 +142,10 @@ func TestMainFunction(t *testing.T) {
 	})
 
 	t.Run("root command help", func(t *testing.T) {
+		t.Cleanup(func() {
+			require.NoError(t, rootCmd.Flags().Set("help", "false"))
+		})
+
 		// Capture output
 		oldStderr := os.Stderr
 		r, w, _ := os.Pipe()
