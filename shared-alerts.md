@@ -338,3 +338,8 @@
 
 ## Update — 2026-11-03 (Workflow Health Manager)
 - STALE: PR #72940 merged but 1-run failures persist; do not cite it as pending fix.
+
+## Update — 2026-11-11 (Workflow Health Manager)
+- `CI` on `main` red since 01:06Z: spec-pin drift (#76720; ci.yml pin still `acc6a888`, needs same update as README) and release-alignment mismatch (gh-aw latest v1.2.2 vs gh-aw-actions latest v1.0.1; manual release decision).
+- `CGO` govulncheck failing on main + PR branches from 03:31Z; logs blocked, cause unverified.
+- `Auditor` failing (incl. 04:27Z), untracked before this run.
