@@ -1358,7 +1358,9 @@ safe-outputs:
 
 The compiler scopes the App token to `repository-advisories: write` in the trusted safe-output job; it does not grant this permission to the agent or the Actions token.
 
-Agent calls `create_security_advisory` with required `summary` (1–1024 characters), `description` (1–65000 characters), and `vulnerabilities` (1–100 entries). Each vulnerability requires `package.ecosystem` and optionally accepts `package.name`, `vulnerable_version_range`, `patched_versions`, and `vulnerable_functions`. Optional top-level fields are `severity` (`critical`, `high`, `medium`, `low`) and `cwe_ids` (for example `["CWE-79"]`). The result contains the created advisory's `ghsa_id` and URL. `max` defaults to 1 (maximum 10); `staged: true` previews without credentials or API writes.
+Agent calls `create_security_advisory` with required `summary` (1–1024 characters), `description` (1–65000 characters), and `vulnerabilities` (1–100 entries). Each vulnerability requires `package.ecosystem` and optionally accepts `package.name`, `vulnerable_version_range`, `patched_versions`, and `vulnerable_functions`. Optional top-level fields are `severity` (`critical`, `high`, `medium`, `low`) and `cwe_ids` (for example `["CWE-79"]`). The result contains the created advisory's `ghsa_id` and URL. The sanitized description includes standard AI attribution, detection warnings, execution metadata, and global `safe-outputs.body-footer` policy text; the complete description is fitted to 65000 characters while preserving required framework content.
+
+`max` defaults to 1 (literal range 1–10); expressions resolving to `-1` retain the standard unlimited behavior. Each attempted API write consumes the limit, including failed requests; the handler does not retry automatically. `staged: true` previews the complete prepared request in logs and the step summary, with secret values redacted, without credentials or API writes.
 
 > [!CAUTION]
 > A private draft does not make the workflow run private. Agent prompts, safe-output payloads, logs, and artifacts may contain advisory details. Use a private workflow repository and restrict access to its runs and artifacts when processing confidential findings.
@@ -1376,10 +1378,10 @@ safe-outputs:
 
 Authentication follows [security advisory drafts](#security-advisory-drafts-create-security-advisory): an external token or GitHub App with **Repository security advisories: write** is required, configured per-output or globally. `GITHUB_TOKEN` is not supported. The authenticated user must be an advisory collaborator, repository administrator, or security manager.
 
-`max` defaults to 1 (maximum 10). `footer: false` disables visible AI attribution; required metadata remains. `staged: true` previews without credentials or API writes. Global `safe-outputs.body-footer` policy text also applies.
+`max` defaults to 1 (literal range 1–10); expressions resolving to `-1` retain the standard unlimited behavior. Each attempted API write consumes the limit, including failed requests; the handler does not retry automatically. `footer: false` disables visible AI attribution; detection warnings and required metadata remain. `staged: true` previews the complete prepared request in logs and the step summary, with secret values redacted, without credentials or API writes. Global `safe-outputs.body-footer` policy text also applies.
 
 > [!IMPORTANT]
-> The [advisory comments API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-advisory-comment) is in public preview for public repositories on supported GitHub cloud plans. Availability on private repositories or GitHub Enterprise Server is not assumed. Comments follow the advisory's visibility, and workflow logs and artifacts may contain their contents.
+> The [advisory comments API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-advisory-comment) requires access to the advisory and advisory-write permission. Verify endpoint availability on the target installation, particularly GitHub Enterprise Server versions. Comments follow the advisory's visibility, and workflow logs and artifacts may contain their contents.
 
 ### Release Updates (`update-release:`)
 

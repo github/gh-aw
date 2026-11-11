@@ -70,13 +70,14 @@ func TestCreateSecurityAdvisoryCompile(t *testing.T) {
 		{name: "rejects Actions token", config: "  create-security-advisory:\n    github-token: ${{ secrets.GITHUB_TOKEN }}\n", wantError: "requires an external"},
 		{name: "handler token", config: "  create-security-advisory:\n    max: 2\n    github-token: ${{ secrets.ADVISORY_TOKEN }}\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "global token", config: "  github-token: ${{ secrets.ADVISORY_TOKEN }}\n  create-security-advisory:\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
+		{name: "global footer disabled", config: "  footer: false\n  create-security-advisory:\n    github-token: ${{ secrets.ADVISORY_TOKEN }}\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "handler App", config: "  create-security-advisory:\n    github-app:\n      client-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_KEY }}\n", wantToken: "${{ steps.create-security-advisory-app-token.outputs.token }}", appStep: "create-security-advisory-app-token"},
 		{name: "global App", config: "  github-app:\n    client-id: ${{ vars.APP_ID }}\n    private-key: ${{ secrets.APP_KEY }}\n  create-security-advisory:\n", wantToken: "${{ steps.safe-outputs-app-token.outputs.token }}", appStep: "safe-outputs-app-token"},
 		{name: "staged without credentials", config: "  create-security-advisory:\n    staged: true\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "advisory.md")
-			content := "---\non: workflow_dispatch\nstrict: false\nengine: copilot\nsafe-outputs:\n  create-issue: false\n" + tt.config + "---\nCreate a draft advisory for review.\n"
+			content := "---\non: workflow_dispatch\nstrict: false\nengine: copilot\nsafe-outputs:\n  create-issue: false\n  report-missing-tool: false\n  report-missing-data: false\n" + tt.config + "---\nCreate a draft advisory for review.\n"
 			require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 			compiler := NewCompiler(WithVersion("test"))
 			err := compiler.CompileWorkflow(path)
@@ -88,6 +89,9 @@ func TestCreateSecurityAdvisoryCompile(t *testing.T) {
 			data, err := compiler.ParseWorkflowFile(path)
 			require.NoError(t, err)
 			require.NotNil(t, data.SafeOutputs.CreateSecurityAdvisory)
+			assert.Nil(t, data.SafeOutputs.CreateIssues)
+			assert.Nil(t, data.SafeOutputs.MissingTool)
+			assert.Nil(t, data.SafeOutputs.MissingData)
 			assert.Contains(t, computeEnabledToolNames(data), "create_security_advisory")
 			assert.True(t, hasHandlerManagerTypes(data))
 			agentConfig, err := generateSafeOutputsConfig(data)
@@ -99,9 +103,20 @@ func TestCreateSecurityAdvisoryCompile(t *testing.T) {
 			require.NoError(t, err)
 			compiled := string(lock)
 			assert.Contains(t, compiled, `"create_security_advisory"`)
+			assert.Contains(t, compiled, "id: process_safe_outputs")
+			if tt.wantToken != "" {
+				assert.Contains(t, compiledLastStepBlockForTest(compiled, "process_safe_outputs"), tt.wantToken)
+			}
 			assert.NotContains(t, compiled, "      repository-advisories: write")
 			if tt.wantToken != "" {
 				assert.Equal(t, tt.wantToken, handlerRegistry["create_security_advisory"](data.SafeOutputs)["github-token"])
+			}
+			handlerConfig := handlerRegistry["create_security_advisory"](data.SafeOutputs)
+			if tt.name == "global footer disabled" {
+				assert.Equal(t, false, handlerConfig["footer"])
+				assert.Contains(t, compiledLastStepBlockForTest(compiled, "process_safe_outputs"), `\"footer\":false`)
+			} else {
+				assert.NotContains(t, handlerConfig, "footer", "unset footer must defer to the runtime default")
 			}
 			if tt.appStep != "" {
 				step := compiledLastStepBlockForTest(compiled, tt.appStep)

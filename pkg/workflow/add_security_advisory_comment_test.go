@@ -30,7 +30,7 @@ func TestAddSecurityAdvisoryCommentCompile(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "advisory-comment.md")
-			content := "---\non: workflow_dispatch\nstrict: false\nengine: copilot\nsafe-outputs:\n  create-issue: false\n" + tt.config + "---\nComment on a security advisory.\n"
+			content := "---\non: workflow_dispatch\nstrict: false\nengine: copilot\nsafe-outputs:\n  create-issue: false\n  report-missing-tool: false\n  report-missing-data: false\n" + tt.config + "---\nComment on a security advisory.\n"
 			require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 			compiler := NewCompiler(WithVersion("test"))
 			err := compiler.CompileWorkflow(path)
@@ -43,6 +43,8 @@ func TestAddSecurityAdvisoryCommentCompile(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, data.SafeOutputs.AddSecurityAdvisoryComment)
 			assert.Nil(t, data.SafeOutputs.CreateIssues)
+			assert.Nil(t, data.SafeOutputs.MissingTool)
+			assert.Nil(t, data.SafeOutputs.MissingData)
 			assert.Contains(t, computeEnabledToolNames(data), "add_security_advisory_comment")
 			assert.True(t, hasHandlerManagerTypes(data))
 			agentConfig, err := generateSafeOutputsConfig(data)
@@ -62,6 +64,10 @@ func TestAddSecurityAdvisoryCommentCompile(t *testing.T) {
 			require.NoError(t, err)
 			compiled := string(lock)
 			assert.Contains(t, compiled, `"add_security_advisory_comment"`)
+			assert.Contains(t, compiled, "id: process_safe_outputs")
+			if tt.wantToken != "" {
+				assert.Contains(t, compiledLastStepBlockForTest(compiled, "process_safe_outputs"), tt.wantToken)
+			}
 			assert.NotContains(t, compiled, "      repository-advisories: write")
 			if tt.appStep != "" {
 				step := compiledLastStepBlockForTest(compiled, tt.appStep)

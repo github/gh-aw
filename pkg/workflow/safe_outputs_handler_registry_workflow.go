@@ -9,7 +9,11 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		c := cfg.CreateSecurityAdvisory
 		return newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
+			AddDefault("inputs", map[string]any{
+				"description": map[string]any{"maxLength": 65000},
+			}).
 			AddIfNotEmpty("github-token", resolveSecurityAdvisoryGitHubToken(cfg, "create-security-advisory", &c.BaseSafeOutputConfig)).
+			AddTemplatableBool("footer", getEffectiveFooterForTemplatable(nil, cfg.Footer)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()
 	},
