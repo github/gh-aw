@@ -295,3 +295,28 @@ func buildDailyAICActivationJobEnv(data *WorkflowData) map[string]string {
 	}
 	return map[string]string{maxDailyAICreditsEnvVar: strconv.Quote(value)}
 }
+
+// dailyAICQuotaStepCondition gates an activation step that consumes GitHub API
+// quota after the daily-AIC guardrail. In enforce mode a handled quota stop
+// skips the agent; later API steps must not turn it back into a failed
+// activation. Warning mode is fail-open and keeps the condition unchanged.
+// Returns nil when the condition is unchanged and empty.
+func dailyAICQuotaStepCondition(data *WorkflowData, condition ConditionNode) ConditionNode {
+	if !hasMaxDailyAICGuardrail(data) || data.MaxDailyAICContinueOnError {
+		return condition
+	}
+	guard := &ExpressionNode{Expression: "steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'"}
+	if condition == nil {
+		return guard
+	}
+	return BuildAnd(condition, guard)
+}
+
+// appendDailyAICQuotaStepIf emits the quota gate for an activation step that
+// has no other condition.
+func appendDailyAICQuotaStepIf(steps []string, data *WorkflowData) []string {
+	if condition := dailyAICQuotaStepCondition(data, nil); condition != nil {
+		steps = append(steps, fmt.Sprintf("        if: %s\n", RenderCondition(condition)))
+	}
+	return steps
+}

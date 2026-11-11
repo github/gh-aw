@@ -3,8 +3,30 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+// Matches only the validated quota details recorded by release_integrity.sh.
+var detectionQuotaDetailsPattern = regexp.MustCompile(`resource=[a-z_]{1,64}; limit=(?:[0-9]{1,16}|unknown); remaining=(?:[0-9]{1,16}|unknown); used=(?:[0-9]{1,16}|unknown); reset=(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z|[0-9]{1,12}|unknown); reason=(?:reset_exceeds_budget|unknown_reset|renewed_exhaustion)`)
+
+// readDetectionQuotaDetails returns the GitHub API quota details recorded by the
+// detection job when AWF attestation verification stopped on quota exhaustion.
+func readDetectionQuotaDetails(runDir string) string {
+	if runDir == "" {
+		return ""
+	}
+	for _, raw := range readJobLogLines(filepath.Join(runDir, "workflow-logs"), JobInfo{Name: "detection"}) {
+		line := stripGHALogTimestamps(raw)
+		if !strings.Contains(line, "GH_AW_GITHUB_API_QUOTA_BLOCKED") && !strings.Contains(line, "GitHub API quota exhausted") {
+			continue
+		}
+		if details := detectionQuotaDetailsPattern.FindString(line); details != "" {
+			return details
+		}
+	}
+	return ""
+}
 
 // Older usage artifacts omit detection.result. Recover only complete, enumerated
 // outcomes from the conclusion job's runner-emitted environment blocks.
@@ -60,7 +82,7 @@ func readConclusionDetectionUsageResult(runDir string) (detectionUsageResult, bo
 				block.Conclusion = value
 			case "GH_AW_DETECTION_REASON":
 				switch value {
-				case "threat_detected", "agent_failure", "parse_error", "detection_skipped":
+				case "threat_detected", "agent_failure", "parse_error", "detection_skipped", "github_api_quota_exhausted":
 					block.Reason = value
 				}
 			}

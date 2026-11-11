@@ -6,8 +6,9 @@ const os = require("os");
 const path = require("path");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
 const { AIC_SCAN_CACHE_FILE_PATH, AIC_SCAN_CACHE_ARTIFACT_NAME, CACHE_RETENTION_MS, readScanCache } = require("./daily_aic_cache_helpers.cjs");
-const { API_READ_OPERATIONS, createAPIBudget, retryNotBefore, isQuotaError, safeResponseHeaders, getAPIReadFailure, withQuotaResetRecovery } = require("./daily_aic_api_budget.cjs");
+const { DAILY_AIC_QUOTA_BLOCKED_ENV, API_READ_OPERATIONS, createAPIBudget, retryNotBefore, isQuotaError, safeResponseHeaders, getAPIReadFailure, withQuotaResetRecovery } = require("./daily_aic_api_budget.cjs");
 const { getGitHubAPIDiagnostic } = require("./github_api_diagnostics.cjs");
+const { GITHUB_API_QUOTA_EXHAUSTED, getGitHubAPIQuotaExhaustion, formatGitHubAPIQuotaDetails } = require("./github_api_quota.cjs");
 
 // Snapshot discovery is only an optimization; the guardrail still scans the
 // complete authoritative window after a miss.
@@ -137,6 +138,7 @@ async function mainWithPaths(cachePath = AIC_SCAN_CACHE_FILE_PATH, options = {})
     const diagnostic = getGitHubAPIDiagnostic(error);
     const failure = getAPIReadFailure(error);
     const retryAt = diagnostic?.retryNotBefore ?? retryNotBefore(error?.response?.headers);
+    const quota = getGitHubAPIQuotaExhaustion(error);
     if (failure) {
       const detail = diagnostic?.message ?? `GitHub API read failed (HTTP ${failure.status ?? "unknown"}; reason=${failure.reason})`;
       const message = `Daily AIC snapshot restore stopped at ${failure.operation} after ${failure.attempts} attempt(s): ${detail}. Accounting remains unverified; agent startup is blocked.`;
@@ -153,14 +155,20 @@ async function mainWithPaths(cachePath = AIC_SCAN_CACHE_FILE_PATH, options = {})
       core.info(`[daily-aic-cache] ${summary}`);
       if (core.summary) {
         try {
-          await core.summary.addRaw(`### Daily AIC snapshot restore blocked\n\n${summary}\n`).write();
+          await core.summary.addRaw(`### ${quota ? GITHUB_API_QUOTA_EXHAUSTED : "Daily AIC snapshot restore blocked"}\n\n${summary}\n`).write();
         } catch {
           core.warning("Failed to write daily AIC snapshot restore failure summary.");
         }
       }
     }
     if (retryAt) core.info(`[daily-aic-cache] No further API requests before ${retryAt}`);
-    throw error;
+    if (!quota) throw error;
+    // Bounded recovery could not resume. Publish an explicit quota-blocked
+    // outcome; the guardrail turns it into a skipped agent, never under-budget.
+    const operation = failure?.operation || "unknown";
+    core.warning(`${GITHUB_API_QUOTA_EXHAUSTED}: daily AIC accounting is unverified and agent startup is blocked (${formatGitHubAPIQuotaDetails(quota)}; operation=${operation}).`);
+    core.exportVariable(DAILY_AIC_QUOTA_BLOCKED_ENV, JSON.stringify({ ...quota, operation }));
+    core.setOutput("github_api_quota_blocked", "true");
   } finally {
     core.info(`[daily-aic-cache] GitHub API rate limit level: ${JSON.stringify(budget.snapshot())}`);
   }

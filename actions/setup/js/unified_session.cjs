@@ -806,7 +806,11 @@ function collectUnifiedSession({
     }
   }
   const status = dailyAIC.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS;
-  if (typeof status === "string" && ["disabled", "skipped", "under_budget", "exceeded", "structural_error", "transient_error"].includes(status) && !sources.some(source => source.events.some(event => event.type === "guardrail.daily_aic"))) {
+  if (
+    typeof status === "string" &&
+    ["disabled", "skipped", "under_budget", "exceeded", "structural_error", "transient_error", "quota_blocked"].includes(status) &&
+    !sources.some(source => source.events.some(event => event.type === "guardrail.daily_aic"))
+  ) {
     /** @type {Record<string, string | number | boolean>} */
     const data = { status };
     if (dailyAIC.GH_AW_DAILY_AI_CREDITS_EXCEEDED === "true" || dailyAIC.GH_AW_DAILY_AI_CREDITS_EXCEEDED === "false") {

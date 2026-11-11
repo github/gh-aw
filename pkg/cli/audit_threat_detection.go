@@ -15,6 +15,8 @@ import (
 
 const threatDetectionResultPrefix = "THREAT_DETECTION_RESULT:"
 
+const threatDetectionWarningTitle = "Threat Detection Warning"
+
 var auditThreatDetectionLog = logger.New("cli:audit_threat_detection")
 
 type threatDetectionVerdict struct {
@@ -76,7 +78,7 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 			impact = "Safe outputs were blocked by the failed security gate"
 		}
 		if detectionFailed && !detectionJobFailed && usageResult.Conclusion == "warning" {
-			title = "Threat Detection Warning"
+			title = threatDetectionWarningTitle
 			description = "Threat detection reported a warning"
 			impact = "The security control did not complete successfully; review detection results before applying agent output"
 		}
@@ -87,6 +89,19 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 				description = "The threat detection engine could not complete its analysis (" + usageResult.Reason + "); this is a tooling error, not a security finding"
 			case "threat_detected":
 				description += " (" + usageResult.Reason + ")"
+			case "github_api_quota_exhausted":
+				// An operational quota stop, not a security finding, and never a security pass.
+				category = "operational"
+				title = "Threat Detection Deferred: GitHub API Quota Exhausted"
+				if !detectionJobFailed && usageResult.Conclusion == "warning" {
+					title = threatDetectionWarningTitle + ": GitHub API Quota Exhausted"
+				}
+				description = "GitHub API quota was exhausted before AWF attestation verification completed, so threat detection was deferred and did not run"
+				if details := readDetectionQuotaDetails(processedRun.Run.LogsPath); details != "" {
+					description += " (" + details + ")"
+				}
+				description += "; this is an operational quota stop, not a security finding, and not a security pass"
+				impact = "No threat verdict was produced; rerun after the GitHub API quota reset before trusting agent output"
 			}
 		}
 		findings = append(findings, AuditFinding{
@@ -143,7 +158,7 @@ func appendAuditDetectionIssues(data *AuditData) {
 			continue
 		}
 		issue := ValidationIssue{Type: "error", Message: finding.Description}
-		if finding.Title == "Threat Detection Warning" {
+		if strings.HasPrefix(finding.Title, threatDetectionWarningTitle) {
 			issue.Type = "warning"
 			data.Warnings = append(data.Warnings, issue)
 		} else {

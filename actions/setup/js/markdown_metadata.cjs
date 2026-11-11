@@ -6,9 +6,14 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
 const { parseLockFileHeaders, parseMarkdownJSON } = require("./lock_file_headers.cjs");
+const { execFileSync } = require("node:child_process");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isRateLimitError } = require("./error_recovery.cjs");
+const { getGitHubAPIQuotaExhaustion, withGitHubAPIQuotaWait } = require("./github_api_quota.cjs");
 // Metadata reads block activation, so cap rate-limit retries at about 90 seconds plus jitter.
-const MARKDOWN_METADATA_RETRY_CONFIG = { ...RATE_LIMIT_RETRY_CONFIG, maxRetries: 2, maxDelayMs: 60000, shouldRetry: isRateLimitError };
+// Genuine quota exhaustion is not retried early here: withGitHubAPIQuotaWait honors
+// the failed response's own reset/Retry-After deadline within its bounded budget.
+const MARKDOWN_METADATA_RETRY_CONFIG = { ...RATE_LIMIT_RETRY_CONFIG, maxRetries: 2, maxDelayMs: 60000, shouldRetry: error => isRateLimitError(error) && !getGitHubAPIQuotaExhaustion(error) };
+const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
 
 /** @typedef {{sha256: string, kind: string, value: any, error?: string}} MetadataRecord */
 /** @typedef {{version: number, records: MetadataRecord[]}} MetadataCatalog */
@@ -283,16 +288,48 @@ function readLocalMarkdownMetadata(file, workspace) {
   return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
 }
 
-/** @param {any} githubClient @param {{owner: string, repo: string, path: string, ref: string}} identity */
-async function readRemoteMarkdownMetadata(githubClient, identity) {
-  if (!githubClient?.rest?.repos?.getContent) throw new Error("Compiler Markdown metadata requires the source repository's GitHub client");
-  let response;
+/**
+ * Read the executing lock manifest from the local git object store by its
+ * immutable commit, never from the worktree. Git objects are content-addressed,
+ * so `<commit>:<path>` is exactly the executing revision's file. Returns
+ * undefined when the object is not available locally (no lazy fetch).
+ * @param {string} workspaceRoot @param {string} revision @param {string} file
+ */
+function readGitObjectMarkdownMetadata(workspaceRoot, revision, file) {
+  if (!fs.existsSync(path.join(workspaceRoot, ".git"))) return undefined;
+  let bytes;
   try {
-    response = await withRetry(() => githubClient.rest.repos.getContent(identity), MARKDOWN_METADATA_RETRY_CONFIG, `read compiler Markdown metadata for ${identity.owner}/${identity.repo}`);
-  } catch (error) {
-    if (error?.originalError) throw error.originalError;
-    throw error;
+    bytes = execFileSync("git", ["-C", workspaceRoot, "--no-replace-objects", "cat-file", "blob", `${revision}:${file}`], {
+      env: { ...process.env, GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0", GIT_CEILING_DIRECTORIES: path.dirname(workspaceRoot) },
+      maxBuffer: MAX_MANIFEST_BYTES,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 10000,
+    });
+  } catch {
+    return undefined;
   }
+  const content = new TextDecoder("utf8", { fatal: true }).decode(bytes);
+  if (typeof core !== "undefined") core.info(`Read compiler Markdown metadata from the local git object for executing revision ${revision}; no Contents API request was needed.`);
+  return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
+}
+
+/**
+ * @param {any} githubClient
+ * @param {{owner: string, repo: string, path: string, ref: string}} identity
+ * @param {{now?: () => number, sleep?: (ms: number) => Promise<void>, maxWaitMs?: number}} [quotaWait]
+ */
+async function readRemoteMarkdownMetadata(githubClient, identity, quotaWait = {}) {
+  if (!githubClient?.rest?.repos?.getContent) throw new Error("Compiler Markdown metadata requires the source repository's GitHub client");
+  const label = `read compiler Markdown metadata for ${identity.owner}/${identity.repo}`;
+  const read = async () => {
+    try {
+      return await withRetry(() => githubClient.rest.repos.getContent(identity), MARKDOWN_METADATA_RETRY_CONFIG, label);
+    } catch (error) {
+      if (error?.originalError) throw error.originalError;
+      throw error;
+    }
+  };
+  const response = await withGitHubAPIQuotaWait(read, { ...quotaWait, label });
   const { data } = response;
   if (!data || data.type !== "file" || data.path !== identity.path || data.encoding !== "base64" || typeof data.content !== "string") throw new Error("Executing workflow lock manifest is not a regular source file");
   if (data.content.length > Math.ceil((4 * 1024 * 1024) / 3) * 4 + 65536) throw new Error("Executing workflow lock manifest exceeds the bounded input limit");
@@ -303,8 +340,8 @@ async function readRemoteMarkdownMetadata(githubClient, identity) {
   return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
 }
 
-/** @param {string} workflowId @param {string} workspace @param {{repository?: string, githubClient?: any, revision?: string}} [options] */
-async function loadMarkdownMetadata(workflowId, workspace, { repository, githubClient, revision } = {}) {
+/** @param {string} workflowId @param {string} workspace @param {{repository?: string, githubClient?: any, revision?: string, quotaWait?: {now?: () => number, sleep?: (ms: number) => Promise<void>, maxWaitMs?: number}}} [options] */
+async function loadMarkdownMetadata(workflowId, workspace, { repository, githubClient, revision, quotaWait } = {}) {
   const match = /^([^/]+)\/([^/]+)\/(.+\.lock\.yml)@(.+)$/.exec(workflowId);
   if (!match) throw new Error("Compiler Markdown metadata requires the executing workflow identity");
   const workspaceRoot = path.resolve(workspace);
@@ -313,7 +350,9 @@ async function loadMarkdownMetadata(workflowId, workspace, { repository, githubC
   if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Invalid compiler Markdown metadata path");
   if (revision && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(revision) || /^0+$/.test(revision))) throw new Error("Executing workflow metadata requires an immutable workflow revision");
   const remote = revision || (repository && repository !== `${match[1]}/${match[2]}`);
-  const metadata = remote ? await readRemoteMarkdownMetadata(githubClient, { owner: match[1], repo: match[2], path: match[3], ref: revision || match[4] }) : readLocalMarkdownMetadata(file, workspaceRoot);
+  const local = revision ? readGitObjectMarkdownMetadata(workspaceRoot, revision, match[3]) : undefined;
+  const metadata =
+    local !== undefined ? local : remote ? await readRemoteMarkdownMetadata(githubClient, { owner: match[1], repo: match[2], path: match[3], ref: revision || match[4] }, quotaWait) : readLocalMarkdownMetadata(file, workspaceRoot);
   if (!metadata) throw new Error("Executing lock manifest lacks compiler Markdown metadata; recompile this workflow");
   installMarkdownMetadata(metadata);
   ensureCheckoutMarkdownMetadata(checkoutArtifactDocuments(workspaceRoot), workspaceRoot);

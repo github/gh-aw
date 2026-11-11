@@ -220,6 +220,67 @@ describe("generate_aw_info.cjs", () => {
     }
   });
 
+  describe("GitHub API quota exhaustion while reading the executing lock manifest", () => {
+    const quotaFailure = resetSeconds =>
+      Object.assign(new Error("API rate limit exceeded for installation"), {
+        status: 403,
+        response: { status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-limit": "15000", "x-ratelimit-used": "15000", "x-ratelimit-resource": "core", "x-ratelimit-reset": String(resetSeconds) } },
+      });
+    const clockAt = start => {
+      let current = start;
+      vi.spyOn(Date, "now").mockImplementation(() => current);
+      return {
+        now: () => current,
+        sleep: vi.fn(async ms => {
+          current += ms;
+        }),
+      };
+    };
+
+    it("waits for the failed response's reset and then generates run info", async () => {
+      const start = Date.parse("2026-11-09T23:58:53Z");
+      const reset = Date.parse("2026-11-10T00:00:04Z");
+      const clock = clockAt(start);
+      const requestTimes = [];
+      const fixture = mockGithub.rest.repos.getContent.getMockImplementation();
+      mockGithub.rest.repos.getContent.mockImplementationOnce(async () => {
+        requestTimes.push(clock.now());
+        throw quotaFailure(reset / 1000);
+      });
+      mockGithub.rest.repos.getContent.mockImplementationOnce(async request => {
+        requestTimes.push(clock.now());
+        return fixture(request);
+      });
+      await main(mockCore, mockContext, mockGithub, { quotaWait: clock });
+      expect(clock.sleep).toHaveBeenCalledExactlyOnceWith(reset + 1000 - start);
+      expect(requestTimes).toHaveLength(2);
+      expect(requestTimes[1]).toBeGreaterThanOrEqual(reset);
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(fs.writeFileSync).toHaveBeenCalledWith(awInfoPath, expect.any(String));
+    });
+
+    it("blocks activation with an explicit quota summary when the reset is beyond the bounded wait", async () => {
+      const start = Date.parse("2026-11-09T23:00:00Z");
+      const clock = clockAt(start);
+      mockGithub.rest.repos.getContent.mockRejectedValueOnce(quotaFailure(start / 1000 + 3600));
+      await expect(main(mockCore, mockContext, mockGithub, { quotaWait: clock })).rejects.toThrow("GitHub API quota exhausted; activation blocked until at least 2026-11-10T00:00:00.000Z");
+      expect(clock.sleep).not.toHaveBeenCalled();
+      expect(mockGithub.rest.repos.getContent).toHaveBeenCalledTimes(1);
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("resource=core; limit=15000; remaining=0; used=15000; reset=2026-11-10T00:00:00.000Z"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("reason=reset_exceeds_budget"));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("### GitHub API quota exhausted"));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("no unverified fallback was used"));
+      expect(fs.writeFileSync).not.toHaveBeenCalledWith(awInfoPath, expect.any(String));
+    });
+
+    it("does not reclassify an authorization 403 as quota exhaustion", async () => {
+      const denied = Object.assign(new Error("Resource not accessible by integration"), { status: 403, response: { status: 403, headers: {} } });
+      mockGithub.rest.repos.getContent.mockRejectedValueOnce(denied);
+      await expect(main(mockCore, mockContext, mockGithub)).rejects.toBe(denied);
+      expect(mockCore.summary.addRaw).not.toHaveBeenCalledWith(expect.stringContaining("GitHub API quota exhausted"));
+    });
+  });
+
   it("records the executing reusable workflow separately from its caller in the same run", async () => {
     const callerRef = "github/my-repo/.github/workflows/caller.yml@refs/heads/main";
     const executingRef = "org/platform/.github/workflows/worker.lock.yml@refs/tags/v1";
