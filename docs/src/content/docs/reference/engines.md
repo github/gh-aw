@@ -155,7 +155,7 @@ network:
   allowed: [defaults, acme.ghe.com, api.acme.ghe.com]
 ```
 
-For GHES Copilot use `api.enterprise.githubcopilot.com`. See [GHE Cloud troubleshooting](/gh-aw/troubleshooting/debug-ghe/) for data-residency setup. Agy does not support `api-target`.
+For GHES Copilot, `api.enterprise.githubcopilot.com` is an endpoint-routing example only if the endpoint is available for your account and deployment; it is not a GHES support promise. Confirm licensing, policy, and firewall prerequisites in [Copilot Engine Prerequisites on GHES](/gh-aw/troubleshooting/common-issues/#copilot-engine-prerequisites-on-ghes). See [GHE Cloud troubleshooting](/gh-aw/troubleshooting/debug-ghe/) for data-residency setup. Agy does not support `api-target`.
 
 #### Custom API Endpoints via Environment Variables
 
