@@ -636,6 +636,9 @@
     "ExecutionResultData": {
       "type": "object",
       "properties": {
+        "state": { "$ref": "#/definitions/JsonValue" },
+        "runId": { "$ref": "#/definitions/JsonValue" },
+        "runAttempt": { "$ref": "#/definitions/JsonValue" },
         "outcome": { "$ref": "#/definitions/JsonValue" },
         "conclusion": { "$ref": "#/definitions/JsonValue" },
         "exitCode": { "$ref": "#/definitions/JsonValue" },

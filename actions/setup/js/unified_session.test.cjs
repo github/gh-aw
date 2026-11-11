@@ -1273,6 +1273,19 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: ["inference_access_error"], exitCode: 1 } }]);
   });
 
+  it.each([
+    ["agent_execution.json", "agent", "started"],
+    ["threat-detection/execution.json", "detection", "not_started"],
+    ["usage/evals/execution.json", "evals", "started"],
+  ])("persists execution lifecycle evidence from %s without inventing completion", (file, phase, state) => {
+    write(file, { version: 1, component: phase, run_id: 42931276553, run_attempt: 1, state });
+    const events = writeUnifiedSession({ rootDir: root });
+    const expected = [{ type: "execution.result", data: { state, runId: 42931276553, runAttempt: 1 }, provenance: { component: "execution", phase, path: file, index: 0 } }];
+    expect(events.filter(event => event.type === "execution.result")).toEqual(expected);
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    expect(persisted.filter(event => event.type === "execution.result")).toEqual(expected);
+  });
+
   it("normalizes mixed legacy Cursor entries without letting canonical execution suppress the conversation", () => {
     write("agent-session.jsonl", [
       { type: "system", subtype: "init", model: null, session_id: null },

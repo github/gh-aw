@@ -421,7 +421,17 @@ const EVENT_FIELDS = {
     delayMs: ["delayMs", "delay_ms"],
     status: ["status"],
   },
-  "execution.result": { outcome: ["outcome"], conclusion: ["conclusion"], exitCode: ["exitCode", "exit_code"], durationMs: ["durationMs", "duration_ms"], startedAt: ["startedAt", "started_at"], finishedAt: ["finishedAt", "finished_at"] },
+  "execution.result": {
+    state: ["state"],
+    runId: ["runId", "run_id"],
+    runAttempt: ["runAttempt", "run_attempt"],
+    outcome: ["outcome"],
+    conclusion: ["conclusion"],
+    exitCode: ["exitCode", "exit_code"],
+    durationMs: ["durationMs", "duration_ms"],
+    startedAt: ["startedAt", "started_at"],
+    finishedAt: ["finishedAt", "finished_at"],
+  },
   "detection.result": {
     jobResult: ["jobResult", "job_result"],
     conclusion: ["conclusion"],

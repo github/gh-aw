@@ -486,6 +486,9 @@ export interface EvalResultData {
 }
 
 export interface ExecutionResultData {
+  state?: JsonValue;
+  runId?: JsonValue;
+  runAttempt?: JsonValue;
   outcome?: JsonValue;
   conclusion?: JsonValue;
   exitCode?: JsonValue;

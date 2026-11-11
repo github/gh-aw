@@ -891,6 +891,8 @@ describe("essential unified session payloads", () => {
     ],
     ["mcp.tool_call", { tool_call_id: "call", tool_name: "lookup", duration: 5, input_size: 0, output_size: 10, status: "error" }, { toolCallId: "call", toolName: "lookup", durationMs: 5, inputSize: 0, outputSize: 10, status: "error" }],
     ["execution.result", { exit_code: 0, duration_ms: 0, outcome: "success", extra: "omit" }, { exitCode: 0, durationMs: 0, outcome: "success" }],
+    ["execution.result", { version: 1, component: "agent", state: "started", run_id: 42931276553, run_attempt: 1 }, { state: "started", runId: 42931276553, runAttempt: 1 }],
+    ["execution.result", { state: "not_started", runId: "42931276553", runAttempt: 2, extra: "omit" }, { state: "not_started", runId: "42931276553", runAttempt: 2 }],
     [
       "detection.result",
       { job_result: "success", conclusion: "warning", reason: "threat_detected", secret_leak: false, prompt_injection: false, malicious_patch: true, reasons: ["PRIVATE_REASON"], raw: "omit" },
