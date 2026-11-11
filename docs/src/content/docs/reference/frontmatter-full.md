@@ -1841,6 +1841,11 @@ on:
       # (optional)
       secret-scanning-alerts: "read"
 
+      # Repository security advisories permission. GitHub App-only; forwarded as
+      # permission-repository-advisories when minting a token.
+      # (optional)
+      repository-advisories: "read"
+
       # Permission level for repository webhooks (read/none; "write" is rejected by the
       # compiler). GitHub App-only permission.
       # (optional)
@@ -3292,9 +3297,9 @@ engine:
     allowed-models: []
       # Array of strings
 
-  # Format 2: Disable the implicit cost/auto model-routing default without
-  # pinning a model; the existing model variables and fallback model apply.
-  model-routing: false
+  # Format 2: Disable the implicit cost/auto model-routing default without pinning a
+  # model; the existing model variables and fallback model apply.
+  model-routing: true
 
   # Optional model context window metadata for engines that need to register
   # explicit model catalog entries. Supported by the Pi engine when generating its
@@ -4316,9 +4321,13 @@ engine:
     # Experimental per-run model and reasoning-effort selection from the task text for
     # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
     # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-    # fixed model and effort settings. See
-    # https://github.github.com/gh-aw/reference/model-routing/.
+    # fixed model and effort settings. Eligible workflows that choose no model or
+    # routing on GitHub Copilot inference default to goal cost and mode auto; set
+    # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
     # (optional)
+    # Accepted formats:
+
+    # Format 1: object
     model-routing:
       # Routing objective: cost prefers the cheapest model and effort that meet the
       # mode's target; cost-speed prefers the fastest model and effort that meet it.
@@ -4343,6 +4352,10 @@ engine:
       # (optional)
       allowed-models: []
         # Array of strings
+
+    # Format 2: Disable the implicit cost/auto model-routing default without pinning a
+    # model; the existing model variables and fallback model apply.
+    model-routing: true
 
     # Optional inference provider override for this engine. Defaults to the engine's
     # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
@@ -4607,6 +4620,11 @@ max-daily-ai-credits:
       # permission-secret-scanning-alerts input for actions/create-github-app-token.
       # (optional)
       secret-scanning-alerts: "read"
+
+      # Repository security advisories permission. GitHub App-only; forwarded as
+      # permission-repository-advisories when minting a token.
+      # (optional)
+      repository-advisories: "read"
 
       # Permission level for repository webhooks (read/none; "write" is rejected by the
       # compiler). GitHub App-only permission.
@@ -5025,6 +5043,11 @@ tools:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -6272,6 +6295,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -6553,6 +6581,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -6825,6 +6858,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -7160,6 +7198,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -7476,6 +7519,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -7742,6 +7790,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -8097,6 +8150,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -8350,6 +8408,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -8675,6 +8738,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -8926,6 +8994,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -9254,6 +9327,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -9532,6 +9610,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -9826,6 +9909,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -10221,6 +10309,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -10593,6 +10686,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -11094,6 +11192,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -11386,6 +11489,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -11711,6 +11819,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -11990,6 +12103,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -12271,6 +12389,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -12551,6 +12674,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -12840,6 +12968,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -13117,6 +13250,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -13370,6 +13508,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -13636,6 +13779,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -13991,6 +14139,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -14298,6 +14451,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -14597,6 +14755,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -14887,6 +15050,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -15232,6 +15400,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -15536,6 +15709,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -15829,6 +16007,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -16126,6 +16309,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -16444,6 +16632,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -16754,6 +16947,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -16798,6 +16996,38 @@ safe-outputs:
   # Format 2: Experimental configuration for controlled pull request merges. The
   # merge is blocked unless all configured gates pass.
   merge-pull-request:
+    # Block merges modifying protected files by default, using create-pull-request's
+    # protected set and exclusions. allowed explicitly disables this file gate, not
+    # other merge gates. Creation-specific request-review and fallback-to-issue
+    # policies are not supported.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: string
+    protected-files: "blocked"
+
+    # Format 2: GitHub Actions expression resolving to blocked or allowed.
+    # Unrecognized resolved values block protected-file changes.
+    protected-files: "example-value"
+
+    # Format 3: object
+    protected-files:
+      # (optional)
+      # Accepted formats:
+
+      # Format 1: string
+      policy: "blocked"
+
+      # Format 2: string
+      policy: "example-value"
+
+      # Same exclusions as create-pull-request: basenames or protected directory
+      # prefixes, or repository-root globs with a leading /. Each pattern must contain a
+      # letter, digit, underscore, or hyphen and no whitespace.
+      # (optional)
+      exclude: []
+        # Array of strings
+
     # Maximum number of pull request merges to perform per run (default: 1). Supports
     # integer or GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
@@ -17067,6 +17297,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -17424,6 +17659,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -17760,6 +18000,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -18140,6 +18385,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -18432,6 +18682,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -18729,6 +18984,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -19014,6 +19274,11 @@ safe-outputs:
           # (optional)
           secret-scanning-alerts: "read"
 
+          # Repository security advisories permission. GitHub App-only; forwarded as
+          # permission-repository-advisories when minting a token.
+          # (optional)
+          repository-advisories: "read"
+
           # Permission level for repository webhooks (read/none; "write" is rejected by the
           # compiler). GitHub App-only permission.
           # (optional)
@@ -19290,6 +19555,11 @@ safe-outputs:
           # (optional)
           secret-scanning-alerts: "read"
 
+          # Repository security advisories permission. GitHub App-only; forwarded as
+          # permission-repository-advisories when minting a token.
+          # (optional)
+          repository-advisories: "read"
+
           # Permission level for repository webhooks (read/none; "write" is rejected by the
           # compiler). GitHub App-only permission.
           # (optional)
@@ -19547,6 +19817,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -19824,6 +20099,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -20106,6 +20386,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -20368,6 +20653,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -20638,6 +20928,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -20923,6 +21218,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -21194,6 +21494,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -21222,6 +21527,524 @@ safe-outputs:
 
   # Format 2: Enable code coverage report uploads with default configuration
   upload-code-coverage: null
+
+  # Experimental. Add comments to repository security advisories. Requires an
+  # external token or GitHub App with Repository security advisories write
+  # permission; GITHUB_TOKEN is not supported.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  add-security-advisory-comment:
+    # Maximum number of advisory comments per run (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # GitHub token expression for same-job contexts. Accepts a secrets expression
+    # (e.g., `${{ secrets.NAME }}` or `${{ secrets.NAME1 || secrets.NAME2 }}`), a
+    # cross-job output expression (e.g., `${{ needs.auth.outputs.token }}`), or a
+    # same-job step output expression with optional secret fallbacks (e.g., `${{
+    # steps.fetch-token.outputs.my-token || secrets.GITHUB_TOKEN }}`). Pattern
+    # details: secret names and job IDs match `[A-Za-z_][A-Za-z0-9_]*`; same-job step
+    # IDs and output names match `[A-Za-z_][A-Za-z0-9_-]*`.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+    # GitHub App credentials for minting installation access tokens.
+    # (optional)
+    github-app:
+      # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
+      # }}').
+      # (optional)
+      app-id: "example-value"
+
+      # GitHub App client ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App
+      # token.
+      # (optional)
+      client-id: "example-value"
+
+      # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
+      # mint a GitHub App token.
+      # (optional)
+      private-key: "example-value"
+
+      # If true, skip token minting when client-id/private-key resolve to empty strings
+      # at runtime. Defaults to false.
+      # (optional)
+      ignore-if-missing: true
+
+      # Optional owner of the GitHub App installation (defaults to current repository
+      # owner if not specified)
+      # (optional)
+      owner: "example-value"
+
+      # Optional list of repositories to grant access to (defaults to current repository
+      # if not specified)
+      # (optional)
+      repositories: []
+        # Array of strings
+
+      # Optional extra GitHub App-only permissions to merge into the minted token. Takes
+      # effect for tools.github.github-app and safe-outputs.github-app; ignored in
+      # on.github-app and the top-level github-app fallback. Use to add GitHub App-only
+      # scopes (e.g. members, organization-administration) not expressible via standard
+      # handler declarations.
+      # (optional)
+      permissions:
+        # Permission level for repository administration (read/none; "write" is rejected
+        # by the compiler). GitHub App-only permission for repository administration.
+        # (optional)
+        administration: "read"
+
+        # Permission level for Codespaces (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        codespaces: "read"
+
+        # Permission level for Codespaces lifecycle administration (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        codespaces-lifecycle-admin: "read"
+
+        # Permission level for Codespaces metadata (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        codespaces-metadata: "read"
+
+        # Permission level for user email addresses (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        email-addresses: "read"
+
+        # Permission level for repository environments (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        environments: "read"
+
+        # Permission level for git signing (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        git-signing: "read"
+
+        # Permission level for organization members (read/none; "write" is rejected by the
+        # compiler). Required for org team membership API calls.
+        # (optional)
+        members: "read"
+
+        # Permission level for organization administration (read/none; "write" is rejected
+        # by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-administration: "read"
+
+        # Permission level for organization announcement banners (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-announcement-banners: "read"
+
+        # Permission level for organization Codespaces (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        organization-codespaces: "read"
+
+        # Permission level for organization Copilot (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        organization-copilot: "read"
+
+        # Permission level for organization custom org roles (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-custom-org-roles: "read"
+
+        # Permission level for organization custom properties (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-custom-properties: "read"
+
+        # Permission level for organization custom repository roles (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-custom-repository-roles: "read"
+
+        # Permission level for organization events (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        organization-events: "read"
+
+        # Permission level for organization webhooks (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        organization-hooks: "read"
+
+        # Permission level for organization members management (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-members: "read"
+
+        # Permission level for organization packages (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        organization-packages: "read"
+
+        # Permission level for organization personal access token requests (read/none;
+        # "write" is rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-personal-access-token-requests: "read"
+
+        # Permission level for organization personal access tokens (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-personal-access-tokens: "read"
+
+        # Permission level for organization plan (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        organization-plan: "read"
+
+        # Permission level for organization self-hosted runners (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-self-hosted-runners: "read"
+
+        # Permission level for organization user blocking (read/none; "write" is rejected
+        # by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-user-blocking: "read"
+
+        # Permission level for repository custom properties (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        repository-custom-properties: "read"
+
+        # Permission level for secret scanning alerts (read/none). Forwarded as
+        # permission-secret-scanning-alerts input for actions/create-github-app-token.
+        # (optional)
+        secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
+        # Permission level for repository webhooks (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        repository-hooks: "read"
+
+        # Permission level for single file access (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        single-file: "read"
+
+        # Permission level for team discussions (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        team-discussions: "read"
+
+        # Permission level for Dependabot vulnerability alerts (read/none; "write" is
+        # rejected by the compiler). Also available as a GITHUB_TOKEN scope. When used
+        # with a GitHub App, forwarded as permission-vulnerability-alerts input.
+        # (optional)
+        vulnerability-alerts: "read"
+
+        # Permission level for GitHub Actions workflow files (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        workflows: "read"
+
+    # Include the standard AI-generated attribution footer (default: true).
+    # (optional)
+    footer: true
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Declarative tool argument samples for deterministic
+    # safe-outputs replay through --use-samples or features.samples.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  add-security-advisory-comment: null
+
+  # Experimental. Create draft repository security advisories only. Requires an
+  # external token or GitHub App with Repository security advisories write
+  # permission; GITHUB_TOKEN is not supported.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  create-security-advisory:
+    # Maximum number of draft advisories per run (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # GitHub token expression for same-job contexts. Accepts a secrets expression
+    # (e.g., `${{ secrets.NAME }}` or `${{ secrets.NAME1 || secrets.NAME2 }}`), a
+    # cross-job output expression (e.g., `${{ needs.auth.outputs.token }}`), or a
+    # same-job step output expression with optional secret fallbacks (e.g., `${{
+    # steps.fetch-token.outputs.my-token || secrets.GITHUB_TOKEN }}`). Pattern
+    # details: secret names and job IDs match `[A-Za-z_][A-Za-z0-9_]*`; same-job step
+    # IDs and output names match `[A-Za-z_][A-Za-z0-9_-]*`.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+    # GitHub App credentials for minting installation access tokens.
+    # (optional)
+    github-app:
+      # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
+      # }}').
+      # (optional)
+      app-id: "example-value"
+
+      # GitHub App client ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App
+      # token.
+      # (optional)
+      client-id: "example-value"
+
+      # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
+      # mint a GitHub App token.
+      # (optional)
+      private-key: "example-value"
+
+      # If true, skip token minting when client-id/private-key resolve to empty strings
+      # at runtime. Defaults to false.
+      # (optional)
+      ignore-if-missing: true
+
+      # Optional owner of the GitHub App installation (defaults to current repository
+      # owner if not specified)
+      # (optional)
+      owner: "example-value"
+
+      # Optional list of repositories to grant access to (defaults to current repository
+      # if not specified)
+      # (optional)
+      repositories: []
+        # Array of strings
+
+      # Optional extra GitHub App-only permissions to merge into the minted token. Takes
+      # effect for tools.github.github-app and safe-outputs.github-app; ignored in
+      # on.github-app and the top-level github-app fallback. Use to add GitHub App-only
+      # scopes (e.g. members, organization-administration) not expressible via standard
+      # handler declarations.
+      # (optional)
+      permissions:
+        # Permission level for repository administration (read/none; "write" is rejected
+        # by the compiler). GitHub App-only permission for repository administration.
+        # (optional)
+        administration: "read"
+
+        # Permission level for Codespaces (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        codespaces: "read"
+
+        # Permission level for Codespaces lifecycle administration (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        codespaces-lifecycle-admin: "read"
+
+        # Permission level for Codespaces metadata (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        codespaces-metadata: "read"
+
+        # Permission level for user email addresses (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        email-addresses: "read"
+
+        # Permission level for repository environments (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        environments: "read"
+
+        # Permission level for git signing (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        git-signing: "read"
+
+        # Permission level for organization members (read/none; "write" is rejected by the
+        # compiler). Required for org team membership API calls.
+        # (optional)
+        members: "read"
+
+        # Permission level for organization administration (read/none; "write" is rejected
+        # by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-administration: "read"
+
+        # Permission level for organization announcement banners (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-announcement-banners: "read"
+
+        # Permission level for organization Codespaces (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        organization-codespaces: "read"
+
+        # Permission level for organization Copilot (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        organization-copilot: "read"
+
+        # Permission level for organization custom org roles (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-custom-org-roles: "read"
+
+        # Permission level for organization custom properties (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-custom-properties: "read"
+
+        # Permission level for organization custom repository roles (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-custom-repository-roles: "read"
+
+        # Permission level for organization events (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        organization-events: "read"
+
+        # Permission level for organization webhooks (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        organization-hooks: "read"
+
+        # Permission level for organization members management (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-members: "read"
+
+        # Permission level for organization packages (read/none; "write" is rejected by
+        # the compiler). GitHub App-only permission.
+        # (optional)
+        organization-packages: "read"
+
+        # Permission level for organization personal access token requests (read/none;
+        # "write" is rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-personal-access-token-requests: "read"
+
+        # Permission level for organization personal access tokens (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-personal-access-tokens: "read"
+
+        # Permission level for organization plan (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        organization-plan: "read"
+
+        # Permission level for organization self-hosted runners (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-self-hosted-runners: "read"
+
+        # Permission level for organization user blocking (read/none; "write" is rejected
+        # by the compiler). GitHub App-only permission.
+        # (optional)
+        organization-user-blocking: "read"
+
+        # Permission level for repository custom properties (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        repository-custom-properties: "read"
+
+        # Permission level for secret scanning alerts (read/none). Forwarded as
+        # permission-secret-scanning-alerts input for actions/create-github-app-token.
+        # (optional)
+        secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
+        # Permission level for repository webhooks (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        repository-hooks: "read"
+
+        # Permission level for single file access (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        single-file: "read"
+
+        # Permission level for team discussions (read/none; "write" is rejected by the
+        # compiler). GitHub App-only permission.
+        # (optional)
+        team-discussions: "read"
+
+        # Permission level for Dependabot vulnerability alerts (read/none; "write" is
+        # rejected by the compiler). Also available as a GITHUB_TOKEN scope. When used
+        # with a GitHub App, forwarded as permission-vulnerability-alerts input.
+        # (optional)
+        vulnerability-alerts: "read"
+
+        # Permission level for GitHub Actions workflow files (read/none; "write" is
+        # rejected by the compiler). GitHub App-only permission.
+        # (optional)
+        workflows: "read"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Declarative tool argument samples for deterministic
+    # safe-outputs replay through --use-samples or features.samples.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  create-security-advisory: null
 
   # Enable AI agents to edit and update GitHub release content, including release
   # notes, assets, and metadata.
@@ -21477,6 +22300,11 @@ safe-outputs:
       # (optional)
       secret-scanning-alerts: "read"
 
+      # Repository security advisories permission. GitHub App-only; forwarded as
+      # permission-repository-advisories when minting a token.
+      # (optional)
+      repository-advisories: "read"
+
       # Permission level for repository webhooks (read/none; "write" is rejected by the
       # compiler). GitHub App-only permission.
       # (optional)
@@ -21610,9 +22438,13 @@ safe-outputs:
       # Experimental per-run model and reasoning-effort selection from the task text for
       # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
       # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-      # fixed model and effort settings. See
-      # https://github.github.com/gh-aw/reference/model-routing/.
+      # fixed model and effort settings. Eligible workflows that choose no model or
+      # routing on GitHub Copilot inference default to goal cost and mode auto; set
+      # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
+      # Accepted formats:
+
+      # Format 1: object
       model-routing:
         # Routing objective: cost prefers the cheapest model and effort that meet the
         # mode's target; cost-speed prefers the fastest model and effort that meet it.
@@ -21637,6 +22469,10 @@ safe-outputs:
         # (optional)
         allowed-models: []
           # Array of strings
+
+      # Format 2: Disable the implicit cost/auto model-routing default without pinning a
+      # model; the existing model variables and fallback model apply.
+      model-routing: true
 
       # Optional model context window metadata for engines that need to register
       # explicit model catalog entries. Supported by the Pi engine when generating its
@@ -22658,9 +23494,13 @@ safe-outputs:
         # Experimental per-run model and reasoning-effort selection from the task text for
         # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
         # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
-        # fixed model and effort settings. See
-        # https://github.github.com/gh-aw/reference/model-routing/.
+        # fixed model and effort settings. Eligible workflows that choose no model or
+        # routing on GitHub Copilot inference default to goal cost and mode auto; set
+        # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
         # (optional)
+        # Accepted formats:
+
+        # Format 1: object
         model-routing:
           # Routing objective: cost prefers the cheapest model and effort that meet the
           # mode's target; cost-speed prefers the fastest model and effort that meet it.
@@ -22685,6 +23525,10 @@ safe-outputs:
           # (optional)
           allowed-models: []
             # Array of strings
+
+        # Format 2: Disable the implicit cost/auto model-routing default without pinning a
+        # model; the existing model variables and fallback model apply.
+        model-routing: true
 
         # Optional inference provider override for this engine. Defaults to the engine's
         # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
@@ -23158,6 +24002,11 @@ safe-outputs:
         # permission-secret-scanning-alerts input for actions/create-github-app-token.
         # (optional)
         secret-scanning-alerts: "read"
+
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
 
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
@@ -23656,6 +24505,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -23977,6 +24831,11 @@ safe-outputs:
         # (optional)
         secret-scanning-alerts: "read"
 
+        # Repository security advisories permission. GitHub App-only; forwarded as
+        # permission-repository-advisories when minting a token.
+        # (optional)
+        repository-advisories: "read"
+
         # Permission level for repository webhooks (read/none; "write" is rejected by the
         # compiler). GitHub App-only permission.
         # (optional)
@@ -24284,6 +25143,14 @@ runtimes:
 
 # Format 1: Single checkout configuration for the default workspace
 checkout:
+  # Acknowledge that host steps consume a separate checkout only as data, not
+  # executable scripts, hooks, or configuration. Suppresses only that checkout's
+  # checkout-ref warning; does not suppress the default workspace checkout warning,
+  # enforce isolation, or change runtime behavior. Every merged request for the same
+  # checkout target must opt in. Requires a literal boolean.
+  # (optional)
+  data-only: true
+
   # Explicitly enable runtime repository-list expansion and its allowlist,
   # visibility, path, and secondary-fetch restrictions. Requires allowed-repos.
   # Otherwise repository/repo must resolve to exactly one owner/repo slug and
@@ -24574,6 +25441,11 @@ checkout:
       # (optional)
       secret-scanning-alerts: "read"
 
+      # Repository security advisories permission. GitHub App-only; forwarded as
+      # permission-repository-advisories when minting a token.
+      # (optional)
+      repository-advisories: "read"
+
       # Permission level for repository webhooks (read/none; "write" is rejected by the
       # compiler). GitHub App-only permission.
       # (optional)
@@ -24772,6 +25644,11 @@ checkout:
       # permission-secret-scanning-alerts input for actions/create-github-app-token.
       # (optional)
       secret-scanning-alerts: "read"
+
+      # Repository security advisories permission. GitHub App-only; forwarded as
+      # permission-repository-advisories when minting a token.
+      # (optional)
+      repository-advisories: "read"
 
       # Permission level for repository webhooks (read/none; "write" is rejected by the
       # compiler). GitHub App-only permission.
@@ -25013,6 +25890,11 @@ github-app:
     # permission-secret-scanning-alerts input for actions/create-github-app-token.
     # (optional)
     secret-scanning-alerts: "read"
+
+    # Repository security advisories permission. GitHub App-only; forwarded as
+    # permission-repository-advisories when minting a token.
+    # (optional)
+    repository-advisories: "read"
 
     # Permission level for repository webhooks (read/none; "write" is rejected by the
     # compiler). GitHub App-only permission.

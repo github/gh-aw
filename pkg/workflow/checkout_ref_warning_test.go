@@ -63,9 +63,10 @@ func TestCheckoutRefWithStepsWarning(t *testing.T) {
 			steps: "steps:\n  - working-directory: tooling\n    run: ./scripts/validate-content ../target",
 		},
 		{
-			name:     "data-only default checkout with imported host steps",
+			name:     "data-only does not suppress default workspace checkout",
 			checkout: "checkout:\n  ref: ${{ needs.plan.outputs.branch }}\n  data-only: true\n",
 			imports:  true,
+			warn:     true,
 		},
 		{
 			name:          "data-only target with pre-agent steps",
@@ -142,6 +143,37 @@ Inspect the repository.
 	}
 }
 
+func TestCheckoutRefWarningAfterDerivedCheckoutPaths(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "checkout-ref-warning-derived-path-test")
+	content := `---
+on: workflow_dispatch
+engine: claude
+strict: false
+permissions:
+  contents: read
+checkout:
+  - repository: example-org/content
+    ref: ${{ needs.plan.outputs.branch }}
+    data-only: true
+  - repository: example-org/content
+    path: content
+steps:
+  - run: ./scripts/validate-content content
+---
+# Checkout ref warning
+Inspect the repository.
+`
+	testFile := filepath.Join(tmpDir, "workflow.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(content), 0644))
+	compiler := NewCompiler()
+	output := captureStderrOutput(t, func() {
+		require.NoError(t, compiler.CompileWorkflow(testFile))
+	})
+
+	assert.Contains(t, output, `uses checkout.ref "${{ needs.plan.outputs.branch }}"`)
+	assert.Contains(t, output, "do not check them out or run their scripts on the host")
+}
+
 func TestCheckoutRefWithStepsWarningMergedCheckouts(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -166,25 +198,35 @@ func TestCheckoutRefWithStepsWarningMergedCheckouts(t *testing.T) {
 		{
 			name: "all merged entries acknowledge data-only use",
 			configs: []*CheckoutConfig{
-				{Ref: "${{ inputs.branch }}", DataOnly: true},
-				{DataOnly: true},
+				{Repository: "org/data", Path: "data", Ref: "${{ inputs.branch }}", DataOnly: true},
+				{Repository: "org/data", Path: "data", DataOnly: true},
 			},
 		},
 		{
 			name: "later merged request does not acknowledge data-only use",
 			configs: []*CheckoutConfig{
-				{Ref: "${{ inputs.branch }}", DataOnly: true},
-				{},
+				{Repository: "org/data", Path: "data", Ref: "${{ inputs.branch }}", DataOnly: true},
+				{Repository: "org/data", Path: "data"},
 			},
 			warn: true,
 		},
 		{
 			name: "later acknowledgement cannot hide earlier request",
 			configs: []*CheckoutConfig{
-				{Ref: "${{ inputs.branch }}"},
-				{DataOnly: true},
+				{Repository: "org/data", Path: "data", Ref: "${{ inputs.branch }}"},
+				{Repository: "org/data", Path: "data", DataOnly: true},
 			},
 			warn: true,
+		},
+		{
+			name:    "data-only does not suppress default workspace checkout",
+			configs: []*CheckoutConfig{{Ref: "${{ inputs.branch }}", DataOnly: true}},
+			warn:    true,
+		},
+		{
+			name:    "data-only does not suppress explicit workspace-root checkout",
+			configs: []*CheckoutConfig{{Repository: "org/data", Path: ".", Ref: "${{ inputs.branch }}", DataOnly: true}},
+			warn:    true,
 		},
 		{
 			name:    "first expression takes precedence",

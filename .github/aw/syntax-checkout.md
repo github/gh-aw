@@ -50,6 +50,7 @@ checkout:
 
 - `repository:` / `repo:` (alias) - Repository in `owner/repo` format (defaults to current repository). Without `multi: true`, must resolve to exactly one repository; wildcards are not supported.
 - `ref:` - Branch, tag, or SHA to check out (defaults to the triggering ref)
+- `data-only:` - Literal boolean, default `false`. Self-attests that trusted host tooling consumes a separate checkout only as data and suppresses only that checkout's ref warning. It does not enforce isolation or change execution, and does not suppress the default workspace checkout warning. Every merged request for the same target must set `true`.
 - `path:` - Relative path within `GITHUB_WORKSPACE` (defaults to workspace root). In `multi: true` mode this is a literal prefix: repositories land under `prefix/owner/repo`.
 - `fetch-depth:` - Number of commits to fetch; `0` = full history, `1` = shallow (default). When multiple configs target the same path, the deepest value wins.
 - `fetch:` - Additional Git refs to fetch after checkout (string or array of patterns)
