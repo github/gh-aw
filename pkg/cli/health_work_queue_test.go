@@ -197,7 +197,7 @@ func TestRunHealthWorkQueueWithoutRuns(t *testing.T) {
 				return commits, nil
 			}
 			output := captureAuditGroupStdout(t, func() {
-				require.NoError(t, RunHealth(HealthConfig{
+				require.NoError(t, runHealth(context.Background(), HealthConfig{
 					WorkflowName: name, Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: fixture.repoOverride,
 				}))
 			})

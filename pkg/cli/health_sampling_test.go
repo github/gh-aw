@@ -255,7 +255,7 @@ func TestHealthLowQuotaAndSecondaryLimitProducePartialJSON(t *testing.T) {
 				return []GitHubWorkflow{{ID: 1, Name: "Example", Path: ".github/workflows/example.lock.yml", State: "active"}}, nil
 			}
 			output := captureAuditGroupStdout(t, func() {
-				require.NoError(t, RunHealth(HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
+				require.NoError(t, runHealth(context.Background(), HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
 			})
 			var report HealthSummary
 			require.NoError(t, json.Unmarshal([]byte(output), &report))
@@ -499,7 +499,7 @@ func TestHealthCurrentSnapshotFromGitHubMetadata(t *testing.T) {
 				}
 			}
 			output := captureAuditGroupStdout(t, func() {
-				require.NoError(t, RunHealth(HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
+				require.NoError(t, runHealth(context.Background(), HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "org/repo"}))
 			})
 			var report HealthSummary
 			require.NoError(t, json.Unmarshal([]byte(output), &report))

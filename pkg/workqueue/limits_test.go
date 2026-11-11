@@ -27,12 +27,12 @@ func TestResourceBudgetsFailBeforePublication(t *testing.T) {
 	}
 	policy := DefaultPolicy(testPrincipal, testRepository)
 	policy.Limits.Operations = 1
-	if err := validatePolicy(policy); err == nil {
+	if err := validatePolicyWithHost(policy, ""); err == nil {
 		t.Fatal("policy cannot reserve less operation headroom than required for closure")
 	}
 	policy = DefaultPolicy(testPrincipal, testRepository)
 	policy.AccountingWeights["\t"] = 1
-	if err := validatePolicy(policy); err == nil {
+	if err := validatePolicyWithHost(policy, ""); err == nil {
 		t.Fatal("unbounded/control-character account identity accepted")
 	}
 }

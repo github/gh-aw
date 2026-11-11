@@ -68,7 +68,7 @@ func TestResolveHealthTimeWindow(t *testing.T) {
 			start, end, err := resolveHealthTimeWindow(tt.config, now)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
-				require.ErrorContains(t, RunHealth(tt.config), tt.err, "invalid windows must fail before accessing GitHub")
+				require.ErrorContains(t, runHealth(context.Background(), tt.config), tt.err, "invalid windows must fail before accessing GitHub")
 				return
 			}
 			require.NoError(t, err)

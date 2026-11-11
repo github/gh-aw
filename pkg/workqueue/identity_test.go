@@ -101,7 +101,7 @@ func TestNativeDecimalIdentityBoundsBeforeWireValidation(t *testing.T) {
 					policy.Producers[id] = policy.Producers[testPrincipal]
 					delete(policy.Producers, testPrincipal)
 				}
-				if err := validatePolicy(policy); (err == nil) != test.valid {
+				if err := validatePolicyWithHost(policy, ""); (err == nil) != test.valid {
 					t.Errorf("native %s policy validity disagrees before schema validation: %v", scope, err)
 				} else if !test.valid && !strings.HasPrefix(err.Error(), "policy_invalid:") {
 					t.Errorf("native %s policy used the wrong rejection code: %v", scope, err)

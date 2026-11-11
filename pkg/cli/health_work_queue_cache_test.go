@@ -169,7 +169,7 @@ func TestRunHealthRetainsActionsEvidenceWhenWorkQueueExhaustsBudget(t *testing.T
 				return []byte(`{"full_name":"org/repo","default_branch":"main"}`), nil
 			}
 			output := captureAuditGroupStdout(t, func() {
-				require.NoError(t, RunHealth(HealthConfig{
+				require.NoError(t, runHealth(context.Background(), HealthConfig{
 					WorkflowName: name, Days: 7, JSONOutput: true, RepoOverride: "org/repo", LogsDir: ".health-unused-cache",
 				}))
 			})

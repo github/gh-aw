@@ -147,11 +147,6 @@ func addHealthFlags(cmd *cobra.Command) {
 	addJSONFlag(cmd)
 }
 
-// RunHealth executes the health command with the given configuration
-func RunHealth(config HealthConfig) error {
-	return runHealth(context.Background(), config)
-}
-
 func runHealth(ctx context.Context, config HealthConfig) error {
 	healthLog.Printf("Running health check: workflow=%s, days=%d, threshold=%.1f", config.WorkflowName, config.Days, config.Threshold)
 	if config.Timeout < 0 {

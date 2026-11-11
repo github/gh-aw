@@ -34,6 +34,9 @@ imports:
       expires: "3d"
       labels: [chore, dead-code, cookie]
       reviewers: [copilot]
+      protected-files:
+        exclude:
+          - README.md
   - shared/otlp.md
 network:
   allowed:

@@ -14,7 +14,7 @@
 | `Finding`, `CoverageGap`, `Result` | Analysis findings and explicit limits on analysis coverage. |
 | `Rule` | Source, sink, and filter predicates for one analysis rule. |
 | `Analyze`, `AnalyzeDocument`, `AnalyzeAuthoredDocument`, `AnalyzeAuthoredScripts` | Analyze compiled Actions workflows and/or authored AW documents. |
-| `CheckSecretLeaks`, `SecretLeakRule` | Built-in secret-disclosure rule and convenience check. |
+| `SecretLeakRule` | Built-in secret-disclosure rule. |
 | `JavaScriptOptions`, `JavaScriptInput`, `JavaScriptResult`, `AnalyzeJavaScript` | Bounded JavaScript analysis using a supplied parser implementation. |
 | `PrimeAuthoredJavaScript` | Primes JavaScript analysis for a set of authored documents. |
 
