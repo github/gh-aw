@@ -509,10 +509,10 @@ tools:
 **Required**: No  
 **Default**: Auto-detected based on repository visibility
 
-The `lockdown` field restricts GitHub MCP server to **only the triggering repository**, preventing access to other repositories even if the token has permissions.
+The `lockdown` field denies GitHub MCP invocations, including access to the triggering repository.
 
 **Values**:
-- `true` - Only triggering repository accessible (cross-repo access rejected)
+- `true` - Deny all GitHub MCP invocations
 - `false` - All token-accessible repositories available
 - **Omitted** - Automatically set based on repository visibility (private repos → `true`, public repos → `false`)
 
@@ -526,11 +526,11 @@ When `lockdown` is not specified, the system automatically determines the settin
 tools:
   github:
     mode: "remote"
-    lockdown: true      # Explicit lockdown to triggering repo only
+    lockdown: true      # Explicitly deny GitHub MCP invocations
     toolsets: [default]
 ```
 
-**Security Best Practice**: Use `lockdown: true` for workflows that should only access the triggering repository, preventing unintended cross-repository operations.
+**Security Best Practice**: Use `lockdown: true` as an emergency stop when a workflow must not invoke GitHub MCP tools.
 
 #### 4.2.9 github-app (Renamed from app)
 
@@ -1850,19 +1850,19 @@ Implementations MUST log all access control decisions with the following informa
 
 ### 9.5 Lockdown Override
 
-This subsection documents how the `lockdown` field (§4.2.8) interacts with guard policy fields (`allowed-repos`, `min-integrity`) when both are present in the same workflow. This relates to the decision recorded in [guard-policies-specification.md Resolved Decisions, decision record #3](guard-policies-specification.md#resolved-decisions).
+This subsection documents how the `lockdown` field (§4.2.8) interacts with guard policy fields (`allowed-repos`, `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels`) when both are present in the same workflow. This relates to the decision recorded in [guard-policies-specification.md Resolved Decisions, decision record #3](guard-policies-specification.md#resolved-decisions).
 
 #### 9.5.1 Precedence Rule
 
-**`lockdown: true` MUST take absolute precedence over all guard policy configuration.** When `lockdown` is active, the GitHub MCP server is restricted to the triggering repository exclusively; `allowed-repos` and `min-integrity` fields are not evaluated.
+**`lockdown: true` MUST take absolute precedence over all guard policy configuration and deny GitHub MCP invocations.** When `lockdown` is active, guard-policy fields (`allowed-repos`, `min-integrity`, `blocked-users`, `trusted-users`, `approval-labels`) are not evaluated.
 
-**Shared precedence rule**: `lockdown: true` takes absolute precedence over `allowed-repos`, including non-empty allowlists, and over `min-integrity`; implementations MUST ignore those guard-policy fields for authorization while lockdown is active and MUST NOT allow them to widen access beyond the triggering repository.
+**Shared precedence rule**: `lockdown: true` takes absolute precedence over all guard-policy fields, including non-empty `allowed-repos` allowlists; implementations MUST ignore those fields for authorization while lockdown is active and MUST deny the invocation.
 
 See also: [guard-policies-specification.md §GP-S002](guard-policies-specification.md#gp-s002-lockdown-supremacy).
 
-- Implementations MUST NOT permit `allowed-repos` or `min-integrity` to widen access beyond the single triggering repository when `lockdown: true` is in effect.
-- Implementations MUST NOT require `allowed-repos` to be set when `lockdown: true` is present; the lockdown restriction supersedes any explicit repository allowlist.
-- Implementations MUST apply the `lockdown` restriction at the gateway middleware layer before evaluating any guard policy fields.
+- Implementations MUST deny all GitHub MCP invocations when `lockdown: true` is in effect, regardless of any guard-policy fields.
+- Implementations MUST NOT require `allowed-repos` to be set when `lockdown: true` is present; lockdown denies invocations independently of any configured guard policy.
+- Implementations MUST apply the lockdown denial at the gateway middleware layer before evaluating any guard policy fields.
 
 #### 9.5.2 Compilation-Time Warning
 
@@ -2409,29 +2409,29 @@ tools:
 - `private-repos: false` prevents private data leakage
 - Combined: Defense-in-depth security for read-only workflows
 
-#### A.10 Lockdown Mode for Single Repository
+#### A.10 Lockdown as an Emergency Stop
 
-Restrict GitHub MCP server to only the triggering repository:
+Deny GitHub MCP invocations:
 
 ```yaml
 tools:
   github:
     mode: "remote"
-    lockdown: true               # Only triggering repository accessible
+    lockdown: true               # No GitHub MCP invocations are permitted
     toolsets: [default]
     roles:
       - "write"
       - "admin"
 ```
 
-**Use Case**: Repository-specific automation, CI/CD workflows, security-sensitive operations
+**Use Case**: Workflows that must not invoke GitHub MCP tools
 
 **Lockdown Behavior**:
-- Agent can ONLY access the repository that triggered the workflow
-- Prevents cross-repository operations even if token has permissions
+- Agent cannot invoke GitHub MCP tools
+- Prevents all GitHub MCP operations even if the token has permissions
 - Automatically enabled for private repositories (unless explicitly disabled)
 
-**Note**: When `lockdown: true`, the `repos` field is not needed as access is automatically scoped to the triggering repository.
+**Note**: When `lockdown: true`, repository access fields are ignored for authorization; the compiler still validates their configuration.
 
 #### A.11 GitHub App Authentication with Access Control
 

@@ -1,6 +1,6 @@
 ---
 title: Safe Output Outcome Evaluation Specification
-version: 1.0.3
+version: 1.0.4
 status: Working Draft
 date: 2026-05-15
 last_updated: 2026-11-05
@@ -190,10 +190,10 @@ coverage qualifications. Per-item cost attribution remains separate work.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.pr.merged` | bool | Whether PR was merged |
-| `ghaw.outcome.pr.review_count` | int | Number of reviews submitted |
-| `ghaw.outcome.pr.additions` | int | Lines added |
-| `ghaw.outcome.pr.deletions` | int | Lines deleted |
+| `gh-aw.outcome.pr.merged` | bool | Whether PR was merged |
+| `gh-aw.outcome.pr.review_count` | int | Number of reviews submitted |
+| `gh-aw.outcome.pr.additions` | int | Lines added |
+| `gh-aw.outcome.pr.deletions` | int | Lines deleted |
 
 ---
 
@@ -225,9 +225,9 @@ coverage qualifications. Per-item cost attribution remains separate work.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.issue.state_reason` | string | `completed` or `not_planned` |
-| `ghaw.outcome.issue.closed_by` | string | Username that closed the issue |
-| `ghaw.outcome.issue.closed_by_bot` | bool | Whether a bot closed it |
+| `gh-aw.outcome.issue.state_reason` | string | `completed` or `not_planned` |
+| `gh-aw.outcome.issue.closed_by` | string | Username that closed the issue |
+| `gh-aw.outcome.issue.closed_by_bot` | bool | Whether a bot closed it |
 
 ---
 
@@ -256,9 +256,9 @@ coverage qualifications. Per-item cost attribution remains separate work.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.comment.reactions` | int | Total reaction count |
-| `ghaw.outcome.comment.replies` | int | Subsequent comments on same thread |
-| `ghaw.outcome.comment.minimized` | bool | Whether the comment was hidden |
+| `gh-aw.outcome.comment.reactions` | int | Total reaction count |
+| `gh-aw.outcome.comment.replies` | int | Subsequent comments on same thread |
+| `gh-aw.outcome.comment.minimized` | bool | Whether the comment was hidden |
 
 ---
 
@@ -282,9 +282,9 @@ coverage qualifications. Per-item cost attribution remains separate work.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.labels.added` | int | Labels the workflow added |
-| `ghaw.outcome.labels.retained` | int | Labels still present |
-| `ghaw.outcome.labels.removed` | int | Labels that were removed |
+| `gh-aw.outcome.labels.added` | int | Labels the workflow added |
+| `gh-aw.outcome.labels.retained` | int | Labels still present |
+| `gh-aw.outcome.labels.removed` | int | Labels that were removed |
 
 **API failure safeguards (`add_labels`):** failures return
 `error`/`weak`/`evaluation_error`, never acceptance based on missing data.
@@ -314,8 +314,8 @@ classification rule.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.reviewer.reviewed` | bool | Whether the assigned reviewer submitted a review |
-| `ghaw.outcome.reviewer.review_state` | string | `approved`, `changes_requested`, `commented` |
+| `gh-aw.outcome.reviewer.reviewed` | bool | Whether the assigned reviewer submitted a review |
+| `gh-aw.outcome.reviewer.review_state` | string | `approved`, `changes_requested`, `commented` |
 
 ---
 
@@ -435,8 +435,8 @@ Same retained-update logic as `update_issue` but on a PR object, using persisted
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.discussion.replies` | int | Reply count |
-| `ghaw.outcome.discussion.answered` | bool | Whether marked as answered |
+| `gh-aw.outcome.discussion.replies` | int | Reply count |
+| `gh-aw.outcome.discussion.answered` | bool | Whether marked as answered |
 
 ---
 
@@ -594,8 +594,8 @@ unattributable.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.agent.pr_number` | int | PR number created by agent |
-| `ghaw.outcome.agent.pr_merged` | bool | Whether agent's PR was merged |
+| `gh-aw.outcome.agent.pr_number` | int | PR number created by agent |
+| `gh-aw.outcome.agent.pr_merged` | bool | Whether agent's PR was merged |
 
 ---
 
@@ -799,10 +799,10 @@ No outcome to evaluate. Skip.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `ghaw.outcome.replace_label.label_to_add` | string | Label that should be present after the replacement |
-| `ghaw.outcome.replace_label.label_to_remove` | string | Label that should be absent after the replacement |
-| `ghaw.outcome.replace_label.add_present` | bool | Whether `label_to_add` is present at evaluation time |
-| `ghaw.outcome.replace_label.remove_absent` | bool | Whether `label_to_remove` is absent at evaluation time |
+| `gh-aw.outcome.replace_label.label_to_add` | string | Label that should be present after the replacement |
+| `gh-aw.outcome.replace_label.label_to_remove` | string | Label that should be absent after the replacement |
+| `gh-aw.outcome.replace_label.add_present` | bool | Whether `label_to_add` is present at evaluation time |
+| `gh-aw.outcome.replace_label.remove_absent` | bool | Whether `label_to_remove` is absent at evaluation time |
 
 **API failure safeguards (`replace_label`):**
 
@@ -887,7 +887,7 @@ These cover the majority of safe output usage. Add the rest incrementally.
 ### Conformance Test Table
 
 The current runtime classifications below supersede existence-based acceptance
-conditions in the original design sections. `ghaw.outcome.type` preserves the
+conditions in the original design sections. `gh-aw.outcome.type` preserves the
 safe-output type; status and evidence strength are separate attributes.
 
 | Output type | Acceptance evidence | Other classifications |
