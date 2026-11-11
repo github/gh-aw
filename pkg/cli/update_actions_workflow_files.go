@@ -160,6 +160,9 @@ func containsMergeConflictMarkers(content string) bool {
 }
 
 func findWorkflowWithMergeConflictMarkers(workflowsDir string) (string, error) {
+	if workflowsDir == "" {
+		workflowsDir = getWorkflowsDir()
+	}
 	var conflictedWorkflow string
 	err := filepath.WalkDir(workflowsDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -171,7 +174,7 @@ func findWorkflowWithMergeConflictMarkers(workflowsDir string) (string, error) {
 
 		content, err := os.ReadFile(path)
 		if err != nil {
-			return nil
+			return err
 		}
 		if containsMergeConflictMarkers(string(content)) && conflictedWorkflow == "" {
 			conflictedWorkflow = path

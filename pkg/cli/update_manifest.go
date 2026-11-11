@@ -214,6 +214,7 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 		}
 		if err := updateManifestManagedWorkflow(ctx, update, opts); errors.Is(err, errManifestWorkflowConflictSkipped) {
 			skippedConflict = true
+			failures = append(failures, updateFailure{Name: wf.Name, Error: err.Error()})
 			continue
 		} else if err != nil {
 			failures = append(failures, updateFailure{Name: wf.Name, Error: err.Error()})
@@ -440,11 +441,18 @@ func rollbackPackageAssets(rollbacks []packageAssetRollback) {
 	// Rollback is best-effort so the original reconciliation error remains actionable.
 	for _, rollback := range slices.Backward(rollbacks) {
 		if rollback.existed {
-			_ = os.MkdirAll(filepath.Dir(rollback.path), constants.DirPermPublic)
-			_ = os.WriteFile(rollback.path, rollback.content, rollback.mode)
+			if err := os.MkdirAll(filepath.Dir(rollback.path), constants.DirPermPublic); err != nil {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Unable to restore package asset %s: %v", rollback.path, err)))
+				continue
+			}
+			if err := os.WriteFile(rollback.path, rollback.content, rollback.mode); err != nil {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Unable to restore package asset %s: %v", rollback.path, err)))
+			}
 			continue
 		}
-		_ = os.Remove(rollback.path)
+		if err := os.Remove(rollback.path); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Unable to remove package asset %s during rollback: %v", rollback.path, err)))
+		}
 	}
 }
 
@@ -660,7 +668,7 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 	}
 	if hasConflicts {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Updated %s from %s to %s with CONFLICTS - please review and resolve manually", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
-		return nil
+		return errManifestWorkflowConflictSkipped
 	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %s from %s to %s", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
 	if !opts.NoCompile {

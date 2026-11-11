@@ -447,6 +447,31 @@ func TestResolveManifestAssetEngine(t *testing.T) {
 	assert.Equal(t, "copilot", overrideEngine)
 }
 
+func TestRollbackPackageAssetsReportsFailuresAndContinues(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	require.NoError(t, os.WriteFile(blocker, []byte("not a directory"), 0o600))
+	nonemptyDir := filepath.Join(dir, "nonempty")
+	require.NoError(t, os.Mkdir(nonemptyDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(nonemptyDir, "child"), nil, 0o600))
+	restored := filepath.Join(dir, "restored")
+
+	output := testutil.CaptureStderr(t, func() {
+		rollbackPackageAssets([]packageAssetRollback{
+			{path: restored, existed: true, content: []byte("original"), mode: 0o600},
+			{path: nonemptyDir},
+			{path: nonemptyDir, existed: true, content: []byte("original"), mode: 0o600},
+			{path: filepath.Join(blocker, "nested", "asset"), existed: true},
+		})
+	})
+	assert.Contains(t, output, "Unable to restore package asset "+nonemptyDir)
+	assert.Contains(t, output, "Unable to restore package asset "+filepath.Join(blocker, "nested", "asset"))
+	assert.Contains(t, output, "Unable to remove package asset "+nonemptyDir)
+	content, err := os.ReadFile(restored)
+	require.NoError(t, err)
+	assert.Equal(t, "original", string(content))
+}
+
 func TestUpdateManifestManagedWorkflowConflictHandling(t *testing.T) {
 	originalDownload := downloadWorkflowContentFn
 	t.Cleanup(func() { downloadWorkflowContentFn = originalDownload })
@@ -501,7 +526,7 @@ func TestUpdateManifestManagedWorkflowConflictHandling(t *testing.T) {
 				return
 			}
 
-			require.NoError(t, err, "frontmatter conflict markers should not be parsed as YAML")
+			require.ErrorIs(t, err, errManifestWorkflowConflictSkipped)
 			assert.Contains(t, string(updated), "<<<<<<< current (local changes)")
 			assert.Contains(t, string(updated), "source: owner/repo@v2.0.0")
 		})
@@ -579,7 +604,9 @@ func TestUpdateManifestWorkflowGroup_ConflictSkipNotReportedAsUpdated(t *testing
 		DisableSecurityScanner: true,
 	})
 
-	require.Empty(t, failures)
+	require.Len(t, failures, 1)
+	assert.Equal(t, "conflict", failures[0].Name)
+	assert.Contains(t, failures[0].Error, "conflicts")
 	assert.Empty(t, successes)
 	updated, err := os.ReadFile(workflowPath)
 	require.NoError(t, err)

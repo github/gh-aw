@@ -290,7 +290,9 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	updateLog.Print("Updating container image digest pins")
 	newContainerPins := false
 	var err error
-	if conflictedWorkflow, scanErr := findWorkflowWithMergeConflictMarkers(opts.WorkflowsDir); scanErr == nil && conflictedWorkflow != "" {
+	if conflictedWorkflow, scanErr := findWorkflowWithMergeConflictMarkers(opts.WorkflowsDir); scanErr != nil {
+		firstErr = errors.Join(firstErr, fmt.Errorf("unable to scan workflows for merge conflicts: %w", scanErr))
+	} else if conflictedWorkflow != "" {
 		message := "Skipping container pin updates and recompilation because merge conflict markers are present in " + conflictedWorkflow
 		updateLog.Print(message)
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))

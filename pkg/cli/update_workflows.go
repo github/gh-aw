@@ -210,6 +210,10 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { /
 	// Show summary
 	showUpdateSummary(successfulUpdates, failedUpdates, opts.NoCompile)
 
+	if len(failedUpdates) > 0 && !allFailuresAreRateLimited(failedUpdates) {
+		return fmt.Errorf("%d workflow(s) failed to update; review the errors above", len(failedUpdates))
+	}
+
 	if len(successfulUpdates) == 0 {
 		// If all failures were due to GitHub API rate limiting, treat as non-fatal.
 		// Rate limiting is a transient infrastructure condition, not a code error.
@@ -669,7 +673,7 @@ func resolveLatestReleaseWithResult(ctx context.Context, deps workflowUpdateDeps
 	if trimmedReleases == "" {
 		return latestRefResolution{}, errors.New("no releases found")
 	}
-	releases := strings.Split(trimmedReleases, "\n")
+	releases := strings.Fields(trimmedReleases)
 
 	// Parse current version
 	currentVer := parseVersion(currentRef)
@@ -987,6 +991,10 @@ func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWork
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Security scanning disabled"))
 	}
 
+	if hasConflicts && !opts.NoCompile {
+		return fmt.Errorf("could not update %s due to merge conflicts; existing workflow left unchanged; resolve local and upstream changes before retrying", wf.Name)
+	}
+
 	// Preserve the pre-update content so it can be restored if the newly
 	// fetched content fails to compile. Without this, a broken upstream
 	// change (e.g. a dispatch-workflow target that doesn't exist locally)
@@ -1002,8 +1010,7 @@ func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWork
 	}
 
 	if hasConflicts {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Updated %s from %s to %s with CONFLICTS - please review and resolve manually", wf.Name, shortRef(currentRef), shortRef(latestRef))))
-		return nil // Not an error, but user needs to resolve conflicts
+		return fmt.Errorf("updated %s from %s to %s with merge conflicts; resolve the conflict markers before compiling", wf.Name, shortRef(currentRef), shortRef(latestRef))
 	}
 
 	updateLog.Printf("Successfully updated workflow %s from %s to %s", wf.Name, currentRef, latestRef)
