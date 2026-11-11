@@ -7,7 +7,7 @@ sidebar:
 
 # Model Alias Format Specification
 
-**Version**: 1.3.0\
+**Version**: 1.3.1\
 **Status**: Draft  
 **Publication Date**: 2026-05-03  
 **Editor**: GitHub Agentic Workflows Team  
@@ -605,7 +605,7 @@ A router value is accepted only as the main agent's model (top-level `model`, `e
 
 - any other identifier in the reserved namespace (for example `router/fast` or `router/Economy`), listing the valid router values;
 - router values with parameters, such as `router/economy?effort=high`;
-- a `models:` alias named `router`, and router values in alias entries, `models.allowed`, `models.blocked`, or `engine.fallback-models`;
+- a `models:` alias named `router`, and router values in alias entries, `models.allowed`, `models.blocked`, `engine.model-routing.allowed-models`, or `engine.fallback-models`;
 - router values for sub-agents, threat detection, evals, or other jobs;
 - a router value combined with `engine.model-routing` or `engine.fallback-models`.
 
@@ -1020,6 +1020,10 @@ Model parameters are compile-time configuration values and are not derived from 
 ---
 
 ## Change Log
+
+### Version 1.3.1 (Draft)
+
+- **Fixed**: §9.4 explicitly includes `engine.model-routing.allowed-models` among model lists that MUST reject reserved router values.
 
 ### Version 1.3.0 (Draft)
 
