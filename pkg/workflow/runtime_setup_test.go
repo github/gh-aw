@@ -583,7 +583,7 @@ func TestNodeSetupSteps_ActionPins(t *testing.T) {
 			data.Runtimes = map[string]any{"node": map[string]any{"version": "22"}}
 			steps := buildStandardNpmEngineInstallSteps("test-cli", "1.0.0", "Install CLI", "test-cli", data, true)
 			require.NotEmpty(t, steps)
-			assert.Contains(t, steps[0], "          node-version: '"+string(constants.DefaultNodeVersion)+"'")
+			assert.Contains(t, steps[0], "          node-version: '22'")
 			return steps[0]
 		}},
 		{name: "existing installation step", generate: func(data *WorkflowData) GitHubActionStep {

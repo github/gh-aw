@@ -471,6 +471,10 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			agentStep := strings.Join(generateNodeJsSetupStep(tt.data), "\n")
+			if !strings.Contains(agentStep, "node-version: '"+tt.version+"'") {
+				t.Errorf("expected Node version %q in agent setup step:\n%s", tt.version, agentStep)
+			}
 			step := strings.Join(generateNodeJsSetupStepForWorkflow(tt.data), "\n")
 			if !strings.Contains(step, tt.expectedUses) {
 				t.Errorf("expected %q in step:\n%s", tt.expectedUses, step)
@@ -505,7 +509,9 @@ func TestRewriteNodeSetupStepSafelySerializesNodeVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			step := rewriteNodeSetupStep(GenerateNodeJsSetupStep(), "", tt.version)
+			step := generateNodeJsSetupStep(&WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"version": tt.version},
+			}})
 			var workflow struct {
 				Steps []struct {
 					Name string         `yaml:"name"`

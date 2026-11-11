@@ -30,13 +30,14 @@ func GenerateNodeJsSetupStep() GitHubActionStep {
 }
 
 func generateNodeJsSetupStep(data *WorkflowData) GitHubActionStep {
-	return GitHubActionStep{
+	step := GitHubActionStep{
 		"      - name: Setup Node.js",
 		"        uses: " + getActionPinForData("actions/setup-node", data),
 		"        with:",
 		fmt.Sprintf("          node-version: '%s'", constants.DefaultNodeVersion),
 		"          package-manager-cache: false",
 	}
+	return rewriteNodeSetupStep(step, "", resolveNodeSetupVersion(data))
 }
 
 // resolveNodeSetupActionOverride returns the runtimes.node.action-repo and
