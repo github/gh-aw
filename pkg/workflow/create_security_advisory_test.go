@@ -26,8 +26,8 @@ func TestCreateSecurityAdvisoryAuthentication(t *testing.T) {
 		{name: "missing credentials", wantError: true},
 		{name: "handler PAT", handler: BaseSafeOutputConfig{GitHubToken: "${{ secrets.ADVISORY_TOKEN }}"}, wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "global PAT", globalToken: "${{ secrets.GLOBAL_TOKEN }}", wantToken: "${{ secrets.GLOBAL_TOKEN }}"},
-		{name: "handler App", handler: BaseSafeOutputConfig{GitHubApp: app}, wantToken: "${{ steps.create-security-advisory-app-token.outputs.token }}"},
-		{name: "global App", globalApp: app, wantToken: "${{ steps.safe-outputs-app-token.outputs.token }}"},
+		{name: "handler App", handler: BaseSafeOutputConfig{GitHubApp: app}, wantError: true},
+		{name: "global App", globalApp: app, wantError: true},
 		{name: "handler overrides global", handler: BaseSafeOutputConfig{GitHubToken: "${{ secrets.ADVISORY_TOKEN }}"}, globalApp: app, wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "Actions token", handler: BaseSafeOutputConfig{GitHubToken: "${{ github.token }}"}, wantError: true},
 		{name: "Actions secret", globalToken: "${{ secrets.GITHUB_TOKEN }}", wantError: true},
@@ -45,7 +45,7 @@ func TestCreateSecurityAdvisoryAuthentication(t *testing.T) {
 			}
 			err := validateSafeOutputsCreateSecurityAdvisory(config)
 			if tt.wantError {
-				require.ErrorContains(t, err, "requires an external github-token or github-app")
+				require.ErrorContains(t, err, "requires an external github-token")
 				return
 			}
 			require.NoError(t, err)
@@ -64,14 +64,13 @@ func TestCreateSecurityAdvisoryCompile(t *testing.T) {
 		config    string
 		wantError string
 		wantToken string
-		appStep   string
 	}{
-		{name: "requires credentials", config: "  create-security-advisory:\n", wantError: "requires an external github-token or github-app"},
+		{name: "requires credentials", config: "  create-security-advisory:\n", wantError: "requires an external github-token"},
 		{name: "rejects Actions token", config: "  create-security-advisory:\n    github-token: ${{ secrets.GITHUB_TOKEN }}\n", wantError: "requires an external"},
 		{name: "handler token", config: "  create-security-advisory:\n    max: 2\n    github-token: ${{ secrets.ADVISORY_TOKEN }}\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "global token", config: "  github-token: ${{ secrets.ADVISORY_TOKEN }}\n  create-security-advisory:\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
-		{name: "handler App", config: "  create-security-advisory:\n    github-app:\n      client-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_KEY }}\n", wantToken: "${{ steps.create-security-advisory-app-token.outputs.token }}", appStep: "create-security-advisory-app-token"},
-		{name: "global App", config: "  github-app:\n    client-id: ${{ vars.APP_ID }}\n    private-key: ${{ secrets.APP_KEY }}\n  create-security-advisory:\n", wantToken: "${{ steps.safe-outputs-app-token.outputs.token }}", appStep: "safe-outputs-app-token"},
+		{name: "handler App", config: "  create-security-advisory:\n    github-app:\n      client-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_KEY }}\n", wantError: "GitHub App authentication is unsupported"},
+		{name: "global App", config: "  github-app:\n    client-id: ${{ vars.APP_ID }}\n    private-key: ${{ secrets.APP_KEY }}\n  create-security-advisory:\n", wantError: "GitHub App authentication is unsupported"},
 		{name: "staged without credentials", config: "  create-security-advisory:\n    staged: true\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -103,14 +102,7 @@ func TestCreateSecurityAdvisoryCompile(t *testing.T) {
 			if tt.wantToken != "" {
 				assert.Equal(t, tt.wantToken, handlerRegistry["create_security_advisory"](data.SafeOutputs)["github-token"])
 			}
-			if tt.appStep != "" {
-				step := compiledLastStepBlockForTest(compiled, tt.appStep)
-				require.NotEmpty(t, step)
-				assert.Contains(t, step, "permission-repository-advisories: write")
-				assert.NotContains(t, step, "permission-contents: write")
-			} else {
-				assert.NotContains(t, compiled, "permission-repository-advisories:")
-			}
+			assert.NotContains(t, compiled, "permission-repository-advisories:")
 		})
 	}
 }

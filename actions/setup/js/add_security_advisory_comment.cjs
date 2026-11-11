@@ -15,11 +15,14 @@ const GHSA_ID_PATTERN = /^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/;
 /** @type {import('./types/handler-factory').HandlerFactoryFunction} */
 async function main(config = {}) {
   const staged = isStagedMode(config);
+  const max = Number(config.max ?? 1);
+  if (!Number.isSafeInteger(max) || max < 1) {
+    throw new Error(`${ERR_CONFIG}: add_security_advisory_comment max must be a positive integer`);
+  }
   if (!staged && (typeof config["github-token"] !== "string" || !config["github-token"].trim())) {
-    throw new Error(`${ERR_CONFIG}: add_security_advisory_comment requires an external github-token or GitHub App token with Repository security advisories write permission; GITHUB_TOKEN is not supported`);
+    throw new Error(`${ERR_CONFIG}: add_security_advisory_comment requires an external github-token with Repository security advisories write permission; GITHUB_TOKEN is not supported`);
   }
   const githubClient = staged ? null : await createAuthenticatedGitHubClient(config);
-  const max = config.max === -1 ? Infinity : (config.max ?? 1);
   let processedCount = 0;
 
   return async function handleAddSecurityAdvisoryComment(message) {
@@ -33,6 +36,9 @@ async function main(config = {}) {
     if (!sanitizedBody.trim()) {
       throw new Error(`${ERR_VALIDATION}: add_security_advisory_comment body is empty after sanitization`);
     }
+    if (processedCount >= max) {
+      return { success: false, skipped: true, reasonCode: "MAX_COUNT_REACHED", error: `Max count of ${max} reached` };
+    }
     const report = buildIssueBodyReport("Security advisory comment", sanitizedBody, {
       repo: context.repo,
       footer: parseBoolTemplatable(config.footer, true),
@@ -41,14 +47,12 @@ async function main(config = {}) {
       workflowIdMarker: false,
     });
     const { body } = renderSizedReport(report, 65000);
-    if (processedCount >= max) {
-      return { success: false, skipped: true, reasonCode: "MAX_COUNT_REACHED", error: `Max count of ${max} reached` };
-    }
     if (staged) {
       processedCount++;
-      logStagedPreviewInfo("Would add a security advisory comment in the workflow repository (content omitted)");
+      logStagedPreviewInfo(`Would add a security advisory comment with request:\n${JSON.stringify({ ...context.repo, ghsa_id: message.ghsa_id, body }, null, 2)}`);
       return { success: true, staged: true };
     }
+    processedCount++;
     try {
       const { data } = await githubClient.request("POST /repos/{owner}/{repo}/security-advisories/{ghsa_id}/comments", {
         ...context.repo,
@@ -56,7 +60,6 @@ async function main(config = {}) {
         body,
         headers: { "X-GitHub-Api-Version": "2026-03-10" },
       });
-      processedCount++;
       if (!Number.isSafeInteger(data.id) || data.id <= 0 || typeof data.html_url !== "string") {
         throw new Error(`${ERR_API}: GitHub did not return a security advisory comment`);
       }

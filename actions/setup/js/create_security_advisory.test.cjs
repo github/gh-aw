@@ -27,28 +27,32 @@ describe("create_security_advisory", () => {
     const handler = await main(tokenConfig);
     expect(await handler(advisory)).toEqual({ success: true, ghsa_id: created.ghsa_id, url: created.html_url });
     expect(global.getOctokit).toHaveBeenCalledWith("external-token", expect.any(Object));
-    expect(createRepositoryAdvisory).toHaveBeenCalledWith({ owner: "owner", repo: "repo", ...advisory, start_private_fork: false });
+    expect(createRepositoryAdvisory).toHaveBeenCalledWith({ owner: "owner", repo: "repo", ...advisory, private_fork: false });
   });
 
   it("never forwards agent-supplied publication, fork, or repository controls", async () => {
     const handler = await main(tokenConfig);
     await handler({ ...advisory, type: "create_security_advisory", state: "published", start_private_fork: true, owner: "other", repo: "public-repo" });
-    expect(createRepositoryAdvisory).toHaveBeenCalledWith({ owner: "owner", repo: "repo", ...advisory, start_private_fork: false });
+    expect(createRepositoryAdvisory).toHaveBeenCalledWith({ owner: "owner", repo: "repo", ...advisory, private_fork: false });
   });
 
   it("rejects missing credentials rather than using the ambient Actions client", async () => {
-    await expect(main()).rejects.toThrow("requires an external github-token or GitHub App token");
+    await expect(main()).rejects.toThrow("requires an external github-token");
     await expect(main({ "github-token": " " })).rejects.toThrow("requires an external");
     expect(createRepositoryAdvisory).not.toHaveBeenCalled();
   });
 
-  it("previews without authentication, API calls, or advisory content in preview logs", async () => {
+  it("previews the complete sanitized request without credentials or API calls", async () => {
     const handler = await main({ staged: true });
     expect(await handler(advisory)).toEqual({ success: true, staged: true });
     expect(global.getOctokit).not.toHaveBeenCalled();
     expect(createRepositoryAdvisory).not.toHaveBeenCalled();
-    expect(JSON.stringify(global.core.info.mock.calls)).not.toContain(advisory.summary);
-    expect(JSON.stringify(global.core.info.mock.calls)).not.toContain(advisory.description);
+    const preview = JSON.stringify(global.core.info.mock.calls);
+    expect(preview).toContain(advisory.summary);
+    expect(preview).toContain(advisory.description);
+    expect(preview).toContain("private_fork");
+    expect(preview).toContain("owner");
+    expect(preview).not.toContain("external-token");
   });
 
   it("enforces max without creating another advisory", async () => {
@@ -58,11 +62,13 @@ describe("create_security_advisory", () => {
     expect(createRepositoryAdvisory).toHaveBeenCalledTimes(1);
   });
 
-  it("supports the standard unlimited max value from a runtime expression", async () => {
-    const handler = await main({ ...tokenConfig, max: -1 });
+  it("normalizes positive expression-valued max strings and rejects unlimited max", async () => {
+    const handler = await main({ ...tokenConfig, max: "2" });
     expect(await handler(advisory)).toMatchObject({ success: true });
     expect(await handler(advisory)).toMatchObject({ success: true });
+    expect(await handler(advisory)).toMatchObject({ skipped: true });
     expect(createRepositoryAdvisory).toHaveBeenCalledTimes(2);
+    await expect(main({ ...tokenConfig, max: "-1" })).rejects.toThrow("max must be a positive integer");
   });
 
   it("preserves summaries up to the advisory API limit rather than the issue-title limit", async () => {

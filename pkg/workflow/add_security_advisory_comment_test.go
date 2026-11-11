@@ -18,14 +18,13 @@ func TestAddSecurityAdvisoryCommentCompile(t *testing.T) {
 		config    string
 		wantError string
 		wantToken string
-		appStep   string
 	}{
-		{name: "requires credentials", config: "  add-security-advisory-comment:\n", wantError: "requires an external github-token or github-app"},
+		{name: "requires credentials", config: "  add-security-advisory-comment:\n", wantError: "requires an external github-token"},
 		{name: "rejects Actions token", config: "  add-security-advisory-comment:\n    github-token: ${{ secrets.GITHUB_TOKEN }}\n", wantError: "requires an external"},
 		{name: "handler token", config: "  add-security-advisory-comment:\n    max: 2\n    footer: false\n    github-token: ${{ secrets.ADVISORY_TOKEN }}\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
 		{name: "global token", config: "  github-token: ${{ secrets.ADVISORY_TOKEN }}\n  add-security-advisory-comment:\n", wantToken: "${{ secrets.ADVISORY_TOKEN }}"},
-		{name: "handler App", config: "  add-security-advisory-comment:\n    github-app:\n      client-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_KEY }}\n", wantToken: "${{ steps.add-security-advisory-comment-app-token.outputs.token }}", appStep: "add-security-advisory-comment-app-token"},
-		{name: "global App", config: "  github-app:\n    client-id: ${{ vars.APP_ID }}\n    private-key: ${{ secrets.APP_KEY }}\n  add-security-advisory-comment:\n", wantToken: "${{ steps.safe-outputs-app-token.outputs.token }}", appStep: "safe-outputs-app-token"},
+		{name: "handler App", config: "  add-security-advisory-comment:\n    github-app:\n      client-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_KEY }}\n", wantError: "GitHub App authentication is unsupported"},
+		{name: "global App", config: "  github-app:\n    client-id: ${{ vars.APP_ID }}\n    private-key: ${{ secrets.APP_KEY }}\n  add-security-advisory-comment:\n", wantError: "GitHub App authentication is unsupported"},
 		{name: "staged without credentials", config: "  add-security-advisory-comment:\n    staged: true\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -63,14 +62,7 @@ func TestAddSecurityAdvisoryCommentCompile(t *testing.T) {
 			compiled := string(lock)
 			assert.Contains(t, compiled, `"add_security_advisory_comment"`)
 			assert.NotContains(t, compiled, "      repository-advisories: write")
-			if tt.appStep != "" {
-				step := compiledLastStepBlockForTest(compiled, tt.appStep)
-				require.NotEmpty(t, step)
-				assert.Contains(t, step, "permission-repository-advisories: write")
-				assert.NotContains(t, step, "permission-contents: write")
-			} else {
-				assert.NotContains(t, compiled, "permission-repository-advisories:")
-			}
+			assert.NotContains(t, compiled, "permission-repository-advisories:")
 		})
 	}
 }

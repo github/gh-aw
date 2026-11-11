@@ -53,11 +53,14 @@ function advisoryPayload(message) {
 /** @type {import('./types/handler-factory').HandlerFactoryFunction} */
 async function main(config = {}) {
   const staged = isStagedMode(config);
+  const max = Number(config.max ?? 1);
+  if (!Number.isSafeInteger(max) || max < 1) {
+    throw new Error(`${ERR_CONFIG}: create_security_advisory max must be a positive integer`);
+  }
   if (!staged && (typeof config["github-token"] !== "string" || !config["github-token"].trim())) {
-    throw new Error(`${ERR_CONFIG}: create_security_advisory requires an external github-token or GitHub App token with Repository security advisories write permission; GITHUB_TOKEN is not supported`);
+    throw new Error(`${ERR_CONFIG}: create_security_advisory requires an external github-token with Repository security advisories write permission; GITHUB_TOKEN is not supported`);
   }
   const githubClient = staged ? null : await createAuthenticatedGitHubClient(config);
-  const max = config.max === -1 ? Infinity : (config.max ?? 1);
   let processedCount = 0;
 
   return async function handleCreateSecurityAdvisory(message) {
@@ -65,19 +68,16 @@ async function main(config = {}) {
     if (processedCount >= max) {
       return { success: false, skipped: true, reasonCode: "MAX_COUNT_REACHED", error: `Max count of ${max} reached` };
     }
+    const request = { ...context.repo, ...payload, private_fork: false };
     if (staged) {
       processedCount++;
-      logStagedPreviewInfo("Would create a draft security advisory in the workflow repository (content omitted)");
+      logStagedPreviewInfo(`Would create a draft security advisory with request:\n${JSON.stringify(request, null, 2)}`);
       return { success: true, staged: true };
     }
     try {
       // The create endpoint always creates a draft. Never forward state, repository,
       // or private-fork controls from the agent.
-      const { data } = await githubClient.rest.securityAdvisories.createRepositoryAdvisory({
-        ...context.repo,
-        ...payload,
-        start_private_fork: false,
-      });
+      const { data } = await githubClient.rest.securityAdvisories.createRepositoryAdvisory(request);
       processedCount++;
       if (data.state !== "draft" || typeof data.ghsa_id !== "string" || typeof data.html_url !== "string") {
         throw new Error(`${ERR_API}: GitHub did not return a draft security advisory`);
