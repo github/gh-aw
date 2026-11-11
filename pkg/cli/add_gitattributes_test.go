@@ -26,7 +26,7 @@ func TestAddCommandUpdatesGitAttributes(t *testing.T) {
 		{
 			name:        "adds_entry_by_default",
 			wantEntry:   true,
-			wantContent: stringPointer(constants.WorkflowsLockYmlGitAttributesEntry),
+			wantContent: new(constants.WorkflowsLockYmlGitAttributesEntry),
 		},
 		{
 			name:            "does_not_create_file_with_flag",
@@ -34,27 +34,27 @@ func TestAddCommandUpdatesGitAttributes(t *testing.T) {
 		},
 		{
 			name:            "preserves_existing_file_with_flag",
-			existing:        stringPointer("*.txt linguist-vendored=true\n"),
+			existing:        new("*.txt linguist-vendored=true\n"),
 			noGitattributes: true,
-			wantContent:     stringPointer("*.txt linguist-vendored=true\n"),
+			wantContent:     new("*.txt linguist-vendored=true\n"),
 		},
 		{
 			name:        "appends_entry_and_preserves_existing_lines",
-			existing:    stringPointer("*.txt linguist-vendored=true\n"),
+			existing:    new("*.txt linguist-vendored=true\n"),
 			wantEntry:   true,
-			wantContent: stringPointer("*.txt linguist-vendored=true\n\n" + constants.WorkflowsLockYmlGitAttributesEntry),
+			wantContent: new("*.txt linguist-vendored=true\n\n" + constants.WorkflowsLockYmlGitAttributesEntry),
 		},
 		{
 			name:        "does_not_duplicate_entry",
 			wantEntry:   true,
-			wantContent: stringPointer(constants.WorkflowsLockYmlGitAttributesEntry),
+			wantContent: new(constants.WorkflowsLockYmlGitAttributesEntry),
 			addTwice:    true,
 		},
 		{
 			name:        "replaces_legacy_entry",
-			existing:    stringPointer("*.txt linguist-vendored=true\n" + constants.WorkflowsLockYmlGitAttributesEntryLegacy + "\n"),
+			existing:    new("*.txt linguist-vendored=true\n" + constants.WorkflowsLockYmlGitAttributesEntryLegacy + "\n"),
 			wantEntry:   true,
-			wantContent: stringPointer("*.txt linguist-vendored=true\n" + constants.WorkflowsLockYmlGitAttributesEntry + "\n"),
+			wantContent: new("*.txt linguist-vendored=true\n" + constants.WorkflowsLockYmlGitAttributesEntry + "\n"),
 		},
 	}
 
@@ -134,8 +134,4 @@ func newTestResolvedWorkflow(content string) *ResolvedWorkflow {
 			SourcePath: "./test.md",
 		},
 	}
-}
-
-func stringPointer(value string) *string {
-	return &value
 }
