@@ -1,12 +1,12 @@
 package parser
 
 import (
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/jsonutil"
 )
 
 func (acc *importAccumulator) extractCheckoutField(fm map[string]any, fullPath string) {
@@ -40,7 +40,7 @@ func (acc *importAccumulator) extractStepAndJobFields(fm map[string]any, importP
 	envContent, err := extractFieldJSONFromMap(fm, "env", "{}")
 	if err == nil && envContent != "" && envContent != "{}" {
 		var envMap map[string]any
-		if jsonErr := json.Unmarshal([]byte(envContent), &envMap); jsonErr == nil {
+		if jsonErr := jsonutil.UnmarshalString(envContent, &envMap); jsonErr == nil {
 			for key := range envMap {
 				if existingSource, exists := acc.envSources[key]; exists {
 					return fmt.Errorf("env variable %q is defined in multiple imports: %q and %q; remove the duplicate definition from one of the imports, or move it to the main workflow to override imported values", key, existingSource, importPath)
@@ -99,7 +99,7 @@ func (acc *importAccumulator) appendFeaturesField(fm map[string]any) {
 		return
 	}
 	var featuresMap map[string]any
-	if jsonErr := json.Unmarshal([]byte(featuresContent), &featuresMap); jsonErr == nil {
+	if jsonErr := jsonutil.UnmarshalString(featuresContent, &featuresMap); jsonErr == nil {
 		acc.features = append(acc.features, featuresMap)
 		parserLog.Printf("Extracted features from import: %d entries", len(featuresMap))
 	}
