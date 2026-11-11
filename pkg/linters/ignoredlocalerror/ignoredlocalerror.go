@@ -51,9 +51,9 @@ func analyzeStmt(pass *analysis.Pass, node ast.Node, generatedFiles filecheck.Ge
 			}
 		}
 	case *ast.ValueSpec:
-		lhs := make([]ast.Expr, len(stmt.Names))
-		for i, name := range stmt.Names {
-			lhs[i] = name
+		lhs := make([]ast.Expr, 0, len(stmt.Names))
+		for _, name := range stmt.Names {
+			lhs = append(lhs, name)
 		}
 		for i, rhs := range stmt.Values {
 			call, ok := astutil.UnwrapParenExpr(rhs).(*ast.CallExpr)
