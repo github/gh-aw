@@ -100,6 +100,11 @@ function writeEntries(entries) {
   fs.writeFileSync(cachePath, entries.map(entry => JSON.stringify(entry)).join("\n"));
 }
 
+function emptyHistoryDiagnostics() {
+  const prefix = "[daily-workflow-aic] Empty history check: ";
+  return global.core.info.mock.calls.filter(([message]) => message.startsWith(prefix)).map(([message]) => JSON.parse(message.slice(prefix.length)));
+}
+
 describe("empty daily AIC history", () => {
   it.each(["restored observations", "unfiltered history"])("fails activation with unknown usage when %s contradict an empty listing", async evidence => {
     const f = fixture([]);
@@ -125,6 +130,7 @@ describe("empty daily AIC history", () => {
     writeEntries([scanCacheEntry(run(1), 0, repository, 7, now)]);
     await expect(scanDailyAIC(f)).rejects.toThrow("Empty daily AIC workflow history");
     expect(f.getRunAIC).not.toHaveBeenCalled();
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode, outcome: "contradictory_observations", observedRuns: 1, pagesAttempted: 0, runsReturned: 0, responsesObserved: 0 }]);
   });
 
   it.each([time, new Date(now - 86400000).toISOString(), new Date(now + 1).toISOString()])("rejects an empty completed listing contradicted by unfiltered workflow history at %s", async created_at => {
@@ -151,6 +157,7 @@ describe("empty daily AIC history", () => {
     await expect(scanDailyAIC(f)).rejects.toThrow("Empty daily AIC workflow history");
 
     expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenCalledTimes(2);
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode: "workflow_id", outcome: "contradictory_history", observedRuns: 0, pagesAttempted: 2, runsReturned: 101, responsesObserved: 2 }]);
     expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenNthCalledWith(2, {
       owner: "example",
       repo: "project",
@@ -168,6 +175,7 @@ describe("empty daily AIC history", () => {
     await expect(scanDailyAIC(f)).rejects.toThrow("exceeds the complete pagination window");
 
     expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenCalledTimes(10);
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode: "workflow_id", outcome: "pagination_limit", observedRuns: 0, pagesAttempted: 10, runsReturned: 1000, responsesObserved: 10 }]);
   });
 
   it("checks unfiltered repository history when workflow-ID lookup falls back", async () => {
@@ -192,6 +200,7 @@ describe("empty daily AIC history", () => {
     f.github.rest.actions.listWorkflowRunsForRepo = vi.fn(async () => response({ workflow_runs: [run(1, { workflow_id: 8 })] }));
 
     expect(await scanDailyAIC(f)).toMatchObject({ countedRuns: [], candidateRunsCount: 0 });
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode: "repo_workflow_id_fallback", outcome: "verified_empty", observedRuns: 0, pagesAttempted: 1, runsReturned: 1, responsesObserved: 1 }]);
   });
 
   it.each([[], [run(99)], [run(1, { status: "in_progress" })], [run(1, { status: "queued" })], [run(1, { created_at: new Date(now - 86400001).toISOString() })]].map(runs => [runs]))(
@@ -235,6 +244,7 @@ describe("empty daily AIC history", () => {
     const f = fixture([]);
     f.github.rest.actions.listWorkflowRuns = vi.fn(async () => response({ workflow_runs }));
     await expect(scanDailyAIC(f)).rejects.toThrow("Incomplete daily AIC workflow history");
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode: "workflow_id", outcome: "invalid_history", observedRuns: 0, pagesAttempted: 1, runsReturned: 0, responsesObserved: 1 }]);
   });
 
   it("rejects completed runs with unknown creation times in unfiltered history", async () => {
@@ -245,10 +255,22 @@ describe("empty daily AIC history", () => {
 
   it("propagates failure of the unfiltered history check", async () => {
     const f = fixture([]);
-    const error = apiError(403, {}, "Resource not accessible by integration");
+    const error = apiError(403, {}, "private response content");
     f.github.rest.actions.listWorkflowRuns = vi.fn().mockRejectedValue(error);
     await expect(scanDailyAIC(f)).rejects.toBe(error);
     expect(f.getRunAIC).not.toHaveBeenCalled();
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode: "workflow_id", outcome: "request_failed", observedRuns: 0, pagesAttempted: 1, runsReturned: 0, responsesObserved: 1 }]);
+    expect(JSON.stringify(emptyHistoryDiagnostics())).not.toContain("private response content");
+  });
+
+  it("counts retry responses without counting another page", async () => {
+    vi.useFakeTimers();
+    const f = fixture([]);
+    f.github.rest.actions.listWorkflowRuns.mockResolvedValueOnce({ status: 503, headers: {}, data: {} }).mockResolvedValueOnce(response({ workflow_runs: [] }));
+    const scan = scanDailyAIC(f);
+    await vi.runAllTimersAsync();
+    await expect(scan).resolves.toMatchObject({ countedRuns: [] });
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode: "workflow_id", outcome: "verified_empty", observedRuns: 0, pagesAttempted: 1, runsReturned: 0, responsesObserved: 2 }]);
   });
 
   it("does not mistake a filtered repository page for an empty source page", async () => {
@@ -256,6 +278,15 @@ describe("empty daily AIC history", () => {
     f.pageRead.mockResolvedValue({ response: response({ workflow_runs: [] }), sourceRunCount: 1, lookupMode: "repo_workflow_id_fallback" });
     writeEntries([scanCacheEntry(run(1), 10, repository, 7, now)]);
     expect(await scanDailyAIC(f)).toMatchObject({ countedRuns: [], candidateRunsCount: 0 });
+    expect(emptyHistoryDiagnostics()).toEqual([]);
+  });
+
+  it("does not include response fields in empty-history diagnostics", async () => {
+    const f = fixture([]);
+    f.github.rest.actions.listWorkflowRuns.mockResolvedValue(response({ workflow_runs: [run(1, { status: "queued", name: "private workflow data" })] }));
+    expect(await scanDailyAIC(f)).toMatchObject({ countedRuns: [] });
+    expect(emptyHistoryDiagnostics()).toEqual([{ lookupMode: "workflow_id", outcome: "verified_empty", observedRuns: 0, pagesAttempted: 1, runsReturned: 1, responsesObserved: 1 }]);
+    expect(JSON.stringify(emptyHistoryDiagnostics())).not.toContain("private workflow data");
   });
 });
 
