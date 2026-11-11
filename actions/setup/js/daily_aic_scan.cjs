@@ -7,6 +7,8 @@ const { API_READ_OPERATIONS, getErrorStatus, isQuotaError, isTransientError, saf
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_PAGES = 25;
+const MAX_UNFILTERED_HISTORY_PAGES = 10;
+const UNFILTERED_HISTORY_PAGE_SIZE = 100;
 
 /**
  * The run listing is authoritative for window membership and attempt identity.
@@ -62,17 +64,56 @@ async function scanDailyAICOnce({ github, context, budget, artifactClient, getRu
       const inWindow = timestamp => {
         const createdAt = Date.parse(timestamp);
         if (!Number.isFinite(createdAt)) throw new Error("A workflow run has an unknown creation time");
-        return createdAt >= now - WINDOW_MS && createdAt <= now;
+        return createdAt >= now - WINDOW_MS;
       };
       const observedRuns = [...entries.values()].filter(entry => entry.run_id !== context.runId && inWindow(entry.created_at)).length;
       if (observedRuns > 0) throw new Error(`Empty daily AIC workflow history contradicts ${observedRuns} restored observations in the inspection window`);
-      if (lookupMode === "workflow_id") {
-        const unfiltered = await budget.request(() => github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: current.workflow_id, per_page: 10, page: 1 }), true, API_READ_OPERATIONS.WORKFLOW_HISTORY);
+      let historyComplete = false;
+      for (let historyPage = 1; historyPage <= MAX_UNFILTERED_HISTORY_PAGES; historyPage++) {
+        const isWorkflowLookup = lookupMode === "workflow_id";
+        const unfiltered = await budget.request(
+          () =>
+            isWorkflowLookup
+              ? github.rest.actions.listWorkflowRuns({
+                  owner,
+                  repo,
+                  workflow_id: current.workflow_id,
+                  created,
+                  per_page: UNFILTERED_HISTORY_PAGE_SIZE,
+                  page: historyPage,
+                })
+              : github.rest.actions.listWorkflowRunsForRepo({
+                  owner,
+                  repo,
+                  created,
+                  per_page: UNFILTERED_HISTORY_PAGE_SIZE,
+                  page: historyPage,
+                }),
+          true,
+          isWorkflowLookup ? API_READ_OPERATIONS.WORKFLOW_HISTORY : API_READ_OPERATIONS.REPOSITORY_HISTORY
+        );
         const runs = unfiltered.data?.workflow_runs;
         if (!Array.isArray(runs)) throw new Error("Incomplete daily AIC workflow history");
-        const completedRuns = runs.filter(run => run.id !== context.runId && run.status === "completed" && inWindow(run.created_at)).length;
-        if (completedRuns > 0) throw new Error(`Empty daily AIC workflow history contradicts ${completedRuns} completed runs in the inspection window`);
+        for (const run of runs) {
+          if (!isWorkflowLookup && (!Number.isSafeInteger(run?.workflow_id) || run.workflow_id <= 0)) {
+            throw new Error("Incomplete daily AIC repository workflow history");
+          }
+          if (run.workflow_id != null && run.workflow_id !== current.workflow_id) continue;
+          if (run.id === context.runId) continue;
+          if (!inWindow(run.created_at)) {
+            historyComplete = true;
+            break;
+          }
+          if (run.status === "completed") {
+            throw new Error("Empty daily AIC workflow history contradicts a completed run in the inspection window");
+          }
+        }
+        if (historyComplete || runs.length < UNFILTERED_HISTORY_PAGE_SIZE) {
+          historyComplete = true;
+          break;
+        }
       }
+      if (!historyComplete) throw new Error("Unfiltered daily AIC workflow history exceeds the complete pagination window");
     }
     for (const run of pageRuns) {
       if (!Number.isSafeInteger(run?.id) || run.id <= 0) throw new Error("A workflow run has an invalid identity");

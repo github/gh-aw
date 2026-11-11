@@ -252,8 +252,8 @@ describe("check_daily_aic_workflow_guardrail", () => {
   });
 
   it("caps inspection when GitHub API rate limit headroom is low", () => {
-    expect(exports.computeMaxInspectableRuns(110)).toBe(0);
-    expect(exports.computeMaxInspectableRuns(120)).toBeGreaterThan(0);
+    expect(exports.computeMaxInspectableRuns(124)).toBe(0);
+    expect(exports.computeMaxInspectableRuns(126)).toBe(1);
   });
 
   it("formats structured daily AI Credits log messages", () => {
@@ -1426,7 +1426,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       await expect(runMain()).resolves.toBeUndefined();
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
-      expect(listWorkflowRunsForRepoCalls).toBe(1);
+      expect(listWorkflowRunsForRepoCalls).toBe(2);
     } finally {
       delete global.core;
       delete global.github;

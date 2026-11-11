@@ -127,7 +127,7 @@ describe("empty daily AIC history", () => {
     expect(f.getRunAIC).not.toHaveBeenCalled();
   });
 
-  it.each([time, new Date(now - 86400000).toISOString()])("rejects an empty completed listing contradicted by unfiltered workflow history at %s", async created_at => {
+  it.each([time, new Date(now - 86400000).toISOString(), new Date(now + 1).toISOString()])("rejects an empty completed listing contradicted by unfiltered workflow history at %s", async created_at => {
     const f = fixture([]);
     f.github.rest.actions.listWorkflowRuns = vi.fn(async () => response({ workflow_runs: [run(1, { created_at })] }));
     await expect(scanDailyAIC(f)).rejects.toThrow("Empty daily AIC workflow history");
@@ -135,27 +135,100 @@ describe("empty daily AIC history", () => {
       owner: "example",
       repo: "project",
       workflow_id: 7,
-      per_page: 10,
+      created: `>=${new Date(now - 86400000).toISOString()}`,
+      per_page: 100,
       page: 1,
     });
     expect(f.budget.snapshot().requests).toBe(3);
     expect(f.getRunAIC).not.toHaveBeenCalled();
   });
 
-  it.each(
-    [[], [run(99)], [run(1, { status: "in_progress" })], [run(1, { status: "queued" })], [run(1, { created_at: new Date(now - 86400001).toISOString() })], [run(1, { created_at: new Date(now + 1).toISOString() })]].map(runs => [runs])
-  )("allows zero usage with no other completed run in the window (%j)", async runs => {
+  it("pages through unfiltered runs to find an in-window completed run", async () => {
     const f = fixture([]);
-    f.github.rest.actions.listWorkflowRuns = vi.fn(async () => response({ workflow_runs: runs }));
-    writeEntries([
-      scanCacheEntry(run(1, { created_at: new Date(now - 86400001).toISOString() }), 10, repository, 7, now),
-      scanCacheEntry(run(2), 10, repository, 8, now),
-      scanCacheEntry(run(3), 10, "other/project", 7, now),
-      scanCacheEntry(run(99), 10, repository, 7, now),
-    ]);
+    const queuedRuns = Array.from({ length: 100 }, (_, index) => run(index + 1, { status: "queued" }));
+    f.github.rest.actions.listWorkflowRuns.mockImplementation(async ({ page }) => response({ workflow_runs: page === 1 ? queuedRuns : [run(101)] }));
+
+    await expect(scanDailyAIC(f)).rejects.toThrow("Empty daily AIC workflow history");
+
+    expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenCalledTimes(2);
+    expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenNthCalledWith(2, {
+      owner: "example",
+      repo: "project",
+      workflow_id: 7,
+      created: `>=${new Date(now - 86400000).toISOString()}`,
+      per_page: 100,
+      page: 2,
+    });
+  });
+
+  it("fails closed when unfiltered history exceeds its pagination limit", async () => {
+    const f = fixture([]);
+    f.github.rest.actions.listWorkflowRuns.mockResolvedValue(response({ workflow_runs: Array.from({ length: 100 }, (_, index) => run(index + 1, { status: "queued" })) }));
+
+    await expect(scanDailyAIC(f)).rejects.toThrow("exceeds the complete pagination window");
+
+    expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenCalledTimes(10);
+  });
+
+  it("checks unfiltered repository history when workflow-ID lookup falls back", async () => {
+    const f = fixture([]);
+    f.pageRead.mockResolvedValue({ response: response({ workflow_runs: [] }), sourceRunCount: 0, lookupMode: "repo_workflow_id_fallback" });
+    f.github.rest.actions.listWorkflowRunsForRepo = vi.fn(async () => response({ workflow_runs: [run(1)] }));
+
+    await expect(scanDailyAIC(f)).rejects.toThrow("Empty daily AIC workflow history");
+
+    expect(f.github.rest.actions.listWorkflowRunsForRepo).toHaveBeenCalledExactlyOnceWith({
+      owner: "example",
+      repo: "project",
+      created: `>=${new Date(now - 86400000).toISOString()}`,
+      per_page: 100,
+      page: 1,
+    });
+  });
+
+  it("ignores other workflows when checking unfiltered repository history", async () => {
+    const f = fixture([]);
+    f.pageRead.mockResolvedValue({ response: response({ workflow_runs: [] }), sourceRunCount: 0, lookupMode: "repo_workflow_id_fallback" });
+    f.github.rest.actions.listWorkflowRunsForRepo = vi.fn(async () => response({ workflow_runs: [run(1, { workflow_id: 8 })] }));
+
     expect(await scanDailyAIC(f)).toMatchObject({ countedRuns: [], candidateRunsCount: 0 });
-    expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenCalledOnce();
-    expect(f.getRunAIC).not.toHaveBeenCalled();
+  });
+
+  it.each([[], [run(99)], [run(1, { status: "in_progress" })], [run(1, { status: "queued" })], [run(1, { created_at: new Date(now - 86400001).toISOString() })]].map(runs => [runs]))(
+    "allows zero usage with no other completed run in the window (%j)",
+    async runs => {
+      const f = fixture([]);
+      f.github.rest.actions.listWorkflowRuns = vi.fn(async () => response({ workflow_runs: runs }));
+      writeEntries([
+        scanCacheEntry(run(1, { created_at: new Date(now - 86400001).toISOString() }), 10, repository, 7, now),
+        scanCacheEntry(run(2), 10, repository, 8, now),
+        scanCacheEntry(run(3), 10, "other/project", 7, now),
+        scanCacheEntry(run(99), 10, repository, 7, now),
+      ]);
+      expect(await scanDailyAIC(f)).toMatchObject({ countedRuns: [], candidateRunsCount: 0 });
+      expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenCalledOnce();
+      expect(f.getRunAIC).not.toHaveBeenCalled();
+    }
+  );
+
+  it("counts a completed run created exactly at the start of the inspection window", async () => {
+    const f = fixture([]);
+    f.github.rest.actions.listWorkflowRuns.mockResolvedValue(response({ workflow_runs: [run(1, { created_at: new Date(now - 86400000).toISOString() })] }));
+
+    await expect(scanDailyAIC(f)).rejects.toThrow("Empty daily AIC workflow history");
+  });
+
+  it.each(["workflow_id", "repo_workflow_id_fallback"])("validates current-run and status exclusions in %s mode", async lookupMode => {
+    const f = fixture([]);
+    f.pageRead.mockResolvedValue({ response: response({ workflow_runs: [] }), sourceRunCount: 0, lookupMode });
+    const runs = [run(99), run(1, { status: "in_progress" }), run(2, { status: "queued" })];
+    if (lookupMode === "workflow_id") {
+      f.github.rest.actions.listWorkflowRuns.mockResolvedValue(response({ workflow_runs: runs }));
+    } else {
+      f.github.rest.actions.listWorkflowRunsForRepo = vi.fn(async () => response({ workflow_runs: runs }));
+    }
+
+    expect(await scanDailyAIC(f)).toMatchObject({ countedRuns: [], candidateRunsCount: 0 });
   });
 
   it.each([undefined, null, "invalid"])("rejects malformed unfiltered history (%s)", async workflow_runs => {
