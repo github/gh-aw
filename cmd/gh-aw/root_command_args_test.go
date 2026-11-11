@@ -9,6 +9,12 @@ func TestRootCommandArgsUsesExtensionPrefixAndSuggestions(t *testing.T) {
 	if rootCmd.Args == nil {
 		t.Fatal("root command should validate unknown arguments")
 	}
+	if rootCmd.SuggestionsMinimumDistance != 2 {
+		t.Fatalf("expected root command suggestion distance 2, got %d", rootCmd.SuggestionsMinimumDistance)
+	}
+	if err := rootCmd.Args(rootCmd, nil); err != nil {
+		t.Fatalf("expected no error without arguments, got: %v", err)
+	}
 
 	err := rootCmd.Args(rootCmd, []string{"not-a-command"})
 	if err == nil || err.Error() != `unknown command "not-a-command" for "gh aw"` {
