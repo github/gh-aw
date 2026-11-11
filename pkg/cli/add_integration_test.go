@@ -630,8 +630,7 @@ Content.
 	assert.Contains(t, gitattributesStr, ".lock.yml", ".gitattributes should contain lock file pattern")
 }
 
-// TestAddWorkflowNoGitattributes tests that --no-gitattributes skips .gitattributes configuration in the add step
-// Note: The compile step may still create .gitattributes, so we check the verbose output instead
+// TestAddWorkflowNoGitattributes tests that --no-gitattributes skips .gitattributes configuration.
 func TestAddWorkflowNoGitattributes(t *testing.T) {
 	setup := setupAddIntegrationTest(t)
 	defer setup.cleanup()
@@ -671,6 +670,7 @@ Content.
 	// Note: The compile step may still create .gitattributes, but the add step should skip it
 	assert.NotContains(t, outputStr, "Configured .gitattributes",
 		"add step should NOT configure .gitattributes when --no-gitattributes is set")
+	require.NoFileExists(t, filepath.Join(setup.tempDir, ".gitattributes"))
 }
 
 // TestAddRemoteWorkflowWithVersion tests adding a remote workflow with a specific version tag

@@ -96,18 +96,18 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 	// .lock.yml. The dispatch-workflow validator requires every .md dispatch target to be
 	// compiled before the main workflow can be validated. With --force, always recompile
 	// to pick up freshly overwritten worker files.
-	compileDispatchWorkflowDependenciesWithActionRef(ctx, destFile, opts.Verbose, opts.Quiet, opts.EngineOverride, opts.GhAwRef, opts.Force, tracker)
+	compileDispatchWorkflowDependenciesWithActionRef(ctx, destFile, opts.Verbose, opts.Quiet, opts.EngineOverride, opts.GhAwRef, opts.Force, tracker, opts.NoGitattributes)
 	// Compile any call-workflow .md worker dependencies that were just fetched and lack a
 	// .lock.yml. Errors are propagated: a missing worker .lock.yml would leave the
 	// orchestrator referencing a non-existent file. With --force, always recompile to
 	// pick up freshly overwritten worker files.
-	if err := compileCallWorkflowDependenciesWithActionRef(ctx, destFile, opts.Verbose, opts.Quiet, opts.EngineOverride, opts.GhAwRef, opts.Force, tracker); err != nil {
+	if err := compileCallWorkflowDependenciesWithActionRef(ctx, destFile, opts.Verbose, opts.Quiet, opts.EngineOverride, opts.GhAwRef, opts.Force, tracker, opts.NoGitattributes); err != nil {
 		printCompilationError(err, opts.Quiet)
 		return
 	}
 	// Compile the workflow
 	if tracker != nil {
-		if err := compileWorkflowWithTrackingAndActionRef(ctx, destFile, opts.Verbose, opts.Quiet, opts.EngineOverride, opts.GhAwRef, tracker); err != nil {
+		if err := compileWorkflowWithTrackingAndActionRef(ctx, destFile, opts.Verbose, opts.Quiet, opts.EngineOverride, opts.GhAwRef, tracker, opts.NoGitattributes); err != nil {
 			printCompilationError(err, opts.Quiet)
 		}
 		return
