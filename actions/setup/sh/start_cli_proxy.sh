@@ -125,6 +125,13 @@ fi
 DOCKER_NETWORK_ARGS=(--network host)
 if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
   DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
+else
+  # shellcheck source=proxy_network_lib.sh
+  source "${SCRIPT_DIR}/proxy_network_lib.sh"
+  if ! install_cli_proxy_ingress_filter; then
+    echo "::error::Cannot restrict legacy CLI proxy ingress; refusing to expose its GitHub credential"
+    exit 1
+  fi
 fi
 
 PROXY_ENV_ARGS=()
