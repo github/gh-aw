@@ -9,11 +9,69 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
 )
+
+func TestConnectorPlanHumanReadable(t *testing.T) {
+	t.Parallel()
+	compiler, root := connectorCompiler(t)
+	specPath := filepath.Join(root, "spec.yaml")
+	spec, err := os.ReadFile(specPath)
+	require.NoError(t, err)
+	literal := "${{ secrets.DO_NOT_EVALUATE }} ${(() => { throw new Error('injected'); })()} `backticks`"
+	spec = []byte(strings.Replace(string(spec), "body: {input: text}", "body: {literal: "+strconv.Quote(literal)+"}", 1))
+	require.NoError(t, os.WriteFile(specPath, spec, 0600))
+	data, err := compiler.ParseWorkflowString(connectorWorkflow("    tools: [get-issue]\n    safe-outputs: [add-comment]\n"), filepath.Join(root, "readable.md"))
+	require.NoError(t, err)
+	config := data.Connectors["tracker"]
+	env, err := connectorEnv(config.Agent, config)
+	require.NoError(t, err)
+	snapshot, ok := env["GH_AW_CONNECTOR_PLAN"].(string)
+	require.True(t, ok)
+	require.True(t, json.Valid([]byte(snapshot)))
+	require.Contains(t, snapshot, "\n  \"spec\": {")
+	decoded, err := connectors.DecodePlan(snapshot)
+	require.NoError(t, err)
+	require.Equal(t, config.Agent.Digest, decoded.Digest)
+	script := generateSafeOutputScriptContent("tracker-add-comment", data.SafeOutputs.Scripts["tracker-add-comment"])
+	require.Contains(t, script, "GH_AW_CONNECTOR_PLAN: String.raw`{\n")
+	require.Contains(t, script, `"api": "https://api.example.com"`)
+	require.NotContains(t, script, literal)
+	require.NotContains(t, script, "${")
+	assets, err := filepath.Abs("../../actions/setup/js")
+	require.NoError(t, err)
+	options, err := json.Marshal(map[string]string{"source": script, "assets": assets, "literal": literal})
+	require.NoError(t, err)
+	node, err := exec.LookPath("node")
+	require.NoError(t, err)
+	driver := fmt.Sprintf(`
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const options = %s;
+const adaptedRequire = name => {
+  if (name === "node:child_process") return {spawnSync(_, args, execution) {
+    assert.equal(args.at(-1), "--stage");
+    const snapshot = require(path.join(options.assets, "connector_runtime.cjs")).decodePlan(execution.env.GH_AW_CONNECTOR_PLAN);
+    assert.equal(snapshot.spec.safeOutputs["add-comment"].request.body.body.literal, options.literal);
+    return {status:0, stdout:'{"staged":true}'};
+  }};
+  return name.startsWith("./") ? require(path.join(options.assets, name)) : require(name);
+};
+const module_ = {exports:{}};
+new Function("require", "module", "process", options.source)(adaptedRequire, module_, {env:{RUNNER_TEMP:"runner"}, execPath:process.execPath});
+(async () => {
+  const handler = await module_.exports.main({staged:true});
+  assert.equal((await handler({type:"tracker_add_comment", issue:"ISSUE-1", text:"body"}, {}, new Map())).staged, true);
+})().catch(error => {console.error(error); process.exitCode = 1;});
+`, options)
+	output, err := exec.CommandContext(t.Context(), node, "-e", driver).CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
 
 func TestConnectorContentCompilerDefaults(t *testing.T) {
 	t.Parallel()

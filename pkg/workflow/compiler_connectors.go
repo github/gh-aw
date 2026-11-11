@@ -23,7 +23,7 @@ func connectorMap(parent map[string]any, key string) map[string]any {
 }
 
 func connectorEnv(plan *connectors.Plan, config *WorkflowConnector) (map[string]any, error) {
-	encoded, err := plan.Encode()
+	encoded, err := plan.EncodeJSON()
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 				stripExpressionWrapper(connectorSecretExpression(config, secret)) + ") || '' }}"
 		}
 	}
-	encoded, err := config.SafeOutputs.Encode()
+	encoded, err := config.SafeOutputs.EncodeJSON()
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,8 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	script.WriteString("const { formatConnectorArguments } = require('./connector_content.cjs');\n")
 	fmt.Fprintf(&script, "const staged = %t || isStagedMode(typeof config === 'undefined' ? undefined : config);\n", staged) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("const input = Object.fromEntries(Object.entries(item).filter(([key]) => !['type', 'output_id', 'depends-on', 'depends_on'].includes(key)));\n")
-	fmt.Fprintf(&script, "const env = { GH_AW_CONNECTOR_PLAN: %q };\n", encoded) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	// Strip formatting newlines so generated JavaScript indentation cannot inflate the environment byte bound.
+	fmt.Fprintf(&script, "const env = { GH_AW_CONNECTOR_PLAN: String.raw`%s`.replace(/\\n[ \\t]*/g, '') };\n", encoded) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("const contentConfig = { ...(typeof connectorContentDefaults === 'undefined' ? {} : connectorContentDefaults), ...(typeof config === 'undefined' ? {} : config) };\n")
 	if binary {
 		script.WriteString("if (!staged) env.GH_AW_CONNECTOR_FILE_ROOT = join(process.env.RUNNER_TEMP, 'gh-aw', 'safeoutputs', 'upload-artifacts');\n")

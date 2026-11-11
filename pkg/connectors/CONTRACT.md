@@ -221,9 +221,12 @@ plan digest and validates arguments again. It does not record staged requests
 as successful mutations.
 
 `Plan.ForPhase` prunes unselected capabilities, endpoints, credentials and grants
-before distribution. `Plan.Encode` and `DecodePlan` carry content-addressed
-snapshots as base64 JSON, limited to 65,536 encoded bytes per phase. Base64 keeps
-definition data out of Actions expression evaluation. A digest is not a
+before distribution. `Plan.EncodeJSON` emits indented, human-reviewable JSON for
+`GH_AW_CONNECTOR_PLAN`, limited to 65,536 UTF-8 bytes per phase. JSON Unicode
+escapes protect expression openers and JavaScript template delimiters from
+evaluation. `DecodePlan` accepts these snapshots and the legacy base64 format
+emitted by `Plan.Encode`. Digest verification preserves field order and numeric
+tokens while normalizing JSON formatting and string escapes. A digest is not a
 signature: only the trusted compiler/lock file may supply runtime plans.
 
 `Plan.CallMCP` calls a real remote SDK endpoint under local tool/argument gates.

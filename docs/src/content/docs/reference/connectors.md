@@ -1203,8 +1203,11 @@ ingress, live mutation delivery or the quality of an agent-generated handoff.
 Compile a consuming workflow with `gh aw compile my-workflow --strict --no-emit`.
 Compilation makes no provider requests. It freezes selected definitions,
 resource grants, and phase-specific secret references into content-addressed
-plans; runtime hosts do not reload mutable configuration. Each encoded phase
-plan is limited to 65,536 bytes.
+plans; runtime hosts do not reload mutable configuration. `GH_AW_CONNECTOR_PLAN`
+contains indented, human-reviewable JSON, not base64. Expression openers and
+JavaScript template delimiters are escaped as JSON Unicode sequences so plan
+data cannot be evaluated as code. Each phase plan is limited to 65,536 UTF-8 bytes.
+Runtime readers retain support for legacy base64 snapshots in older locks.
 
 Safe-output handlers keep message metadata (`type`, `output_id`, `depends-on`,
 and its `depends_on` alias) outside connector arguments. Dependency scheduling

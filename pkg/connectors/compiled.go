@@ -13,7 +13,7 @@ import (
 )
 
 // MaxEncodedPlanBytes keeps a compiled plan below the per-environment-variable
-// limit on Linux runners. Base64 also prevents Actions expression evaluation.
+// limit on Linux runners.
 const MaxEncodedPlanBytes = 65536
 
 type compiledPlan struct {
@@ -23,8 +23,8 @@ type compiledPlan struct {
 	Binding    Binding       `json:"binding"`
 }
 
-// Encode freezes content into the lock file rather than loading mutable
-// repository definitions on the runner. It contains secret names, never values.
+// Encode retains the legacy base64 snapshot format for existing consumers.
+// New workflow environment variables use EncodeJSON for human review.
 func (p *Plan) Encode() (string, error) {
 	data, err := json.Marshal(compiledPlan{p.Digest, p.spec, p.connection, p.binding})
 	if err != nil {
@@ -37,15 +37,34 @@ func (p *Plan) Encode() (string, error) {
 	return encoded, nil
 }
 
+// EncodeJSON freezes a readable snapshot containing secret names, never values.
+// Escape expression openers and template delimiters so it remains data in both
+// Actions YAML and the generated JavaScript raw template literal.
+func (p *Plan) EncodeJSON() (string, error) {
+	data, err := json.MarshalIndent(compiledPlan{p.Digest, p.spec, p.connection, p.binding}, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("encode connector plan JSON: %w", err)
+	}
+	snapshot := strings.NewReplacer("${", `\u0024{`, "`", `\u0060`).Replace(string(data))
+	if len(snapshot) > MaxEncodedPlanBytes {
+		return "", errors.New("compiled connector plan exceeds 65536 JSON bytes; select fewer capabilities")
+	}
+	return snapshot, nil
+}
+
 // DecodePlan verifies a compiler-owned snapshot. A digest detects corruption;
 // it is not a signature and does not authorize an untrusted plan.
 func DecodePlan(encoded string) (*Plan, error) {
 	if len(encoded) > MaxEncodedPlanBytes {
 		return nil, errors.New("compiled connector plan exceeds its byte bound")
 	}
-	data, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return nil, errors.New("compiled connector plan must be base64 JSON")
+	data := []byte(encoded)
+	if !strings.HasPrefix(strings.TrimSpace(encoded), "{") {
+		var err error
+		data, err = base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return nil, errors.New("compiled connector plan must be JSON or legacy base64 JSON")
+		}
 	}
 	var document compiledPlan
 	if err := decodeStrictJSON(data, &document); err != nil {
