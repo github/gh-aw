@@ -23,6 +23,9 @@ type CopilotModelRoutingConfig struct {
 	// implicit marks the compiler's cost/auto default, as opposed to an
 	// authored or imported engine.model-routing block. It is never emitted.
 	implicit bool
+	// requested is the router value (for example router/economy) that selected
+	// routing through the main agent's model, or "" for engine.model-routing.
+	requested string
 }
 
 func isModelRoutingEnabled(data *WorkflowData) bool {

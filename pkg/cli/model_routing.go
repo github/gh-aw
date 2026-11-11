@@ -131,6 +131,11 @@ func resolveEffectiveModelAttribution(runDir string, info *AwInfo, routing *Mode
 	if result.RequestedModel == "" && (info.ModelRouting != nil || (routing != nil && routing.Status != "" && routing.Status != "not_routed")) {
 		result.RequestedModel = info.Model
 	}
+	// A router model value (for example router/economy) is what the workflow requested;
+	// show it next to the model the router picked.
+	if requested := info.requestedRouterValue(); requested != "" {
+		result.RequestedModel = requested
+	}
 
 	primaryModel := primaryTokenUsageModel(usage)
 	routingActive := (info.ModelRouting != nil && info.ModelRouting.Status != "" && info.ModelRouting.Status != "not_routed") ||
@@ -185,6 +190,9 @@ func mergeSessionModelRoutingAwInfo(runDir string, info *AwInfo) *AwInfo {
 	}
 	if modelRouting := sessionRouting.modelRouting(); modelRouting != nil {
 		sessionInfo.ModelRouting = modelRouting
+	}
+	if sessionRouting.ModelConfig != nil {
+		sessionInfo.ModelConfig = sessionRouting.ModelConfig
 	}
 	return &sessionInfo
 }

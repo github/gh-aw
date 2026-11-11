@@ -419,6 +419,57 @@ func TestUnifiedSessionModelRoutingAttribution(t *testing.T) {
 	}
 }
 
+func TestUnifiedSessionModelConfigRequestedRouterValue(t *testing.T) {
+	runDir := t.TempDir()
+	sessionDir := filepath.Join(runDir, "usage")
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	session := strings.Join([]string{
+		`{"type":"workflow.info","data":{"engineId":"copilot","model":"gpt-5.6-luna","requestedModel":"auto","modelRouting":{"status":"selected","wireModel":"gpt-5.6-luna","model":"gpt-5.6-luna","effort":"low","appliedEffort":"low"}},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":0}}`,
+		`{"type":"model.config","data":{"routing":{"enabled":true,"goal":"cost","mode":"economy","requested":"router/economy"}},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":0}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	attribution, found, err := readSessionModelRouting(runDir)
+	if err != nil || !found || attribution.ModelConfig == nil || attribution.ModelConfig.Routing == nil ||
+		attribution.ModelConfig.Routing.Requested != "router/economy" {
+		t.Fatalf("session model.config was not read: found=%t err=%v attribution=%+v", found, err, attribution)
+	}
+	if got := resolveEffectiveModelAttribution(runDir, nil, nil, nil); got.RequestedModel != "router/economy" || got.Model != "gpt-5.6-luna" {
+		t.Fatalf("merged session attribution lost the router value: %+v", got)
+	}
+	config := extractEngineConfigWithInferredEngine(runDir, "")
+	if config == nil || config.RequestedModel != "router/economy" || config.Model != "gpt-5.6-luna" {
+		t.Fatalf("session-only engine config lost the router value: %+v", config)
+	}
+}
+
+func TestUnifiedSessionUntrustedModelConfigIgnored(t *testing.T) {
+	runDir := t.TempDir()
+	sessionDir := filepath.Join(runDir, "usage")
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	session := strings.Join([]string{
+		`{"type":"workflow.info","data":{"engineId":"copilot","model":"gpt-5.6-luna","requestedModel":"auto","modelRouting":{"status":"selected","wireModel":"gpt-5.6-luna"}},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":0}}`,
+		`{"type":"model.config","data":{"routing":{"enabled":true,"requested":"router/robust"}},"provenance":{"component":"workflow","phase":"agent","path":"agent/aw_info.json","index":0}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	attribution, found, err := readSessionModelRouting(runDir)
+	if err != nil || !found || attribution.ModelConfig != nil {
+		t.Fatalf("agent-written model.config was trusted: found=%t err=%v attribution=%+v", found, err, attribution)
+	}
+	if config := extractEngineConfigWithInferredEngine(runDir, ""); config == nil || config.RequestedModel != "auto" {
+		t.Fatalf("agent-written model.config changed the requested model: %+v", config)
+	}
+}
+
 func TestOutcomeOnlySessionDoesNotAttributeModelRouting(t *testing.T) {
 	runDir := t.TempDir()
 	sessionDir := filepath.Join(runDir, "usage")

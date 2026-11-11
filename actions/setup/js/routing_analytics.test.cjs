@@ -170,6 +170,9 @@ describe("routing analytics in aw_session.jsonl", () => {
     // Native routing records its provider; Copilot routing omits it and unknown values are dropped.
     expect(projectModelConfig({ routing: { enabled: true, provider: "anthropic", candidate_models: ["claude-sonnet-5"] } })).toEqual({ routing: { enabled: true, provider: "anthropic", candidateModels: ["claude-sonnet-5"] } });
     expect(projectModelConfig({ routing: { enabled: true, provider: "copilot" } })).toEqual({ routing: { enabled: true } });
+    // A router model value is recorded as requested; anything else is dropped.
+    expect(projectModelConfig({ routing: { enabled: true, goal: "cost", mode: "economy", requested: "router/economy" } })).toEqual({ routing: { enabled: true, goal: "cost", mode: "economy", requested: "router/economy" } });
+    expect(projectModelConfig({ routing: { enabled: true, requested: "router/fast" } })).toEqual({ routing: { enabled: true } });
   });
 
   it("model_config_records_unrouted_resolved_baseline", async () => {

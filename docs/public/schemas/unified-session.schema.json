@@ -1042,6 +1042,11 @@
             "enabled": { "type": "boolean" },
             "goal": { "type": "string" },
             "mode": { "type": "string" },
+            "requested": {
+              "type": "string",
+              "enum": ["router", "router/economy", "router/balanced", "router/robust"],
+              "description": "Router value the workflow set as its model (for example `router/economy`); absent when routing comes from `engine.model-routing` or the implicit default."
+            },
             "provider": { "type": "string", "enum": ["anthropic", "openai"], "description": "Native routing provider (`anthropic` or `openai`) sent to AWF as `apiProxy.routing.provider`; absent for GitHub Copilot routing." },
             "allowedModels": { "type": "array", "items": { "type": "string" }, "description": "Configured routing candidates as authored (exact ids or gh-aw aliases) without provider prefix; absent means the router default or unknown." },
             "candidateModels": {

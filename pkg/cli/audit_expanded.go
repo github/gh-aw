@@ -353,6 +353,7 @@ func clearUntrustedAgentRoutingMetadata(logsPath, awInfoPath string, awInfo *AwI
 		}
 		awInfo.ModelRouting = nil
 		awInfo.ModelSelection = nil
+		awInfo.ModelConfig = nil
 	}
 }
 

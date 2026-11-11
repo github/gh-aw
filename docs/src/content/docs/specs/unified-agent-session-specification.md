@@ -1080,8 +1080,9 @@ selected `aw_info.json` copy) as exactly one `model.config` event per run, with
 
 | Field | Writer and provenance | Meaning |
 | --- | --- | --- |
-| `routing.enabled` | Compiler → runner | Whether `engine.model-routing` is configured. `false` is an explicit unrouted run. |
+| `routing.enabled` | Compiler → runner | Whether model routing is configured (`engine.model-routing`, a router model value, or the implicit default). `false` is an explicit unrouted run. |
 | `routing.goal`, `routing.mode` | Compiler → runner | Configured routing objective and mode. Never the router's per-run classification (`workflow.info.modelRouting.mode`). |
+| `routing.requested` | Compiler → runner | Router value the workflow set as its model: `router`, `router/economy`, `router/balanced`, or `router/robust`. Absent when routing comes from `engine.model-routing` or the implicit default. |
 | `routing.provider` | Compiler → runner | Native routing provider sent to AWF as `apiProxy.routing.provider`: `anthropic` (Claude) or `openai` (Codex). Absent for GitHub Copilot routing. |
 | `routing.allowedModels` | Compiler → runner | Configured routing candidates as authored (exact ids or gh-aw aliases) without the routing provider prefix; absent when unset or expression-valued. |
 | `routing.candidateModels` | Compiler → runner | Effective router pool sent to AWF (`routing.candidateModels`, or the allow list on AWF without it): `github-copilot/` ids and patterns for Copilot routing, or bare ids and patterns of the native `routing.provider`, with aliases expanded and narrowed by `models.allowed` and `models.blocked`, or the Claude/Codex family default. Absent when the router has no shortlist or a candidate is expression-valued. |

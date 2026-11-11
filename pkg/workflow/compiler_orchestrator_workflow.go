@@ -303,6 +303,9 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := c.processOnSectionAndFilters(ctx.frontmatter.Frontmatter, ctx.workflowData, ctx.cleanPath); err != nil {
 		return err
 	}
+	if err := validateRouterModelValuePlacement(ctx.workflowData); err != nil {
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
+	}
 	// Shared by every parse entry point so file, string, document, and Wasm
 	// compilation resolve the implicit model-routing default identically.
 	c.applyDefaultModelRouting(ctx)

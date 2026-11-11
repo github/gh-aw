@@ -20,6 +20,8 @@ const MODEL_IDENTIFIER = /^[A-Za-z0-9*][A-Za-z0-9._:/*@+-]{0,127}$/;
 const ERROR_IDENTIFIER = /^[A-Za-z0-9_.:-]{1,64}$/;
 const ENGINE_HARNESSES = new Set(["copilot-cli", "copilot-sdk"]);
 const NATIVE_ROUTING_PROVIDERS = new Set(["anthropic", "openai"]);
+/** Router model values (`model: router`, `router/<mode>`) that request model routing. */
+const ROUTER_MODEL_VALUES = new Set(["router", "router/economy", "router/balanced", "router/robust"]);
 const MAX_AI_CREDITS_SOURCES = new Set(["frontmatter", "default"]);
 const MAX_AI_CREDITS = /^[1-9][0-9]{0,9}$/;
 const MAX_AI_CREDITS_LIMIT = 2147483647;
@@ -29,6 +31,18 @@ const isObject = value => value !== null && typeof value === "object" && !Array.
 
 /** @param {unknown} value @returns {value is string} */
 const isModelIdentifier = value => typeof value === "string" && MODEL_IDENTIFIER.test(value);
+
+/**
+ * Whether a model value uses the reserved router namespace (`router` or
+ * `router/...`, in any case, with or without parameters).
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isRouterModelValue(value) {
+  if (typeof value !== "string") return false;
+  const base = value.trim().split("?")[0].toLowerCase();
+  return base === "router" || base.startsWith("router/");
+}
 
 /** @param {unknown} value @returns {value is string} */
 const isErrorIdentifier = value => typeof value === "string" && ERROR_IDENTIFIER.test(value);
@@ -67,6 +81,7 @@ function sanitizeModelConfig(value) {
   for (const key of ["goal", "mode"]) {
     if (isModelIdentifier(value.routing[key])) routing[key] = value.routing[key];
   }
+  if (ROUTER_MODEL_VALUES.has(value.routing.requested)) routing.requested = value.routing.requested;
   if (NATIVE_ROUTING_PROVIDERS.has(value.routing.provider)) routing.provider = value.routing.provider;
   const allowedModels = identifierList(value.routing.allowed_models);
   if (allowedModels) routing.allowed_models = allowedModels;
@@ -332,6 +347,8 @@ module.exports = {
   normalizeEngineHarness,
   sanitizeModelConfig,
   parseCompiledModelConfig,
+  isRouterModelValue,
+  ROUTER_MODEL_VALUES,
   resolveBaselineModel,
   persistModelConfigBaseline,
   projectModelConfig,

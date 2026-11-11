@@ -216,11 +216,11 @@ Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provi
 
 Gemini and declarative engines pass model names through unchanged and warn about gh-aw aliases. AWF can independently rewrite unrecognized models on non-Copilot providers; disable [`sandbox.agent.model-fallback`](/gh-aw/reference/sandbox/#model-fallback-sandboxagentmodel-fallback) when exact routing is required.
 
-Resolution is recorded as `model.resolution` in `usage/aw_session.jsonl`. See [Model Aliases](/gh-aw/reference/model-tables/) for the catalog and [Model Routing](/gh-aw/reference/model-routing/) for experimental per-run model and effort selection.
+Resolution produces `model.resolution` evidence in `usage/aw_session.jsonl`. See [Model Aliases](/gh-aw/reference/model-tables/) for the catalog and [Model Routing](/gh-aw/reference/model-routing/) for experimental per-run model/effort selection on Copilot-backed Copilot, Claude, Codex, and Pi, chosen with `model: router` (or `router/economy`, `router/balanced`, `router/robust`). Router values are not model names: `router` and `router/*` are reserved and can't be used as aliases.
 
 ### Default model routing
 
-On GitHub Copilot inference, `copilot`, `claude`, `codex`, and `pi` workflows that set no model or routing use `goal: cost` and `mode: auto` (Claude and Codex also require `model-provider: github`). Any explicit `model`, `engine.model`, `engine.model-routing`, `engine.fallback-models`, or model `engine.env` variable, including from imports, keeps existing behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable overrides the default at run time for Copilot, Claude, and Codex. Opt out with `engine.model-routing: false`; see [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
+On GitHub Copilot inference, `copilot`, `claude`, `codex`, and `pi` workflows that set no model or routing use `goal: cost` and `mode: auto`, the same as `model: router` (Claude and Codex also require `model-provider: github`). Any explicit `model` (including a router value), `engine.model`, `engine.model-routing`, `engine.fallback-models`, or model `engine.env` variable, including from imports, keeps existing behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable overrides the default at run time for Copilot, Claude, and Codex. Opt out with `engine.model-routing: false`; see [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
 
 ### Ordered model fallback (`fallback-models`)
 
