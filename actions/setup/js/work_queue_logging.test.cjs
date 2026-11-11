@@ -77,7 +77,6 @@ describe("privacy-preserving work queue logging", () => {
   it("distinguishes missing protected context from invalid bindings and unattested receipts", async () => {
     vi.stubEnv("DEBUG", "work-queue:delivery");
     expect(await verifyClaimDelivery({}, {})).toEqual({ verified: false, effects: "unknown" });
-    expect(output()).toContain("delivery.verify.trusted_context_missing");
     const assignment = {
       version: 3,
       dispatch_id: "private-dispatch",
@@ -91,10 +90,24 @@ describe("privacy-preserving work queue logging", () => {
     const member = assignment.claims[0];
     const verify = createClaimDeliveryVerifier({ assignment, recheck: async () => ({ verification: "verified", private_data: "private-token" }) });
     const verification = { assignment, contract: member.work.effect_contract, attempt: 1, run: { run_id: "42", run_attempt: 1 } };
-    expect(await verify(member, { ...verification, attempt: 0 })).toEqual({ verified: false, effects: "unknown" });
-    expect(output()).toContain("delivery.verify.binding_invalid original_claim=true contract_present=true attempt=0");
-    expect(await verify(member, verification)).toEqual({ verified: false, effects: "unknown" });
-    expect(output()).toContain("delivery.verify.receipt_rejected receipt_present=false readback_verified=true");
+    const invalidBinding = await verify(member, { ...verification, attempt: 0 });
+    expect(invalidBinding).toMatchObject({
+      verified: false,
+      effects: "unknown",
+      reason: "recheck_binding_invalid",
+      diagnostics: { original_claim: true, attempt: 0, first_run_attempt: true },
+    });
+    const unattestedReceipt = await verify(member, verification);
+    expect(unattestedReceipt).toMatchObject({
+      verified: false,
+      effects: "unknown",
+      reason: "recheck_receipt_rejected",
+      diagnostics: { receipt_present: false, readback_verified: true },
+    });
+    for (const rejection of [invalidBinding, unattestedReceipt]) {
+      expect(rejection).not.toHaveProperty("receipt");
+      expect(JSON.stringify(rejection)).not.toContain("private-");
+    }
     expect(output()).not.toContain("private-");
   });
 

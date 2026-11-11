@@ -75,7 +75,12 @@ func TestNestedImportHashGoJavaScriptParity(t *testing.T) {
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			for _, baseDir := range []string{".github/workflows", filepath.Join(t.TempDir(), ".github", "workflows")} {
+			for _, baseDir := range []string{
+				".github/workflows",
+				filepath.Join(t.TempDir(), ".github", "workflows"),
+				filepath.Join(".github", ".github", "workflows"),
+				filepath.Join(t.TempDir(), ".github", ".github", "workflows"),
+			} {
 				input := nestedHashParityInput{WorkflowPath: filepath.Join(baseDir, fixture.Workflow.Path), Files: make(map[string]string)}
 				for path, content := range scenario {
 					input.Files[filepath.Join(baseDir, path)] = content

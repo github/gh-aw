@@ -37,7 +37,7 @@ async function main(config = {}, suppliedClient) {
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue asset requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
   const namespace = path.basename(claimArtifactPath("", factoryClaim));
-  const branch = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`) + `/claims/${namespace}`;
+  const branch = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`) + `-claims/${namespace}`;
   const allowed = config["allowed-exts"] || [".png", ".jpg", ".jpeg"];
   const maximum = Number(config["max-size"] || 10240) * 1024;
   const limit = Number(config.max || 10);
@@ -104,17 +104,19 @@ async function main(config = {}, suppliedClient) {
 async function verifyAssetDelivery(options) {
   const { claim, result, github } = options;
   const receipt = result && receipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim)) return { verified: false };
+  if (!receiptMatchesClaim(receipt, claim)) return { verified: false, diagnostics: { event: "asset.receipt_missing" } };
   const [owner, repo] = receipt.repository.split("/");
   const ref = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
-  if (ref.data.object.sha !== receipt.commit) return { verified: false };
+  if (ref.data.object.sha !== receipt.commit) return { verified: false, diagnostics: { event: "asset.ref_mismatch" } };
   const commit = await github.rest.git.getCommit({ owner, repo, commit_sha: receipt.commit });
-  if (commit.data.sha !== receipt.commit || commit.data.tree.sha !== receipt.tree) return { verified: false };
-  if (receipt.parent ? commit.data.parents?.length !== 1 || commit.data.parents[0].sha !== receipt.parent : commit.data.parents?.length !== 0) return { verified: false };
+  if (commit.data.sha !== receipt.commit || commit.data.tree.sha !== receipt.tree) return { verified: false, diagnostics: { event: "asset.commit_mismatch" } };
+  if (receipt.parent ? commit.data.parents?.length !== 1 || commit.data.parents[0].sha !== receipt.parent : commit.data.parents?.length !== 0) return { verified: false, diagnostics: { event: "asset.parent_mismatch" } };
   const tree = await github.rest.git.getTree({ owner, repo, tree_sha: receipt.tree, recursive: "true" });
-  if (tree.data.truncated || tree.data.sha !== receipt.tree || !tree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob)) return { verified: false };
+  if (tree.data.truncated || tree.data.sha !== receipt.tree || !tree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob))
+    return { verified: false, diagnostics: { event: "asset.tree_mismatch" } };
   const blob = await github.rest.git.getBlob({ owner, repo, file_sha: receipt.blob });
-  if (blob.data.sha !== receipt.blob || blob.data.encoding !== "base64" || crypto.createHash("sha256").update(Buffer.from(blob.data.content, "base64")).digest("hex") !== receipt.sha256) return { verified: false };
+  if (blob.data.sha !== receipt.blob || blob.data.encoding !== "base64" || crypto.createHash("sha256").update(Buffer.from(blob.data.content, "base64")).digest("hex") !== receipt.sha256)
+    return { verified: false, diagnostics: { event: "asset.blob_mismatch" } };
   const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,

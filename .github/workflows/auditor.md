@@ -524,28 +524,32 @@ steps:
 
 # Auditor
 
-Read `/tmp/gh-aw/auditor/manifest.json` first. Stop with `noop` if it is missing,
-invalid, incomplete, has no **new** non-intentional failures, or lacks a complete
-open-PR listing. “Bail out” means no NEW failures, not no historical failures.
-Collection failure must never be interpreted as an empty result.
-Read `sampling_gaps` separately from current-sample completeness. A recorded gap
-does not invalidate current run evidence, but it is never evidence of historical
-coverage or recovery. Preserved `recovery/` checkpoint snapshots retain the
-previous seen/backlog/pending state for separately authorized reconciliation.
-If `evidence_complete` is false, `noop`: the checkpoint retains deferred failures
-for later batches; cluster rankings are not yet scope-complete. Unfinished runs
-are tracked separately and do not block ranking completed failures.
+Read `/tmp/gh-aw/auditor/manifest.json` first. Call `noop` if it is missing,
+invalid, incomplete, has no **new** non-intentional failures, lacks a complete
+open-PR listing, or has `evidence_complete: false`. Collection failure is not an
+empty result; deferred failures remain checkpointed for later batches. Unfinished
+runs do not block ranking completed failures.
+
+Read `sampling_gaps` separately: a gap does not invalidate current evidence or
+prove historical coverage or recovery. Preserved `recovery/` snapshots retain
+the previous seen/backlog/pending state for separately authorized reconciliation.
+
+## Success criteria and self-check
+
+Success is one validated, novel draft PR for the largest actionable evidenced
+cluster, or a `noop` explaining why no safe fix can be published. Before finishing,
+check the evidence and coverage limitations, confirm all required validation and
+fresh PR deduplication for any fix, and ensure the result distinguishes observed
+facts from inference. Never publish when a required check is incomplete.
 
 ## Evidence and selection
 
-The trusted `collect` job discovers failures with `gh aw health`, then queries `gh aw logs`, caches attempt-specific
-JSONL/artifacts, and runs up to three representative audits using native
-`gh aw logs --audit` (local audit generation from cached runs, no automatic
-previous-run baseline downloads). Read its
-compact reports and audit JSON before any source inspection. Do not rerun logs,
-download all artifacts, broaden the time window, or perform further remote
-audits. Audit paths inside reports refer to the collection runner, not this
-checkout; only the manifest's relative files were transferred.
+The trusted `collect` job uses `gh aw health` and `gh aw logs`, caches
+attempt-specific evidence, and locally generates up to three audits. Read its
+compact reports and audit JSON before source inspection. Only the manifest's
+relative files were transferred; report audit paths refer to the collection
+runner. Do not rerun logs, download all artifacts, broaden the window, or
+perform further remote audits.
 
 Rank unresolved clusters by unique affected run count (descending), breaking
 ties with first failing boundaries before aftermath. Counts overlap: do not sum
@@ -622,26 +626,20 @@ If no safe, novel, evidenced fix is available, call `noop` with a concise reason
 
 ## Usage and collection limits
 
-Runs hourly on the default branch. Manual dispatch is recovery-only on the
-default branch and cannot activate the agent. Each scheduled invocation uses `gh aw health --json`
-over runs created in the preceding 24 hours, selecting only revision-checked
-failure representatives from registered agentic workflows. Superseded, jobless,
-unverified, intentional and auditor failures never activate collection.
-Health is a bounded sample, not an all-history completion census or fleet failure
-rate. Its collection metadata is included as `discovery` in the manifest.
-The documented `failure_listing_limit` may leave the inventory partial; verified
-representatives remain actionable, but rankings cover only the collected sample.
-Other partial/invalid health results fail closed without advancing the checkpoint.
-The checkpoint is a last-successful-sample timestamp, not an all-run census cursor.
-After a gap over 24 hours, collection resumes the same bounded current health
-sample and explicitly records the interval outside that window in `sampling_gaps`.
-The original state and referenced compact query reports are content-addressed in `recovery/`, retained in the cache and
-uploaded with every compact collection. Gap records persist across subsequent
-samples and emit warnings; no history is silently reset, backfilled or declared
-healthy. Separately authorized complete backfill or an explicit acknowledged-gap
-decision is required to reconcile them. Invalid/missing/changed snapshots fail
-closed without advancing the checkpoint. Retained pending/backlog IDs are
-refreshed only while included in health's current-revision cohorts.
+Scheduled collection samples the preceding 24 hours; manual dispatch is
+default-branch recovery only and cannot activate the agent. Only revision-checked
+representatives of registered agentic workflows are eligible; superseded,
+jobless, unverified, intentional and auditor failures are excluded.
+`discovery` describes a bounded sample, not a census or fleet failure rate.
+The `failure_listing_limit` may leave rankings partial; other partial or invalid
+health results fail closed without advancing the last-successful-sample checkpoint.
+
+Gaps over 24 hours are recorded in `sampling_gaps`, with content-addressed prior
+state and compact reports retained in `recovery/` and uploaded. Gaps persist and
+warn; they are not backfilled or declared healthy. Reconciliation requires separately
+authorized complete backfill or explicit gap acceptance. Invalid, missing or changed
+snapshots fail closed. Pending/backlog IDs are refreshed only in health's
+current-revision cohorts.
 Fail closed at 1,000 selected metadata runs, 1,025 metadata requests, ten PR
 pages, incomplete evidence results, or exhausted API reserve.
 Process at most 25 new failures FIFO per hour; excess candidates are checkpointed,

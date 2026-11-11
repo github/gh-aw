@@ -67,8 +67,9 @@ describe("frontmatter_hash_pure (text-based)", () => {
       expect(getContent.mock.calls.every(([request]) => !request.path.includes("/shared/shared/"))).toBe(true);
     });
 
-    it("should produce the same complete hashes for local fallback without missing imports", async () => {
-      const baseDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "nested-import-hash-"));
+    it.each(["repository", ".github"])("should hash imports in a repository named %s without missing imports", async repositoryName => {
+      const rootDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "nested-import-hash-"));
+      const baseDir = path.join(rootDir, repositoryName, ".github", "workflows");
       try {
         for (const file of [workflow, ...imports]) {
           const filePath = path.join(baseDir, file.path);
@@ -81,8 +82,20 @@ describe("frontmatter_hash_pure (text-based)", () => {
         expect(await computeBodyHash(workflowPath)).toBe(expectedBody);
         expect(onMissingImport).not.toHaveBeenCalled();
       } finally {
-        fs.rmSync(baseDir, { recursive: true, force: true });
+        fs.rmSync(rootDir, { recursive: true, force: true });
       }
+    });
+
+    it.each([".github/../../outside.md", "/.agents/../../outside.md", "/outside.md"])("should reject unsafe import %s before reading it", async importPath => {
+      const workflowPath = ".github/workflows/workflow.md";
+      const fileReader = vi.fn(async filePath => {
+        if (filePath !== workflowPath) throw new Error(`Unexpected read: ${filePath}`);
+        return `---\nengine: copilot\nimports:\n  - uses: "${importPath}"\n---\nBody`;
+      });
+      for (const compute of [computeFrontmatterHash, computeBodyHash]) {
+        await expect(compute(workflowPath, { fileReader })).rejects.toThrow("security:");
+      }
+      expect(fileReader.mock.calls.every(([filePath]) => filePath === workflowPath)).toBe(true);
     });
   });
 

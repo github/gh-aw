@@ -285,7 +285,8 @@
       "description": "Optional array of labels to categorize and organize workflows. Labels can be used to filter workflows in status/list commands.",
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "maxLength": 50
       },
       "examples": [
         ["automation", "security"],
@@ -6778,7 +6779,8 @@
                   "type": "array",
                   "description": "Optional list of labels to automatically attach to created issues (e.g., ['automation', 'ai-generated'])",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50
                   }
                 },
                 "allowed-labels": {
@@ -7548,7 +7550,8 @@
                 "labels": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50
                   },
                   "description": "Optional list of labels to attach to created discussions. Also used for matching when close-older-discussions is enabled - discussions must have ALL specified labels (AND logic)."
                 },
@@ -8578,9 +8581,21 @@
                     {
                       "type": "array",
                       "description": "Array of label names",
-                      "items": {
-                        "type": "string"
-                      }
+                      "anyOf": [
+                        {
+                          "items": {
+                            "type": "string",
+                            "maxLength": 50
+                          }
+                        },
+                        {
+                          "maxItems": 1,
+                          "items": {
+                            "type": "string",
+                            "pattern": "^\\$\\{\\{.*\\}\\}$"
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "string",
@@ -8648,7 +8663,8 @@
                   "type": "array",
                   "description": "Optional labels to apply to fallback issues created when pull request creation cannot proceed. When omitted, fallback issues reuse pull request labels. A managed label is always added for triage.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50
                   }
                 },
                 "draft": {
@@ -11930,7 +11946,8 @@
                   "type": "array",
                   "description": "Labels to add to created issues for missing tools",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50
                   },
                   "default": []
                 },
@@ -12018,7 +12035,8 @@
                   "type": "array",
                   "description": "Labels to add to created issues for missing data",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50
                   },
                   "default": []
                 },
@@ -13567,7 +13585,8 @@
                   "type": "array",
                   "description": "Labels to add to created issues for incomplete runs",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50
                   },
                   "default": []
                 },
