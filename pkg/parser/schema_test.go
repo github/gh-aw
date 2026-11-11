@@ -2685,7 +2685,7 @@ func TestValidateWithSchema_YAMLTypedSlice(t *testing.T) {
 
 func TestProtectedFilesExclusionsRequireScope(t *testing.T) {
 	t.Parallel()
-	for _, handler := range []string{"create-pull-request", "push-to-pull-request-branch", "approve-workflow-run"} {
+	for _, handler := range []string{"create-pull-request", "push-to-pull-request-branch", "merge-pull-request", "approve-workflow-run"} {
 		for _, pattern := range []string{"", "*", "**", "**/*", "*/**/*", "/**", "/**/*", "**.*", "/**.*", ".*/**", "/.*/**", ".", "/", " ", " docs/**", "docs/** ", "docs/a b.md", "docs/\tfile.md", "docs/\nfile.md", "AGENTS.md", ".agents/", "/pyproject.toml", "/.changeset/*.md", "/docs/**", "/**/*.md", "/_/**", "/-/**", "/1/**"} {
 			t.Run(handler+"/"+pattern, func(t *testing.T) {
 				config := map[string]any{

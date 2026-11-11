@@ -1,0 +1,44 @@
+{
+  "groupID": "1234567890",
+  "eventID": "0123456789abcdef0123456789abcdef",
+  "id": "0123456789abcdef0123456789abcdef",
+  "type": "error",
+  "platform": "javascript",
+  "user": {
+    "email": "synthetic@example.invalid",
+    "ip_address": "192.0.2.1"
+  },
+  "entries": [
+    {
+      "type": "breadcrumbs",
+      "data": {
+        "values": [{ "message": "synthetic-private-breadcrumb" }]
+      }
+    },
+    {
+      "type": "exception",
+      "data": {
+        "values": [
+          {
+            "type": "SyntheticError",
+            "value": "Synthetic fixture error",
+            "stacktrace": {
+              "frames": [
+                {
+                  "filename": "src/example.js",
+                  "function": "example",
+                  "lineNo": 42,
+                  "colNo": 7,
+                  "vars": {
+                    "privateValue": "synthetic-private-local"
+                  },
+                  "context": [[42, "synthetic-private-source"]]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

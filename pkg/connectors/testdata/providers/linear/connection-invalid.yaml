@@ -1,0 +1,7 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: linear.app/issues
+credentials:
+  reader: { secret: LINEAR_READ_API_KEY }
+resources:
+  issues: ["*"]

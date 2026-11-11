@@ -85,9 +85,7 @@ func TestActivationStepsAddSafeOutputSecretValidationSteps(t *testing.T) {
 	ctx := newActivationStepsTestContext(&WorkflowData{
 		AI: "copilot",
 		SafeOutputs: &SafeOutputsConfig{
-			JiraCreateIssue:   &JiraSafeOutputConfig{},
-			LinearCreateIssue: &LinearCreateIssueConfig{},
-			CreateWorkItems:   &CreateWorkItemConfig{},
+			CreateIssues: &CreateIssuesConfig{},
 		},
 	})
 	ctx.engine = engine
@@ -95,15 +93,15 @@ func TestActivationStepsAddSafeOutputSecretValidationSteps(t *testing.T) {
 	compiler.addActivationSecretValidationStep(ctx)
 
 	steps := strings.Join(ctx.steps, "")
-	assert.Contains(t, steps, "JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}")
-	assert.Contains(t, steps, "JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}")
-	assert.Contains(t, steps, "LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}")
-	assert.Contains(t, steps, "LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}")
-	assert.Contains(t, steps, "AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}")
-	assert.Contains(t, steps, "'Jira safe outputs'")
-	assert.Contains(t, steps, "'Linear safe outputs'")
-	assert.Contains(t, steps, "'Azure DevOps safe outputs'")
-	assert.Contains(t, ctx.outputs["secret_verification_result"], "steps.validate-safe-output-secret-5.outcome == 'failure'")
+	assert.NotContains(t, steps, "JIRA_USER_EMAIL")
+	assert.NotContains(t, steps, "JIRA_API_TOKEN")
+	assert.NotContains(t, steps, "LINEAR_API_KEY")
+	assert.NotContains(t, steps, "LINEAR_TEAM_ID")
+	assert.NotContains(t, steps, "AZURE_DEVOPS_EXT_PAT")
+	assert.NotContains(t, steps, "'Jira safe outputs'")
+	assert.NotContains(t, steps, "'Linear safe outputs'")
+	assert.NotContains(t, steps, "'Azure DevOps safe outputs'")
+	assert.NotContains(t, ctx.outputs["secret_verification_result"], "steps.validate-safe-output-secret-")
 }
 
 func TestActivationStepsAddOAuthTokenCheckStep(t *testing.T) {

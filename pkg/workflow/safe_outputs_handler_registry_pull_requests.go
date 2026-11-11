@@ -83,6 +83,12 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 		handler := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
 			AddIfNotEmpty("target", c.Target).
+			AddDefault("protected_files_policy", "blocked").
+			AddIfNotEmpty("protected_files_policy", c.ProtectedFilesPolicy).
+			AddStringSlice("protected_files", getAllManifestFiles()).
+			AddStringSlice("protected_path_prefixes", getProtectedPathPrefixes()).
+			AddDefault("protect_top_level_dot_folders", true).
+			AddStringSlice("_protected_files_exclude", defaultProtectedFilesExclude(c.ProtectedFilesExclude)).
 			AddStringSlice("required_checks", c.RequiredChecks).
 			AddStringSlice("required_approvers", c.RequiredApprovers).
 			AddStringSlice("required_labels", c.RequiredLabels).AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).AddStringSlice("allowed_branches", c.AllowedBranches).
@@ -91,6 +97,9 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "merge-pull-request", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()
+		if isExpression(c.ProtectedFilesPolicy) {
+			handler["protected_files_policy"] = newTemplatableJSONExpression(wrapExpressionWithToJSON(c.ProtectedFilesPolicy))
+		}
 		if len(c.RequiredCheckApps) > 0 {
 			handler["required_check_apps"] = c.RequiredCheckApps
 		}
