@@ -1,30 +1,46 @@
 ---
 private: true
-name: Dev Auto Model Smoke Test
-description: Minimal inference and safe-output test for Pi, Codex, and Claude using auto on GitHub.
-intent: Detect whether an engine can complete GitHub inference and emit a safe output using auto.
+name: Dev mini-SWE-agent Smoke Test
+description: Minimal mini-SWE-agent inference, shell, and noop test on GitHub.
 on:
   workflow_dispatch:
 permissions:
   contents: read
   copilot-requests: write
 engine:
-  id: pi
+  id: mini-swe-agent
   model-provider: github
-model: auto
+model: copilot/claude-haiku-5.5
+imports:
+  - shared/mini-swe-agent.md
 checkout: false
+network:
+  allowed: []
 tools:
-  github: false
+  github:
+    mode: gh-proxy
+    toolsets: [repos]
+  bash: ["*"]
 safe-outputs:
+  create-issue: false
   noop:
+    report-as-issue: false
+  report-incomplete: false
+  report-missing-tool: false
+  report-missing-data: false
+  report-failure-as-issue: false
   threat-detection: false
 timeout-minutes: 5
-evals:
-  - id: auto_inference_completed
-    question: Did the agent call noop exactly once with message AUTO_MODEL_OK without performing any other task?
+max-turns: 5
+max-ai-credits: 5
+sandbox:
+  agent:
+    id: awf
 ---
 
-# Auto Model Smoke Test
+# mini-SWE-agent Smoke Test
 
-Call the `noop` safe-output tool exactly once with message `AUTO_MODEL_OK`.
-Do not inspect the repository, run commands, or perform any other task.
+Run `printf 'MINI_SWE_AGENT_OK\n'`.
+Call `safeoutputs noop` once with message `MINI_SWE_AGENT_OK`.
+Finally run `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` as a separate action.
+Do not inspect the repository, edit files, or perform any other task.

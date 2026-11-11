@@ -10,6 +10,7 @@ permissions:
   issues: read
 engine:
   id: mini-swe-agent
+  model-provider: github
 model: copilot/claude-haiku-5.5
 imports:
   - shared/mini-swe-agent.md
@@ -53,6 +54,9 @@ post-steps:
 ---
 
 # Smoke Test: mini-SWE-agent
+
+Inference uses the GitHub provider with the workflow token granted
+`copilot-requests: write`; no separate provider API key is required.
 
 Create `/tmp/gh-aw/agent/smoke-mini-swe-agent.txt` containing exactly
 `Smoke test passed for mini-SWE-agent`. Read the file back to verify it.
