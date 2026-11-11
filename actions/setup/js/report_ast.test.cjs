@@ -59,6 +59,50 @@ describe("report AST", () => {
     expect(renderReport(report(children)).body).toBe(source.replace("\n[", "\n\n[") + "\n");
   });
 
+  it("preserves fragment-only reference definitions as opaque review metadata", () => {
+    const source = "Body text.\n\n[my-marker]: #score=85,run_id=1,run_attempt=1\n[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi";
+    const children = parseReportMarkdown(source, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true });
+
+    expect(children.map(node => node.type)).toEqual(["paragraph", "reference_definition", "reference_definition"]);
+    expect(children.slice(1)).toEqual([
+      { type: "reference_definition", value: "[my-marker]: #score=85,run_id=1,run_attempt=1", agentTainted: true },
+      { type: "reference_definition", value: "[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi", agentTainted: true },
+    ]);
+    const body = renderReport(report(children)).body;
+    expect(body).toBe("Body text.\n\n[my-marker]: #score=85,run_id=1,run_attempt=1\n\n[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi\n");
+    expect(body).toContain("[my-marker]: #score=85,run_id=1,run_attempt=1");
+    expect(body).toContain("[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi");
+    expect(body).not.toContain("\\[my-marker\\]");
+    expect(body).not.toContain("abc\\_def\\_ghi");
+    expect(parseReportMarkdown("[external]: https://example.com", { allowMetadata: true })[0].type).toBe("paragraph");
+  });
+
+  it.each(["[state]: #value=a&amp;amp;b", "[state]: #value=&amp;lt;", "[state]: #value=&lt;"])("preserves literal entity bytes in reference definitions: %s", source => {
+    const children = parseReportMarkdown(source, { allowMetadata: true, agentTainted: true });
+
+    expect(children).toEqual([{ type: "reference_definition", value: source, agentTainted: true }]);
+    expect(renderReport(report(children)).body).toBe(`${source}\n`);
+  });
+
+  it("renders a secret-redacted reference definition as escaped text instead of aborting", () => {
+    vi.stubEnv("GH_AW_SECRET_NAMES", "REFERENCE_LABEL");
+    vi.stubEnv("SECRET_REFERENCE_LABEL", "marker-secret-fixture");
+    const children = parseReportMarkdown("[marker-secret-fixture]: #state=ok", { allowMetadata: true, agentTainted: true });
+
+    expect(() => renderReport(report(children))).not.toThrow();
+    const normalized = normalizeReport(report(children));
+    expect(normalized.children.map(node => node.type)).toEqual(["paragraph"]);
+    const body = renderReport(report(children)).body;
+    expect(body).toContain("\\[");
+    expect(body).toContain("state=ok");
+    expect(body).not.toContain("marker-secret-fixture");
+    expect(body).not.toContain("[marker-secret-fixture]:");
+  });
+
+  it("rejects non-fragment reference definitions in typed reports", () => {
+    expect(() => renderReport(report([{ type: "reference_definition", value: "[external]: javascript:alert(1)" }]))).toThrow("Invalid report reference definition");
+  });
+
   it.each(["%", "%FF", "%E0%A4"])("keeps malformed review metadata %s literal instead of failing publication", encoded => {
     const children = parseReportMarkdown(`[gh-aw-workflow-call-id]: # "${encoded}"`, { allowMetadata: true, agentTainted: true });
     expect(children).toHaveLength(1);
