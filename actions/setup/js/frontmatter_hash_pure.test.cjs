@@ -68,7 +68,8 @@ describe("frontmatter_hash_pure (text-based)", () => {
     });
 
     it("should produce the same complete hashes for local fallback without missing imports", async () => {
-      const baseDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "nested-import-hash-"));
+      const rootDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "nested-import-hash-"));
+      const baseDir = path.join(rootDir, ".github", "workflows");
       try {
         for (const file of [workflow, ...imports]) {
           const filePath = path.join(baseDir, file.path);
@@ -81,7 +82,7 @@ describe("frontmatter_hash_pure (text-based)", () => {
         expect(await computeBodyHash(workflowPath)).toBe(expectedBody);
         expect(onMissingImport).not.toHaveBeenCalled();
       } finally {
-        fs.rmSync(baseDir, { recursive: true, force: true });
+        fs.rmSync(rootDir, { recursive: true, force: true });
       }
     });
   });

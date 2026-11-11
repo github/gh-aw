@@ -11,11 +11,11 @@ permissions:
   actions: read
 engine: copilot
 imports:
-  - uses: "./connectors/jira.md"
+  - uses: ".github/workflows/connectors/jira.md"
     with:
       site: https://pelidehalleux.atlassian.net
       projects: [KAN]
-  - uses: "./connectors/linear.md"
+  - uses: ".github/workflows/connectors/linear.md"
     with:
       writer-secret: LINEAR_API_KEY
       create-team-secret: LINEAR_TEAM_ID

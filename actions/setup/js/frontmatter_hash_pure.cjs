@@ -715,13 +715,17 @@ function isWorkflowSpecImport(importPath) {
 
 /**
  * Mirrors the compiler's nested local import resolution: bare names and ./ paths
- * are file-relative; qualified paths are relative to the root workflow directory.
+ * are file-relative; .github/ paths are repository-relative; other qualified
+ * paths are relative to the root workflow directory.
  * @param {string} importPath
  * @param {string} baseDir
  * @param {string} rootDir
  * @returns {string}
  */
 function resolveHashImportPath(importPath, baseDir, rootDir) {
+  if (importPath.startsWith(".github/")) {
+    return path.join(runtimeImportHashWorkspaceRoot(rootDir), importPath);
+  }
   const fileRelative = !importPath.includes("/") || importPath.startsWith("./");
   return path.join(fileRelative ? baseDir : rootDir, importPath);
 }
