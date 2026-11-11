@@ -41,7 +41,8 @@ func TestSecurityAdvisoryMCPSubmissionPreservesBoundedContent(t *testing.T) {
 		"jsonrpc": "2.0", "id": 0, "method": "initialize",
 		"params": map[string]any{"protocolVersion": "2024-11-05", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "advisory-test", "version": "1"}},
 	}))
-	id := 0
+	require.NoError(t, encoder.Encode(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))
+	id := 1
 	for _, tool := range []string{"create_security_advisory", "add_security_advisory_comment"} {
 		for _, length := range []int{64001, 65000, 65001} {
 			id++
@@ -74,8 +75,24 @@ func TestSecurityAdvisoryMCPSubmissionPreservesBoundedContent(t *testing.T) {
 	output, err := cmd.Output()
 	require.NoError(t, err, "%s", stderr.String())
 	responses := strings.Split(strings.TrimSpace(string(output)), "\n")
-	require.Len(t, responses, 7, "%s", output)
-	for i, response := range responses[1:] {
+	require.Len(t, responses, 8, "%s", output)
+	var discovery struct {
+		Result struct {
+			Tools []struct {
+				Name        string         `json:"name"`
+				InputSchema map[string]any `json:"inputSchema"`
+			} `json:"tools"`
+		} `json:"result"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(responses[1]), &discovery))
+	var names []string
+	for _, tool := range discovery.Result.Tools {
+		names = append(names, tool.Name)
+		assert.Equal(t, false, tool.InputSchema["additionalProperties"])
+	}
+	assert.ElementsMatch(t, []string{"create_security_advisory", "add_security_advisory_comment"}, names)
+	assert.NotContains(t, responses[1], "github-token")
+	for i, response := range responses[2:] {
 		var decoded struct {
 			Error  any `json:"error"`
 			Result struct {
