@@ -454,7 +454,26 @@ function sanitizeUrlDomains(s, allowed) {
     const hostname = hostnameWithPort.split(":")[0].toLowerCase();
 
     // Check if domain is in the allowed list or is a subdomain of an allowed domain
-    const isAllowed = allowed.some(allowedDomain => {
+    if (isHostnameAllowed(hostname)) {
+      return match; // Keep the full URL as-is
+    } else {
+      // Redact the domain but preserve the protocol and structure for debugging
+      // A redacted www. hostname must not itself become a GFM autolink.
+      const sanitized = sanitizeDomainName(hostname).replace(/^www\./i, "www[.]");
+      const truncated = hostname.length > 12 ? hostname.substring(0, 12) + "..." : hostname;
+      core.info(`Redacted URL: ${truncated}`);
+      addRedactedDomain(hostname);
+      // Return sanitized domain format
+      return sanitized ? `(${sanitized}/redacted)` : "(redacted)";
+    }
+  }
+
+  /**
+   * @param {string} hostname
+   * @returns {boolean}
+   */
+  function isHostnameAllowed(hostname) {
+    return allowed.some(allowedDomain => {
       const normalizedAllowed = allowedDomain.toLowerCase();
 
       // Exact match
@@ -471,19 +490,6 @@ function sanitizeUrlDomains(s, allowed) {
       // Subdomain match (example.com matches subdomain.example.com)
       return hostname.endsWith("." + normalizedAllowed);
     });
-
-    if (isAllowed) {
-      return match; // Keep the full URL as-is
-    } else {
-      // Redact the domain but preserve the protocol and structure for debugging
-      // A redacted www. hostname must not itself become a GFM autolink.
-      const sanitized = sanitizeDomainName(hostname).replace(/^www\./i, "www[.]");
-      const truncated = hostname.length > 12 ? hostname.substring(0, 12) + "..." : hostname;
-      core.info(`Redacted URL: ${truncated}`);
-      addRedactedDomain(hostname);
-      // Return sanitized domain format
-      return sanitized ? `(${sanitized}/redacted)` : "(redacted)";
-    }
   }
 
   // Pass 1: handle angle-bracket autolinks and Slack mrkdwn links as a unit so
@@ -558,57 +564,114 @@ function sanitizeUrlDomains(s, allowed) {
     while (end > 0) {
       const last = candidate[end - 1];
       if (last === ")" && closing > opening) closing--;
-      else if (!/[?!.,:;*_~]/.test(last)) break;
+      else if (!/[?!.,:;>*_~]/.test(last)) break;
       end--;
     }
     const url = candidate.slice(0, end);
     const suffix = candidate.slice(end);
-    const normalized = stripUrlUserinfo(`https://${url}`).slice("https://".length);
     let parsed;
     try {
-      parsed = new URL(`https://${normalized}`);
+      // GFM percent-encodes backslashes in autolink destinations. Keep them
+      // from being treated as URL path separators while validating the host.
+      parsed = new URL(`https://${url.replace(/\\/g, "%5C")}`);
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
       core.info("Redacted invalid scheme-less www URL");
       return prefix + "(redacted)" + suffix;
     }
-    return prefix + applyDomainFilter(normalized, parsed.hostname) + suffix;
+
+    // URL parsing is authoritative for the actual host, including userinfo
+    // containing commas or backslashes. Remove all userinfo from allowed URLs
+    // before returning the original scheme-less form.
+    const authorityEnd = url.search(/[/?#]/);
+    const authority = url.slice(0, authorityEnd === -1 ? url.length : authorityEnd);
+    const userinfoEnd = authority.lastIndexOf("@");
+    const cleanUrl = userinfoEnd === -1 ? url : url.slice(userinfoEnd + 1);
+    const hostname = parsed.hostname.toLowerCase();
+    if (isHostnameAllowed(hostname)) {
+      return prefix + cleanUrl + suffix;
+    }
+
+    core.info("Redacted scheme-less www URL");
+    addRedactedDomain(hostname);
+    const sanitized = sanitizeDomainName(hostname).replace(/^www\./i, "www[.]");
+    return prefix + (sanitized ? `(${sanitized}/redacted)` : "(redacted)") + suffix;
   }
 
-  // GFM links www. tokens after whitespace or emphasis/opening delimiters.
-  // Include backticks for allowed-only filtering, and skip existing URLs as a
-  // unit so www. text in an allowed URL's path is not mistaken for a new link.
-  const wwwUrlRegex = /(\]\(\s*)?((?:https:\/\/|[/\\]{2})[\w.-]+[^\s<>`]*)|(^|[\s*_~(`])(www\.[^\s<>`]+)/gi;
+  // Scan URLs and www. candidates once from left to right. Explicit HTTPS URLs
+  // are skipped only to a Markdown boundary, or through their enclosing link
+  // destination, so emphasis and adjacent links cannot hide another autolink.
+  const urlOrWwwRegex = /https:\/\/|(^|[^a-z0-9])(www\.)/gi;
   const parts = [];
+  const authorityUserinfoAt = new Uint8Array(s.length + 1);
+  let hasAuthorityUserinfo = false;
+  for (let i = s.length - 1; i >= 0; i--) {
+    const character = s[i];
+    if (character === "/" || character === "?" || character === "#" || character === "|" || character === "[" || character === "]" || /\s/.test(character)) {
+      hasAuthorityUserinfo = false;
+    } else if (character === "@") {
+      hasAuthorityUserinfo = true;
+    }
+    authorityUserinfoAt[i] = hasAuthorityUserinfo ? 1 : 0;
+  }
   let position = 0;
   let match;
-  while ((match = wwwUrlRegex.exec(s))) {
+  while ((match = urlOrWwwRegex.exec(s))) {
     parts.push(s.slice(position, match.index));
-    const [full, destinationPrefix, explicitUrl, prefix, candidate] = match;
-    if (explicitUrl !== undefined) {
-      let end = full.length;
-      if (destinationPrefix !== undefined) {
-        // A Markdown destination ends at its unmatched closing parenthesis.
-        // Resume there so an adjacent www. autolink is still checked.
-        let depth = 0;
-        for (let i = destinationPrefix.length; i < full.length; i++) {
-          if (full[i] === "\\") i++;
-          else if (full[i] === "(") depth++;
-          else if (full[i] === ")") {
-            if (depth === 0) {
-              end = i;
-              break;
-            }
-            depth--;
+    if (match[0].toLowerCase() === "https://") {
+      const destinationPrefix = /\]\(\s*$/.test(s.slice(position, match.index));
+      let end = match.index + match[0].length;
+      let depth = 0;
+      for (; end < s.length; end++) {
+        const character = s[end];
+        if (character === "\\" && end + 1 < s.length) {
+          end++;
+        } else if (character === "(") {
+          depth++;
+        } else if (character === ")") {
+          if (depth === 0) {
+            if (destinationPrefix) end++;
+            break;
           }
+          depth--;
+        } else if (destinationPrefix && character === "]") {
+          break;
+        } else if (!destinationPrefix && /[\s<>`*~|\[\]]/.test(character)) {
+          break;
         }
       }
-      parts.push(full.slice(0, end));
-      wwwUrlRegex.lastIndex = match.index + end;
+      parts.push(s.slice(match.index, end));
+      position = end;
+      urlOrWwwRegex.lastIndex = end;
     } else {
-      parts.push(filterWwwUrl(prefix, candidate));
+      const prefix = match[1];
+      const candidateStart = match.index + match[0].length - match[2].length;
+      const hasAuthorityUserinfo = authorityUserinfoAt[candidateStart] === 1;
+      let end = candidateStart;
+      let depth = 0;
+      let inAuthority = true;
+      for (; end < s.length; end++) {
+        const character = s[end];
+        if (character === "\\" && end + 1 < s.length) {
+          end++;
+        } else if (character === "`" && (!inAuthority || !hasAuthorityUserinfo || prefix === "`")) {
+          break;
+        } else if (character === "(") {
+          depth++;
+        } else if (character === ")") {
+          if (depth === 0) break;
+          depth--;
+        } else if (character === "/" || character === "?" || character === "#") {
+          inAuthority = false;
+        } else if (/[\s|\[\]]/.test(character) || (/[*_~]/.test(character) && s.slice(end + 1, end + 5).toLowerCase() === "www.")) {
+          break;
+        }
+      }
+      const candidate = s.slice(candidateStart, end);
+      parts.push(prefix + filterWwwUrl("", candidate));
+      position = end;
+      urlOrWwwRegex.lastIndex = end;
     }
-    position = wwwUrlRegex.lastIndex;
   }
 
   return parts.join("") + s.slice(position);

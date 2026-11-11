@@ -58,6 +58,19 @@ describe("scheme-less www URL filtering", () => {
 
   it("strips userinfo even when the actual destination is allowed", () => {
     expect(sanitizeUrlDomains("www.synthetic.invalid@www.github.com/path", ["github.com"])).toBe("www.github.com/path");
+    expect(sanitizeUrlDomains("www.outside.invalid,@www.github.com/path", ["github.com"])).toBe("www.github.com/path");
+  });
+
+  it("uses the rendered authority when userinfo contains backslashes", () => {
+    const input = "www.github.com\\@%6Futside.invalid/path";
+    expect(sanitizeUrlDomains(input, ["github.com"])).toBe("(outside.invalid/redacted)");
+  });
+
+  it("does not log attacker-controlled scheme-less hostnames", () => {
+    const hostname = "tokenized-secret.outside.invalid";
+    sanitizeUrlDomains(`www.${hostname}/path`, ["github.com"]);
+    expect(core.info).toHaveBeenCalledWith("Redacted scheme-less www URL");
+    expect(core.info.mock.calls.flat().join(" ")).not.toContain(hostname);
   });
 
   it.each([".", ",", "!", "?", ":", ";", ").", "**", "_", "~~"])("preserves trailing prose punctuation %j", suffix => {
@@ -75,12 +88,50 @@ describe("scheme-less www URL filtering", () => {
   it.each([
     "wordwww.outside.invalid/path",
     "https://github.com/_www.outside.invalid/path",
-    "//github.com/_www.outside.invalid/path",
     "www.github.com/www.outside.invalid/path",
     "https://github.com/a(b)_www.outside.invalid/path",
     "[x](https://github.com/a(b)_www.outside.invalid/path)",
     "[x](https://github.com/a\\)_www.outside.invalid/path)",
   ])("does not rewrite non-autolinks or allowed URL paths: %s", input => {
+    expect(sanitizeContent(input)).toBe(input);
+  });
+
+  it.each([
+    ["//github.com/_www.outside.invalid/path", "//github.com/_(www[.]outside.invalid/redacted)"],
+    ["\\\\github.com/_www.outside.invalid/path", "//github.com/_(www[.]outside.invalid/redacted)"],
+    ["a//x_www.outside.invalid/path", "a//x_(www[.]outside.invalid/redacted)"],
+    ["//github.com/*www.outside.invalid/path*", "//github.com/*(www[.]outside.invalid/redacted)*"],
+    ["//github.com/~www.outside.invalid/path~", "//github.com/~(www[.]outside.invalid/redacted)~"],
+  ])("scans www. after a protocol-relative or backslash run: %s", (input, expected) => {
+    expect(sanitizeContent(input)).toBe(expected);
+  });
+
+  it.each([
+    [">www.outside.invalid/path", ">(www[.]outside.invalid/redacted)"],
+    ["[^1]:www.outside.invalid/path", "[^1]:(www[.]outside.invalid/redacted)"],
+    ["|www.outside.invalid|keep |", "|(www[.]outside.invalid/redacted)|keep |"],
+    ["|www.github.com|keep |", "|www.github.com|keep |"],
+  ])("recognizes block, footnote, and table-cell boundaries: %s", (input, expected) => {
+    expect(sanitizeUrlDomains(input, ["github.com"])).toBe(expected);
+  });
+
+  it.each(["www.github.com>@%6Futside.invalid/path", "www.github.com`@%6Futside.invalid/path"])("validates the full GFM authority including %s", input => {
+    expect(sanitizeUrlDomains(input, ["github.com"])).toBe("(outside.invalid/redacted)");
+  });
+
+  it("preserves adjacent Markdown links around a filtered www. destination", () => {
+    const input = "[docs](www.example.invalid/path)[source](https://github.com/source)";
+    expect(sanitizeContent(input)).toBe("[docs]((www[.]example.invalid/redacted))[source](https://github.com/source)");
+    expect(sanitizeContent("[www.example.invalid/path](https://github.com/source)")).toBe("[(www[.]example.invalid/redacted)](https://github.com/source)");
+  });
+
+  it("filters a www. autolink after emphasis in an explicit URL", () => {
+    expect(sanitizeContent("https://github.com/x*www.outside.invalid/path*")).toBe("https://github.com/x*(www[.]outside.invalid/redacted)*");
+    expect(sanitizeContent("[https://github.com/x]*www.outside.invalid/path*")).toBe("[https://github.com/x]*(www[.]outside.invalid/redacted)*");
+  });
+
+  it("scans many adjacent allowed links in one forward pass", () => {
+    const input = Array.from({ length: 500 }, (_, index) => `[link${index}](https://github.com/${index})`).join("");
     expect(sanitizeContent(input)).toBe(input);
   });
 
