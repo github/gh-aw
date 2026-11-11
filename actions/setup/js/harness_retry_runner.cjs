@@ -69,7 +69,7 @@ function selectedHarnessStrategy(args, engine) {
 /**
  * `nextDelayMs` overrides the delay before the immediately next attempt; following retries
  * resume exponential backoff from that delay.
- * @typedef {{ exitCode: number, output: string, hasOutput: boolean, durationMs?: number, watchdogFired?: boolean, runtimeGuardFired?: boolean, runtimeGuardReason?: string, safeOutputsByteOffset?: number, nativeTerminalRateLimitError?: boolean, cancelled?: boolean, failureClasses?: string[], strategy?: "restart" | "resume" }} HarnessAttemptResult
+ * @typedef {{ exitCode: number, output: string, hasOutput: boolean, durationMs?: number, watchdogFired?: boolean, runtimeGuardFired?: boolean, runtimeGuardReason?: string, safeOutputsByteOffset?: number, nativeTerminalRateLimitError?: boolean, retryAfterMs?: number | null, cancelled?: boolean, failureClasses?: string[], strategy?: "restart" | "resume" }} HarnessAttemptResult
  * @typedef {{ action: "retry" | "stop", exitCode?: number, nextDelayMs?: number }} HarnessFailureDecision
  */
 

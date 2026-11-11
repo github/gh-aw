@@ -72,6 +72,7 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
+const { parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
 const {
   captureExecutionEvidenceConfiguration,
@@ -2104,6 +2105,17 @@ async function main() {
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
           let nativeTerminalRateLimitError = false;
+          let retryAfterOutput = "";
+          /** @param {string} line */
+          const observeRetryAfter = line => {
+            try {
+              const event = JSON.parse(line);
+              if (event?.type && !["error", "session.error", "turn.failed"].includes(event.type)) return;
+            } catch {
+              // Ignore JSON parsing failures: native CLI errors and header dumps are plain text.
+            }
+            retryAfterOutput = (retryAfterOutput + "\n" + line).slice(-64 * 1024);
+          };
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
           // already started the sidecar; the driver only opens an SDK client connection.
           const result = await runProcess({
@@ -2124,11 +2136,13 @@ async function main() {
               if (!copilotSDKMode && durableSession && sessionId && ["session.start", "session.resume", "assistant.message", "tool.execution_start"].includes(event?.type)) {
                 durableSession.started(sessionId);
               }
-              if (["error", "session.error", "turn.failed"].includes(event?.type) && NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) {
-                nativeTerminalRateLimitError = true;
+              if (["error", "session.error", "turn.failed"].includes(event?.type)) {
+                observeRetryAfter(line);
+                if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) nativeTerminalRateLimitError = true;
               }
             },
             onStderrLine: line => {
+              observeRetryAfter(line);
               if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(line)) nativeTerminalRateLimitError = true;
             },
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
@@ -2154,7 +2168,7 @@ async function main() {
           detectedCopilotErrors.agenticEngineTimeout ||= attemptDetections.agenticEngineTimeout;
           detectedCopilotErrors.modelNotSupportedError ||= attemptDetections.modelNotSupportedError;
           detectedCopilotErrors.http400ResponseError ||= attemptDetections.http400ResponseError;
-          return { ...result, strategy, nativeTerminalRateLimitError };
+          return { ...result, strategy, nativeTerminalRateLimitError, retryAfterMs: parseCopilotRetryAfterMs(retryAfterOutput) };
         },
         handleFailure: async ({ attempt, result }) => {
           if (result.runtimeGuardReason === "copilot_model_verification") {
@@ -2505,6 +2519,32 @@ async function main() {
           }
           if (isStartupRetryEligible && isStartupNoOutputRetryCandidate(result) && scheduledExit2Retries < MAX_SCHEDULED_EXIT2_RETRIES && attempt >= maxRetries) {
             log(`attempt ${attempt + 1}: startup interruption detected (driver-handoff Turns=0) but retry budget exhausted — no attempts remain`);
+          }
+
+          if (result.retryAfterMs != null) {
+            // Node timers overflow above 2^31-1 ms and would otherwise retry immediately.
+            const exceedsDelayCap = result.retryAfterMs > Math.min(maxDelayMs, 2147483647);
+            const exceedsTimeout = softTimeoutGuard && Date.now() + result.retryAfterMs >= softTimeoutGuard.softDeadlineMs;
+            if (exceedsDelayCap || exceedsTimeout) {
+              result.failureClasses = ["rate_limit_wait_exceeded"];
+              const reason = exceedsDelayCap ? `max-delay-ms=${maxDelayMs}` : "remaining job timeout budget";
+              log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 Retry-After=${result.retryAfterMs}ms exceeds ${reason}; not retrying`);
+              emitInfrastructureIncomplete(`Copilot HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`);
+              return { action: "stop" };
+            }
+            result.failureClasses = ["rate_limit_error"];
+            if (attempt >= maxRetries) {
+              log(`all ${maxRetries} retries exhausted after HTTP 429 — not retrying`);
+              return { action: "stop" };
+            }
+            useContinueOnRetry = shouldContinueCopilotSessionAfterFailure({
+              copilotSDKMode,
+              continueDisabledPermanently,
+              hasOutput: result.hasOutput,
+              hasCAPIServerError,
+            });
+            log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${result.retryAfterMs}ms before next attempt`);
+            return { action: "retry", nextDelayMs: result.retryAfterMs };
           }
 
           if (isQuotaExceeded) {

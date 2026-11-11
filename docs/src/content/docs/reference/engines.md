@@ -197,6 +197,8 @@ The built-in Copilot, Claude, and Codex harnesses accept:
 
 All accept integers or Actions expressions. A watchdog expression must already be in milliseconds. Explicit `engine.env.GH_AW_HARNESS_*` values override these fields; see [runtime tuning variables](/gh-aw/reference/environment-variables/#harness-settings-and-runtime-tuning-variables).
 
+For HTTP 429 errors with a valid `Retry-After` header (seconds or HTTP-date), the Copilot harness waits at least that long before retrying. If the wait exceeds `max-delay-ms` or the remaining step timeout budget (including the harness's shutdown buffer), it stops immediately with failure class `rate_limit_wait_exceeded` instead of retrying early. For example, a 245-second wait requires `max-delay-ms: 245000` and sufficient time remaining. Missing or invalid headers keep the existing retry policy. This does not enable model fallback on HTTP 429.
+
 The watchdog arms after a terminal safe output (not diagnostic reports such as `report_incomplete`) and resets on any stdout or stderr activity. It can end a quiet process that is still working and count that as success. Claude counts only current-attempt terminal outputs; its [resume rules](/gh-aw/reference/engines/claude/#harness-recovery) also apply.
 
 Threat detection defaults to zero retries; configure its engine explicitly to change that. Model fallback below retries individual inference requests, not whole agent attempts.
