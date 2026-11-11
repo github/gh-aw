@@ -13,8 +13,10 @@ permissions:
 
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6-sol
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 network:
   allowed:

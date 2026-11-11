@@ -162,44 +162,68 @@ per run. Include a 7-day rolling-average overlay. Title: "Spending Trend — Las
 
 ```python
 #!/tmp/gh-aw/python/venv/bin/python
-import json, os, sys
+import json, os
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from datetime import datetime, timedelta
 
-data_file = "/tmp/gh-aw/python/data/run_samples.json"
+forecast_file = "/tmp/gh-aw/python/data/forecast.json"
 chart_file = "/tmp/gh-aw/python/charts/spending_trend.png"
 
-# Load data written from forecast.json (run_samples list)
-with open(data_file) as f:
-    samples = json.load(f)
+try:
+    with open(forecast_file) as f:
+        forecast = json.load(f)
+except (OSError, json.JSONDecodeError):
+    forecast = None
+
+samples = []
+if isinstance(forecast, dict):
+    for wf in forecast.get("workflows") or []:
+        if not isinstance(wf, dict) or not wf.get("workflow_id"):
+            continue
+        run_samples = wf.get("run_samples") or []
+        if isinstance(run_samples, list):
+            for sample in run_samples:
+                if isinstance(sample, dict):
+                    samples.append({**sample, "workflow_id": wf["workflow_id"]})
 
 df = pd.DataFrame(samples)
-df["run_started_at"] = pd.to_datetime(df["run_started_at"])
-df["date"] = df["run_started_at"].dt.date
+if not {"date", "aic", "workflow_id"}.issubset(df.columns):
+    df = pd.DataFrame()
+elif not df.empty:
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["aic"] = pd.to_numeric(df["aic"], errors="coerce")
+    df = df.dropna(subset=["date", "aic", "workflow_id"])
 
-top5 = df.groupby("workflow_id")["aic"].sum().nlargest(5).index
-df["series"] = df["workflow_id"].where(df["workflow_id"].isin(top5), "Other")
+if df.empty:
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
+    ax.text(0.5, 0.5, "Forecast unavailable: no dated run samples",
+            ha="center", va="center", transform=ax.transAxes)
+    ax.set_axis_off()
+else:
+    top5 = df.groupby("workflow_id")["aic"].sum().nlargest(5).index
+    df["series"] = df["workflow_id"].where(df["workflow_id"].isin(top5), "Other")
 
-sns.set_style("whitegrid")
-fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
-palette = sns.color_palette("husl", n_colors=len(df["series"].unique()))
-for idx, (name, grp) in enumerate(df.groupby("series")):
-    daily = grp.groupby("date")["aic"].mean()
-    ax.plot(daily.index, daily.values, marker="o", linewidth=1.5,
-            label=name, color=palette[idx], alpha=0.8)
-    rolling = daily.rolling(7, min_periods=1).mean()
-    ax.plot(rolling.index, rolling.values, linewidth=2.5, linestyle="--",
-            color=palette[idx], alpha=0.5)
+    sns.set_style("whitegrid")
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
+    palette = sns.color_palette("husl", n_colors=len(df["series"].unique()))
+    for idx, (name, grp) in enumerate(df.groupby("series")):
+        daily = grp.groupby("date")["aic"].mean().sort_index()
+        ax.plot(daily.index, daily.values, marker="o", linewidth=1.5,
+                label=name, color=palette[idx], alpha=0.8)
+        rolling = daily.rolling(7, min_periods=1).mean()
+        ax.plot(rolling.index, rolling.values, linewidth=2.5, linestyle="--",
+                color=palette[idx], alpha=0.5)
+
+    ax.set_xlabel("Date")
+    ax.set_ylabel("AIC per Run")
+    ax.legend(fontsize=9, loc="upper left")
 
 ax.set_title("Spending Trend — Last 30 Days", fontsize=14, fontweight="bold")
-ax.set_xlabel("Date")
-ax.set_ylabel("AIC per Run")
-ax.legend(fontsize=9, loc="upper left")
-plt.xticks(rotation=45)
+if not df.empty:
+    plt.xticks(rotation=45)
 plt.tight_layout()
 plt.savefig(chart_file, dpi=300, bbox_inches="tight", facecolor="white")
 print(f"Chart saved: {chart_file}")
@@ -213,7 +237,7 @@ Forecast Distribution (P10 optimistic / P50 median / P90 conservative)".
 
 ```python
 #!/tmp/gh-aw/python/venv/bin/python
-import json, os
+import json, math, os
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
@@ -223,46 +247,72 @@ import seaborn as sns
 forecast_file = "/tmp/gh-aw/python/data/forecast.json"
 chart_file = "/tmp/gh-aw/python/charts/forecast_distribution.png"
 
-with open(forecast_file) as f:
-    forecast = json.load(f)
+try:
+    with open(forecast_file) as f:
+        forecast = json.load(f)
+except (OSError, json.JSONDecodeError):
+    forecast = None
 
 rows = []
-for wf in forecast.get("workflows", []):
-    proj = wf.get("projection", {})
-    rows.append({
-        "workflow": wf.get("workflow_id", "unknown")[-30:],
-        "p10": proj.get("weekly_aic_p10", 0),
-        "p50": proj.get("weekly_aic_p50", 0),
-        "p90": proj.get("weekly_aic_p90", 0),
-    })
+if isinstance(forecast, dict):
+    for wf in forecast.get("workflows") or []:
+        if not isinstance(wf, dict) or not wf.get("workflow_id"):
+            continue
+        weekly = wf.get("weekly_monte_carlo")
+        if not isinstance(weekly, dict):
+            continue
+        percentiles = [
+            weekly.get("p10_projected_aic"),
+            weekly.get("p50_projected_aic"),
+            weekly.get("p90_projected_aic"),
+        ]
+        if not all(isinstance(value, (int, float)) and math.isfinite(value)
+                   for value in percentiles):
+            continue
+        rows.append({
+            "workflow": wf["workflow_id"][-30:],
+            "p10": percentiles[0],
+            "p50": percentiles[1],
+            "p90": percentiles[2],
+        })
 
-df = pd.DataFrame(rows).sort_values("p50", ascending=True).tail(10)
+df = pd.DataFrame(rows)
+if df.empty:
+    fig, ax = plt.subplots(figsize=(12, 4), dpi=300)
+    ax.text(0.5, 0.5, "Forecast unavailable: no weekly Monte Carlo data",
+            ha="center", va="center", transform=ax.transAxes)
+    ax.set_axis_off()
+else:
+    df = df.sort_values("p50", ascending=True).tail(10)
 
-sns.set_style("whitegrid")
-fig, ax = plt.subplots(figsize=(12, max(4, len(df) * 0.6)), dpi=300)
-y = range(len(df))
-ax.barh(y, df["p90"], color="#d73027", alpha=0.6,
-        label="P90 (conservative — 90th percentile)")
-ax.barh(y, df["p50"], color="#4575b4", alpha=0.8,
-        label="P50 (median — 50th percentile)")
-ax.barh(y, df["p10"], color="#1a9850", alpha=0.9,
-        label="P10 (optimistic — 10th percentile)")
-ax.set_yticks(list(y))
-ax.set_yticklabels(df["workflow"].tolist(), fontsize=9)
-ax.set_xlabel("Projected Weekly AIC")
+    sns.set_style("whitegrid")
+    fig, ax = plt.subplots(figsize=(12, max(4, len(df) * 0.6)), dpi=300)
+    y = range(len(df))
+    ax.barh(y, df["p90"], color="#d73027", alpha=0.6,
+            label="P90 (conservative — 90th percentile)")
+    ax.barh(y, df["p50"], color="#4575b4", alpha=0.8,
+            label="P50 (median — 50th percentile)")
+    ax.barh(y, df["p10"], color="#1a9850", alpha=0.9,
+            label="P10 (optimistic — 10th percentile)")
+    ax.set_yticks(list(y))
+    ax.set_yticklabels(df["workflow"].tolist(), fontsize=9)
+    ax.set_xlabel("Projected Weekly AIC")
+    ax.legend(fontsize=9)
+
 ax.set_title(
     "Weekly Forecast Distribution\n(P10 optimistic / P50 median / P90 conservative)",
     fontsize=13, fontweight="bold"
 )
-ax.legend(fontsize=9)
 plt.tight_layout()
 plt.savefig(chart_file, dpi=300, bbox_inches="tight", facecolor="white")
 print(f"Chart saved: {chart_file}")
 ```
 
 Before running these scripts, write the necessary JSON data files:
-- Extract `run_samples` from `forecast.json` and save to `/tmp/gh-aw/python/data/run_samples.json`
-- Copy or symlink `forecast.json` to `/tmp/gh-aw/python/data/forecast.json`
+- Copy or symlink `forecast.json` to `/tmp/gh-aw/python/data/forecast.json`. Chart 1
+  combines each workflow's `run_samples` with its parent `workflow_id` and uses the
+  sample's `date` field. Both charts show an explicit unavailable message when their
+  required data is missing rather than treating missing values as zero spending.
 
 After generating charts, upload each with `upload_asset` and store the returned URLs for
 embedding in the report.

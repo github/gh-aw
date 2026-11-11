@@ -1022,7 +1022,7 @@ models:
 
 ### Model Routing (`engine.model-routing`)
 
-An experimental feature that chooses the model and reasoning effort for each run from the task the run receives, instead of a single fixed `engine.model`. Configured with a required `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`), optionally limited to a shortlist of allowed models. Eligible workflows on the `copilot`, `claude`, `codex`, or `pi` engine that set no model run on GitHub Copilot with `goal: cost` and `mode: balanced` by default; setting `model-routing: false` opts out. See [Model Routing](/gh-aw/reference/model-routing/).
+An experimental feature that chooses the model and reasoning effort for each run from the task the run receives, instead of a single fixed `engine.model`. Configured with a required `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`), optionally limited to a shortlist of allowed models. Eligible workflows on the `copilot`, `claude`, `codex`, or `pi` engine that set no model run on GitHub Copilot with `goal: cost` and `mode: auto` by default; setting `model-routing: false` opts out. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ### Default AI Credits Pricing (`models.default-ai-credits-pricing`)
 
@@ -1536,7 +1536,7 @@ The default coding agent sandbox that isolates AI agent execution in a container
 
 ### AWF Reflect Route (`/reflect`)
 
-A runtime HTTP endpoint exposed by the AWF API proxy at `http://api-proxy:10000/reflect`. Returns the currently configured inference providers and their model availability for the active run. Use this route in shared workflows or tools that need to discover gateway endpoints, check provider availability, or select a model dynamically at runtime without hardcoding upstream API URLs. The response includes an `endpoints` array (with `provider`, `base_url`, `configured`, and `models` fields) and a `models_fetch_complete` flag. See [AWF Reflect Route](/gh-aw/experimental/awf-reflect/).
+A runtime HTTP endpoint exposed by the AWF API proxy at `http://api-proxy:10000/reflect`. Returns the currently configured inference providers and their model availability for the active run. Use this route in shared workflows or tools that need to discover gateway endpoints, check provider availability, or select a model dynamically at runtime without hardcoding upstream API URLs. The response includes an `endpoints` array (with `provider`, `base_url`, `configured`, and `models` fields) and a `models_fetch_complete` flag. See [AWF Reflect Route](/gh-aw/reference/awf-reflect/).
 
 ### Bridge Pattern
 

@@ -39,6 +39,7 @@ async function fixture(t, options = {}) {
   const runs = options.runs || [];
   const calls = [];
   const outputs = {};
+  const warnings = [];
   const clock = { time: options.time || now };
   class FixtureDate extends Date {
     constructor(...args) {
@@ -53,6 +54,18 @@ async function fixture(t, options = {}) {
     rest: {
       actions: {
         listWorkflowRunsForRepo: async () => assert.fail("Discovery must use health, not an all-run census"),
+        listWorkflowRuns: async params => {
+          calls.push(["prior-history", params.workflow_id]);
+          assert.equal(params.status, undefined);
+          assert.equal(params.per_page, 2);
+          if (options.historyError) throw new Error("Prior collection history unavailable");
+          return {
+            data: {
+              total_count: options.previousRun ? 2 : 1,
+              workflow_runs: [{ id: 99, conclusion: null }, ...(options.previousRun ? [{ id: 41, conclusion: options.previousRun }] : [])],
+            },
+          };
+        },
         getWorkflowRun: async params => {
           calls.push(["tracked", params.run_id]);
           const selected = runs.find(r => r.id === params.run_id);
@@ -162,13 +175,14 @@ async function fixture(t, options = {}) {
     };
   };
   const core = {
+    warning: message => warnings.push(message),
     setOutput: (key, value) => {
       outputs[key] = value;
     },
     summary: { addRaw: () => ({ write: async () => {} }) },
   };
-  const execute = () => collect(mockRequire, { env: { CACHE_DIR: cache, DATA_DIR: data } }, { repo: { owner: "example", repo: "repo" } }, github, core, FixtureDate);
-  return { execute, calls, outputs, cache, data, runs, clock };
+  const execute = () => collect(mockRequire, { env: { CACHE_DIR: cache, DATA_DIR: data, GITHUB_RUN_ATTEMPT: String(options.runAttempt || 1) } }, { repo: { owner: "example", repo: "repo" }, runId: 99 }, github, core, FixtureDate);
+  return { execute, calls, outputs, warnings, cache, data, runs, clock };
 }
 
 test("empty complete collection checkpoints but never audits or activates", async t => {
@@ -177,6 +191,40 @@ test("empty complete collection checkpoints but never audits or activates", asyn
   assert.equal(f.outputs.has_new_failures, "false");
   assert.ok(fs.existsSync(path.join(f.cache, "checkpoint.json")));
   assert.equal(f.calls.filter(call => call.includes("--audit")).length, 0);
+  assert.deepEqual(
+    f.calls.filter(call => call[0] === "prior-history"),
+    [["prior-history", "auditor.lock.yml"]]
+  );
+});
+
+for (const conclusion of ["success", "failure", "cancelled"]) {
+  test(`cache loss after collection with overall ${conclusion} cannot silently bootstrap`, async t => {
+    const options = { runs: [run(42)] };
+    const f = await fixture(t, options);
+    await f.execute();
+    assert.equal(f.outputs.has_new_failures, "true");
+    options.previousRun = conclusion;
+    fs.rmSync(f.cache, { recursive: true, force: true });
+    f.calls.length = 0;
+    await assert.rejects(f.execute(), /checkpoint cache is missing with prior Auditor execution history/);
+    assert.equal(fs.existsSync(path.join(f.cache, "checkpoint.json")), false);
+    assert.equal(f.outputs.has_new_failures, "false");
+    assert.deepEqual(f.calls, [["prior-history", "auditor.lock.yml"]]);
+  });
+}
+
+test("retry cannot bootstrap lost state from an earlier attempt", async t => {
+  const f = await fixture(t, { runAttempt: 2 });
+  await assert.rejects(f.execute(), /prior Auditor execution history/);
+  assert.equal(fs.existsSync(path.join(f.cache, "checkpoint.json")), false);
+  assert.equal(f.calls.filter(call => call[1] === "health").length, 0);
+});
+
+test("unavailable bootstrap history fails closed before discovery", async t => {
+  const f = await fixture(t, { historyError: true });
+  await assert.rejects(f.execute(), /Prior collection history unavailable/);
+  assert.equal(fs.existsSync(path.join(f.cache, "checkpoint.json")), false);
+  assert.equal(f.calls.filter(call => call[1] === "health").length, 0);
 });
 
 test("repeated observation is not new", async t => {
@@ -312,9 +360,9 @@ test("health cohorts retain processed backlog identities until expiry", async t 
   assert.equal(f.calls.filter(call => call[0] === "tracked").length, 25);
 });
 
-for (const [name, age, healthCollection] of [
-  ["gap beyond 24 hours", 86400001, undefined],
-  ["failed health discovery", 3600000, { partial: true, reason: "api_error" }],
+for (const [name, age] of [
+  ["failed health discovery", 3600000],
+  ["failed discovery after a stale sample", 86400001],
 ]) {
   test(`${name} preserves an existing checkpoint and does not activate`, async t => {
     const state = {
@@ -325,16 +373,17 @@ for (const [name, age, healthCollection] of [
       backlog: [],
       pending: [42],
     };
-    const f = await fixture(t, { state, healthCollection });
+    const f = await fixture(t, { state, healthCollection: { partial: true, reason: "api_error" } });
     await assert.rejects(f.execute(), /checkpoint|scope/);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
     assert.equal(f.outputs.has_new_failures, "false");
     assert.equal(f.calls.filter(call => call[0] === "tracked").length, 0);
-    if (age > 86400000) assert.equal(f.calls.length, 0);
+    assert.equal(f.calls.filter(call => call[1] === "health").length, 1);
+    assert.deepEqual(f.warnings, []);
   });
 }
 
-test("a checkpoint gap of exactly 24 hours remains covered, not silently clamped", async t => {
+test("a sample gap of exactly 24 hours adds no missed interval", async t => {
   const checkpoint = new Date(Date.parse(now) - 86400000).toISOString();
   const f = await fixture(t, {
     state: { version: 1, repository: "example/repo", checkpoint, seen: [], backlog: [], pending: [] },
@@ -342,6 +391,111 @@ test("a checkpoint gap of exactly 24 hours remains covered, not silently clamped
   await f.execute();
   const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
   assert.equal(Date.parse(manifest.window_start), Date.parse(checkpoint));
+  assert.deepEqual(manifest.sampling_gaps, []);
+  assert.deepEqual(f.warnings, []);
+});
+
+test("stale samples resume current monitoring while preserving full prior state and explicit gaps", async t => {
+  const f = await fixture(t, { runs: [run(42)] });
+  await f.execute();
+  const previousState = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8"));
+  const priorReport = previousState.backlog[0].report_file;
+  const previousReport = JSON.parse(fs.readFileSync(path.join(f.cache, priorReport), "utf8"));
+  assert.equal(previousState.backlog.length, 1);
+  f.clock.time = new Date(Date.parse(now) + 25 * 3600000).toISOString();
+  f.runs.push(run(43, { created_at: f.clock.time, updated_at: f.clock.time }));
+  await f.execute();
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+  const state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.equal(f.outputs.has_new_failures, "true");
+  assert.equal(state.checkpoint, f.clock.time);
+  assert.equal(manifest.new_failures, 1);
+  assert.equal(manifest.sampling_gaps.length, 1);
+  const gap = manifest.sampling_gaps[0];
+  assert.deepEqual(gap, {
+    start: now,
+    end: new Date(Date.parse(now) + 3600000).toISOString(),
+    observed_at: f.clock.time,
+    state_file: gap.state_file,
+  });
+  assert.match(gap.state_file, /^checkpoint-[a-f0-9]{64}\.json$/);
+  const preserved = JSON.parse(fs.readFileSync(path.join(f.cache, "recovery", gap.state_file), "utf8"));
+  assert.deepEqual(preserved, { state: previousState, reports: { [priorReport]: previousReport } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.data, "recovery", gap.state_file), "utf8")), preserved);
+  assert.deepEqual(state.sampling_gaps, manifest.sampling_gaps);
+  assert.match(f.warnings[0], /historical sampling gap.*remain unresolved/);
+
+  f.clock.time = new Date(Date.parse(f.clock.time) + 3600000).toISOString();
+  await f.execute();
+  const next = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.deepEqual(next.sampling_gaps, state.sampling_gaps);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(f.warnings.length, 2);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.data, "recovery", gap.state_file), "utf8")), preserved);
+});
+
+for (const damage of ["missing", "changed"]) {
+  test(`${damage} sampling-gap snapshot fails closed without advancing state`, async t => {
+    const f = await fixture(t, {
+      state: {
+        version: 1,
+        repository: "example/repo",
+        checkpoint: new Date(Date.parse(now) - 25 * 3600000).toISOString(),
+        seen: ["42-1-old"],
+        backlog: [],
+        pending: [42],
+      },
+    });
+    await f.execute();
+    const previous = fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8");
+    const state = JSON.parse(previous);
+    const snapshot = path.join(f.cache, "recovery", state.sampling_gaps[0].state_file);
+    if (damage === "missing") fs.unlinkSync(snapshot);
+    else fs.writeFileSync(snapshot, "{}");
+    f.clock.time = new Date(Date.parse(now) + 3600000).toISOString();
+    await assert.rejects(f.execute(), damage === "missing" ? /ENOENT/ : /snapshot changed/);
+    assert.equal(fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8"), previous);
+    assert.equal(f.outputs.has_new_failures, "false");
+  });
+}
+
+test("invalid sampling-gap paths fail before collection", async t => {
+  const state = {
+    version: 1,
+    repository: "example/repo",
+    checkpoint: now,
+    seen: [],
+    backlog: [],
+    pending: [],
+    sampling_gaps: [
+      {
+        start: new Date(Date.parse(now) - 25 * 3600000).toISOString(),
+        end: new Date(Date.parse(now) - 24 * 3600000).toISOString(),
+        observed_at: now,
+        state_file: "../checkpoint.json",
+      },
+    ],
+  };
+  const f = await fixture(t, { state });
+  await assert.rejects(f.execute(), /Invalid sampling gap/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
+  assert.deepEqual(f.calls, []);
+});
+
+test("stale backlog report traversal fails before discovery", async t => {
+  const state = {
+    version: 1,
+    repository: "example/repo",
+    checkpoint: new Date(Date.parse(now) - 25 * 3600000).toISOString(),
+    seen: [],
+    backlog: [{ report_file: "queries/../report.json" }],
+    pending: [],
+  };
+  const f = await fixture(t, { state });
+  await assert.rejects(f.execute(), /Invalid prior report reference/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.deepEqual(f.calls, []);
 });
 
 test("unfinished run is discovered by health after failing", async t => {
@@ -471,11 +625,12 @@ test("health removes previously collected superseded failures from the backlog",
   assert.equal(f.outputs.has_new_failures, "false");
 });
 
-test("native exclusion and no-dispatch policy are explicit", () => {
+test("native exclusion and recovery-only dispatch policy are explicit", () => {
   assert.match(workflow, /excluded-files:\n\s+- "\*\*\/\*\.lock\.yml"/);
-  assert.doesNotMatch(workflow, /ignore-files:|workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /ignore-files:/);
+  assert.match(workflow, /workflow_dispatch:\n\s+inputs:/);
   assert.match(workflow, /if: github\.event_name == 'schedule' && needs\.collect\.outputs\.has_new_failures == 'true'/);
   assert.match(workflow, /github-token-for-extra-empty-commit: none/);
-  assert.match(workflow, /name: Collect failure evidence\n\s+if: github\.event_name == 'schedule'/);
+  assert.match(workflow, /name: Collect failure evidence\n\s+if: github\.event_name == 'schedule' \|\| \(github\.event_name == 'workflow_dispatch'.*inputs\.acknowledge_gap == true\)/);
   assert.match(workflow, /tools:\n\s+bash: \["\*"\]\n\s+edit:/);
 });

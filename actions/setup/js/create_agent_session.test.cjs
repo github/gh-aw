@@ -221,6 +221,34 @@ describe("create_agent_session.cjs", () => {
   });
 
   describe("error handling", () => {
+    it.each([
+      [401, false],
+      [401, true],
+      [403, false],
+      [403, true],
+      [500, false],
+      [500, true],
+      [undefined, false],
+    ])("uses structured HTTP status %s (response-only: %s) despite authentication digits in the request ID", async (status, responseOnly) => {
+      mockGithub.request.mockRejectedValueOnce(
+        Object.assign(new Error(""), {
+          ...(responseOnly ? {} : { status }),
+          response: { status, headers: { "x-github-request-id": "C401:C403:C404:6553A7F0" } },
+        })
+      );
+
+      const handler = await createAgentSessionModule.main({ base: "main" });
+      const result = await handler({ type: "create_agent_session", body: "Test task" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("request ID C401:C403:C404:");
+      if (status === 401 || status === 403) {
+        expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("authentication/permission error"));
+      } else {
+        expect(mockCore.error).toHaveBeenCalledExactlyOnceWith(`Error creating agent session: ${result.error}`);
+      }
+    });
+
     it("should return failure when REST API fails with auth error", async () => {
       mockGithub.request.mockRejectedValueOnce(new Error("permission denied (403)"));
 

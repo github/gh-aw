@@ -1,8 +1,8 @@
-// This file implements the implicit cost/balanced model-routing default.
+// This file implements the implicit cost/auto model-routing default.
 //
 // Eligible main-agent workflows that choose neither a model nor a routing
 // configuration, and whose inference runs on GitHub Copilot, are routed with
-// goal cost and mode balanced. The default is conservative: any explicit model or
+// goal cost and mode auto. The default is conservative: any explicit model or
 // routing choice, the `engine.model-routing: false` opt-out, or a configuration
 // whose routing eligibility is uncertain keeps the previous non-routed behavior
 // without new errors, warnings, or notices.
@@ -32,7 +32,7 @@ var modelRoutingDefaultLog = logger.New("workflow:model_routing_default")
 
 const (
 	defaultModelRoutingGoal = "cost"
-	defaultModelRoutingMode = "balanced"
+	defaultModelRoutingMode = "auto"
 
 	// modelRoutingDecisionStepID is the activation step that resolves whether the
 	// implicit routing default applies for this run.
@@ -224,7 +224,7 @@ func engineObjectDeclaresModelChoice(engineObj map[string]any) bool {
 	return false
 }
 
-// applyDefaultModelRouting applies the implicit cost/balanced routing default to
+// applyDefaultModelRouting applies the implicit cost/auto routing default to
 // an eligible workflow. Ineligible or uncertain workflows are left unchanged.
 func (c *Compiler) applyDefaultModelRouting(ctx *workflowBuildContext) {
 	if ctx == nil || ctx.workflowData == nil || ctx.engineSetup == nil || ctx.engineSetup.modelChoiceDeclared {

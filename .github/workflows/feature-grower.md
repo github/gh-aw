@@ -152,8 +152,10 @@ safe-outputs:
 timeout-minutes: 20
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-5.6-terra
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 evals:
   - id: eligible-crop-parent
     question: For a requested cookie issue, does its numeric parent identify a crop confirmed immediately beforehand to remain open without an open cookie child? Return UNKNOWN when no issue is requested.

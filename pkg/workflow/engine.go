@@ -96,7 +96,7 @@ type EngineConfig struct {
 
 	ModelRouting *CopilotModelRoutingConfig
 	// ModelRoutingDisabled records an explicit `engine.model-routing: false`,
-	// which opts out of the implicit cost/balanced routing default.
+	// which opts out of the implicit cost/auto routing default.
 	ModelRoutingDisabled bool
 	FallbackModels       []string
 
