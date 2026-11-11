@@ -152,3 +152,5 @@
 {"id":"pr_created_or_noop","question":"Was a pull request created with formatting and tidying fixes, or was noop used when no changes were needed?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-09T07:11:54.123Z","runid":"42575332949"}
 {"id":"tidy_completed","question":"Did the agent run code formatting and tidying tools on the codebase?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-10T07:05:06.115Z","runid":"42770090235"}
 {"id":"pr_created_or_noop","question":"Was a pull request created with formatting and tidying fixes, or was noop used when no changes were needed?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-10T07:05:06.115Z","runid":"42770090235"}
+{"id":"tidy_completed","question":"Did the agent run code formatting and tidying tools on the codebase?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-11T07:05:38.179Z","runid":"42974165530"}
+{"id":"pr_created_or_noop","question":"Was a pull request created with formatting and tidying fixes, or was noop used when no changes were needed?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-11T07:05:38.179Z","runid":"42974165530"}
