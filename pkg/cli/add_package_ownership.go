@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -612,12 +613,18 @@ func removePackageOwnedFilesIfUnused(packageBase string) error {
 		return nil
 	}
 	recordPath := packageOwnershipRecordPath(gitRoot, packageBase)
+	if err := fileutil.ValidatePathWithinBase(gitRoot, recordPath); err != nil {
+		return fmt.Errorf("invalid package ownership record path %q: %w", recordPath, err)
+	}
 	record, err := readPackageOwnershipRecord(recordPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-		return err
+		return fmt.Errorf("failed to read package ownership record %q: %w", recordPath, err)
+	}
+	if err := validatePackageOwnershipRemoval(gitRoot, packageBase, record); err != nil {
+		return fmt.Errorf("invalid package ownership record %q: %w", recordPath, err)
 	}
 	var kept []packageOwnershipFileEntry
 	for _, entry := range record.Files {
@@ -650,6 +657,37 @@ func removePackageOwnedFilesIfUnused(packageBase string) error {
 	}
 	data = append(data, '\n')
 	return os.WriteFile(recordPath, data, constants.FilePermPublic)
+}
+
+// Validate the whole record before cleanup so an invalid later entry cannot cause partial deletion.
+func validatePackageOwnershipRemoval(gitRoot, packageBase string, record *packageOwnershipRecord) error {
+	if record.SchemaVersion != packageOwnershipSchemaVersion {
+		return fmt.Errorf("unsupported schema version %d; expected %d", record.SchemaVersion, packageOwnershipSchemaVersion)
+	}
+	if record.Package != packageBase {
+		return fmt.Errorf("package %q does not match %q", record.Package, packageBase)
+	}
+	if record.Files == nil {
+		return errors.New("files must be an array")
+	}
+	for _, entry := range record.Files {
+		destination, err := cleanManifestRelativePath(entry.Destination)
+		if err != nil {
+			return fmt.Errorf("invalid destination %q: %w", entry.Destination, err)
+		}
+		if strings.ContainsRune(destination, '\x00') {
+			return fmt.Errorf("invalid destination %q: path contains a null character", entry.Destination)
+		}
+		path := filepath.Join(gitRoot, filepath.FromSlash(destination))
+		if err := fileutil.ValidatePathWithinBase(gitRoot, path); err != nil {
+			return fmt.Errorf("invalid destination %q: %w", entry.Destination, err)
+		}
+		digest, err := hex.DecodeString(entry.SHA256)
+		if err != nil || len(digest) != sha256.Size {
+			return fmt.Errorf("invalid SHA256 for destination %q: expected a 64-character hexadecimal digest", entry.Destination)
+		}
+	}
+	return nil
 }
 
 func isMarkdownOwnedWorkflowDestination(destination string) bool {
