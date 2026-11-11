@@ -86,6 +86,10 @@ func validateAddedWorkflowDestination(baseDir, name, extension string) error {
 }
 
 func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *WorkflowSpec, githubWorkflowsDir string, tracker *FileTracker, opts AddOptions) {
+	if tracker == nil {
+		tracker = NewFileTracker()
+	}
+
 	// For remote workflows: now that the main workflow and all its imports are on disk,
 	// parse the fully merged safe-outputs configuration to discover any dispatch or
 	// call-workflow workers that originate from imported shared workflows (not visible
@@ -102,9 +106,7 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 		verbose: opts.Verbose, quiet: opts.Quiet, engineOverride: opts.EngineOverride, actionRef: opts.GhAwRef,
 		force: opts.Force, tracker: tracker, noGitattributes: opts.NoGitattributes,
 	}
-	if err := compileDispatchWorkflowDependenciesWithOptions(ctx, destFile, compileDeps); err != nil {
-		addWorkflowCompilationLog.Printf("Failed to compile dispatch workflow dependencies: %v", err)
-	}
+	compileDispatchWorkflowDependenciesWithOptions(ctx, destFile, compileDeps)
 	// Compile any call-workflow .md worker dependencies that were just fetched and lack a
 	// .lock.yml. Errors are propagated: a missing worker .lock.yml would leave the
 	// orchestrator referencing a non-existent file. With --force, always recompile to
@@ -115,16 +117,10 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 		return
 	}
 	// Compile the workflow
-	if tracker != nil {
-		if err := compileWorkflowWithTrackingAndOptions(ctx, destFile, trackedWorkflowCompileOptions{
-			verbose: opts.Verbose, quiet: opts.Quiet, engineOverride: opts.EngineOverride, actionRef: opts.GhAwRef,
-			tracker: tracker, noGitattributes: opts.NoGitattributes,
-		}); err != nil {
-			printCompilationError(err, opts.Quiet)
-		}
-		return
-	}
-	if err := compileWorkflowWithActionRef(ctx, destFile, opts.Verbose, opts.Quiet, opts.EngineOverride, opts.GhAwRef); err != nil {
+	if err := compileWorkflowWithTrackingAndOptions(ctx, destFile, trackedWorkflowCompileOptions{
+		verbose: opts.Verbose, quiet: opts.Quiet, engineOverride: opts.EngineOverride, actionRef: opts.GhAwRef,
+		tracker: tracker, noGitattributes: opts.NoGitattributes,
+	}); err != nil {
 		printCompilationError(err, opts.Quiet)
 	}
 }

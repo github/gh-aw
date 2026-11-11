@@ -92,6 +92,7 @@ This is a test workflow.`)
 
 			workflowPath := filepath.Join(".github", "workflows", "test.md")
 			require.FileExists(t, workflowPath)
+			require.FileExists(t, filepath.Join(".github", "workflows", "test.lock.yml"))
 
 			gitAttributesPath := ".gitattributes"
 			if tt.wantContent == nil {
@@ -116,6 +117,44 @@ This is a test workflow.`)
 			}
 		})
 	}
+}
+
+func TestAddWorkflowDependencyNoGitattributes(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Chdir(tmpDir)
+	require.NoError(t, exec.Command("git", "init").Run())
+
+	workflowsDir := filepath.Join(".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+	mainPath := filepath.Join(workflowsDir, "dispatcher.md")
+	workerPath := filepath.Join(workflowsDir, "worker.md")
+	require.NoError(t, os.WriteFile(mainPath, []byte(`---
+name: Dispatcher
+on:
+  workflow_dispatch:
+safe-outputs:
+  dispatch-workflow:
+    workflows: [worker]
+---
+
+# Dispatcher
+`), 0o644))
+	require.NoError(t, os.WriteFile(workerPath, []byte(`---
+name: Worker
+on:
+  workflow_dispatch:
+---
+
+# Worker
+`), 0o644))
+
+	compileDispatchWorkflowDependenciesWithOptions(context.Background(), mainPath, compileDepsOptions{
+		quiet:           true,
+		noGitattributes: true,
+	})
+
+	require.FileExists(t, filepath.Join(workflowsDir, "worker.lock.yml"))
+	require.NoFileExists(t, ".gitattributes")
 }
 
 func newTestResolvedWorkflow(content string) *ResolvedWorkflow {
