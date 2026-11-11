@@ -169,6 +169,10 @@ safe-outputs:
     repositories: ["*"]
 ```
 
+### Connector (`connectors:`)
+
+A declarative third-party integration written as an ordinary AW Markdown file under `.github/workflows/connectors/`. A connector declares provider endpoints, credential secret names, exact resource grants, and capabilities (read tools, triggers, safe outputs) under `connectors.<id>`. Declarations are editable source imported into a workflow; importing alone grants no capabilities. See [Connectors](/gh-aw/reference/connectors/).
+
 ### Jira Connector (`jira:`)
 
 An editable Markdown declaration imported with exact approved Jira resources and independently selected read tools and safe outputs. Read access uses Atlassian's hosted MCP service with the declaration's phase-specific credentials; importing alone grants no capabilities or provider permissions. See [Jira connector](/gh-aw/reference/connectors/#jira).
@@ -518,7 +522,7 @@ A safe output capability that approves a GitHub Actions workflow run in the "act
 
 ### Merge Pull Request (`merge-pull-request:`)
 
-An experimental safe output capability for merging pull requests after policy-driven gate checks pass. Validates status checks, required approvals, resolved review threads, label and branch constraints, and GitHub mergeability before applying the merge. Merges to the repository default branch are always refused. Supports `merge`, `squash`, and `rebase` methods, cross-repository targets, and `staged: true` for dry-run gate evaluation without calling the GitHub merge API. Compiling a workflow with `merge-pull-request` emits an experimental feature warning. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request) and the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/#type-merge_pull_request).
+An experimental safe output capability for merging pull requests after policy-driven gate checks pass. Validates status checks, required approvals, resolved review threads, label and branch constraints, and GitHub mergeability before applying the merge. Merges to the repository default branch are always refused. Supports `merge`, `squash`, and `rebase` methods, cross-repository targets, and `staged: true` for dry-run gate evaluation without calling the GitHub merge API. Enforces Protected Files by default (`protected-files: allowed` disables the file gate) and blocks merging when detection or caution notices are present. Compiling a workflow with `merge-pull-request` emits an experimental feature warning. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request) and the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/#type-merge_pull_request).
 
 ### Close Pull Request (`close-pull-request:`)
 
@@ -534,7 +538,11 @@ A safe output capability for modifying a pull request's `title` or `body`. Title
 
 ### Protected Files
 
-A security mechanism on `create-pull-request` and `push-to-pull-request-branch` safe outputs that prevents AI agents from modifying sensitive repository files. By default, protects dependency manifests (e.g., `package.json`, `go.mod`), GitHub Actions workflow files, and lock files. Configured via `protected-files:` with three policies: `blocked` (default — fails with error), `allowed` (no restriction), or `fallback-to-issue` (creates a review issue for human inspection instead of applying changes). Also accepts an object form `{ policy: string, exclude: [...] }` to remove specific files or path prefixes from the default protected set while keeping protection active for the remaining files. Repository-wide exceptions can be set with `protected_files.exclude` in `.github/workflows/aw.json` using root-relative path globs (e.g., `.changeset/*.md`); catch-all patterns such as `**` are rejected, and these exceptions never bypass `allowed-files`. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#protected-files).
+A security mechanism on `create-pull-request`, `push-to-pull-request-branch`, and `merge-pull-request` safe outputs that prevents AI agents from modifying sensitive repository files. By default, protects dependency manifests (e.g., `package.json`, `go.mod`), GitHub Actions workflow files, and lock files. Configured via `protected-files:` with three policies: `blocked` (default — fails with error), `allowed` (no restriction), or `fallback-to-issue` (creates a review issue for human inspection instead of applying changes). Also accepts an object form `{ policy: string, exclude: [...] }` to remove specific files or path prefixes from the default protected set while keeping protection active for the remaining files. Repository-wide exceptions can be set with `protected_files.exclude` in `.github/workflows/aw.json` using root-relative path globs (e.g., `.changeset/*.md`); catch-all patterns such as `**` are rejected, and these exceptions never bypass `allowed-files`. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#protected-files).
+
+### Security Advisory Outputs (`create-security-advisory:`, `add-security-advisory-comment:`)
+
+Safe output capabilities that create a draft repository security advisory or comment on an existing one. Both require an external `github-token` or `github-app` because `GITHUB_TOKEN` cannot manage advisories; neither publishes advisories or accepts an agent-selected repository. See [Safe Outputs](/gh-aw/reference/safe-outputs/#security-advisory-drafts-create-security-advisory).
 
 ### Allow Workflows (`allow-workflows:`)
 
