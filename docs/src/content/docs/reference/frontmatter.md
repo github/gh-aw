@@ -90,6 +90,8 @@ Decision metadata is retained in the existing harness retry artifact and as type
 
 Optional array of strings for categorizing workflows by purpose, team, or functionality. Labels appear in `gh aw status` output as `[automation ci diagnostics]` (or a JSON array in `--json` mode) and can be filtered with `gh aw status --label automation`.
 
+Each label name is limited to 50 characters. The compiler rejects longer names, including static labels configured for safe outputs.
+
 ```yaml wrap
 labels: ["automation", "ci", "diagnostics"]
 ```

@@ -118,20 +118,22 @@ function createRestEffectHandler(adapter, github) {
 
 async function verifyRestAdapterDelivery(options) {
   const { adapter, result, claim, github } = options;
+  const unverified = field_index => ({ verified: false, diagnostics: { event: "rest.readback.mismatch", field_index } });
   validateRestAdapter(adapter);
   const receipt = result && privateReceipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
-  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return { verified: false };
+  if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return unverified(-1);
+  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return unverified(-1);
   const [owner, repo] = adapter["target-repo"].split("/");
   const route = concreteRoute(adapter.verifier.route, { ...receipt.fields, owner, repo, receipt_id: receipt.id });
   const { data } = await github.request(`GET ${route}`);
-  if (!data || nativeIdentity(data.id) !== receipt.id) return { verified: false };
-  for (const [desired, observed] of Object.entries(adapter.verifier.fields)) {
-    if (!Object.hasOwn(data, observed) || canonical(data[observed]) !== canonical(receipt.fields[desired])) return { verified: false };
+  if (!data || nativeIdentity(data.id) !== receipt.id) return unverified(-1);
+  const verifiedFields = Object.entries(adapter.verifier.fields);
+  for (const [index, [desired, observed]] of verifiedFields.entries()) {
+    if (!Object.hasOwn(data, observed) || canonical(data[observed]) !== canonical(receipt.fields[desired])) return unverified(index);
   }
   const numberField = adapter.verifier["number-field"];
   const number = numberField === undefined ? undefined : data[numberField];
-  if (numberField !== undefined && (!Number.isSafeInteger(number) || number < 1)) return { verified: false };
+  if (numberField !== undefined && (!Number.isSafeInteger(number) || number < 1)) return unverified(verifiedFields.length);
   const resource = { kind: adapter.verifier["resource-kind"], repository: adapter["target-repo"], id: receipt.id, ...(number === undefined ? {} : { number }) };
   const proof = createClaimResourceVerification({
     verified: true,

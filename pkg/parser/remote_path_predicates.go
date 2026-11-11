@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -134,4 +135,20 @@ func computeIncludeResolveAndSecurityBases(filePath, baseDir string) (string, st
 		}
 	}
 	return resolveBase, securityBase, normalizedFilePath
+}
+
+// Resolve lexical paths before reader-specific filesystem checks.
+func resolveLocalIncludePath(filePath, resolveBase, securityBase string) (string, error) {
+	if stripped, ok := strings.CutPrefix(filepath.ToSlash(filePath), "/"); ok {
+		if !strings.HasPrefix(stripped, constants.GithubDir) && !strings.HasPrefix(stripped, ".agents/") {
+			return "", fmt.Errorf("security: path %s must be within .github or .agents folder", filePath)
+		}
+	}
+	fullPath := filepath.Join(resolveBase, filePath)
+	normalizedSecurityBase := filepath.Clean(securityBase)
+	relativePath, err := filepath.Rel(normalizedSecurityBase, filepath.Clean(fullPath))
+	if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) || filepath.IsAbs(relativePath) {
+		return "", fmt.Errorf("security: path %s must be within %s folder (resolves to: %s)", filePath, filepath.Base(normalizedSecurityBase), relativePath)
+	}
+	return fullPath, nil
 }

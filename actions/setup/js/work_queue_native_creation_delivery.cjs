@@ -54,26 +54,29 @@ async function readCode(github, receipt, pinnedCommit) {
   const { data: ref } = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
   const sha = ref?.object?.sha;
   if (ref?.ref !== `refs/heads/${receipt.branch}` || ref.object.type !== "commit" || !REVISION.test(sha) || (pinnedCommit !== undefined && sha !== pinnedCommit)) {
-    log.debug("creation.code.ref_mismatch", { ref_matches: ref?.ref === `refs/heads/${receipt.branch}`, commit_type: ref?.object?.type === "commit", pinned_commit_matches: pinnedCommit === undefined || sha === pinnedCommit });
-    return null;
+    const fields = { ref_matches: ref?.ref === `refs/heads/${receipt.branch}`, commit_type: ref?.object?.type === "commit", pinned_commit_matches: pinnedCommit === undefined || sha === pinnedCommit };
+    log.debug("creation.code.ref_mismatch", fields);
+    return { sha: null, diagnostics: { event: "creation.code.ref_mismatch", ...fields } };
   }
   const { data: commit } = await github.rest.git.getCommit({ owner, repo, commit_sha: sha });
   if (commit?.sha !== sha || commit.tree?.sha !== receipt.tree || !Array.isArray(commit.parents) || !commit.parents.length || commit.parents.some(parent => !REVISION.test(parent.sha))) {
-    log.debug("creation.code.commit_mismatch", { commit_matches: commit?.sha === sha, tree_matches: commit?.tree?.sha === receipt.tree, parents_present: Array.isArray(commit?.parents) && commit.parents.length > 0 });
-    return null;
+    const fields = { commit_matches: commit?.sha === sha, tree_matches: commit?.tree?.sha === receipt.tree, parents_present: Array.isArray(commit?.parents) && commit.parents.length > 0 };
+    log.debug("creation.code.commit_mismatch", fields);
+    return { sha: null, diagnostics: { event: "creation.code.commit_mismatch", ...fields } };
   }
   const { data: tree } = await github.rest.git.getTree({ owner, repo, tree_sha: receipt.tree });
   if (tree?.sha !== receipt.tree || tree.truncated !== false || !Array.isArray(tree.tree)) {
-    log.debug("creation.code.tree_invalid", { tree_matches: tree?.sha === receipt.tree, complete: tree?.truncated === false, entries_present: Array.isArray(tree?.tree) });
-    return null;
+    const fields = { tree_matches: tree?.sha === receipt.tree, complete: tree?.truncated === false, entries_present: Array.isArray(tree?.tree) };
+    log.debug("creation.code.tree_invalid", fields);
+    return { sha: null, diagnostics: { event: "creation.code.tree_invalid", ...fields } };
   }
   // Cross-repository PR comparisons are read from the base repository using a qualified head.
   const head = receipt.headRepository === receipt.repository ? sha : `${owner}:${sha}`;
   if (!(await readAncestry(github, receipt.repository, receipt.base, head))) {
     log.debug("creation.code.ancestry_mismatch");
-    return null;
+    return { sha: null, diagnostics: { event: "creation.code.ancestry_mismatch" } };
   }
-  return sha;
+  return { sha };
 }
 
 async function capturePullRequestDelivery(result, message, expected, github) {
@@ -81,11 +84,11 @@ async function capturePullRequestDelivery(result, message, expected, github) {
   const receipt = { ...claimIdentity(currentClaimHandle()), type: "create_pull_request", message: canonical({ ...message, repo: expected.repository }), ...structuredClone(expected), ...expected.prepared };
   delete receipt.prepared;
   try {
-    const commit = await readCode(github, receipt);
+    const code = await readCode(github, receipt);
     const repository = await resolveRepositoryTarget(github, { repository: receipt.repository });
     const headRepository = await resolveRepositoryTarget(github, { repository: receipt.headRepository });
-    if (commit && repository.repository_id && headRepository.repository_id) receipts.set(result, { ...receipt, commit, repositoryId: repository.repository_id, headRepositoryId: headRepository.repository_id });
-    else log.debug("creation.capture.receipt_missing", { code_verified: !!commit, repository_verified: !!repository.repository_id, head_repository_verified: !!headRepository.repository_id });
+    if (code.sha && repository.repository_id && headRepository.repository_id) receipts.set(result, { ...receipt, commit: code.sha, repositoryId: repository.repository_id, headRepositoryId: headRepository.repository_id });
+    else log.debug("creation.capture.receipt_missing", { code_verified: !!code.sha, repository_verified: !!repository.repository_id, head_repository_verified: !!headRepository.repository_id });
   } catch (error) {
     log.failure("creation.capture.unverified", error);
     // An unavailable readback must leave the successful write unverified, not create a fallback resource.
@@ -110,8 +113,9 @@ async function verifyDiscussion(options, receipt) {
         (cleanup.type === "comment" && typeof cleanup.body !== "string")
     )
   ) {
-    log.diagnostic("discussion.cleanup.readback.mismatch", { receipt_valid: false });
-    return { verified: false };
+    const fields = { receipt_valid: false };
+    log.diagnostic("discussion.cleanup.readback.mismatch", fields);
+    return { verified: false, diagnostics: { event: "discussion.cleanup.readback.mismatch", ...fields } };
   }
   const response = await readQueueMetadata(
     () =>
@@ -152,7 +156,7 @@ async function verifyDiscussion(options, receipt) {
     !Array.isArray(node.labels.nodes) ||
     canonical(names(node.labels.nodes)) !== canonical(names(receipt.labels))
   ) {
-    log.debug("discussion.readback.mismatch", {
+    const fields = {
       discussion_present: node?.__typename === "Discussion",
       identity_matches: node?.id === receipt.id && node?.number === receipt.number,
       repository_matches: node?.repository?.id === receipt.repositoryNodeId && node?.repository?.nameWithOwner === receipt.repository,
@@ -162,8 +166,9 @@ async function verifyDiscussion(options, receipt) {
       labels_complete: node?.labels?.pageInfo?.hasNextPage === false,
       labels_matches: diagnosticNamesMatch(node?.labels?.nodes, receipt.labels),
       url_matches: node?.url === receipt.url,
-    });
-    return { verified: false };
+    };
+    log.debug("discussion.readback.mismatch", fields);
+    return { verified: false, diagnostics: { event: "discussion.readback.mismatch", ...fields } };
   }
   const authority = await resolveRepositoryTarget(github, { repository: receipt.repository, repository_id: nativeDecimalIdentity(node.repository.databaseId), number: node.number });
   const authorities = [authority];
@@ -198,8 +203,9 @@ async function verifyDiscussion(options, receipt) {
       (comment ? resource.body !== cleanup.body : discussion.closed !== true || discussion.stateReason !== "OUTDATED")
     ) {
       // Cleanup failures must remain visible without DEBUG when creation itself succeeded.
-      log.diagnostic("discussion.cleanup.readback.mismatch", { comment, resource_present: !!resource });
-      return { verified: false };
+      const fields = { comment, resource_present: !!resource };
+      log.diagnostic("discussion.cleanup.readback.mismatch", fields);
+      return { verified: false, diagnostics: { event: "discussion.cleanup.readback.mismatch", ...fields } };
     }
     const target = canonicalResourceTarget({ ...authority, number: discussion.number });
     const key = canonical(target);
@@ -222,14 +228,17 @@ async function verifyDiscussion(options, receipt) {
 
 async function verifyPullRequest(options, receipt) {
   const { github, claim } = options;
-  if (!Number.isSafeInteger(receipt.number) || receipt.number < 1 || nativeDecimalIdentity(receipt.id) !== receipt.id) return { verified: false };
+  if (!Number.isSafeInteger(receipt.number) || receipt.number < 1 || nativeDecimalIdentity(receipt.id) !== receipt.id) return { verified: false, diagnostics: { event: "pull_request.receipt_identity_invalid" } };
   const message = options.message;
-  if ((message.head_repo !== undefined && message.head_repo !== receipt.headRepository) || (message.base_branch !== undefined && message.base_branch !== receipt.transportBaseBranch)) return { verified: false };
+  if ((message.head_repo !== undefined && message.head_repo !== receipt.headRepository) || (message.base_branch !== undefined && message.base_branch !== receipt.transportBaseBranch))
+    return { verified: false, diagnostics: { event: "pull_request.transport_route_mismatch" } };
   if (message.base_commit !== undefined) {
-    if (typeof message.base_commit !== "string" || !REVISION.test(message.base_commit)) return { verified: false };
-    if (message.base_commit !== receipt.transportBase && !(await readAncestry(github, receipt.repository, message.base_commit, receipt.transportBase))) return { verified: false };
+    if (typeof message.base_commit !== "string" || !REVISION.test(message.base_commit)) return { verified: false, diagnostics: { event: "pull_request.base_commit_invalid" } };
+    if (message.base_commit !== receipt.transportBase && !(await readAncestry(github, receipt.repository, message.base_commit, receipt.transportBase)))
+      return { verified: false, diagnostics: { event: "pull_request.base_commit_not_ancestor" } };
   }
-  if (!(await readCode(github, receipt, receipt.commit))) return { verified: false };
+  const code = await readCode(github, receipt, receipt.commit);
+  if (!code.sha) return { verified: false, diagnostics: code.diagnostics };
   const [owner, repo] = receipt.repository.split("/");
   const { data } = await github.rest.pulls.get({ owner, repo, pull_number: receipt.number });
   if (
@@ -252,7 +261,7 @@ async function verifyPullRequest(options, receipt) {
     canonical(names(data.labels || [])) !== canonical(names(receipt.labels)) ||
     canonical(names(data.assignees || [])) !== canonical(names(receipt.assignees))
   ) {
-    log.debug("pull_request.readback.mismatch", {
+    const fields = {
       resource_present: !!data,
       identity_matches: !!data && nativeIdentityMatches(data.id, receipt.id) && data.number === receipt.number,
       title_matches: data?.title === receipt.title,
@@ -266,8 +275,9 @@ async function verifyPullRequest(options, receipt) {
       url_matches: data?.html_url === receipt.url,
       repository_id_matches: nativeIdentityMatches(data?.base?.repo?.id, receipt.repositoryId),
       head_repository_id_matches: nativeIdentityMatches(data?.head?.repo?.id, receipt.headRepositoryId),
-    });
-    return { verified: false };
+    };
+    log.debug("pull_request.readback.mismatch", fields);
+    return { verified: false, diagnostics: { event: "pull_request.readback.mismatch", ...fields } };
   }
   const authority = await resolveParentResourceTarget(github, { repository: receipt.repository, kind: "pull_request", number: receipt.number }, data);
   const head = await resolveRepositoryTarget(github, { repository: receipt.headRepository, repository_id: nativeDecimalIdentity(data.head.repo.id), ref: `refs/heads/${receipt.branch}` });
@@ -282,20 +292,21 @@ async function verifyPullRequest(options, receipt) {
         effect.expected.sha !== effect.id ||
         (effect.id !== receipt.commit && !(await readAncestry(github, receipt.headRepository, effect.id, receipt.commit)))
       )
-        return { verified: false };
+        return { verified: false, diagnostics: { event: "pull_request.effect_ref_mismatch" } };
       effects.push({ kind: "git_ref", repository: receipt.headRepository, id: effect.id });
     }
     if (effect.repository === receipt.headRepository && effect.kind === "graphql" && effect.commit) {
-      if (!REVISION.test(effect.commit) || (effect.commit !== receipt.commit && !(await readAncestry(github, receipt.headRepository, effect.commit, receipt.commit)))) return { verified: false };
+      if (!REVISION.test(effect.commit) || (effect.commit !== receipt.commit && !(await readAncestry(github, receipt.headRepository, effect.commit, receipt.commit))))
+        return { verified: false, diagnostics: { event: "pull_request.effect_graphql_commit_mismatch" } };
       effects.push({ kind: "graphql", repository: receipt.headRepository, id: effect.id });
     }
     if (effect.repository === receipt.repository && effect.kind === "issue" && effect.number === receipt.number) {
       if (!effect.expected || !Object.keys(effect.expected).length || Object.keys(effect.expected).some(field => !["labels", "assignees"].includes(field))) continue;
-      for (const field of Object.keys(effect.expected)) if (canonical(names(effect.expected[field])) !== canonical(names(receipt[field]))) return { verified: false };
+      for (const field of Object.keys(effect.expected)) if (canonical(names(effect.expected[field])) !== canonical(names(receipt[field]))) return { verified: false, diagnostics: { event: "pull_request.effect_issue_expected_mismatch" } };
       const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: receipt.number });
       const parent = await resolveParentResourceTarget(github, { repository: receipt.repository, kind: "issue", number: receipt.number }, issue);
-      if (parent.kind !== "pull_request" || parent.resource_id !== receipt.id || (effect.id && effect.id !== String(issue.id))) return { verified: false };
-      for (const field of Object.keys(effect.expected)) if (canonical(names(issue[field] || [])) !== canonical(names(receipt[field]))) return { verified: false };
+      if (parent.kind !== "pull_request" || parent.resource_id !== receipt.id || (effect.id && effect.id !== String(issue.id))) return { verified: false, diagnostics: { event: "pull_request.effect_parent_mismatch" } };
+      for (const field of Object.keys(effect.expected)) if (canonical(names(issue[field] || [])) !== canonical(names(receipt[field]))) return { verified: false, diagnostics: { event: "pull_request.effect_issue_fields_mismatch" } };
       effects.push({ kind: "issue", repository: receipt.repository, id: nativeDecimalIdentity(issue.id), number: receipt.number });
     }
   }
@@ -318,10 +329,11 @@ async function verifyNativeCreationDelivery(options) {
     (options.message.repo !== undefined && options.message.repo !== receipt.repository) ||
     receipt.message !== canonical({ ...options.message, repo: receipt.repository })
   ) {
-    log.debug("creation.receipt.unverified", { receipt: !!receipt, claim_matches: receiptMatchesClaim(receipt, options.claim), type_matches: receipt?.type === options.message.type });
-    return { verified: false };
+    const fields = { receipt: !!receipt, claim_matches: receiptMatchesClaim(receipt, options.claim), type_matches: receipt?.type === options.message.type };
+    log.debug("creation.receipt.unverified", fields);
+    return { verified: false, diagnostics: { event: "creation.receipt.unverified", ...fields } };
   }
-  const fields = new Set([
+  const allowedFields = new Set([
     "type",
     "output_id",
     "depends-on",
@@ -335,9 +347,10 @@ async function verifyNativeCreationDelivery(options) {
     "labels",
     ...(receipt.type === "create_discussion" ? ["category"] : ["branch", "base", "draft", "head_repo", "base_branch", "base_commit"]),
   ]);
-  if (Object.keys(options.message).some(field => !fields.has(field)) || options.result.staged || options.result.fallback_used) {
-    log.debug("creation.receipt.unsupported", { staged: !!options.result.staged, fallback_used: !!options.result.fallback_used, undeclared_fields: Object.keys(options.message).some(field => !fields.has(field)) });
-    return { verified: false };
+  if (Object.keys(options.message).some(field => !allowedFields.has(field)) || options.result.staged || options.result.fallback_used) {
+    const fields = { staged: !!options.result.staged, fallback_used: !!options.result.fallback_used, undeclared_fields: Object.keys(options.message).some(field => !allowedFields.has(field)) };
+    log.debug("creation.receipt.unsupported", fields);
+    return { verified: false, diagnostics: { event: "creation.receipt.unsupported", ...fields } };
   }
   try {
     const proof = receipt.type === "create_discussion" ? await verifyDiscussion(options, receipt) : await verifyPullRequest(options, receipt);
@@ -345,7 +358,7 @@ async function verifyNativeCreationDelivery(options) {
     return proof;
   } catch (error) {
     log.failure("creation.readback.unverified", error);
-    return { verified: false };
+    return { verified: false, diagnostics: { event: "creation.readback.unverified", thrown: true } };
   }
 }
 

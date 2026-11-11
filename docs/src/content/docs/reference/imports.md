@@ -238,6 +238,15 @@ imports:
 
 Use this form when workflows in different directories need the same stable import path, and for files under `.github/agents/`.
 
+The object form, such as `uses: ".github/workflows/connectors/jira.md"`, follows
+the same resolution rules. Go compilation and JavaScript activation hash checks
+resolve `.github/` imports from the repository root, including nested imports,
+and hash their frontmatter and bodies. Missing local imports fail compilation;
+they are not treated as optional.
+
+Hash checks use the same local path resolution and allowed-root rules as
+`imports`, regardless of the checkout directory's name.
+
 ### Cross-repo imports
 
 Paths matching `owner/repo/path@ref` are fetched from GitHub at compile time. The `@ref` suffix can be a semantic tag (`@v1.0.0`), branch (`@main`), or commit SHA. Remote imports are cached in `.github/aw/imports/` by commit SHA to support offline compilation; local imports are never cached. See [Adding Existing Workflows](/gh-aw/setup/working-with-workflows/#adding-existing-workflows) for installation flows.

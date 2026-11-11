@@ -73,6 +73,7 @@ Prose isn't native error.
 | `model_policy_violation`, `content_filter` | Provider/proxy reason; endpoint mismatch separately. | Correct request within policy; no credential swap/bypass. |
 | `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone != authentication failure. |
 | `capi_quota_exceeded_error` | Native 429; exhausted retries. | Respect quota/reset; no retry storm. |
+| `rate_limit_wait_exceeded`, `rate_limit_error` | Native 429, model provider, `Retry-After`, harness attempt telemetry, `max-delay-ms` and remaining timeout. | For GitHub-provided models in Copilot, Claude or Codex, allow the requested wait only if it fits both bounds; otherwise stop/defer. Other providers retain their existing retry policy. Terminal quota and proxy guards still take precedence. Check whether the CLI emitted a usable header; other engines may not have a retrying harness. Do not redispatch without authorization. |
 | `capi_server_error`, `engine_outage`, `infrastructure_error` | Exhausted native 5xx/infrastructure timeline. | Report cause; bounded backoff, no unapproved redispatch. |
 | `agentic_engine_timeout` | Step/SDK budget vs post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone != timeout. |
 | `sandbox_runtime_crash` | Exit/signal, resources, runtime revision. | Fix crash/resources; retain redacted diagnostic/version. |

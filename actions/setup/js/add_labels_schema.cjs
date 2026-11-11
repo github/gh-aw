@@ -3,7 +3,7 @@
 const ADD_LABELS_OBJECT_ONLY_FIELD_DESC = "Labels to add. Each label must be an object matching the configured item schema; plain string label names are not permitted. Labels must exist in the repository.";
 
 const OBJECT_SCHEMA_KEYS = new Set(["type", "properties", "required", "additionalProperties", "title", "description", "$comment"]);
-const PROPERTY_SCHEMA_KEYS = new Set(["type", "enum", "const", "title", "description", "$comment", "default", "examples"]);
+const PROPERTY_SCHEMA_KEYS = new Set(["type", "enum", "const", "maxLength", "title", "description", "$comment", "default", "examples"]);
 
 /**
  * @param {unknown} value
@@ -80,6 +80,7 @@ function buildAddLabelsExampleValue(fieldName, schema) {
     }
   }
 
+  if (typeof value === "string" && typeof schema.maxLength === "number" && Array.from(value).length > schema.maxLength) return null;
   return matchesType(value, type) ? { value } : null;
 }
 

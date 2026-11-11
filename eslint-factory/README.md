@@ -111,6 +111,7 @@ negative controls and validated readable traces without live effects.
 | [`prefer-actions-exec-over-child-process`](#prefer-actions-exec-over-child-process) | Prefer `@actions/exec` over `child_process` to spawn processes that run to completion |
 | [`no-unguarded-async-timer-callback`](#no-unguarded-async-timer-callback) | Require async timer callbacks to wrap their entire body in try/catch |
 | [`require-finite-check-before-date-toisostring`](#require-finite-check-before-date-toisostring) | Validate dynamic dates before calling `toISOString()` or `toJSON()` |
+| [`require-null-check-with-typeof-object`](#require-null-check-with-typeof-object) | Require a null check for the same value alongside `typeof value === "object"` |
 | [`require-per-page-on-github-list-call`](#require-per-page-on-github-list-call) | Require explicit `per_page` values on paginated Octokit REST list calls |
 
 ### `no-ad-hoc-jsonl-parser`
@@ -1334,3 +1335,25 @@ const comments = await github.rest.issues.listComments({ owner, repo, issue_numb
 const page = await github.rest.issues.listComments({ owner, repo, issue_number: 1, per_page: 100 });
 const allComments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: 1, per_page: 100 });
 ```
+
+### `require-null-check-with-typeof-object`
+
+Require a null check for the same value when `typeof value === "object"` or `typeof value == "object"` is used. `typeof null` is `"object"`, so a `null` value passes these checks and later property access (for example `value.counts` or `Object.values(value)`) throws a `TypeError`. Inequality comparisons (`!==` and `!=`) exclude `null` and are not flagged. In `actions/setup/js` this shows up when parsing state files and API payloads where `null` is a valid JSON value.
+
+**Flagged forms:**
+```js
+const ok = !!parsed && typeof parsed.counts === "object"; // parsed.counts may be null
+const states = typeof result === "object" ? Object.values(result.claims || {}) : [];
+```
+
+**Safe alternatives:**
+```js
+const ok = !!parsed && parsed.counts !== null && typeof parsed.counts === "object";
+const states = result && typeof result === "object" ? Object.values(result.claims || {}) : [];
+```
+
+**Not flagged:**
+- A null/truthiness guard for the same value makes the conjunction fail for `null`, or a top-level early-exit `if` in the same function exits for `null`/falsy values before the check.
+- A loose comparison against `undefined` (`value != undefined`) excludes `null`; strict comparisons (`!== undefined` or `=== undefined`) do not.
+- Other `typeof` comparisons such as `"string"` or `"function"`.
+- `typeof` operands that are not a plain identifier or non-computed member chain (calls, computed access).

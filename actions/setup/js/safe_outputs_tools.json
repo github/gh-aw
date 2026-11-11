@@ -145,7 +145,8 @@
         "labels": {
           "type": ["array", "string"],
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 50
           },
           "description": "Labels to categorize the issue (e.g., 'bug', 'enhancement'). Labels must exist in the repository. Accepts either an array of strings or a comma-separated string; string input is split on commas, trimmed, and normalized to an array."
         },
@@ -313,7 +314,8 @@
         "labels": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 50
           },
           "description": "Replace the discussion labels with this list (e.g., ['bug', 'help wanted']). Labels must exist in the repository. This replaces all existing labels on the discussion."
         },
@@ -566,7 +568,8 @@
         "labels": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 50
           },
           "description": "Labels to categorize the PR (e.g., 'enhancement', 'bugfix'). Labels must exist in the repository."
         },
@@ -861,7 +864,8 @@
           "items": {
             "oneOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 50
               },
               {
                 "type": "object",
@@ -869,6 +873,7 @@
                 "properties": {
                   "name": {
                     "type": "string",
+                    "maxLength": 50,
                     "description": "Label name to apply."
                   },
                   "rationale": {
@@ -922,7 +927,8 @@
           "items": {
             "oneOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 50
               },
               {
                 "type": "object",
@@ -930,6 +936,7 @@
                 "properties": {
                   "name": {
                     "type": "string",
+                    "maxLength": 50,
                     "description": "Label name to remove."
                   },
                   "rationale": {
@@ -980,10 +987,12 @@
       "properties": {
         "label_to_remove": {
           "type": "string",
+          "maxLength": 50,
           "description": "Label name to remove from the issue or pull request, e.g. 'triage'."
         },
         "label_to_add": {
           "type": "string",
+          "maxLength": 50,
           "description": "Label name to add to the issue or pull request, e.g. 'in-progress'."
         },
         "item_number": {
@@ -1283,7 +1292,8 @@
           "items": {
             "oneOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 50
               },
               {
                 "type": "object",
@@ -1291,6 +1301,7 @@
                 "properties": {
                   "name": {
                     "type": "string",
+                    "maxLength": 50,
                     "description": "Label name to apply."
                   },
                   "rationale": {

@@ -457,7 +457,6 @@ case "$ENGINE_TYPE" in
     else
       cp /tmp/gh-aw/mcp-config/gateway-output.json "$HOME/.copilot/mcp-config.json"
     fi
-    cat "$HOME/.copilot/mcp-config.json"
     ;;
 esac
 print_timing $CONFIG_CONVERT_START "Configuration conversion"

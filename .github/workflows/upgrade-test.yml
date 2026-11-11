@@ -35,11 +35,14 @@ jobs:
       - name: Find target and previous releases
         id: releases
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           # Include prereleases too; /releases/latest only returns non-prerelease releases.
           # For release-created events, use that exact tag as the upgrade target.
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TARGET="${{ github.event.release.tag_name }}"
+          if [ "$EVENT_NAME" = "release" ]; then
+            TARGET="$RELEASE_TAG"
             PREVIOUS=$(gh api "repos/github/gh-aw/releases?per_page=50" \
               | jq -r --arg target "$TARGET" '[.[] | select(.draft == false and .tag_name != $target)][0].tag_name')
           else
