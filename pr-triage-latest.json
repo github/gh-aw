@@ -1,49 +1,161 @@
 {
-  "run_id": "42972072363",
-  "run_date": "2026-11-11T06:25:54Z",
+  "run_id": "20261111T122855Z",
+  "run_date": "2026-11-11T12:28:55.098473Z",
   "source": "pr-triage",
-  "eligible_total": 4,
-  "open_copilot_prs": 6,
-  "cooldown_skipped": 2,
+  "eligible_total": 10,
+  "open_copilot_prs": 10,
+  "cooldown_skipped": 0,
   "category_counts": {
-    "bug": 3,
+    "bug": 9,
     "feature": 1
   },
   "risk_counts": {
-    "medium": 3,
-    "high": 1
+    "low": 1,
+    "medium": 7,
+    "high": 2
   },
   "priority_counts": {
-    "medium": 3,
-    "high": 1
+    "medium": 8,
+    "high": 2
   },
   "action_counts": {
-    "batch_review": 3,
-    "fast_track": 1
+    "auto_merge": 2,
+    "fast_track": 2,
+    "batch_review": 6
   },
   "batches": [
     {
-      "id": "pr-batch:copilot-ops",
+      "id": "pr-batch:copilot-runtime",
       "prs": [
-        76617,
+        76807,
+        76806,
+        76805,
+        76804,
+        76803
+      ]
+    },
+    {
+      "id": "pr-batch:copilot-platform",
+      "prs": [
+        76801,
+        76800,
+        76776,
         76731,
-        76754
+        76617
       ]
     }
   ],
   "selected_candidates": [
     {
-      "number": 76617,
-      "title": "Choose model routing with `model: router` and `router/economy|balanced|robust`",
-      "category": "feature",
+      "number": 76807,
+      "title": "Honor Retry-After in Copilot harness HTTP 429 retries",
+      "category": "bug",
       "risk": "medium",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 83,
+      "score_breakdown": {
+        "impact": 41,
+        "urgency": 27,
+        "quality": 15
+      }
+    },
+    {
+      "number": 76806,
+      "title": "Add per-checkout data-only acknowledgement for ref warnings",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "auto_merge",
+      "score": 69,
+      "score_breakdown": {
+        "impact": 33,
+        "urgency": 20,
+        "quality": 16
+      }
+    },
+    {
+      "number": 76805,
+      "title": "Preserve hidden reference markers in PR review bodies",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "auto_merge",
+      "score": 67,
+      "score_breakdown": {
+        "impact": 34,
+        "urgency": 18,
+        "quality": 15
+      }
+    },
+    {
+      "number": 76804,
+      "title": "Fail closed on contradictory empty daily AIC history",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 88,
+      "score_breakdown": {
+        "impact": 46,
+        "urgency": 27,
+        "quality": 15
+      }
+    },
+    {
+      "number": 76803,
+      "title": "Honor Node runtime pins in agent engine-install steps",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 73,
+      "score_breakdown": {
+        "impact": 39,
+        "urgency": 19,
+        "quality": 15
+      }
+    },
+    {
+      "number": 76801,
+      "title": "Diagnose CGO govulncheck failure",
+      "category": "bug",
+      "risk": "low",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 60,
+      "score_breakdown": {
+        "impact": 24,
+        "urgency": 21,
+        "quality": 15
+      }
+    },
+    {
+      "number": 76800,
+      "title": "Keep Go probe tests from enumerating process environment",
+      "category": "bug",
+      "risk": "low",
       "priority": "medium",
       "action": "batch_review",
       "score": 62,
       "score_breakdown": {
+        "impact": 26,
+        "urgency": 21,
+        "quality": 15
+      }
+    },
+    {
+      "number": 76776,
+      "title": "Sync the CI spec pin and extend Auditor health collection",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 68,
+      "score_breakdown": {
         "impact": 35,
-        "urgency": 13,
-        "quality": 14
+        "urgency": 18,
+        "quality": 15
       }
     },
     {
@@ -53,41 +165,27 @@
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 58,
+      "score": 71,
       "score_breakdown": {
-        "impact": 31,
-        "urgency": 14,
-        "quality": 13
-      }
-    },
-    {
-      "number": 76753,
-      "title": "Raise the Go toolchain baseline to 1.27.4",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 82,
-      "score_breakdown": {
-        "impact": 42,
-        "urgency": 25,
+        "impact": 38,
+        "urgency": 18,
         "quality": 15
       }
     },
     {
-      "number": 76754,
-      "title": "Sync MCP spec pin and reviewer workflow locks",
-      "category": "bug",
+      "number": 76617,
+      "title": "Choose model routing with `model: router` and `router/economy|balanced|robust`",
+      "category": "feature",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 56,
+      "score": 76,
       "score_breakdown": {
-        "impact": 29,
-        "urgency": 15,
-        "quality": 12
+        "impact": 40,
+        "urgency": 21,
+        "quality": 15
       }
     }
   ],
-  "summary": "Four eligible Copilot-authored PRs passed the one-hour cooldown. The set is led by a security-worthy Go baseline update and a small cluster of medium-risk automation hardening and routing work. The model-routing feature is the biggest scope item, while the runtime, CI, and lock-sync fixes are narrower and suitable for a grouped review."
+  "summary": "Ten active Copilot PRs were reviewed without any cooldown skips. The set is dominated by safety and runtime fixes, with two high-value fast-track items and two grouped review batches around runtime and platform hardening."
 }
