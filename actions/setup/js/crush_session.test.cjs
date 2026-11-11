@@ -101,6 +101,26 @@ describe("Crush 0.98.1 quiet-mode sessions", () => {
     expect(parseEngineSession("[]\n", "crush")).toEqual([]);
   });
 
+  it.each(["compact array", "pretty array", "JSONL"])("retains startup observations before canonical %s output", format => {
+    const records = [
+      { type: "assistant.message", data: { content: "Observed answer." } },
+      { type: "session.result", data: { numTurns: 0 } },
+    ];
+    const text = format === "JSONL" ? records.map(JSON.stringify).join("\n") : JSON.stringify(records, null, format === "pretty array" ? 2 : undefined);
+    for (const suffix of ["", '\n{"type":"result","num_turns":0}']) {
+      const canonical = parseEngineSession(`${nativePreamble}\n${text}${suffix}\n`, "crush");
+      const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: canonical }]);
+      for (const events of [canonical, unified]) {
+        expect(events[0]).toMatchObject({ type: "session.init", data: { sourceEngine: "crush", provider: "awf-proxy", model: "auto", sessionId: "05482e8a-0c34-4d78-8c21-26e6d147607a" } });
+        expect(events[1]).toMatchObject({ type: "crush.diagnostic", data: { content: nativePreamble.split("\n").slice(1).join("\n") } });
+        expect(events.slice(2, 4).map(({ type, data }) => ({ type, data }))).toEqual(records);
+        expect(events).toHaveLength(suffix ? 5 : 4);
+        if (suffix) expect(events.at(-1)).toMatchObject({ type: "session.result", data: { numTurns: 0 } });
+      }
+      expect(validateSession(JSON.stringify(canonical), "agent", "json")).toBe(canonical.length);
+    }
+  });
+
   it("retains explicit historical terminal observations rather than inferred counters", () => {
     const events = parseEngineSession('Observed answer.\n{"type":"result","num_turns":0,"usage":{"output_tokens":0}}\n', "crush");
     expect(events.find(event => event.type === "assistant.message").data.content).toBe("Observed answer.");
