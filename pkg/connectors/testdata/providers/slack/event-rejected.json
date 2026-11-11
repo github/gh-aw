@@ -1,0 +1,14 @@
+{
+  "type": "event_callback",
+  "team_id": "T123ABC456",
+  "api_app_id": "A123ABC456",
+  "event_id": "EvUnapprovedChannel",
+  "event": {
+    "type": "app_mention",
+    "channel": "CUNAPPROVED",
+    "user": "U123ABC456",
+    "text": "Do not dispatch outside approved channels",
+    "ts": "1515449533.000017",
+    "thread_ts": "1515449522.000016"
+  }
+}

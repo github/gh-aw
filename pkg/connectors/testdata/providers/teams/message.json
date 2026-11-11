@@ -1,0 +1,21 @@
+{
+  "id": "1730000000000",
+  "replyToId": null,
+  "messageType": "message",
+  "createdDateTime": "2026-10-27T03:33:20Z",
+  "from": {
+    "user": {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "displayName": "Fixture participant",
+      "userIdentityType": "aadUser"
+    }
+  },
+  "body": {
+    "contentType": "html",
+    "content": "<p>Review the rollout proposal.</p>"
+  },
+  "channelIdentity": {
+    "teamId": "11111111-1111-4111-8111-111111111111",
+    "channelId": "19:approved-channel@thread.tacv2"
+  }
+}

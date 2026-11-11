@@ -115,6 +115,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 		config[ledgerMutationHandlerKey] = handlerConfig
 	}
 	addStandaloneLedgerConfigs(config, data.LedgerConfig)
+	addConnectorThreatWarningPolicies(config, safeOutputs.Scripts)
 
 	// Include top-level mentions configuration so the handler manager can pass it to
 	// markdown-producing handlers that call sanitizeContent with allowed aliases.

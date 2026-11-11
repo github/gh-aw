@@ -1,0 +1,15 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: atlassian.com/jira-cloud
+credentials:
+  mcp-service-account: {secret: JIRA_MCP_SERVICE_ACCOUNT_KEY}
+  mcp-personal: {secret: JIRA_MCP_PERSONAL_BASIC_AUTH}
+  rest-writer: {secret: JIRA_REST_BASIC_AUTH}
+  context-reader: {secret: JIRA_CONTEXT_BASIC_AUTH}
+resources:
+  issues: [APP-1]
+  issue-ids: ["10001"]
+  issue-urls: [https://example.atlassian.net/rest/api/3/issue/10001]
+  projects: [APP]
+  cloud-ids: [00000000-0000-4000-8000-000000000001]
+  queries: ["project = APP ORDER BY created DESC"]

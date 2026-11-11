@@ -1,0 +1,6 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: atlassian.com/confluence
+safeOutputs:
+  create-page:
+    encoding: plain-text-to-storage
