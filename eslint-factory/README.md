@@ -1338,7 +1338,7 @@ const allComments = await github.paginate(github.rest.issues.listComments, { own
 
 ### `require-null-check-with-typeof-object`
 
-Require a null check for the same value whenever `typeof value === "object"` (or `!==`, `==`, `!=`) is used. `typeof null` is `"object"`, so a `null` value passes the check and later property access (for example `value.counts` or `Object.values(value)`) throws a `TypeError`. In `actions/setup/js` this shows up when parsing state files and API payloads where `null` is a valid JSON value.
+Require a null check for the same value when `typeof value === "object"` or `typeof value == "object"` is used. `typeof null` is `"object"`, so a `null` value passes these checks and later property access (for example `value.counts` or `Object.values(value)`) throws a `TypeError`. Inequality comparisons (`!==` and `!=`) exclude `null` and are not flagged. In `actions/setup/js` this shows up when parsing state files and API payloads where `null` is a valid JSON value.
 
 **Flagged forms:**
 ```js
@@ -1353,6 +1353,7 @@ const states = result && typeof result === "object" ? Object.values(result.claim
 ```
 
 **Not flagged:**
-- The same value is checked against `null`/`undefined` or tested for truthiness (`value &&`, `value != null`, `!value ||`, `Boolean(value)`) in the same logical expression, or earlier in the same function.
-- `typeof` operands that are not a plain identifier or non-computed member chain (calls, computed access).
+- A null/truthiness guard for the same value makes the conjunction fail for `null`, or a top-level early-exit `if` in the same function exits for `null`/falsy values before the check.
+- A loose comparison against `undefined` (`value != undefined`) excludes `null`; strict comparisons (`!== undefined` or `=== undefined`) do not.
 - Other `typeof` comparisons such as `"string"` or `"function"`.
+- `typeof` operands that are not a plain identifier or non-computed member chain (calls, computed access).

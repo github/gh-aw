@@ -10,7 +10,7 @@ const cjsRuleTester = new RuleTester({
 });
 
 const messageFor = (subject: string, operator = "===") =>
-  `\`typeof ${subject} ${operator} "object"\` is also satisfied by \`null\`. Check \`${subject}\` for null (or truthiness) in the same condition or earlier in the function; otherwise a null value is treated as an object and later property access throws.`;
+  `\`typeof ${subject} ${operator} "object"\` is also satisfied by \`null\`. Guard \`${subject}\` in the same conjunction or exit early for null before this check; otherwise a null value is treated as an object and later property access throws.`;
 
 describe("require-null-check-with-typeof-object", () => {
   it("uses the correct docs URL", () => {
@@ -34,12 +34,16 @@ describe("require-null-check-with-typeof-object", () => {
           errors: [{ message: messageFor("parsed.counts") }],
         },
         {
+          code: `if (value !== undefined && typeof value === "object") Object.keys(value);`,
+          errors: [{ message: messageFor("value") }],
+        },
+        {
           code: `const isObj = "object" === typeof value;`,
           errors: [{ message: messageFor("value") }],
         },
         {
-          code: `const notObj = typeof value != "object";`,
-          errors: [{ message: messageFor("value", "!=") }],
+          code: `function f(value) { if (value !== undefined) return; return typeof value === "object" ? Object.keys(value) : []; }`,
+          errors: [{ message: messageFor("value") }],
         },
         {
           code: `function f(a, b) { if (b !== null) {} return typeof a === "object"; }`,
@@ -48,6 +52,26 @@ describe("require-null-check-with-typeof-object", () => {
         {
           code: `function f(a) { return typeof a === "object"; } function g(a) { if (a) {} }`,
           errors: [{ message: messageFor("a") }],
+        },
+        {
+          code: `function f(value) { function helper(value) { if (value) return; } if (typeof value === "object") return Object.keys(value); }`,
+          errors: [{ message: messageFor("value") }],
+        },
+        {
+          code: `function f(value, condition) { const result = condition && value; return typeof value === "object" ? Object.keys(value) : result; }`,
+          errors: [{ message: messageFor("value") }],
+        },
+        {
+          code: `function f(value) { if (value) log("set"); return typeof value === "object" ? Object.keys(value) : []; }`,
+          errors: [{ message: messageFor("value") }],
+        },
+        {
+          code: `if (value == null || typeof value === "object") Object.keys(value);`,
+          errors: [{ message: messageFor("value") }],
+        },
+        {
+          code: `function helper(x) { if (x) return; } const ok = typeof x === "object";`,
+          errors: [{ message: messageFor("x") }],
         },
       ],
     });
@@ -61,10 +85,13 @@ describe("require-null-check-with-typeof-object", () => {
         { code: `const ok = typeof value === "object" && value !== null;` },
         { code: `const ok = value != null && typeof value === "object";` },
         { code: `const ok = typeof value === "object" && value !== undefined && value !== null;` },
-        { code: `const ok = typeof value === "object" && !Array.isArray(value) && value !== null;` },
+        { code: `const ok = value != undefined && typeof value === "object";` },
+        { code: `const ok = value !== null && typeof value === "object" && !Array.isArray(value);` },
         { code: `const ok = Boolean(value) && typeof value === "object";` },
         { code: `const ok = !value || typeof value !== "object";` },
         { code: `const ok = value == null || typeof value !== "object";` },
+        { code: `const notObj = typeof value != "object";` },
+        { code: `const notObj = typeof value !== "object";` },
         { code: `const ok = result?.target && typeof result.target === "object" ? result.target : undefined;` },
         { code: `function f(headers) { if (headers == null) { return false; } if (typeof headers === "object") { return true; } return false; }` },
         { code: `function f(value) { if (value === null) return 1; return typeof value === "object" ? 2 : 3; }` },

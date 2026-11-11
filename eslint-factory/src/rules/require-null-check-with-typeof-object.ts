@@ -3,6 +3,7 @@ import { AST_NODE_TYPES, ESLintUtils, TSESLint, TSESTree } from "@typescript-esl
 const createRule = ESLintUtils.RuleCreator(name => `https://github.com/github/gh-aw/tree/main/eslint-factory#${name}`);
 
 const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
+const TYPEOF_OBJECT_OPERATORS = new Set(["===", "=="]);
 
 /** Source-level name of an identifier or non-computed member chain (optional chaining ignored); null for any other expression. */
 function subjectText(node: TSESTree.Node): string | null {
@@ -23,7 +24,7 @@ function isNullish(node: TSESTree.Node): boolean {
 
 /** Matches `typeof <subject> <op> "object"` in either operand order. */
 function matchTypeofObject(node: TSESTree.BinaryExpression): { text: string; operator: string } | null {
-  if (!EQUALITY_OPERATORS.has(node.operator)) return null;
+  if (!TYPEOF_OBJECT_OPERATORS.has(node.operator)) return null;
   const isObjectLiteral = (n: TSESTree.Node) => n.type === AST_NODE_TYPES.Literal && n.value === "object";
   const typeofSide = isObjectLiteral(node.right) ? node.left : isObjectLiteral(node.left) ? node.right : null;
   if (!typeofSide || typeofSide.type !== AST_NODE_TYPES.UnaryExpression || typeofSide.operator !== "typeof") return null;
@@ -31,58 +32,84 @@ function matchTypeofObject(node: TSESTree.BinaryExpression): { text: string; ope
   return text === null ? null : { text, operator: node.operator };
 }
 
-/** True when `node` is an expression that tests `text` for null/undefined or truthiness. */
-function isNullGuard(node: TSESTree.Node, text: string): boolean {
+type GuardEffect = "nonNull" | "nullish" | null;
+
+/** Describes whether a true result from `node` proves `text` non-null or nullish. */
+function guardEffect(node: TSESTree.Node, text: string): GuardEffect {
+  if (node.type === AST_NODE_TYPES.UnaryExpression && node.operator === "!") {
+    const effect = guardEffect(node.argument, text);
+    return effect === "nonNull" ? "nullish" : effect === "nullish" ? "nonNull" : null;
+  }
+  if (node.type === AST_NODE_TYPES.CallExpression && node.callee.type === AST_NODE_TYPES.Identifier && node.callee.name === "Boolean" && node.arguments.length === 1) {
+    return subjectText(node.arguments[0]) === text ? "nonNull" : null;
+  }
   if (node.type === AST_NODE_TYPES.BinaryExpression && EQUALITY_OPERATORS.has(node.operator)) {
     const other = isNullish(node.right) ? node.left : isNullish(node.left) ? node.right : null;
-    return other !== null && subjectText(other) === text;
+    if (other === null || subjectText(other) !== text) return null;
+    const nullLiteral = (node.left.type === AST_NODE_TYPES.Literal && node.left.value === null) || (node.right.type === AST_NODE_TYPES.Literal && node.right.value === null);
+    if (nullLiteral) {
+      return node.operator === "!=" || node.operator === "!==" ? "nonNull" : "nullish";
+    }
+    if (node.operator === "==") return "nullish";
+    if (node.operator === "!=") return "nonNull";
+    return null;
   }
-  if (subjectText(node) !== text) return false;
-  const parent = node.parent;
-  if (!parent) return false;
-  if (parent.type === AST_NODE_TYPES.LogicalExpression) return true;
-  if (parent.type === AST_NODE_TYPES.UnaryExpression) return parent.operator === "!";
-  if (parent.type === AST_NODE_TYPES.CallExpression) return parent.callee.type === AST_NODE_TYPES.Identifier && parent.callee.name === "Boolean" && parent.arguments[0] === node;
-  if (parent.type === AST_NODE_TYPES.IfStatement || parent.type === AST_NODE_TYPES.ConditionalExpression || parent.type === AST_NODE_TYPES.WhileStatement) return parent.test === node;
+  return subjectText(node) === text ? "nonNull" : null;
+}
+
+/** True when a conjunction guards the `typeof` check with a test for `text`. */
+function hasSameExpressionGuard(node: TSESTree.Node, text: string): boolean {
+  let chain = node;
+  while (chain.parent?.type === AST_NODE_TYPES.LogicalExpression && chain.parent.operator === "&&") {
+    chain = chain.parent;
+  }
+  const operands: TSESTree.Node[] = [];
+  const flattenAnd = (current: TSESTree.Node) => {
+    if (current.type === AST_NODE_TYPES.LogicalExpression && current.operator === "&&") {
+      flattenAnd(current.left);
+      flattenAnd(current.right);
+    } else {
+      operands.push(current);
+    }
+  };
+  flattenAnd(chain);
+  const nodeIndex = operands.indexOf(node);
+  const isGuardSyntax = (candidate: TSESTree.Node) =>
+    guardEffect(candidate, text) !== null ||
+    (candidate.type === AST_NODE_TYPES.BinaryExpression &&
+      EQUALITY_OPERATORS.has(candidate.operator) &&
+      ((isNullish(candidate.left) && subjectText(candidate.right) === text) || (isNullish(candidate.right) && subjectText(candidate.left) === text)));
+  if (nodeIndex >= 0) {
+    for (let index = 0; index < operands.length; index++) {
+      if (index === nodeIndex || guardEffect(operands[index], text) !== "nonNull") continue;
+      if (index < nodeIndex || operands.slice(nodeIndex + 1, index).every(isGuardSyntax)) return true;
+    }
+  }
+
   return false;
 }
 
-function outermostLogicalChain(node: TSESTree.Node): TSESTree.Node {
-  let current = node;
-  while (current.parent && (current.parent.type === AST_NODE_TYPES.LogicalExpression || (current.parent.type === AST_NODE_TYPES.UnaryExpression && current.parent.operator === "!"))) {
-    current = current.parent;
-  }
-  return current;
-}
-
-function enclosingFunctionOrProgram(node: TSESTree.Node): TSESTree.Node {
+function enclosingFunction(node: TSESTree.Node): TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression | null {
   let current: TSESTree.Node | undefined = node.parent;
   while (current) {
-    if (current.type === AST_NODE_TYPES.FunctionDeclaration || current.type === AST_NODE_TYPES.FunctionExpression || current.type === AST_NODE_TYPES.ArrowFunctionExpression || current.type === AST_NODE_TYPES.Program) {
+    if (current.type === AST_NODE_TYPES.FunctionDeclaration || current.type === AST_NODE_TYPES.FunctionExpression || current.type === AST_NODE_TYPES.ArrowFunctionExpression) {
       return current;
     }
     current = current.parent;
   }
-  return node;
+  return null;
 }
 
-/** Depth-first walk of `root`, skipping `skip`, returning true as soon as `visit` matches a node whose range ends at or before `endLimit`. */
-function someNode(root: TSESTree.Node, skip: TSESTree.Node, endLimit: number, visit: (node: TSESTree.Node) => boolean): boolean {
-  const stack: TSESTree.Node[] = [root];
-  while (stack.length > 0) {
-    const node = stack.pop()!;
-    if (node === skip) continue;
-    if (node.range[1] <= endLimit && visit(node)) return true;
-    for (const key of Object.keys(node)) {
-      if (key === "parent") continue;
-      const value = (node as unknown as Record<string, unknown>)[key];
-      const children = Array.isArray(value) ? value : [value];
-      for (const child of children) {
-        if (child && typeof (child as TSESTree.Node).type === "string") stack.push(child as TSESTree.Node);
-      }
-    }
-  }
-  return false;
+function exitsUnconditionally(statement: TSESTree.Statement): boolean {
+  if (statement.type === AST_NODE_TYPES.ReturnStatement || statement.type === AST_NODE_TYPES.ThrowStatement) return true;
+  return statement.type === AST_NODE_TYPES.BlockStatement && statement.body.length > 0 && exitsUnconditionally(statement.body[statement.body.length - 1]);
+}
+
+/** Earlier guards count only when a top-level early exit excludes null before this check. */
+function hasEarlierExitGuard(node: TSESTree.Node, text: string): boolean {
+  const fn = enclosingFunction(node);
+  if (!fn || fn.body.type !== AST_NODE_TYPES.BlockStatement) return false;
+  return fn.body.body.some(statement => statement.range[1] < node.range[0] && statement.type === AST_NODE_TYPES.IfStatement && guardEffect(statement.test, text) === "nullish" && exitsUnconditionally(statement.consequent));
 }
 
 export const requireNullCheckWithTypeofObjectRule = createRule({
@@ -95,7 +122,7 @@ export const requireNullCheckWithTypeofObjectRule = createRule({
     schema: [],
     messages: {
       missingNullCheck:
-        '`typeof {{subject}} {{operator}} "object"` is also satisfied by `null`. Check `{{subject}}` for null (or truthiness) in the same condition or earlier in the function; otherwise a null value is treated as an object and later property access throws.',
+        '`typeof {{subject}} {{operator}} "object"` is also satisfied by `null`. Guard `{{subject}}` in the same conjunction or exit early for null before this check; otherwise a null value is treated as an object and later property access throws.',
     },
   },
   defaultOptions: [],
@@ -105,9 +132,7 @@ export const requireNullCheckWithTypeofObjectRule = createRule({
         const match = matchTypeofObject(node);
         if (!match) return;
 
-        const guard = (candidate: TSESTree.Node) => isNullGuard(candidate, match.text);
-        if (someNode(outermostLogicalChain(node), node, Infinity, guard)) return;
-        if (someNode(enclosingFunctionOrProgram(node), node, node.range[0], guard)) return;
+        if (hasSameExpressionGuard(node, match.text) || hasEarlierExitGuard(node, match.text)) return;
 
         context.report({
           node,
