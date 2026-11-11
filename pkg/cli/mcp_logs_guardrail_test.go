@@ -5,18 +5,22 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	// buildLogsFileResponse always writes to a file and returns file_path
 	output := `{"summary": {"total_runs": 1}, "runs": []}`
 
-	result := buildLogsFileResponse(output)
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	result := buildLogsFileResponseInDir(output, cacheDir)
 
 	// Verify the result is valid JSON
 	var response MCPLogsGuardrailResponse
@@ -35,8 +39,8 @@ func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	}
 
 	// Verify the file is in the cache directory (not the artifact directory)
-	if !strings.HasPrefix(response.FilePath, mcpLogsCacheDir) {
-		t.Errorf("File should be in cache dir %q, got %q", mcpLogsCacheDir, response.FilePath)
+	if filepath.Dir(response.FilePath) != cacheDir {
+		t.Errorf("File should be in cache dir %q, got %q", cacheDir, response.FilePath)
 	}
 
 	// Verify the file was actually created and contains the output
@@ -52,9 +56,10 @@ func TestBuildLogsFileResponse_WritesFile(t *testing.T) {
 	_ = os.Remove(response.FilePath)
 }
 
-func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
+func TestBuildLogsFileResponse_SetsPrivatePermissions(t *testing.T) {
 	output := `{"summary":{"total_runs":1}}`
-	result := buildLogsFileResponse(output)
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	result := buildLogsFileResponseInDir(output, cacheDir)
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -64,33 +69,109 @@ func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
 		t.Fatal("Response should include file_path")
 	}
 
-	cacheInfo, err := os.Stat(mcpLogsCacheDir)
+	cacheInfo, err := os.Stat(cacheDir)
 	if err != nil {
 		t.Fatalf("Cache directory should exist: %v", err)
 	}
 	cachePerm := cacheInfo.Mode().Perm()
-	if cachePerm&0o005 != 0o005 {
-		t.Errorf("Cache directory should be accessible to other users (expected other r-x bits set), got mode %o", cachePerm)
-	}
+	assert.Equal(t, constants.DirPermOwnerOnly, cachePerm, "only the owner's UID may traverse or list cached reports")
 
 	fileInfo, err := os.Stat(response.FilePath)
 	if err != nil {
 		t.Fatalf("Cache file should exist: %v", err)
 	}
 	filePerm := fileInfo.Mode().Perm()
-	if filePerm&0o004 != 0o004 {
-		t.Errorf("Cache file should be world-readable (expected other read bit set), got mode %o", filePerm)
-	}
+	assert.Equal(t, constants.FilePermSensitive, filePerm, "group and other users must not read reports")
+	data, err := os.ReadFile(response.FilePath)
+	require.NoError(t, err, "same-UID agents must retain access")
+	assert.Equal(t, output, string(data))
 
 	_ = os.Remove(response.FilePath)
+}
+
+func TestBuildLogsFileResponse_RestrictsLegacyCache(t *testing.T) {
+	for _, reuse := range []bool{false, true} {
+		name := "new report"
+		if reuse {
+			name = "reused report"
+		}
+		t.Run(name, func(t *testing.T) {
+			cacheDir := filepath.Join(t.TempDir(), "cache")
+			output := `{"summary":{"total_runs":1}}`
+			var original MCPLogsGuardrailResponse
+			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseInDir(output, cacheDir)), &original))
+			require.NotEmpty(t, original.FilePath)
+			require.NoError(t, os.Chmod(original.FilePath, constants.FilePermPublic))
+			require.NoError(t, os.Chmod(cacheDir, constants.DirPermPublic))
+
+			if !reuse {
+				output = `{"summary":{"total_runs":2}}`
+			}
+			var response MCPLogsGuardrailResponse
+			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseInDir(output, cacheDir)), &response))
+			require.NotEmpty(t, response.FilePath)
+
+			cacheInfo, err := os.Stat(cacheDir)
+			require.NoError(t, err)
+			assert.Equal(t, constants.DirPermOwnerOnly, cacheInfo.Mode().Perm(), "deny other UIDs access to every legacy report, not only the requested report")
+			fileInfo, err := os.Stat(response.FilePath)
+			require.NoError(t, err)
+			assert.Equal(t, constants.FilePermSensitive, fileInfo.Mode().Perm())
+			data, err := os.ReadFile(response.FilePath)
+			require.NoError(t, err)
+			assert.Equal(t, output, string(data))
+			data, err = os.ReadFile(original.FilePath)
+			require.NoError(t, err, "same-UID readers must retain access to legacy reports")
+			assert.JSONEq(t, `{"summary":{"total_runs":1}}`, string(data))
+		})
+	}
+}
+
+func TestBuildLogsFileResponse_RejectsCacheSymlinks(t *testing.T) {
+	for _, directory := range []bool{false, true} {
+		name := "report"
+		if directory {
+			name = "directory"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			cacheDir := filepath.Join(root, "cache")
+			target := filepath.Join(root, "target")
+			output := `{"summary":{"total_runs":1}}`
+			var targetMode os.FileMode
+			if directory {
+				targetMode = constants.DirPermPublic
+				require.NoError(t, os.Mkdir(target, targetMode))
+				require.NoError(t, os.Symlink(target, cacheDir))
+			} else {
+				targetMode = constants.FilePermPublic
+				require.NoError(t, os.WriteFile(target, []byte("unrelated"), targetMode))
+				var response MCPLogsGuardrailResponse
+				require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseInDir(output, cacheDir)), &response))
+				require.NotEmpty(t, response.FilePath)
+				require.NoError(t, os.Remove(response.FilePath))
+				require.NoError(t, os.Symlink(target, response.FilePath))
+			}
+			require.NoError(t, os.Chmod(target, targetMode))
+
+			var response MCPLogsGuardrailResponse
+			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseInDir(output, cacheDir)), &response))
+			assert.Empty(t, response.FilePath)
+			assert.Contains(t, response.Message, "is a symlink; refusing to use it")
+			info, err := os.Stat(target)
+			require.NoError(t, err)
+			assert.Equal(t, targetMode, info.Mode().Perm(), "migration must not chmod a symlink target")
+		})
+	}
 }
 
 func TestBuildLogsFileResponse_ContentDeduplication(t *testing.T) {
 	// Same content should yield the same file path (content-addressed)
 	output := `{"summary": {"total_runs": 5}, "runs": []}`
 
-	result1 := buildLogsFileResponse(output)
-	result2 := buildLogsFileResponse(output)
+	cacheDir := t.TempDir()
+	result1 := buildLogsFileResponseInDir(output, cacheDir)
+	result2 := buildLogsFileResponseInDir(output, cacheDir)
 
 	var r1, r2 MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result1), &r1); err != nil {
@@ -117,7 +198,7 @@ func TestBuildLogsFileResponse_LargeOutput(t *testing.T) {
 	// buildLogsFileResponse should always write to file regardless of output size
 	largeOutput := strings.Repeat("x", 50000)
 
-	result := buildLogsFileResponse(largeOutput)
+	result := buildLogsFileResponseInDir(largeOutput, t.TempDir())
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -144,7 +225,7 @@ func TestBuildLogsFileResponse_LargeOutput(t *testing.T) {
 func TestBuildLogsFileResponse_ResponseStructure(t *testing.T) {
 	output := `{"summary": {"total_runs": 2}}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseInDir(output, t.TempDir())
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -166,7 +247,7 @@ func TestBuildLogsFileResponse_ResponseStructure(t *testing.T) {
 func TestBuildLogsFileResponse_MarksPartialResults(t *testing.T) {
 	output := `{"summary":{"total_runs":2},"continuation":{"message":"Timeout reached. Use these parameters to continue fetching more logs.","before_run_id":42,"count":100}}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseInDir(output, t.TempDir())
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -193,7 +274,7 @@ func TestBuildLogsFileResponse_MarksPartialResults(t *testing.T) {
 func TestBuildLogsFileResponse_CompleteResultsNotPartial(t *testing.T) {
 	output := `{"summary":{"total_runs":2},"runs":[]}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseInDir(output, t.TempDir())
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -308,7 +389,7 @@ func TestBuildLogsFileResponse_CollectionCoverage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var response MCPLogsGuardrailResponse
-			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponse(tt.output)), &response))
+			require.NoError(t, json.Unmarshal([]byte(buildLogsFileResponseInDir(tt.output, t.TempDir())), &response))
 			require.NotEmpty(t, response.FilePath)
 			t.Cleanup(func() { assert.NoError(t, os.Remove(response.FilePath)) })
 			assert.Equal(t, tt.partial, response.Partial)
@@ -516,7 +597,7 @@ func TestExtractLogsCollectionState_MalformedSectionIndependence(t *testing.T) {
 func TestBuildLogsFileResponse_SurfacesStaleDataWarning(t *testing.T) {
 	output := `{"summary":{"total_runs":1},"runs":[],"stale_warning":"No start_date/end_date was specified, and the most recent run in this result is 11 days old."}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseInDir(output, t.TempDir())
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
@@ -540,7 +621,7 @@ func TestBuildLogsFileResponse_DoesNotWarnOnOrdinaryMessage(t *testing.T) {
 	// trigger the WARNING prefix.
 	output := `{"summary":{"total_runs":1},"runs":[],"message":"Only the usage artifact was downloaded."}`
 
-	result := buildLogsFileResponse(output)
+	result := buildLogsFileResponseInDir(output, t.TempDir())
 
 	var response MCPLogsGuardrailResponse
 	if err := json.Unmarshal([]byte(result), &response); err != nil {

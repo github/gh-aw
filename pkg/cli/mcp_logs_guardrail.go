@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -24,7 +25,7 @@ const (
 	CharsPerToken = 4
 
 	// mcpLogsCacheDir is the directory where MCP logs data files are cached.
-	// This lives under /tmp/gh-aw/ so that agents can read the files, but
+	// This lives under /tmp/gh-aw/ so that agents with the same UID can read the files, but
 	// is separate from the artifact download directory (/tmp/gh-aw/aw-mcp/logs)
 	// so that these JSON summary files are not included in artifact uploads.
 	mcpLogsCacheDir = "/tmp/gh-aw/logs-cache"
@@ -65,7 +66,7 @@ func (response *MCPLogsGuardrailResponse) decodeCollectionSection(raw json.RawMe
 func extractLogsCollectionState(outputStr string) MCPLogsGuardrailResponse {
 	response := MCPLogsGuardrailResponse{}
 	var parsed map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(outputStr), &parsed); err != nil || parsed == nil {
+	if err := jsonutil.UnmarshalString(outputStr, &parsed); err != nil || parsed == nil {
 		response.markCollectionStateUnknown("invalid_report_json")
 		return response
 	}
@@ -133,7 +134,7 @@ func extractLogsStaleWarning(outputStr string) string {
 	var parsed struct {
 		StaleWarning string `json:"stale_warning"`
 	}
-	if err := json.Unmarshal([]byte(outputStr), &parsed); err != nil {
+	if err := jsonutil.UnmarshalString(outputStr, &parsed); err != nil {
 		mcpLogsGuardrailLog.Printf("extractLogsStaleWarning: failed to parse output JSON: %v", err)
 		return ""
 	}
@@ -146,18 +147,26 @@ func extractLogsStaleWarning(outputStr string) string {
 // are deduplicated — if the file already exists it is not rewritten.
 // The cache directory is kept separate from the artifact download directory so
 // these summary files are never included in artifact uploads.
-func buildLogsFileResponse(outputStr string) string { //nolint:largefunc // Keep the existing symlink-safe cache write and response assembly together.
+func buildLogsFileResponse(outputStr string) string {
+	return buildLogsFileResponseInDir(outputStr, mcpLogsCacheDir)
+}
+
+func buildLogsFileResponseInDir(outputStr, cacheDir string) string { //nolint:largefunc // Keep the existing symlink-safe cache write and response assembly together.
 	// Verify or create the cache directory. Use Lstat to detect symlinks and
 	// refuse to follow them, hardening against symlink-based directory attacks.
-	if info, err := os.Lstat(mcpLogsCacheDir); err == nil {
+	if info, err := os.Lstat(cacheDir); err == nil {
 		if info.Mode()&os.ModeSymlink != 0 {
-			return buildLogsFileErrorResponse(fmt.Sprintf("logs cache path %q is a symlink; refusing to use it", mcpLogsCacheDir))
+			return buildLogsFileErrorResponse(fmt.Sprintf("logs cache path %q is a symlink; refusing to use it", cacheDir))
 		}
 		if !info.IsDir() {
-			return buildLogsFileErrorResponse(fmt.Sprintf("logs cache path %q is not a directory", mcpLogsCacheDir))
+			return buildLogsFileErrorResponse(fmt.Sprintf("logs cache path %q is not a directory", cacheDir))
 		}
 	} else if errors.Is(err, fs.ErrNotExist) {
-		if mkErr := os.MkdirAll(mcpLogsCacheDir, constants.DirPermPublic); mkErr != nil && !errors.Is(mkErr, fs.ErrExist) {
+		if mkErr := os.MkdirAll(filepath.Dir(cacheDir), constants.DirPermPublic); mkErr != nil {
+			mcpLogsGuardrailLog.Printf("Failed to create logs cache parent directory: %v", mkErr)
+			return buildLogsFileErrorResponse(fmt.Sprintf("failed to create logs cache parent directory: %v", mkErr))
+		}
+		if mkErr := os.Mkdir(cacheDir, constants.DirPermOwnerOnly); mkErr != nil && !errors.Is(mkErr, fs.ErrExist) {
 			mcpLogsGuardrailLog.Printf("Failed to create logs cache directory: %v", mkErr)
 			return buildLogsFileErrorResponse(fmt.Sprintf("failed to create logs cache directory: %v", mkErr))
 		}
@@ -165,7 +174,8 @@ func buildLogsFileResponse(outputStr string) string { //nolint:largefunc // Keep
 		mcpLogsGuardrailLog.Printf("Failed to stat logs cache directory: %v", err)
 		return buildLogsFileErrorResponse(fmt.Sprintf("failed to access logs cache directory: %v", err))
 	}
-	if chmodErr := os.Chmod(mcpLogsCacheDir, constants.DirPermPublic); chmodErr != nil {
+	// Seal the directory before opening reports, including untouched legacy files.
+	if chmodErr := os.Chmod(cacheDir, constants.DirPermOwnerOnly); chmodErr != nil {
 		mcpLogsGuardrailLog.Printf("Failed to set logs cache directory permissions: %v", chmodErr)
 		return buildLogsFileErrorResponse(fmt.Sprintf("failed to set logs cache directory permissions: %v", chmodErr))
 	}
@@ -173,7 +183,7 @@ func buildLogsFileResponse(outputStr string) string { //nolint:largefunc // Keep
 	// Use SHA256 of content as filename for content-addressed deduplication.
 	sum := sha256.Sum256([]byte(outputStr))
 	fileName := hex.EncodeToString(sum[:]) + ".json"
-	filePath := filepath.Join(mcpLogsCacheDir, fileName)
+	filePath := filepath.Join(cacheDir, fileName)
 
 	// Skip writing if a file with identical content already exists.
 	if fileInfo, err := os.Lstat(filePath); err == nil {
@@ -183,7 +193,7 @@ func buildLogsFileResponse(outputStr string) string { //nolint:largefunc // Keep
 		if !fileInfo.Mode().IsRegular() {
 			return buildLogsFileErrorResponse(fmt.Sprintf("logs cache file path %q is not a regular file", filePath))
 		}
-		if chmodErr := os.Chmod(filePath, constants.FilePermPublic); chmodErr != nil {
+		if chmodErr := os.Chmod(filePath, constants.FilePermSensitive); chmodErr != nil {
 			mcpLogsGuardrailLog.Printf("Failed to update logs cache file permissions: %v", chmodErr)
 			return buildLogsFileErrorResponse(fmt.Sprintf("failed to set logs cache file permissions: %v", chmodErr))
 		}
@@ -191,7 +201,7 @@ func buildLogsFileResponse(outputStr string) string { //nolint:largefunc // Keep
 	} else if errors.Is(err, fs.ErrNotExist) {
 		// Write with O_EXCL to avoid following symlinks or races.
 		writeErr := func() (err error) {
-			f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, constants.FilePermPublic)
+			f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, constants.FilePermSensitive)
 			if err != nil {
 				return fmt.Errorf("failed to create logs cache file: %w", err)
 			}
@@ -208,11 +218,15 @@ func buildLogsFileResponse(outputStr string) string { //nolint:largefunc // Keep
 		}()
 		if writeErr != nil {
 			mcpLogsGuardrailLog.Printf("Failed to populate logs cache file %s: %v", filePath, writeErr)
-			_ = os.Remove(filePath)
+			if removeErr := os.Remove(filePath); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+				mcpLogsGuardrailLog.Printf("Failed to remove incomplete logs cache file %s: %v", filePath, removeErr)
+			}
 			return buildLogsFileErrorResponse(writeErr.Error())
 		}
-		if chmodErr := os.Chmod(filePath, constants.FilePermPublic); chmodErr != nil {
-			_ = os.Remove(filePath)
+		if chmodErr := os.Chmod(filePath, constants.FilePermSensitive); chmodErr != nil {
+			if removeErr := os.Remove(filePath); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+				mcpLogsGuardrailLog.Printf("Failed to remove logs cache file after permission error %s: %v", filePath, removeErr)
+			}
 			mcpLogsGuardrailLog.Printf("Failed to set logs cache file permissions: %v", chmodErr)
 			return buildLogsFileErrorResponse(fmt.Sprintf("failed to set logs cache file permissions: %v", chmodErr))
 		}
