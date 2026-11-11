@@ -480,12 +480,12 @@ async function finalizeWorkerResults(options = {}) {
         if (disposition === "none" && (!verificationReceipt || !beforeVerification.terminal)) disposition = "unknown";
         if (!native.terminal) {
           log.debug("delivery.settlement.native_run_pending", { attempts, contract_supported: contractSupported });
-          results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid" };
+          results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid", verifier: verification?.reason ?? null };
           continue;
         }
         if (attempts < policy.max_attempts && checkedAt - work.completion_at < policy.deadline_ms) {
           log.debug("delivery.settlement.budget_remaining", { attempts, max_attempts: policy.max_attempts });
-          results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted" };
+          results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted", verifier: verification?.reason ?? null };
           continue;
         }
         const evidence = {
@@ -500,7 +500,7 @@ async function finalizeWorkerResults(options = {}) {
         };
         const operation = { kind: "DeliveryFailure", work_id: member.work_id, claim_id: member.claim_id, completion_id: work.completion_id, reason: "verification_exhausted", disposition, evidence };
         await publishOperations(configured, trustedContext, ["delivery_failure", assignment.dispatch_id, member.handle, work.completion_id], "delivery_failure", [operation]);
-        results[member.handle] = { state: "delivery_failed", effects: disposition };
+        results[member.handle] = { state: "delivery_failed", effects: disposition, verifier: verification?.reason ?? null };
         log.diagnostic(
           "delivery.failure.persisted",
           {

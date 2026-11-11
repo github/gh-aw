@@ -231,7 +231,9 @@ Test.
 
 			var err error
 			if tracked {
-				err = compileWorkflowWithTrackingAndActionRef(context.Background(), workflowFile, false, true, "", "", NewFileTracker())
+				err = compileWorkflowWithTrackingAndOptions(context.Background(), workflowFile, trackedWorkflowCompileOptions{
+					quiet: true, tracker: NewFileTracker(),
+				})
 			} else {
 				err = compileWorkflowWithActionRef(context.Background(), workflowFile, false, true, "", "")
 			}
@@ -740,7 +742,7 @@ on:
 # Worker
 `), 0o644))
 
-	compileDispatchWorkflowDependenciesWithActionRef(context.Background(), mainPath, false, true, "", "", false, nil)
+	compileDispatchWorkflowDependenciesWithOptions(context.Background(), mainPath, compileDepsOptions{quiet: true})
 
 	lockPath := filepath.Join(workflowsDir, "worker.lock.yml")
 	_, err := os.Stat(lockPath)
@@ -775,7 +777,9 @@ safe-outputs:
 	// Write an intentionally broken worker file (no frontmatter — compile will fail).
 	require.NoError(t, os.WriteFile(workerPath, []byte(`not valid workflow content`), 0o644))
 
-	err := compileCallWorkflowDependenciesWithActionRef(context.Background(), mainPath, false, true, "", "", false, nil)
+	err := compileCallWorkflowDependenciesWithOptions(context.Background(), mainPath, compileDepsOptions{
+		quiet: true, propagateErrors: true,
+	})
 	require.Error(t, err, "worker compilation failure should propagate as an error")
 	require.ErrorContains(t, err, "worker", "error should mention the worker name")
 }
@@ -814,13 +818,15 @@ on:
 	require.NoError(t, os.WriteFile(lockPath, []byte("# stale lock"), 0o644))
 
 	// Without force: stale lock is preserved.
-	err := compileCallWorkflowDependenciesWithActionRef(context.Background(), mainPath, false, true, "", "", false, nil)
+	err := compileCallWorkflowDependenciesWithOptions(context.Background(), mainPath, compileDepsOptions{quiet: true})
 	require.NoError(t, err)
 	content, _ := os.ReadFile(lockPath)
 	assert.Equal(t, "# stale lock", string(content), "without force, stale lock should not be recompiled")
 
 	// With force: stale lock gets recompiled.
-	err = compileCallWorkflowDependenciesWithActionRef(context.Background(), mainPath, false, true, "", "", true, nil)
+	err = compileCallWorkflowDependenciesWithOptions(context.Background(), mainPath, compileDepsOptions{
+		quiet: true, force: true,
+	})
 	require.NoError(t, err)
 	recompiled, _ := os.ReadFile(lockPath)
 	assert.NotEqual(t, "# stale lock", string(recompiled), "with force, stale lock should be recompiled")

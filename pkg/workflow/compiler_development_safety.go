@@ -70,8 +70,11 @@ func dryRunResolvedOutputEffects(data *WorkflowData) []string {
 		unsupported = append(unsupported, "secret-masking.steps")
 	}
 	if outputs := data.SafeOutputs; outputs != nil {
-		if len(outputs.Scripts) > 0 {
-			unsupported = append(unsupported, "safe-outputs.scripts")
+		for _, script := range outputs.Scripts {
+			if script == nil || !script.connectorDryRun {
+				unsupported = append(unsupported, "safe-outputs.scripts")
+				break
+			}
 		}
 		if len(outputs.Steps) > 0 {
 			unsupported = append(unsupported, "safe-outputs.steps")

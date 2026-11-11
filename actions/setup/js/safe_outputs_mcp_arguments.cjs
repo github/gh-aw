@@ -2,6 +2,7 @@
 
 const { normalizeTool } = require("./mcp_server_core.cjs");
 const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
+const { normalizeCreateIssueLabels } = require("./safe_output_type_validator.cjs");
 
 /**
  * Unwrap mistakenly nested MCP arguments like { create_discussion: { ... } }.
@@ -74,6 +75,10 @@ function normalizeSafeOutputToolArguments(toolName, args, logger, inputSchema) {
 
   if (remapped.length > 0) {
     logger?.debug?.(`Recovered safe-output parameter synonyms for '${normalizedToolName}': ${JSON.stringify(remapped)}`);
+  }
+
+  if (normalizedToolName === "create_issue" && typeof remappedArgs.labels === "string") {
+    remappedArgs.labels = normalizeCreateIssueLabels(remappedArgs.labels);
   }
 
   return normalizeBlankOptionalFields(remappedArgs, inputSchema.properties, inputSchema.required);

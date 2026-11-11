@@ -60,6 +60,29 @@ const ISSUE_INTENT_LABEL_TYPES = new Set(["add_labels", "remove_labels", "update
 const STRUCTURED_DATA_LABEL = "Structured data:";
 
 /**
+ * Normalize legacy JSON-array and comma-separated create_issue label strings.
+ * @param {string} value
+ * @returns {string[]}
+ */
+function normalizeCreateIssueLabels(value) {
+  const trimmedValue = value.trim();
+  if (trimmedValue.startsWith("[")) {
+    try {
+      const parsedValue = JSON.parse(trimmedValue);
+      if (Array.isArray(parsedValue)) {
+        return parsedValue.filter(item => typeof item === "string");
+      }
+    } catch {
+      // Invalid JSON is intentionally ignored; fall back to legacy comma-separated parsing.
+    }
+  }
+  return value
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+/**
  * Remove markdown backticks around recognized issue-closing keyword references.
  * Only applied to body fields for configured safe output types.
  * @param {string} content
@@ -624,25 +647,7 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
     // Backward compatibility: create_issue agents sometimes provide labels as a JSON array
     // or comma-separated string. Normalize either form before strict array validation.
     if (itemType === "create_issue" && fieldName === "labels" && typeof value === "string") {
-      const trimmedValue = value.trim();
-      if (trimmedValue.startsWith("[")) {
-        try {
-          const parsedValue = JSON.parse(trimmedValue);
-          if (Array.isArray(parsedValue)) {
-            // Filter out non-string entries from the JSON-parsed array.
-            value = parsedValue.filter(item => typeof item === "string");
-          }
-          // Non-array JSON values (objects, primitives) fall through to comma-separated parsing.
-        } catch {
-          // Invalid JSON — ignored, fall back to comma-separated parsing below.
-        }
-      }
-      if (typeof value === "string") {
-        value = value
-          .split(",")
-          .map(item => item.trim())
-          .filter(Boolean);
-      }
+      value = normalizeCreateIssueLabels(value);
     }
 
     if (!Array.isArray(value)) {
@@ -955,6 +960,7 @@ module.exports = {
   validateOptionalPositiveIntegerOrAuto,
   validateIssueOrPRNumber,
   validateIssueNumberOrTemporaryId,
+  normalizeCreateIssueLabels,
 
   // Configuration accessors
   loadValidationConfig,
