@@ -210,6 +210,8 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { /
 	// Show summary
 	showUpdateSummary(successfulUpdates, failedUpdates, opts.NoCompile)
 
+	// Fail closed even after partial success so callers cannot publish an
+	// incomplete update. Only transient rate-limit-only failures are exempt.
 	if len(failedUpdates) > 0 && !allFailuresAreRateLimited(failedUpdates) {
 		return fmt.Errorf("%d workflow(s) failed to update; review the errors above", len(failedUpdates))
 	}

@@ -243,6 +243,8 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 	}
 
 	if skippedConflict {
+		// Ownership describes the entire package revision. Refreshing it would
+		// incorrectly record preserved or conflict-marked workflows as installed.
 		successes = append(successes, groupedSuccesses...)
 		return successes, failures
 	}

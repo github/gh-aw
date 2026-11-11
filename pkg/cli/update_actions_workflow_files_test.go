@@ -25,6 +25,19 @@ func TestFindWorkflowWithMergeConflictMarkers_DefaultDirectory(t *testing.T) {
 	require.Equal(t, path, found)
 }
 
+func TestFindWorkflowWithMergeConflictMarkers_MissingDirectory(t *testing.T) {
+	for _, workflowsDir := range []string{"", "custom/workflows"} {
+		t.Run(workflowsDir, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			t.Setenv("GH_AW_WORKFLOWS_DIR", "")
+
+			found, err := findWorkflowWithMergeConflictMarkers(workflowsDir)
+			require.NoError(t, err)
+			require.Empty(t, found)
+		})
+	}
+}
+
 func TestFindWorkflowWithMergeConflictMarkers_ReadFailure(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.Symlink(filepath.Join(dir, "missing"), filepath.Join(dir, "broken.md")))
