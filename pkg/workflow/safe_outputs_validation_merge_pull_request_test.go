@@ -149,6 +149,7 @@ func TestMergePullRequestProtectedFiles(t *testing.T) {
 		{"expression", map[string]any{"protected-files": "${{ inputs.policy }}"}, "${{ inputs.policy }}"},
 		{"exclusions", map[string]any{"protected-files": map[string]any{"exclude": []any{"AGENTS.md", "/pyproject.toml"}}}, "blocked"},
 		{"object policy", map[string]any{"protected-files": map[string]any{"policy": "allowed"}}, "allowed"},
+		{"object expression", map[string]any{"protected-files": map[string]any{"policy": "${{ inputs.policy }}"}}, "${{ inputs.policy }}"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := NewCompiler().parseMergePullRequestConfig(map[string]any{"merge-pull-request": tc.config})
@@ -156,7 +157,13 @@ func TestMergePullRequestProtectedFiles(t *testing.T) {
 			config := &SafeOutputsConfig{MergePullRequest: cfg}
 			require.NoError(t, validateMergePullRequestPolicies(config, "Test"))
 			handler := pullRequestHandlerRegistry["merge_pull_request"](config)
-			assert.Equal(t, tc.policy, handler["protected_files_policy"])
+			if isExpression(tc.policy) {
+				expression, ok := handler["protected_files_policy"].(templatableJSONExpression)
+				require.True(t, ok)
+				assert.Equal(t, "${{ toJSON(inputs.policy) }}", expression.expr)
+			} else {
+				assert.Equal(t, tc.policy, handler["protected_files_policy"])
+			}
 			assert.Contains(t, handler["protected_files"], "package.json")
 			assert.Equal(t, true, handler["protect_top_level_dot_folders"])
 			assert.Contains(t, handler["_protected_files_exclude"], "CHANGELOG.md")

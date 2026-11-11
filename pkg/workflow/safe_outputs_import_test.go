@@ -609,6 +609,11 @@ func TestMergeSafeOutputsMergePullRequestProtectedFilesExclude(t *testing.T) {
 			wantExclude:  []string{"AGENTS.md"},
 		},
 		{
+			name:         "import supplies rooted changeset exclusion",
+			importedJSON: []string{`{"merge-pull-request":{"protected-files":{"policy":"allowed","exclude":["/.changeset/*.md"]}}}`},
+			wantExclude:  []string{"/.changeset/*.md"},
+		},
+		{
 			name:         "main and import exclusions merge as a set",
 			topExclude:   []string{"CLAUDE.md"},
 			importedJSON: []string{`{"merge-pull-request":{"protected-files":{"exclude":["AGENTS.md","CLAUDE.md"]}}}`},

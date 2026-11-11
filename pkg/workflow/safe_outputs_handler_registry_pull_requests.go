@@ -97,6 +97,9 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "merge-pull-request", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()
+		if isExpression(c.ProtectedFilesPolicy) {
+			handler["protected_files_policy"] = newTemplatableJSONExpression(wrapExpressionWithToJSON(c.ProtectedFilesPolicy))
+		}
 		if len(c.RequiredCheckApps) > 0 {
 			handler["required_check_apps"] = c.RequiredCheckApps
 		}
