@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-11",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/workflow-structure.md",
+      "docs/src/content/docs/blog/2026-08-23-from-conformance-failure-to-eslint-rule.md"
+    ],
+    "cli": [
+      "gh aw (root help, cmd/gh-aw/main.go)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/daily-max-ai-credits-test.md",
+      ".github/workflows/smoke-workflow-call.md"
+    ],
+    "validation": [
+      "pkg/workflow/post_steps_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "pkg/workflow/post_steps_validation.go: errors name the step and link to safe-outputs docs",
+    "compile and run help: rich Examples blocks with realistic invocations",
+    "workflow-structure.md: 'Editing Workflows' link resolves to setup/working-with-workflows.mdx#editing-workflows"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "high",
+      "issue": "Root 'Common Tasks' help (lines 92-103) pads comments with tabs; '#' lands at different columns (col 40 for init, col 48 for doctor). Replace tabs with space padding to one fixed column."
+    },
+    {
+      "file": "docs/src/content/docs/reference/workflow-structure.md",
+      "priority": "medium",
+      "issue": "Lock header example (line 50) shows schema_version v3 (current is v4) and omits the gh-aw-manifest line present in the sampled lock file (.github/workflows/ab-testing-advisor.lock.yml line 2); directory tree (lines 35-38) child indentation is off by two columns."
+    }
+  ]
+}

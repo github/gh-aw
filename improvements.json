@@ -1,6 +1,18 @@
 {
-  "last_updated": "2026-11-10",
+  "last_updated": "2026-11-11",
   "pending_tasks": [
+    {
+      "file": "cmd/gh-aw/main.go",
+      "created": "2026-11-11",
+      "status": "pending",
+      "issue": "Root 'Common Tasks' help (lines 92-103) mixes tab and space padding; the doctor row's '#' lands at column 48 while others land at column 40"
+    },
+    {
+      "file": "docs/src/content/docs/reference/workflow-structure.md",
+      "created": "2026-11-11",
+      "status": "pending",
+      "issue": "Lock header example (line 50) shows schema_version v3 (current v4) and omits the gh-aw-manifest line; directory tree (lines 35-38) child indent is off by two columns"
+    },
     {
       "file": "docs/src/content/docs/gallery/multi-repo/feature-sync.md",
       "created": "2026-11-10",
