@@ -757,12 +757,12 @@ describe("check_daily_aic_workflow_guardrail", () => {
       const detailsPrefix = "[daily-workflow-aic] Daily AIC business API requests: ";
       const details = JSON.parse(consumptionLog.slice(detailsPrefix.length));
       expect(details).toMatchObject({
-        requests: 2,
+        requests: 3,
         cacheHits: 0,
       });
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
 
-      // Only the authoritative run and history requests are needed.
+      // Only the authoritative run, history, and empty-listing check requests are needed.
       expect(rateLimitCallCount).toBe(0);
     } finally {
       delete global.core;
