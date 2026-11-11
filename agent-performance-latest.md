@@ -100,3 +100,12 @@ No new evidence; weekly report already posted 2026-11-03. No discussion/issue fi
 
 ## Run 2026-11-10T12:45Z
 metrics/latest.json (2026-11-09) partial: 2.93h coverage, 120 runs, safe-output outcomes/quality null. Live logs retry hit 60s context deadline. Ranking deferred; weekly report already posted 2026-11-03; no discussion/issue filed.
+
+## Run 2026-11-11 (scored from complete 24h snapshot 2026-11-08)
+- Ranking unblocked: `metrics/latest.json` is partial (2.25h, null run/quality fields) and was NOT used. Scored from `metrics/daily/2026-11-08.json` (complete, 362 workflows, 511 executed, 444 ok = 86.9%, 354 safe outputs, 430 accepted / 0 rejected).
+- Quality and engagement fields are null across all snapshots: quality scores not computable; success rate and safe-output acceptance used as proxies (stated in report).
+- Bottom (executed >= 3): ai-moderator 1/16 (6%; declares timeout-minutes 5 but avg 6513s, suspect), auditor 1/11 (9%, 0 tokens), code-scanning-fixer 2/3, pr-specification-reviewer 31/41 (76%, avg 2642s), design-decision-gate 31/35 (89%, 2.25M tokens), mattpocock-skills-reviewer 29/31 (94%, 2.78M tokens, 60 comments).
+- Top: pr-sous-chef 112/112 (63 issues created), avenger, issue-monster, pr-triage-agent, smoke-claude-dynamic, daily-go-test-parallelizer (1.0 each).
+- Log-fetch (`agenticworkflows logs`) timed out at 60s; ai-moderator and auditor root causes unverified.
+- Stale claims corrected in shared-alerts.md (avenger npm mount gone; gpclean model-provider fixed; #63656/#63657 closed not_planned).
+- Open config defect still live: metrics-collector.md lacks `model-provider` under `engine:`.

@@ -343,3 +343,9 @@
 - `CI` on `main` red since 01:06Z: spec-pin drift (#76720; ci.yml pin still `acc6a888`, needs same update as README) and release-alignment mismatch (gh-aw latest v1.2.2 vs gh-aw-actions latest v1.0.1; manual release decision).
 - `CGO` govulncheck failing on main + PR branches from 03:31Z; logs blocked, cause unverified.
 - `Auditor` failing (incl. 04:27Z), untracked before this run.
+
+## Correction — 2026-11-11 (Agent Performance Analyzer) — supersedes 2026-09-xx entries above
+- STALE, do not cite as pending: (a) avenger.md `/usr/local/bin/npm` symlink mount — no longer present on main; (b) gpclean.md retired `gpt-5-codex` — now `model-provider: github` + `model-routing` (lines 60-62); (c) #63656 and #63657 — both CLOSED as not_planned, not open.
+- Still live: metrics-collector.md lacks `model-provider` under `engine:` (line 14). Its daily failures were also attributed to a separate AWF redaction crash, so the config fix alone may not clear them.
+- Ranking now uses the complete 2026-11-08 snapshot; `metrics/latest.json` is partial and is not a scoring source.
+- ai-moderator (1/16 on 11-08; 3/17 → 12/24 → 1/16 trend) and auditor (1/11) are the critical failure clusters; logs unverified.
