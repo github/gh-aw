@@ -25,6 +25,12 @@ interface BaseSafeOutputItem {
 
 type IssueArtifactType = "generic" | "link" | "plan" | "embedded_html";
 
+interface AddSecurityAdvisoryCommentItem extends BaseSafeOutputItem {
+  type: "add_security_advisory_comment";
+  ghsa_id: string;
+  body: string;
+}
+
 interface CreateSecurityAdvisoryItem extends BaseSafeOutputItem {
   type: "create_security_advisory";
   summary: string;
@@ -566,6 +572,7 @@ interface ResolvePullRequestReviewThreadItem extends BaseSafeOutputItem {
  * Union type of all possible safe output items
  */
 type SafeOutputItem =
+  | AddSecurityAdvisoryCommentItem
   | CreateSecurityAdvisoryItem
   | CreateIssueItem
   | CreateDiscussionItem
@@ -613,6 +620,7 @@ interface SafeOutputItems {
 
 // === Export JSONL types ===
 export {
+  AddSecurityAdvisoryCommentItem,
   CreateSecurityAdvisoryItem,
   // JSONL item types
   BaseSafeOutputItem,

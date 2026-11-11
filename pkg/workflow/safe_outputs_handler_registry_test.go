@@ -18,7 +18,7 @@ func TestHandlerRegistryDomainComposition(t *testing.T) {
 		{name: "workflowHandlerRegistry", registry: workflowHandlerRegistry, wantKeys: []string{"create_security_advisory", "approve_workflow_run", "create_code_scanning_alert", "create_check_run", "dispatch_workflow", "dispatch_repository", "call_workflow", "autofix_code_scanning_alert", "upload_code_coverage", "upload_asset", "upload_artifact"}},
 		{name: "projectHandlerRegistry", registry: projectHandlerRegistry, wantKeys: []string{"create_project", "update_project", "create_project_status_update"}},
 		{name: "assignmentHandlerRegistry", registry: assignmentHandlerRegistry, wantKeys: []string{"assign_to_agent", "assign_to_user", "unassign_from_user", "create_agent_session"}},
-		{name: "commentHandlerRegistry", registry: commentHandlerRegistry, wantKeys: []string{"add_comment", "hide_comment"}},
+		{name: "commentHandlerRegistry", registry: commentHandlerRegistry, wantKeys: []string{"add_security_advisory_comment", "add_comment", "hide_comment"}},
 		{name: "jiraHandlerRegistry", registry: jiraHandlerRegistry, wantKeys: []string{"jira_create_issue", "jira_update_issue", "jira_add_comment", "jira_add_label"}},
 		{name: "releaseHandlerRegistry", registry: releaseHandlerRegistry, wantKeys: []string{"update_release"}},
 		{name: "diagnosticHandlerRegistry", registry: diagnosticHandlerRegistry, wantKeys: []string{"report_missing_tool", "report_missing_data", "noop", "report_incomplete", "create_report_incomplete_issue"}},

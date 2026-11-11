@@ -32,6 +32,20 @@ describe("Safe Outputs MCP Schema Validation", () => {
       expect(validate({ ...advisory, severity: "high", cwe_ids: ["CWE-79"] })).toBe(true);
     });
 
+    describe("Security advisory comments", () => {
+      const schema = tools.find(tool => tool.name === "add_security_advisory_comment").inputSchema;
+      const validate = new Ajv({ strict: false }).compile(schema);
+      const comment = { ghsa_id: "GHSA-2345-6789-cfgh", body: "The proposed fix is ready for review." };
+
+      it("accepts a GHSA identifier and comment body", () => {
+        expect(validate(comment)).toBe(true);
+      });
+
+      it.each([{ repo: "other/public" }, { confidential: true }, { state: "published" }, { "github-token": "agent-token" }, { ghsa_id: "../issues/123" }, { body: "" }])("rejects unsupported controls and invalid comments: %j", fields => {
+        expect(validate({ ...comment, ...fields })).toBe(false);
+      });
+    });
+
     it.each([{ state: "published" }, { start_private_fork: true }, { repo: "other/public" }, { "github-token": "agent-token" }, { vulnerabilities: [] }, { cwe_ids: ["invalid"] }])(
       "rejects unsupported controls and invalid advisory metadata: %j",
       fields => {

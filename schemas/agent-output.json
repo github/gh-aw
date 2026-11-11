@@ -27,6 +27,7 @@
       "title": "Safe Output Item",
       "description": "Union type of all supported safe output entries",
       "oneOf": [
+        { "$ref": "#/$defs/AddSecurityAdvisoryCommentOutput" },
         { "$ref": "#/$defs/CreateSecurityAdvisoryOutput" },
         { "$ref": "#/$defs/CreateIssueOutput" },
         { "$ref": "#/$defs/AddCommentOutput" },
@@ -67,6 +68,18 @@
         { "$ref": "#/$defs/LinkWorkItemsOutput" },
         { "$ref": "#/$defs/UploadWorkItemAttachmentOutput" }
       ]
+    },
+    "AddSecurityAdvisoryCommentOutput": {
+      "title": "Add Security Advisory Comment Output",
+      "description": "Add a comment to a security advisory in the workflow repository.",
+      "type": "object",
+      "required": ["type", "ghsa_id", "body"],
+      "properties": {
+        "type": { "const": "add_security_advisory_comment" },
+        "ghsa_id": { "type": "string", "pattern": "^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$" },
+        "body": { "type": "string", "minLength": 1, "maxLength": 65000 }
+      },
+      "additionalProperties": false
     },
     "CreateSecurityAdvisoryOutput": {
       "title": "Create Security Advisory Output",

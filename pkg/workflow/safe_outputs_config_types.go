@@ -42,6 +42,7 @@ type SafeOutputsConfig struct {
 	Steer                                  bool                                   `yaml:"steer,omitempty"` // Experimental. Create an issue and steer the agent from issue comments.
 	CreateIssues                           *CreateIssuesConfig                    `yaml:"create-issue,omitempty"`
 	CreateSecurityAdvisory                 *CreateSecurityAdvisoryConfig          `yaml:"create-security-advisory,omitempty"`
+	AddSecurityAdvisoryComment             *AddSecurityAdvisoryCommentConfig      `yaml:"add-security-advisory-comment,omitempty"`
 	CreateWorkItems                        *CreateWorkItemConfig                  `yaml:"ado-create-work-item,omitempty"`
 	UpdateWorkItems                        *UpdateWorkItemConfig                  `yaml:"ado-update-work-item,omitempty"`
 	CommentOnWorkItems                     *CommentOnWorkItemConfig               `yaml:"ado-comment-on-work-item,omitempty"`

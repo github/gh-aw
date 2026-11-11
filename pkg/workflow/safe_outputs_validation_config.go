@@ -68,6 +68,13 @@ const (
 // ValidationConfig contains all safe output type validation rules
 // This is the single source of truth for validation rules
 var ValidationConfig = map[string]TypeValidationConfig{
+	"add_security_advisory_comment": {
+		DefaultMax: 1,
+		Fields: map[string]FieldValidation{
+			"ghsa_id": {Required: true, Type: "string", Pattern: "^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$"},
+			"body":    {Required: true, Type: "string", Sanitize: true, MinLength: 1, MaxLength: MaxBodyLength, RejectIfOversized: true},
+		},
+	},
 	"create_security_advisory": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

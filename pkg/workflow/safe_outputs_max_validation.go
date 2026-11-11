@@ -113,6 +113,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.AddSecurityAdvisoryComment != nil {
+		if err := checkMaxField("add_security_advisory_comment", config.AddSecurityAdvisoryComment.Max); err != nil {
+			return err
+		}
+	}
 	if config.AssignMilestone != nil {
 		if err := checkMaxField("assign_milestone", config.AssignMilestone.Max); err != nil {
 			return err

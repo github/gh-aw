@@ -1338,6 +1338,24 @@ jobs:
                 },
                 "customValidation": "requiresOneOf:reviewers,team_reviewers"
               },
+              "add_security_advisory_comment": {
+                "defaultMax": 1,
+                "fields": {
+                  "body": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 65000,
+                    "minLength": 1,
+                    "rejectIfOversized": true
+                  },
+                  "ghsa_id": {
+                    "required": true,
+                    "type": "string",
+                    "pattern": "^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$"
+                  }
+                }
+              },
               "ado_assign_work_item": {
                 "defaultMax": 1,
                 "fields": {

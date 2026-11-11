@@ -9,6 +9,11 @@ interface SafeOutputConfig {
 
 // === Specific Safe Output Configuration Interfaces ===
 
+interface AddSecurityAdvisoryCommentConfig extends SafeOutputConfig {
+  footer?: boolean;
+  staged?: boolean;
+}
+
 interface CreateSecurityAdvisoryConfig extends SafeOutputConfig {
   staged?: boolean;
 }
@@ -385,6 +390,7 @@ interface SafeJobConfig {
 
 // Union type of all specific safe output configurations
 type SpecificSafeOutputConfig =
+  | AddSecurityAdvisoryCommentConfig
   | CreateSecurityAdvisoryConfig
   | CreateIssueConfig
   | CreateDiscussionConfig
@@ -422,6 +428,7 @@ type SpecificSafeOutputConfig =
 type SafeOutputConfigs = Record<string, SafeOutputConfig | SpecificSafeOutputConfig>;
 
 export {
+  AddSecurityAdvisoryCommentConfig,
   CreateSecurityAdvisoryConfig,
   SafeOutputConfig,
   SafeOutputConfigs,

@@ -1,5 +1,28 @@
 [
   {
+    "name": "add_security_advisory_comment",
+    "description": "Add a comment to an existing security advisory in the workflow repository. Requires a configured external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported. Comments inherit the advisory's visibility, and workflow logs and artifacts may contain their contents. Never publishes the advisory or falls back to a public issue comment.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["ghsa_id", "body"],
+      "properties": {
+        "ghsa_id": {
+          "type": "string",
+          "pattern": "^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$",
+          "description": "Identifier of the existing advisory in the workflow repository, for example GHSA-2345-6789-cfgh."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65000,
+          "description": "Comment content in Markdown, up to 65000 characters. Standard safe-output sanitization and attribution apply.",
+          "x-safe-output-sanitization": "content"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "create_security_advisory",
     "description": "Create a draft security advisory in the workflow repository for private maintainer review. Never publishes the advisory or creates a private fork. Requires a configured external token or GitHub App; GITHUB_TOKEN is not supported. Advisory content may appear in workflow logs and artifacts, so use a private workflow repository for confidential findings.",
     "inputSchema": {

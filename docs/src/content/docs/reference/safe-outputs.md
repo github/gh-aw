@@ -164,6 +164,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | [Create Project Status Update](#project-status-updates-create-project-status-update) | `create-project-status-update` | Create project status updates |
 | [Update Release](#release-updates-update-release) | `update-release` | Update GitHub release descriptions; requires an existing GitHub Release, not just a Git tag (max: 1) |
 | [Create Security Advisory](#security-advisory-drafts-create-security-advisory) | `create-security-advisory` | Create draft repository security advisories with an external token or GitHub App (max: 1) |
+| [Add Security Advisory Comment](#security-advisory-comments-add-security-advisory-comment) | `add-security-advisory-comment` | Comment on an existing repository security advisory with an external token or GitHub App (max: 1) |
 | [Upload Artifact](#artifact-uploads-upload-artifact) | `upload-artifact` | Upload files as run-scoped GitHub Actions artifacts (max: 1 by default) |
 | [Upload Assets](#asset-uploads-upload-asset) | `upload-asset` | Upload files to orphaned git branch (max: 10, same-repo only). **Prefer `upload-artifact` with `skip-archive` instead.** |
 
@@ -1361,6 +1362,24 @@ Agent calls `create_security_advisory` with required `summary` (1–1024 charact
 
 > [!CAUTION]
 > A private draft does not make the workflow run private. Agent prompts, safe-output payloads, logs, and artifacts may contain advisory details. Use a private workflow repository and restrict access to its runs and artifacts when processing confidential findings.
+
+### Security Advisory Comments (`add-security-advisory-comment:`)
+
+Adds a comment to an existing security advisory in the workflow repository. The agent supplies `ghsa_id` (for example `GHSA-2345-6789-cfgh`) and `body` (1–65000 characters of Markdown). The handler sanitizes content, adds standard attribution, and returns the created comment's `comment_id` and URL. It never publishes an advisory, changes comment visibility, or falls back to an issue comment.
+
+```yaml wrap
+safe-outputs:
+  add-security-advisory-comment:
+    github-token: ${{ secrets.SECURITY_ADVISORY_TOKEN }}
+    max: 1
+```
+
+Authentication follows [security advisory drafts](#security-advisory-drafts-create-security-advisory): an external token or GitHub App with **Repository security advisories: write** is required, configured per-output or globally. `GITHUB_TOKEN` is not supported. The authenticated user must be an advisory collaborator, repository administrator, or security manager.
+
+`max` defaults to 1 (maximum 10). `footer: false` disables visible AI attribution; required metadata remains. `staged: true` previews without credentials or API writes. Global `safe-outputs.body-footer` policy text also applies.
+
+> [!IMPORTANT]
+> The [advisory comments API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-advisory-comment) is in public preview for public repositories on supported GitHub cloud plans. Availability on private repositories or GitHub Enterprise Server is not assumed. Comments follow the advisory's visibility, and workflow logs and artifacts may contain their contents.
 
 ### Release Updates (`update-release:`)
 

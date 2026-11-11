@@ -295,6 +295,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		{logMessage: "Validating safe-outputs allow-workflows", validateFn: func() error { return validateSafeOutputsAllowWorkflows(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs approve-workflow-run authentication", validateFn: func() error { return validateSafeOutputsApproveWorkflowRun(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs create-security-advisory authentication", validateFn: func() error { return validateSafeOutputsCreateSecurityAdvisory(workflowData.SafeOutputs) }},
+		{logMessage: "Validating safe-outputs add-security-advisory-comment authentication", validateFn: func() error { return validateSafeOutputsAddSecurityAdvisoryComment(workflowData.SafeOutputs) }},
 		{logMessage: "Validating OTLP resource attributes", validateFn: func() error { return validateOTLPResourceAttributes(workflowData) }},
 		{logMessage: "Validating labels", validateFn: func() error { return validateLabels(workflowData) }},
 		{logMessage: "Validating workflow_dispatch input requirements for command triggers", validateFn: func() error { return validateCommandWorkflowDispatchInputs(workflowData) }},

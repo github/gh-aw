@@ -9,7 +9,7 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		c := cfg.CreateSecurityAdvisory
 		return newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
-			AddIfNotEmpty("github-token", resolveSecurityAdvisoryGitHubToken(cfg)).
+			AddIfNotEmpty("github-token", resolveSecurityAdvisoryGitHubToken(cfg, "create-security-advisory", &c.BaseSafeOutputConfig)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()
 	},

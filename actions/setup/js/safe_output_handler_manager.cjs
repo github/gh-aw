@@ -74,6 +74,7 @@ const GITHUB_TOKEN_CONFIG_KEY = "github-token";
  * Maps safe output types to their handler module file paths
  */
 const HANDLER_MAP = {
+  add_security_advisory_comment: "./add_security_advisory_comment.cjs",
   create_security_advisory: "./create_security_advisory.cjs",
   linear_create_issue: "./linear_create_issue.cjs",
   linear_add_comment: "./linear_add_comment.cjs",
@@ -182,6 +183,7 @@ const WTD3_REQUIREMENT_ID = "WTD3";
  * @type {Set<string>}
  */
 const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
+  "add_security_advisory_comment",
   "create_security_advisory",
   "linear_create_issue",
   "linear_add_comment",
