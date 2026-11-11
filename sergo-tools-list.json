@@ -1,6 +1,7 @@
 {
-  "last_updated": "2026-11-09T00:00:00Z",
+  "last_updated": "2026-11-11T00:00:00Z",
   "tool_count": 24,
+  "tool_change_R125": "STABLE 24 tools (serena --help exact match), activate_project OK (go/typescript/bash).",
   "tool_change_R124": "STABLE 24 tools (serena --help exact match), activate_project OK (go/typescript/bash).",
   "tool_change_R123": "STABLE 24 tools (serena --help exact match), activate_project OK (go/typescript/bash).",
   "tool_change_R122": "STABLE 24 tools (serena --help exact match), activate_project OK (go/typescript/bash).",
