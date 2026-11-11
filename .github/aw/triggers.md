@@ -28,6 +28,12 @@ Use the smallest trigger that matches the request.
 
 The matrix above gives trigger, tools, and output. These add the `paths:` scoping and definitions the matrix cannot express.
 
+### Pull Request Path Filters and Diffs
+
+- Treat `pull_request.paths` as an activation filter, not as the complete changed-file inventory. GitHub evaluates PR path filters against a three-dot diff and documents a 300-file limit; a matching change outside the files considered by that filter may not start the workflow. See [GitHub's path-filter and diff behavior](https://docs.github.com/actions/reference/workflow-syntax-for-github-actions).
+- For renames, inspect the PR's changed-file list and consider both `filename` and `previous_filename` when a file has status `renamed`. GitHub's path-filter guidance does not promise that the old path independently matches, so include patterns for both old and new locations when either should activate the workflow, or avoid a narrow filter when missing a move is unacceptable. See the [pull-request changed-files API](https://docs.github.com/rest/pulls/pulls#list-pull-requests-files).
+- For a local base-to-head Git diff, the default agent checkout is shallow (`fetch-depth: 1`). Configure checkout with `fetch-depth: 0` and ensure both base and head refs/SHA are available so Git can find the comparison range. If no local Git operations are needed, use the pull-request changed-files API instead. See [GitHub Repository Checkout](https://github.github.com/gh-aw/reference/checkout/) for checkout behavior.
+
 Engineering-focused:
 
 - **Schema/API review on PRs**: `paths:` scoped to backend contract files (`db/migrate/**`, `migrations/**`, `schema/**`, `openapi/**`, `api/**`); `noop` when contracts are unchanged.
