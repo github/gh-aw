@@ -276,6 +276,7 @@ function extractImportsFromText(frontmatterText) {
 
   let inImports = false;
   let baseIndent = 0;
+  /** @type {number|null} */
   let importItemIndent = null;
 
   for (let i = 0; i < lines.length; i++) {
