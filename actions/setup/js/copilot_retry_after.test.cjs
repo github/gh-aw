@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { parseCopilotRetryAfterMs, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const harnessPath = require.resolve("./copilot_harness.cjs");
 const now = Date.parse("Wed, 11 Nov 2026 08:43:00 GMT");
@@ -29,6 +29,25 @@ describe("Copilot Retry-After parsing", () => {
     ["HTTP 429\nRetry-After: 999999999999999999999999", Number.MAX_SAFE_INTEGER],
   ])("parses %s", (text, expected) => {
     expect(parseCopilotRetryAfterMs(text, now)).toBe(expected);
+  });
+
+  describe("other engine terminal response parsing", () => {
+    it.each([
+      ["codex", { type: "turn.failed", error: { status: 429, headers: { "retry-after": "2" } } }, 2000],
+      ["codex", { type: "turn.failed", error: { headers: { "Retry-After": "2" }, status: 429 } }, 2000],
+      ["codex", { type: "error", message: "HTTP 429\nRetry-After: 2" }, 2000],
+      ["claude", { type: "result", is_error: true, result: "HTTP 429\nRetry-After: 2" }, 2000],
+      ["claude", { type: "error", error: { status: 429, headers: { "retry-after": "2" } } }, 2000],
+      ["claude", { type: "result", is_error: false, result: "HTTP 429\nRetry-After: 2" }, undefined],
+      ["codex", { type: "item.completed", item: { type: "command_execution", output: "HTTP 429\nRetry-After: 2" } }, undefined],
+      ["claude", { type: "assistant", message: "HTTP 429\nRetry-After: 2" }, undefined],
+      ["codex", { type: "turn.failed", error: { status: 503, headers: { "retry-after": "429" } } }, null],
+    ])("restricts %s evidence to terminal responses", (engine, event, expected) => {
+      expect(parseTerminalRetryAfterMs(JSON.stringify(event), engine)).toBe(expected);
+    });
+    it("ignores unstructured output", () => {
+      expect(parseTerminalRetryAfterMs("HTTP 429\nRetry-After: 2", "codex")).toBeUndefined();
+    });
   });
 
   it.each([

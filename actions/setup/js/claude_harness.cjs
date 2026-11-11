@@ -627,6 +627,8 @@ async function main() {
     getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
     runAttempt: async (attempt, observeStrategy) => {
       let nativeTerminalRateLimitError = false;
+      /** @type {number | null} */
+      let retryAfterMs = null;
       // Resume only the captured session; never select the latest unrelated conversation.
       // Claude Code resumes the session from on-disk state; re-sending the original
       // instructions would re-execute the full task from scratch.
@@ -658,6 +660,8 @@ async function main() {
         onStdoutLine: line => {
           observeDurableSession(durableSession, "claude", line);
           if (isRateLimitError(classifiableOutput(line))) nativeTerminalRateLimitError = true;
+          const delay = require("./copilot_retry_after.cjs").parseTerminalRetryAfterMs(line, "claude");
+          if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
         },
         onStderrLine: line => {
           if (isRateLimitError(line)) nativeTerminalRateLimitError = true;
@@ -682,6 +686,7 @@ async function main() {
         safeOutputsByteOffset,
         strategy,
         nativeTerminalRateLimitError,
+        retryAfterMs,
       };
     },
     handleFailure: async ({ attempt, result }) => {

@@ -114,4 +114,38 @@ function parseCopilotRetryAfterMs(output, now = Date.now()) {
   return delay;
 }
 
-module.exports = { hasCopilotResponseStatus, parseCopilotRetryAfterMs };
+/**
+ * @param {string} line
+ * @param {"claude" | "codex"} engine
+ * @returns {number | null | undefined} Undefined means the line is not a terminal response.
+ */
+function parseTerminalRetryAfterMs(line, engine) {
+  try {
+    const event = JSON.parse(line);
+    const terminal = engine === "codex" ? event?.type === "turn.failed" || event?.type === "error" : event?.type === "error" || (event?.type === "result" && event?.is_error === true);
+    if (!terminal) return undefined;
+    /** @param {any} value @param {number} depth @returns {number | null} */
+    const structuredDelay = (value, depth) => {
+      if (!value || typeof value !== "object" || depth > 4) return null;
+      /** @type {number | null} */
+      let delay = null;
+      if (Number(value.status ?? value.statusCode ?? value.status_code) === 429 && value.headers && typeof value.headers === "object") {
+        const entry = Object.entries(value.headers).find(([key]) => key.toLowerCase() === "retry-after");
+        if (entry && (typeof entry[1] === "string" || typeof entry[1] === "number") && !/[\r\n]/.test(String(entry[1]))) {
+          delay = parseCopilotRetryAfterMs(`HTTP 429\nRetry-After: ${entry[1]}`);
+        }
+      }
+      for (const key of ["error", "data", "response"]) {
+        const nested = structuredDelay(value[key], depth + 1);
+        if (nested !== null) delay = Math.max(delay ?? 0, nested);
+      }
+      return delay;
+    };
+    const delay = structuredDelay(event, 0);
+    return delay ?? (hasCopilotResponseStatus(line) ? parseCopilotRetryAfterMs(line) : undefined);
+  } catch {
+    return undefined;
+  }
+}
+
+module.exports = { hasCopilotResponseStatus, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs };

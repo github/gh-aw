@@ -89,6 +89,49 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
 }
 
 describe("claude_harness.cjs", () => {
+  it.each([
+    ["1", "2000", 2, "rate_limit_error", false],
+    ["245", "60000", 1, "rate_limit_wait_exceeded", false],
+    ["245", "60000", 1, "rate_limit_wait_exceeded", true],
+  ])("honors Retry-After=%s within cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
+    const { result, calls, harnessRetry } = runHarnessWithStub({
+      extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "1", GH_AW_HARNESS_MAX_DELAY_MS: cap, ...(github ? { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: "claude-sonnet-5" } : {}) },
+      ...(github ? { reflectData: { endpoints: [{ provider: "copilot", configured: true, port: 43123, models_url: "http://api-proxy:43123/models" }] } } : {}),
+      stubScript: `
+        const fs = require("fs");
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, "{}\\n");
+        const attempts = fs.readFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, "utf8").trim().split("\\n").length;
+        if (attempts === 1) {
+          console.log(JSON.stringify({type:"result", is_error:true, result:"HTTP 429\\nRetry-After: ${delay}"}));
+          console.log(JSON.stringify({type:"result", is_error:true, result:"HTTP 429"}));
+          process.exit(1);
+        }
+      `,
+    });
+    expect(result.status, result.stderr).toBe(attempts === 2 ? 0 : 1);
+    expect(calls).toHaveLength(attempts);
+    expect(harnessRetry.attempt_results[0].failure_classes).toEqual([failureClass]);
+    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(1000);
+  });
+
+  it("does not use stderr Retry-After as timing evidence", () => {
+    const { result, calls, harnessRetry } = runHarnessWithStub({
+      extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "1" },
+      stubScript: `
+        const fs = require("fs");
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, "{}\\n");
+        if (fs.readFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, "utf8").trim().split("\\n").length === 1) {
+          console.error("HTTP 429\\nRetry-After: 245");
+          process.exit(1);
+        }
+      `,
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toHaveLength(2);
+    expect(harnessRetry.attempt_results[0].failure_classes).not.toContain("rate_limit_wait_exceeded");
+    expect(harnessRetry.attempt_results[1].backoff_ms).toBe(1);
+  });
+
   it("handles structured permission failures without replaying work", () => {
     const directory = makeHarnessTempDir("claude-permission-output-");
     const safeOutputsPath = path.join(directory, "safe-outputs.jsonl");

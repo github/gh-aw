@@ -1129,6 +1129,8 @@ async function main() {
       const strategy = selectedHarnessStrategy(resumeArgs || resolvedArgs, "codex");
       observeStrategy(strategy);
       const terminalErrors = [];
+      /** @type {number | null} */
+      let retryAfterMs = null;
       let nativeStderrRateLimitError = false;
       const recordTerminalError = line => {
         terminalErrors.push(line);
@@ -1158,6 +1160,8 @@ async function main() {
           if (!event) return;
           if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
           if (event.type === "turn.failed" || event.type === "error") recordTerminalError(line);
+          const delay = require("./copilot_retry_after.cjs").parseTerminalRetryAfterMs(line, "codex");
+          if (delay != null) retryAfterMs = Math.max(retryAfterMs ?? 0, delay);
         },
         onStdoutLinePrefix: prefix => {
           const event = mcpWatchdog.observePrefix(prefix);
@@ -1222,6 +1226,7 @@ async function main() {
         safeOutputsByteOffset,
         strategy,
         nativeTerminalRateLimitError: nativeStderrRateLimitError || isRateLimitError(terminalErrors.join("\n")),
+        retryAfterMs,
       };
     },
     handleFailure: async ({ attempt, result }) => {

@@ -391,6 +391,21 @@ async function runHarnessRetryLoop(options) {
       }
 
       const failureDecision = await options.handleFailure({ attempt, result, maxRetries: options.maxRetries });
+      if (failureDecision.action === "retry" && result.retryAfterMs != null) {
+        const exceedsDelayCap = result.retryAfterMs > Math.min(options.maxDelayMs, 2147483647);
+        const exceedsTimeout = options.softTimeoutGuard && Date.now() + result.retryAfterMs >= options.softTimeoutGuard.softDeadlineMs;
+        if (exceedsDelayCap || exceedsTimeout) {
+          const reason = exceedsDelayCap ? `max-delay-ms=${options.maxDelayMs}` : "remaining job timeout budget";
+          result.failureClasses = ["rate_limit_wait_exceeded"];
+          options.log(`attempt ${attempt + 1}: failureClass=rate_limit_wait_exceeded — HTTP 429 Retry-After=${result.retryAfterMs}ms exceeds ${reason}; not retrying`);
+          require("./safeoutputs_cli.cjs").emitInfrastructureIncomplete(`${options.harnessName} HTTP 429 Retry-After wait exceeds ${reason}. Stopping rather than retrying inside the rate-limit window.`, { logger: options.log });
+          failureDecision.action = "stop";
+        } else {
+          result.failureClasses = ["rate_limit_error"];
+          failureDecision.nextDelayMs = result.retryAfterMs;
+          options.log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${result.retryAfterMs}ms before next attempt`);
+        }
+      }
       if (result.failureClasses?.length) {
         attemptResult.failure_classes = result.failureClasses;
       }
