@@ -157,36 +157,36 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `engine_driver_failure`, `driver_crash` | Driver exit/signal; final native error. | Fix driver first; nonzero exit alone != outage. |
 | `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs/disable masking. |
 | `safeoutputs_cli_error` | Arguments, registration, denial. | Fix supported invocation/allowlist; no unauthorized `gh` writes. |
-| `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
-| `safe_output_dependency_invalid`, `safe_output_dependency_failed` | Graph IDs/aliases/edges/cycles; prerequisite results. | Fix graph or failed prerequisites; queued/staged/delegated != published. Never replay mutations. |
+| `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields. |
+| `safe_output_dependency_invalid`, `safe_output_dependency_failed` | Graph IDs/aliases/edges/cycles; prerequisite results. | Fix graph/failed prerequisites; queued/staged/delegated != published. Never replay mutations. |
 | `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error, budget, missing evidence. | Resolve cause; retain unknown without evidence. |
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
 | `E002`, `MAX_COUNT_REACHED`, `connector_budget_exceeded` | Cap vs attempts/records. | Reduce count; no replay. |
 | `E003` | Named count/size limit. | Split/reduce authorized payload. |
 | `ERR_PERMISSION`, `E004`, `APPROVE_WORKFLOW_RUN_PERMISSION_DENIED`, `DISCUSSIONS_TOKEN_SCOPE_MISMATCH` | Target/scope, permissions, token type. | Fix authorized permissions; never expose tokens/evade guards. |
-| `E006` | Body/string length. | Shorten; retain required content. |
-| `E008` | URL count/limit. | Reduce links; no concealment. |
+| `E006` | Body/string length. | Shorten. |
+| `E008` | URL count/limit. | Reduce links. |
 | `ERR_API`, `E007` | GitHub status; operation guard. | Resolve API/target cause; policy skip != failed mutation. |
-| `ERR_CONFIG`, `ERR_ADMISSION`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Schema/OIDC/auth/admission. | Fix config/auth; honor denials/outage policy; recompile; keep credentials/environment private. |
-| `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Version vs provenance/minimums/blocklist. | Update gh-aw; recompile/publish source+lock; retain enforcement. |
-| `ERR_GRADER_SESSION_INVALID` | Unified event array: type/data/provenance. | Fix producer/caller; never fabricate sessions. |
-| `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED` | Tool deep-copy failure. | Fix definition/loader; retain copy isolation. |
-| `ERR_SAFE_OUTPUTS_GATEWAY_CONFIG` | Numeric `MCP_GATEWAY_PORT`; present `MCP_GATEWAY_AGENT_ID` (private). | Fix config; retain readiness/auth checks. |
+| `ERR_CONFIG`, `ERR_ADMISSION`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Schema/OIDC/auth/admission. | Fix config/auth; honor denials/outage policy; recompile; keep credentials private. |
+| `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Version vs provenance/minimums/blocklist. | Update gh-aw; recompile/publish source+lock. |
+| `ERR_GRADER_SESSION_INVALID` | Unified event array: type/data/provenance. | Fix producer/caller; no fabricated data. |
+| `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED` | Tool deep-copy failure. | Fix definition/loader. |
+| `ERR_SAFE_OUTPUTS_GATEWAY_CONFIG` | Numeric `MCP_GATEWAY_PORT`; present `MCP_GATEWAY_AGENT_ID` (private). | Fix config. |
 | `ERR_NOT_FOUND`, `TARGET_NOT_FOUND` | Target/repository; visibility. | Correct target/access; 404 may conceal inaccessible resources. |
-| `ERR_PARSE` | JSON/NDJSON framing/schema/producer. | Fix producer/format; retain private evidence. |
-| `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout; wrapper is not cause. |
-| `no_new_commits`, `missing_pr_head`, `shallow_history` | Commits/refs/history. | Verify no-op; prepare PR refs/full history before agent. |
+| `ERR_PARSE` | JSON/NDJSON framing/schema/producer. | Fix producer/format. |
+| `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout. |
+| `no_new_commits`, `missing_pr_head`, `shallow_history` | Commits/refs/history. | Verify no-op; prepare PR refs/history. |
 | `E009`, `CONFIG_HASH_MISMATCH` | Source vs lock hash. | Recompile/publish source+lock together; no manual hash edit. |
-| `E010`, `RATE_LIMIT_EXCEEDED` | Retry budget; reset headers. | Stop exhausted retries; respect reset/backoff; reduce API work. |
-| `POLICY_FILE_PROTECTION_DENIED` | Allowed/protected files and attempted patch. | Respect intentional skip; constrain change, don't disable protection. |
-| `NO_CONTEXT` | Trigger context; explicit target. | Supply authorized target/context-appropriate output. |
+| `E010`, `RATE_LIMIT_EXCEEDED` | Retry budget; reset headers. | Stop exhausted retries; respect reset/backoff. |
+| `POLICY_FILE_PROTECTION_DENIED` | Allowed/protected files and attempted patch. | Respect intentional skip; constrain change, keep protection. |
+| `NO_CONTEXT` | Trigger context; explicit target. | Supply authorized target/output. |
 | `NO_LABELS_PROVIDED` | Requested/existing labels. | Supply valid labels; don't claim mutation. |
-| `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title vs guards. | Respect deliberate skip; fix mistaken target/config only. |
+| `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title vs guards. | Respect skip; fix mistaken target/config only. |
 | `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL` | Lock/approval state. | Respect state; no unrelated unlock/approval. |
-| `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Response quota; retry-not-before. | Stop/defer within bounds; missing accounting != zero usage. |
+| `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Response quota; retry-not-before. | Stop/defer; missing accounting != zero usage. |
 | `AIC_USAGE_UNKNOWN` | Missing usage/accounting. | Fix collection/access; remaining budget stays unknown. |
-| `permission_denied` | Business response; operation authority. | Fix authorized credentials/permissions, not quota. |
+| `permission_denied` | Business response; operation authority. | Fix authorized credentials/permissions. |
 
 ## Merge guard codes
 
@@ -197,11 +197,11 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 | `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
 | `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR. | Use allowed PRs; retain protections. |
 | `pr_is_draft`, `pr_not_open` | Draft/open. | Honor author readiness; stop closed/merged PRs. |
-| `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
+| `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve conflicts; bound waits. |
 | `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
-| `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks; no bypass. |
+| `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks. |
 | `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Reviews/vetoes/threads; current-head allowlisted human approval. | Address feedback; retain independent reviewer authority. |
-| `protected_files_modified` | Complete live PR file list, including deleted paths and both rename sides; shared protected-file rules/exclusions. | Independently review and merge manually, or correct authorized scoped exclusions in trusted workflow configuration and recompile. Explicit `protected-files: allowed` disables only this file gate, not caution vetoes or other merge guards. |
+| `protected_files_modified` | Live PR file list, incl. deleted paths and both rename sides; protected-file rules/exclusions. | Independently review and merge manually, or correct authorized scoped exclusions in trusted config and recompile. Explicit `protected-files: allowed` disables only this file gate, not caution vetoes or other guards. |
 | `manual_review_caution` | PR/review detection/protected-files/caution notice. | Use independent manual review/merge; approvals/dismissals/labels/green checks cannot clear this guard. |
 | `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
 
@@ -252,10 +252,10 @@ or profile/effect-scope bypass.
 | `claim_delivery_unverified`, `delivery_failed`, `verification_unresolved`, `delivery_conflict`, `delivery_barrier_conflict`, `delivery_contract_required`, `delivery_evidence_required`, `evidence_invalid`, `evidence_required`, `terminal_evidence_required`, `nonlaunch_evidence_required` | Claim state/effects; independent receipts; barrier/contract. | Reconcile before retry; never force terminal state. |
 | `result_invalid`, `completion_conflict`, `cancellation_conflict`, `ownership_terminal`, `work_terminal`, `work_missing` | Work/ownership state; finish/result intent. | Respect terminal transitions; reconcile duplicate/conflicting completion/cancellation. |
 | `retry_invalid`, `retry_exhausted`, `release_invalid`, `release_open_claims`, `remediation_invalid` | Retry/release policy, attempts, open claims. | Stop exhausted retries; reconcile claims; authorized recovery only. |
-| `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason, run/Claim binding, provenance/freshness. | Bounded trusted reconciliation; unverified stays blocked; never force release. |
-| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit`, `obsolete_limit` | Named limit; count. | Bound/batch/compact via supported paths; keep limits. |
+| `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason, run/Claim binding, provenance/freshness. | Trusted bounded reconciliation; unverified stays blocked; no forced release. |
+| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit`, `obsolete_limit` | Named limit; count. | Bound/batch/compact via supported paths. |
 | `issue_binding_invalid`, `issue_binding_conflict` | Queue-issue binding; ownership. | Correct authorized binding; never adopt another work item's issue. |
-| `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, native acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes, drop uncertain locks or rewrite history. |
+| `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, native acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes, drop locks or rewrite history. |
 | `projection_target_unavailable`, `projection_unavailable` | Actual failure; safe status/request ID. | Diagnose cause; preserve mirrors and locks. |
 | `projection_receipt_pending`, `projection_comment_pending`, `projection_label_pending`, `projection_coordination_pending`, `projection_pagination_pending`, `projection_rate_pending` | Checkpoint/pacing/mirrors/receipts. | Reconcile exact request; never recreate mirrors or mistake pending for terminal failure. |
 
