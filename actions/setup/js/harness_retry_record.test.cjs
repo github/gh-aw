@@ -46,6 +46,7 @@ describe("normalizeHarnessRetryRecord", () => {
     "copilot_model_verification",
     "overloaded_error",
     "rate_limit_error",
+    "rate_limit_wait_exceeded",
     "max_turns",
     "no_deferred_marker",
     "invalid_model",

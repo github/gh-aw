@@ -12,6 +12,9 @@ type awInfoModelRouting struct {
 	Enabled bool   `json:"enabled"`
 	Goal    string `json:"goal,omitempty"`
 	Mode    string `json:"mode,omitempty"`
+	// Requested is the router value (for example router/economy) the workflow set as
+	// its model; it is omitted when routing comes from engine.model-routing.
+	Requested string `json:"requested,omitempty"`
 	// Provider is the native routing provider (anthropic or openai) sent to AWF as
 	// apiProxy.routing.provider; it is omitted for GitHub Copilot routing.
 	Provider      string   `json:"provider,omitempty"`
@@ -52,10 +55,11 @@ func buildAwInfoModelConfig(data *WorkflowData) (string, string) {
 	if isModelRoutingEnabled(data) {
 		routing := data.EngineConfig.ModelRouting
 		config.Routing = awInfoModelRouting{
-			Enabled:  true,
-			Goal:     routing.Goal,
-			Mode:     routing.Mode,
-			Provider: modelRoutingNativeProvider(data.EngineConfig.ID, data),
+			Enabled:   true,
+			Goal:      routing.Goal,
+			Mode:      routing.Mode,
+			Requested: routing.requested,
+			Provider:  modelRoutingNativeProvider(data.EngineConfig.ID, data),
 		}
 		if groups, err := resolveModelRoutingCandidateGroups(data, data.EngineConfig.ID); err == nil {
 			allowed := make([]string, 0, len(groups))

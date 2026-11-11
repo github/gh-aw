@@ -1016,9 +1016,9 @@ models:
   blocked: ["*-preview"]
 ```
 
-### Model Routing (`engine.model-routing`)
+### Model Routing (`model: router`, `engine.model-routing`)
 
-An experimental feature that chooses the model and reasoning effort for each run from the task the run receives, instead of a single fixed `engine.model`. Configured with a required `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`), optionally limited to a shortlist of allowed models. Eligible workflows on the `copilot`, `claude`, `codex`, or `pi` engine that set no model run on GitHub Copilot with `goal: cost` and `mode: auto` by default; setting `model-routing: false` opts out. See [Model Routing](/gh-aw/reference/model-routing/).
+An experimental feature that chooses the model and reasoning effort for each run from the task the run receives, instead of a single fixed `engine.model`. Chosen with a router value as the model: `model: router`, `router/economy`, `router/balanced`, or `router/robust`, which are not model names and can't be used as aliases or in model lists. Also configurable under `engine.model-routing` with a required `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`), optionally limited to a shortlist of allowed models. Eligible workflows on the `copilot`, `claude`, `codex`, or `pi` engine that set no model run on GitHub Copilot with `goal: cost` and `mode: auto` by default, the same as `model: router`; setting `model-routing: false` opts out. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ### Default AI Credits Pricing (`models.default-ai-credits-pricing`)
 

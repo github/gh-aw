@@ -79,6 +79,33 @@ describe("harness_retry_runner.cjs", () => {
     return { outcome, questions: [{ question: 1, outcome }], latencyMs: 1 };
   }
 
+  it.each([
+    [5, 10, null, 2, "rate_limit_error"],
+    [11, 10, null, 1, "rate_limit_wait_exceeded"],
+    [1000, 2000, 500, 1, "rate_limit_wait_exceeded"],
+  ])("enforces retry-after %i against delay cap %i and deadline %s", async (requested, cap, deadline, attempts, failureClass) => {
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS", "");
+    const options = telemetryOptions([1, 0]);
+    options.maxDelayMs = cap;
+    options.softTimeoutGuard = deadline === null ? null : { timeoutMinutes: 1, softDeadlineMs: Date.now() + deadline };
+    options.runAttempt = async attempt => ({ exitCode: attempt === 0 ? 1 : 0, output: "error", hasOutput: true, retryAfterMs: requested });
+    options.sleepFn = vi.fn();
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ attempts, exitCode: attempts === 2 ? 0 : 1 });
+    expect(options.sleepFn.mock.calls).toEqual(attempts === 2 ? [[requested]] : []);
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[0].failure_classes).toEqual([failureClass]);
+  });
+
+  it("does not override a terminal failure decision with Retry-After", async () => {
+    const options = telemetryOptions([1]);
+    options.runAttempt = async () => ({ exitCode: 1, output: "quota", hasOutput: true, retryAfterMs: 5 });
+    options.handleFailure = ({ result }) => {
+      result.failureClasses = ["invocation_cap_exceeded"];
+      return { action: "stop" };
+    };
+    expect(await runHarnessRetryLoop(options)).toMatchObject({ exitCode: 1, attempts: 1 });
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[0].failure_classes).toEqual(["invocation_cap_exceeded"]);
+  });
+
   it.each(["", "[]"])("does not request decisions without nonempty configured questions: %j", async configuration => {
     vi.stubEnv("GH_AW_SKIP_IF_DECISION", configuration);
     vi.stubEnv("AWF_REFLECT_ENABLED", "1");

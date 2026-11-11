@@ -63,7 +63,8 @@ The Copilot harness resolves aliases such as `auto` through the AWF alias map an
 model catalog to a concrete model ID. An alias is not a fixed model: inspect the
 run's resolution rather than assuming what `auto` selected.
 
-When `engine.model-routing` is enabled, AWF's per-model endpoint metadata
+When model routing is enabled (`model: router`, `router/economy`, `router/balanced`,
+`router/robust`, or `engine.model-routing`), AWF's per-model endpoint metadata
 (`/reflect` `supported_endpoints`) takes precedence. AWF checks compatibility at
 startup and fails fast with `Model endpoint mismatch: … Pin a compatible model,
 remove the COPILOT_PROVIDER_WIRE_API override, or upgrade gh-aw.` This check

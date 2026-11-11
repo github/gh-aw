@@ -149,6 +149,42 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 }
 
 describe("codex_harness.cjs", () => {
+  it.each([
+    ["1", "2000", 2, "rate_limit_error", true],
+    ["245", "60000", 1, "rate_limit_wait_exceeded", true],
+    ["245", "60000", 2, null, false],
+  ])("honors Retry-After=%s within cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
+    const { result, calls, harnessRetry } = runHarnessFixture(
+      `
+        const attempts = fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS, "utf8").trim().split("\\n").length;
+        if (attempts === 1) {
+          console.log(JSON.stringify({type:"error", error:{headers:{"retry-after":"${delay}"}, status:429}}));
+          console.log(JSON.stringify({type:"turn.failed", error:{message:"429 Too Many Requests"}}));
+          process.exit(1);
+        }
+      `,
+      { env: { GH_AW_HARNESS_MAX_DELAY_MS: cap, GH_AW_LLM_PROVIDER: github ? "github" : "openai", ...(github ? { GH_AW_MODEL_AGENT_CODEX: "copilot/gpt-5" } : {}) } }
+    );
+    expect(result.status, result.stderr).toBe(attempts === 2 ? 0 : 1);
+    expect(calls).toHaveLength(attempts);
+    if (failureClass) expect(harnessRetry.attempt_results[0].failure_classes).toEqual([failureClass]);
+    else expect(harnessRetry.attempt_results[0].failure_classes || []).not.toContain("rate_limit_wait_exceeded");
+    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(github ? 1000 : 1);
+  });
+
+  it("does not use tool output as Retry-After timing evidence", () => {
+    const { result, calls, harnessRetry } = runHarnessFixture(`
+      if (fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS, "utf8").trim().split("\\n").length === 1) {
+        console.log(JSON.stringify({type:"item.completed", item:{type:"command_execution", output:"HTTP 429\\nRetry-After: 245"}}));
+        process.exit(1);
+      }
+    `);
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toHaveLength(2);
+    expect(harnessRetry.attempt_results[0].failure_classes).not.toContain("rate_limit_wait_exceeded");
+    expect(harnessRetry.attempt_results[1].backoff_ms).toBe(1);
+  });
+
   it("handles repeated permission failures without replaying work", () => {
     const directory = makeHarnessTempDir("permission-output-");
     const safeOutputsPath = path.join(directory, "safe-outputs.jsonl");

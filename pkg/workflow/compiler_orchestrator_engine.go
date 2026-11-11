@@ -76,6 +76,10 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		preservedMaxRuns:            preservedMaxRuns,
 		preservedMaxTurnCacheMisses: preservedMaxTurnCacheMisses,
 	})
+	model, err = applyRouterModelValue(engineConfig, model)
+	if err != nil {
+		return nil, err
+	}
 	agenticEngine, configSteps, err := c.resolveEngineRuntimeConfig(engineSetting, engineConfig)
 	if err != nil {
 		return nil, c.formatUnknownEngineError(result, cleanPath, content, err)

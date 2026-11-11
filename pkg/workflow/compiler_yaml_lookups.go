@@ -161,6 +161,22 @@ func getDefaultModelOverrideVar(engineID string) string {
 	}
 }
 
+// mainAgentModelFallbackExpression returns the GH_AW_MODEL_FALLBACK expression the
+// engine's main-agent step uses when the configured model is an expression that
+// resolves empty, or "" for engines without model variables.
+func mainAgentModelFallbackExpression(engineID string) string {
+	switch engineID {
+	case string(constants.CopilotEngine):
+		return compilerenv.BuildModelOverrideExpression(constants.EnvVarModelAgentCopilot, compilerenv.DefaultModelCopilot, constants.CopilotBYOKDefaultModel)
+	case string(constants.ClaudeEngine):
+		return compilerenv.BuildModelOverrideExpression(constants.EnvVarModelAgentClaude, compilerenv.DefaultModelClaude, constants.SonnetDefaultModel)
+	case string(constants.CodexEngine):
+		return compilerenv.BuildModelOverrideExpressionEmptyFallback(constants.EnvVarModelAgentCodex, compilerenv.DefaultModelCodex)
+	default:
+		return ""
+	}
+}
+
 // versionToGitRef converts a compiler version string to a valid git ref for use
 // in actions/checkout ref: fields.
 //

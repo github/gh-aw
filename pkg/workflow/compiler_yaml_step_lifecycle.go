@@ -165,6 +165,13 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 		// pick-experiment step's output directly rather than via the needs context.
 		infoModel := RewriteActivationOutputsToLocalStepOutputs(data.Model, data.Experiments)
 		writeFormattedYAML(yaml, "          GH_AW_INFO_MODEL: \"%s\"\n", infoModel)
+		// When the model expression resolves empty, the harness uses GH_AW_MODEL_FALLBACK.
+		// Publish the same fallback so activation checks the model the harness will use.
+		if containsExpression(data.Model) && !isModelRoutingUnconditional(data) {
+			if fallback := mainAgentModelFallbackExpression(engineID); fallback != "" {
+				writeFormattedYAML(yaml, "          GH_AW_INFO_MODEL_FALLBACK: %s\n", fallback)
+			}
+		}
 	} else {
 		// Use the engine's default model as fallback when neither explicit model nor
 		// model variable is configured, so the run details show "agent" rather than "(none)".
