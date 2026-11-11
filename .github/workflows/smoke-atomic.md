@@ -23,7 +23,7 @@ network:
     - go
 runtimes:
   go:
-    version: "1.27.3"
+    version: "1.27.4"
 evals:
   - id: native_mcp_report_completeness
     question: Does the report explicitly state PASS or FAIL for native GitHub MCP retrieval and, when reporting PASS, include exactly two merged PR titles and numbers?

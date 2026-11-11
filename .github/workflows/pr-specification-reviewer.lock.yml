@@ -893,7 +893,7 @@ jobs:
               "description_suffixes": {
                 "create_pull_request_review_comment": " CONSTRAINTS: Maximum 6 review comment(s) can be created. Comments will be on the RIGHT side of the diff.",
                 "push_to_pull_request_branch": " CONSTRAINTS: Maximum 1 push(es) can be made.",
-                "submit_pull_request_review": " CONSTRAINTS: Maximum 1 review(s) can be submitted."
+                "submit_pull_request_review": " CONSTRAINTS: Maximum 1 review(s) can be submitted. Allowed review events: COMMENT, REQUEST_CHANGES. Events not listed (APPROVE) are rejected; do not use them."
               },
               "repo_params": {},
               "dynamic_tools": [],

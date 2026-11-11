@@ -460,7 +460,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			checkContent: []string{
 				"Setup Go",
 				"actions/setup-go@",
-				"go-version: '1.27.3'",
+				"go-version: '1.27.4'",
 				"cache: false",
 				"Capture GOROOT for AWF chroot mode",
 			},

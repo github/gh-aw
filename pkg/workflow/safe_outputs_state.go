@@ -41,6 +41,8 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 
 	// Direct nil checks — no reflection, no heap allocation.
 	return safeOutputs.CreateIssues != nil ||
+		safeOutputs.CreateSecurityAdvisory != nil ||
+		safeOutputs.AddSecurityAdvisoryComment != nil ||
 		safeOutputs.CreateWorkItems != nil ||
 		safeOutputs.UpdateWorkItems != nil ||
 		safeOutputs.CommentOnWorkItems != nil ||
@@ -116,6 +118,8 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 
 	// Direct nil checks for non-builtin pointer fields.
 	return safeOutputs.CreateIssues != nil ||
+		safeOutputs.CreateSecurityAdvisory != nil ||
+		safeOutputs.AddSecurityAdvisoryComment != nil ||
 		safeOutputs.CreateWorkItems != nil ||
 		safeOutputs.UpdateWorkItems != nil ||
 		safeOutputs.CommentOnWorkItems != nil ||
