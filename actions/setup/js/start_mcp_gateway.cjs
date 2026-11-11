@@ -1487,13 +1487,6 @@ async function main() {
         throw codedError(`Failed to copy file ${outputPath} to ${copilotConfigFile}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
       }
     }
-    let copilotConfigContent;
-    try {
-      copilotConfigContent = fs.readFileSync(copilotConfigFile, "utf8");
-    } catch (err) {
-      throw codedError(`Failed to read file ${copilotConfigFile}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
-    }
-    core.info(copilotConfigContent);
   }
   printTiming(configConvertStart, "Configuration conversion");
   core.info("");

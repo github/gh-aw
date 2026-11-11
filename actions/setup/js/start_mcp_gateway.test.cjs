@@ -661,6 +661,58 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
 });
 
 describe("start_mcp_gateway logging", () => {
+  it.each(["", '["cli"]', "invalid-json"])("does not log fallback configuration credentials (CLI servers: %s)", async cliServers => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "gateway-fallback-"));
+    const outputPath = path.join(directory, "gateway-output.json");
+    const configFile = path.join(directory, ".copilot", "mcp-config.json");
+    const credentials = ["synthetic-agent-credential", "synthetic-header-credential", "synthetic-url-credential", "synthetic-env-credential"];
+    const gatewayOutput = {
+      gateway: { agentId: credentials[0] },
+      mcpServers: {
+        remote: { url: `https://example.invalid/mcp?token=${credentials[2]}`, headers: { Authorization: `Bearer ${credentials[1]}` }, env: { API_KEY: credentials[3] } },
+        cli: { url: "http://localhost:8080/cli" },
+      },
+    };
+    const core = { info: vi.fn(), error: vi.fn() };
+    const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
+    const conversion = source.slice(source.indexOf('  core.info("Converting gateway configuration to agent format...");'), source.indexOf('  core.info("Checking MCP server functionality...");'));
+    try {
+      fs.writeFileSync(outputPath, JSON.stringify(gatewayOutput));
+      await vm.runInNewContext(`(async () => { ${conversion} })()`, {
+        fs,
+        path,
+        core,
+        process: { env: { GH_AW_MCP_CLI_SERVERS: cliServers } },
+        outputPath,
+        gatewayOutput,
+        agentId: credentials[0],
+        configDir: directory,
+        nowMs: () => 0,
+        detectEngineType: () => "unknown",
+        resolveCopilotConfigPaths: () => ({ dir: path.dirname(configFile), file: configFile }),
+        printTiming: vi.fn(),
+      });
+
+      const saved = JSON.parse(fs.readFileSync(configFile, "utf8"));
+      expect(saved.gateway.agentId).toBe(credentials[0]);
+      expect(saved.mcpServers.remote).toEqual(gatewayOutput.mcpServers.remote);
+      expect(Object.keys(saved.mcpServers)).toEqual(cliServers === '["cli"]' ? ["remote"] : ["remote", "cli"]);
+      expect(core.info).toHaveBeenCalledWith("No agent-specific converter found for engine: unknown");
+      expect(core.info).toHaveBeenCalledWith("Using gateway output directly");
+      if (cliServers === "invalid-json") {
+        expect(core.error).toHaveBeenCalledWith("ERROR: Failed to filter CLI-mounted servers from agent MCP config");
+      } else {
+        expect(core.error).not.toHaveBeenCalled();
+      }
+      const diagnostics = JSON.stringify([core.info.mock.calls, core.error.mock.calls]);
+      for (const credential of credentials) {
+        expect(diagnostics).not.toContain(credential);
+      }
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("records only a sanitized configuration snapshot before launching the gateway", () => {
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
     expect(source).toContain("writeMcpConfiguration(logDir, configObj)");
