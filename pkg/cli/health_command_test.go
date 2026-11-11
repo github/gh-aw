@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -81,7 +82,7 @@ func TestHealthConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := RunHealth(tt.config)
+			err := runHealth(context.Background(), tt.config)
 			if tt.wantDaysErr {
 				require.Error(t, err, "RunHealth should return a validation error for: %s", tt.name)
 				require.ErrorContains(t, err, tt.errContains, "Error message should describe the validation failure")
@@ -112,7 +113,7 @@ func TestRunHealthInvalidDays(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := HealthConfig{Days: tt.days, Threshold: 80.0}
-			err := RunHealth(config)
+			err := runHealth(context.Background(), config)
 			require.Error(t, err, "RunHealth should return an error for days=%d", tt.days)
 			require.ErrorContains(t, err, tt.errContains, "Error should describe the invalid days value")
 			require.ErrorContains(t, err, "Must be 7, 30, or 90", "Error should list the valid days options")
@@ -222,7 +223,7 @@ func TestRunHealthEmptySummaryJSON(t *testing.T) {
 		w.Close()
 	})
 	os.Stdout = w
-	runErr := RunHealth(HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "owner/repo", LogsDir: t.TempDir()})
+	runErr := runHealth(context.Background(), HealthConfig{Days: 7, Threshold: 80, JSONOutput: true, RepoOverride: "owner/repo", LogsDir: t.TempDir()})
 	require.NoError(t, w.Close())
 	os.Stdout = oldStdout
 	require.NoError(t, runErr)

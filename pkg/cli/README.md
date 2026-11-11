@@ -134,7 +134,6 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `RunAuditDiff` | `func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, opts AuditOptions) error` | Diffs multiple audit reports. |
 | `DownloadWorkflowLogs` | `func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) error` | Downloads and parses workflow logs and artifacts. |
 | `NewHealthCommand` | `func NewHealthCommand() *cobra.Command` | Constructs the `gh aw health` command. |
-| `RunHealth` | `func RunHealth(config HealthConfig) error` | Computes workflow health metrics for one workflow or all workflows. |
 | `CalculateWorkflowHealth` | `func CalculateWorkflowHealth(workflowName string, runs []WorkflowRun, threshold float64) WorkflowHealth` | Calculates success-rate and trend metrics for one workflow. |
 | `CalculateHealthSummary` | `func CalculateHealthSummary(workflowHealths []WorkflowHealth, period string, threshold float64) HealthSummary` | Aggregates workflow health results. |
 | `NewChecksCommand` | `func NewChecksCommand() *cobra.Command` | Constructs the `gh aw checks` command. |
@@ -540,16 +539,6 @@ err := cli.AuditWorkflowRun(ctx, runID, cli.AuditOptions{
     OutputDir: "/tmp/output",
     Verbose:   true,
     Parse:     true,
-})
-```
-
-### Checking workflow health
-
-```go
-err := cli.RunHealth(cli.HealthConfig{
-    Pattern:   "*.md",
-    Threshold: 0.8,
-    Period:    "30d",
 })
 ```
 

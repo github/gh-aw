@@ -148,7 +148,7 @@ func TestValidateDockerImage_MissingRegistryImage(t *testing.T) {
 	t.Setenv("FAKE_DOCKER_INSPECT_RESULT", "missing")
 	t.Setenv("FAKE_DOCKER_PULL_RESULT", "missing")
 
-	err := validateDockerImage("example/mcp:nonexistent", false, false)
+	err := validateDockerImageWithMode("example/mcp:nonexistent", false, false, false)
 	require.ErrorContains(t, err, "manifest unknown")
 	require.ErrorContains(t, err, "container image 'example/mcp:nonexistent' not found")
 

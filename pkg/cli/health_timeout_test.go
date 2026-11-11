@@ -24,7 +24,7 @@ func TestHealthTimeoutFlag(t *testing.T) {
 	timeout, err = cmd.Flags().GetDuration("timeout")
 	require.NoError(t, err)
 	assert.Zero(t, timeout)
-	require.ErrorContains(t, RunHealth(HealthConfig{Timeout: -time.Second}), "--timeout must not be negative")
+	require.ErrorContains(t, runHealth(context.Background(), HealthConfig{Timeout: -time.Second}), "--timeout must not be negative")
 }
 
 func TestHealthTimeBudgetCancelsInFlightRequests(t *testing.T) {
@@ -110,7 +110,7 @@ func TestHealthTimeBudgetReturnsPartialJSON(t *testing.T) {
 			}
 			start := time.Now()
 			output := captureAuditGroupStdout(t, func() {
-				require.NoError(t, RunHealth(HealthConfig{
+				require.NoError(t, runHealth(context.Background(), HealthConfig{
 					Days: 7, Threshold: 80, RepoOverride: "org/repo",
 					JSONOutput: true, LogsDir: t.TempDir(), Timeout: 30 * time.Millisecond,
 				}))

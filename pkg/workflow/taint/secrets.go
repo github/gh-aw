@@ -3,7 +3,6 @@ package taint
 import (
 	"strings"
 
-	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/rhysd/actionlint"
 )
 
@@ -65,8 +64,4 @@ func secretSink(site Site) bool {
 	default:
 		return false
 	}
-}
-
-func CheckSecretLeaks(workflow *actions.Workflow) (Result, error) {
-	return Analyze(workflow, SecretLeakRule())
 }
