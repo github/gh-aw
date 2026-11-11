@@ -3491,7 +3491,7 @@ engine:
   # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
   # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
   # fixed model and effort settings. Eligible workflows that choose no model or
-  # routing on GitHub Copilot inference default to goal cost and mode balanced; set
+  # routing on GitHub Copilot inference default to goal cost and mode auto; set
   # false to opt out. See https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   # Accepted formats:
@@ -3522,7 +3522,7 @@ engine:
     allowed-models: []
       # Array of strings
 
-  # Format 2: Disable the implicit cost/balanced model-routing default without
+  # Format 2: Disable the implicit cost/auto model-routing default without
   # pinning a model; the existing model variables and fallback model apply.
   model-routing: false
 

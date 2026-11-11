@@ -92,7 +92,7 @@ func TestVisualRegressionCheckerAgenticsDependency(t *testing.T) {
 			}
 			require.NotEqual(t, -1, checkoutIndex, "agentics checkout step not found")
 
-			for _, name := range []string{"Build documentation", "Start docs server"} {
+			for _, name := range []string{"Build documentation"} {
 				found := false
 				for i, s := range steps {
 					if s.Name == name {

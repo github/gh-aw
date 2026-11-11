@@ -100,6 +100,86 @@ describe("Safe Output Handler Manager", () => {
   });
 
   describe("PR closure during output processing", () => {
+    it("records local incomplete diagnostics without another PR read or replaying a published comment", async () => {
+      global.context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 42, state: "open" } } };
+      global.github = {
+        rest: {
+          pulls: {
+            get: vi
+              .fn()
+              .mockResolvedValueOnce({ data: { state: "open" } })
+              .mockRejectedValue(new Error("metadata unavailable")),
+          },
+        },
+      };
+      const comment = vi.fn().mockResolvedValue({ success: true });
+      const handlers = await loadHandlers({ report_incomplete: {} });
+      handlers.set("add_comment", comment);
+      const result = await processMessages(handlers, [
+        { type: "add_comment", body: "Blocked visual review" },
+        { type: "report_incomplete", reason: "Screenshots unavailable" },
+      ]);
+      expect(global.github.rest.pulls.get).toHaveBeenCalledTimes(1);
+      expect(comment).toHaveBeenCalledTimes(1);
+      expect(result.results[1]).toMatchObject({ success: true, result: { reason: "Screenshots unavailable" } });
+      expect(result.missings.reportIncomplete).toHaveLength(1);
+    });
+
+    it("fails closed for mutations and preserves empty-message HTTP errors while retaining diagnostics", async () => {
+      global.context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 42, state: "open" } } };
+      const error = Object.assign(new Error(""), { status: 500, response: { headers: { "x-github-request-id": "ABC:123" } } });
+      global.github = { rest: { pulls: { get: vi.fn().mockRejectedValue(error) } } };
+      const comment = vi.fn();
+      const handlers = await loadHandlers({ report_incomplete: {} });
+      handlers.set("add_comment", comment);
+      const result = await processMessages(handlers, [
+        { type: "add_comment", body: "Do not publish without fresh PR state" },
+        { type: "report_incomplete", reason: "Screenshots unavailable" },
+      ]);
+      expect(comment).not.toHaveBeenCalled();
+      expect(global.github.rest.pulls.get).toHaveBeenCalledTimes(1);
+      expect(result.results[0]).toMatchObject({ success: false, error: "GitHub API request failed (HTTP 500; request ID ABC:123)" });
+      expect(result.results[1]).toMatchObject({ success: true });
+    });
+
+    it("does not grant a same-named custom script the built-in diagnostic exemption", async () => {
+      global.context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 42, state: "open" } } };
+      global.github = { rest: { pulls: { get: vi.fn().mockRejectedValue(Object.assign(new Error("state unavailable"), { status: 500 })) } } };
+      const runnerTemp = fs.mkdtempSync(path.join("/tmp", "gh-aw-custom-incomplete-"));
+      process.env.RUNNER_TEMP = runnerTemp;
+      process.env.GH_AW_SAFE_OUTPUT_SCRIPTS = JSON.stringify({ report_incomplete: "custom_incomplete.cjs" });
+      const actionsDir = path.join(runnerTemp, "gh-aw", "actions");
+      fs.mkdirSync(actionsDir, { recursive: true });
+      fs.writeFileSync(path.join(actionsDir, "custom_incomplete.cjs"), "exports.main = async () => async () => { throw new Error('Custom handler must not run'); };");
+      try {
+        const handlers = await loadHandlers({ report_incomplete: {} });
+        const result = await processMessages(handlers, [{ type: "report_incomplete", reason: "custom replacement" }]);
+        expect(global.github.rest.pulls.get).toHaveBeenCalledTimes(1);
+        expect(result.results[0]).toMatchObject({ success: false, error: "state unavailable" });
+      } finally {
+        fs.rmSync(runnerTemp, { recursive: true, force: true });
+      }
+    });
+
+    it("rechecks PR state before a deferred same-named custom handler runs again", async () => {
+      global.context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 42, state: "open" } } };
+      global.github = {
+        rest: {
+          pulls: {
+            get: vi
+              .fn()
+              .mockResolvedValueOnce({ data: { state: "open" } })
+              .mockResolvedValue({ data: { state: "closed" } }),
+          },
+        },
+      };
+      const handler = vi.fn().mockResolvedValue({ deferred: true, success: true });
+      const result = await processMessages(new Map([["report_incomplete", handler]]), [{ type: "report_incomplete", reason: "custom replacement" }]);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(global.github.rest.pulls.get).toHaveBeenCalledTimes(2);
+      expect(result.results[0]).toMatchObject({ skipped: true, reason: expect.stringContaining("closed after") });
+    });
+
     it("skips subsequent effects when the triggering PR closes between messages", async () => {
       global.context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 42, state: "open" } } };
       global.github = {

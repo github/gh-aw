@@ -9,7 +9,7 @@
 const HANDLER_TYPE = "remove_labels";
 
 const { validateLabels } = require("./safe_output_validator.cjs");
-const { getErrorMessage } = require("./error_helpers.cjs");
+const { getErrorMessage, getErrorStatus } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
@@ -218,7 +218,8 @@ const main = createCountGatedHandler({
         } catch (error) {
           // Label might not exist on the issue/PR - this is not a failure
           const errorMessage = getErrorMessage(error);
-          if (errorMessage.includes("Label does not exist") || errorMessage.includes("404")) {
+          const errorStatus = getErrorStatus(error);
+          if (errorStatus === 404 || (errorStatus == null && errorMessage.includes("Label does not exist"))) {
             core.info(`Label "${label}" was not present on ${contextType} #${itemNumber} in ${itemRepo}, skipping`);
           } else {
             core.warning(`Failed to remove label "${label}": ${errorMessage}`);

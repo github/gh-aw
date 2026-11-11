@@ -20,7 +20,7 @@ type CopilotModelRoutingConfig struct {
 	Goal          string
 	Mode          string
 	AllowedModels []string
-	// implicit marks the compiler's cost/balanced default, as opposed to an
+	// implicit marks the compiler's cost/auto default, as opposed to an
 	// authored or imported engine.model-routing block. It is never emitted.
 	implicit bool
 }

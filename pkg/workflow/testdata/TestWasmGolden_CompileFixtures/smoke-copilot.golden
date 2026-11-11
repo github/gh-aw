@@ -119,7 +119,7 @@ jobs:
             echo "Model routing disabled: vars.GH_AW_DEFAULT_MODEL_COPILOT selects the model"
             echo "model-routing=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Model routing enabled: goal cost, mode balanced"
+            echo "Model routing enabled: goal cost, mode auto"
             echo "model-routing=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Generate agentic run info
@@ -143,7 +143,7 @@ jobs:
           GH_AW_INFO_FIREWALL_TYPE: "squid"
           GH_AW_INFO_AGENT_RUNTIME: ""
           GH_AW_INFO_ENGINE_HARNESS: "copilot-cli"
-          GH_AW_INFO_MODEL_CONFIG: '${{ steps.resolve-model-routing.outputs.model-routing == ''true'' && ''{"routing":{"enabled":true,"goal":"cost","mode":"balanced"},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' || ''{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' }}'
+          GH_AW_INFO_MODEL_CONFIG: '${{ steps.resolve-model-routing.outputs.model-routing == ''true'' && ''{"routing":{"enabled":true,"goal":"cost","mode":"auto"},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' || ''{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'' }}'
           GH_AW_INFO_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_INFO_CACHE_MEMORY: "true"
           GH_AW_COMPILED_STRICT: "true"

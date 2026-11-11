@@ -12,6 +12,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 
 
 network:
@@ -57,8 +58,10 @@ experiments:
 
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: false
 
 imports:
