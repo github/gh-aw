@@ -19,7 +19,7 @@ import (
 
 var (
 	docBulletRe   = regexp.MustCompile(`^//\s+-\s+([a-z0-9_-]+)\s+—`)
-	readmeTableRe = regexp.MustCompile(`^\|\s+` + "`" + `([a-z0-9_-]+)` + "`" + `\s+\|`)
+	readmeTableRe = regexp.MustCompile(`^\|\s+` + "`" + `([a-z0-9_-]+)` + "`" + `(?:\s+\(` + "`" + `([a-z0-9_-]+)` + "`" + `\))?\s+\|`)
 	linterFlagsRe = regexp.MustCompile(`LINTER_FLAGS=["']([^"']+)["']`)
 )
 
@@ -38,6 +38,7 @@ var notYetEnforced = map[string]string{
 	"fprintferrorunchecked":        "existing production violations need remediation before enforcement; nolint suppression already works",
 	"goroutineresourceleak":        "requires an enforcement-readiness audit before native and WebAssembly CI enable it",
 	"hardcodedfilepath":            "requires an enforcement audit after the same-package constant fix (#52428)",
+	"ignoredlocalerror":            "existing ignored local errors need review before CI enforcement",
 	"jsonunmarshalbytesconversion": "existing production conversions need review before CI enforcement",
 	"largefunc":                    "existing production violations need remediation before enforcement; nolint suppression already works",
 	"lenstringzero":                "requires an enforcement audit after the diagnostic-message fix (#54717)",
@@ -272,10 +273,14 @@ func parseReadmeSubpackageSet(t *testing.T) map[string]struct{} {
 		if m == nil {
 			continue
 		}
-		if m[1] == "internal" {
+		label := m[1]
+		if m[2] != "" {
+			label = m[2]
+		}
+		if label == "internal" {
 			continue
 		}
-		readmeSet[m[1]] = struct{}{}
+		readmeSet[label] = struct{}{}
 	}
 
 	return readmeSet

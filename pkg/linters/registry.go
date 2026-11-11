@@ -37,6 +37,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httpnoctx"
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
+	"github.com/github/gh-aw/pkg/linters/ignoredlocalerror"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
@@ -144,6 +145,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	httprespbodyclose.Analyzer,
 	ioutildeprecated.Analyzer,
 	httpstatuscode.Analyzer,
+	ignoredlocalerror.Analyzer,
 	largefunc.Analyzer,
 	logfatallibrary.Analyzer,
 	manualmutexunlock.Analyzer,
