@@ -268,7 +268,8 @@ func buildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData
 	var steps []GitHubActionStep
 
 	if len(npmSteps) > 0 {
-		steps = append(steps, npmSteps[0]) // Node.js setup step
+		nodeSetupStep := rewriteNodeSetupStep(npmSteps[0], "", resolveNodeSetupVersion(workflowData))
+		steps = append(steps, nodeSetupStep) // Node.js setup step
 	}
 
 	steps = appendAWFInstallationSteps(steps, workflowData)

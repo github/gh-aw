@@ -475,6 +475,15 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 			if !strings.Contains(agentStep, "node-version: '"+tt.version+"'") {
 				t.Errorf("expected Node version %q in agent setup step:\n%s", tt.version, agentStep)
 			}
+			data := tt.data
+			if data == nil {
+				data = &WorkflowData{}
+			}
+			installSteps := NewClaudeEngine().GetInstallationSteps(data)
+			installStep := strings.Join(installSteps[0], "\n")
+			if !strings.Contains(installStep, "node-version: '"+tt.version+"'") {
+				t.Errorf("expected Node version %q in Claude installation step:\n%s", tt.version, installStep)
+			}
 			step := strings.Join(generateNodeJsSetupStepForWorkflow(tt.data), "\n")
 			if !strings.Contains(step, tt.expectedUses) {
 				t.Errorf("expected %q in step:\n%s", tt.expectedUses, step)
