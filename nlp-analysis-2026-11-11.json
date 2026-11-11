@@ -1,0 +1,91 @@
+{
+  "date": "2026-11-11",
+  "window_start": "2026-11-04T10:19:56Z",
+  "prs_analyzed": 207,
+  "messages": 207,
+  "avg_polarity": 0.014,
+  "median_polarity": 0.0,
+  "positive_pct": 31.9,
+  "neutral_pct": 39.6,
+  "negative_pct": 28.5,
+  "topics": [
+    {
+      "label": "output / coverage / safe",
+      "count": 67,
+      "pct": 32.4
+    },
+    {
+      "label": "guidance / issues / update",
+      "count": 53,
+      "pct": 25.6
+    },
+    {
+      "label": "copilot / model / routing",
+      "count": 47,
+      "pct": 22.7
+    },
+    {
+      "label": "package / workflow / cli",
+      "count": 29,
+      "pct": 14.0
+    },
+    {
+      "label": "analyzer / linter / calls",
+      "count": 11,
+      "pct": 5.3
+    }
+  ],
+  "top_keywords": [
+    [
+      "workflow",
+      142
+    ],
+    [
+      "coverage",
+      117
+    ],
+    [
+      "run",
+      101
+    ],
+    [
+      "add",
+      92
+    ],
+    [
+      "agent",
+      85
+    ],
+    [
+      "existing",
+      78
+    ],
+    [
+      "model",
+      73
+    ],
+    [
+      "detection",
+      72
+    ],
+    [
+      "regression",
+      69
+    ],
+    [
+      "validation",
+      65
+    ]
+  ],
+  "most_positive_pr": {
+    "number": 75754,
+    "title": "Fix PR triage safe-output targeting",
+    "score": 0.5
+  },
+  "most_negative_pr": {
+    "number": 75385,
+    "title": "Allow pi model selection from dispatch inputs",
+    "score": -0.5
+  },
+  "data_limitation": "all 207 pr-comments files empty; PR body text only"
+}
