@@ -223,10 +223,12 @@ jobs:
                 state_file: `checkpoint-${crypto.createHash('sha256').update(newSnapshot).digest('hex')}.json`
               });
             }
+            const healthTimeoutSeconds = 300;
             const health = JSON.parse(execFileSync('gh', ['aw', 'health',
               '--repo', repository, '--start-date', retentionStart, '--end-date', end,
-              '--logs-dir', path.join(cache, 'health'), '--timeout', '5m', '--json'], {
-              encoding: 'utf8', timeout: 330000, maxBuffer: 16 * 1024 * 1024
+              '--logs-dir', path.join(cache, 'health'), '--timeout', `${healthTimeoutSeconds}s`, '--json'], {
+              encoding: 'utf8', timeout: (healthTimeoutSeconds + 30) * 1000, // 30s slack beyond the CLI deadline
+              maxBuffer: 16 * 1024 * 1024
             }));
             const discovery = health.collection;
             if (!discovery || !Array.isArray(health.workflows) ||
@@ -440,7 +442,7 @@ jobs:
               new_failures: newFailures,
               evidence_complete: deferred === 0, pending_runs: pending.length, deferred_failures: deferred,
               open_prs_complete: true, open_prs: openPRs, clusters: ranked,
-              limits: {health_timeout_seconds: 300, metadata_requests: 1025, metadata_runs: 999,
+              limits: {health_timeout_seconds: healthTimeoutSeconds, metadata_requests: 1025, metadata_runs: 999,
                 pr_pages: 10, new_runs: 25, audits: 3, api_used_ceiling: ceiling}
             };
             for (const [index, cluster] of manifest.clusters.entries()) {
