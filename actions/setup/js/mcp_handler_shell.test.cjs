@@ -1,6 +1,6 @@
 // @ts-check
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createShellHandler } from "./mcp_handler_shell.cjs";
 import fs from "fs";
 import path from "path";
@@ -23,6 +23,7 @@ describe("createShellHandler", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     // Clean up temporary directory
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -181,10 +182,77 @@ sleep 30
     fs.writeFileSync(testScriptPath, shCode);
     fs.chmodSync(testScriptPath, "755");
 
+    const outputPaths = [];
+    mockServer.debug = message => {
+      if (message.includes("Output file: ")) outputPaths.push(message.split("Output file: ")[1]);
+    };
     const handler = createShellHandler(mockServer, "slow-tool", testScriptPath, 1);
 
     await expect(handler({})).rejects.toThrow();
+    expect(outputPaths).toHaveLength(1);
+    expect(fs.existsSync(path.dirname(outputPaths[0]))).toBe(false);
   }, 15000);
+
+  it("uses a private directory and ignores planted legacy output symlinks", async () => {
+    vi.spyOn(os, "tmpdir").mockReturnValue(tempDir);
+    vi.spyOn(Date, "now").mockReturnValue(123);
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const sentinel = path.join(tempDir, "sentinel");
+    fs.writeFileSync(sentinel, "external=unchanged");
+    const legacyPath = path.join(tempDir, `mcp-shell-output-123-${(0.5).toString(36).substring(2)}.txt`);
+    fs.symlinkSync(sentinel, legacyPath);
+    testScriptPath = path.join(tempDir, "private-output.sh");
+    fs.writeFileSync(testScriptPath, '#!/bin/bash\nprintf "key=value\\n" >> "$GITHUB_OUTPUT"\nprintf "%s" "$GITHUB_OUTPUT"\n');
+    fs.chmodSync(testScriptPath, "755");
+
+    let outputPath;
+    mockServer.debug = message => {
+      if (message.includes("Output file: ")) {
+        outputPath = message.split("Output file: ")[1];
+        expect(fs.statSync(path.dirname(outputPath)).mode & 0o777).toBe(0o700);
+      }
+    };
+    const result = await createShellHandler(mockServer, "private-output", testScriptPath)({});
+    const output = JSON.parse(result.content[0].text);
+    expect(output.outputs).toEqual({ key: "value" });
+    expect(output.stdout).toBe(outputPath);
+    expect(fs.existsSync(path.dirname(outputPath))).toBe(false);
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("external=unchanged");
+    expect(fs.lstatSync(legacyPath).isSymbolicLink()).toBe(true);
+  });
+
+  it("reads the original output handle when the script replaces its path with a symlink", async () => {
+    const sentinel = path.join(tempDir, "sentinel");
+    fs.writeFileSync(sentinel, "external=secret\n");
+    testScriptPath = path.join(tempDir, "replace-output.sh");
+    fs.writeFileSync(testScriptPath, '#!/bin/bash\nprintf "key=value\\n" >> "$GITHUB_OUTPUT"\nrm "$GITHUB_OUTPUT"\nln -s "$INPUT_SENTINEL" "$GITHUB_OUTPUT"\nprintf "%s" "$GITHUB_OUTPUT"\n');
+    fs.chmodSync(testScriptPath, "755");
+    const result = await createShellHandler(mockServer, "replace-output", testScriptPath)({ sentinel });
+    const output = JSON.parse(result.content[0].text);
+    expect(output.outputs).toEqual({ key: "value" });
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("external=secret\n");
+    expect(fs.existsSync(path.dirname(output.stdout))).toBe(false);
+  });
+
+  it("cleans up the private directory if exclusive output creation fails", async () => {
+    vi.spyOn(os, "tmpdir").mockReturnValue(tempDir);
+    vi.spyOn(fs, "openSync").mockImplementation(() => {
+      throw new Error("output allocation failed");
+    });
+    await expect(createShellHandler(mockServer, "allocation-failure", "/unused")({})).rejects.toThrow("output allocation failed");
+    expect(fs.readdirSync(tempDir)).toEqual([]);
+  });
+
+  it("reports directory allocation failures with the original cause", async () => {
+    const cause = new Error("temporary parent is not writable");
+    vi.spyOn(fs, "mkdtempSync").mockImplementation(() => {
+      throw cause;
+    });
+    await expect(createShellHandler(mockServer, "allocation-failure", "/unused")({})).rejects.toMatchObject({
+      message: expect.stringContaining("Failed to create shell output directory for allocation-failure"),
+      cause,
+    });
+  });
 
   it("should execute script from GITHUB_WORKSPACE directory", async () => {
     const originalWorkspace = process.env.GITHUB_WORKSPACE;

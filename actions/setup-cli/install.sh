@@ -347,6 +347,16 @@ if [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)$ ]]; then
     VERSION="$BEST_TAG"
 fi
 
+cleanup_install() {
+    if [ -n "${STAGING_DIR:-}" ]; then
+        rm -rf -- "$STAGING_DIR"
+    fi
+}
+STAGING_DIR=""
+trap cleanup_install EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 # Try gh extension install if requested (and gh is available)
 if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
     print_info "Attempting to install gh-aw using 'gh extension install'..."
@@ -367,12 +377,10 @@ if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
     install_result=0
     if [ -n "$VERSION" ] && [ "$VERSION" != "latest" ]; then
         # shellcheck disable=SC2086  # GH_INSTALL_CMD_TIMEOUT is intentionally unquoted
-        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force --pin "$VERSION" 2>&1 | tee /tmp/gh-install.log
-        install_result=${PIPESTATUS[0]}
+        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force --pin "$VERSION" || install_result=$?
     else
         # shellcheck disable=SC2086  # GH_INSTALL_CMD_TIMEOUT is intentionally unquoted
-        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force 2>&1 | tee /tmp/gh-install.log
-        install_result=${PIPESTATUS[0]}
+        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force || install_result=$?
     fi
 
     # Exit code 124 means the timeout command fired; treat it the same as a
@@ -416,9 +424,6 @@ if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
         fi
     else
         print_warning "gh extension install failed, falling back to manual installation..."
-        if [ -f /tmp/gh-install.log ]; then
-            cat /tmp/gh-install.log
-        fi
     fi
 elif [ "$TRY_GH_INSTALL" = true ]; then
     print_info "gh CLI not available, proceeding with manual installation..."
@@ -482,9 +487,6 @@ if ! STAGING_DIR=$(mktemp -d "$INSTALL_DIR/.gh-aw-install.XXXXXX"); then
 fi
 STAGED_BINARY_PATH="$STAGING_DIR/$BINARY_NAME"
 CHECKSUMS_PATH="$STAGING_DIR/checksums.txt"
-trap 'rm -rf -- "$STAGING_DIR"' EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
 
 # Download the binary with retry logic
 print_info "Downloading gh-aw binary..."
