@@ -24,12 +24,15 @@ func TestCompileImportedEngineSupportedEnvVarKeysStrict(t *testing.T) {
 		awfVersion  string
 		wantError   string
 		envValue    string
+		importedEnv string
 	}{
 		{name: "declared key", key: "ANTHROPIC_API_KEY", strict: true},
 		{name: "undeclared key", key: "OTHER_API_KEY", strict: true, wantSection: "engine.env"},
 		{name: "top-level secret", key: "ANTHROPIC_API_KEY", topLevelEnv: "env:\n  TOP_SECRET: ${{ secrets.TOP_SECRET }}\n", strict: true, wantSection: "env"},
 		{name: "non-strict top-level warning once", key: "ANTHROPIC_API_KEY", topLevelEnv: "env:\n  TOP_SECRET: ${{ secrets.TOP_SECRET }}\n"},
 		{name: "non-strict engine warning once", key: "OTHER_API_KEY"},
+		{name: "imported top-level credential strict", key: "ANTHROPIC_API_KEY", strict: true, importedEnv: "env:\n  IMPORTED_TOKEN: ${{ github.token }}\n", wantSection: "env"},
+		{name: "imported top-level credential non-strict warning once", key: "ANTHROPIC_API_KEY", importedEnv: "env:\n  IMPORTED_TOKEN: ${{ github.token }}\n"},
 		{name: "older firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "v0.25.0", wantError: "requires AWF v0.25.3 or newer"},
 		{name: "minimum firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "v0.25.3"},
 		{name: "latest firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "latest"},
@@ -45,7 +48,7 @@ func TestCompileImportedEngineSupportedEnvVarKeysStrict(t *testing.T) {
 				dir := t.TempDir()
 				sharedDir := filepath.Join(dir, "shared")
 				require.NoError(t, os.MkdirAll(sharedDir, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "engine.md"), []byte(`---
+				require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "engine.md"), []byte(fmt.Sprintf(`---
 engine:
   id: my-engine
   display-name: My Engine
@@ -55,8 +58,8 @@ engine:
     execution:
       command-name: my-engine
       step-name: Execute My Engine
----
-`), 0600))
+%s---
+`, tt.importedEnv)), 0600))
 				path := filepath.Join(dir, "repro.md")
 				sandbox := ""
 				if tt.awfVersion != "" {
@@ -97,6 +100,7 @@ Say hello.
 				})
 				if tt.wantSection != "" {
 					require.ErrorContains(t, compileErr, "strict mode: secrets detected in '"+tt.wantSection+"' section")
+					require.NoFileExists(t, filepath.Join(dir, "repro.lock.yml"))
 					return
 				}
 				if tt.wantError != "" {
@@ -116,7 +120,7 @@ Say hello.
 				}
 				assert.Contains(t, yamlContent, envValue)
 				wantTopWarnings, wantEngineWarnings := 0, 0
-				if tt.topLevelEnv != "" {
+				if tt.topLevelEnv != "" || tt.importedEnv != "" {
 					wantTopWarnings = 1
 				}
 				if tt.key == "OTHER_API_KEY" {
@@ -169,6 +173,10 @@ func TestCompileEnvCredentialReferences(t *testing.T) {
 	}{
 		{name: "dot token", value: "${{ github.token }}", wantSection: "env"},
 		{name: "single quoted token", value: "${{ github['token'] }}", wantSection: "env"},
+		{name: "whole github context", value: "${{ github }}", wantSection: "env"},
+		{name: "computed github access", value: "${{ github[vars.KEY] }}", wantSection: "env"},
+		{name: "whole secrets context", value: "${{ secrets }}", wantSection: "env"},
+		{name: "computed secrets access", value: "${{ secrets[vars.KEY] }}", wantSection: "env"},
 		{name: "double quoted token", value: `${{ github["token"] }}`, wantError: "invalid expression in 'env' section"},
 		{name: "case insensitive token", value: "${{ GitHub [ 'ToKeN' ] }}", wantSection: "env"},
 		{name: "fallback token", value: "${{ vars.VALUE || github['token'] }}", wantSection: "env"},
@@ -179,11 +187,13 @@ func TestCompileEnvCredentialReferences(t *testing.T) {
 		{name: "quoted token control", value: "${{ 'github.token' }}"},
 		{name: "quoted bracket token control", value: `${{ 'github["token"]' }}`},
 		{name: "plain token control", value: "github['token']"},
+		{name: "non-strict whole github context", value: "${{ github }}", nonStrict: true, wantSection: "env"},
 		{name: "non-strict single quoted token", value: "${{ github['token'] }}", nonStrict: true, wantSection: "env"},
 		{name: "non-strict double quoted token", value: `${{ github["token"] }}`, nonStrict: true, wantError: "invalid expression in 'env' section"},
 		{name: "unsupported engine key", value: "${{ github['token'] }}", engineEnv: true, wantSection: "engine.env"},
 		{name: "unsupported engine double quoted token", value: `${{ github["token"] }}`, engineEnv: true, wantError: "invalid expression in 'engine.env' section"},
 		{name: "supported engine key", value: "${{ github['token'] }}", engineEnv: true, key: "COPILOT_GITHUB_TOKEN"},
+		{name: "non-core Copilot provider key", value: "${{ github['token'] }}", engineEnv: true, key: "COPILOT_PROVIDER_API_KEY"},
 		{name: "supported engine double quoted token", value: `${{ github["token"] }}`, engineEnv: true, key: "COPILOT_GITHUB_TOKEN", wantError: "invalid expression in 'engine.env' section"},
 		{name: "supported engine key older firewall", value: "${{ github['token'] }}", engineEnv: true, key: "COPILOT_GITHUB_TOKEN", awfVersion: "v0.25.0", wantError: "requires AWF v0.25.3 or newer"},
 		{name: "supported engine dot token older firewall", value: "${{ github.token }}", engineEnv: true, key: "COPILOT_GITHUB_TOKEN", awfVersion: "v0.25.0", wantError: "requires AWF v0.25.3 or newer"},
@@ -232,6 +242,7 @@ func TestCompileEnvCredentialReferences(t *testing.T) {
 				}
 				if tt.wantError != "" {
 					require.ErrorContains(t, compileErr, tt.wantError)
+					assert.NotContains(t, compileErr.Error(), "invalid expression in env variable")
 					require.NoFileExists(t, filepath.Join(dir, "credentials.lock.yml"))
 					return
 				}
@@ -250,6 +261,26 @@ func TestCompileEnvCredentialReferences(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestCredentialExpressionsFromMapSerializationException(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "whole secrets context", value: "${{ secrets }}", want: true},
+		{name: "unresolved github access", value: "${{ github[vars.KEY] }}", want: true},
+		{name: "secrets serialization is handled separately", value: "${{ toJSON(secrets) }}"},
+		{name: "credential beside serialized secrets", value: "${{ format('{0}{1}', toJSON(secrets), github.token) }}", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := credentialExpressionsFromMap(map[string]string{"VALUE": tt.value})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, len(got) > 0)
+		})
 	}
 }
 

@@ -91,20 +91,25 @@ func findSecretsSerializationCallRanges(expr string) [][]int {
 	}
 	var ranges [][]int
 	actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
-		if node.Kind == "call" && strings.EqualFold(node.Token.Text, "toJSON") && len(node.Children) == 1 {
-			argument := node.Child(0)
-			for argument.Kind == "group" && len(argument.Children) == 1 {
-				argument = argument.Child(0)
-			}
-			path, ok := actionslanguageservice.Reference(argument)
-			if ok && len(path) == 1 && strings.EqualFold(path[0], "secrets") {
-				ranges = append(ranges, []int{node.Start, node.End})
-				return false
-			}
+		if isSecretsSerializationCall(node) {
+			ranges = append(ranges, []int{node.Start, node.End})
+			return false
 		}
 		return true
 	})
 	return ranges
+}
+
+func isSecretsSerializationCall(node *actionslanguageservice.Expression) bool {
+	if node.Kind != "call" || !strings.EqualFold(node.Token.Text, "toJSON") || len(node.Children) != 1 {
+		return false
+	}
+	argument := node.Child(0)
+	for argument.Kind == "group" && len(argument.Children) == 1 {
+		argument = argument.Child(0)
+	}
+	path, ok := actionslanguageservice.Reference(argument)
+	return ok && len(path) == 1 && strings.EqualFold(path[0], "secrets")
 }
 
 func replaceStringRanges(input string, ranges [][]int, replacement string) string {

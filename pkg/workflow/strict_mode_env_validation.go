@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -27,7 +26,7 @@ func credentialExpressionsFromMap(values map[string]string) ([]string, error) {
 		value := values[key]
 		spans, err := actionslanguageservice.ExtractExpressions(value)
 		if err != nil {
-			return nil, fmt.Errorf("invalid expression in env variable %q: %w", key, err)
+			return nil, fmt.Errorf("%q: %w", key, err)
 		}
 		for _, span := range spans {
 			expression, err := actionslanguageservice.ParseSyntax(span.Content)
@@ -35,12 +34,10 @@ func credentialExpressionsFromMap(values map[string]string) ([]string, error) {
 				if err == nil {
 					err = errors.New("an expression was expected")
 				}
-				return nil, fmt.Errorf("invalid expression in env variable %q: %w", key, err)
+				return nil, fmt.Errorf("%q: %w", key, err)
 			}
 			// Whole-context secrets serialization has its own validation pass.
-			if slices.ContainsFunc(actionslanguageservice.References(expression), func(path []string) bool {
-				return len(path) >= 2 && isCredentialReference(path)
-			}) {
+			if expressionUsesCredentialReference(expression, true) {
 				result[value[span.Start:span.End]] = struct{}{}
 			}
 		}
@@ -65,8 +62,8 @@ func (c *Compiler) validateEnvSecrets(frontmatter map[string]any) error {
 
 func (c *Compiler) validateEarlyEnvSecrets(frontmatter map[string]any) error {
 	if frontmatterDeclaresImports(frontmatter) {
-		// Imported engine definitions are not registered until imports have been merged.
-		return c.validateEnvSecretsSection(frontmatter, "env", nil)
+		// Validate the full top-level env after imported values have been merged.
+		return nil
 	}
 	_, config, _ := c.ExtractEngineConfig(frontmatter)
 	if config != nil && len(config.FallbackModels) > 0 {

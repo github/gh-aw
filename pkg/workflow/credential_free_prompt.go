@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/goccy/go-yaml"
 )
 
@@ -19,7 +20,41 @@ func promptValueUsesCredentials(value string) bool {
 
 func isCredentialReference(path []string) bool {
 	return referenceHasPrefix(path, []string{"secrets"}) ||
-		referenceHasPrefix(path, []string{"github", "token"})
+		referenceHasPrefix(path, []string{"github", "token"}) ||
+		len(path) == 1 && strings.EqualFold(path[0], "github")
+}
+
+func expressionUsesCredentialReference(expression *actionslanguageservice.Expression, ignoreSecretsSerialization bool) bool {
+	found := false
+	actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+		if ignoreSecretsSerialization && isSecretsSerializationCall(node) {
+			return false
+		}
+		path, ok := actionslanguageservice.Reference(node)
+		if !ok {
+			return true
+		}
+		found = found || isCredentialReference(path)
+		return false
+	})
+	return found
+}
+
+func valueUsesCredentialReference(value string) bool {
+	spans, err := actionslanguageservice.ExtractExpressions(value)
+	if err != nil {
+		return true
+	}
+	for _, span := range spans {
+		expression, err := actionslanguageservice.ParseSyntax(span.Content)
+		if err != nil || expression == nil {
+			return true
+		}
+		if expressionUsesCredentialReference(expression, false) {
+			return true
+		}
+	}
+	return false
 }
 
 func validatePromptSecretBindings(data *WorkflowData, localImports string) error {
