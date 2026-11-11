@@ -65,7 +65,7 @@ const main = async () => {
   try {
     let binary = command;
     if (command === "agy") {
-      if (process.platform !== "linux" || process.arch !== "x64") throw new Error("Experimental Agy installation supports Linux x64 only");
+      if (process.platform !== "linux" || process.arch !== "x64") throw new Error("Agy installation supports Linux x64 only");
       const archive = path.join(root, "agy.tar.gz");
       fail(
         spawnSync(
@@ -145,7 +145,7 @@ const main = async () => {
     }
     const prompt = fs.readFileSync(promptPath, "utf8");
     const args = [...commandArgs, "--input-format", "stream-json", "--output-format", "stream-json", "--print-timeout", "5m", "--model", model, "--dangerously-skip-permissions"];
-    log(`verified experimental Agy ${version}`);
+    log(`verified Agy ${version}`);
     const decisionEnabled = Boolean(process.env.GH_AW_SKIP_IF_DECISION);
     const runAttempt = () =>
       new Promise(

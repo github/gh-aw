@@ -36,7 +36,7 @@ func TestSetupEngineAndImports_GeminiDeprecation(t *testing.T) {
 		{name: "batch mode aggregates notice", engine: "engine: gemini\n", batchMode: true, wantEngine: "gemini", wantBatchUse: 1},
 		{name: "quiet mode suppresses notice", engine: "engine: gemini\n", quiet: true, wantEngine: "gemini"},
 		{name: "default engine", wantEngine: "copilot"},
-		{name: "experimental replacement", engine: "engine: agy\n", wantEngine: "agy"},
+		{name: "replacement", engine: "engine: agy\n", wantEngine: "agy"},
 		{
 			name: "Google WIF",
 			engine: `engine:

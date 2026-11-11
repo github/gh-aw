@@ -22,7 +22,7 @@ const (
 	CodexEngine EngineName = "codex"
 	// GeminiEngine is the Google Gemini engine identifier
 	GeminiEngine EngineName = "gemini"
-	// AgyEngine is the experimental Google Antigravity CLI engine identifier.
+	// AgyEngine is the Google Antigravity CLI engine identifier.
 	AgyEngine EngineName = "agy"
 	// PiEngine is the Pi engine identifier
 	PiEngine EngineName = "pi"
@@ -84,18 +84,18 @@ var EngineOptions = []EngineOption{
 	{
 		Value:       string(GeminiEngine),
 		Label:       "Gemini (Deprecated)",
-		Description: "Deprecated Google Gemini CLI; use the experimental agy engine where supported",
+		Description: "Deprecated Google Gemini CLI; use the agy engine where supported",
 		SecretName:  GeminiAPIKey,
 		KeyURL:      "https://aistudio.google.com/app/apikey",
 		WhenNeeded:  "Gemini engine workflows",
 	},
 	{
 		Value:       string(AgyEngine),
-		Label:       "Google Antigravity CLI (Experimental)",
-		Description: "Experimental native Agy CLI with Gemini API-key authentication",
+		Label:       "Google Antigravity CLI",
+		Description: "Native Agy CLI with Gemini API-key authentication",
 		SecretName:  GeminiAPIKey,
 		KeyURL:      "https://aistudio.google.com/app/apikey",
-		WhenNeeded:  "Experimental Agy engine workflows (API key only)",
+		WhenNeeded:  "Agy engine workflows (API key only)",
 	},
 	{
 		Value:              string(PiEngine),

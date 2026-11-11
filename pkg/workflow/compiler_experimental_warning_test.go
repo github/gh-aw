@@ -49,6 +49,28 @@ func TestExperimentalWarningAccounting(t *testing.T) {
 	}
 }
 
+func TestExperimentsNoExperimentalNotice(t *testing.T) {
+	t.Parallel()
+	for _, batch := range []bool{false, true} {
+		for _, continual := range []*ContinualExperimentConfig{nil, {Seed: "stable-seed", Ramp: []int{10, 25, 50}}} {
+			compiler := NewCompiler()
+			compiler.SetBatchMode(batch)
+			data := &WorkflowData{
+				Experiments: map[string][]string{"optimization": {"control", "candidate"}},
+				ExperimentConfigs: map[string]*ExperimentConfig{
+					"optimization": {Variants: []string{"control", "candidate"}, Continual: continual},
+				},
+			}
+			var output bytes.Buffer
+			compiler.emitExperimentalFeatureWarningsTo(data, &output)
+			assert.Empty(t, output.String())
+			assert.Zero(t, compiler.GetWarningCount())
+			assert.Zero(t, compiler.GetExperimentalWarningCount())
+			assert.Empty(t, compiler.GetExperimentalFeatureUsage())
+		}
+	}
+}
+
 func TestSkipIfDecisionExperimentalNoticeClassification(t *testing.T) {
 	t.Parallel()
 	for _, batch := range []bool{false, true} {

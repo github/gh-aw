@@ -108,7 +108,7 @@ experiments:
 	}
 }
 
-func TestContinualExperimentsExperimentalWarning(t *testing.T) {
+func TestContinualExperimentsNoExperimentalWarning(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "continual-experiments-experimental-warning-test")
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
 	content := `---
@@ -150,11 +150,11 @@ experiments:
 	if err != nil {
 		t.Fatalf("Expected compilation to succeed but it failed: %v", err)
 	}
-	expectedMessage := "Using experimental feature: continual experiments"
-	if !strings.Contains(stderrOutput, expectedMessage) {
-		t.Errorf("Expected warning containing %q, got stderr:\n%s", expectedMessage, stderrOutput)
+	unexpectedMessage := "Using experimental feature: continual experiments"
+	if strings.Contains(stderrOutput, unexpectedMessage) {
+		t.Errorf("Did not expect warning containing %q, got stderr:\n%s", unexpectedMessage, stderrOutput)
 	}
-	if compiler.GetWarningCount() == 0 {
-		t.Error("Expected warning count > 0 but got 0")
+	if compiler.GetExperimentalWarningCount() != 0 {
+		t.Error("Expected no experimental warnings")
 	}
 }

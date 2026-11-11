@@ -79,7 +79,7 @@ The built-in headless profile uses `--dangerously-skip-permissions`, not `/plan`
 
 Missing credentials fail activation. Provider-selection errors indicate a problem with the generated native Gemini profile; AWF discovery errors require a working Gemini proxy, not credentials inside the agent.
 
-The manual `engine-conformance-agy.md` workflow checks the production installer, AWF, native MCP, CLI-mounted tools, and staged safe outputs. Stable promotion depends on this path, not only native authentication probes or mocked tests. Native and unified-session parsing retain observed tools, errors, and usage; see the [session specification](/gh-aw/specs/unified-agent-session-specification/).
+The manual `engine-conformance-agy.md` workflow checks the production installer, AWF, native MCP, CLI-mounted tools, and staged safe outputs. Conformance depends on this path, not only native authentication probes or mocked tests. Native and unified-session parsing retain observed tools, errors, and usage; see the [session specification](/gh-aw/specs/unified-agent-session-specification/).
 
 ## Evaluating a Gemini API-key workflow
 
@@ -87,7 +87,7 @@ Do not migrate a WIF workflow or one requiring native bash restrictions.
 For an API-key workflow within Agy's documented capabilities, changing the
 engine is an explicit choice, not an automatic migration:
 
-| Gemini configuration | Experimental Agy configuration |
+| Gemini configuration | Agy configuration |
 |---|---|
 | `engine: gemini` | `engine: agy` |
 | Gemini CLI version pin | Verified native `version: "1.3.6"`; explicit `"1.3.3"` and `"1.3.1"` remain supported |

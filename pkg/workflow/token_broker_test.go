@@ -13,8 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTokenBrokerExperimentalWarning(t *testing.T) {
-	const warning = "Using experimental feature: token-broker"
+func TestTokenBrokerNoExperimentalWarning(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		request bool
@@ -38,19 +37,10 @@ func TestTokenBrokerExperimentalWarning(t *testing.T) {
 						TokenBrokerCopilotTask:    tc.task,
 					}, &output)
 
-					if enabled {
-						assert.Equal(t, 1, compiler.GetWarningCount())
-						if batchMode {
-							assert.Empty(t, output.String())
-							assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()[warning])
-						} else {
-							assert.Contains(t, output.String(), warning)
-						}
-					} else {
-						assert.Empty(t, output.String())
-						assert.Zero(t, compiler.GetWarningCount())
-						assert.Zero(t, compiler.GetExperimentalFeatureUsage()[warning])
-					}
+					assert.Empty(t, output.String())
+					assert.Zero(t, compiler.GetWarningCount())
+					assert.Zero(t, compiler.GetExperimentalWarningCount())
+					assert.Empty(t, compiler.GetExperimentalFeatureUsage())
 				})
 			}
 		})

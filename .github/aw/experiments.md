@@ -291,7 +291,7 @@ experiments:
 
 ## Continual Experiment Ramps
 
-`continual:` is experimental. It provides deterministic control/candidate
+`continual:` provides deterministic control/candidate
 assignment with a runtime-managed traffic ramp. The first variant is the control
 and the second is the candidate. Existing experiments without this block keep
 their current behavior.

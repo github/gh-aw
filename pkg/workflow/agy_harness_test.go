@@ -276,7 +276,7 @@ func TestAgyHarnessRetainsVerifiedLegacyVersion(t *testing.T) {
 			}
 			out, err := cmd.CombinedOutput()
 			require.NoError(t, err, "%s", out)
-			assert.Contains(t, string(out), "verified experimental Agy "+version)
+			assert.Contains(t, string(out), "verified Agy "+version)
 			assert.NotContains(t, string(out), "session.error")
 		})
 	}

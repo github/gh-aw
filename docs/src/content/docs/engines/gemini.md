@@ -8,7 +8,7 @@ Run Gemini CLI workflows with a Gemini API key or Google Workload Identity Feder
 ## Connect your account
 
 > [!NOTE]
-> Gemini is deprecated but remains supported. Experimental [Agy](/gh-aw/engines/agy/) supports a narrower API-key-only setup; keep Gemini for WIF or command-level shell restrictions.
+> Gemini is deprecated but remains supported. [Agy](/gh-aw/engines/agy/) supports a narrower API-key-only setup; keep Gemini for WIF or command-level shell restrictions.
 
 Set `engine: gemini` and add a [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key) repository secret, or configure [Google WIF](/gh-aw/reference/auth/#google-workload-identity-federation-wif).
 

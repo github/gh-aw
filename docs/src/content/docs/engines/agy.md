@@ -1,12 +1,12 @@
 ---
 title: Using Agy with GitHub Agentic Workflows
-description: Connect a Gemini API key to the experimental Antigravity CLI engine.
+description: Connect a Gemini API key to the Antigravity CLI engine.
 ---
 
 Agy runs Google's Antigravity CLI in GitHub Actions with gh-aw's sandbox and safe outputs.
 
 > [!WARNING]
-> Agy is experimental, Linux x64 only, and supports Gemini API keys—not Google WIF, ADC, or Vertex AI. It cannot disable native shell, editing, or web tools. Keep [Gemini CLI](/gh-aw/engines/gemini/) if your workflow needs those restrictions or WIF.
+> Agy is Linux x64 only and supports Gemini API keys—not Google WIF, ADC, or Vertex AI. It cannot disable native shell, editing, or web tools. Keep [Gemini CLI](/gh-aw/engines/gemini/) if your workflow needs those restrictions or WIF.
 
 ## Connect your account
 

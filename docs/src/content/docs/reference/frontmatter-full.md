@@ -28,9 +28,8 @@ JSON Schema for validating agentic workflow frontmatter configuration
 skip-if-decision: []
   # Array of strings
 
-# Experimental. Select independent Copilot capabilities to authenticate through
-# the OIDC token broker. Using this field emits a compile-time warning.
-# Configuration and behavior may change without deprecation.
+# Select independent Copilot capabilities to authenticate through the OIDC token
+# broker.
 # (optional)
 token-broker:
   # Use brokered authentication for supported Copilot inference jobs.

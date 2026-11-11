@@ -18,7 +18,7 @@ An engine runs a workflow's Markdown instructions with its configured tools, san
 | OpenAI Codex | `engine: codex` | [Codex setup](/gh-aw/engines/codex/) | [Codex reference](/gh-aw/reference/engines/codex/) |
 | Gemini CLI (deprecated) | `engine: gemini` | [Gemini setup](/gh-aw/engines/gemini/) | [Gemini reference](/gh-aw/reference/engines/gemini/) |
 | Pi | `engine: pi` | [Pi setup](/gh-aw/engines/pi/) | [Pi reference](/gh-aw/reference/engines/pi/) |
-| Agy (experimental) | `engine: agy` | [Agy setup](/gh-aw/engines/agy/) | [Agy reference](/gh-aw/reference/engines/agy/) |
+| Agy | `engine: agy` | [Agy setup](/gh-aw/engines/agy/) | [Agy reference](/gh-aw/reference/engines/agy/) |
 
 For imported engine definitions and third-party samples, see [Custom AI engines](/gh-aw/reference/third-party-agent/). Switching engines may require different credentials, models, tools, and network rules.
 

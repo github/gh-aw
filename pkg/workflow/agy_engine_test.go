@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,14 +34,15 @@ func TestAgyBuiltInRegistration(t *testing.T) {
 	registered, err := NewEngineRegistry().GetEngine("agy")
 	require.NoError(t, err)
 	assert.IsType(t, engine, registered)
-	assert.True(t, engine.IsExperimental())
+	assert.False(t, engine.IsExperimental())
+	assert.False(t, def.Experimental)
 	assert.Equal(t, "1.3.6", def.Version)
 	assert.False(t, engine.GetCapabilities().BashCommandAllowlist)
 	assert.False(t, engine.GetCapabilities().BashDisable)
 	assert.Contains(t, NewEngineCatalog(NewEngineRegistry()).IDs(), "agy")
 	assert.Equal(t, "copilot", def.DetectionEngine)
 	assert.NotNil(t, constants.GetEngineOption("agy"))
-	assert.Contains(t, constants.GetEngineOption("agy").Label, "Experimental")
+	assert.NotContains(t, constants.GetEngineOption("agy").Label, "Experimental")
 	assert.Contains(t, engine.GetAgentManifestFiles(), "AGENTS.md")
 	assert.Contains(t, engine.GetAgentManifestFiles(), "GEMINI.md")
 	assert.Contains(t, engine.GetAgentManifestPathPrefixes(), ".agents/")
@@ -110,12 +112,18 @@ func TestAgyCompilerSelectionAndRestrictions(t *testing.T) {
 	}
 }
 
-func TestAgyExperimentalDiagnosticIsInformational(t *testing.T) {
-	compiler := NewCompiler()
-	engine, _, err := compiler.resolveEngineRuntimeConfig("agy", &EngineConfig{ID: "agy"})
-	require.NoError(t, err)
-	assert.True(t, engine.IsExperimental())
-	assert.Zero(t, compiler.GetWarningCount())
+func TestAgyNoExperimentalDiagnostic(t *testing.T) {
+	for _, verbose := range []bool{false, true} {
+		compiler := NewCompiler(WithVerbose(verbose))
+		output := testutil.CaptureStderr(t, func() {
+			engine, _, err := compiler.resolveEngineRuntimeConfig("agy", &EngineConfig{ID: "agy"})
+			require.NoError(t, err)
+			assert.False(t, engine.IsExperimental())
+		})
+		assert.NotContains(t, output, "Using experimental engine:")
+		assert.Zero(t, compiler.GetWarningCount())
+		assert.Zero(t, compiler.GetExperimentalWarningCount())
+	}
 }
 
 func TestAgyInstallationDoesNotMutateOptionalConfiguration(t *testing.T) {
@@ -546,7 +554,7 @@ func TestAgySmokeLabelCommandIsCentrallyRouted(t *testing.T) {
 func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, workQueueCLIServer bool) {
 	t.Helper()
 	steps, environment, commands := agyConformanceStepContent(compiled)
-	execution := steps["Execute experimental Agy CLI"]
+	execution := steps["Execute Agy CLI"]
 	require.NotNil(t, execution)
 	assert.Equal(t, "agentic_execution", execution["id"])
 	assert.EqualValues(t, 10, execution["timeout-minutes"])

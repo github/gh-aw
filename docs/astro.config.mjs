@@ -418,6 +418,7 @@ export default defineConfig({
             { label: "Claude Code", link: "/engines/claude/" },
             { label: "OpenAI Codex", link: "/engines/codex/" },
             { label: "Google Gemini", link: "/engines/gemini/" },
+            { label: "Google Antigravity CLI", link: "/engines/agy/" },
             { label: "Pi", link: "/engines/pi/" },
           ],
         },
@@ -447,6 +448,7 @@ export default defineConfig({
         {
           label: "Guides",
           items: [
+            { label: "A/B Experiments", link: "/experimental/experiments/" },
             { label: "GitHub Actions Primer", link: "/guides/github-actions-primer/" },
             { label: "Using at Scale in Organizations", link: "/guides/using-at-scale/" },
             { label: "Using MCPs", link: "/guides/mcps/" },
@@ -568,7 +570,7 @@ export default defineConfig({
         {
           label: "Specs",
           collapsed: true,
-          items: [{ autogenerate: { directory: "specs" } }],
+          items: [{ label: "A/B Experiments", link: "/experimental/experiments-specification/" }, { autogenerate: { directory: "specs" } }],
         },
         {
           label: "Troubleshooting",
@@ -579,9 +581,6 @@ export default defineConfig({
           label: "Experimental",
           collapsed: true,
           items: [
-            { label: "Agy Engine (experimental)", link: "/engines/agy/" },
-            { label: "A/B Experiments", link: "/experimental/experiments/" },
-            { label: "A/B Experiments (Spec)", link: "/experimental/experiments-specification/" },
             { label: "CorrectionOps", link: "/experimental/correction-ops/" },
             { label: "Drive Memory (Private Preview)", link: "/experimental/drive-memory/" },
             { label: "Private Repository Enclaves", link: "/experimental/enclaves/" },

@@ -263,7 +263,7 @@ safe-outputs:
 
 ### Token Broker (`token-broker:`)
 
-An experimental frontmatter field that exchanges the job's OIDC identity for short-lived credentials from an organization-operated broker instead of using existing secrets. The `copilot-request` and `copilot-task` modes can be selected independently. Brokered request authentication is supported in threat-detection and evals jobs, and the broker endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime. A missing configuration or failed exchange blocks the affected operation rather than falling back to other credentials. See [Token Broker](/gh-aw/reference/frontmatter/#token-broker-token-broker) and the [Token Broker Specification](/gh-aw/specs/token-broker-specification/).
+A frontmatter field that exchanges the job's OIDC identity for short-lived credentials from an organization-operated broker instead of using existing secrets. The `copilot-request` and `copilot-task` modes can be selected independently. Brokered request authentication is supported in threat-detection and evals jobs, and the broker endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime. A missing configuration or failed exchange blocks the affected operation rather than falling back to other credentials. See [Token Broker](/gh-aw/reference/frontmatter/#token-broker-token-broker) and the [Token Broker Specification](/gh-aw/specs/token-broker-specification/).
 
 ```aw wrap
 token-broker:

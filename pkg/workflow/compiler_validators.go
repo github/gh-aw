@@ -587,7 +587,6 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows"},
 		{enabled: workflowData.RateLimit != nil, message: "Using experimental feature: rate limiting"},
 		{enabled: isSkipIfDecisionEnabled(workflowData), message: "Using experimental feature: skip-if-decision"},
-		{enabled: workflowData.TokenBrokerEnabled, message: "Using experimental feature: token-broker"},
 		{enabled: workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil, message: "Using experimental feature: engine.durable"},
 		{enabled: len(workflowData.WebhookSubscriptions) > 0, message: "Using experimental feature: on.gateway-dispatch (approved webhook bridge required)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "projects_v2_item" }), message: "Using experimental feature: on.gateway-dispatch.projects-items (hosted CAO triggers)"},
@@ -610,7 +609,6 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: len(workflowData.Plugins) > 0, message: "Using experimental feature: plugins"},
 		{enabled: workflowData.DriveMemoryConfig != nil && len(workflowData.DriveMemoryConfig.Drives) > 0, message: "Using experimental feature: drive-memory"},
 		{enabled: workflowData.RepoMemoryConfig != nil && slices.ContainsFunc(workflowData.RepoMemoryConfig.Memories, func(memory RepoMemoryEntry) bool { return memory.Ledger != nil }), message: "Using experimental feature: repo-memory ledger"},
-		{enabled: hasContinualExperiment(workflowData.ExperimentConfigs), message: "Using experimental feature: continual experiments"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.Steer, message: "Using experimental feature: safe-outputs steer"},
 	}
 	for _, warning := range warnings {
@@ -636,15 +634,6 @@ func writeExperimentalFeatureWarning(writer io.Writer, message string) {
 	if _, err := fmt.Fprintln(writer, console.FormatWarningMessageStderr(message)); err != nil {
 		workflowLog.Printf("Failed to write compiler warning: %v", err)
 	}
-}
-
-func hasContinualExperiment(configs map[string]*ExperimentConfig) bool {
-	for _, config := range configs {
-		if config != nil && config.Continual != nil {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *Compiler) validateGitHubToolsAndPermissions(workflowData *WorkflowData, markdownPath string, workflowPermissions *Permissions) error {

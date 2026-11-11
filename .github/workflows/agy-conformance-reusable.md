@@ -1,6 +1,6 @@
 ---
-name: Agy Conformance Reusable (Experimental)
-description: Feature-branch reusable entry point for the canonical experimental Agy conformance gate.
+name: Agy Conformance Reusable
+description: Feature-branch reusable entry point for the canonical Agy conformance gate.
 on:
   workflow_call:
 permissions:

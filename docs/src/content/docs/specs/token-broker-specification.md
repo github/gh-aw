@@ -8,7 +8,7 @@ sidebar:
 # Token Broker Specification
 
 **Version**: 1.0.0<br />
-**Status**: Experimental draft<br />
+**Status**: Stable<br />
 **Date**: 2026-10-30<br />
 **Editors**: GitHub Agentic Workflows maintainers<br />
 **Latest version**: [Token Broker Specification](/gh-aw/specs/token-broker-specification/)
@@ -19,7 +19,7 @@ This specification defines a deployment-owned HTTPS service that exchanges a ver
 
 ## Status of This Document
 
-Token broker authentication is experimental. The protocol, configuration, and behavior may change without deprecation. Compiling a workflow that enables either broker capability emits an experimental-feature warning.
+Token broker authentication is non-experimental. Enabling either broker capability does not emit an experimental-feature warning. The implementation limitations below still apply.
 
 This is a project specification following W3C-style conventions, not a W3C Recommendation. Repository maintainers govern changes through the normal contribution and review process. Version numbers follow semantic versioning: incompatible contract changes increment the major version, backward-compatible features increment the minor version, and clarifications increment the patch version.
 

@@ -21,8 +21,8 @@ func NewAgyEngine() *AgyEngine {
 	return &AgyEngine{
 		id:           string(constants.AgyEngine),
 		displayName:  "Google Antigravity CLI",
-		description:  "Experimental native Agy CLI with Gemini API-key authentication",
-		experimental: true,
+		description:  "Native Agy CLI with Gemini API-key authentication",
+		experimental: false,
 		capabilities: EngineCapabilities{
 			MCP: true,
 		},

@@ -18,7 +18,7 @@ func (e *AgyEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string
 	command := e.buildExecutionCommand(workflowData, logFile, engineCommand, firewallEnabled)
 	env := e.buildExecutionEnv(workflowData, firewallEnabled)
 	step := []string{
-		"      - name: Execute experimental Agy CLI",
+		"      - name: Execute Agy CLI",
 		"        id: agentic_execution",
 		"        timeout-minutes: " + resolveStepTimeoutValue(workflowData),
 	}

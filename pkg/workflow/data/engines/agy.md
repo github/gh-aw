@@ -2,8 +2,8 @@
 engine:
   id: agy
   display-name: Google Antigravity CLI
-  description: Experimental native Agy CLI with Gemini API-key authentication
-  experimental: true
+  description: Native Agy CLI with Gemini API-key authentication
+  experimental: false
   detection-engine: copilot
   runtime-id: agy
   version: "1.3.6"

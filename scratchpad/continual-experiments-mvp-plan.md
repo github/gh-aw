@@ -1,11 +1,11 @@
 # Continual Experiments MVP — Status and Next Work
 
-**Status**: Active MVP (experimental)
-**Last updated**: 2026-08-22
+**Status**: Active MVP (non-experimental)
+**Last updated**: 2026-11-10
 
 ## Current feature status (what is implemented now)
 
-- `experiments.<name>.continual` is explicitly treated as **experimental**.
+- `experiments.<name>.continual` is non-experimental and does not emit an experimental-feature notice.
 - Assignment happens at **GitHub Action runtime** in `actions/setup/js/pick_experiment.cjs`.
 - Assignment is deterministic per run using the configured `seed` plus workflow/run identity inputs.
 - Dynamic ramp state (`current_stage`) is treated as mutable runtime state and persisted on the workflow experiment state branch (not in frontmatter/workflow source).

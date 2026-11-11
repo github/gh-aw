@@ -91,7 +91,7 @@ Keywords expanding to curated domain lists:
 | `claude` | Claude engine transport | `api.github.com`, `github.com`, `host.docker.internal`, `raw.githubusercontent.com`; direct Anthropic API is added only when the effective target is Anthropic |
 | `codex` | Codex engine transport | `172.30.0.1`, `api.openai.com`, GitHub API/web, `host.docker.internal` |
 | `gemini` | Gemini engine transport (deprecated, prefer `agy`) | `generativelanguage.googleapis.com`, GitHub web, `host.docker.internal`, `raw.githubusercontent.com` |
-| `agy` | Agy (Antigravity CLI) engine transport (experimental) | `github.com`, `api.github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `host.docker.internal` |
+| `agy` | Agy (Antigravity CLI) engine transport | `github.com`, `api.github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `host.docker.internal` |
 | `pi` | Pi engine transport | `api.githubcopilot.com`, GitHub web, `host.docker.internal`, `raw.githubusercontent.com` |
 | `pi-base` | Pi provider-independent baseline | `github.com`, `host.docker.internal`, `raw.githubusercontent.com` |
 | `threat-detection` | Compatibility alias for Copilot threat detection | Copilot API hosts, GitHub API/web, `host.docker.internal`, `registry.npmjs.org` |

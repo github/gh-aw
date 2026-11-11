@@ -71,7 +71,7 @@ Sub-agent files are written to the directory and with the extension each engine 
 | Claude | `.claude/agents/` | `.md` |
 | Codex | `.codex/agents/` | `.md` |
 | Gemini (deprecated) | `.gemini/agents/` | `.md` |
-| Agy (experimental) | `.agents/agents/` | `.agent.md` |
+| Agy | `.agents/agents/` | `.agent.md` |
 | Pi | `.pi/agents/` | `.md` |
 
 The engine is detected at compile time from the `engine:` field and injected as `GH_AW_ENGINE_ID` into the interpolation step's environment.

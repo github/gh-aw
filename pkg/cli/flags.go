@@ -2,7 +2,7 @@ package cli
 
 import "github.com/spf13/cobra"
 
-const engineFlagHelpList = "copilot, claude, codex, gemini, pi, agy (experimental)"
+const engineFlagHelpList = "copilot, claude, codex, gemini, pi, agy"
 
 const (
 	EngineFlagOverrideUsage = "Override AI engine (" + engineFlagHelpList + ")"

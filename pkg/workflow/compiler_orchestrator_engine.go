@@ -136,7 +136,7 @@ func (c *Compiler) emitGeminiDeprecationNotice(engine CodingAgentEngine) {
 	if c.batchMode {
 		c.featureUsage["gemini deprecation"]++
 	} else if !c.quiet {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("The gemini engine is deprecated in favor of the experimental agy engine. Use engine: agy where supported; retain engine: gemini for Google WIF or features Agy does not support. See https://github.github.com/gh-aw/engines/agy/"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("The gemini engine is deprecated in favor of the agy engine. Use engine: agy where supported; retain engine: gemini for Google WIF or features Agy does not support. See https://github.github.com/gh-aw/engines/agy/"))
 	}
 }
 
@@ -747,9 +747,7 @@ func (c *Compiler) resolveEngineRuntimeConfig(engineSetting string, engineConfig
 		return nil, nil, fmt.Errorf("engine %s RenderConfig failed: %w", engineSetting, err)
 	}
 	workflowLog.Printf("AI engine: %s (%s)", agenticEngine.GetDisplayName(), engineSetting)
-	if agenticEngine.GetID() == string(constants.AgyEngine) {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Using experimental engine: "+agenticEngine.GetDisplayName()+" (Gemini API key only; retain engine: gemini for WIF)"))
-	} else if agenticEngine.IsExperimental() && c.verbose {
+	if agenticEngine.IsExperimental() && c.verbose {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Using experimental engine: "+agenticEngine.GetDisplayName()))
 		c.IncrementExperimentalWarningCount()
 	}

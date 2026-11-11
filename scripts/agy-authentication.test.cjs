@@ -77,7 +77,7 @@ test("mocked gate exercises isolated positive, negative, and actual local endpoi
   const report = await runProbe({ ...options(), run: fakeCLI() });
   assert.equal(report.status, "passed");
   assert.equal(report.awfConformance, "not-run");
-  assert.equal(report.experimental, true);
+  assert.equal(report.experimental, false);
   assert.equal(report.checks.length, 5);
   assert.equal(report.checks.at(-1).geminiProtocolConfirmed, true);
   assert.ok(!JSON.stringify(report).includes("test-provider-key"));

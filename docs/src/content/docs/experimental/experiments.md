@@ -5,10 +5,6 @@ sidebar:
   order: 7
 ---
 
-:::caution[Experimental]
-A/B Experiments is an experimental feature.
-:::
-
 Use the `experiments` frontmatter section to compare workflow variants across
 repeated runs. Each experiment declares a name and a set of variants. On every
 run, the activation job picks one variant and exposes it to the prompt.
@@ -727,13 +723,9 @@ Tracking issue: [#1234](https://github.com/owner/repo/issues/1234)
 | `issue` | `integer` | | GitHub issue number that tracks this experiment's lifecycle |
 | `start_date` | `string` | | ISO-8601 date (`YYYY-MM-DD`) before which the experiment is inactive. The control variant is returned before this date without incrementing any counter. |
 | `end_date` | `string` | | ISO-8601 date (`YYYY-MM-DD`) after which the experiment is inactive. The control variant is returned after this date without incrementing any counter. |
-| `continual` | `object` | | Experimental deterministic control/candidate assignment with automatic traffic ramping. |
+| `continual` | `object` | | Deterministic control/candidate assignment with automatic traffic ramping. |
 
 ## Continual experiment ramps
-
-:::caution[Experimental]
-Continual experiments are experimental and may change in future releases.
-:::
 
 A continual experiment assigns a candidate to a bounded share of future executions.
 The first variant is the control and the second is the candidate.

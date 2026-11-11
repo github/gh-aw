@@ -14,7 +14,7 @@
       "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
     },
     "token-broker": {
-      "description": "Experimental. Select independent Copilot capabilities to authenticate through the OIDC token broker. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation.",
+      "description": "Select independent Copilot capabilities to authenticate through the OIDC token broker.",
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
@@ -3724,7 +3724,7 @@
                   }
                 },
                 "additionalProperties": false,
-                "description": "Experimental opt-in control/candidate traffic ramp. The first variant is control and the second is candidate. Using this field emits a compile-time warning."
+                "description": "Opt-in control/candidate traffic ramp. The first variant is control and the second is candidate."
               }
             },
             "additionalProperties": false,

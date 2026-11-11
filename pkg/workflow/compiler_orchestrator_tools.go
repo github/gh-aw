@@ -444,7 +444,7 @@ func (c *Compiler) validateEngineToolRequirements(frontmatter map[string]any, ag
 	if agenticEngine.GetID() == string(constants.AgyEngine) {
 		for _, name := range []string{"edit", "web-fetch", "web-search"} {
 			if disabled, ok := tools[name].(bool); ok && !disabled {
-				return fmt.Errorf("experimental agy cannot enforce tools.%s: false; its native permission profile enables tools inside the outer sandbox", name)
+				return fmt.Errorf("agy cannot enforce tools.%s: false; its native permission profile enables tools inside the outer sandbox", name)
 			}
 		}
 	}

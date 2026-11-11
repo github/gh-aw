@@ -1,6 +1,6 @@
 ---
-name: Engine Conformance Agy (Experimental)
-description: Bounded production authentication, AWF, MCP and safe-output gate for experimental Agy.
+name: Engine Conformance Agy
+description: Bounded production authentication, AWF, MCP and safe-output gate for Agy.
 on:
   workflow_dispatch:
 permissions:

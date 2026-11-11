@@ -286,7 +286,7 @@ async function runProbe({ binary, model, apiKey, run = runCLI, platform = proces
     });
     return {
       engine: "agy",
-      experimental: true,
+      experimental: false,
       version: VERSION,
       platform,
       architecture: arch,
@@ -308,12 +308,12 @@ async function main() {
   try {
     report = await runProbe({ binary, model, apiKey: process.env.GEMINI_API_KEY });
   } catch (error) {
-    report = { engine: "agy", experimental: true, version: VERSION, status: "failed", checks: [], error: error instanceof ProbeError ? error.message : "Probe infrastructure failed", awfConformance: "not-run" };
+    report = { engine: "agy", experimental: false, version: VERSION, status: "failed", checks: [], error: error instanceof ProbeError ? error.message : "Probe infrastructure failed", awfConformance: "not-run" };
   }
   fs.mkdirSync(path.dirname(output), { recursive: true, mode: 0o700 });
   fs.writeFileSync(output, JSON.stringify(report, null, 2) + "\n", { mode: 0o600, flag: "wx" });
   const summary = [
-    "## Experimental Agy native authentication gate",
+    "## Agy native authentication gate",
     "",
     "| Probe | Result |",
     "|---|---|",
