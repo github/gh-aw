@@ -49,6 +49,9 @@ Find the likely cause of issue #${{ github.event.issue.number }} and comment wit
 | `router/balanced` | The cheapest model and effort that meet a medium bar, for general-purpose work. |
 | `router/robust` | The cheapest model and effort that meet the highest bar, for tasks where a failed run is costly. |
 
+> [!NOTE]
+> `model: auto` retains the engine or provider's own model-selection behavior and does not enable gh-aw routing. `model: router` uses gh-aw's per-task router with `goal: cost` and `mode: auto`; that routing mode selects economy, balanced, or robust for each task, falling back to `balanced` when classification is unavailable or unknown.
+
 Router values work anywhere the main agent's model is set: the top-level `model`, `engine.model`, and imported workflows. The usual precedence applies: `engine.model` wins over the top-level `model`, and a workflow's own model wins over an imported one. A workflow with no model at all already behaves like `model: router` when it is eligible; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model).
 
 A router value is not a model name. The compiler rejects other `router/...` values (such as `router/fast` or `router/Economy`), parameters such as `router/economy?effort=high` (the router chooses the effort; pin a model to set it), router values in `models.allowed`, `models.blocked`, `engine.fallback-models`, or a `models:` alias, and router values for sub-agents, threat detection, or evals, which are never routed. A router value can't be combined with `engine.model-routing` or `engine.fallback-models`. When the main agent's model comes from an expression or a variable, such as `${{ vars.MODEL }}` or `GH_AW_DEFAULT_MODEL_COPILOT`, and resolves to a router value at run time, the run stops before the agent starts; write the router value in the workflow instead.

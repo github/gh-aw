@@ -9,7 +9,7 @@ For first-time setup, see [Using OpenAI Codex](/gh-aw/engines/codex/). Shared op
 
 Use `engine: codex` with `CODEX_API_KEY`, `OPENAI_API_KEY`, or [OpenAI Workload Identity Federation](#openai-workload-identity-federation). [GitHub Copilot inference](#github-copilot-inference) uses separate GitHub authentication. ChatGPT subscription login is unsupported. The default CLI pin is `0.167.0`; override it with `engine.version`.
 
-Codex has no default model. Set `model` explicitly or configure the repository's model-selection variables; see [model selection](/gh-aw/reference/model-tables/).
+With the native OpenAI provider, Codex has no default model: set `model` explicitly, configure [model routing](/gh-aw/reference/model-routing/#native-anthropic-and-openai-routing), or configure the repository's model-selection variables; see [model selection](/gh-aw/reference/model-tables/). Eligible Codex workflows that use `model-provider: github` and set no model are routed by default; see [GitHub Copilot inference](#github-copilot-inference) and [default routing for workflows without a model](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
 
 ## OpenAI Workload Identity Federation
 

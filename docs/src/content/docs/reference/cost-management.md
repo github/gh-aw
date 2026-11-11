@@ -189,21 +189,23 @@ steps:
 Use `skip-if-match` / `skip-if-no-match` whenever possible because they also avoid scheduling the agent job. Use `noop` when you need arbitrary shell logic. See [Triggers](/gh-aw/reference/triggers/) for the full syntax.
 ### Choose a Cheaper Model
 
-The `engine.model` field selects the AI model. Smaller or faster models cost significantly less per token while still handling many routine tasks:
+Unless a task needs a particular model, let [model routing](/gh-aw/reference/model-routing/) right-size the model and reasoning effort for each run instead of pinning one. An [eligible workflow](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) that omits `model` is already routed with `goal: cost` and `mode: auto`. For routine, low-risk work such as triage, labeling, and summaries, set `router/economy` explicitly:
 
 ```aw wrap
-engine:
-  id: copilot
-  model: gpt-4.1-mini
+engine: copilot
+model: router/economy
 ```
+
+`router/economy` sets the lowest success target, so the router prefers the cheapest model and effort likely to meet it. It is not a guaranteed spending cap, and it doesn't make any particular model available; combine it with [`max-ai-credits`](#cap-ai-credits-per-run) for a hard stop.
+
+When a task requires a particular model or its capabilities, select one explicitly. An alias such as `small` skips per-task routing, but it resolves against the models available at run time and can map to a different model over time. Use an exact model ID when the workflow must run on one concrete model:
 
 ```aw wrap
-engine:
-  id: claude
-  model: claude-haiku-4-5
+engine: copilot
+model: small
 ```
 
-Reserve frontier models (GPT-5, Claude Sonnet, etc.) for complex tasks. Use lighter models for triage, labeling, summarization, and other structured outputs.
+Reserve frontier models for complex tasks, and prefer lighter models or `router/economy` for triage, labeling, summarization, and other structured outputs.
 
 ### Limit Context Size
 
@@ -239,6 +241,8 @@ engine: copilot
 model: auto
 max-ai-credits: 500
 ```
+
+Here `auto` is the engine or provider's own selector (Copilot's server-side selector in this example), not gh-aw's per-task router; to route each task with gh-aw, use `model: router` instead (see [Model Routing](/gh-aw/reference/model-routing/)).
 
 gh-aw does not compile a synthetic price for the selector itself. Requests are accounted against the concrete model reported by the response, so each model is charged at its own catalog rate. When a response omits model metadata, the proxy falls back to its conservative rate rather than undercounting.
 
@@ -438,9 +442,11 @@ gh aw env get defaults.yml --scope org --org MY_ORG
 default_max_ai_credits: "5M"
 default_max_daily_ai_credits: "15M"
 default_model_copilot: "gpt-5-mini"
-default_model_claude: "claude-haiku-4-5"
+default_model_claude: "small"
 default_model_codex: "gpt-5.4-mini"
 ```
+
+`default_model_*` variables are explicit model overrides: when set, they bypass [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model). They cannot enable routing, so do not set them to `router` or `router/*` values; a run whose model resolves to a router value at run time stops before the agent starts. To route workflows, write the router value in the workflow or omit the model.
 
 ```bash
 gh aw env update defaults.yml --scope org --org MY_ORG
@@ -501,7 +507,7 @@ permissions:
   issues: read
 engine:
   id: copilot
-  model: gpt-4.1-mini
+model: router/economy
 tools:
   github:
     toolsets: [issues]
