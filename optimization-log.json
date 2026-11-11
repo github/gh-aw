@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-09-25",
-    "workflow_name": "PR Sous Chef",
-    "workflow_file": "pr-sous-chef",
-    "total_aic_analyzed": 324.41305,
-    "runs_audited": 11,
-    "recommendations_count": 4,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 5
-  },
-  {
     "date": "2026-09-28",
     "workflow_name": "Daily File Diet",
     "workflow_file": "daily-file-diet",
@@ -298,5 +288,15 @@
     "recommendations_count": 5,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 0.5
+  },
+  {
+    "date": "2026-11-11",
+    "workflow_name": "Avenger",
+    "workflow_file": "avenger",
+    "total_aic_analyzed": 96.20477,
+    "runs_audited": 3,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 20
   }
 ]
