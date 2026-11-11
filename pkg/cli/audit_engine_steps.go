@@ -844,6 +844,8 @@ func isStepHeaderLine(line string) bool {
 	return strings.HasPrefix(stripGHALogTimestamps(line), "##[group]Run ")
 }
 
+var ghaLogTimestampPrefixPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T`)
+
 func parseGHALogTimestamp(line string) (time.Time, bool) {
 	if !ghaLogTimestampPrefixPattern.MatchString(line) {
 		return time.Time{}, false

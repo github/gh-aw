@@ -9,6 +9,7 @@ const { validateContextVariables } = require("./validate_context_variables.cjs")
 const validateLockdownRequirements = require("./validate_lockdown_requirements.cjs");
 const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { GITHUB_API_QUOTA_EXHAUSTED, getGitHubAPIQuotaExhaustion, formatGitHubAPIQuotaDetails, writeGitHubAPIQuotaSummary } = require("./github_api_quota.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
 const { buildWorkflowCallId, normalizeLegacyWorkQueueContext, normalizeWorkQueueContext, resolveWorkQueueRuntime, readInboundAwContext } = require("./aw_context.cjs");
 const { normalizeWebhookContext } = require("./webhook_context.cjs");
@@ -28,9 +29,10 @@ const { normalizeEngineHarness, parseCompiledModelConfig } = require("./routing_
  * @param {typeof import('@actions/core')} core - GitHub Actions core library
  * @param {any} ctx - GitHub Actions context object
  * @param {any} [githubClient] - Authenticated GitHub client; falls back to global.github
+ * @param {{quotaWait?: {now?: () => number, sleep?: (ms: number) => Promise<void>, maxWaitMs?: number}}} [options] - Test seams for the bounded quota wait
  * @returns {Promise<void>}
  */
-async function main(core, ctx, githubClient) {
+async function main(core, ctx, githubClient, options = {}) {
   // Validate numeric context variables before processing run info.
   // This prevents malicious payloads from hiding special text or code in numeric fields.
   await validateContextVariables(core, ctx);
@@ -61,11 +63,30 @@ async function main(core, ctx, githubClient) {
   const workflowId = process.env.GH_AW_INFO_WORKFLOW_ID || "";
   if (!process.env.GH_AW_INFO_WORKFLOW_SHA) throw new Error("Executing compiler metadata requires GH_AW_INFO_WORKFLOW_SHA; recompile this workflow");
   const { loadMarkdownMetadata, metadataManifestFields } = require("./markdown_metadata.cjs");
-  const markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
-    repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
-    githubClient: githubClient || global.github,
-    revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
-  });
+  let markdownMetadata;
+  try {
+    markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
+      repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,
+      githubClient: githubClient || global.github,
+      revision: process.env.GH_AW_INFO_WORKFLOW_SHA,
+      quotaWait: options.quotaWait,
+    });
+  } catch (error) {
+    const quota = getGitHubAPIQuotaExhaustion(error);
+    if (!quota) throw error;
+    // No empty or unverified metadata fallback: activation is blocked with an
+    // explicit quota reason instead of an unexplained run-info failure.
+    const reason = /** @type {any} */ error.reason || "";
+    await writeGitHubAPIQuotaSummary({
+      stage: "Activation: Generate agentic run info (executing workflow lock manifest read)",
+      quota,
+      reason,
+      impact: `Activation is blocked; the agent did not start. Compiler metadata for the executing workflow revision could not be read and no unverified fallback was used. Check existing scheduled runs after ${quota.retryNotBefore || quota.reset || "the quota reset"} before retrying; do not queue simultaneous reruns.`,
+    });
+    const message = `${ERR_SYSTEM}: ${GITHUB_API_QUOTA_EXHAUSTED}; activation blocked until at least ${quota.retryNotBefore || quota.reset || "an unknown reset"} (${formatGitHubAPIQuotaDetails(quota)}${reason ? `; reason=${reason}` : ""}).`;
+    core.setFailed(message);
+    throw new Error(message, { cause: error });
+  }
 
   // Reject model names that contain an unresolved GitHub Actions expression.
   // This can happen when a vars.* expression was used for the model in the

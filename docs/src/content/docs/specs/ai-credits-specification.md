@@ -7,7 +7,7 @@ sidebar:
 
 # AI Credits Specification
 
-**Version**: 1.5.2<br />
+**Version**: 1.5.3<br />
 **Status**: Draft  
 **Publication Date**: 2026-11-05<br />
 **Editor**: GitHub Agentic Workflows Team  
@@ -453,7 +453,7 @@ A conforming implementation MUST enforce the following at compile time:
 | T-AIC-DG-019 | Agent, Detection, and Evaluations accounting is validated independently without overlapping-source double counting | §9.11 |
 | T-AIC-DG-020 | Every supported zero-accounting path satisfies its documented evidence conditions | §9.11 |
 | T-AIC-DG-021 | Unresolved historical accounting substitutes the positive configured per-run maximum for the whole run | §9.12 |
-| T-AIC-DG-022 | Transient reads retry at most three times; quota, permission, and retry restrictions stop without estimates | §9.13 |
+| T-AIC-DG-022 | Transient reads retry at most three times; exhausted quota stops remain unverified and block enforced startup without estimates | §9.13, §9.14 |
 | T-AIC-DG-023 | Workflow-history 404 uses repository-history fallback, not zero usage or an incomplete total | §9.9, §9.13 |
 | T-AIC-DG-024 | Estimated credits are reported separately and equality with the threshold is exceeded | §9.14 |
 | T-AIC-DG-025 | Repo-memory trust, timestamp filtering, duplicate selection, and permissive read behavior match the separate backend contract | §9.15 |
@@ -589,7 +589,7 @@ Retry, recovery, and stop diagnostics identify the read using a fixed operation 
 
 After every authoritative candidate has been resolved, sum its selected measured or estimated value exactly once, including confirmed-zero runs in run counts and statistics. `daily_ai_credits_total` is this sum; `daily_ai_credits_estimated` is the sum restricted to estimated runs. Every supplied run value and aggregate total MUST be finite and non-negative; overflow MUST fail accounting before publishing a total or threshold decision, for either backend. For positive threshold `L`, totals strictly below `L` produce `under_budget`; totals at or above `L` produce `exceeded`, set `daily_ai_credits_exceeded: true`, and gracefully skip the agent.
 
-An unresolved scan MUST NOT report `under_budget` from a partial total. It calls `core.setFailed` and reports `structural_error` for missing credentials, HTTP 401/404, or a non-rate-limited 403; other caught accounting failures report `transient_error`. A marked quota/reserve stop takes precedence over the HTTP resource/permission classification and reports `transient_error`. Disabled or bypassed checks report `disabled` or `skipped` without accounting.
+An unresolved scan MUST NOT report `under_budget` from a partial total. It calls `core.setFailed` and reports `structural_error` for missing credentials, HTTP 401/404, or a non-rate-limited 403; other caught accounting failures report `transient_error`. A marked quota/reserve stop takes precedence over the HTTP resource/permission classification and reports `quota_blocked` without calling `core.setFailed`; the total and estimated outputs remain empty and `daily_ai_credits_exceeded` remains `false`. Enforce mode MUST gate agent startup on this status; an explicitly configured fail-open mode MAY continue, but MUST NOT relabel the result as complete, under budget, or exceeded. Disabled or bypassed checks report `disabled` or `skipped` without accounting.
 
 `continue-on-error: true` is an explicit Actions step-level fail-open policy: it may allow continuation despite an unknown total, but MUST NOT relabel the accounting result as complete or under budget. Summary-rendering failures are outside the accounting state machine; they may change step failure reporting after totals were computed.
 
@@ -611,7 +611,7 @@ The writer uses staged usage files and the permissive usage parser, appending ti
 
 ### 9.16 Native Contract Coverage and Validation Boundary
 
-Focused Vitest suites exercise the runtime behavior described in Sections 9.9–9.15, including history completeness, snapshot trust and reinspection, component accounting, fallback decisions, API retries and quota handling, and repo-memory ledger rules. The spec-derived fixed-output contract cases are in `actions/setup/js/daily_aic_spec_conformance.test.cjs`; related implementation suites cover detailed boundaries. These tests are executable conformance examples, not a proof of provider billing or GitHub API behavior.
+Focused Vitest suites exercise the runtime behavior described in Sections 9.9–9.15, including history completeness, snapshot trust and reinspection, component accounting, fallback decisions, API retries and quota handling, and repo-memory ledger rules. The spec-derived fixed-output contract cases are in `actions/setup/js/daily_aic_spec_conformance.test.cjs`; quota-blocked cases verify empty totals, `exceeded: false`, and no activation failure, while compiler tests verify enforced startup gating and configured fail-open behavior. These tests are executable conformance examples, not a proof of provider billing or GitHub API behavior.
 
 ---
 
@@ -767,6 +767,11 @@ This specification MUST be revalidated when any of the following occurs:
 
 <a id="change-log"></a>
 ## Change Log
+
+### Version 1.5.3 (2026-11-10)
+
+- **Clarified**: A marked quota/reserve stop reports `quota_blocked` with empty totals and `exceeded: false`; enforced startup is gated without converting the unknown total into a failed or exceeded accounting result.
+- **Updated**: Spec-conformance documentation to identify the quota-blocked output and compiler startup-gating checks, while preserving configured fail-open behavior.
 
 ### Version 1.5.2 (2026-11-05)
 

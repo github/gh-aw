@@ -123,6 +123,51 @@ func TestMaintenanceWorkflowOptionalCacheCleanup(t *testing.T) {
 	require.Contains(t, generated, "- 'clean_cache_memories'")
 }
 
+func TestMaintenanceOperationNames(t *testing.T) {
+	tests := []struct {
+		name           string
+		hasCacheMemory bool
+		hasLedgers     bool
+	}{
+		{name: "default"},
+		{name: "cache memory", hasCacheMemory: true},
+		{name: "ledgers", hasLedgers: true},
+		{name: "cache memory and ledgers", hasCacheMemory: true, hasLedgers: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want := []string{
+				"disable",
+				"enable",
+				"update",
+				"upgrade",
+				"safe_outputs",
+				"create_labels",
+				"activity_report",
+				"close_agentic_workflows_issues",
+			}
+			if tt.hasCacheMemory {
+				want = append(want, "clean_cache_memories")
+			}
+			want = append(want, "update_pull_request_branches", "validate", "forecast")
+			if tt.hasLedgers {
+				want = append(want, maintenanceCompactLedgerOperation)
+			}
+
+			operations := maintenanceOperationNames(tt.hasCacheMemory, tt.hasLedgers)
+			require.Equal(t, want, operations)
+
+			dispatchOperations := append([]string{maintenanceNoOperationValue}, operations...)
+			dispatchYAML := buildMaintenanceDispatchInputsYAML(tt.hasLedgers, tt.hasCacheMemory)
+			require.Contains(t, dispatchYAML, "options:\n          - '"+strings.Join(dispatchOperations, "'\n          - '")+"'\n")
+
+			workflowCallYAML := buildMaintenanceWorkflowCallYAML("", "", tt.hasLedgers, tt.hasCacheMemory, &MaintenanceConfig{})
+			require.Contains(t, workflowCallYAML, "description: 'Optional maintenance operation to run ("+strings.Join(operations, ", ")+")'")
+		})
+	}
+}
+
 func TestMaintenanceWorkflowDisabledManualJobs(t *testing.T) {
 	manualJobs := []string{
 		"run_operation", "cleanup-cache-memory", "update_pull_request_branches",

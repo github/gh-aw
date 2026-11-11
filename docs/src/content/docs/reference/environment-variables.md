@@ -27,6 +27,10 @@ GitHub Agentic Workflows supports environment variables in 13 distinct contexts:
 | **Safe Outputs Job** | `safe-outputs.jobs.<name>.env` | Specific safe-output job | Job-specific config |
 | **GitHub Actions Step** | `githubActionsStep.env` | Pre-defined steps | Step configuration |
 
+Strict mode rejects credential expressions in workflow-level `env`, including `secrets` references and `github.token` in either dot or bracket notation. Non-strict mode emits a warning. Supported credential keys in `engine.env` remain allowed; strict mode requires AWF v0.25.3 or newer to exclude those values from the agent sandbox.
+
+Invalid expressions in `env` or `engine.env` fail compilation in either mode. Actions bracket indexes use single-quoted strings, for example `github['repository']`; double-quoted indexes are invalid.
+
 ### Example Configurations
 
 **Workflow-level shared configuration:**

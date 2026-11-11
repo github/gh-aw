@@ -638,7 +638,7 @@ export interface AdmissionDecisionData {
 }
 
 export interface DailyAICDecisionData {
-  status: "disabled" | "skipped" | "under_budget" | "exceeded" | "structural_error" | "transient_error";
+  status: "disabled" | "skipped" | "under_budget" | "exceeded" | "structural_error" | "transient_error" | "quota_blocked";
   exceeded?: boolean;
   total?: number;
   estimated?: number;

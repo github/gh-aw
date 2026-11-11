@@ -532,6 +532,8 @@ type safeOutputsHandlerOutputsAndActionState struct {
 // processed by the consolidated handler manager step (as opposed to a dedicated job/step).
 func hasHandlerManagerTypes(data *WorkflowData) bool {
 	return isWorkQueueParticipant(data) ||
+		data.SafeOutputs.CreateSecurityAdvisory != nil ||
+		data.SafeOutputs.AddSecurityAdvisoryComment != nil ||
 		data.SafeOutputs.CreateIssues != nil ||
 		data.SafeOutputs.AddComments != nil ||
 		data.SafeOutputs.CreateDiscussions != nil ||

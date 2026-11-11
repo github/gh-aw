@@ -13,6 +13,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildSafeOutputsSectionsSecurityAdvisories(t *testing.T) {
+	for _, tool := range []string{"create_security_advisory", "add_security_advisory_comment"} {
+		for _, tt := range []struct {
+			name    string
+			enabled bool
+			max     *string
+			budget  string
+		}{
+			{name: "disabled"},
+			{name: "default budget", enabled: true},
+			{name: "single call", enabled: true, max: strPtr("1")},
+			{name: "multiple calls", enabled: true, max: strPtr("3"), budget: "(max:3)"},
+			{name: "dynamic budget", enabled: true, max: strPtr("${{ inputs.limit }}"), budget: "(max:__GH_AW_INPUTS_LIMIT__)"},
+		} {
+			t.Run(tool+"/"+tt.name, func(t *testing.T) {
+				config := &SafeOutputsConfig{NoOp: &NoOpConfig{}}
+				if tt.enabled {
+					base := BaseSafeOutputConfig{Max: tt.max}
+					if tool == "create_security_advisory" {
+						config.CreateSecurityAdvisory = &CreateSecurityAdvisoryConfig{BaseSafeOutputConfig: base}
+					} else {
+						config.AddSecurityAdvisoryComment = &AddSecurityAdvisoryCommentConfig{BaseSafeOutputConfig: base}
+					}
+				}
+				sections := buildSafeOutputsSections(config, nil, nil)
+				require.NotEmpty(t, sections)
+				if !tt.enabled {
+					assert.NotContains(t, sections[0].Content, tool)
+					return
+				}
+				assert.Equal(t, "<safe-output-tools>\nTools: "+tool+tt.budget+", noop", sections[0].Content)
+				if tt.name == "dynamic budget" {
+					assert.Equal(t, "${{ inputs.limit }}", sections[0].EnvVars["GH_AW_INPUTS_LIMIT"])
+				}
+			})
+		}
+	}
+}
+
 func TestBuildSafeOutputsSectionsReportIncomplete(t *testing.T) {
 	for _, tt := range []struct {
 		name     string

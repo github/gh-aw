@@ -1,4 +1,4 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"2503049f95a6fa51b0e1aac2a9506a88a3ee0cf0de8edbf7e348c89cff1c9e2a","body_hash":"70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.319"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"5302579957f475373e10a1ef0dbfc1e1fc1947d85b73f34a77e5f8c246e38955","body_hash":"70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.319"}}
 # gh-aw-manifest: {"version":1,"secrets":["ANTHROPIC_API_KEY","COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-go","sha":"b7ad1dad31e06c5925ef5d2fc7ad053ef454303e","version":"v7.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"},{"repo":"astral-sh/setup-uv","sha":"68559e99cc807c1eb7e9238fd43a15bba460eec2","version":"v10.3.3"},{"repo":"docker/build-push-action","sha":"c3c9e263c25d99ce0380d002d59b67737d91b0dc","version":"v7.4.0"},{"repo":"docker/setup-buildx-action","sha":"f87e5991a6d7451dcb8d9637bfbc97413f497069","version":"v4.4.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11","digest":"sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11@sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11","digest":"sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11@sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11","digest":"sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11@sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.6","digest":"sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.6@sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"mcp_servers":[{"name":"agenticworkflows","tools":["*"]},{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_discussion","create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"15017e3e044d67536091":{"model":"small"},"4943cffeebb6706aa8bc":{"name":"Squad"},"71d29462803fbcea9785":{"model":"small"},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"b2322300e04bf0416973":{"model":"small"},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}},"metadata_refs":{"artifact:4943cffeebb6706aa8bc":{"/tools":"/manifest/mcp_servers/0/tools"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
@@ -186,7 +186,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"sub_agent_strategy":{"variants":["sub_agents","single_agent"],"description":"Test whether delegating trajectory-builder, artifacts-summarizer, and failure-pattern-classifier to small-model sub-agents improves recommendation quality vs. inline analysis by the main agent","hypothesis":"H0: no change in issue quality or run success rate. H1: sub_agents variant yields higher evidence completeness score with equal or lower token cost","metric":"issue_evidence_completeness","secondary_metrics":["run_success_rate","ai_credits_total","run_duration_ms"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"\u003c=0.10"},{"name":"noop_rate","threshold":"\u003c=0.30"}],"min_samples":20,"weight":[50,50],"start_date":"2026-06-02"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 2503049f95a6fa51b0e1aac2a9506a88a3ee0cf0de8edbf7e348c89cff1c9e2a:70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53
+          GH_AW_HARNESS_VERSION: 5302579957f475373e10a1ef0dbfc1e1fc1947d85b73f34a77e5f8c246e38955:70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53
         with:
           script: |
             const path = require('path');
@@ -322,6 +322,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/save_base_github_folders.sh"
       - name: Check workflow lock file
         id: check-lock-file
+        if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_WORKFLOW_FILE: "daily-agentrx-trace-optimizer.lock.yml"
@@ -642,7 +643,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "2503049f95a6fa51b0e1aac2a9506a88a3ee0cf0de8edbf7e348c89cff1c9e2a:70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "5302579957f475373e10a1ef0dbfc1e1fc1947d85b73f34a77e5f8c246e38955:70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -654,7 +655,8 @@ jobs:
     name: agent
     needs: activation
     if: >
-      ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true')
+      ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
+      needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked')
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
@@ -838,7 +840,7 @@ jobs:
           AGENTRX_HOME: /tmp/gh-aw/python/agentrx
           UV_PYTHON_INSTALL_DIR: /tmp/gh-aw/python/uv-python
         name: Install AgentRx with a sandbox-compatible CPython
-        run: "set -euo pipefail\n# The agent sandbox cannot run the runner's CPython (glibc mismatch) and only\n# ships PyPy, which has no wheels for AgentRx dependencies. Install a portable\n# uv-managed CPython plus AgentRx under /tmp/gh-aw, which is mounted read-write\n# into the sandbox.\nrm -rf \"$AGENTRX_HOME\"\nmkdir -p \"$AGENTRX_HOME\"\ngit init \"$AGENTRX_HOME/src\"\ngit -C \"$AGENTRX_HOME/src\" remote add origin https://github.com/microsoft/AgentRx.git\ngit -C \"$AGENTRX_HOME/src\" fetch --depth 1 origin 7a18c79708e7671be15124460f4f7296107c2a55\ngit -C \"$AGENTRX_HOME/src\" checkout --detach FETCH_HEAD\nuv venv --python 3.12 --python-preference only-managed \"$AGENTRX_HOME/.venv\"\n# run.py imports AgentRx from the pinned checkout directly. Sync its complete\n# dependency lock without executing a source build or resolving new versions.\nuv pip sync --require-hashes --only-binary=:all: --python \"$AGENTRX_HOME/.venv/bin/python\" \"${GITHUB_WORKSPACE}/.github/workflows/requirements-agentrx.txt\"\n\"$AGENTRX_HOME/.venv/bin/python\" \"$AGENTRX_HOME/src/run.py\" --help >/dev/null"
+        run: "set -euo pipefail\n# The agent sandbox cannot run the runner's CPython (glibc mismatch) and only\n# ships PyPy, which has no wheels for AgentRx dependencies. Install a portable\n# uv-managed CPython plus AgentRx under /tmp/gh-aw, which is mounted read-write\n# into the sandbox.\nrm -rf \"$AGENTRX_HOME\"\nmkdir -p \"$AGENTRX_HOME\"\ngit init \"$AGENTRX_HOME/src\"\ngit -C \"$AGENTRX_HOME/src\" remote add origin https://github.com/microsoft/AgentRx.git\ngit -C \"$AGENTRX_HOME/src\" fetch --depth 1 origin 7a18c79708e7671be15124460f4f7296107c2a55\ngit -C \"$AGENTRX_HOME/src\" checkout --detach FETCH_HEAD\nuv venv --python 3.12 --python-preference only-managed \"$AGENTRX_HOME/.venv\"\n# run.py imports AgentRx from the pinned checkout directly. Sync its complete\n# dependency lock without executing a source build or resolving new versions.\nuv pip sync --require-hashes --only-binary=:all: --python \"$AGENTRX_HOME/.venv/bin/python\" \"${GITHUB_WORKSPACE}/.github/workflows/requirements-agentrx.txt\"\nuv pip check --python \"$AGENTRX_HOME/.venv/bin/python\"\nPYTHONPATH=\"$AGENTRX_HOME/src\" \"$AGENTRX_HOME/.venv/bin/python\" -c 'import agentrx.pipeline.globals, agentrx.ir.trajectory_ir, agentrx.invariants.domain_registry, pydantic, pydantic_core'\n\"$AGENTRX_HOME/.venv/bin/python\" \"$AGENTRX_HOME/src/run.py\" --help >/dev/null\nSMOKE_DIR=\"$AGENTRX_HOME/smoke\"\nmkdir -p \"$SMOKE_DIR\"\ncat > \"$SMOKE_DIR/trajectory.md\" <<'EOF'\n## ***user*** #0\nAgentRx dependency compatibility smoke test\nEOF\n\"$AGENTRX_HOME/.venv/bin/python\" \"$AGENTRX_HOME/src/run.py\" \"$SMOKE_DIR/trajectory.md\" --stage ir --run-dir \"$SMOKE_DIR/run\""
 
       - name: Configure Git credentials
         env:
@@ -1845,6 +1847,15 @@ jobs:
       - name: Warn if threat detection produced no verdict
         if: always() && needs.detection.result != 'skipped' && (needs.detection.outputs.detection_reason == 'agent_failure' || needs.detection.outputs.detection_reason == 'parse_error' || needs.detection.outputs.detection_conclusion == '')
         run: echo "::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs."
+      - name: Report quota-blocked threat detection
+        if: always() && needs.detection.outputs.detection_reason == 'github_api_quota_exhausted'
+        run: |
+          echo "::warning::GitHub API quota exhausted: threat detection was deferred and is not a security pass. Safe outputs were not published; agent artifacts are retained for a later run."
+          {
+            echo "### GitHub API quota exhausted"
+            echo ""
+            echo "Threat detection was deferred because AWF attestation verification could not complete before the GitHub API quota reset. This is not a security pass: safe outputs were not published, and completed agent artifacts are retained. See the detection job summary for resource, limit, remaining, and reset details."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Download detection artifact
         id: download-detection-artifact
         continue-on-error: true
@@ -2213,7 +2224,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "2503049f95a6fa51b0e1aac2a9506a88a3ee0cf0de8edbf7e348c89cff1c9e2a:70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "5302579957f475373e10a1ef0dbfc1e1fc1947d85b73f34a77e5f8c246e38955:70100624a2b3116270151694bad814fc18d4219b937ba9538e995e25da477d53"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -2371,6 +2382,7 @@ jobs:
           mkdir -p /tmp/gh-aw/threat-detection
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
+        id: detection_awf_install
         env:
           GH_TOKEN: ${{ github.token }}
           GH_HOST: github.com
@@ -2392,7 +2404,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh" v0.5.3 --artifact-base-url https://github.com/github/gh-aw-threat-detection/releases/download --sha256-amd64 7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009 --sha256-arm64 6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6
       - name: Execute threat detection with AWF
         id: detection_agentic_execution
-        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true' && steps.threat_detect_install.outcome == 'success'
+        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true' && steps.threat_detect_install.outcome == 'success' && steps.detection_awf_install.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 10
         env:
@@ -2577,6 +2589,7 @@ jobs:
           RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}
           DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}
           THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}
+          AWF_INSTALL_OUTCOME: ${{ steps.detection_awf_install.outcome }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json

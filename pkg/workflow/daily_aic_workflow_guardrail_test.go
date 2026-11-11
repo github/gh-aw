@@ -92,6 +92,9 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, "needs.activation.outputs.daily_ai_credits_exceeded != 'true'") {
 		t.Fatal("expected the agent job to be skipped when the daily AI Credits guardrail is exceeded")
 	}
+	if !strings.Contains(lockStr, "needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'") {
+		t.Fatal("expected a handled GitHub API quota stop to skip the agent job instead of failing activation")
+	}
 	if !strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}") {
 		t.Fatal("expected the conclusion job to receive the daily AI Credits guardrail output")
 	}
@@ -817,5 +820,66 @@ func TestDailyAICRepoMemorySelectionAndValidation(t *testing.T) {
 	data.RepoMemoryConfig = nil
 	if err := validateMaxDailyAICFrontmatter(data); err == nil || !strings.Contains(err.Error(), "requires tools.repo-memory") {
 		t.Fatalf("expected imported repo-memory backend to require repo-memory, got %v", err)
+	}
+}
+
+func TestDailyAICQuotaBlockedGatesActivationAPISteps(t *testing.T) {
+	const quotaGuard = "steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'"
+	gatedSteps := []string{"id: react", "id: check-lock-file", "id: sanitized", "id: add-comment", "id: lock-issue"}
+	for _, tc := range []struct {
+		name         string
+		dailyCredits string
+		gated        bool
+	}{
+		{"enforce mode", "max-daily-ai-credits: 1000", true},
+		{"warn mode", "max-daily-ai-credits:\n  value: 1000\n  continue-on-error: true", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testDir := testutil.TempDir(t, "daily-aic-quota-gate-*")
+			workflowFile := filepath.Join(testDir, "quota-gate.md")
+			workflow := "---\non:\n  issues:\n    types: [opened]\n    lock-for-agent: true\n  reaction: eyes\n  status-comment: true\n" + tc.dailyCredits + "\nsafe-outputs:\n  add-comment:\n    max: 1\n---\n\nRespond to ${{ steps.sanitized.outputs.text }}\n"
+			if err := os.WriteFile(workflowFile, []byte(workflow), 0o644); err != nil {
+				t.Fatalf("failed to write test workflow: %v", err)
+			}
+			if err := NewCompiler().CompileWorkflow(workflowFile); err != nil {
+				t.Fatalf("failed to compile workflow: %v", err)
+			}
+			lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowFile))
+			if err != nil {
+				t.Fatalf("failed to read lock file: %v", err)
+			}
+			lockStr := string(lockContent)
+			activationStart := strings.Index(lockStr, "\n  activation:\n")
+			if activationStart == -1 {
+				t.Fatal("expected an activation job")
+			}
+			activation := lockStr[activationStart:]
+			if next := strings.Index(activation, "\n  agent:\n"); next != -1 {
+				activation = activation[:next]
+			}
+			guardrailIdx := strings.Index(activation, "id: daily-ai-credits-workflow-guardrail")
+			if guardrailIdx == -1 {
+				t.Fatal("expected the daily AI Credits guardrail step")
+			}
+			for _, stepID := range gatedSteps {
+				idx := strings.Index(activation, stepID+"\n")
+				if idx == -1 {
+					t.Fatalf("expected activation step %q", stepID)
+				}
+				if idx < guardrailIdx {
+					t.Fatalf("expected %q to run after the guardrail step", stepID)
+				}
+				ifLine := activation[idx:]
+				ifLine = ifLine[strings.Index(ifLine, "\n")+1:]
+				ifLine = ifLine[:strings.Index(ifLine, "\n")]
+				hasGuard := strings.HasPrefix(strings.TrimSpace(ifLine), "if:") && strings.Contains(ifLine, quotaGuard)
+				if hasGuard != tc.gated {
+					t.Fatalf("step %q quota gate = %t, want %t (if line: %q)", stepID, hasGuard, tc.gated, ifLine)
+				}
+			}
+			if strings.Contains(activation, "Publish daily AIC scan observations\n        if: always() && env.GH_AW_ADMISSION_RESULT != 'admitted' && env.GH_AW_MAX_DAILY_AI_CREDITS != ''\n") == false {
+				t.Fatal("expected daily AIC scan publication to stay unconditional on the quota status")
+			}
+		})
 	}
 }

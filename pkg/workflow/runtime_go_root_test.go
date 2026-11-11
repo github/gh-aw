@@ -18,7 +18,7 @@ func TestGoRootCaptureReplacesStaleToolchainRoot(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			dir := t.TempDir()
 			bin := filepath.Join(dir, "bin")
-			root := filepath.Join(dir, "go toolchain", "1.27.3")
+			root := filepath.Join(dir, "go toolchain", "1.27.4")
 			require.NoError(t, os.MkdirAll(bin, 0o755))
 			require.NoError(t, os.MkdirAll(filepath.Join(root, "bin"), 0o755))
 			mock := `#!/bin/sh

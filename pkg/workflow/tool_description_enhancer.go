@@ -369,7 +369,31 @@ func submitPullRequestReviewConstraints(config *SubmitPullRequestReviewConfig) [
 		appendMaxConstraint(constraints, config.Max, "Maximum %d review(s) can be submitted.")
 		appendTargetConstraint(constraints, config.Target)
 		appendStringConstraint(constraints, config.TargetRepoSlug, "Reviews will be submitted in repository %q.")
+		appendAllowedReviewEventsConstraint(constraints, config.AllowedEvents)
 	})
+}
+
+// reviewEventValues lists every review event the submit_pull_request_review tool schema supports.
+var reviewEventValues = []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"}
+
+// appendAllowedReviewEventsConstraint tells the agent which review events are permitted when
+// allowed-events narrows the set, and explicitly names the excluded ones so the base
+// description's references to APPROVE do not mislead the agent into a rejected call.
+func appendAllowedReviewEventsConstraint(constraints *[]string, allowedEvents []string) {
+	if len(allowedEvents) == 0 {
+		return
+	}
+	text := "Allowed review events: " + strings.Join(allowedEvents, ", ") + "."
+	var excluded []string
+	for _, event := range reviewEventValues {
+		if !slices.Contains(allowedEvents, event) {
+			excluded = append(excluded, event)
+		}
+	}
+	if len(excluded) > 0 {
+		text += " Events not listed (" + strings.Join(excluded, ", ") + ") are rejected; do not use them."
+	}
+	*constraints = append(*constraints, text)
 }
 
 func replyToPullRequestReviewCommentConstraints(config *ReplyToPullRequestReviewCommentConfig) []string {

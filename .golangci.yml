@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.27.3"
+  go: "1.27.4"
   tests: true
   timeout: 10m  # Prevent linter from hanging indefinitely
   modules-download-mode: readonly  # Use cached modules only, skip downloads

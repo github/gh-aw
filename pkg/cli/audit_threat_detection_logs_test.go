@@ -103,3 +103,52 @@ func TestAuditDetectionIssuesDoNotDoubleCountLogErrors(t *testing.T) {
 	assert.Equal(t, 3, data.Metrics.ErrorCount)
 	require.Len(t, data.Errors, 1)
 }
+
+func TestAuditReportsQuotaDeferredDetectionAsOperational(t *testing.T) {
+	t.Parallel()
+	const details = "resource=core; limit=15000; remaining=0; used=15000; reset=2026-11-10T21:00:00Z; reason=reset_exceeds_budget"
+	for _, tc := range []struct {
+		name, payload, title string
+		warning              bool
+	}{
+		{"strict", `{"job_result":"failure","conclusion":"failure","reason":"github_api_quota_exhausted"}`, "Threat Detection Deferred: GitHub API Quota Exhausted", false},
+		{"warn mode", `{"job_result":"success","conclusion":"warning","reason":"github_api_quota_exhausted"}`, "Threat Detection Warning: GitHub API Quota Exhausted", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			runDir := t.TempDir()
+			usageDir := filepath.Join(runDir, "usage", "detection")
+			require.NoError(t, os.MkdirAll(usageDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(usageDir, "detection_result.json"), []byte(tc.payload), 0o600))
+			writeConclusionDetectionLog(t, runDir, "3_detection.txt",
+				"2026-11-10T20:00:00.0000000Z ##[error]GitHub API quota exhausted: threat detection deferred because AWF attestation verification did not complete ("+details+"). Safe outputs are not published.\n")
+			findings := generateThreatDetectionFindings(ProcessedRun{Run: WorkflowRun{LogsPath: runDir}})
+			require.Len(t, findings, 1)
+			finding := findings[0]
+			assert.Equal(t, AuditFindingDetectionJobFailed, finding.Code)
+			assert.Equal(t, "operational", finding.Category)
+			assert.Equal(t, tc.title, finding.Title)
+			assert.Contains(t, finding.Description, "GitHub API quota was exhausted")
+			assert.Contains(t, finding.Description, details)
+			assert.Contains(t, finding.Description, "did not run")
+			assert.Contains(t, finding.Description, "not a security pass")
+			data := AuditData{KeyFindings: findings}
+			appendAuditDetectionIssues(&data)
+			if tc.warning {
+				assert.Len(t, data.Warnings, 1)
+				assert.Empty(t, data.Errors)
+			} else {
+				assert.Len(t, data.Errors, 1)
+				assert.Empty(t, data.Warnings)
+			}
+		})
+	}
+}
+
+func TestReadDetectionQuotaDetailsRejectsUnvalidatedText(t *testing.T) {
+	t.Parallel()
+	runDir := t.TempDir()
+	writeConclusionDetectionLog(t, runDir, "3_detection.txt", "GitHub API quota exhausted (resource=core; limit=PRIVATE; remaining=0)\n")
+	assert.Empty(t, readDetectionQuotaDetails(runDir))
+	assert.Empty(t, readDetectionQuotaDetails(""))
+}

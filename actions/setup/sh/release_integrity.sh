@@ -183,19 +183,151 @@ verify_release_digest() {
   fi
 }
 
+# Exit status for a verification deferred by GitHub API quota exhaustion. It is
+# never success: the release stays unverified and nothing is installed.
+RELEASE_QUOTA_EXHAUSTED_STATUS=75
+RELEASE_QUOTA_WAITED_SECONDS=0
+
+release_quota_iso_time() {
+  local epoch="$1"
+  [[ "$epoch" =~ ^[0-9]{1,12}$ ]] || { printf 'unknown'; return 0; }
+  date -u -d "@${epoch}" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -r "$epoch" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf '%s' "$epoch"
+}
+
+# Read the quota headers of the same attestation endpoint with the same
+# credential as the failed verification. Only validated header values are kept.
+release_quota_probe() {
+  local file="$1" repository="$2" digest response line name value
+  RELEASE_QUOTA_STATUS="" RELEASE_QUOTA_RESOURCE="unknown" RELEASE_QUOTA_LIMIT="" RELEASE_QUOTA_REMAINING="" RELEASE_QUOTA_USED="" RELEASE_QUOTA_RESET="" RELEASE_QUOTA_RETRY_AFTER=""
+  if command -v sha256sum >/dev/null 2>&1; then
+    digest=$(sha256sum "$file") || return 1
+  else
+    digest=$(shasum -a 256 "$file") || return 1
+  fi
+  digest="${digest%% *}"
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  response=$(gh api --hostname github.com --include "repos/${repository}/attestations/sha256:${digest}" 2>/dev/null) || true
+  while IFS= read -r line; do
+    line="${line%$'\r'}"
+    [ -z "$line" ] && [ -n "$RELEASE_QUOTA_STATUS" ] && break
+    if [[ "$line" =~ ^HTTP/[0-9.]+\ ([0-9]{3}) ]]; then
+      RELEASE_QUOTA_STATUS="${BASH_REMATCH[1]}"
+      continue
+    fi
+    name="${line%%:*}"
+    value="${line#*:}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    case "${name,,}" in
+      x-ratelimit-resource) [[ "$value" =~ ^[a-z_]{1,64}$ ]] && RELEASE_QUOTA_RESOURCE="$value" ;;
+      x-ratelimit-limit) [[ "$value" =~ ^[0-9]{1,16}$ ]] && RELEASE_QUOTA_LIMIT="$value" ;;
+      x-ratelimit-remaining) [[ "$value" =~ ^[0-9]{1,16}$ ]] && RELEASE_QUOTA_REMAINING="$value" ;;
+      x-ratelimit-used) [[ "$value" =~ ^[0-9]{1,16}$ ]] && RELEASE_QUOTA_USED="$value" ;;
+      x-ratelimit-reset) [[ "$value" =~ ^[0-9]{1,12}$ ]] && RELEASE_QUOTA_RESET="$value" ;;
+      retry-after) [[ "$value" =~ ^[0-9]{1,8}$ ]] && RELEASE_QUOTA_RETRY_AFTER="$value" ;;
+    esac
+  done <<< "$response"
+  return 0
+}
+
+report_release_quota_blocked() {
+  local file="$1" reason="$2" reset_iso details
+  reset_iso=$(release_quota_iso_time "$RELEASE_QUOTA_RESET")
+  details="resource=${RELEASE_QUOTA_RESOURCE}; limit=${RELEASE_QUOTA_LIMIT:-unknown}; remaining=${RELEASE_QUOTA_REMAINING:-unknown}; used=${RELEASE_QUOTA_USED:-unknown}; reset=${reset_iso}; reason=${reason}"
+  echo "ERROR: GitHub API quota exhausted during release attestation verification for $(basename "$file") (HTTP ${RELEASE_QUOTA_STATUS:-unknown}; ${details}). The release was not verified or installed." >&2
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    {
+      echo "### GitHub API quota exhausted"
+      echo ""
+      echo "| Field | Value |"
+      echo "| --- | --- |"
+      echo "| Stage | Release attestation verification ($(basename "$file")) |"
+      echo "| HTTP status | ${RELEASE_QUOTA_STATUS:-unknown} |"
+      echo "| Resource | ${RELEASE_QUOTA_RESOURCE} |"
+      echo "| Limit | ${RELEASE_QUOTA_LIMIT:-unknown} |"
+      echo "| Remaining | ${RELEASE_QUOTA_REMAINING:-unknown} |"
+      echo "| Used | ${RELEASE_QUOTA_USED:-unknown} |"
+      echo "| Reset | ${reset_iso} |"
+      echo "| Reason | ${reason} |"
+      echo ""
+      echo "Attestation verification is required and was not bypassed; nothing was installed. Dependent execution is blocked until a later run after the reset."
+      echo ""
+    } >> "$GITHUB_STEP_SUMMARY" || true
+  fi
+  if [ -n "${GITHUB_ENV:-}" ]; then
+    printf 'GH_AW_GITHUB_API_QUOTA_BLOCKED=%s\n' "$details" >> "$GITHUB_ENV" || true
+  fi
+}
+
+# gh attestation verify is the required provenance check. On a genuine quota
+# 403/429 (remaining=0 or Retry-After), wait until the server's own reset within
+# GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS (default 300, cumulative for this
+# installer) and verify again. Never skip verification; other failures keep
+# their original status.
 verify_release_attestation() {
-  local file="$1" repository="$2"
-  gh attestation verify "$file" --hostname github.com \
-    --repo "$repository" \
-    --signer-workflow "${repository}/.github/workflows/release.yml" \
-    --cert-oidc-issuer https://token.actions.githubusercontent.com \
-    --deny-self-hosted-runners
+  local file="$1" repository="$2" output status now deadline delay reason max_wait
+  local transient_retries=0 waited=0
+  max_wait="${GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS:-300}"
+  [[ "$max_wait" =~ ^[0-9]{1,6}$ ]] || max_wait=300
+  # Bounded: at most two transient retries and one quota wait, and every
+  # permitted wait is followed by another verification.
+  while true; do
+    status=0
+    output=$(gh attestation verify "$file" --hostname github.com \
+      --repo "$repository" \
+      --signer-workflow "${repository}/.github/workflows/release.yml" \
+      --cert-oidc-issuer https://token.actions.githubusercontent.com \
+      --deny-self-hosted-runners 2>&1) || status=$?
+    [ -n "$output" ] && printf '%s\n' "$output"
+    [ "$status" -eq 0 ] && return 0
+    if ! grep -qiE 'rate limit|HTTP 429' <<< "$output"; then
+      return "$status"
+    fi
+    release_quota_probe "$file" "$repository" || return "$status"
+    if [ "$RELEASE_QUOTA_STATUS" != 403 ] && [ "$RELEASE_QUOTA_STATUS" != 429 ]; then
+      if [[ "$RELEASE_QUOTA_STATUS" =~ ^2 ]] && [ "$transient_retries" -lt 2 ]; then
+        transient_retries=$((transient_retries + 1))
+        continue
+      fi
+      return "$status"
+    fi
+    if [ "$RELEASE_QUOTA_REMAINING" != 0 ] && [ -z "$RELEASE_QUOTA_RETRY_AFTER" ]; then
+      # A rate-limit response without exhaustion metadata is not established quota exhaustion.
+      return "$status"
+    fi
+    now=$(date +%s)
+    deadline=""
+    if [ "$RELEASE_QUOTA_REMAINING" = 0 ] && [ -n "$RELEASE_QUOTA_RESET" ] && [ "$RELEASE_QUOTA_RESET" -gt "$now" ]; then
+      deadline="$RELEASE_QUOTA_RESET"
+    fi
+    if [ -n "$RELEASE_QUOTA_RETRY_AFTER" ] && { [ -z "$deadline" ] || [ $((now + RELEASE_QUOTA_RETRY_AFTER)) -gt "$deadline" ]; }; then
+      deadline=$((now + RELEASE_QUOTA_RETRY_AFTER))
+    fi
+    reason=""
+    if [ "$waited" -eq 1 ]; then
+      reason="renewed_exhaustion"
+    elif [ -z "$deadline" ]; then
+      reason="unknown_reset"
+    else
+      delay=$((deadline - now + 1))
+      if [ $((RELEASE_QUOTA_WAITED_SECONDS + delay)) -gt "$max_wait" ]; then
+        reason="reset_exceeds_budget"
+      fi
+    fi
+    if [ -n "$reason" ]; then
+      report_release_quota_blocked "$file" "$reason"
+      return "$RELEASE_QUOTA_EXHAUSTED_STATUS"
+    fi
+    echo "GitHub API quota exhausted during attestation verification for $(basename "$file"); waiting ${delay}s for the server reset at $(release_quota_iso_time "$deadline") before verifying again." >&2
+    sleep "$delay"
+    RELEASE_QUOTA_WAITED_SECONDS=$((RELEASE_QUOTA_WAITED_SECONDS + delay))
+    waited=1
+  done
 }
 
 verify_release_identity() {
   local checksums_file="$1" identity_file="$2" repository="$3" version="$4" digest="$5"
   verify_release_digest "$checksums_file" "$digest" || return 1
-  verify_release_attestation "$identity_file" "$repository" || return 1
+  verify_release_attestation "$identity_file" "$repository" || return
   if [ "$(cat "$identity_file")" != "${digest}  refs/tags/v${version#v}" ]; then
     echo "ERROR: Release identity does not bind checksums.txt to refs/tags/v${version#v}" >&2
     return 1

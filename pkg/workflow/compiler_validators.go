@@ -267,6 +267,7 @@ func (c *Compiler) warnLegacyBehaviorInstallationCooldown(workflowData *Workflow
 	c.IncrementWarningCount()
 }
 
+//nolint:largefunc // Keep the ordered core validation table and its dispatch together.
 func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, markdownPath string) error {
 	validations := []struct {
 		logMessage string
@@ -294,6 +295,8 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		{logMessage: "Validating network firewall configuration", validateFn: func() error { return validateNetworkFirewallConfig(workflowData.NetworkPermissions) }},
 		{logMessage: "Validating safe-outputs allow-workflows", validateFn: func() error { return validateSafeOutputsAllowWorkflows(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs approve-workflow-run authentication", validateFn: func() error { return validateSafeOutputsApproveWorkflowRun(workflowData.SafeOutputs) }},
+		{logMessage: "Validating safe-outputs create-security-advisory authentication", validateFn: func() error { return validateSafeOutputsCreateSecurityAdvisory(workflowData.SafeOutputs) }},
+		{logMessage: "Validating safe-outputs add-security-advisory-comment authentication", validateFn: func() error { return validateSafeOutputsAddSecurityAdvisoryComment(workflowData.SafeOutputs) }},
 		{logMessage: "Validating OTLP resource attributes", validateFn: func() error { return validateOTLPResourceAttributes(workflowData) }},
 		{logMessage: "Validating labels", validateFn: func() error { return validateLabels(workflowData) }},
 		{logMessage: "Validating workflow_dispatch input requirements for command triggers", validateFn: func() error { return validateCommandWorkflowDispatchInputs(workflowData) }},
@@ -596,6 +599,7 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "dependabot_alert" }), message: "Using experimental feature: on.gateway-dispatch.dependabot-alerts (hosted CAO triggers)"},
 		{enabled: workflowData.RawFrontmatter["graders"] != nil && workflowData.Graders != nil && workflowData.Graders.HasGraders(), message: "Using experimental feature: graders"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.MergePullRequest != nil, message: "Using experimental feature: merge-pull-request"},
+		{enabled: workflowData.SafeOutputs != nil && (workflowData.SafeOutputs.CreateSecurityAdvisory != nil || workflowData.SafeOutputs.AddSecurityAdvisoryComment != nil), message: "Using experimental feature: security advisory safe outputs"},
 		{enabled: len(workflowData.LSP) > 0, message: "Using experimental feature: lsp"},
 		{enabled: hasCloudHypervisorEnclaves(workflowData), message: "Using experimental feature: enclaves cloud-hypervisor runtime"},
 		{enabled: len(workflowData.Plugins) > 0, message: "Using experimental feature: plugins"},

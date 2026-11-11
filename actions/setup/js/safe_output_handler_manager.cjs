@@ -74,6 +74,8 @@ const GITHUB_TOKEN_CONFIG_KEY = "github-token";
  * Maps safe output types to their handler module file paths
  */
 const HANDLER_MAP = {
+  add_security_advisory_comment: "./add_security_advisory_comment.cjs",
+  create_security_advisory: "./create_security_advisory.cjs",
   create_issue: "./create_issue.cjs",
   add_comment: "./add_comment.cjs",
   comment_memory: "./comment_memory.cjs",
@@ -168,6 +170,8 @@ const WTD3_REQUIREMENT_ID = "WTD3";
  * @type {Set<string>}
  */
 const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
+  "add_security_advisory_comment",
+  "create_security_advisory",
   "create_issue",
   "add_comment",
   "create_pull_request",
@@ -355,6 +359,9 @@ const handlerThreatWarningAbortTypes = new WeakMap();
 /** @type {WeakMap<Map<string, Function>, Map<string, {max: number, attempted: number}>>} Trusted connector proposal budgets, scoped to a handler factory. */
 const connectorBudgetsByHandlerMap = new WeakMap();
 
+/** @type {WeakSet<Function>} Only built-in local diagnostics may bypass publication checks. */
+const localDiagnosticHandlers = new WeakSet();
+
 /**
  * Wrap a handler so project-safe-output execution can temporarily bind global.github
  * to the handler-specific authenticated client.
@@ -530,7 +537,9 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
                   : value;
             }
           }
-          messageHandlers.set(type, factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable));
+          const loadedHandler = factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable);
+          if (type === "report_incomplete") localDiagnosticHandlers.add(loadedHandler);
+          messageHandlers.set(type, loadedHandler);
           core.info(`✓ Loaded and initialized handler for: ${type}`);
         } else {
           handlerLoadErrors.set(type, "handler module does not export a main function");
@@ -1318,7 +1327,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
 
       // Call the message handler with the individual message and resolved temp IDs
       await assertClaimAuthorized(effectiveMessage);
-      const stalePRReason = await getStalePullRequestReason(global.github, global.context);
+      // Incomplete signals only record local diagnostics; they do not publish to the PR.
+      const stalePRReason = localDiagnosticHandlers.has(messageHandler) ? null : await getStalePullRequestReason(global.github, global.context);
       if (stalePRReason) {
         core.info(stalePRReason);
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
@@ -1545,7 +1555,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
 
           // Call the handler again with updated temp ID map
           await assertClaimAuthorized(deferred.message);
-          const stalePRReason = await getStalePullRequestReason(global.github, global.context);
+          const stalePRReason = localDiagnosticHandlers.has(deferred.handler) ? null : await getStalePullRequestReason(global.github, global.context);
           const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
 
           if (result && result.skipped === true && !result.deferred) {

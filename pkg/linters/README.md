@@ -42,6 +42,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `httpnoctx` — reports HTTP client and package-level HTTP calls that do not accept a `context.Context`.
 - `httprespbodyclose` — reports directly matched HTTP response `Body.Close()` calls that are not deferred.
 - `httpstatuscode` — reports raw HTTP status-code integer literals that should use `net/http` named constants.
+- `ignoredlocalerror` — reports ignored error results from functions in the `github.com/github/gh-aw` module.
 - `ioutildeprecated` — reports uses of deprecated `io/ioutil` functions (deprecated since Go 1.16) and suggests their replacements in the `io` and `os` packages.
 - `jsonmarshalignoredeerror` — reports `json.Marshal` and `json.Unmarshal` calls where the error return is discarded.
 - `jsonunmarshalbytesconversion` — reports `json.Unmarshal([]byte(s), ...)` calls where `s` is a string; use a decoder for streams, or require a second `Decode` to return `io.EOF` to preserve whole-document validation.
@@ -219,6 +220,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `httpnoctx` | Custom `go/analysis` analyzer that flags HTTP calls that do not accept a `context.Context` |
 | `httprespbodyclose` | Custom `go/analysis` analyzer that flags directly matched HTTP response `Body.Close()` calls that are not deferred |
 | `httpstatuscode` | Custom `go/analysis` analyzer that flags raw HTTP status-code integer literals that should use `net/http` named constants |
+| `ignoredlocalerror` | Custom `go/analysis` analyzer that flags discarded errors from functions in the `github.com/github/gh-aw` module |
 | `ioutildeprecated` | Custom `go/analysis` analyzer that flags deprecated `io/ioutil` function calls (deprecated since Go 1.16) and suggests replacements in the `io` and `os` packages |
 | `jsonmarshalignoredeerror` | Custom `go/analysis` analyzer that flags `json.Marshal`/`json.Unmarshal` calls where the error return is discarded |
 | `jsonunmarshalbytesconversion` | Custom `go/analysis` analyzer that flags `json.Unmarshal([]byte(s), ...)` calls where `s` is a string and recommends `strings.NewReader(s)` for streams or requiring a second `Decode` to return `io.EOF` for whole-document validation |
@@ -386,6 +388,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/httpnoctx` — HTTP-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/httprespbodyclose` — HTTP-response-body-close analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/httpstatuscode` — http-status-code analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/ignoredlocalerror` — ignored-local-error analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/ioutildeprecated` — ioutil-deprecated analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror` — json-marshal-ignored-error analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/largefunc` — large-func analyzer subpackage
@@ -456,6 +459,7 @@ _ = typeassertionnil.Analyzer
 - `typeassertionnil` is registered but excluded from CI enforcement pending a cross-platform enforcement-readiness audit.
 - `unchecked_deferredclose` is registered but excluded from CI enforcement until existing deferred `Close()` findings are remediated.
 - `walkdirignoredeerror` is registered but excluded from CI enforcement until existing discarded `WalkDir` errors in `pkg/cli/audit_threat_detection.go` and `pkg/cli/model_routing.go` are remediated.
+- `ignoredlocalerror` is registered but excluded from CI enforcement until existing ignored local errors are reviewed.
 - `excessivefuncparams` exposes a `-max-params` analyzer flag and defaults to `8` parameters (`DefaultMaxParams`).
 - `largefunc` exposes a `-max-lines` analyzer flag, defaults to `60` lines (`DefaultMaxLines`), and skips `_test.go` files.
 - `osexitinlibrary` helps enforce separation between library logic and process-level termination.

@@ -538,6 +538,12 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	// Build compact list of enabled tool names, annotated with max budget when > 1.
 	var tools []string
 	var sharedBudgets []string
+	if safeOutputs.CreateSecurityAdvisory != nil {
+		tools = append(tools, toolWithMaxBudget("create_security_advisory", safeOutputs.CreateSecurityAdvisory.Max))
+	}
+	if safeOutputs.AddSecurityAdvisoryComment != nil {
+		tools = append(tools, toolWithMaxBudget("add_security_advisory_comment", safeOutputs.AddSecurityAdvisoryComment.Max))
+	}
 	if safeOutputs.AddComments != nil {
 		tools = append(tools, toolWithMaxBudget("add_comment", safeOutputs.AddComments.Max))
 	}

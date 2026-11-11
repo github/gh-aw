@@ -169,35 +169,109 @@ describe("compiler metadata source acquisition", () => {
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
   });
 
-  it("retries remote metadata reads after GitHub reports an exhausted API rate limit", async () => {
-    const file = ".github/workflows/main.lock.yml";
-    const rateLimitError = Object.assign(new Error("API rate limit exceeded"), {
+  const quotaError = (resetSeconds, extra = {}) =>
+    Object.assign(new Error("API rate limit exceeded for installation"), {
       status: 403,
-      response: { status: 403, headers: { "x-ratelimit-remaining": "0" } },
+      response: {
+        status: 403,
+        headers: { "x-ratelimit-remaining": "0", "x-ratelimit-limit": "15000", "x-ratelimit-used": "15000", "x-ratelimit-resource": "core", ...(resetSeconds ? { "x-ratelimit-reset": String(resetSeconds) } : {}), ...extra },
+      },
     });
+  const fakeClock = start => {
+    let current = start;
+    vi.spyOn(Date, "now").mockImplementation(() => current);
+    return {
+      now: () => current,
+      sleep: vi.fn(async ms => {
+        current += ms;
+      }),
+    };
+  };
+
+  it("resumes remote metadata reads only after the failed response's quota reset", async () => {
+    const file = ".github/workflows/main.lock.yml";
+    const start = Date.parse("2026-11-09T23:58:53Z");
+    const clock = fakeClock(start);
+    const reset = Date.parse("2026-11-10T00:00:04Z");
+    const requestTimes = [];
+    const githubClient = {
+      rest: {
+        repos: {
+          getContent: vi.fn(async () => {
+            requestTimes.push(clock.now());
+            if (requestTimes.length === 1) throw quotaError(reset / 1000);
+            return remoteFile(file, [record({ model: "small" })]);
+          }),
+        },
+      },
+    };
+    const result = await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient, quotaWait: clock });
+    expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(2);
+    expect(clock.sleep).toHaveBeenCalledExactlyOnceWith(reset + 1000 - start);
+    expect(requestTimes[1]).toBeGreaterThanOrEqual(reset);
+    expect(result.records).toEqual(decodedCatalog([record({ model: "small" })]).records);
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
+  });
+
+  it.each([
+    ["reset beyond the bounded wait", 3600, "reset_exceeds_budget", 0, 1],
+    ["unknown reset", 0, "unknown_reset", 0, 1],
+    ["renewed exhaustion", 60, "renewed_exhaustion", 1, 2],
+  ])("blocks activation with an explicit quota error on %s without an empty or checkout fallback", async (_case, resetOffset, reason, sleeps, requests) => {
+    const file = ".github/workflows/main.lock.yml";
+    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
+    const start = Date.parse("2026-11-09T23:58:53Z");
+    const clock = fakeClock(start);
+    const githubClient = { rest: { repos: { getContent: vi.fn(async () => Promise.reject(quotaError(resetOffset ? Math.floor(clock.now() / 1000) + resetOffset : 0))) } } };
+    const failure = metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient, quotaWait: { ...clock, maxWaitMs: 10 * 60 * 1000 } });
+    await expect(failure).rejects.toMatchObject({ code: "GH_AW_GITHUB_API_QUOTA_EXHAUSTED", reason, quota: { status: 403, resource: "core", limit: 15000, remaining: 0, used: 15000 } });
+    await expect(failure).rejects.toThrow("GitHub API quota exhausted");
+    expect(clock.sleep).toHaveBeenCalledTimes(sleeps);
+    expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(requests);
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({});
+  });
+
+  it("keeps the bounded retry for rate limits without quota exhaustion metadata", async () => {
+    const file = ".github/workflows/main.lock.yml";
+    const secondary = Object.assign(new Error("You have exceeded a secondary rate limit. API rate limit exceeded"), { status: 403, response: { status: 403, headers: {} } });
     const githubClient = {
       rest: {
         repos: {
           getContent: vi
             .fn()
-            .mockRejectedValueOnce(rateLimitError)
+            .mockRejectedValueOnce(secondary)
             .mockResolvedValue(remoteFile(file, [record({ model: "small" })])),
         },
       },
     };
-
     vi.useFakeTimers();
     try {
       const request = metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, workspace, { revision, githubClient });
       await vi.runAllTimersAsync();
-      const result = await request;
-
+      await request;
       expect(githubClient.rest.repos.getContent).toHaveBeenCalledTimes(2);
-      expect(result.records).toEqual(decodedCatalog([record({ model: "small" })]).records);
-      expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("reads the exact executing revision from the local git object store with zero Contents API requests", async () => {
+    const file = ".github/workflows/main.lock.yml";
+    const git = (...args) =>
+      execFileSync("git", ["-C", workspace, ...args], { stdio: ["ignore", "pipe", "ignore"] })
+        .toString()
+        .trim();
+    git("init", "-q");
+    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "small", tools: ["Read"] })]));
+    git("add", file);
+    git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "lock");
+    const executing = git("rev-parse", "HEAD");
+    // A replaced worktree file must never be used as the executing lock.
+    fs.writeFileSync(path.join(workspace, file), headers([record({ model: "forged" })]));
+    const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(quotaError(0)) } } };
+    await metadata.loadMarkdownMetadata(`owner/repo/${file}@refs/heads/main`, workspace, { repository: "owner/repo", revision: executing, githubClient });
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small", tools: ["Read"] });
   });
 
   it("merges matching caller checkout records for reusable workflows and preserves cache transport", async () => {

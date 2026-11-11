@@ -230,7 +230,7 @@ export default defineConfig({
     "/reference/safe-outputs-specification/": "/gh-aw/specs/safe-outputs-specification/",
     "/practices/organization-practices/": "/gh-aw/guides/using-at-scale/",
 
-    "/reference/awf-reflect/": "/gh-aw/experimental/awf-reflect/",
+    "/experimental/awf-reflect/": "/gh-aw/reference/awf-reflect/",
 
     // Patterns → Experimental
     "/patterns/correction-ops/": "/gh-aw/experimental/correction-ops/",
@@ -506,6 +506,7 @@ export default defineConfig({
             { label: "AI Engines (Agy)", link: "/reference/engines/agy/" },
             { label: "AI Engines (Custom)", link: "/reference/third-party-agent/" },
             { label: "AI Engines (Azure BYOK)", link: "/reference/azure-openai-byok/" },
+            { label: "AWF Reflect Route", link: "/reference/awf-reflect/" },
             { label: "Authentication", link: "/reference/auth/" },
             { label: "Authentication (Projects)", link: "/reference/auth-projects/" },
             { label: "Compilation Process", link: "/reference/compilation-process/" },
@@ -593,7 +594,6 @@ export default defineConfig({
             { label: "Agy Engine (experimental)", link: "/engines/agy/" },
             { label: "A/B Experiments", link: "/experimental/experiments/" },
             { label: "A/B Experiments (Spec)", link: "/experimental/experiments-specification/" },
-            { label: "AWF Reflect Route", link: "/experimental/awf-reflect/" },
             { label: "CorrectionOps", link: "/experimental/correction-ops/" },
             { label: "Drive Memory (Private Preview)", link: "/experimental/drive-memory/" },
             { label: "Private Repository Enclaves", link: "/experimental/enclaves/" },

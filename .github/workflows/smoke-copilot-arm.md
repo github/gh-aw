@@ -55,7 +55,7 @@ tools:
   playwright:
 runtimes:
   go:
-    version: "1.27.3"
+    version: "1.27.4"
 safe-outputs:
     allowed-domains: [default-safe-outputs]
     add-comment:

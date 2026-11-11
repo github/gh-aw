@@ -39,6 +39,8 @@ imports:
 sandbox:
   agent:
     id: awf
+    mounts:
+      - "/opt/gh-aw/formal-check:/opt/gh-aw/formal-check:ro"
 tools:
   cli-proxy: true
   github:
@@ -51,8 +53,8 @@ tools:
     max-file-size: 65536
   edit: null
   bash:
-    - "gofmt -w *"
-    - "go test *"
+    - "gofmt -w:*"
+    - "go test:*"
     - "find specs -type f -name \"*.md\" | sort"
     - "cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json"
     - "cat specs/*.md"
@@ -62,19 +64,22 @@ tools:
     - "find specs -type f -name \"*.tla\""
     - "find specs -type f -name \"*.kk\""
     - "sha256sum *"
-    - "mkdir -p /tmp/gh-aw/agent/formal-spec-verifier/*"
-    - "/tmp/gh-aw/agent/koka/bin/koka --version"
-    - "/tmp/gh-aw/agent/tla-tools/jre/bin/java -version"
-    - "timeout --kill-after=30s * /tmp/gh-aw/agent/tla-tools/jre/bin/java *"
-    - "cd specs/*"
-    - "timeout --kill-after=30s * /tmp/gh-aw/agent/koka/bin/koka *"
-    - "timeout --kill-after=30s * /tmp/gh-aw/agent/formal-spec-verifier/*"
-    - "cat /tmp/gh-aw/agent/formal-spec-verifier/*"
-    - "tee /tmp/gh-aw/agent/formal-spec-verifier/*"
+    - "node /opt/gh-aw/formal-check/formal_spec_check.cjs:*"
 
 steps:
     - name: Validate fixture-based TLA+ installer
       run: bash .github/scripts/install_tla_runtime_test.sh
+    - name: Stage verified Formal checker
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo install -d -m 0755 /opt/gh-aw/formal-check
+        sudo install -m 0444 "$GITHUB_WORKSPACE/.github/scripts/formal_spec_check.cjs" /opt/gh-aw/formal-check/formal_spec_check.cjs
+        printf '%s  %s\n' a66fed02c32af32390cffdccc6850cd28cfb454f74748b0e4842e3c87f0a6770 /opt/gh-aw/formal-check/formal_spec_check.cjs | sha256sum --check --strict
+        node -e 'process.stdout.write(JSON.stringify({ workspace: process.env.GITHUB_WORKSPACE }) + "\n")' | sudo tee /opt/gh-aw/formal-check/workspace.json > /dev/null
+        sudo chmod 0444 /opt/gh-aw/formal-check/workspace.json
+        # runner-guard:ignore RGS-018 -- Default-branch checker is SHA-256 verified before execution; AWF mounts its directory read-only.
 
 post-steps:
   - name: Upload formal verification evidence
@@ -105,6 +110,22 @@ features:
 # Daily Formal Spec Verifier 🔬
 
 Use only commands listed under `tools.bash`, one standalone command per call. Pipelines are permitted only when the complete pipeline is explicitly allowlisted. Do not append commands, redirections, or subshells to an allowed command. If a required operation is blocked, stop and report it instead of probing command variants.
+
+On the first tool denial, stop that operation and use a known permitted alternative:
+native file inspection for source and notes, or a standalone command below. Do not
+retry `go version`, `git log`, Python, or another ungranted discovery command.
+A workflow tool denial is not a GitHub authentication error; do not request new
+credentials or broader permissions. If a required capability has no permitted
+alternative, call `report_incomplete` before exhausting the three-denial budget.
+
+| Operation | Permitted standalone invocation |
+|---|---|
+| Read source or prior notes | Built-in file inspection tools, using the full path |
+| Check existing work | `gh pr list --state open --search "formal-spec" --json number,title` |
+| Format the generated test | `gofmt -w pkg/workflow/example_formal_test.go` (use the actual test path) |
+| Run focused tests | `go test ./pkg/workflow -run '^TestSelectedSpec' -count=1` (use the actual package and selector) |
+| Run a bounded formal check | `node /opt/gh-aw/formal-check/formal_spec_check.cjs sany specs/example.md Model.tla` (see the model contract below) |
+| Inspect formal-check evidence | Built-in file inspection on the exact `evidence.json` path printed by the helper |
 
 You are a formal methods expert and Go test engineer. Your mission is to:
 
@@ -218,27 +239,73 @@ Rules:
 ### Optional executable models and gradual adoption
 
 Inspect the selected spec's existing `.tla`/`.cfg` or `.kk` files and documented
-verification wrapper. Preserve established model paths, tool compatibility,
-expected negative controls, and finite bounds. Run a wrapper only if it can
-restrict execution to this spec within the limits below and its command is
-already allowed; otherwise use the declared direct tool commands. Never run the
-whole corpus. Report a pinned-tool incompatibility instead of downloading another tool.
+verification wrapper. Preserve tool compatibility, expected negative controls,
+and finite bounds. This workflow permits only the bounded formal-check helper
+below, not arbitrary repository wrappers or direct tool commands. If an existing
+model cannot use this contract without changing its semantics, keep it unchanged
+and report the incompatibility. Never run the whole corpus or download another tool.
 
 If no suitable model exists and modeling adds value, add a small model under
 `specs/formal/<spec-slug>/`, where the slug derives from the complete selected
-spec path relative to `specs/` (replace `/` with `-` and remove `.md`). Commit
+spec path relative to `specs/` (replace `/` with `-` and remove `.md`). The helper
+rejects colliding slugs (for example `a/b.md` and `a-b.md`); report those as
+incompatible rather than sharing a model directory. Commit
 the `.tla`/`.cfg` or `.kk` sources with the Go tests. Do not add markdown files
 there that would enter the spec rotation, port production code to Koka, or
 introduce a Koka dependency into the Go application's build.
 
-Use `JAVA_BIN`, `TLA2TOOLS_JAR`, and `KOKA_BIN` from the shared setup. Keep all
-transient outputs under `/tmp/gh-aw/agent/formal-spec-verifier/<spec-slug>/`,
-not in the committed model directory. Invoke tools through the declared bash
-patterns, with `timeout --kill-after=30s`: at most 2 minutes per compilation or
-TLC invocation, 30 seconds per Koka executable, and **8 minutes total** for all
-formal checks. TLC uses at most 2 workers and a 2 GiB Java heap. Leave at least
-10 minutes for Go tests and delivery; narrow the model before starting if these
-limits cannot accommodate it.
+Use `node /opt/gh-aw/formal-check/formal_spec_check.cjs` with one operation per call:
+
+```text
+node /opt/gh-aw/formal-check/formal_spec_check.cjs sany specs/<selected-spec>.md Model.tla
+node /opt/gh-aw/formal-check/formal_spec_check.cjs tlc specs/<selected-spec>.md Model.tla Model.cfg
+node /opt/gh-aw/formal-check/formal_spec_check.cjs koka specs/<selected-spec>.md main.kk
+```
+
+Replace the specification path and model basenames with actual files. The helper
+derives `<spec-slug>` from the complete selected spec path, accepts models only
+under `specs/formal/<spec-slug>/`, and rejects path traversal, symlinks, unknown
+operations, and extra arguments. Do not edit the helper. Models needing different
+paths or unsupported flags must be reported as incompatible, not run through an
+ungranted `cd`, `timeout`, interpreter, or wrapper.
+
+The default-branch setup verifies the staged helper's checksum and records the
+workspace in its adjacent read-only configuration. AWF binds the entire helper
+directory read-only; the allowlist does not grant the checkout copy. This protects
+the helper/configuration, not mutable model, toolchain, or budget files.
+
+The helper supports single-file models only. TLA+ `INSTANCE` and local `EXTENDS`
+dependencies are unsupported; the only allowed `EXTENDS` modules are the pinned
+standard modules Naturals, Integers, Reals, Sequences, FiniteSets, Bags, TLC, TLCExt,
+and Randomization. Koka models must not contain `import`, `extern`, or `include`
+tokens (even in comments/strings). Report other dependency contracts as
+incompatible before running. Validated model/configuration bytes are hashed and
+copied into a fresh inputs directory; execution uses those copies, not the
+mutable checkout, so neighboring files cannot shadow pinned standard modules.
+
+The helper uses only the pinned tool paths from shared setup. It runs from the
+fresh inputs directory, creates fresh evidence/build directories under
+`/tmp/gh-aw/agent/formal-spec-verifier/<spec-slug>/`, and captures tool versions,
+source hashes, exact arguments, raw process statuses, validation statuses, and bounded, redacted stdout/stderr
+previews in each run's `evidence.json`. Use built-in file inspection on the exact
+`evidence.json` path printed by the helper, not a shell glob over slug directories.
+Each child gets a fixed system toolchain `PATH`, locale, and timezone, plus fresh
+`HOME` and `TMPDIR` directories; no agent credentials or runtime hooks are inherited.
+Child output capture uses a 64 KiB `maxBuffer`; excessive output fails the check.
+Persisted previews are limited to 8 KiB per stream with truncation flags, and known
+sensitive inherited values are redacted from previews and process errors. Raw logs
+are not persisted. This environment cleanup is not filesystem isolation; do not
+read credentials or other agent files from models. The helper enforces
+`timeout --kill-after=30s`, at most 2 minutes per compilation or TLC invocation,
+30 seconds per Koka executable, and a shared **8-minute total** formal-check
+budget. TLC uses 2 workers and a 2 GiB Java heap. Leave at least 10 minutes for Go
+tests and delivery; narrow the model before starting if these limits cannot fit.
+The helper reserves the entire remaining shared budget before starting children
+and refunds unused time only after confirmed child completion. An interrupted
+check or uncertain child termination conservatively exhausts the remaining
+budget. Live lock owners cause an explicit wait message; dead owners are
+recovered without deleting lock generations or refunding interrupted work.
+Never remove or edit budget/lock files; report exhaustion instead.
 
 For TLA+, run SANY and the documented TLC configuration, retaining exhaustion
 status, checked invariants/temporal properties, state counts, and counterexamples.
@@ -246,12 +313,16 @@ For Koka, compile from the model's directory with the build directory and output
 executable under the transient results path, then execute its assertions and
 deterministic handlers. Include an intentional negative control for new models
 and check its expected diagnostic/verdict, not just a nonzero exit code. Confirm
-the sandbox has the native C compiler and headers needed by Koka's backend.
+Koka's native C compiler/header availability through the helper's compile
+validation status and captured diagnostic previews. Do not run `which`, compiler
+version probes, or header-discovery commands; report a failed compile instead.
 Simulate external effects with deterministic handlers; do not use live GitHub
 mutations, services, or credentials as model fixtures.
 
 Record source/config hashes, tool versions, exact commands, exit statuses,
-bounds, verdicts, and complete sanitized logs in that results directory. Link
+bounds, verdicts, and the helper's bounded, redacted output previews in that results directory.
+Do not treat a truncated preview as complete evidence; narrow the model or report
+the evidence limitation. Link
 the `formal-spec-verifier-<run_id>-<run_attempt>` artifact and summarize evidence
 in the PR's Formal Model and Usage sections. Distinguish expected negative
 controls from genuine violations, timeouts, parse errors, and tooling failures.
