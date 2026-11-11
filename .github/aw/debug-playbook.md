@@ -10,7 +10,7 @@ Do not dispatch workflows or execute artifacts; keep secrets/prompts/config/reas
 
 ## Start here
 
-Preserve `RUN_URL`, including its fragment; derive `REPO` (`HOST/OWNER/REPO`)/`RUN_ID`. Qualify bare IDs.
+Preserve `RUN_URL`, including its fragment; derive `REPO` (`HOST/OWNER/REPO`)/`RUN_ID`.
 
 ```bash
 : "${RUN_URL:?Set URL}"
@@ -45,11 +45,11 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 | `threat_detection_job_failed`, `engine_step_failed` | Detector/evals step, first error, execution state. | Fix engine/proxy startup; failed/green job != clean verdict/evals. |
 | `threat_detected` | Private structured verdict/artifact. | Stop unsafe effects; follow [security guidance](debug-security-review.md). Never publish payloads. |
 | `high_token_usage`, `many_iterations` | Tokens/cache/turns, repeated calls. | [Optimize](optimize-agentic-workflow.md) scope/context/loops before raising caps. |
-| `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic` | Assessment, deterministic alternatives. | Script mechanical work; retain necessary judgment. |
-| `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work; preserve outcomes. |
-| `agentic_model_downgrade_available` | Capability/API needs; measured alternatives. | Benchmark; no automatic downgrade. |
-| `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory, not always error. |
-| `workflow_succeeded` | Downstream effect. | Verify effect; conclusion alone insufficient. |
+| `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic` | Assessment, deterministic alternatives. | Script mechanical work. |
+| `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work. |
+| `agentic_model_downgrade_available` | Capability/API needs; alternatives. | Benchmark; no auto-downgrade. |
+| `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory. |
+| `workflow_succeeded` | Downstream effect. | Verify effect. |
 
 ## Agent, model, and proxy classifications
 
@@ -71,12 +71,12 @@ Prose isn't native error.
 | `effective_tokens_limit_exceeded` | Effective tokens; prompt/turn growth. | Reduce context/iterations; retain guard. |
 | `permission_denied_limit_exceeded` | Denied calls; allowed tools. | Stop denied calls; use allowed tools, not larger denial budget. |
 | `model_policy_violation`, `content_filter` | Provider/proxy reason; endpoint mismatch separately. | Correct request within policy; no credential swap/bypass. |
-| `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone != authentication failure. |
-| `capi_quota_exceeded_error` | Native 429; exhausted retries. | Respect quota/reset; no retry storm. |
+| `awf_api_proxy_blocking_requests` | Budget/policy/filter guard. | Address guard; blocking != auth failure. |
+| `capi_quota_exceeded_error` | Native 429; retries. | Respect quota/reset; no retry storm. |
 | `capi_server_error`, `engine_outage`, `infrastructure_error` | Exhausted native 5xx/infrastructure timeline. | Report cause; bounded backoff, no unapproved redispatch. |
 | `agentic_engine_timeout` | Step/SDK budget vs post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone != timeout. |
 | `sandbox_runtime_crash` | Exit/signal, resources, runtime revision. | Fix crash/resources; retain redacted diagnostic/version. |
-| `goal_already_active` | Unfinished goal. | Update/complete existing goal; no duplicate. |
+| `goal_already_active` | Unfinished goal. | Complete existing goal. |
 | `shell_expansion_guard_rejected` | Private denied command; allowed syntax. | Use allowed tools; no dangerous expansion/obfuscation/bypass. |
 | `ERR_MODEL_PIN_REFLECT_REQUIRED` | Missing `--reflect`. | Supply same-run reflection. |
 
@@ -85,8 +85,7 @@ Prose isn't native error.
 Read `engine_config` ([start](#start-here)). Pi `not advertised`:
 confirmed absence → `model_unavailable`; incomplete/invalid/ambiguous evidence →
 `model_availability_unknown`. No auto-substitution.
-Inspect job/step URLs/lines; missing context:
-`gh run view "$RUN_ID" --repo "$REPO" --log`.
+Missing context: `gh run view "$RUN_ID" --repo "$REPO" --log`.
 
 ### Inspect cached models
 
@@ -97,7 +96,6 @@ gh aw models --repo "$REPO" --logs-dir "$EVIDENCE" --refresh-count 5
 ```
 
 `catalog`/`aliases`/`observed` differ; aggregates != same-run access.
-Refresh downloads artifacts.
 
 ### Verify exact same-run inventory
 
@@ -114,9 +112,9 @@ jq --arg model "$MODEL" --arg provider "$PROVIDER" '
   ]}' "$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json"
 ```
 
-Strip provider prefix/query; retain dated/version IDs.
-Resolve aliases (`github` → `copilot`); inspect `auto`/`opus`
-`model_aliases`/harness resolution. Alias != concrete ID; `routing_models` != inventory.
+Strip provider prefix/query; keep dated IDs.
+Resolve aliases (`github` → `copilot`); inspect `auto`/`opus` `model_aliases`/harness.
+Alias != concrete ID; `routing_models` != inventory.
 
 | Evidence | Meaning |
 | --- | --- |
@@ -126,8 +124,8 @@ Resolve aliases (`github` → `copilot`); inspect `auto`/`opus`
 | ID present; inference rejected | Inspect request model/API/status/policy/auth error. |
 
 `token-usage.jsonl`: empty file + fatal startup rejection supports no inference;
-missing file: unknown. Missing/expired/denied artifacts: unavailable.
-If audit fails, target `gh run download` at `agent`/`info`.
+missing file: unknown. Missing/expired artifacts: unavailable.
+If audit fails, `gh run download` `agent`/`info`.
 
 ### Compare one success
 
@@ -138,13 +136,10 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
 ```
 
 First run = reference. Compare model/provider, credential source (names only),
-revision/runtimes/inventory; success != identity.
+revision/runtimes/inventory.
 Different inventories/same AWF version: not proof of regression/retirement.
-Evidence required for removal time/cause.
 Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
-
 Absent pin: verify same-provider API/capabilities/policy.
-Authorized patch: edit source/recompile; compilation cannot test inference.
 
 ## Completion and safe-output errors
 
