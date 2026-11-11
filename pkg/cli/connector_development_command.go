@@ -96,7 +96,7 @@ func NewConnectorCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&options.root, "root", "", "Repository root (default: detected Git root, otherwise current directory)")
 	cmd.Flags().StringVar(&options.file, "file", "", "Explicit repository-owned AW Markdown declaration or normal-import wrapper within --root")
-	cmd.Flags().StringVar(&options.repo, "repo", "", "Check missing setup secret/variable names in OWNER/REPO (read-only; setup only; omit for offline guidance)")
+	cmd.Flags().StringVarP(&options.repo, "repo", "r", "", "Check missing setup secret/variable names in OWNER/REPO (read-only; setup only; omit for offline guidance)")
 	cmd.Flags().StringArrayVar(&options.inputs, "input", nil, "Import-schema binding name=JSON, e.g. 'reader-secret=\"DEV_READ_TOKEN\"' (repeatable)")
 	cmd.Flags().StringArrayVar(&options.grants, "grant", nil, "Exact resource allowlist resource=JSON-array, e.g. 'issues=[\"ISSUE-1\"]' (repeatable)")
 	cmd.Flags().StringVar(&options.phase, "phase", "", "Test phase: agent, context, safe-output, or offline trigger (required for test; credential phase for setup)")

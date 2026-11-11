@@ -443,6 +443,7 @@ func TestCommandErrorHandling(t *testing.T) {
 		err := rootCmd.Execute()
 
 		assert.Error(t, err, "invalid command should produce an error")
+		assert.ErrorContains(t, err, `unknown command "invalid-command" for "gh aw"`)
 
 		// With RunE and SilenceErrors, errors are returned but not automatically printed
 		// The main() function is responsible for formatting and printing errors

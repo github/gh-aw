@@ -168,6 +168,13 @@ func TestConnectorDevelopmentSetup(t *testing.T) {
 	require.NotContains(t, output, "DEV_WRITE_TOKEN")
 }
 
+func TestConnectorDevelopmentRepoFlagHasShortAlias(t *testing.T) {
+	flag := NewConnectorCommand().Flags().Lookup("repo")
+	require.NotNil(t, flag)
+	require.Equal(t, "r", flag.Shorthand)
+	require.Contains(t, flag.Usage, "read-only; setup only")
+}
+
 func TestConnectorDevelopmentSetupStability(t *testing.T) {
 	root := t.TempDir()
 	writeDevelopmentConnector(t, root, strings.Replace(developmentConnectorFixture, "experimental: true", "experimental: false", 1))

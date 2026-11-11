@@ -91,7 +91,7 @@ func addEpisodeRetrievalFlags(cmd *cobra.Command, opts *EpisodeRetrievalOptions,
 	flags.IntVar(&opts.MaxAPIRequests, "max-api-requests", opts.MaxAPIRequests, "Maximum GitHub REST requests for the entire retrieval")
 	flags.DurationVar(&opts.Timeout, "timeout", opts.Timeout, "Wall-clock retrieval deadline")
 	flags.StringVarP(&opts.OutputDir, "output", "o", opts.OutputDir, "Directory for compact artifacts")
-	flags.BoolVar(jsonOutput, "json", false, "Output the standard logs report with retrieval bounds and gaps as JSON")
+	flags.BoolVarP(jsonOutput, "json", "j", false, "Output the standard logs report with retrieval bounds and gaps as JSON")
 }
 
 func renderEpisodeRetrieval(w io.Writer, data LogsData) error {
