@@ -59,7 +59,16 @@ steps:
       # run.py imports AgentRx from the pinned checkout directly. Sync its complete
       # dependency lock without executing a source build or resolving new versions.
       uv pip sync --require-hashes --only-binary=:all: --python "$AGENTRX_HOME/.venv/bin/python" "${GITHUB_WORKSPACE}/.github/workflows/requirements-agentrx.txt"
+      uv pip check --python "$AGENTRX_HOME/.venv/bin/python"
+      PYTHONPATH="$AGENTRX_HOME/src" "$AGENTRX_HOME/.venv/bin/python" -c 'import agentrx.pipeline.globals, agentrx.ir.trajectory_ir, agentrx.invariants.domain_registry, pydantic, pydantic_core'
       "$AGENTRX_HOME/.venv/bin/python" "$AGENTRX_HOME/src/run.py" --help >/dev/null
+      SMOKE_DIR="$AGENTRX_HOME/smoke"
+      mkdir -p "$SMOKE_DIR"
+      cat > "$SMOKE_DIR/trajectory.md" <<'EOF'
+      ## ***user*** #0
+      AgentRx dependency compatibility smoke test
+      EOF
+      "$AGENTRX_HOME/.venv/bin/python" "$AGENTRX_HOME/src/run.py" "$SMOKE_DIR/trajectory.md" --stage ir --run-dir "$SMOKE_DIR/run"
 safe-outputs:
   mentions: false
   allowed-github-references: []

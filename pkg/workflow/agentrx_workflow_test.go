@@ -30,7 +30,10 @@ func TestAgentRxSetupUsesHashedDependencyLock(t *testing.T) {
 	setup := frontmatter.Steps[0].Run
 	require.Contains(t, setup, `uv pip sync --require-hashes --only-binary=:all: --python "$AGENTRX_HOME/.venv/bin/python" "${GITHUB_WORKSPACE}/.github/workflows/requirements-agentrx.txt"`)
 	require.NotContains(t, setup, "uv pip install", "installing the source project dynamically resolves build and runtime dependencies")
+	require.Contains(t, setup, `uv pip check --python "$AGENTRX_HOME/.venv/bin/python"`)
+	require.Contains(t, setup, `PYTHONPATH="$AGENTRX_HOME/src" "$AGENTRX_HOME/.venv/bin/python" -c 'import agentrx.pipeline.globals, agentrx.ir.trajectory_ir, agentrx.invariants.domain_registry, pydantic, pydantic_core'`)
 	require.Contains(t, setup, `"$AGENTRX_HOME/.venv/bin/python" "$AGENTRX_HOME/src/run.py" --help`)
+	require.Contains(t, setup, `"$AGENTRX_HOME/src/run.py" "$SMOKE_DIR/trajectory.md" --stage ir --run-dir "$SMOKE_DIR/run"`)
 
 	compiled, err := os.ReadFile("../../.github/workflows/daily-agentrx-trace-optimizer.lock.yml")
 	require.NoError(t, err)
@@ -53,6 +56,9 @@ func TestAgentRxSetupUsesHashedDependencyLock(t *testing.T) {
 
 	lock, err := os.ReadFile("../../.github/workflows/requirements-agentrx.txt")
 	require.NoError(t, err)
+	require.Contains(t, string(lock), "pydantic==2.14.1")
+	require.Contains(t, string(lock), "pydantic-core==2.50.1 \\\n    --hash=sha256:93ba4e9d8210d941c200431a56b2c0400b131865947903937ed3ec5404307d2e")
+	require.NotContains(t, string(lock), "pydantic-core==2.50.2")
 	revision := regexp.MustCompile(`fetch --depth 1 origin ([0-9a-f]{40})`).FindStringSubmatch(setup)
 	require.Len(t, revision, 2, "AgentRx source must remain pinned to an immutable commit")
 	require.Contains(t, string(lock), "# AgentRx "+revision[1]+" runtime dependencies.")
