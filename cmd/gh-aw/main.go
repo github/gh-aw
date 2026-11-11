@@ -776,19 +776,19 @@ func configureRootCommand() {
 }
 
 func rootCommandArgs(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return nil
-	}
-
-	arg := args[0]
-	suggestion := ""
-	if !cmd.DisableSuggestions {
-		if suggestions := cmd.SuggestionsFor(arg); len(suggestions) > 0 {
-			suggestion = "\n\nDid you mean this?\n\t" + strings.Join(suggestions, "\n\t") + "\n"
+	if len(args) > 0 {
+		arg := args[0]
+		suggestion := ""
+		if !cmd.DisableSuggestions {
+			if suggestions := cmd.SuggestionsFor(arg); len(suggestions) > 0 {
+				suggestion = "\n\nDid you mean this?\n\t" + strings.Join(suggestions, "\n\t") + "\n"
+			}
 		}
+
+		return fmt.Errorf("unknown command %q for %q%s", arg, constants.CLIExtensionPrefix, suggestion)
 	}
 
-	return fmt.Errorf("unknown command %q for %q%s", arg, constants.CLIExtensionPrefix, suggestion)
+	return nil
 }
 
 func createCommandSet() commandSet {
