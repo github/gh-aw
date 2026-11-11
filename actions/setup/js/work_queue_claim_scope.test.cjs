@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
-import { normalizeAssignment, normalizeClaimScope, normalizeRuntimeMessage, assertClaimAuthorized, withClaimExecution, claimArtifactPath, scopedArtifactFilename } from "./work_queue_claim_scope.cjs";
+import { normalizeAssignment, normalizeClaimScope, normalizeRuntimeMessage, assertClaimAuthorized, withClaimExecution, claimArtifactPath, scopedArtifactFilename, claimDeliveryReceipt } from "./work_queue_claim_scope.cjs";
 import sharedChecks from "./work_queue_claim_scope_checks.cjs";
 
 const assignment = count => ({
@@ -15,6 +15,20 @@ const assignment = count => ({
 });
 
 describe("immutable Claim scope", () => {
+  it("rebinds only explicitly durable receipts to their active Claim", async () => {
+    const original = assignment(1);
+    const claim = original.claims[0];
+    await withClaimExecution({ assignment: original, claim_handle: "h1" }, async () => {
+      const input = { claim, result: { entry: { verifier: "builtin", receipt: { number: 123, claim_handle: "foreign" } } } };
+      const receipt = { number: 456 };
+      for (const receipts of [new WeakMap([[input.result, receipt]]), () => receipt]) {
+        expect(claimDeliveryReceipt(input, "builtin", receipts)).toBe(receipt);
+        expect(claimDeliveryReceipt({ ...input, durable: true }, "asset", receipts)).toBeUndefined();
+        expect(claimDeliveryReceipt({ ...input, durable: true }, "builtin", receipts)).toMatchObject({ number: 123, claim_handle: "h1", claim_id: claim.claim_id });
+      }
+    });
+  });
+
   it("preserves unscoped message identity unless normalizing a historical alias", () => {
     vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "false");
     try {

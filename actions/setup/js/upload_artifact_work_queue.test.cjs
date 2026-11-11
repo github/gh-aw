@@ -140,6 +140,35 @@ describe("upload_artifact actual disabled/single/multi-Claim entrypoints", () =>
     expect((await f.execute("h1", () => runtime.verifyArtifactDelivery({ claim: f.fixture.assignment.claims[0], result: { ...result }, github: {} }))).verified).toBe(false);
   });
 
+  it("verifies serialized artifact receipts after module reload and rejects incomplete or changed evidence", async () => {
+    const f = setup();
+    await f.stage("h1");
+    await f.complete();
+    const handler = await f.execute("h1", () => runtime.main({}));
+    const result = await f.execute("h1", () => handler({ type: "upload_artifact", path: "report.txt", name: "report" }));
+    const claim = f.fixture.assignment.claims[0];
+    const receipt = JSON.parse(JSON.stringify(await f.execute("h1", () => runtime.durableArtifactReceipt(result, claim))));
+    for (const key of ["dispatch_id", "claim_id", "work_id", "claim_handle"]) expect(receipt).not.toHaveProperty(key);
+    expect(await f.execute("h1", () => runtime.durableArtifactReceipt({ ...result }, claim))).toBeNull();
+    expect(await f.execute("h1", () => runtime.durableArtifactReceipt(result, { ...claim, claim_id: "foreign" }))).toBeNull();
+    delete require.cache[require.resolve("./upload_artifact.cjs")];
+    runtime = require("./upload_artifact.cjs");
+    const data = { id: 101, name: result.artifactName, expired: false, workflow_run: { id: 42 }, digest: `sha256:${digest}`, size_in_bytes: 6 };
+    const read = vi.fn(async () => ({ data }));
+    const entry = { index: 0, type: "upload_artifact", verifier: "artifact", receipt };
+    const verify = (overrides = {}) => f.execute("h1", () => runtime.verifyArtifactDelivery({ claim, durable: true, result: { entry }, github: { rest: { actions: { getArtifact: read } } }, ...overrides }), { closedEffectChannel: true });
+    expect((await verify()).verified).toBe(true);
+    expect((await verify({ durable: false, result })).verified).toBe(false);
+    for (const key of ["repository", "run_id", "name", "id", "digest", "url"]) {
+      const incomplete = { ...receipt };
+      delete incomplete[key];
+      expect((await verify({ result: { entry: { ...entry, receipt: incomplete } } })).verified).toBe(false);
+    }
+    expect((await verify({ result: { entry: { ...entry, verifier: "wrong" } } })).verified).toBe(false);
+    data.digest = `sha256:${"c".repeat(64)}`;
+    expect((await verify()).verified).toBe(false);
+  });
+
   it("authorizes Claim artifact uploads on the configured enterprise host", async () => {
     process.env.GITHUB_SERVER_URL = "https://contoso.example";
     const f = setup(1, "contoso.example");

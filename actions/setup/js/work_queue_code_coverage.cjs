@@ -16,6 +16,8 @@ const {
   withClaimResourceEffects,
   createClaimResourceVerification,
   withClaimResourceVerification,
+  claimDeliveryReceipt,
+  durableReceipt,
 } = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget, canonicalResourceTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
@@ -103,9 +105,35 @@ async function main(config = {}, suppliedClient) {
 }
 
 async function verifyCodeCoverageDelivery(options) {
-  const { claim, result, github } = options;
+  const receipt = claimDeliveryReceipt(options, "code_coverage", privateReceipts);
+  return verifyCodeCoverageReceipt(options, receipt);
+}
+
+function validCodeCoverageReceipt(receipt, claim) {
+  return (
+    receiptMatchesClaim(receipt, claim) &&
+    ["repository", "revision", "ref", "path", "language", "label", "report_id"].every(key => typeof receipt[key] === "string" && receipt[key].length > 0) &&
+    /^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(receipt.repository) &&
+    /^[a-f0-9]{64}$/.test(receipt.sha256) &&
+    /^[A-Za-z0-9_-]{1,256}$/.test(receipt.report_id) &&
+    Number.isSafeInteger(receipt.timeout) &&
+    receipt.timeout >= 0 &&
+    receipt.timeout <= 600 &&
+    receipt.authorityResource?.repository === receipt.repository &&
+    receipt.authorityResource.ref === receipt.ref &&
+    receipt.authorityResource.path === receipt.path
+  );
+}
+
+function durableCodeCoverageReceipt(result, claim) {
   const receipt = result && privateReceipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || !Number.isSafeInteger(receipt.timeout) || receipt.timeout < 0 || receipt.timeout > 600) return { verified: false };
+  if (!validCodeCoverageReceipt(receipt, claim)) return null;
+  return durableReceipt(receipt);
+}
+
+async function verifyCodeCoverageReceipt(options, receipt) {
+  const { claim, github } = options;
+  if (!validCodeCoverageReceipt(receipt, claim)) return { verified: false };
   const [owner, repo] = receipt.repository.split("/");
   const deadline = Date.now() + receipt.timeout * 1000;
   let status;
@@ -126,4 +154,4 @@ async function verifyCodeCoverageDelivery(options) {
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
-module.exports = { main, verifyCodeCoverageDelivery };
+module.exports = { main, verifyCodeCoverageDelivery, durableCodeCoverageReceipt };

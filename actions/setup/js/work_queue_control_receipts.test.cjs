@@ -1,6 +1,14 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
-import { claimControlReceipts, controlReceiptForRequest, readClaimQueueControls, isTrustedClaimQueueControlInventory, isUncommittedClaimDispatchNext, verifyClaimQueueControl } from "./work_queue_control_receipts.cjs";
+import {
+  claimControlReceipts,
+  controlReceiptForRequest,
+  readClaimQueueControls,
+  isTrustedClaimQueueControlInventory,
+  isUncommittedClaimDispatchNext,
+  verifyClaimQueueControl,
+  verifyCommittedClaimQueueControl,
+} from "./work_queue_control_receipts.cjs";
 import { intentContext, acceptedSubmissionParameters } from "./work_queue_dispatch.cjs";
 import { normalizeDispatchParameters, normalizeSubmitParameters, requestForIntent } from "./work_queue_intents.cjs";
 import { compactTransactions, replayTransactions } from "./work_queue_replay.cjs";
@@ -162,6 +170,18 @@ describe("independent Claim-scoped queue control readback", () => {
     expect(await verifyClaimQueueControl({ ...options, message: changed, inventory })).toMatchObject({ verified: false, effects: "unknown", reason: "queue_control_request_mismatch" });
     expect(await verifyClaimQueueControl({ ...options, message: { ...message, intent_id: "never-accepted" }, inventory })).toMatchObject({ verified: false, effects: "unknown", reason: "queue_control_not_committed" });
     expect((await readClaimQueueControls({ ...options, claim_handle: "h2" })).controls).toEqual([]);
+  });
+
+  it("verifies durable control IDs only against fresh trusted same-Claim inventory", async () => {
+    const { options, request } = await setup();
+    const inventory = await readClaimQueueControls({ ...options, claim_handle: "h1" });
+    const input = { ...options, claim_handle: "h1", request_id: request.id, inventory };
+    expect(await verifyCommittedClaimQueueControl(input)).toMatchObject({ verified: true, claim_handle: "h1", resource: { id: inventory.controls[0].commit_id }, evidence: inventory.controls[0] });
+    await expect(verifyCommittedClaimQueueControl({ ...input, inventory: JSON.parse(JSON.stringify(inventory)) })).rejects.toThrow(/untrusted/);
+    await expect(verifyCommittedClaimQueueControl({ ...input, claim_handle: "h2" })).rejects.toThrow(/untrusted/);
+    expect(await verifyCommittedClaimQueueControl({ ...input, request_id: "missing" })).toMatchObject({ verified: false, effects: "unknown" });
+    const siblingInventory = await readClaimQueueControls({ ...options, claim_handle: "h2" });
+    expect(await verifyCommittedClaimQueueControl({ ...input, claim_handle: "h2", inventory: siblingInventory })).toMatchObject({ verified: false, effects: "unknown" });
   });
 
   it("brands even zero-control inventories against the complete immutable assignment and original Claim", async () => {
