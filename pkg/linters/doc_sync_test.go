@@ -32,6 +32,7 @@ var notYetEnforced = map[string]string{
 	"deferrerrorunchecked":         "new deferred-error analyzer needs an enforcement-readiness audit before native and WebAssembly CI enable it",
 	"errorfwrapv":                  "requires an enforcement audit after the recent false-positive fix (#51928)",
 	"errormessage":                 "dedicated lint-error-messages CI job is intentionally advisory (continue-on-error per #54800)",
+	"errorsnewerrorstring":         "requires an enforcement-readiness audit before CI enables it",
 	"excessivefuncparams":          "existing production violations need remediation before enforcement; nolint suppression already works",
 	"filepathwalkpreferwalkdir":    "existing filepath.Walk calls need remediation before CI enforcement",
 	"formatintitoa":                "existing FormatInt conversions need remediation before CI enforcement",
