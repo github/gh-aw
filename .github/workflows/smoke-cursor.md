@@ -36,7 +36,7 @@ network:
     - go
 runtimes:
   go:
-    version: "1.27.3"
+    version: "1.27.4"
 evals:
   - id: native_mcp_prs
     question: Does the output show exactly two merged PR titles and numbers retrieved through native GitHub MCP rather than a CLI substitute?

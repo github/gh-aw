@@ -64,7 +64,7 @@ func TestAiderDailyGoValidationContracts(t *testing.T) {
 			parts := strings.SplitN(string(content), "---", 3)
 			require.Len(t, parts, 3)
 			require.NoError(t, yaml.Unmarshal([]byte(parts[1]), &frontmatter))
-			assert.Equal(t, "1.27.3", frontmatter.Runtimes["go"].Version)
+			assert.Equal(t, "1.27.4", frontmatter.Runtimes["go"].Version)
 			assert.NotContains(t, parts[2], "|| safeoutputs noop")
 			assert.NotContains(t, parts[2], "|| true")
 			assert.NotContains(t, parts[2], "GOMODCACHE=/tmp/")
