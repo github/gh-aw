@@ -51,6 +51,7 @@ func (c *Compiler) addActivationCommandAndLabelOutputs(ctx *activationJobBuildCo
 		compilerActivationJobLog.Print("Adding remove-trigger-label step for label-command workflow")
 		ctx.steps = append(ctx.steps, "      - name: Remove trigger label\n")
 		ctx.steps = append(ctx.steps, fmt.Sprintf("        id: %s\n", constants.RemoveTriggerLabelStepID))
+		ctx.steps = appendDailyAICQuotaStepIf(ctx.steps, data)
 		ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
 		ctx.steps = append(ctx.steps, "        env:\n")
 		labelNamesJSON, err := json.Marshal(data.LabelCommand)

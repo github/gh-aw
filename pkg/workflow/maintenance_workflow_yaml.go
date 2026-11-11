@@ -167,14 +167,12 @@ const maintenanceLedgerInputDescription = "Ledger name to compact when operation
 // buildMaintenanceDispatchInputsYAML returns the workflow_dispatch trigger block.
 // When compaction-enabled ledgers exist, it adds the compact_ledger operation and a ledger input.
 func buildMaintenanceDispatchInputsYAML(hasLedgers, hasCacheMemory bool) string {
-	ledgerOption := ""
-	ledgerInput := ""
-	cacheOption := ""
-	if hasCacheMemory {
-		cacheOption = "          - 'clean_cache_memories'\n"
+	var operationOptions strings.Builder
+	for _, operation := range maintenanceOperationNames(hasCacheMemory, hasLedgers) {
+		operationOptions.WriteString("          - '" + operation + "'\n")
 	}
+	ledgerInput := ""
 	if hasLedgers {
-		ledgerOption = "          - '" + maintenanceCompactLedgerOperation + "'\n"
 		ledgerInput = `      ledger:
         description: '` + maintenanceLedgerInputDescription + `'
         required: false
@@ -191,36 +189,20 @@ func buildMaintenanceDispatchInputsYAML(hasLedgers, hasCacheMemory bool) string 
         default: '%[1]s'
         options:
           - '%[1]s'
-          - 'disable'
-          - 'enable'
-          - 'update'
-          - 'upgrade'
-          - 'safe_outputs'
-          - 'create_labels'
-          - 'activity_report'
-          - 'close_agentic_workflows_issues'
-%[4]s          - 'update_pull_request_branches'
-          - 'validate'
-          - 'forecast'
 %[2]s      run_url:
         description: 'Run URL or run ID to replay safe outputs from (e.g. https://github.com/owner/repo/actions/runs/12345 or 12345). Required when operation is safe_outputs.'
         required: false
         type: string
         default: ''
-%[3]s`, maintenanceNoOperationValue, ledgerOption, ledgerInput, cacheOption)
+%[3]s`, maintenanceNoOperationValue, operationOptions.String(), ledgerInput)
 }
 
 // buildMaintenanceWorkflowCallYAML returns the workflow_call trigger block.
 func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue string, hasLedgers, hasCacheMemory bool, config *MaintenanceConfig) string {
-	operations := "disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues"
-	if hasCacheMemory {
-		operations += ", clean_cache_memories"
-	}
-	operations += ", update_pull_request_branches, validate, forecast"
+	operations := strings.Join(maintenanceOperationNames(hasCacheMemory, hasLedgers), ", ")
 	completedOperation := maintenanceCompletedOperationExpression(hasLedgers, hasCacheMemory, config)
 	ledgerInput := ""
 	if hasLedgers {
-		operations += ", " + maintenanceCompactLedgerOperation
 		ledgerInput = `      ledger:
         description: '` + maintenanceLedgerInputDescription + `'
         required: false
@@ -248,6 +230,27 @@ func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLVal
         description: '` + appliedRunURLDescription + `'
         value: ` + appliedRunURLValue + `
 `
+}
+
+func maintenanceOperationNames(hasCacheMemory, hasLedgers bool) []string {
+	operations := []string{
+		"disable",
+		"enable",
+		"update",
+		"upgrade",
+		"safe_outputs",
+		"create_labels",
+		"activity_report",
+		"close_agentic_workflows_issues",
+	}
+	if hasCacheMemory {
+		operations = append(operations, "clean_cache_memories")
+	}
+	operations = append(operations, "update_pull_request_branches", "validate", "forecast")
+	if hasLedgers {
+		operations = append(operations, maintenanceCompactLedgerOperation)
+	}
+	return operations
 }
 
 func maintenanceCompletedOperationExpression(hasLedgers, hasCacheMemory bool, config *MaintenanceConfig) string {

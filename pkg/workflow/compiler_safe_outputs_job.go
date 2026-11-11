@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
@@ -531,16 +532,9 @@ type safeOutputsHandlerOutputsAndActionState struct {
 // processed by the consolidated handler manager step (as opposed to a dedicated job/step).
 func hasHandlerManagerTypes(data *WorkflowData) bool {
 	return isWorkQueueParticipant(data) ||
+		data.SafeOutputs.CreateSecurityAdvisory != nil ||
+		data.SafeOutputs.AddSecurityAdvisoryComment != nil ||
 		data.SafeOutputs.CreateIssues != nil ||
-		data.SafeOutputs.CreateWorkItems != nil ||
-		data.SafeOutputs.UpdateWorkItems != nil ||
-		data.SafeOutputs.CommentOnWorkItems != nil ||
-		data.SafeOutputs.AssignWorkItems != nil ||
-		data.SafeOutputs.LinkWorkItems != nil ||
-		data.SafeOutputs.UploadWorkItemAttachments != nil ||
-		data.SafeOutputs.LinearCreateIssue != nil ||
-		data.SafeOutputs.LinearAddComment != nil ||
-		data.SafeOutputs.LinearUpdateIssue != nil ||
 		data.SafeOutputs.AddComments != nil ||
 		data.SafeOutputs.CreateDiscussions != nil ||
 		data.SafeOutputs.CreateProjectStatusUpdates != nil ||
@@ -600,6 +594,14 @@ func (c *Compiler) appendLedgerTransactionsArtifactUpload(data *WorkflowData, st
 // appendCustomScriptFilesStep appends the setup step(s) for writing custom safe-output scripts to
 // disk, when the workflow declares any, to the accumulated job state.
 func (c *Compiler) appendCustomScriptFilesStep(data *WorkflowData, state *safeOutputsHandlerOutputsAndActionState) error {
+	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
+		if data.Connectors[alias].SafeOutputs != nil {
+			if isWorkQueueParticipant(data) {
+				return fmt.Errorf("connectors.%s.safe-outputs is not supported for work-queue participants; independent connector effect verification is required", alias)
+			}
+		}
+	}
+	state.steps = append(state.steps, c.connectorGitHubAppSteps(data, "safe-output")...)
 	if !isWorkQueueParticipant(data) && len(data.SafeOutputs.Scripts) > 0 {
 		consolidatedSafeOutputsJobLog.Printf("Adding setup step for %d custom safe-output script(s)", len(data.SafeOutputs.Scripts))
 		scriptSetupSteps, err := buildCustomScriptFilesStep(data.SafeOutputs.Scripts)
@@ -638,9 +640,6 @@ func (c *Compiler) appendHandlerManagerStep(data *WorkflowData, state *safeOutpu
 		if err != nil {
 			return err
 		}
-		handlerManagerSteps = injectLinearCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
-		handlerManagerSteps = injectJiraCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
-		handlerManagerSteps = injectAzureDevOpsCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		state.steps = append(state.steps, handlerManagerSteps...)
 		state.safeOutputStepNames = append(state.safeOutputStepNames, "process_safe_outputs")
 		addHandlerManagerOutputs(data, state.outputs)
@@ -869,7 +868,7 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 	if data.SafeOutputs.GitHubApp != nil {
 		appPermissions := computePermissionsForSafeOutputs(data.SafeOutputs, true)
 		if !globalAppTokenNeededForPermissions(appPermissions) {
-			// No enabled handler (e.g. a Linear-only configuration) consumes GitHub
+			// No enabled handler (e.g. a connector-only configuration) consumes GitHub
 			// permissions from this global app, so skip minting an unrelated
 			// installation token purely because a top-level github-app was
 			// configured or auto-copied via applyTopLevelGitHubAppFallbacks.

@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.22<br>
+**Version**: 1.29.23<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-09<br>
+**Publication Date**: 2026-11-11<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -3444,73 +3444,13 @@ Artifact limits use the same parsing and defaults as `create-issue`: `max-issue-
 
 ---
 
-#### Type: linear_create_issue
+#### Linear connector effects
 
-**Purpose**: Create an issue in one trusted Linear team using Linear's public GraphQL API.
-
-**Experimental**: Yes. Compiling a workflow with any Linear Safe Output emits: `Using experimental feature: Linear safe outputs`.
-
-**Configuration**:
-
-- `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-create-issue.team-id`: OPTIONAL Linear team model UUID, key, name, or GitHub Actions expression, falling back to `LINEAR_TEAM_ID`
-- `linear-create-issue.project-id`: OPTIONAL trusted Linear project URL identifier or model UUID, falling back to `LINEAR_PROJECT_ID`
-- `linear-create-issue.max`: Operation limit (default: 1)
-- `linear-create-issue.staged`: Staged mode override
-
-**MCP Tool**: `linear_create_issue`
-
-The MCP input object MUST require `title` and `body`, MUST reject additional properties, and MUST limit them to 128 and 65,000 characters respectively. The body MUST contain at least 20 characters. The trusted team identifier, optional project identifier, and credential MUST NOT be MCP inputs. Team UUIDs MUST be passed directly to `issueCreate`; other identifiers MUST be resolved case-insensitively against available team keys, then names, before issue creation.
-
-**Operational Semantics**:
-
-1. The processor MUST POST to the fixed `https://api.linear.app/graphql` endpoint using `Content-Type: application/json` and the API key as the raw `Authorization` header value.
-2. The implementation-defined `issueCreate(input: IssueCreateInput!)` document MUST use GraphQL variables for `teamId`, `title`, and `description`.
-3. `title` and `body` MUST undergo standard Safe Outputs title and content sanitization before `body` is mapped to Linear's `description`.
-4. The processor MUST fail on HTTP errors, malformed JSON, a non-empty top-level GraphQL `errors` array, `success: false`, or a missing issue object.
-5. Staged mode MUST validate and sanitize the request but MUST NOT perform a network mutation.
-
-The configured team ID MUST be a canonical UUID. Input exceeding a configured limit MUST be rejected, not silently truncated.
-
-#### Type: linear_add_comment
-
-**Purpose**: Add a comment to one trusted Linear issue.
-
-**Experimental**: Yes.
-
-**Configuration**:
-
-- `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-add-comment.target`: REQUIRED fixed issue UUID or shorthand identifier such as `ENG-123`
-- `linear-add-comment.max`: Operation limit (default: 1)
-- `linear-add-comment.staged`: Staged mode override
-
-**MCP Tool**: `linear_add_comment`
-
-The MCP input object MUST require only `body`, MUST reject additional properties, and MUST limit the body to 65,000 characters. The target and credential MUST NOT be MCP inputs.
-
-The processor MUST use the fixed `commentCreate(input: CommentCreateInput!)` GraphQL document and pass the configured target as `issueId` through variables. The body MUST undergo standard Safe Outputs content sanitization. HTTP, parsing, GraphQL, unsuccessful-payload, and staged-mode behavior MUST match `linear_create_issue`.
-
-#### Type: linear_update_issue
-
-**Purpose**: Replace explicitly enabled basic fields on one trusted Linear issue.
-
-**Experimental**: Yes.
-
-**Configuration**:
-
-- `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-update-issue.target`: REQUIRED fixed issue UUID or shorthand identifier such as `ENG-123`
-- `linear-update-issue.title`: Set to `true` to enable title replacement
-- `linear-update-issue.body`: Set to `true` to enable description replacement
-- `linear-update-issue.max`: Operation limit (default: 1)
-- `linear-update-issue.staged`: Staged mode override
-
-At least one of `title` or `body` MUST be enabled. The MCP tool name is `linear_update_issue`; its schema MUST expose only enabled fields, require at least one exposed field, reject additional properties, and apply the same field limits and sanitization as `linear_create_issue`. The target and credential MUST NOT be MCP inputs.
-
-The processor MUST use the fixed `issueUpdate(id: String!, input: IssueUpdateInput!)` GraphQL document. The configured target and update values MUST be GraphQL variables. `body` maps to Linear's `description`. Omitted fields MUST remain unchanged. HTTP, parsing, GraphQL, unsuccessful-payload, and staged-mode behavior MUST match `linear_create_issue`.
-
-For all Linear types, GraphQL source, endpoint, protocol, and host are implementation-defined and MUST NOT be agent-controlled. Linear API keys and GitHub App installation tokens are separate credentials for separate services. Enabling only Linear handlers MUST NOT request GitHub API write permissions or mint GitHub App tokens. Linear credentials MUST exist only in the trusted execution path and MUST NOT appear in handler configuration visible to the agent.
+The former `linear_create_issue`, `linear_add_comment`, and
+`linear_update_issue` handlers are removed. Linear operations are declarations
+in an imported, editable Markdown connector and run through the shared
+connector runtime. See [Connectors](/gh-aw/reference/connectors/#linear) for the
+authoritative credential, resource, typed-input, staging, and migration contract.
 
 ---
 
@@ -4107,9 +4047,10 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 8. **Complete Review Evidence**: Missing PR/thread data, invalid review decisions, missing thread resolution flags, malformed pagination, repeated continuation cursors, or a head revision different from the evaluated SHA MUST block merging. Individual reviews MUST be evaluated even without an approver allowlist; any reviewer's latest effective `CHANGES_REQUESTED` review MUST block merging. A null aggregate review decision MUST NOT override an individual objection and is not affirmative approval.
 9. **Final Revalidation**: Before either execution or a staged preview, re-read PR policy fields, target branch policy, the open upstream PR, reviews, configured approvals, and required checks. Changed policy evidence or non-passing checks MUST block the operation. Only the head SHA is enforced atomically by GitHub; other mutable policy state retains a race window after these reads.
 10. **Independent-Review Caution Veto**: Current-run threat warnings or failures, or a missing successful conclusion when detection is required, MUST block merging. Live PR bodies and labels and every individual review body MUST be inspected for threat-detected, detector-engine-error, protected-files-review, and caution notices. Retained notices MUST block both execution and staged success, regardless of affirmative approval, passing checks, or whether a review is advisory, dismissed, or superseded. Missing or malformed relevant evidence MUST fail closed; an API body of `null` represents valid empty content. PR body and review caution evidence MUST be revalidated before execution. Flagged changes require independent review and the repository's normal manual merge process; removing a notice is not evidence that its underlying risk was resolved.
+11. **Protected Changed Files**: Unless trusted configuration sets `protected-files: allowed`, the handler MUST inspect the complete live changed-file list for the target PR, including deleted paths and both old and new rename paths. It MUST use the same protected set, engine-specific files, top-level dot-folder rules, default `CHANGELOG.md` exclusion, handler exclusions, and repository-wide exclusions as `create-pull-request`. Protected changes MUST block both execution and staged success, independently of notice markers or approvals. Missing, malformed, duplicate, or incomplete file evidence, or a changed-file count exceeding GitHub's 3000-file listing limit, MUST block merging. File protection MUST be checked again during final revalidation. Only the evaluated head SHA is atomically enforced; these reads do not eliminate the documented mutable-policy race.
 
-The current handler implements a conservative notice-based veto, not a fresh scan
-of changed files or an immutable history of removed metadata. Ordinary unmarked
+The notice-based veto is independent of live changed-file protection and is
+not an immutable history of removed metadata. Ordinary unmarked
 PRs retain the configured approval policy. Caution evidence MUST NOT add raw PR
 or review bodies to returned or persisted decision evidence.
 
@@ -4123,6 +4064,7 @@ or review bodies to returned or persisted decision evidence.
 - `required-checks`: Exact check-run names, unioned with branch-policy requirements. Each MUST complete with `success` on the evaluated head SHA. Missing, pending, skipped, neutral, failed, or wrong-revision checks block merging. Missing app identities or multiple apps publishing the same required name also block merging; this does not authenticate an expected producer. The compiler rejects overlap with the workflow's resolved agent-controlled `create-check-run` name. Legacy commit-status contexts are not supported. An empty or omitted list adds no workflow-owned CI requirement; if the union is empty, CI is not queried.
 - `required-check-apps`: Optional map from names in `required-checks` to positive GitHub App IDs. For mapped names, every observed non-deployment check run MUST have the configured app ID, including during final revalidation. Unknown names and invalid IDs MUST fail compilation. App identity does not establish which workflow produced a check; CI workflow definitions still require independent protection.
 - `required-approvers`: Human GitHub logins (case-insensitive). When non-empty, at least one allowlisted human MUST have a current `APPROVED` review on the evaluated head SHA. Later decisive review state supersedes earlier approval by validated submission time, not review ID; invalid/missing timestamps or ambiguous same-reviewer ordering block merging. Dismissed approvals and active changes requested block merging. The PR author, bot accounts, and authenticated merge identity cannot authorize. Empty or omitted requires no affirmative approval.
+- `protected-files`: `blocked` (default) or `allowed`, a GitHub Actions expression, or an object with optional `policy` and `exclude`. Exclusions MUST use the same basename, directory-prefix, and rooted path-glob semantics as `create-pull-request`. Only an exact resolved `allowed` disables the changed-file gate; it MUST NOT override caution vetoes or other merge gates. Creation-specific review and issue fallback policies are unsupported.
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
 - `staged`: Staged mode override
@@ -6957,6 +6899,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.23** (2026-11-11):
+
+- **Specified**: `merge_pull_request` blocks protected-file changes by default using the shared creation rules and exclusions, complete live file evidence, and final revalidation for both live and staged execution.
+- **Clarified**: Explicit `protected-files: allowed` disables only the changed-file gate; caution vetoes and other merge requirements remain enforced. Creation-only review and issue fallback policies are unsupported.
 
 **Version 1.29.22** (2026-11-09):
 

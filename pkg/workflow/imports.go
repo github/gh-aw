@@ -373,10 +373,10 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 
 	// Recompute the implicit report-incomplete create-issue default now that imports are
 	// merged. The default is originally computed from only the main workflow's own
-	// safe-outputs block, before Linear (or other) handlers supplied by an import are
+	// safe-outputs block, before handlers supplied by an import are
 	// visible. Without recomputing here, a main workflow that declares only global fields
-	// (e.g. linear-token) could inherit an implicit `create-issue: true` default meant for
-	// a GitHub-only configuration, even though the merged result is Linear-only.
+	// could inherit an implicit `create-issue: true` default meant for
+	// a GitHub-only configuration, even though the merged result is connector-only.
 	if result.ReportIncomplete != nil && result.ReportIncomplete.Implicit {
 		recomputed := defaultReportIncompleteCreateIssue(result)
 		result.ReportIncomplete.CreateIssue = &recomputed
@@ -402,6 +402,15 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 					excludeFiles...,
 				)
 				importsLog.Printf("Merged %d accumulated protected-files exclude(s) into push-to-pull-request-branch", len(excludeFiles))
+			}
+		}
+		if result.MergePullRequest != nil {
+			if excludeFiles, ok := accumulatedExclude["merge-pull-request"]; ok && len(excludeFiles) > 0 {
+				result.MergePullRequest.ProtectedFilesExclude = sliceutil.MergeUnique(
+					result.MergePullRequest.ProtectedFilesExclude,
+					excludeFiles...,
+				)
+				importsLog.Printf("Merged %d accumulated protected-files exclude(s) into merge-pull-request", len(excludeFiles))
 			}
 		}
 	}
@@ -532,9 +541,6 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs 
 	}
 	if result.GitHubToken == "" && importedConfig.GitHubToken != "" {
 		result.GitHubToken = importedConfig.GitHubToken
-	}
-	if result.LinearToken == "" && importedConfig.LinearToken != "" {
-		result.LinearToken = importedConfig.LinearToken
 	}
 	if result.GitHubApp == nil && importedConfig.GitHubApp != nil {
 		result.GitHubApp = importedConfig.GitHubApp

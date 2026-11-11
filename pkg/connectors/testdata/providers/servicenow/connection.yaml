@@ -1,0 +1,10 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: servicenow.com/records
+credentials:
+  reader: {secret: SERVICENOW_READ_TOKEN}
+  context-reader: {secret: SERVICENOW_CONTEXT_TOKEN}
+  writer: {secret: SERVICENOW_WRITE_TOKEN}
+resources:
+  incidents: [0123456789abcdef0123456789abcdef]
+  requested-items: [fedcba9876543210fedcba9876543210]

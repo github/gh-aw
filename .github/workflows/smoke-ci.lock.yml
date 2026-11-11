@@ -291,6 +291,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/save_base_github_folders.sh"
       - name: Check workflow lock file
         id: check-lock-file
+        if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_WORKFLOW_FILE: "smoke-ci.lock.yml"
@@ -305,6 +306,7 @@ jobs:
             await main();
       - name: Compute current body text
         id: sanitized
+        if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
@@ -661,7 +663,8 @@ jobs:
     name: agent
     needs: activation
     if: >
-      ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true')
+      ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
+      needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked')
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
@@ -1442,7 +1445,12 @@ jobs:
         id: agentic_execution
         env:
           GH_AW_SAMPLES: |
-            [{"tool":"add_comment","arguments":{"body":"smoke-ci samples replay comment for run ${{ github.run_id }}.","item_number":"#aw_smokeci"}},{"tool":"add_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"create_issue","arguments":{"body":"Deterministic samples replay for run ${{ github.run_id }}.\n\nThis issue is produced by `safe-outputs.create-issue.samples`, not by an agent.\n","temporary_id":"#aw_smokeci","title":"safe-outputs samples replay"}},{"tool":"remove_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"update_issue","arguments":{"body":"smoke-ci samples replay confirmed the update-issue handler for run ${{ github.run_id }}.","issue_number":"#aw_smokeci","operation":"append"}}]
+            [{"tool":"add_comment","arguments":{"body":"smoke-ci samples replay comment for run \u0024{{ github.run_id }}.","item_number":"#aw_smokeci"}},{"tool":"add_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"create_issue","arguments":{"body":"Deterministic samples replay for run \u0024{{ github.run_id }}.\n\nThis issue is produced by `safe-outputs.create-issue.samples`, not by an agent.\n","temporary_id":"#aw_smokeci","title":"safe-outputs samples replay"}},{"tool":"remove_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"update_issue","arguments":{"body":"smoke-ci samples replay confirmed the update-issue handler for run \u0024{{ github.run_id }}.","issue_number":"#aw_smokeci","operation":"append"}}]
+          GH_AW_SAMPLE_BINDINGS: |
+            [{"entry":0,"path":["arguments","body"],"env":"GH_AW_SAMPLE_VALUE_0"},{"entry":2,"path":["arguments","body"],"env":"GH_AW_SAMPLE_VALUE_1"},{"entry":4,"path":["arguments","body"],"env":"GH_AW_SAMPLE_VALUE_2"}]
+          GH_AW_SAMPLE_VALUE_0: "smoke-ci samples replay comment for run ${{ github.run_id }}."
+          GH_AW_SAMPLE_VALUE_1: "Deterministic samples replay for run ${{ github.run_id }}.\n\nThis issue is produced by `safe-outputs.create-issue.samples`, not by an agent.\n"
+          GH_AW_SAMPLE_VALUE_2: "smoke-ci samples replay confirmed the update-issue handler for run ${{ github.run_id }}."
           GH_AW_AGENT_STDIO_LOG: /tmp/gh-aw/agent-stdio.log
           GH_AW_SAFE_OUTPUTS_CONFIG_PATH: ${{ runner.temp }}/gh-aw/safeoutputs/config.json
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl

@@ -1,0 +1,58 @@
+{
+  "verified": "2026-11-02",
+  "hashFormat": "SHA-256 of exact public HTTP response bytes; Markdown requested using accept=text/markdown",
+  "operations": {
+    "get-work-item": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/get-work-item?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "eb1773c10e717ad65db6b2b6d746327ee275b5ecc39afb24e6c93cdfec2d7d0d"
+    },
+    "run-work-item-query": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/wiql/query-by-id?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "c38ae470b73960e51877d5fa02443f30564f6bcadacd78494a81487c2e48ea0e"
+    },
+    "get-repository": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/git/repositories/get-repository?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "00df2d7f627d09de1ab964fe3793b014e1ed27172a6c59c085579f88c956b07a"
+    },
+    "get-repository-file": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/git/items/get?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "9cfeafeaea080fc449752fb4f31004aca31d356de6c2191e21506ce94dd9fb6d"
+    },
+    "list-pull-requests": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-requests?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "b06f9ccdcfabbc2b327944491cd9834d6d0f0d2c4115534f9354aadc2398d423"
+    },
+    "get-pull-request": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-request?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "410c2fcae80e0876bf8f8831efc75a7231ad463d84acd4751b71e09947cb0095"
+    },
+    "list-pipeline-definitions": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/list?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "7116b2615bae28856c326fd52d3734cfc0f0d0b21a3d5b9166a8917515f6cccc"
+    },
+    "get-pipeline-definition": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/build/definitions/get?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "f16d13973b53be2ea893da4d93626e2d337d38df0471a9bda6e42458351dccc2"
+    },
+    "list-pipeline-runs": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/list?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "c03794b545eb06abbb99cdea5ee7f4c6b696071b58d41c08a2d72558ffc899ec"
+    },
+    "get-pipeline-run": {
+      "url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/build/builds/get?view=azure-devops-rest-7.1&accept=text/markdown",
+      "sha256": "4f53236b02dac457b731d280c616d8e2d1dcd7664920b04e52763e137abc48c7"
+    }
+  },
+  "collectionWireEvidence": [
+    {
+      "url": "https://raw.githubusercontent.com/Azure/azure-devops-cli-extension/ad33bb3719638d4fb89029b4ef961a269a42cb14/azure-devops/azext_devops/tests/latest/integrationtests/recordings/test_build_definition_listShow.yaml",
+      "sha256": "e70638473ae808b5a1c3df3834876605f6b527584a7187c55ec57543b705305b",
+      "shape": "object envelope with count and value array"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Azure/azure-devops-cli-extension/ad33bb3719638d4fb89029b4ef961a269a42cb14/azure-devops/azext_devops/tests/latest/integrationtests/recordings/test_build_listQueueShow.yaml",
+      "sha256": "8006e60436340e22e30a9b23b0fb8db37606aa9430a4983ac61dbc445e992586",
+      "shape": "object envelope with count and value array"
+    }
+  ]
+}

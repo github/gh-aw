@@ -234,6 +234,13 @@ func InitRepository(opts InitOptions) error {
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Or add an example workflow, see https://github.com/githubnext/agentics"))
 		fmt.Fprintln(os.Stderr, "")
+		root, err := gitutil.FindGitRoot()
+		if err == nil {
+			err = writeRepositoryConnectorGuidance(os.Stderr, root)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Connector setup discovery incomplete: %v", err)))
+		}
 	}
 
 	return nil

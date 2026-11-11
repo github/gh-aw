@@ -1,0 +1,118 @@
+[
+  { "name": "explicit null", "rule": { "path": "/old", "op": "null" }, "payload": { "old": null }, "matched": true, "known": true },
+  { "name": "missing is not null", "rule": { "path": "/old", "op": "null" }, "payload": {}, "matched": false, "known": false },
+  { "name": "missing explicit presence", "rule": { "path": "/old", "op": "present" }, "payload": {}, "matched": false, "known": true },
+  { "name": "present null", "rule": { "path": "/old", "op": "present" }, "payload": { "old": null }, "matched": true, "known": true },
+  { "name": "fallback only when absent", "rule": { "path": "/old", "fallback": "/current", "op": "null" }, "payload": { "old": null, "current": "changed" }, "matched": true, "known": true },
+  { "name": "unchanged fallback", "rule": { "path": "/old", "fallback": "/current", "op": "equals", "value": "same" }, "payload": { "current": "same" }, "matched": true, "known": true },
+  {
+    "name": "known false dominates conjunction",
+    "rule": {
+      "all": [
+        { "path": "/missing", "op": "null" },
+        { "path": "/action", "op": "equals", "value": "update" }
+      ]
+    },
+    "payload": { "action": "create" },
+    "matched": false,
+    "known": true
+  },
+  {
+    "name": "known true dominates alternative",
+    "rule": {
+      "any": [
+        { "path": "/missing", "op": "null" },
+        { "path": "/action", "op": "equals", "value": "update" }
+      ]
+    },
+    "payload": { "action": "update" },
+    "matched": true,
+    "known": true
+  },
+  { "name": "terminal entry", "rule": { "path": "/new", "other": "/old", "op": "enters", "values": ["Done", "Closed"] }, "payload": { "old": "Active", "new": "Done" }, "matched": true, "known": true },
+  { "name": "terminal-to-terminal is not close", "rule": { "path": "/new", "other": "/old", "op": "enters", "values": ["Done", "Closed"] }, "payload": { "old": "Closed", "new": "Done" }, "matched": false, "known": true },
+  { "name": "terminal exit", "rule": { "path": "/new", "other": "/old", "op": "leaves", "values": ["Done"] }, "payload": { "old": "Done", "new": "Active" }, "matched": true, "known": true },
+  { "name": "unconfigured terminal entry", "rule": { "path": "/new", "other": "/old", "op": "enters" }, "payload": { "old": "Active", "new": "Done" }, "matched": false, "known": true },
+  { "name": "empty terminal exit", "rule": { "path": "/new", "other": "/old", "op": "leaves", "values": [] }, "payload": { "old": "Done", "new": "Active" }, "matched": false, "known": true },
+  { "name": "missing old state", "rule": { "path": "/new", "other": "/old", "op": "enters", "values": ["Done"] }, "payload": { "new": "Done" }, "matched": false, "known": false },
+  { "name": "label addition", "rule": { "path": "/new", "other": "/old", "op": "set-added" }, "payload": { "old": ["a"], "new": ["a", "b"] }, "matched": true, "known": true },
+  { "name": "set order duplicates irrelevant", "rule": { "path": "/new", "other": "/old", "op": "set-added" }, "payload": { "old": ["a", "b"], "new": ["b", "a", "a"] }, "matched": false, "known": true },
+  { "name": "label removal", "rule": { "path": "/new", "other": "/old", "op": "set-removed" }, "payload": { "old": ["a", "b"], "new": ["a"] }, "matched": true, "known": true },
+  { "name": "malformed labels", "rule": { "path": "/new", "other": "/old", "op": "set-added" }, "payload": { "old": null, "new": ["b"] }, "matched": false, "known": false },
+  { "name": "azure tag splitting", "rule": { "path": "/new", "other": "/old", "op": "set-added", "separator": ";" }, "payload": { "old": "one; two", "new": "two; one ; three" }, "matched": true, "known": true },
+  { "name": "azure tag unchanged normalized", "rule": { "path": "/new", "other": "/old", "op": "set-removed", "separator": ";" }, "payload": { "old": "one; two;one", "new": " two ; one " }, "matched": false, "known": true },
+  {
+    "name": "bounded item correlation",
+    "rule": {
+      "path": "/changes",
+      "op": "any-item",
+      "items": {
+        "all": [
+          { "path": "/field", "op": "equals", "value": "labels" },
+          { "path": "/to", "op": "equals", "other": "/label" },
+          { "path": "/labels", "root": true, "op": "length", "value": 1 }
+        ]
+      }
+    },
+    "payload": { "label": "bug", "labels": ["bug"], "changes": [{ "field": "labels", "to": "bug" }] },
+    "matched": true,
+    "known": true
+  },
+  {
+    "name": "different entries cannot combine",
+    "rule": {
+      "path": "/changes",
+      "op": "any-item",
+      "items": {
+        "all": [
+          { "path": "/field", "op": "equals", "value": "resolution" },
+          { "path": "/to", "op": "text" }
+        ]
+      }
+    },
+    "payload": { "changes": [{ "field": "resolution" }, { "field": "other", "to": "Done" }] },
+    "matched": false,
+    "known": false
+  },
+  { "name": "valid terminal timestamp", "rule": { "path": "/time", "op": "timestamp" }, "payload": { "time": "2026-11-02T23:00:00.123Z" }, "matched": true, "known": true },
+  { "name": "null timestamp is known open", "rule": { "path": "/time", "op": "timestamp" }, "payload": { "time": null }, "matched": false, "known": true },
+  { "name": "invalid timestamp unknown", "rule": { "path": "/time", "op": "timestamp" }, "payload": { "time": "closed" }, "matched": false, "known": false },
+  { "name": "strict typed equality", "rule": { "path": "/id", "op": "equals", "value": 1 }, "payload": { "id": "1" }, "matched": false, "known": true },
+  { "name": "no timestamp date rollover", "rule": { "path": "/time", "op": "timestamp" }, "payload": { "time": "2026-02-30T12:00:00Z" }, "matched": false, "known": false },
+  { "name": "timestamp offset bounded", "rule": { "path": "/time", "op": "timestamp" }, "payload": { "time": "2026-11-02T12:00:00+24:00" }, "matched": false, "known": false },
+  { "name": "null equality needs null operator", "rule": { "path": "/old", "op": "equals", "other": "/new" }, "payload": { "old": null, "new": null }, "matched": false, "known": false },
+  { "name": "integer representation comparison", "rule": { "path": "/old", "op": "equals", "value": 1 }, "payload": { "old": 1.0 }, "matched": true, "known": true },
+  { "name": "title prefix", "rule": { "path": "/title", "op": "prefix", "values": ["Agent: "] }, "payload": { "title": "Agent: reviewed issue" }, "matched": true, "known": true },
+  { "name": "title prefix does not infer a grant", "rule": { "path": "/title", "op": "prefix", "values": ["Agent: "] }, "payload": { "title": "Other title" }, "matched": false, "known": true },
+  { "name": "case-insensitive path descendant", "rule": { "path": "/area", "op": "path-prefix", "values": ["Project\\Backend"] }, "payload": { "area": "project\\backend\\service" }, "matched": true, "known": true },
+  { "name": "path prefix enforces component boundary", "rule": { "path": "/area", "op": "path-prefix", "values": ["Project\\Backend"] }, "payload": { "area": "Project\\BackendOther" }, "matched": false, "known": true },
+  { "name": "tag prefix", "rule": { "path": "/tags", "op": "member-prefix", "values": ["agent-"], "separator": ";" }, "payload": { "tags": "triaged; agent-review" }, "matched": true, "known": true },
+  {
+    "name": "attachment URL identity and known query",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/org/_apis/wit/attachments/abc-123?fileName=image.png" },
+    "matched": true,
+    "known": true
+  },
+  {
+    "name": "attachment URL rejects different identity",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/org/_apis/wit/attachments/other?fileName=image.png" },
+    "matched": false,
+    "known": true
+  },
+  {
+    "name": "attachment URL rejects unknown query",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/org/_apis/wit/attachments/abc-123?token=forbidden" },
+    "matched": false,
+    "known": true
+  },
+  {
+    "name": "attachment URL rejects path normalization",
+    "rule": { "path": "/url", "op": "url-id", "other": "/id", "value": "https://dev.azure.com/org/_apis/wit/attachments/", "values": ["fileName"] },
+    "payload": { "id": "abc-123", "url": "https://dev.azure.com/other/../org/_apis/wit/attachments/abc-123" },
+    "matched": false,
+    "known": true
+  }
+]

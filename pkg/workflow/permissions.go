@@ -102,6 +102,7 @@ const (
 	PermissionCodespaces                 PermissionScope = "codespaces"
 	PermissionRepositoryCustomProperties PermissionScope = "repository-custom-properties"
 	PermissionSecretScanningAlerts       PermissionScope = "secret-scanning-alerts"
+	PermissionRepositoryAdvisories       PermissionScope = "repository-advisories"
 
 	// Organization-level GitHub App permissions
 	PermissionMembers                             PermissionScope = "members"
@@ -171,6 +172,7 @@ func GetAllGitHubAppOnlyScopes() []PermissionScope {
 		PermissionCodespaces,
 		PermissionRepositoryCustomProperties,
 		PermissionSecretScanningAlerts,
+		PermissionRepositoryAdvisories,
 		// Organization-level GitHub App permissions
 		PermissionOrganizationProj,
 		PermissionMembers,

@@ -395,6 +395,10 @@ function generateSafeOutputSummary(options) {
     if (codes.includes("manual_review_caution")) {
       summary += "Independently review the detection or protected-files caution and merge through the repository's normal manual process. Approvals or dismissed reviews do not clear this automated-merge veto.\n\n";
     }
+    if (codes.includes("protected_files_modified")) {
+      summary +=
+        "Independently review the protected-file changes and merge through the repository's normal manual process. If protection is misconfigured, have a repository maintainer review the trusted protected-files configuration; approvals do not bypass this gate or any caution veto.\n\n";
+    }
     if (result.audit_failed) {
       summary += "> ⚠️ Merge decision audit persistence failed; the operation outcome is unchanged.\n\n";
     } else if (result.audit_recorded) {

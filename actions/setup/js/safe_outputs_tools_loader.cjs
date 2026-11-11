@@ -176,10 +176,6 @@ function loadTools(server) {
 function attachHandlers(tools, handlers, logger) {
   const handlerMap = {
     create_issue: handlers.createIssueHandler,
-    jira_create_issue: handlers.jiraCreateIssueHandler,
-    jira_update_issue: handlers.jiraUpdateIssueHandler,
-    jira_add_comment: handlers.jiraAddCommentHandler,
-    jira_add_label: handlers.jiraAddLabelHandler,
     create_pull_request: handlers.createPullRequestHandler,
     push_to_pull_request_branch: handlers.pushToPullRequestBranchHandler,
     push_repo_memory: handlers.pushRepoMemoryHandler,
@@ -203,12 +199,6 @@ function attachHandlers(tools, handlers, logger) {
     remove_labels: handlers.removeLabelsHandler,
     update_discussion: handlers.updateDiscussionHandler,
     close_discussion: handlers.closeDiscussionHandler,
-    ado_create_work_item: handlers.createWorkItemHandler,
-    ado_update_work_item: handlers.updateWorkItemHandler,
-    ado_comment_on_work_item: handlers.commentOnWorkItemHandler,
-    ado_assign_work_item: handlers.assignWorkItemHandler,
-    ado_link_work_items: handlers.linkWorkItemsHandler,
-    ado_upload_workitem_attachment: handlers.uploadWorkItemAttachmentHandler,
   };
 
   tools.forEach(tool => {

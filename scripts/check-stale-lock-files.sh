@@ -98,11 +98,12 @@ all_modified=$(collect_modified_files)
 # Filter to .md files within the workflows directory.
 # Strip a leading "./" from WORKFLOWS_DIR for consistent prefix matching.
 # Exclude subdirectories whose files are compiled into parent workflow lock files
-# rather than producing their own lock file (e.g. shared/, and skill directories).
+# rather than producing their own lock file (shared/, connectors/, and skills/).
 workflows_prefix="${WORKFLOWS_DIR#./}"
 modified_mds=$(printf '%s\n' "$all_modified" \
     | grep "^${workflows_prefix}.*\.md$" \
     | grep -v "^${workflows_prefix}/shared/" \
+    | grep -v "^${workflows_prefix}/connectors/" \
     | grep -v "^${workflows_prefix}/skills/" \
     || true)
 
@@ -121,7 +122,7 @@ while IFS= read -r md; do
 
     if [ ! -f "$lock" ]; then
         missing_locks+=("$md")
-    elif ! printf '%s\n' "$all_modified" | grep -Fxq "$lock"; then
+    elif ! printf '%s\n' "$all_modified" | grep -Fx "$lock" >/dev/null; then
         stale_files+=("$md")
     fi
 done <<< "$modified_mds"

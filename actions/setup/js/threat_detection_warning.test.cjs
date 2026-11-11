@@ -40,6 +40,12 @@ describe("threat_detection_warning", () => {
       expect(getDetectionReasonText("threat_detected")).toContain("Potential security threats were detected");
     });
 
+    it("describes a quota-deferred detection as not a security pass", () => {
+      expect(getDetectionReasonText("github_api_quota_exhausted")).toContain("GitHub API quota exhausted");
+      expect(getDetectionReasonText("github_api_quota_exhausted")).toContain("not a security pass");
+      expect(isToolingFailureReason("github_api_quota_exhausted")).toBe(false);
+    });
+
     it("returns fallback description for unknown reason", () => {
       expect(getDetectionReasonText("new_reason")).toBe("The threat detection analysis could not be completed.");
     });

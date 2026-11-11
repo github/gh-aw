@@ -34,7 +34,7 @@ let cachePath;
 beforeEach(() => {
   directory = fs.mkdtempSync(path.join(os.tmpdir(), "aic-scan-test-"));
   cachePath = path.join(directory, "scan.jsonl");
-  global.core = { info: vi.fn(), warning: vi.fn() };
+  global.core = { info: vi.fn(), warning: vi.fn(), exportVariable: vi.fn(), setOutput: vi.fn() };
   vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
 });
 afterEach(() => {
@@ -198,6 +198,29 @@ describe("complete daily AIC phase recovery", () => {
     expect(f.github.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(2);
     expect(f.listPage).not.toHaveBeenCalled();
     expect(f.getRunAIC).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["reset beyond the ten-minute budget", { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(now / 1000 + 900) }, "1", 0],
+    ["rerun ineligible for recovery", { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(now / 1000 + 60) }, "2", 0],
+    ["unknown reset", { "x-ratelimit-remaining": "0" }, "1", 0],
+    ["renewed exhaustion", { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(now / 1000 + 60) }, "1", 1],
+  ])("publishes an explicit quota-blocked restore outcome for %s without authorizing accounting", async (_case, headers, runAttempt, sleeps) => {
+    const recovery = { ...recoveryClock(), runAttempt };
+    const getWorkflowRun = vi.fn().mockRejectedValue(apiError(403, { ...headers, "x-ratelimit-limit": "15000", "x-ratelimit-used": "15000", "x-ratelimit-resource": "core" }, "API rate limit exceeded"));
+    const listWorkflowRuns = vi.fn();
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: {} };
+    global.github = { rest: { actions: { getWorkflowRun, listWorkflowRuns } } };
+    const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
+    global.core.summary = summary;
+    await expect(restore(cachePath, { recovery })).resolves.toBeUndefined();
+    expect(recovery.sleep).toHaveBeenCalledTimes(sleeps);
+    expect(getWorkflowRun).toHaveBeenCalledTimes(sleeps + 1);
+    expect(listWorkflowRuns).not.toHaveBeenCalled();
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("### GitHub API quota exhausted"));
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Accounting remains unverified; agent startup is blocked"));
+    expect(JSON.parse(global.core.exportVariable.mock.calls[0][1])).toMatchObject({ resource: "core", limit: 15000, remaining: 0, used: 15000, operation: "current_run" });
+    expect(fs.existsSync(cachePath)).toBe(false);
   });
 
   it("bounds snapshot misses on normal workflow history before a fresh full scan", async () => {
@@ -1052,7 +1075,8 @@ describe("trusted artifact fallback without writable Actions cache", () => {
       },
     };
     global.core.summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
-    await expect(restore(cachePath)).rejects.toMatchObject({ code: "DAILY_AIC_QUOTA_STOP" });
+    await expect(restore(cachePath)).resolves.toBeUndefined();
+    expect(global.core.exportVariable).toHaveBeenCalledWith("GH_AW_DAILY_AIC_QUOTA_BLOCKED", expect.stringContaining('"operation":"repository_history"'));
     expect(listWorkflowRunsForRepo).toHaveBeenCalledTimes(2);
     expect(listWorkflowRunArtifacts).not.toHaveBeenCalled();
     expect(global.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("restore stopped at repository_history after 1 attempt(s)"));
@@ -1069,8 +1093,11 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     global.github = { rest: { actions: { getWorkflowRun, listWorkflowRuns } } };
     const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
     global.core.summary = summary;
-    await expect(restore(cachePath)).rejects.toMatchObject({ code: "DAILY_AIC_QUOTA_STOP", status: 403 });
+    await expect(restore(cachePath)).resolves.toBeUndefined();
     expect(getWorkflowRun).toHaveBeenCalledOnce();
+    expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("### GitHub API quota exhausted"));
+    expect(global.core.setOutput).toHaveBeenCalledWith("github_api_quota_blocked", "true");
+    expect(JSON.parse(global.core.exportVariable.mock.calls[0][1])).toMatchObject({ status: 403, resource: "unknown", limit: 15000, remaining: 0, used: 15000, reset: "2026-10-14T10:06:00.000Z", operation: "current_run" });
     expect(listWorkflowRuns).not.toHaveBeenCalled();
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("restore stopped at current_run after 1 attempt(s)"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("quota_exhausted"));
@@ -1106,7 +1133,8 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     global.github = { rest: { actions: { getWorkflowRun } } };
     const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
     global.core.summary = summary;
-    await expect(restore(cachePath)).rejects.toBe(wrapped);
+    await expect(restore(cachePath)).resolves.toBeUndefined();
+    expect(global.core.exportVariable).toHaveBeenCalledWith("GH_AW_DAILY_AIC_QUOTA_BLOCKED", expect.any(String));
     expect(getWorkflowRun).toHaveBeenCalledOnce();
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("quota_exhausted"));
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("retry_not_before=2026-10-14T10:06:00.000Z"));
@@ -1133,7 +1161,8 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     global.github = { rest: { actions: { getWorkflowRun, listWorkflowRuns } } };
     const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
     global.core.summary = summary;
-    await expect(restore(cachePath)).rejects.toMatchObject({ code: "DAILY_AIC_QUOTA_STOP" });
+    await expect(restore(cachePath)).resolves.toBeUndefined();
+    expect(global.core.exportVariable).toHaveBeenCalledOnce();
     expect(getWorkflowRun).toHaveBeenCalledOnce();
     expect(listWorkflowRuns).not.toHaveBeenCalled();
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining(deadline ? `Blocked until at least ${deadline}` : "Blocked until: unknown"));
