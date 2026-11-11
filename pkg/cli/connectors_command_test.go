@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -148,6 +150,60 @@ func TestConnectorsValidateCommand(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 	require.Contains(t, output.String(), "valid ConnectorSpec example.com/issues")
 	require.Contains(t, output.String(), "no provider access or webhook activation")
+}
+
+func TestConnectorsValidatePublicProviderSpecs(t *testing.T) {
+	t.Parallel()
+	repository, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	declarations, err := filepath.Glob(filepath.Join(repository, ".github", "workflows", "connectors", "*.md"))
+	require.NoError(t, err)
+	require.Len(t, declarations, 13)
+	args := []string{"connectors", "validate", "--json"}
+	var expectedIDs []string
+	directory := t.TempDir()
+	for _, path := range declarations {
+		provider := strings.TrimSuffix(filepath.Base(path), ".md")
+		golden, err := os.ReadFile(filepath.Join(repository, "pkg", "cli", "workflows", provider+"-golden.md"))
+		require.NoError(t, err)
+		parsed, err := parser.ExtractFrontmatterFromContent(string(golden))
+		require.NoError(t, err)
+		imports, ok := parsed.Frontmatter["imports"].([]any)
+		require.True(t, ok)
+		require.Len(t, imports, 1)
+		entry, ok := imports[0].(map[string]any)
+		require.True(t, ok)
+		var inputs map[string]any
+		if bindings := entry["with"]; bindings != nil {
+			inputs, ok = bindings.(map[string]any)
+			require.True(t, ok, provider)
+		}
+		declaration, err := workflow.LoadDevelopmentConnector(repository, provider, path, inputs, nil)
+		require.NoError(t, err)
+		spec, err := json.Marshal(declaration.Registration.Spec)
+		require.NoError(t, err)
+		definition := filepath.Join(directory, provider+".json")
+		require.NoError(t, os.WriteFile(definition, spec, 0600))
+		args = append(args, definition)
+		expectedIDs = append(expectedIDs, "aw.github.com/"+provider)
+	}
+
+	var output bytes.Buffer
+	connectorsCommand := NewConnectorsCommand()
+	connectorsCommand.SetOut(&output)
+	root := &cobra.Command{Use: "aw"}
+	root.AddCommand(connectorsCommand)
+	root.SetArgs(args)
+	require.NoError(t, root.ExecuteContext(t.Context()))
+	var results []connectorValidationResult
+	require.NoError(t, json.Unmarshal(output.Bytes(), &results), "JSON output must contain only one result array")
+	require.Len(t, results, len(declarations))
+	for index, result := range results {
+		require.Equal(t, args[index+3], result.File)
+		require.Equal(t, expectedIDs[index], result.ID)
+		require.True(t, result.Valid, result.File)
+		require.Empty(t, result.Error)
+	}
 }
 
 func TestConnectorsValidateRequiresFiles(t *testing.T) {
