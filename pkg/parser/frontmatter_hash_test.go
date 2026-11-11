@@ -340,6 +340,15 @@ func TestRuntimeImportHashWorkspaceRoot(t *testing.T) {
 			assert.Equal(t, []string{filepath.FromSlash(".github/prompts/context.md")}, runtimeImportHashCandidatePaths(".github/prompts/context.md", filepath.FromSlash(baseDir)))
 		})
 	}
+	for _, root := range []string{".github", filepath.Join(t.TempDir(), ".github")} {
+		for _, directory := range []string{".github", ".github/workflows", ".github/workflows/shared"} {
+			baseDir := filepath.Join(root, filepath.FromSlash(directory))
+			t.Run(baseDir, func(t *testing.T) {
+				assert.Equal(t, root, runtimeImportHashWorkspaceRoot(baseDir))
+				assert.Equal(t, []string{filepath.Join(root, ".github", "prompts", "context.md")}, runtimeImportHashCandidatePaths(".github/prompts/context.md", baseDir))
+			})
+		}
+	}
 }
 
 func TestCollectRuntimeImportTemplateExpressionsTopologies(t *testing.T) {

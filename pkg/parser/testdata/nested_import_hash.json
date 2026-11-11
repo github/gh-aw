@@ -1,14 +1,14 @@
 {
   "workflow": {
     "path": "workflow.md",
-    "frontmatter": "engine: copilot\nimports:\n  - shared/graders.md\n  - uses: \".github/workflows/shared/repository.md\"",
+    "frontmatter": "engine: copilot\nimports:\n  - shared/graders.md\n  - uses: \".github/workflows/shared/repository.md#shared\"\n  - uses: \"/.agents/planner.md\"",
     "body": "Main workflow"
   },
   "imports": [
     {
       "path": "shared/graders.md",
       "importPath": "shared/graders.md",
-      "frontmatter": "imports:\n  - shared/graders/recurrence-determinism.md\n  - ./sibling.md\n  - bare.md\n  - uses: \".github/workflows/shared/nested-repository.md\"",
+      "frontmatter": "imports:\n  - shared/graders/recurrence-determinism.md\n  - ./sibling.md\n  - bare.md\n  - uses: \"/.github/workflows/shared/nested-repository.md\"",
       "body": "Shared graders"
     },
     {
@@ -43,15 +43,21 @@
     },
     {
       "path": "shared/repository.md",
-      "importPath": ".github/workflows/shared/repository.md",
+      "importPath": ".github/workflows/shared/repository.md#shared",
       "frontmatter": "description: repository-relative import",
-      "body": "Repository"
+      "body": "# Shared\nRepository"
     },
     {
       "path": "shared/nested-repository.md",
-      "importPath": ".github/workflows/shared/nested-repository.md",
+      "importPath": "/.github/workflows/shared/nested-repository.md",
       "frontmatter": "description: nested repository-relative import",
       "body": "Nested repository ${{ vars.REPOSITORY_CONTEXT }}"
+    },
+    {
+      "path": "../../.agents/planner.md",
+      "importPath": "/.agents/planner.md",
+      "frontmatter": "description: approved agent import",
+      "body": "Planner"
     }
   ],
   "expressions": ["${{ vars.GRADER_CONTEXT }}", "${{ vars.REPOSITORY_CONTEXT }}"]

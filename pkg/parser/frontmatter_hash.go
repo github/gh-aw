@@ -457,10 +457,8 @@ func indentationOf(line string) int {
 
 // processImportsTextBased processes imports from frontmatter using text-based parsing
 // Returns: importedFiles (list of import paths), importedFrontmatterTexts (list of frontmatter texts)
-func processImportsTextBased(frontmatterText, baseDir, rootDir string, visited map[string]struct {
-}, fileReader FileReader) ([]string, []string, error) {
-	var importedFiles []string
-	var importedFrontmatterTexts []string
+func processImportsTextBased(frontmatterText, baseDir, rootDir string, visited map[string]struct{}, fileReader FileReader) ([]string, []string, error) {
+	var importedFiles, importedFrontmatterTexts []string
 
 	// Extract imports from frontmatter text
 	imports := extractImportsFromText(frontmatterText)
@@ -475,8 +473,10 @@ func processImportsTextBased(frontmatterText, baseDir, rootDir string, visited m
 	sort.Strings(imports)
 
 	for _, importPath := range imports {
-		// Resolve import path relative to base directory
-		fullPath := resolveHashImportPath(importPath, baseDir, rootDir)
+		fullPath, err := resolveHashImportPath(importPath, baseDir, rootDir)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		// Skip if already visited (cycle detection)
 		if setutil.Contains(visited, fullPath) {
@@ -508,8 +508,7 @@ func processImportsTextBased(frontmatterText, baseDir, rootDir string, visited m
 		importBaseDir := filepath.Dir(fullPath)
 		nestedFiles, nestedTexts, err := processImportsTextBased(importFrontmatterText, importBaseDir, rootDir, visited, fileReader)
 		if err != nil {
-			// Continue processing other imports even if one fails
-			continue
+			return nil, nil, err
 		}
 
 		// Add nested imports
@@ -521,14 +520,14 @@ func processImportsTextBased(frontmatterText, baseDir, rootDir string, visited m
 	return importedFiles, importedFrontmatterTexts, nil
 }
 
-func resolveHashImportPath(importPath, baseDir, rootDir string) string {
-	if strings.HasPrefix(filepath.ToSlash(importPath), constants.GithubDir) {
-		return filepath.Join(runtimeImportHashWorkspaceRoot(rootDir), importPath)
-	}
+func resolveHashImportPath(importPath, baseDir, rootDir string) (string, error) {
+	importPath, _ = splitPathAndSection(importPath)
+	resolveBase := rootDir
 	if isFileRelativeImportPath(importPath) {
-		return filepath.Join(baseDir, importPath)
+		resolveBase = baseDir
 	}
-	return filepath.Join(rootDir, importPath)
+	resolveBase, securityBase, normalizedPath := computeIncludeResolveAndSecurityBases(importPath, resolveBase)
+	return resolveLocalIncludePath(normalizedPath, resolveBase, securityBase)
 }
 
 // collectImportedBodies processes imports from frontmatter and returns the body texts of all
@@ -545,7 +544,10 @@ func collectImportedBodies(frontmatterText, baseDir, rootDir string, visited map
 	sort.Strings(imports)
 
 	for _, importPath := range imports {
-		fullPath := resolveHashImportPath(importPath, baseDir, rootDir)
+		fullPath, err := resolveHashImportPath(importPath, baseDir, rootDir)
+		if err != nil {
+			return nil, err
+		}
 
 		if setutil.Contains(visited, fullPath) {
 			continue
@@ -568,7 +570,7 @@ func collectImportedBodies(frontmatterText, baseDir, rootDir string, visited map
 		importBaseDir := filepath.Dir(fullPath)
 		nestedBodies, err := collectImportedBodies(importFrontmatterText, importBaseDir, rootDir, visited, fileReader)
 		if err != nil {
-			continue
+			return nil, err
 		}
 		importedBodyTexts = append(importedBodyTexts, nestedBodies...)
 	}
@@ -781,15 +783,9 @@ func runtimeImportHashCandidatePaths(importPath, baseDir string) []string {
 }
 
 func runtimeImportHashWorkspaceRoot(baseDir string) string {
-	normalized := filepath.ToSlash(filepath.Clean(baseDir))
-	if normalized == ".github" || strings.HasPrefix(normalized, constants.GithubDir) {
-		return "."
-	}
-	if before, _, ok := strings.Cut(normalized, "/.github/"); ok {
-		return filepath.FromSlash(before)
-	}
-	if strings.HasSuffix(normalized, "/.github") {
-		return filepath.Dir(baseDir)
+	githubFolder := findGitHubFolder(filepath.Clean(baseDir))
+	if strings.HasSuffix(githubFolder, ".github") {
+		return filepath.Dir(githubFolder)
 	}
 	return baseDir
 }
