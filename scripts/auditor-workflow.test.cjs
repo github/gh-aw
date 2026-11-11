@@ -634,3 +634,13 @@ test("native exclusion and recovery-only dispatch policy are explicit", () => {
   assert.match(workflow, /name: Collect failure evidence\n\s+if: github\.event_name == 'schedule' \|\| \(github\.event_name == 'workflow_dispatch'.*inputs\.acknowledge_gap == true\)/);
   assert.match(workflow, /tools:\n\s+bash: \["\*"\]\n\s+edit:/);
 });
+
+test("agent prompt states success and checks before publication", () => {
+  const prompt = workflow.split("\n# Auditor\n")[1];
+  assert.ok(prompt);
+  assert.match(prompt, /## Success criteria and self-check/);
+  assert.match(prompt, /one validated, novel draft PR/);
+  assert.match(prompt, /`noop` explaining why no safe fix can be published/);
+  assert.match(prompt, /fresh PR deduplication/);
+  assert.match(prompt, /Never publish when a required check is incomplete/);
+});
