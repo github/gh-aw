@@ -304,6 +304,10 @@ func TestRenderStepForRunner(t *testing.T) {
 		strings.Contains(got, "$processEnvironment.Keys | Where-Object") {
 		t.Fatalf("Windows step did not restrict WSL environment forwarding:\n%s", got)
 	}
+	if !strings.Contains(got, "$wslEnvironment.Length -gt 32767") ||
+		!strings.Contains(got, "$env:WSLENV = $wslEnvironment") {
+		t.Fatalf("Windows step did not enforce the WSL environment forwarding limit:\n%s", got)
+	}
 	if !strings.Contains(got, `cd "$GH_AW_WSL_WORKING_DIRECTORY"`) ||
 		!strings.Contains(got, "+ \"`n\" +") ||
 		strings.Contains(got, "[System.Environment]::NewLine") {
@@ -312,7 +316,7 @@ func TestRenderStepForRunner(t *testing.T) {
 	for _, expected := range []string{
 		"& $wsl.Source --status",
 		"--install --web-download --distribution Ubuntu --no-launch",
-		"apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git jq nodejs npm xz-utils",
+		"apt-get install -y --no-install-recommends ca-certificates curl docker.io gh git gpgv jq nodejs npm xz-utils",
 		"WSL is unavailable",
 	} {
 		if !strings.Contains(got, expected) {
@@ -348,7 +352,9 @@ func TestRenderStepForRunner(t *testing.T) {
 		"id: wsl_setup_node",
 		"name: Setup Node.js in WSL",
 		"${{ steps.wsl_setup_node.outputs.node-version }}",
-		"SHASUMS256.txt",
+		"SHASUMS256.txt.asc",
+		"gpgv --keyring",
+		"https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg-only-active-keys/pubring.kbx",
 		"ln -sfn \"$install_dir\" /usr/local/lib/nodejs/current",
 		`export PATH="/usr/local/lib/nodejs/current/bin:$PATH"`,
 	} {
