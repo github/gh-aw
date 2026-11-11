@@ -1,184 +1,30 @@
 {
-  "run_id": "42873398149",
-  "run_date": "2026-11-10T18:18:44Z",
+  "run_id": "42932429961",
+  "run_date": "2026-11-11T00:36:55Z",
   "source": "pr-triage",
-  "eligible_total": 11,
-  "open_copilot_prs": 11,
+  "eligible_total": 3,
+  "open_copilot_prs": 3,
   "cooldown_skipped": 0,
   "category_counts": {
-    "test": 1,
-    "bug": 7,
-    "feature": 3
+    "bug": 1,
+    "feature": 2
   },
   "risk_counts": {
-    "low": 1,
-    "medium": 8,
-    "high": 2
+    "medium": 2,
+    "high": 1
   },
   "priority_counts": {
-    "low": 1,
-    "medium": 8,
-    "high": 2
+    "medium": 2,
+    "high": 1
   },
   "action_counts": {
-    "batch_review": 8,
-    "fast_track": 2,
-    "defer": 1
+    "batch_review": 2,
+    "fast_track": 1
   },
-  "batches": [
-    {
-      "id": "pr-batch:model-routing",
-      "prs": [
-        76330,
-        76323,
-        76319
-      ]
-    }
-  ],
   "selected_candidates": [
     {
-      "number": 76434,
-      "title": "Verify ZIP extraction bounds and scanning status",
-      "category": "test",
-      "risk": "low",
-      "priority": "low",
-      "action": "defer",
-      "score": 32,
-      "score_breakdown": {
-        "impact": 12,
-        "urgency": 6,
-        "quality": 14
-      }
-    },
-    {
-      "number": 76433,
-      "title": "Clarify daily AIC restore quota blocks and recovery guidance",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 56,
-      "score_breakdown": {
-        "impact": 28,
-        "urgency": 16,
-        "quality": 12
-      }
-    },
-    {
-      "number": 76432,
-      "title": "Fix Super-Linter startup quoting and preserve failure logs",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 56,
-      "score_breakdown": {
-        "impact": 26,
-        "urgency": 18,
-        "quality": 12
-      }
-    },
-    {
-      "number": 76430,
-      "title": "Propagate 404s for declared workflow imports",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 52,
-      "score_breakdown": {
-        "impact": 25,
-        "urgency": 15,
-        "quality": 12
-      }
-    },
-    {
-      "number": 76429,
-      "title": "Preserve inline agents and skills in embedded prompts",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 55,
-      "score_breakdown": {
-        "impact": 27,
-        "urgency": 16,
-        "quality": 12
-      }
-    },
-    {
-      "number": 76428,
-      "title": "Authenticate setup-cli release downloads with GH_TOKEN",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 59,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 18,
-        "quality": 12
-      }
-    },
-    {
-      "number": 76427,
-      "title": "Harden OpenAI WIF version, detection, and egress handling",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 68,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 20,
-        "quality": 13
-      }
-    },
-    {
-      "number": 76422,
-      "title": "Harden Pi sub-agent invocation validation",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 68,
-      "score_breakdown": {
-        "impact": 36,
-        "urgency": 18,
-        "quality": 14
-      }
-    },
-    {
-      "number": 76330,
-      "title": "Route four Copilot-backed Codex workflows to cost model routing instead of fixed GPT pins",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 56,
-      "score_breakdown": {
-        "impact": 32,
-        "urgency": 12,
-        "quality": 12
-      }
-    },
-    {
-      "number": 76323,
-      "title": "Route nine pinned Codex workflows through GitHub Copilot model routing",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 58,
-      "score_breakdown": {
-        "impact": 32,
-        "urgency": 14,
-        "quality": 12
-      }
-    },
-    {
-      "number": 76319,
-      "title": "Migrate remaining Copilot GPT-5.6 Terra pins before 16 November 2026 retirement",
+      "number": 76620,
+      "title": "[linter-miner] Add ignored local error linter",
       "category": "feature",
       "risk": "medium",
       "priority": "medium",
@@ -189,7 +35,35 @@
         "urgency": 15,
         "quality": 12
       }
+    },
+    {
+      "number": 76617,
+      "title": "Choose model routing with `model: router` and `router/economy|balanced|robust`",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 62,
+      "score_breakdown": {
+        "impact": 35,
+        "urgency": 13,
+        "quality": 14
+      }
+    },
+    {
+      "number": 76583,
+      "title": "Handle GitHub API quota exhaustion in daily-AIC accounting, run-info metadata and AWF detection setup",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 82,
+      "score_breakdown": {
+        "impact": 42,
+        "urgency": 25,
+        "quality": 15
+      }
     }
   ],
-  "summary": "Eleven eligible Copilot-authored PRs aged past the one-hour cooldown and were triaged. The portfolio is dominated by workflow hardening and model-routing changes, with the highest-risk work focused on OpenAI WIF and Pi sub-agent validation. The only low-risk item is a verification-only draft; the three model-routing PRs form a clear batch cluster."
+  "summary": "Three eligible Copilot-authored PRs were triaged after the one-hour cooldown. The set is dominated by a medium-risk feature update and one critical runtime bug fix: quota exhaustion handling for activation and detection setup. The draft model-routing PR is high-scope but still coherent and verified; the linter PR is moderate-risk and suitable for a grouped review."
 }
