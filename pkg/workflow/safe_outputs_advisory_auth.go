@@ -23,7 +23,7 @@ func validateSecurityAdvisoryAuthentication(config *SafeOutputsConfig, key strin
 		return nil
 	}
 	if handler.GitHubApp != nil || (handler.GitHubToken == "" && config.GitHubApp != nil) {
-		return fmt.Errorf("safe-outputs.%s: requires an external github-token with Repository security advisories write permission; GitHub App authentication is unsupported because the token action does not expose an advisory permission input, and GITHUB_TOKEN cannot perform advisory writes.", key)
+		return fmt.Errorf("safe-outputs.%s: requires an external github-token with Repository security advisories write permission; GitHub App authentication is unsupported because the token action does not expose an advisory permission input, and GITHUB_TOKEN cannot perform advisory writes", key)
 	}
 	token := resolveSecurityAdvisoryGitHubToken(config, key, handler)
 	if strings.TrimSpace(token) != "" && !defaultActionsAdvisoryTokenPattern.MatchString(token) {
