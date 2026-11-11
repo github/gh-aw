@@ -1206,6 +1206,11 @@ resource grants, and phase-specific secret references into content-addressed
 plans; runtime hosts do not reload mutable configuration. Each encoded phase
 plan is limited to 65,536 bytes.
 
+Safe-output handlers keep message metadata (`type`, `output_id`, `depends-on`,
+and its `depends_on` alias) outside connector arguments. Dependency scheduling
+remains enforced by the handler manager; other undeclared arguments are rejected.
+Declared inputs such as `temporary_id` remain available to connector operations.
+
 String input `maxLength` counts Unicode code points, not UTF-8 bytes.
 Encoded plans, JSON argument documents, and HTTP responses have separate byte
 limits; accepting a string's character count does not bypass those limits.

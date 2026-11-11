@@ -213,7 +213,7 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	script.WriteString("const { decodePlan } = require('./connector_runtime.cjs');\n")
 	script.WriteString("const { formatConnectorArguments } = require('./connector_content.cjs');\n")
 	fmt.Fprintf(&script, "const staged = %t || isStagedMode(typeof config === 'undefined' ? undefined : config);\n", staged) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-	script.WriteString("const input = { ...item }; delete input.type;\n")
+	script.WriteString("const input = Object.fromEntries(Object.entries(item).filter(([key]) => !['type', 'output_id', 'depends-on', 'depends_on'].includes(key)));\n")
 	fmt.Fprintf(&script, "const env = { GH_AW_CONNECTOR_PLAN: %q };\n", encoded) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("const contentConfig = { ...(typeof connectorContentDefaults === 'undefined' ? {} : connectorContentDefaults), ...(typeof config === 'undefined' ? {} : config) };\n")
 	if binary {
