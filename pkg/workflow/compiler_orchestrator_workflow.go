@@ -680,7 +680,7 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		return fmt.Errorf("failed to merge safe-outputs from imports: %w", err)
 	}
 	workflowData.SafeOutputs = mergedSafeOutputs
-	if err := attachConnectorInputSchemas(workflowData); err != nil {
+	if err := c.attachConnectorInputSchemas(workflowData); err != nil {
 		return err
 	}
 	if workflowData.SafeOutputs == nil && workflowData.LedgerConfig != nil && workflowData.LedgerConfig.Enabled() {

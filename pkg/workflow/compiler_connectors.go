@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,24 @@ func connectorMap(parent map[string]any, key string) map[string]any {
 		parent[key] = value
 	}
 	return value
+}
+
+func (c *Compiler) validateDryRunEffectsWithConnectors(data *WorkflowData) error {
+	if !c.dryRun || data.SafeOutputs == nil {
+		return c.validateDryRunEffects(data)
+	}
+	validation := *data
+	outputs := *data.SafeOutputs
+	outputs.Scripts = maps.Clone(outputs.Scripts)
+	// Compiler-owned connector handlers are already forced to stage without
+	// write credentials; keep authored handlers subject to the host-code gate.
+	for name, script := range outputs.Scripts {
+		if script != nil && script.connectorDryRun {
+			delete(outputs.Scripts, name)
+		}
+	}
+	validation.SafeOutputs = &outputs
+	return c.validateDryRunEffects(&validation)
 }
 
 func connectorEnv(plan *connectors.Plan, config *WorkflowConnector) (map[string]any, error) {
@@ -122,7 +141,7 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 	return nil
 }
 
-func attachConnectorInputSchemas(data *WorkflowData) error {
+func (c *Compiler) attachConnectorInputSchemas(data *WorkflowData) error {
 	for alias, config := range data.Connectors {
 		if config.SafeOutputs == nil {
 			continue
@@ -137,6 +156,7 @@ func attachConnectorInputSchemas(data *WorkflowData) error {
 				return err
 			}
 			data.SafeOutputs.Scripts[name].connectorInputSchema = schema
+			data.SafeOutputs.Scripts[name].connectorDryRun = c.dryRun
 			options := config.operationOptions(operation)
 			data.SafeOutputs.Scripts[name].Max = options.Max
 			data.SafeOutputs.Scripts[name].connectorOptions = &options

@@ -132,6 +132,36 @@ engine: copilot
     });
   });
 
+  describe("smoke-issues connector imports", () => {
+    it.each(["API", "local fallback"])("should verify the compiled smoke workflow through %s", async mode => {
+      const repoRoot = path.resolve(__dirname, "../../..");
+      const files = new Map(
+        ["smoke-issues.md", "smoke-issues.lock.yml", "connectors/jira.md", "connectors/linear.md"].map(file => {
+          const filePath = `.github/workflows/${file}`;
+          return [filePath, fs.readFileSync(path.join(repoRoot, filePath), "utf8")];
+        })
+      );
+      process.env.GH_AW_WORKFLOW_FILE = "smoke-issues.lock.yml";
+      process.env.GITHUB_WORKSPACE = repoRoot;
+      process.env.GH_AW_STALE_CHECK_FULL = "true";
+      mockGithub.rest.repos.getContent.mockImplementation(async ({ path: filePath }) => {
+        if (mode === "local fallback") throw Object.assign(new Error("Service unavailable"), { status: 503 });
+        if (!files.has(filePath)) throw Object.assign(new Error(`Unexpected import path: ${filePath}`), { status: 404 });
+        return { data: { type: "file", encoding: "base64", content: Buffer.from(files.get(filePath)).toString("base64") } };
+      });
+
+      await main();
+
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is up to date"));
+      if (mode === "API") {
+        for (const connector of ["jira", "linear"]) {
+          expect(mockGithub.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ path: `.github/workflows/connectors/${connector}.md` }));
+        }
+      }
+    });
+  });
+
   describe("immutable workflow revision", () => {
     const workflowSha = "84af1fd59015b65a792b4d301c365adf72613385";
     const validHash = "c2a79263dc72f28c76177afda9bf0935481b26da094407a50155a6e0244084e3";
