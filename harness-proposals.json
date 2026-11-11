@@ -61,5 +61,15 @@
     "experiment_name": "remove_unnecessary_tool_v1",
     "pr_or_issue": "issue",
     "decision": null
+  },
+  {
+    "date": "2026-11-11",
+    "workflow_id": "daily-storify",
+    "primary_dimension": "tool interaction",
+    "subtype": "deterministic_precondition",
+    "experiment_name": "deterministic_precondition_v1",
+    "pr_or_issue": "issue",
+    "decision": null,
+    "note": "DUPLICATE of the 2026-10-31 daily-storify proposal (same dimension/subtype) that this run should have excluded per Phase 1 but missed; issue so_YK0uOsueRbWS was created in error and should be closed by a human in favor of the 2026-10-31 proposal (or whichever is still viable)."
   }
 ]
