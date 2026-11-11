@@ -912,6 +912,15 @@ describe("essential unified session payloads", () => {
     expect(data).toEqual(original);
   });
 
+  it.each(["session.init", "session.start"])("omits non-string initialization version and provider fields for %s", type => {
+    expect(
+      normalizeUnifiedSessionEvent({
+        type,
+        data: { agentVersion: 2, agent_version: "ignored", provider: { name: "invalid" }, model: "fixture" },
+      })
+    ).toEqual({ type, data: { model: "fixture" } });
+  });
+
   it("flattens RPC metadata but excludes arguments, response bodies, and error context", () => {
     const events = [
       { type: "mcp.rpc.request", data: { server_id: "github", payload: { id: 0, method: "tools/call", params: { name: "list_issues", arguments: { token: "PRIVATE_RPC_ARGUMENT" } } } } },

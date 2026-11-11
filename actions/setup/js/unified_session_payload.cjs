@@ -685,6 +685,11 @@ function normalizeUnifiedSessionEvent(event, phase) {
   }
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = event.type === "mcp.configuration" ? normalizeMcpConfigurationData(source) : known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (event.type === "session.init" || event.type === "session.start") {
+    for (const field of ["agentVersion", "provider"]) {
+      if (typeof data[field] !== "string") delete data[field];
+    }
+  }
   if (event.type === "harness.decision") {
     const decision = normalizeHarnessDecisionData(source);
     if (!decision) throw new Error(`${ERR_VALIDATION}: Harness decision evidence must contain bounded outcomes and latency metadata`);
