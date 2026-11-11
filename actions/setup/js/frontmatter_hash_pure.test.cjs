@@ -293,6 +293,20 @@ engine: copilot`;
       // Object-form path: import path is extracted.
       expect(result).toEqual(["shared/tool.md"]);
     });
+
+    it("should ignore nested list items in import options", () => {
+      const frontmatterText = `imports:
+  - shared/mcp-pagination.md
+  - uses: shared/daily-pr-base.md
+    with:
+      protected-files:
+        exclude:
+          - .github/extensions/
+  - shared/otlp.md`;
+
+      const result = extractImportsFromText(frontmatterText);
+      expect(result).toEqual(["shared/mcp-pagination.md", "shared/daily-pr-base.md", "shared/otlp.md"]);
+    });
   });
 
   describe("extractRelevantTemplateExpressions", () => {
