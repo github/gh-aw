@@ -3,8 +3,8 @@
 set -euo pipefail
 
 CURRENT_GO="$(env -u GOROOT GOTOOLCHAIN=local go version | awk '{print $3}')"
-if [ "$CURRENT_GO" != go1.27.3 ]; then
-  echo "ERROR: Expected Go 1.27.3 from the pinned devcontainer feature; found ${CURRENT_GO}. Rebuild the devcontainer." >&2
+if [ "$CURRENT_GO" != go1.27.4 ]; then
+  echo "ERROR: Expected Go 1.27.4 from the pinned devcontainer feature; found ${CURRENT_GO}. Rebuild the devcontainer." >&2
   exit 1
 fi
 echo "Go tooling is pinned to ${CURRENT_GO}."
