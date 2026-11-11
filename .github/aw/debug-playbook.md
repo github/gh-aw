@@ -46,10 +46,10 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 | `threat_detected` | Private structured verdict/artifact. | Stop unsafe effects; follow [security guidance](debug-security-review.md). Never publish payloads. |
 | `high_token_usage`, `many_iterations` | Tokens/cache/turns, repeated calls. | [Optimize](optimize-agentic-workflow.md) scope/context/loops before raising caps. |
 | `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic` | Assessment, deterministic alternatives. | Script mechanical work; retain necessary judgment. |
-| `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work; preserve outcomes. |
-| `agentic_model_downgrade_available` | Capability/API needs; measured alternatives. | Benchmark; no automatic downgrade. |
-| `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory, not always error. |
-| `workflow_succeeded` | Downstream effect. | Verify effect; conclusion alone insufficient. |
+| `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work. |
+| `agentic_model_downgrade_available` | Capability/API needs; alternatives. | Benchmark; no auto downgrade. |
+| `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory. |
+| `workflow_succeeded` | Downstream effect. | Verify effect. |
 
 ## Agent, model, and proxy classifications
 
@@ -85,7 +85,7 @@ Prose isn't native error.
 Read `engine_config` ([start](#start-here)). Pi `not advertised`:
 confirmed absence → `model_unavailable`; incomplete/invalid/ambiguous evidence →
 `model_availability_unknown`. No auto-substitution.
-Inspect job/step URLs/lines; missing context:
+Missing context:
 `gh run view "$RUN_ID" --repo "$REPO" --log`.
 
 ### Inspect cached models
@@ -96,12 +96,11 @@ gh aw models --json --refresh-observed=false --logs-dir "$EVIDENCE"
 gh aw models --repo "$REPO" --logs-dir "$EVIDENCE" --refresh-count 5
 ```
 
-`catalog`/`aliases`/`observed` differ; aggregates != same-run access.
-Refresh downloads artifacts.
+`catalog`/`aliases`/`observed` differ from same-run access.
 
 ### Verify exact same-run inventory
 
-Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json` (or audit path).
+Read same-run `$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json`.
 
 ```bash
 : "${MODEL:?Set exact model}" "${PROVIDER:?Set provider}"
@@ -114,9 +113,7 @@ jq --arg model "$MODEL" --arg provider "$PROVIDER" '
   ]}' "$EVIDENCE/run-$RUN_ID/sandbox/firewall/awf-reflect.json"
 ```
 
-Strip provider prefix/query; retain dated/version IDs.
-Resolve aliases (`github` → `copilot`); inspect `auto`/`opus`
-`model_aliases`/harness resolution. Alias != concrete ID; `routing_models` != inventory.
+Resolve aliases (`github` → `copilot`); inspect `model_aliases`/harness resolution. Alias != concrete ID; `routing_models` != inventory.
 
 | Evidence | Meaning |
 | --- | --- |
@@ -137,14 +134,12 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
   --output "$EVIDENCE" --json
 ```
 
-First run = reference. Compare model/provider, credential source (names only),
+Compare model/provider, credential source (names only),
 revision/runtimes/inventory; success != identity.
 Different inventories/same AWF version: not proof of regression/retirement.
-Evidence required for removal time/cause.
-Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
 
 Absent pin: verify same-provider API/capabilities/policy.
-Authorized patch: edit source/recompile; compilation cannot test inference.
+Authorized patch: edit source/recompile.
 
 ## Completion and safe-output errors
 
@@ -271,4 +266,4 @@ or profile/effect-scope bypass.
 No run: inspect file/line; follow [compile-only gates](debug-compilation.md).
 Compilation != inference/execution authority.
 
-Report code/boundary/revision, evidence/uncertainty, remedy/files/execution; no blind retries/downgrades/credential-rotation/guard-bypass.
+Report code/boundary/revision, evidence/uncertainty, remedy/files/execution; no blind retries/downgrades/credential rotation/guard bypass.
