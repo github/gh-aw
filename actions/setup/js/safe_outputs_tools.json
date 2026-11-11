@@ -1,7 +1,7 @@
 [
   {
     "name": "add_security_advisory_comment",
-    "description": "Add a comment to an existing security advisory in the workflow repository. Requires a configured external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported. Comments inherit the advisory's visibility, and workflow logs and artifacts may contain their contents. Never publishes the advisory or falls back to a public issue comment.",
+    "description": "Experimental. Add a comment to an existing security advisory in the workflow repository. Requires a configured external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported. Comments inherit the advisory's visibility, and workflow logs and artifacts may contain their contents. Never publishes the advisory or falls back to a public issue comment.",
     "inputSchema": {
       "type": "object",
       "required": ["ghsa_id", "body"],
@@ -24,7 +24,7 @@
   },
   {
     "name": "create_security_advisory",
-    "description": "Create a draft security advisory in the workflow repository for private maintainer review. Never publishes the advisory or creates a private fork. Requires a configured external token or GitHub App; GITHUB_TOKEN is not supported. Advisory content may appear in workflow logs and artifacts, so use a private workflow repository for confidential findings.",
+    "description": "Experimental. Create a draft security advisory in the workflow repository for private maintainer review. Never publishes the advisory or creates a private fork. Requires a configured external token or GitHub App; GITHUB_TOKEN is not supported. Advisory content may appear in workflow logs and artifacts, so use a private workflow repository for confidential findings.",
     "inputSchema": {
       "type": "object",
       "required": ["summary", "description", "vulnerabilities"],

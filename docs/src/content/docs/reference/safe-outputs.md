@@ -1337,6 +1337,9 @@ For multi-checkout workflows, if one checkout is marked `current: true` and the 
 
 ### Security Advisory Drafts (`create-security-advisory:`)
 
+> [!NOTE]
+> Experimental. The configuration and behavior may change.
+
 Creates a **draft** security advisory in the workflow repository for maintainer review. This output never publishes advisories, creates private forks, or accepts an agent-selected repository.
 
 ```yaml wrap
@@ -1367,6 +1370,9 @@ Agent calls `create_security_advisory` with required `summary` (1–1024 charact
 
 ### Security Advisory Comments (`add-security-advisory-comment:`)
 
+> [!NOTE]
+> Experimental. The configuration and behavior may change.
+
 Adds a comment to an existing security advisory in the workflow repository. The agent supplies `ghsa_id` (for example `GHSA-2345-6789-cfgh`) and `body` (1–65000 characters of Markdown). The handler sanitizes content, adds standard attribution, and returns the created comment's `comment_id` and URL. It never publishes an advisory, changes comment visibility, or falls back to an issue comment.
 
 ```yaml wrap
@@ -1382,6 +1388,8 @@ Authentication follows [security advisory drafts](#security-advisory-drafts-crea
 
 > [!IMPORTANT]
 > The [advisory comments API](https://docs.github.com/en/rest/security-advisories/repository-advisories#create-a-repository-advisory-comment) requires access to the advisory and advisory-write permission. Verify endpoint availability on the target installation, particularly GitHub Enterprise Server versions. Comments follow the advisory's visibility, and workflow logs and artifacts may contain their contents.
+
+Both advisory outputs accept `samples` as a single tool-argument object or a list of objects for deterministic replay with `features.samples: true` or `gh aw compile --use-samples`. Samples are validated against the corresponding tool schema. Use `staged: true` to preview replayed requests without API writes; sample replay alone does not suppress mutations.
 
 ### Release Updates (`update-release:`)
 

@@ -12737,7 +12737,7 @@
           "description": "Enable AI agents to upload a code coverage report (e.g. a Cobertura XML file) to GitHub's code coverage API via actions/upload-code-coverage. The agent stages the report file and calls the tool with file/language/label; a separate job performs the actual upload with dedicated code-quality: write permissions."
         },
         "add-security-advisory-comment": {
-          "description": "Add comments to repository security advisories. Requires an external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported.",
+          "description": "Experimental. Add comments to repository security advisories. Requires an external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported.",
           "oneOf": [
             {
               "type": "object",
@@ -12752,7 +12752,14 @@
                 "github-token": { "$ref": "#/$defs/github_token_same_job" },
                 "github-app": { "$ref": "#/$defs/github_app" },
                 "footer": { "type": "boolean", "description": "Include the standard AI-generated attribution footer (default: true)." },
-                "staged": { "$ref": "#/$defs/templatable_boolean" }
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
+                "samples": {
+                  "description": "Internal hidden feature. Declarative tool argument samples for deterministic safe-outputs replay through --use-samples or features.samples.",
+                  "oneOf": [
+                    { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    { "type": "object", "additionalProperties": true }
+                  ]
+                }
               },
               "additionalProperties": false
             },
@@ -12760,7 +12767,7 @@
           ]
         },
         "create-security-advisory": {
-          "description": "Create draft repository security advisories only. Requires an external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported.",
+          "description": "Experimental. Create draft repository security advisories only. Requires an external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported.",
           "oneOf": [
             {
               "type": "object",
@@ -12774,7 +12781,14 @@
                 },
                 "github-token": { "$ref": "#/$defs/github_token_same_job" },
                 "github-app": { "$ref": "#/$defs/github_app" },
-                "staged": { "$ref": "#/$defs/templatable_boolean" }
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
+                "samples": {
+                  "description": "Internal hidden feature. Declarative tool argument samples for deterministic safe-outputs replay through --use-samples or features.samples.",
+                  "oneOf": [
+                    { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    { "type": "object", "additionalProperties": true }
+                  ]
+                }
               },
               "additionalProperties": false
             },
