@@ -1338,23 +1338,7 @@ jobs:
                 },
                 "customValidation": "requiresOneOf:reviewers,team_reviewers"
               },
-              "ado_assign_work_item": {
-                "defaultMax": 1,
-                "fields": {
-                  "assignee": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256,
-                    "minLength": 1
-                  },
-                  "work_item_id": {
-                    "required": true,
-                    "issueNumberOrTemporaryId": true
-                  }
-                }
-              },
-              "ado_comment_on_work_item": {
+              "add_security_advisory_comment": {
                 "defaultMax": 1,
                 "fields": {
                   "body": {
@@ -1362,146 +1346,13 @@ jobs:
                     "type": "string",
                     "sanitize": true,
                     "maxLength": 65000,
-                    "minLength": 10
+                    "minLength": 1,
+                    "rejectIfOversized": true
                   },
-                  "work_item_id": {
-                    "required": true,
-                    "issueNumberOrTemporaryId": true
-                  }
-                }
-              },
-              "ado_create_work_item": {
-                "defaultMax": 1,
-                "fields": {
-                  "description": {
+                  "ghsa_id": {
                     "required": true,
                     "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000,
-                    "minLength": 31
-                  },
-                  "tags": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 256
-                  },
-                  "temporary_id": {
-                    "required": true,
-                    "type": "string",
-                    "pattern": "^#aw_[A-Za-z0-9_]{3,12}$",
-                    "temporaryId": true
-                  },
-                  "title": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 255,
-                    "minLength": 6
-                  }
-                }
-              },
-              "ado_link_work_items": {
-                "defaultMax": 5,
-                "fields": {
-                  "comment": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 1024,
-                    "minLength": 5
-                  },
-                  "link_type": {
-                    "required": true,
-                    "type": "string",
-                    "enum": [
-                      "parent",
-                      "child",
-                      "related",
-                      "predecessor",
-                      "successor",
-                      "duplicate",
-                      "duplicate-of"
-                    ]
-                  },
-                  "source_id": {
-                    "required": true,
-                    "issueNumberOrTemporaryId": true
-                  },
-                  "target_id": {
-                    "required": true,
-                    "issueNumberOrTemporaryId": true
-                  }
-                }
-              },
-              "ado_update_work_item": {
-                "defaultMax": 1,
-                "fields": {
-                  "area_path": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 512
-                  },
-                  "assignee": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256
-                  },
-                  "body": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000
-                  },
-                  "id": {
-                    "required": true,
-                    "issueNumberOrTemporaryId": true
-                  },
-                  "iteration_path": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 512
-                  },
-                  "state": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
-                  },
-                  "tags": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 256
-                  },
-                  "title": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 255,
-                    "minLength": 1
-                  }
-                },
-                "customValidation": "requiresOneOf:title,body,state,area_path,iteration_path,assignee,tags"
-              },
-              "ado_upload_workitem_attachment": {
-                "defaultMax": 1,
-                "fields": {
-                  "comment": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 1024,
-                    "minLength": 3
-                  },
-                  "file_path": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 1024
-                  },
-                  "staged_file": {
-                    "required": true,
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9._/-]+$"
-                  },
-                  "work_item_id": {
-                    "required": true,
-                    "issueNumberOrTemporaryId": true
+                    "pattern": "^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$"
                   }
                 }
               },
@@ -2276,6 +2127,44 @@ jobs:
                   "type": "object"
                 }
               },
+              "create_security_advisory": {
+                "defaultMax": 1,
+                "fields": {
+                  "cwe_ids": {
+                    "type": "array",
+                    "itemType": "string"
+                  },
+                  "description": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 65000,
+                    "minLength": 1,
+                    "rejectIfOversized": true
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "critical",
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "summary": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 1024,
+                    "minLength": 1,
+                    "rejectIfOversized": true
+                  },
+                  "vulnerabilities": {
+                    "required": true,
+                    "type": "array"
+                  }
+                }
+              },
               "dismiss_pull_request_review": {
                 "defaultMax": 10,
                 "fields": {
@@ -2353,118 +2242,6 @@ jobs:
                     "maxLength": 256
                   }
                 }
-              },
-              "jira_add_comment": {
-                "defaultMax": 1,
-                "fields": {
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 32767,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "issue_key": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  }
-                }
-              },
-              "jira_add_label": {
-                "defaultMax": 1,
-                "fields": {
-                  "issue_key": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "label": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": "^[A-Za-z0-9_.-]+$",
-                    "patternError": "must contain only letters, numbers, periods, hyphens, and underscores"
-                  }
-                }
-              },
-              "jira_create_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "description": {
-                    "type": "string",
-                    "maxLength": 32767,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "issue_type": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "project_key": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "summary": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "temporary_id": {
-                    "required": true,
-                    "type": "string",
-                    "pattern": "^#aw_[A-Za-z0-9_]{3,12}$",
-                    "temporaryId": true
-                  }
-                }
-              },
-              "jira_update_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "description": {
-                    "type": "string",
-                    "maxLength": 32767,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "issue_key": {
-                    "required": true,
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  },
-                  "summary": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  }
-                },
-                "customValidation": "requiresOneOf:summary,description"
               },
               "ledger_append": {
                 "defaultMax": 100,
@@ -2572,55 +2349,6 @@ jobs:
                     "type": "string",
                     "sanitize": true,
                     "maxLength": 512
-                  }
-                }
-              },
-              "linear_add_comment": {
-                "defaultMax": 1,
-                "fields": {
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000,
-                    "rejectIfOversized": true
-                  }
-                }
-              },
-              "linear_create_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000,
-                    "minLength": 20,
-                    "rejectIfOversized": true
-                  },
-                  "title": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128,
-                    "rejectIfOversized": true
-                  }
-                }
-              },
-              "linear_update_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "body": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000,
-                    "rejectIfOversized": true
-                  },
-                  "title": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128,
-                    "rejectIfOversized": true
                   }
                 }
               },
@@ -4003,6 +3731,15 @@ jobs:
       - name: Warn if threat detection produced no verdict
         if: always() && needs.detection.result != 'skipped' && (needs.detection.outputs.detection_reason == 'agent_failure' || needs.detection.outputs.detection_reason == 'parse_error' || needs.detection.outputs.detection_conclusion == '')
         run: echo "::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs."
+      - name: Report quota-blocked threat detection
+        if: always() && needs.detection.outputs.detection_reason == 'github_api_quota_exhausted'
+        run: |
+          echo "::warning::GitHub API quota exhausted: threat detection was deferred and is not a security pass. Safe outputs were not published; agent artifacts are retained for a later run."
+          {
+            echo "### GitHub API quota exhausted"
+            echo ""
+            echo "Threat detection was deferred because AWF attestation verification could not complete before the GitHub API quota reset. This is not a security pass: safe outputs were not published, and completed agent artifacts are retained. See the detection job summary for resource, limit, remaining, and reset details."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Download detection artifact
         id: download-detection-artifact
         continue-on-error: true
@@ -4531,6 +4268,7 @@ jobs:
           mkdir -p /tmp/gh-aw/threat-detection
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
+        id: detection_awf_install
         env:
           GH_TOKEN: ${{ github.token }}
           GH_HOST: github.com
@@ -4554,7 +4292,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh" v0.5.3 --artifact-base-url https://github.com/github/gh-aw-threat-detection/releases/download --sha256-amd64 7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009 --sha256-arm64 6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6
       - name: Execute threat detection with AWF
         id: detection_agentic_execution
-        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true' && steps.threat_detect_install.outcome == 'success'
+        if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true' && steps.threat_detect_install.outcome == 'success' && steps.detection_awf_install.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 10
         env:
@@ -4753,6 +4491,7 @@ jobs:
           RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}
           DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}
           THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}
+          AWF_INSTALL_OUTCOME: ${{ steps.detection_awf_install.outcome }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json

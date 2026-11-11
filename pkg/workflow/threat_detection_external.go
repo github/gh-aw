@@ -462,11 +462,25 @@ func (c *Compiler) buildInstallAWFForExternalDetectorStep(data *WorkflowData) []
 		return nil
 	}
 
-	lines := make([]string, 0, len(step))
-	for _, line := range step {
+	lines := make([]string, 0, len(step)+1)
+	for i, line := range step {
 		lines = append(lines, line+"\n")
+		if i == 0 {
+			// Expose the install outcome so execution is gated on a verified AWF and
+			// the conclude step can report a GitHub API quota stop explicitly.
+			lines = append(lines, "        id: "+detectionAWFInstallStepID+"\n")
+		}
 	}
 	return lines
+}
+
+// detectionAWFInstallStepID identifies the external detector's AWF installation step.
+const detectionAWFInstallStepID = "detection_awf_install"
+
+// hasExternalDetectorAWFInstallStep reports whether the external detector path emits
+// an AWF installation step whose outcome can gate execution and conclusion.
+func (c *Compiler) hasExternalDetectorAWFInstallStep(data *WorkflowData) bool {
+	return len(c.buildInstallAWFForExternalDetectorStep(data)) > 0
 }
 
 // buildInstallDetectionEngineForExternalDetectorStep installs the selected detection
@@ -675,6 +689,10 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	}
 
 	executionCondition := detectionExecutionCondition + " && steps.threat_detect_install.outcome == 'success'"
+	if c.hasExternalDetectorAWFInstallStep(data) {
+		// Never run a missing or unverified AWF binary after a failed installation.
+		executionCondition += " && steps." + detectionAWFInstallStepID + ".outcome == 'success'"
+	}
 	if isArcDindTopology(threatDetectionData) {
 		executionCondition += " && steps.detection_staging_reset.outcome == 'success'"
 	}
@@ -890,6 +908,13 @@ func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []strin
 		// The placeholder cannot set conclusion outputs itself, so the script emits the
 		// agent_failure conclusion from this outcome instead.
 		"          THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}\n",
+	}...)
+	if c.hasExternalDetectorAWFInstallStep(data) {
+		// A failed AWF install (for example a GitHub API quota stop during attestation
+		// verification) is reported explicitly instead of as a missing-binary error.
+		steps = append(steps, "          AWF_INSTALL_OUTCOME: ${{ steps."+detectionAWFInstallStepID+".outcome }}\n")
+	}
+	steps = append(steps, []string{
 		coeEnvLine,
 		"        run: |\n",
 		fmt.Sprintf("          bash \"${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh\" %s\n", shellEscapeArg(constants.ThreatDetectionResultPath)),

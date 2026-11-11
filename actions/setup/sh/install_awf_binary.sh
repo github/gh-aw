@@ -256,7 +256,13 @@ install_bundle() {
   fi
 
   # Verify checksum
-  if ! verify_checksum "${TEMP_DIR}/${bundle_name}" "${bundle_name}"; then
+  local verify_status=0
+  verify_checksum "${TEMP_DIR}/${bundle_name}" "${bundle_name}" || verify_status=$?
+  if [ "$verify_status" -eq "$RELEASE_QUOTA_EXHAUSTED_STATUS" ]; then
+    echo "ERROR: Bundle attestation verification blocked by GitHub API quota exhaustion; refusing fallback" >&2
+    exit "$RELEASE_QUOTA_EXHAUSTED_STATUS"
+  fi
+  if [ "$verify_status" -ne 0 ]; then
     echo "ERROR: Bundle checksum verification failed; refusing fallback" >&2
     exit 1
   fi

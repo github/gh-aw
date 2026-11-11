@@ -13,7 +13,8 @@ const { parsePositiveCompactNumber } = require("./numeric_limits.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { createRateLimitAwareGithub } = require("./github_rate_limit_logger.cjs");
 const { scanDailyAIC } = require("./daily_aic_scan.cjs");
-const { API_READ_OPERATIONS, createAPIBudget, retryNotBefore, safeResponseHeaders, isQuotaError, getAPIReadFailure } = require("./daily_aic_api_budget.cjs");
+const { DAILY_AIC_QUOTA_BLOCKED_ENV, API_READ_OPERATIONS, createAPIBudget, retryNotBefore, safeResponseHeaders, isQuotaError, getAPIReadFailure } = require("./daily_aic_api_budget.cjs");
+const { GITHUB_API_QUOTA_EXHAUSTED, getGitHubAPIQuotaExhaustion, formatGitHubAPIQuotaDetails, writeGitHubAPIQuotaSummary } = require("./github_api_quota.cjs");
 const { getGitHubAPIDiagnostic } = require("./github_api_diagnostics.cjs");
 const { loadBillableJobs, allBillableJobsNotStarted, allBillableJobsSkipped, sumCoveredComponents } = require("./daily_aic_component_coverage.cjs");
 const { readLedgerEntries, readLedgerCoverageStart, WINDOW_MS } = require("./daily_aic_repo_memory_ledger.cjs");
@@ -678,6 +679,37 @@ async function appendDailyAICSummary(workflowName, actorLogin, threshold, counte
 }
 
 /**
+ * @param {string | undefined} value
+ * @returns {(import("./github_api_quota.cjs").GitHubAPIQuotaExhaustion & {operation?: string}) | null}
+ */
+function parseRestoreQuotaBlocked(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === "object") return parsed;
+  } catch {
+    // Fall through: presence alone still means the restore was quota-blocked.
+  }
+  return { status: null, resource: "unknown", limit: null, remaining: null, used: null, reset: "", retryNotBefore: "", operation: "unknown" };
+}
+
+/**
+ * Publish a typed quota-blocked outcome. It never reports verified accounting,
+ * under_budget, or a zero total, and it is not an activation failure: the
+ * compiled agent job condition skips agent startup on this status.
+ * @param {import("./github_api_quota.cjs").GitHubAPIQuotaExhaustion} quota
+ * @param {string} operation
+ */
+function reportQuotaBlocked(quota, operation) {
+  const message = `Daily workflow AI Credits are unknown: ${GITHUB_API_QUOTA_EXHAUSTED} at ${operation} (${formatGitHubAPIQuotaDetails(quota)}). Accounting remains unverified; agent startup is blocked until a later run after the reset.`;
+  core.setOutput("daily_ai_credits_guardrail_status", "quota_blocked");
+  core.setOutput("daily_ai_credits_guardrail_error", message);
+  logDailyGuardrail("AIC inspection deferred", { status: "quota_blocked", operation, retryNotBefore: quota.retryNotBefore || null });
+  if (quota.retryNotBefore) core.info(`Daily AIC inspection must not retry before ${quota.retryNotBefore}`);
+  core.warning(message);
+}
+
+/**
  * @returns {Promise<void>}
  *
  * Requires github-script globals (`core`, `github`, `context`) provided by setupGlobals().
@@ -788,6 +820,13 @@ async function main(options = {}) {
       core.info(`Daily workflow AIC guardrail exceeded for ${workflowName}: ${totalAIC}/${threshold}.`);
       return;
     }
+    const restoreQuotaBlocked = parseRestoreQuotaBlocked(process.env[DAILY_AIC_QUOTA_BLOCKED_ENV]);
+    if (restoreQuotaBlocked) {
+      // The restore already observed genuine quota exhaustion that bounded
+      // recovery could not resume. Spend no further reads on the same quota.
+      reportQuotaBlocked(restoreQuotaBlocked, `restore ${restoreQuotaBlocked.operation || "unknown"}`);
+      return;
+    }
     const githubClient = createRateLimitAwareGithub(github);
     const budget = createAPIBudget();
     const artifactClient = await module.exports.getArtifactClient(undefined, budget.request);
@@ -854,6 +893,17 @@ async function main(options = {}) {
       `Daily workflow AIC guardrail exceeded for ${workflowName}: ${totalAIC}/${threshold} (measured AIC: ${totalAIC - estimatedAIC}, confirmed-zero runs: ${confirmedZeroRuns}, assumed AIC: ${estimatedAIC}). Guardrail accounting is not provider billing.`
     );
   } catch (error) {
+    const quota = isStructuralGuardrailError(error) ? null : getGitHubAPIQuotaExhaustion(error);
+    if (quota) {
+      const readFailure = getAPIReadFailure(error);
+      reportQuotaBlocked(quota, readFailure?.operation || "accounting");
+      await writeGitHubAPIQuotaSummary({
+        stage: "Activation: Check daily workflow token guardrail",
+        quota,
+        impact: "Daily AIC accounting remains unverified; agent startup is blocked. This is not an under-budget result. Check existing scheduled runs after the reset before retrying; do not queue simultaneous reruns.",
+      });
+      return;
+    }
     const status = isStructuralGuardrailError(error) ? "structural_error" : "transient_error";
     const readFailure = getAPIReadFailure(error);
     const reason = readFailure

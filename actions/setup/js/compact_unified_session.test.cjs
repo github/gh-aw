@@ -260,6 +260,7 @@ describe("compact unified session projection", () => {
     ["guardrail.daily_aic", { exceeded: true }],
     ["guardrail.daily_aic", { status: "structural_error" }],
     ["guardrail.daily_aic", { status: "transient_error" }],
+    ["guardrail.daily_aic", { status: "quota_blocked", exceeded: false }],
     ["memory.push", { jobResult: "failure" }],
     ["harness.attempt", { exitCode: 1 }],
     ["workflow.job_result", { result: "timed_out" }],
@@ -267,7 +268,7 @@ describe("compact unified session projection", () => {
     expect(sessionEventPriority({ type, data })).toBe(2);
   });
 
-  it.each(["structural_error", "transient_error"])("retains a late daily-AIC %s ahead of successful guardrails and graders", status => {
+  it.each(["structural_error", "transient_error", "quota_blocked"])("retains a late daily-AIC %s ahead of successful guardrails and graders", status => {
     const successes = Array.from({ length: MAX_COMPACT_SESSION_EVENTS }, (_, index) =>
       index % 2 === 0 ? { type: "guardrail.daily_aic", data: { status: "under_budget", exceeded: false } } : { type: "grader.result", data: { id: String(index), passed: true } }
     );

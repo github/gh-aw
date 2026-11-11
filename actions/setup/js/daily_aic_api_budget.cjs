@@ -171,4 +171,9 @@ function createAPIBudget(reserve = 100) {
   return budget;
 }
 
-module.exports = { API_READ_OPERATIONS, safeResponseHeaders, apiError, retryNotBefore, createAPIBudget, getErrorStatus, isQuotaError, isTransientError, getAPIReadFailure, withQuotaResetRecovery };
+// Exported by the restore step for the guardrail step in the same job. Its
+// presence means restore stopped on genuine quota exhaustion that bounded
+// recovery could not resume; accounting stays unverified.
+const DAILY_AIC_QUOTA_BLOCKED_ENV = "GH_AW_DAILY_AIC_QUOTA_BLOCKED";
+
+module.exports = { DAILY_AIC_QUOTA_BLOCKED_ENV, API_READ_OPERATIONS, safeResponseHeaders, apiError, retryNotBefore, createAPIBudget, getErrorStatus, isQuotaError, isTransientError, getAPIReadFailure, withQuotaResetRecovery };

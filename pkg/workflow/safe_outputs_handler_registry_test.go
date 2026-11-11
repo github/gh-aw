@@ -15,15 +15,12 @@ func TestHandlerRegistryDomainComposition(t *testing.T) {
 		{name: "issueHandlerRegistry", registry: issueHandlerRegistry, wantKeys: []string{"create_issue", "close_issue", "update_issue", "link_sub_issue", "set_issue_type", "set_issue_field", "add_labels", "remove_labels", "replace_label", "assign_milestone"}},
 		{name: "discussionHandlerRegistry", registry: discussionHandlerRegistry, wantKeys: []string{"create_discussion", "close_discussion", "update_discussion"}},
 		{name: "pullRequestHandlerRegistry", registry: pullRequestHandlerRegistry, wantKeys: []string{"create_pull_request", "push_to_pull_request_branch", "update_pull_request", "merge_pull_request", "close_pull_request", "mark_pull_request_as_ready_for_review", "add_reviewer", "dismiss_pull_request_review", "submit_pull_request_review", "resolve_pull_request_review_thread", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"}},
-		{name: "workflowHandlerRegistry", registry: workflowHandlerRegistry, wantKeys: []string{"approve_workflow_run", "create_code_scanning_alert", "create_check_run", "dispatch_workflow", "dispatch_repository", "call_workflow", "autofix_code_scanning_alert", "upload_code_coverage", "upload_asset", "upload_artifact"}},
+		{name: "workflowHandlerRegistry", registry: workflowHandlerRegistry, wantKeys: []string{"create_security_advisory", "approve_workflow_run", "create_code_scanning_alert", "create_check_run", "dispatch_workflow", "dispatch_repository", "call_workflow", "autofix_code_scanning_alert", "upload_code_coverage", "upload_asset", "upload_artifact"}},
 		{name: "projectHandlerRegistry", registry: projectHandlerRegistry, wantKeys: []string{"create_project", "update_project", "create_project_status_update"}},
 		{name: "assignmentHandlerRegistry", registry: assignmentHandlerRegistry, wantKeys: []string{"assign_to_agent", "assign_to_user", "unassign_from_user", "create_agent_session"}},
-		{name: "commentHandlerRegistry", registry: commentHandlerRegistry, wantKeys: []string{"add_comment", "hide_comment"}},
-		{name: "jiraHandlerRegistry", registry: jiraHandlerRegistry, wantKeys: []string{"jira_create_issue", "jira_update_issue", "jira_add_comment", "jira_add_label"}},
+		{name: "commentHandlerRegistry", registry: commentHandlerRegistry, wantKeys: []string{"add_security_advisory_comment", "add_comment", "hide_comment"}},
 		{name: "releaseHandlerRegistry", registry: releaseHandlerRegistry, wantKeys: []string{"update_release"}},
 		{name: "diagnosticHandlerRegistry", registry: diagnosticHandlerRegistry, wantKeys: []string{"report_missing_tool", "report_missing_data", "noop", "report_incomplete", "create_report_incomplete_issue"}},
-		{name: "azureDevOpsWorkItemHandlerRegistry", registry: azureDevOpsWorkItemHandlerRegistry, wantKeys: []string{"ado_create_work_item", "ado_update_work_item", "ado_comment_on_work_item", "ado_assign_work_item", "ado_link_work_items", "ado_upload_workitem_attachment"}},
-		{name: "linearHandlerRegistry", registry: linearHandlerRegistry, wantKeys: []string{"linear_create_issue", "linear_add_comment", "linear_update_issue"}},
 	}
 
 	wantAll := map[string]struct{}{}
@@ -101,17 +98,7 @@ func TestHandlerRegistryBuilders(t *testing.T) {
 		{name: "assign_to_user", cfg: &SafeOutputsConfig{AssignToUser: &AssignToUserConfig{}}},
 		{name: "unassign_from_user", cfg: &SafeOutputsConfig{UnassignFromUser: &UnassignFromUserConfig{}}},
 		{name: "create_agent_session", cfg: &SafeOutputsConfig{CreateAgentSessions: &CreateAgentSessionConfig{}}},
-		{name: "ado_create_work_item", cfg: &SafeOutputsConfig{CreateWorkItems: &CreateWorkItemConfig{}}},
-		{name: "ado_update_work_item", cfg: &SafeOutputsConfig{UpdateWorkItems: &UpdateWorkItemConfig{}}},
-		{name: "ado_comment_on_work_item", cfg: &SafeOutputsConfig{CommentOnWorkItems: &CommentOnWorkItemConfig{}}},
-		{name: "ado_assign_work_item", cfg: &SafeOutputsConfig{AssignWorkItems: &AssignWorkItemConfig{}}},
-		{name: "ado_link_work_items", cfg: &SafeOutputsConfig{LinkWorkItems: &LinkWorkItemsConfig{}}},
-		{name: "ado_upload_workitem_attachment", cfg: &SafeOutputsConfig{UploadWorkItemAttachments: &UploadWorkItemAttachmentConfig{}}},
 		{name: "add_comment", cfg: &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}},
-		{name: "jira_create_issue", cfg: &SafeOutputsConfig{JiraCreateIssue: &JiraSafeOutputConfig{}}},
-		{name: "jira_update_issue", cfg: &SafeOutputsConfig{JiraUpdateIssue: &JiraSafeOutputConfig{}}},
-		{name: "jira_add_comment", cfg: &SafeOutputsConfig{JiraAddComment: &JiraSafeOutputConfig{}}},
-		{name: "jira_add_label", cfg: &SafeOutputsConfig{JiraAddLabel: &JiraSafeOutputConfig{}}},
 		{name: "hide_comment", cfg: &SafeOutputsConfig{HideComment: &HideCommentConfig{}}},
 		{name: "update_release", cfg: &SafeOutputsConfig{UpdateRelease: &UpdateReleaseConfig{}}},
 		{name: "report_missing_tool", cfg: &SafeOutputsConfig{MissingTool: &MissingToolConfig{}}},
@@ -119,9 +106,6 @@ func TestHandlerRegistryBuilders(t *testing.T) {
 		{name: "noop", cfg: &SafeOutputsConfig{NoOp: &NoOpConfig{}}},
 		{name: "report_incomplete", cfg: &SafeOutputsConfig{ReportIncomplete: &ReportIncompleteConfig{}}},
 		{name: "create_report_incomplete_issue", cfg: &SafeOutputsConfig{ReportIncomplete: &ReportIncompleteConfig{CreateIssue: strPtr("true")}}},
-		{name: "linear_create_issue", cfg: &SafeOutputsConfig{LinearCreateIssue: &LinearCreateIssueConfig{}}},
-		{name: "linear_add_comment", cfg: &SafeOutputsConfig{LinearAddComment: &LinearTargetConfig{}}},
-		{name: "linear_update_issue", cfg: &SafeOutputsConfig{LinearUpdateIssue: &LinearUpdateIssueConfig{}}},
 	}
 
 	for _, tt := range tests {

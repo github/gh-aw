@@ -116,7 +116,7 @@ func testSerenaGoExposureScript(t *testing.T, script, serverPath string) {
 		t.Run(scenario, func(t *testing.T) {
 			dir := t.TempDir()
 			cache := filepath.Join(dir, "tool cache")
-			root := filepath.Join(cache, "go", "1.27.3", "x64")
+			root := filepath.Join(cache, "go", "1.27.4", "x64")
 			if scenario == "outside-mount" {
 				root = filepath.Join(dir, "outside")
 			}

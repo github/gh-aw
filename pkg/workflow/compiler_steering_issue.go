@@ -64,7 +64,11 @@ func (c *Compiler) addActivationSteeringIssueStep(ctx *activationJobBuildContext
 		"        id: create-steering-issue\n",
 	)
 	if hasMaxDailyAICGuardrail(ctx.data) {
-		ctx.steps = append(ctx.steps, "        if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded != 'true'\n")
+		if ctx.data.MaxDailyAICContinueOnError {
+			ctx.steps = append(ctx.steps, "        if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded != 'true'\n")
+		} else {
+			ctx.steps = append(ctx.steps, "        if: steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded != 'true' && steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'\n")
+		}
 	}
 	ctx.steps = append(ctx.steps,
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)),

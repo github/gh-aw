@@ -12,6 +12,7 @@ import "embed"
 //go:embed js/schema-validation.cjs js/json_schema_validation.cjs js/memory_schema_contract.cjs
 //go:embed js/add_labels_schema.cjs
 //go:embed js/skill_inventory.cjs js/markdown_metadata.cjs js/error_recovery.cjs js/github_rate_limit_logger.cjs
+//go:embed js/github_api_quota.cjs js/github_api_diagnostics.cjs
 //go:embed js/unified_session_order.cjs js/unified_session_otel.cjs
 //go:embed js/trace_graders.cjs js/grader_session.cjs js/grader_artifacts.cjs js/trajectory_graders.cjs js/builtin_graders.json js/working_set_metrics.cjs
 //go:embed js/custom_graders.cjs js/custom_grader_worker.cjs
@@ -42,6 +43,7 @@ import "embed"
 //go:embed js/work_queue_host.cjs
 //go:embed js/aw_context.cjs js/experiment_helpers.cjs js/finish_work_queue_claim.cjs
 //go:embed js/webhook_context.cjs js/provider_issue_webhook.cjs js/webhook_resource.cjs
+//go:embed js/connector_webhook.cjs js/event_predicate.cjs
 //go:embed js/gateway_command_webhook.cjs js/slash_command_matcher.cjs
 //go:embed js/github_notification_webhook.cjs js/github_notification_webhooks.json
 //go:embed js/messages_core.cjs

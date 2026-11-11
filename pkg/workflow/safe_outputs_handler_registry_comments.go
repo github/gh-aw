@@ -2,6 +2,21 @@ package workflow
 
 // commentHandlerRegistry contains comment handler builders.
 var commentHandlerRegistry = map[string]handlerBuilder{
+	"add_security_advisory_comment": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.AddSecurityAdvisoryComment == nil {
+			return nil
+		}
+		c := cfg.AddSecurityAdvisoryComment
+		return newHandlerConfigBuilder().
+			AddTemplatableInt("max", c.Max).
+			AddDefault("inputs", map[string]any{
+				"body": map[string]any{"maxLength": 65000},
+			}).
+			AddIfNotEmpty("github-token", resolveSecurityAdvisoryGitHubToken(cfg, "add-security-advisory-comment", &c.BaseSafeOutputConfig)).
+			AddTemplatableBool("footer", getEffectiveFooterForTemplatable(c.Footer, cfg.Footer)).
+			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
+			Build()
+	},
 	"add_comment": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.AddComments == nil {
 			return nil

@@ -4,6 +4,39 @@ package parser
 
 import "testing"
 
+func TestMainWorkflowSchema_MergePullRequestProtectedFiles(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		value any
+		valid bool
+	}{
+		{"blocked", "blocked", true},
+		{"allowed", "allowed", true},
+		{"expression", "${{ inputs.policy }}", true},
+		{"exclusions", map[string]any{"exclude": []any{"AGENTS.md", ".agents/", "/.changeset/*.md"}}, true},
+		{"object policy", map[string]any{"policy": "allowed"}, true},
+		{"object expression", map[string]any{"policy": "${{ inputs.policy }}"}, true},
+		{"request-review unsupported", "request-review", false},
+		{"fallback unsupported", "fallback-to-issue", false},
+		{"invalid policy", map[string]any{"policy": "invalid"}, false},
+		{"unknown key", map[string]any{"files": []any{"package.json"}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "push",
+				"safe-outputs": map[string]any{
+					"merge-pull-request": map[string]any{"protected-files": tc.value},
+				},
+			}
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/merge-policy.md")
+			if (err == nil) != tc.valid {
+				t.Fatalf("schema validity = %v, want %v: %v", err == nil, tc.valid, err)
+			}
+		})
+	}
+}
+
 func TestMainWorkflowSchema_MergePullRequestPolicies(t *testing.T) {
 	t.Parallel()
 	for _, field := range []string{"required-checks", "required-approvers"} {

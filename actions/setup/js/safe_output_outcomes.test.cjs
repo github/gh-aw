@@ -161,6 +161,42 @@ describe("safe-output application outcomes", () => {
     expect(canonicalSafeOutputUrl("https://other.example.com/org/repo/issues/2")).toBeUndefined();
   });
 
+  it.each([
+    ["GHSA-2345-6789-cfgh", "", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "?token=PRIVATE#advisory-comment-17", "GHSA-2345-6789-cfgh#advisory-comment-17"],
+    ["GHSA-2345-6789-cfgh", "#advisory-comment-PRIVATE", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "#advisory-comment-0", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "#advisory-comment-17-PRIVATE", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "#issuecomment-17", "GHSA-2345-6789-cfgh"],
+    ["GHSA-2345-6789-cfgh", "/comments/17", undefined],
+    ["GHSA-2345-6789-cfgh", "/PRIVATE", undefined],
+    ["GHSA-2345-6789-cfgh-PRIVATE", "", undefined],
+    ["GHSA-0000-6789-cfgh", "", undefined],
+    ["GHSA-2345-6789", "", undefined],
+    ["PRIVATE_TITLE", "", undefined],
+  ])("canonicalizes advisory identity %s%s without free-form content", (identifier, suffix, expected) => {
+    const base = "https://github.com/org/repo/security/advisories/";
+    expect(canonicalSafeOutputUrl(`${base}${identifier}${suffix}`)).toBe(expected ? `${base}${expected}` : undefined);
+  });
+
+  it("only retains advisory comment fragments on advisory links at allowed origins", () => {
+    vi.stubEnv("GITHUB_SERVER_URL", "https://github.example.com");
+    const resource = "/org/repo/security/advisories/GHSA-2345-6789-cfgh#advisory-comment-17";
+    expect(canonicalSafeOutputUrl(`https://github.example.com${resource}`)).toBe(`https://github.example.com${resource}`);
+    expect(canonicalSafeOutputUrl(`https://other.example.com${resource}`)).toBeUndefined();
+    expect(canonicalSafeOutputUrl("https://github.com/org/repo/issues/1#advisory-comment-17")).toBe("https://github.com/org/repo/issues/1");
+    expect(canonicalSafeOutputUrl("https://api.github.com/repos/org/repo/security-advisories/GHSA-2345-6789-cfgh/comments/17")).toBeUndefined();
+  });
+
+  it.each([
+    ["create_security_advisory", { ghsa_id: "GHSA-2345-6789-cfgh", url: "https://github.com/org/repo/security/advisories/GHSA-2345-6789-cfgh" }],
+    ["add_security_advisory_comment", { comment_id: 17, url: "https://github.com/org/repo/security/advisories/GHSA-2345-6789-cfgh#advisory-comment-17" }],
+  ])("retains %s handler result URLs only for applied outcomes", (type, result) => {
+    expect(buildSafeOutputOutcomes([{ type, success: true, result: { success: true, ...result } }])[0]).toMatchObject({ type, status: "success", url: result.url });
+    expect(buildSafeOutputOutcomes([{ type, success: true, result }], true)[0]).not.toHaveProperty("url");
+    expect(buildSafeOutputOutcomes([{ type, success: false, result }])[0]).not.toHaveProperty("url");
+  });
+
   it("rejects credential-bearing resource URLs", () => {
     const url = new URL("https://github.com/org/repo/issues/2");
     url.username = "PRIVATE_USER";

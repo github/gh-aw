@@ -24,7 +24,7 @@ func (c *Compiler) addActivationReactionStep(ctx *activationJobBuildContext) {
 	)
 	ctx.steps = append(ctx.steps, fmt.Sprintf("      - name: Add %s reaction for immediate feedback\n", ctx.data.AIReaction))
 	ctx.steps = append(ctx.steps, "        id: react\n")
-	ctx.steps = append(ctx.steps, fmt.Sprintf("        if: %s\n", RenderCondition(reactionCondition)))
+	ctx.steps = append(ctx.steps, fmt.Sprintf("        if: %s\n", RenderCondition(dailyAICQuotaStepCondition(ctx.data, reactionCondition))))
 	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)))
 	ctx.steps = append(ctx.steps, "        env:\n")
 	ctx.steps = append(ctx.steps, fmt.Sprintf("          GH_AW_REACTION: %q\n", ctx.data.AIReaction))
@@ -186,6 +186,7 @@ func (c *Compiler) addActivationLockFileStep(ctx *activationJobBuildContext) {
 	}
 	ctx.steps = append(ctx.steps, "      - name: Check workflow lock file\n")
 	ctx.steps = append(ctx.steps, "        id: check-lock-file\n")
+	ctx.steps = appendDailyAICQuotaStepIf(ctx.steps, ctx.data)
 	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)))
 	ctx.steps = append(ctx.steps, "        env:\n")
 	ctx.steps = append(ctx.steps, fmt.Sprintf("          GH_AW_WORKFLOW_FILE: \"%s\"\n", ctx.lockFilename))
@@ -207,6 +208,7 @@ func (c *Compiler) addActivationVersionCheckStep(ctx *activationJobBuildContext)
 		return
 	}
 	ctx.steps = append(ctx.steps, "      - name: Check compile-agentic version\n")
+	ctx.steps = appendDailyAICQuotaStepIf(ctx.steps, ctx.data)
 	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)))
 	ctx.steps = append(ctx.steps, "        env:\n")
 	ctx.steps = append(ctx.steps, fmt.Sprintf("          GH_AW_COMPILED_VERSION: \"%s\"\n", c.version))
@@ -338,6 +340,7 @@ func (c *Compiler) addActivationTextOutputStep(ctx *activationJobBuildContext) e
 	}
 	ctx.steps = append(ctx.steps, "      - name: Compute current body text\n")
 	ctx.steps = append(ctx.steps, "        id: sanitized\n")
+	ctx.steps = appendDailyAICQuotaStepIf(ctx.steps, ctx.data)
 	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)))
 	domainsStr, err := c.computeActivationSanitizationDomains(ctx.data)
 	if err != nil {
@@ -387,7 +390,7 @@ func (c *Compiler) addActivationStatusCommentStep(ctx *activationJobBuildContext
 	)
 	ctx.steps = append(ctx.steps, "      - name: Add comment with workflow run link\n")
 	ctx.steps = append(ctx.steps, "        id: add-comment\n")
-	ctx.steps = append(ctx.steps, fmt.Sprintf("        if: %s\n", RenderCondition(statusCommentCondition)))
+	ctx.steps = append(ctx.steps, fmt.Sprintf("        if: %s\n", RenderCondition(dailyAICQuotaStepCondition(ctx.data, statusCommentCondition))))
 	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)))
 	ctx.steps = append(ctx.steps, "        env:\n")
 	ctx.steps = append(ctx.steps, fmt.Sprintf("          GH_AW_WORKFLOW_NAME: %q\n", ctx.data.Name))
@@ -436,7 +439,7 @@ func (c *Compiler) addActivationIssueLockStep(ctx *activationJobBuildContext) {
 	)
 	ctx.steps = append(ctx.steps, "      - name: Lock issue for agentic workflow\n")
 	ctx.steps = append(ctx.steps, "        id: lock-issue\n")
-	ctx.steps = append(ctx.steps, fmt.Sprintf("        if: %s\n", RenderCondition(lockCondition)))
+	ctx.steps = append(ctx.steps, fmt.Sprintf("        if: %s\n", RenderCondition(dailyAICQuotaStepCondition(ctx.data, lockCondition))))
 	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)))
 	ctx.steps = append(ctx.steps, "        with:\n")
 	ctx.steps = append(ctx.steps, "          script: |\n")

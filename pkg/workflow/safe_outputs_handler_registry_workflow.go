@@ -2,6 +2,21 @@ package workflow
 
 // workflowHandlerRegistry contains CI, workflow-triggering, artifact, and coverage handler builders.
 var workflowHandlerRegistry = map[string]handlerBuilder{
+	"create_security_advisory": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.CreateSecurityAdvisory == nil {
+			return nil
+		}
+		c := cfg.CreateSecurityAdvisory
+		return newHandlerConfigBuilder().
+			AddTemplatableInt("max", c.Max).
+			AddDefault("inputs", map[string]any{
+				"description": map[string]any{"maxLength": 65000},
+			}).
+			AddIfNotEmpty("github-token", resolveSecurityAdvisoryGitHubToken(cfg, "create-security-advisory", &c.BaseSafeOutputConfig)).
+			AddTemplatableBool("footer", getEffectiveFooterForTemplatable(nil, cfg.Footer)).
+			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
+			Build()
+	},
 	"approve_workflow_run": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.ApproveWorkflowRun == nil {
 			return nil

@@ -68,36 +68,6 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 	// Fields are checked in the alphabetical order of their struct field names,
 	// matching the sort order of safeOutputFieldMapping keys for deterministic
 	// error reporting.
-	if config.AssignWorkItems != nil {
-		if err := checkMaxField("ado_assign_work_item", config.AssignWorkItems.Max); err != nil {
-			return err
-		}
-	}
-	if config.CommentOnWorkItems != nil {
-		if err := checkMaxField("ado_comment_on_work_item", config.CommentOnWorkItems.Max); err != nil {
-			return err
-		}
-	}
-	if config.CreateWorkItems != nil {
-		if err := checkMaxField("ado_create_work_item", config.CreateWorkItems.Max); err != nil {
-			return err
-		}
-	}
-	if config.LinkWorkItems != nil {
-		if err := checkMaxField("ado_link_work_items", config.LinkWorkItems.Max); err != nil {
-			return err
-		}
-	}
-	if config.UpdateWorkItems != nil {
-		if err := checkMaxField("ado_update_work_item", config.UpdateWorkItems.Max); err != nil {
-			return err
-		}
-	}
-	if config.UploadWorkItemAttachments != nil {
-		if err := checkMaxField("ado_upload_workitem_attachment", config.UploadWorkItemAttachments.Max); err != nil {
-			return err
-		}
-	}
 	if config.AddComments != nil {
 		if err := checkMaxField("add_comment", config.AddComments.Max); err != nil {
 			return err
@@ -110,6 +80,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 	}
 	if config.AddReviewer != nil {
 		if err := checkMaxField("add_reviewer", config.AddReviewer.Max); err != nil {
+			return err
+		}
+	}
+	if config.AddSecurityAdvisoryComment != nil {
+		if err := checkMaxField("add_security_advisory_comment", config.AddSecurityAdvisoryComment.Max); err != nil {
 			return err
 		}
 	}
@@ -201,6 +176,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.CreateSecurityAdvisory != nil {
+		if err := checkMaxField("create_security_advisory", config.CreateSecurityAdvisory.Max); err != nil {
+			return err
+		}
+	}
 	if config.DispatchWorkflow != nil {
 		if err := checkMaxField("dispatch_workflow", config.DispatchWorkflow.Max); err != nil {
 			return err
@@ -216,33 +196,10 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
-	if config.JiraAddComment != nil {
-		if err := checkMaxField("jira_add_comment", config.JiraAddComment.Max); err != nil {
-			return err
-		}
-	}
-	if config.JiraAddLabel != nil {
-		if err := checkMaxField("jira_add_label", config.JiraAddLabel.Max); err != nil {
-			return err
-		}
-	}
-	if config.JiraCreateIssue != nil {
-		if err := checkMaxField("jira_create_issue", config.JiraCreateIssue.Max); err != nil {
-			return err
-		}
-	}
-	if config.JiraUpdateIssue != nil {
-		if err := checkMaxField("jira_update_issue", config.JiraUpdateIssue.Max); err != nil {
-			return err
-		}
-	}
 	if config.LinkSubIssue != nil {
 		if err := checkMaxField("link_sub_issue", config.LinkSubIssue.Max); err != nil {
 			return err
 		}
-	}
-	if err := validateLinearSafeOutputsMax(config); err != nil {
-		return err
 	}
 	if config.MarkPullRequestAsReadyForReview != nil {
 		if err := checkMaxField("mark_pull_request_as_ready_for_review", config.MarkPullRequestAsReadyForReview.Max); err != nil {
@@ -396,22 +353,5 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 	}
 
 	safeOutputsMaxValidationLog.Print("Safe-outputs max fields validation passed")
-	return nil
-}
-
-func validateLinearSafeOutputsMax(config *SafeOutputsConfig) error {
-	handlers := []struct {
-		name string
-		max  *string
-	}{
-		{name: "linear_add_comment", max: config.linearAddCommentMax()},
-		{name: "linear_create_issue", max: config.linearCreateIssueMax()},
-		{name: "linear_update_issue", max: config.linearUpdateIssueMax()},
-	}
-	for _, handler := range handlers {
-		if err := checkMaxField(handler.name, handler.max); err != nil {
-			return err
-		}
-	}
 	return nil
 }

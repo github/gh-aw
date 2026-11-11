@@ -44,6 +44,7 @@ describe("handle_detection_runs", () => {
     ["agent_failure", "detector_execution_failure"],
     ["parse_error", "detector_result_invalid"],
     ["threat_detected", "threat_finding"],
+    ["github_api_quota_exhausted", "detection_deferred"],
     ["", "detection_outcome_unknown"],
   ])("classifies structured reason %s as %s under both policies", async (reason, category) => {
     process.env.GH_AW_DETECTION_REASON = reason;

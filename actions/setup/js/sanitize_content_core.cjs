@@ -384,7 +384,9 @@ function sanitizeUrlProtocols(s) {
   //                   another protocol name (e.g. "ttps://" inside "https://…").
   //   (?!https://)  — negative lookahead: explicitly excludes https://, which is
   //                   passed through to sanitizeUrlDomains for domain filtering.
-  let result = normalized.replace(/(?<![a-z0-9])(?!https:\/\/)([a-z][a-z0-9+.-]*)(:\/\/)([\w.-]*)([^\s]*)/gi, (_match, scheme, _slashes, domain, _rest) => {
+  // URL redaction must leave HTML attribute quotes and tag boundaries intact:
+  // attribute stripping has already run, so deleting them could pull prose into a tag.
+  let result = normalized.replace(/(?<![a-z0-9])(?!https:\/\/)([a-z][a-z0-9+.-]*)(:\/\/)([\w.-]*)([^\s"'<>]*)/gi, (_match, scheme, _slashes, domain, _rest) => {
     const fullMatch = _match;
     if (!domain) {
       // No host present (e.g. "file:///path" or bare "http://"). Use the scheme
@@ -407,7 +409,7 @@ function sanitizeUrlProtocols(s) {
   // For schemes that do not use "//", a targeted blocklist is used because a
   // fully general single-colon pattern produces too many false positives
   // (e.g. "key:value" in YAML, "std::vector" in C++, "C:\path" on Windows).
-  return result.replace(/(?:data|javascript|vbscript|about|mailto|tel|magnet):[^\s]+/gi, match => {
+  return result.replace(/(?:data|javascript|vbscript|about|mailto|tel|magnet):(?=[^\s])[^\s"'<>]*/gi, match => {
     const protocolMatch = match.match(/^([^:]+):/);
     if (protocolMatch) {
       const protocol = protocolMatch[1] + ":";
@@ -441,7 +443,7 @@ function sanitizeUrlDomains(s, allowed) {
   // 3. Allow optional port (:8080)
   // 4. Allow optional path and query string (but not trailing commas/periods)
   // 5. Stop before another https:// URL in query params (using negative lookahead)
-  const httpsUrlRegex = /https:\/\/([\w.-]+(?::\d+)?)(\/(?:(?!https:\/\/)[^\s,])*)?/gi;
+  const httpsUrlRegex = /https:\/\/([\w.-]+(?::\d+)?)(\/(?:(?!https:\/\/)[^\s,"'<>])*)?/gi;
 
   /**
    * Shared domain-allowlist check and redaction logic.
@@ -542,7 +544,7 @@ function sanitizeUrlDomains(s, allowed) {
   //   2: separator (// or a backslash variant)
   //   3: hostname (and optional port)
   //   4: optional path
-  const protoRelativeUrlRegex = new RegExp(`(^|${URL_START_DELIMITERS})([/\\\\]{2})([\\w.-]+(?::\\d+)?)((?:/(?:(?![/\\\\]{2})[^\\s,])*)?)`, "gi");
+  const protoRelativeUrlRegex = new RegExp(`(^|${URL_START_DELIMITERS})([/\\\\]{2})([\\w.-]+(?::\\d+)?)((?:/(?:(?![/\\\\]{2})[^\\s,"'<>])*)?)`, "gi");
 
   s = s.replace(protoRelativeUrlRegex, (match, prefix, _separator, hostnameWithPort, path = "") => {
     // Normalize the separator to "//" so a backslash form can never survive as
@@ -604,6 +606,39 @@ function sanitizeUrlDomains(s, allowed) {
   const urlOrWwwRegex = /https:\/\/|(^|[^a-z0-9])(www\.)/gi;
   const parts = [];
   const authorityUserinfoAt = new Uint8Array(s.length + 1);
+  const htmlTagAt = new Uint8Array(s.length);
+  const htmlTagQuotedAt = new Uint8Array(s.length);
+  const maxHtmlTagLength = 4096;
+  let inHtmlTag = false;
+  let htmlQuote = "";
+  let htmlTagStart = -1;
+  for (let i = 0; i < s.length; i++) {
+    const character = s[i];
+    if (inHtmlTag && ((/\r|\n/.test(character) && htmlQuote) || i - htmlTagStart >= maxHtmlTagLength)) {
+      inHtmlTag = false;
+      htmlQuote = "";
+      htmlTagStart = -1;
+    }
+    if (!inHtmlTag && character === "<" && /[a-z]/i.test(s[i + 1] || "")) {
+      let tagNameEnd = i + 2;
+      while (/[a-z0-9:-]/i.test(s[tagNameEnd] || "")) tagNameEnd++;
+      if (/[\s/>]/.test(s[tagNameEnd] || "")) {
+        inHtmlTag = true;
+        htmlTagStart = i;
+      }
+    }
+    if (!inHtmlTag) continue;
+    htmlTagAt[i] = 1;
+    htmlTagQuotedAt[i] = htmlQuote ? 1 : 0;
+    if (htmlQuote) {
+      if (character === htmlQuote) htmlQuote = "";
+    } else if (character === '"' || character === "'") {
+      htmlQuote = character;
+    } else if (character === ">") {
+      inHtmlTag = false;
+      htmlTagStart = -1;
+    }
+  }
   let hasAuthorityUserinfo = false;
   for (let i = s.length - 1; i >= 0; i--) {
     const character = s[i];
@@ -647,12 +682,22 @@ function sanitizeUrlDomains(s, allowed) {
       const prefix = match[1];
       const candidateStart = match.index + match[0].length - match[2].length;
       const hasAuthorityUserinfo = authorityUserinfoAt[candidateStart] === 1;
+      const isHtmlTagCandidate = htmlTagAt[candidateStart] === 1;
       let end = candidateStart;
       let depth = 0;
       let inAuthority = true;
       for (; end < s.length; end++) {
         const character = s[end];
-        if (character === "\\" && end + 1 < s.length) {
+        // GFM permits ">" inside a userinfo authority, but HTML tag candidates
+        // must stop there even when later prose contains "@".
+        if (
+          /[\s|\[\]]/.test(character) ||
+          (isHtmlTagCandidate && /["']/.test(character) && !hasAuthorityUserinfo) ||
+          (/[<>]/.test(character) && (isHtmlTagCandidate ? !htmlTagQuotedAt[end] : !inAuthority || !hasAuthorityUserinfo)) ||
+          (/["']/.test(character) && (!inAuthority || !hasAuthorityUserinfo))
+        ) {
+          break;
+        } else if (character === "\\" && end + 1 < s.length && !/["'<>]/.test(s[end + 1])) {
           end++;
         } else if (character === "`" && (!inAuthority || !hasAuthorityUserinfo || prefix === "`")) {
           break;
@@ -663,7 +708,7 @@ function sanitizeUrlDomains(s, allowed) {
           depth--;
         } else if (character === "/" || character === "?" || character === "#") {
           inAuthority = false;
-        } else if (/[\s|\[\]]/.test(character) || (/[*_~]/.test(character) && s.slice(end + 1, end + 5).toLowerCase() === "www.")) {
+        } else if (/[*_~]/.test(character) && s.slice(end + 1, end + 5).toLowerCase() === "www.") {
           break;
         }
       }
