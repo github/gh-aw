@@ -105,6 +105,7 @@ const WebhookPayloadProjectionPolicy = "resource-url-types-filters/v2"
 
 // WebhookSubscription is the compiler's versioned filter and routing declaration.
 type WebhookSubscription struct {
+	Connector             *ConnectorWebhookSource       `json:"connector,omitempty"`
 	Provider              string                        `json:"provider,omitempty"`
 	NativeEvents          []string                      `json:"native_events,omitempty"`
 	ActivityNormalization *WebhookActivityNormalization `json:"activity_normalization,omitempty"`
@@ -204,14 +205,13 @@ func parseWebhookSubscription(raw any, path, event, workflowID string, definitio
 	if !ok {
 		return WebhookSubscription{}, fmt.Errorf("%s must be an object", path)
 	}
-	config, closedStates, err := providerIssueConfig(config, path, event, definition)
+	config, err := providerIssueConfig(config, path, event, definition)
 	if err != nil {
 		return WebhookSubscription{}, err
 	}
 	for _, key := range sortedWebhookKeys(config) {
 		supported := key == "types" || key == "filters" ||
-			(event == "projects_v2_item" && key == "status-transitions") ||
-			(event == "azure_devops_issue" && key == "closed-states")
+			(event == "projects_v2_item" && key == "status-transitions")
 		if !supported {
 			return WebhookSubscription{}, fmt.Errorf("unsupported %s property %q", path, key)
 		}
@@ -235,7 +235,7 @@ func parseWebhookSubscription(raw any, path, event, workflowID string, definitio
 	if err := applyWebhookStatusTransitions(&subscription, config, definition); err != nil {
 		return WebhookSubscription{}, err
 	}
-	if err := applyProviderIssueNormalization(&subscription, definition, closedStates, path); err != nil {
+	if err := applyProviderIssueNormalization(&subscription, definition, path); err != nil {
 		return WebhookSubscription{}, err
 	}
 	return subscription, nil

@@ -63,12 +63,13 @@ Conformance tests that validate `DriftRecord` schema compliance are implemented 
 ```
 pkg/workflow/awf_config_drift_test.go   — DriftRecord schema validation and usage (T-DR-001 through T-DR-010; T-DR-005: TestDriftRecord_TDR005_NoAdditionalProperties)
 pkg/workflow/awf_config_safeguards_formal_test.go — unavailable-source safeguards (T-DR-SAFE-001 through T-DR-SAFE-004) and CR-06a escalation-owner acknowledgement (T-DR-011)
+pkg/workflow/awf_config_conformance_registry_formal_test.go — registry column mapping, identifier invariants, and specification/file cross-references
 ```
 
 To run related tests:
 
 ```bash
-go test -v -run "TestDriftRecord|TestAWFConfigSafeguard" ./pkg/workflow/
+go test -v -run "TestDriftRecord|TestAWFConfigSafeguard|TestFormalConformanceRegistry" ./pkg/workflow/
 ```
 
 ---

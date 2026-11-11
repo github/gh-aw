@@ -60,6 +60,19 @@ func formalConformanceRegistryBaselineRows(t *testing.T) []formalConformanceRegi
 	return rows
 }
 
+func TestFormalConformanceRegistry_BaselineColumnMapping(t *testing.T) {
+	rows := formalConformanceRegistryBaselineRows(t)
+	require.Len(t, rows, 15)
+	assert.Equal(t, formalConformanceRegistryRow{
+		TestID: "T-DR-001", Requirement: "§3.1 — required fields",
+		TestFile: "pkg/workflow/awf_config_drift_test.go",
+	}, rows[0])
+	assert.Equal(t, formalConformanceRegistryRow{
+		TestID: "T-DR-SAFE-004", Requirement: "§8 item 4 — scheduled persistence",
+		TestFile: "pkg/workflow/awf_config_safeguards_formal_test.go",
+	}, rows[len(rows)-1])
+}
+
 func formalConformanceRegistryParseSeriesID(id string, prefix string) (int, bool) {
 	if !strings.HasPrefix(id, prefix) {
 		return 0, false
