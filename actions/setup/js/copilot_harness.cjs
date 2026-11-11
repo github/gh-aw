@@ -2105,6 +2105,7 @@ async function main() {
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
           let nativeTerminalRateLimitError = false;
+          /** @type {number | null} */
           let retryAfterMs = null;
           let pendingStderrResponse = "";
           let pendingStderrHeaderLines = 0;
@@ -2115,6 +2116,7 @@ async function main() {
           };
           /** @param {string} line */
           const observeStderrRetryAfter = line => {
+            /** @type {{ type?: string } | null} */
             let event = null;
             try {
               event = JSON.parse(line);
@@ -2196,6 +2198,7 @@ async function main() {
           return { ...result, strategy, nativeTerminalRateLimitError, retryAfterMs };
         },
         handleFailure: async ({ attempt, result }) => {
+          /** @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision | null} */
           const retryAfterDecision = () => {
             if (result.retryAfterMs == null) return null;
             const exceedsDelayCap = result.retryAfterMs > Math.min(maxDelayMs, 2147483647);
@@ -2211,7 +2214,11 @@ async function main() {
             log(`attempt ${attempt + 1}: failureClass=rate_limit_error — HTTP 429 Retry-After requires ${result.retryAfterMs}ms before next attempt`);
             return { action: "retry", nextDelayMs: result.retryAfterMs };
           };
-          const retryDecision = (nextDelayMs = undefined) => {
+          /**
+           * @param {number} [nextDelayMs]
+           * @returns {import("./harness_retry_runner.cjs").HarnessFailureDecision}
+           */
+          const retryDecision = nextDelayMs => {
             const rateLimitDecision = retryAfterDecision();
             if (rateLimitDecision) return rateLimitDecision;
             return { action: "retry", ...(nextDelayMs === undefined ? {} : { nextDelayMs }) };
@@ -2584,7 +2591,7 @@ async function main() {
               hasOutput: result.hasOutput,
               hasCAPIServerError,
             });
-            return decision;
+            return decision ?? { action: "retry", nextDelayMs: result.retryAfterMs };
           }
 
           if (shouldRetryFailedExecution({ ...result, isModelRoutingFailure, attempt, maxRetries })) {
