@@ -1,5 +1,3 @@
-// Package parser provides functions for parsing and processing workflow markdown files.
-
 // import_accumulator.go defines importAccumulator, which centralizes result-building
 // state for imported workflow files.
 package parser

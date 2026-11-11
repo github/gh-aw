@@ -1,5 +1,7 @@
 package parser
 
+import "encoding/json"
+
 // extractActivationFields extracts activation and authentication-related fields from
 // the frontmatter map: bots, skip-roles, skip-bots, skip-if-match, skip-if-no-match,
 // top-level ambient-folders, on.github-token, on.github-app, top-level github-app, and checkout.
@@ -49,7 +51,7 @@ func mergeJSONStringListField(
 		return
 	}
 	var imported []string
-	if jsonErr := unmarshalJSONFromString(content, &imported); jsonErr != nil {
+	if jsonErr := json.Unmarshal([]byte(content), &imported); jsonErr != nil {
 		return
 	}
 	for _, value := range imported {
@@ -82,7 +84,7 @@ func (acc *importAccumulator) extractActivationGitHubToken(fm map[string]any, fu
 		return
 	}
 	var token string
-	if jsonErr := unmarshalJSONFromString(tokenJSON, &token); jsonErr == nil && token != "" {
+	if jsonErr := json.Unmarshal([]byte(tokenJSON), &token); jsonErr == nil && token != "" {
 		acc.activationGitHubToken = token
 		parserLog.Printf("Extracted on.github-token from import: %s", fullPath)
 	}
@@ -113,7 +115,7 @@ func validateGitHubAppJSON(appJSON string) string {
 		return ""
 	}
 	var appMap map[string]any
-	if err := unmarshalJSONFromString(appJSON, &appMap); err != nil {
+	if err := json.Unmarshal([]byte(appJSON), &appMap); err != nil {
 		return ""
 	}
 	_, hasClientID := appMap["client-id"].(string)
