@@ -1,1 +1,56 @@
-[]
+[
+ {
+  "id": "UnclesLibrary/agentic-workflows-library",
+  "kind": "workflow-collection",
+  "source": "search: gh aw add/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "tomsiwik/laboratory",
+  "kind": "workflow-collection",
+  "source": "search: gh aw add/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "jcampb/mm-bmad",
+  "kind": "workflow-collection",
+  "source": "search: gh aw add/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "notglossy/agentic-workflows",
+  "kind": "workflow-collection",
+  "source": "search: gh aw add/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "pulumi-labs/gh-aw-internal",
+  "kind": "other",
+  "source": "search: gh aw add/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "mohith-e/gh-aw-trial",
+  "kind": "other",
+  "source": "search: gh-aw safe-outputs/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "ymd65536/GitHubAgenticWorkflows",
+  "kind": "other",
+  "source": "search: gh aw add/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "svennijhuis/agentic-workflows",
+  "kind": "workflow-collection",
+  "source": "search: gh aw add/agentic repo search",
+  "discovered": "2026-11-11"
+ },
+ {
+  "id": "OttilieWilliams/agentic-workflows-playground",
+  "kind": "other",
+  "source": "search: gh-aw safe-outputs/agentic repo search",
+  "discovered": "2026-11-11"
+ }
+]

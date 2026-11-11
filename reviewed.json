@@ -87,7 +87,7 @@
   "summary": "Claude Code plugin to discover/install gh-aw workflows from agentics catalog plus agent-team pattern; stale since June 2026.",
   "highlights": [
    "Conversational discover/install skills",
-   "catalog/agent-team: spec\u2192plan\u2192impl\u2192review workflows",
+   "catalog/agent-team: spec→plan→impl→review workflows",
    "Starter pitch: zero-risk daily-repo-status"
   ],
   "blogged": false
@@ -657,6 +657,45 @@
   "score": 0,
   "summary": "Appears to be the CAO extension already covered under githubnext/gh-aw-cao (9, blogged); not re-scored.",
   "highlights": [],
+  "blogged": false
+ },
+ "OneRose328/awesome-agentic-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-11",
+  "score": 6,
+  "summary": "Claims 56 gh-aw templates across 7 categories; the sample I read has tight read-only permissions and bounded safe-outputs, but the \"tested\" and count claims are unverified.",
+  "highlights": [
+   "templates/issue-management/auto-triage.md: permissions issues:read, safe-outputs add-labels max 3 and add-comment max 1",
+   "Instructions say to stop when confidence is low and to avoid public speculation on security-sensitive issues",
+   "Layout: templates/ (7 categories), examples/full-project-setup, docs/getting-started.md",
+   "Gap: the README says each template is tested against the current gh-aw CLI; I did not verify this or the 56-template count"
+  ],
+  "blogged": false
+ },
+ "SkylineCommunications/_ReusableAgenticWorkflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-11",
+  "score": 7,
+  "summary": "Org-internal reusable gh-aw workflows (triage, release notes, doc drift, collaboration sync) with separated agent prompts, skills and docs; marked experimental.",
+  "highlights": [
+   "workflows/rn-write.md: pull_request_target guarded by same-owner check and checkout:false; safe-outputs add-labels allowed:[rn-proposal] max 1",
+   "workflows/collaboration-syncer.md: network allowlist to api.skyline.be only; secrets declared; noop on missing config; create-issue max 50",
+   "workflows/doc-update-checker.md: sparse-checkout; create-issue max 3; explicit noop activation guard",
+   "Imports agents/*.agent.md via runtime-import, so prompts are reusable across repos; issue-triager uses network: defaults and min-integrity: none"
+  ],
+  "blogged": false
+ },
+ "balcsida/pig-gh-aw-test": {
+  "kind": "other",
+  "reviewed": "2026-11-11",
+  "score": 7,
+  "summary": "Experiment running the PiG Go binary as gh-aw pi engine via engine.command, with honest write-up of setup, limits, and a Piglet-binary variant.",
+  "highlights": [
+   "README.md: documents the three env vars needed (PIG_VERSION_FORMAT, PIG_USE_PI_DIRS, XDG_RUNTIME_DIR) with reasons for each",
+   ".github/workflows/pig-anthropic.md: pinned release download verified by sha256sum -c before install",
+   "README \"Is it worth it?\" and \"Not tested\" sections state where PiG is worse and what was untested; explicitly not an official integration",
+   "piglet/gh-aw-smoke.yaml: Piglet restricts tools to read and bash; sample of tool-scoping approach"
+  ],
   "blogged": false
  }
 }

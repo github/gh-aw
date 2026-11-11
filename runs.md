@@ -41,3 +41,4 @@
 2026-11-08: discovery (repo search); only unreviewed hits were trivial/packaging repos; no blog; backlog 0.
 2026-11-09: discovery (repo search); only already-reviewed repos surfaced; no blog; backlog 0.
 2026-11-10: discovery (repo search); reviewed oblt-aw (8, blogged), docs-actions (6), gh-cao (dup of gh-aw-cao); blog PR; backlog 0.
+2026-11-11: discovery (repo search; code search rate-limited 429); 74 unique hits, ~12 gh-aw-specific queued; reviewed OneRose awesome-agentic-workflows (6), SkylineCommunications/_ReusableAgenticWorkflows (7), balcsida/pig-gh-aw-test (7); no blog (none >=8 unblogged); backlog 9.
