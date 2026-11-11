@@ -27,13 +27,14 @@ func (c *Compiler) warnCheckoutRefWithSteps(data *WorkflowData, markdownPath str
 		if entry.isDefault() && (entry != defaultCheckout || !c.shouldAddCheckoutStep(data)) {
 			continue
 		}
-		if !checkoutRefMayBeUntrusted(entry.key.repository, entry.ref) {
+		if entry.dataOnly || !checkoutRefMayBeUntrusted(entry.key.repository, entry.ref) {
 			continue
 		}
 		msg := fmt.Sprintf(
 			"checkout step %q uses checkout.ref %q with an untrusted or unparseable expression, and host setup steps run after it. "+
 				"Imported or workflow-owned steps and pre-agent-steps execute outside the sandbox and may run checked-out code. "+
-				"Keep the agent workspace on a trusted ref and inspect fetched untrusted refs only as data; do not check them out or run their scripts on the host. "+
+				"Keep executable host tooling on a trusted ref and inspect untrusted refs only as data; do not run their scripts on the host. "+
+				"For a separate checkout consumed only as data by trusted host tooling, set data-only: true on that checkout to acknowledge this separation (not enforced isolation). "+
 				"For PR-head work, use compiler-managed automatic PR checkout so trusted agent configuration is restored.",
 			checkoutStepName(entry.key),
 			entry.ref,

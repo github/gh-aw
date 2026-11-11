@@ -17485,6 +17485,11 @@
       "description": "Configuration for a single actions/checkout step",
       "additionalProperties": false,
       "properties": {
+        "data-only": {
+          "type": "boolean",
+          "default": false,
+          "description": "Acknowledge that host steps consume this checkout only as data, not executable scripts, hooks, or configuration. Suppresses only this checkout's checkout-ref warning; does not enforce isolation or change runtime behavior. Every merged request for the same checkout target must opt in. Requires a literal boolean."
+        },
         "multi": {
           "type": "boolean",
           "default": false,

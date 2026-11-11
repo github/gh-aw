@@ -29,6 +29,27 @@ The relevant agent-job order is:
 
 Keep the agent workspace on a trusted ref and, when needed, fetch untrusted refs only to inspect their contents as data. Do not switch the host workspace to an untrusted branch or run its scripts: a manual checkout can execute Git hooks and can expose branch-controlled agent configuration. For PR-head work, use compiler-managed automatic PR checkout so the trusted agent configuration is restored; disabling that checkout also disables its paired configuration restore.
 
+### Separate Tooling and Data Checkouts
+
+When trusted host tooling processes a separate checkout only as data, `data-only: true` acknowledges that separation and suppresses the checkout-ref warning for that checkout:
+
+```aw wrap
+checkout:
+  - path: tooling
+    ref: ${{ github.event.repository.default_branch }}
+  - repository: example-org/content
+    ref: ${{ needs.prepare.outputs.branch }}
+    path: target
+    data-only: true
+steps:
+  - working-directory: tooling
+    run: ./scripts/validate-content ../target
+```
+
+This is an author acknowledgement, not enforced isolation or a declaration that the ref is trusted. It does not change checkout behavior, credentials, permissions, automatic PR checkout, or other diagnostics. The compiler does not infer data-only use from `working-directory`: commands can execute code outside that directory. Host tooling must not execute scripts, hooks, plugins, or configuration from the data checkout, including indirectly through validators or package managers. Keep tooling on a trusted ref and use separate, non-overlapping checkout paths.
+
+The option defaults to `false` and accepts only literal booleans. If imports or repeated entries request the same checkout target, every merged request must set `data-only: true`; otherwise the warning remains enabled.
+
 ## PR Revision Binding
 
 By default, the compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch.
@@ -114,6 +135,7 @@ checkout:
 | `max-repos` | integer | Maximum unique repositories per `multi: true` checkout entry. Requires `allowed-repos` in multi mode; defaults to `10`. Must be a positive literal integer. Ignored in single-repository mode. |
 | `allow-private-repos` | boolean | With `multi: true`, allow private/internal targets in a runtime list hosted by a private/internal repository. Requires `allowed-repos` in multi mode; defaults to `false` and must be a literal boolean. Public hosts always reject non-public multi targets, even when `true`. Ignored in single-repository mode. |
 | `ref` | string | Branch, tag, or SHA to checkout. Defaults to the triggering ref. |
+| `data-only` | boolean | Acknowledge data-only consumption by host steps and suppress only this checkout's checkout-ref warning. Defaults to `false`; literal boolean only. Does not enforce isolation or change execution. All merged requests for the target must opt in. See [Separate Tooling and Data Checkouts](#separate-tooling-and-data-checkouts). |
 | `path` | string | Path within `GITHUB_WORKSPACE` to place the checkout. Defaults to workspace root. |
 | `github-token` | string | Token for authentication. Use `${{ secrets.MY_TOKEN }}` syntax. |
 | `github-app` | object | GitHub App credentials (`client-id` or `app-id` (deprecated), `private-key`, optional `owner`, `repositories`). Mutually exclusive with `github-token`. `app` is a deprecated alias for the field name. Run `gh aw fix` to auto-migrate `app-id` to `client-id`. |
