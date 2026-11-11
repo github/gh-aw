@@ -6,6 +6,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,7 +14,36 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
+
+// Keep credential classification separate from named-secret extraction, which
+// also drives bindings for secrets but not github.token.
+func credentialExpressionsFromMap(values map[string]string) ([]string, error) {
+	result := make(map[string]struct{})
+	for _, key := range sliceutil.SortedKeys(values) {
+		value := values[key]
+		spans, err := actionslanguageservice.ExtractExpressions(value)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", key, err)
+		}
+		for _, span := range spans {
+			expression, err := actionslanguageservice.ParseSyntax(span.Content)
+			if err != nil || expression == nil {
+				if err == nil {
+					err = errors.New("an expression was expected")
+				}
+				return nil, fmt.Errorf("%q: %w", key, err)
+			}
+			// Whole-context secrets serialization has its own validation pass.
+			if expressionUsesCredentialReference(expression, true) {
+				result[value[span.Start:span.End]] = struct{}{}
+			}
+		}
+	}
+	return sliceutil.SortedKeys(result), nil
+}
 
 // validateEnvSecrets detects secrets in the top-level env section and the engine.env section,
 // raising an error in strict mode or a warning in non-strict mode. Secrets in env will be
@@ -32,8 +62,8 @@ func (c *Compiler) validateEnvSecrets(frontmatter map[string]any) error {
 
 func (c *Compiler) validateEarlyEnvSecrets(frontmatter map[string]any) error {
 	if frontmatterDeclaresImports(frontmatter) {
-		// Imported engine definitions are not registered until imports have been merged.
-		return c.validateEnvSecretsSection(frontmatter, "env", nil)
+		// Validate the full top-level env after imported values have been merged.
+		return nil
 	}
 	_, config, _ := c.ExtractEngineConfig(frontmatter)
 	if config != nil && len(config.FallbackModels) > 0 {
@@ -87,8 +117,14 @@ func (c *Compiler) validateResolvedEngineEnvSecrets(ctx *workflowBuildContext) e
 				return err
 			}
 		}
-		if c.strictMode && cfg != nil && len(ExtractSecretsFromMap(cfg.Env)) > 0 && !awfSupportsExcludeEnv(getFirewallConfig(ctx.workflowData)) {
-			return fmt.Errorf("strict mode: secret configuration in 'engine.env' requires AWF %s or newer to keep secrets out of the agent container. Set sandbox.agent.version to %s or newer", constants.AWFExcludeEnvMinVersion, constants.AWFExcludeEnvMinVersion)
+		if cfg != nil {
+			credentialRefs, err := credentialExpressionsFromMap(cfg.Env)
+			if err != nil {
+				return fmt.Errorf("invalid expression in 'engine.env' section: %w", err)
+			}
+			if c.strictMode && len(credentialRefs) > 0 && !awfSupportsExcludeEnv(getFirewallConfig(ctx.workflowData)) {
+				return fmt.Errorf("strict mode: secret configuration in 'engine.env' requires AWF %s or newer to keep secrets out of the agent container. Set sandbox.agent.version to %s or newer", constants.AWFExcludeEnvMinVersion, constants.AWFExcludeEnvMinVersion)
+			}
 		}
 		return nil
 	})
@@ -160,20 +196,16 @@ func (c *Compiler) validateEnvSecretsSection(config map[string]any, sectionName 
 		}
 	}
 
-	// Extract secrets from env values
-	secrets := ExtractSecretsFromMap(envStrings)
-	if len(secrets) == 0 {
+	secretRefs, err := credentialExpressionsFromMap(envStrings)
+	if err != nil {
+		return fmt.Errorf("invalid expression in '%s' section: %w", sectionName, err)
+	}
+	if len(secretRefs) == 0 {
 		strictModeValidationLog.Printf("No secrets found in %s section", sectionName)
 		return nil
 	}
 
-	// Build list of secret references found
-	var secretRefs []string
-	for _, secretExpr := range secrets {
-		secretRefs = append(secretRefs, secretExpr)
-	}
-
-	strictModeValidationLog.Printf("Found %d secret(s) in %s section: %v", len(secrets), sectionName, secretRefs)
+	strictModeValidationLog.Printf("Found %d credential expression(s) in %s section: %v", len(secretRefs), sectionName, secretRefs)
 
 	// In strict mode, this is an error
 	if c.strictMode {
