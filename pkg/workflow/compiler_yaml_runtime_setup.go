@@ -80,7 +80,7 @@ func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, 
 	compilerYamlLog.Printf("Generating cache steps for workflow")
 	generateCacheSteps(yaml, data, c.verbose)
 
-	return customStepsContainCheckout, nil
+	return customStepsContainCheckout, c.generateAgentConnectorSteps(yaml, data)
 }
 
 func (c *Compiler) generateWorkQueueIntentOriginStep(yaml *strings.Builder, data *WorkflowData) {

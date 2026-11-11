@@ -103,6 +103,11 @@ func (c *Compiler) parseFrontmatterSection(markdownPath string) (*frontmatterPar
 		orchestratorFrontmatterLog.Printf("Schedule preprocessing failed: %v", err)
 		return nil, err
 	}
+	onValue, hasOnField := result.Frontmatter["on"]
+	isMain := parser.HasConnectorTriggers(result.Frontmatter) || (hasOnField && !parser.IsImportSafeSharedWorkflowOn(onValue))
+	if err := c.normalizeWorkflowConnectors(result, cleanPath, contentString, isMain && result.Markdown != ""); err != nil {
+		return nil, err
+	}
 
 	// Create a copy of frontmatter without internal markers for schema validation
 	// Keep the original frontmatter with markers for YAML generation
@@ -167,6 +172,9 @@ func (c *Compiler) parseSharedOrRedirectWorkflow(
 	// Check if "on" field is missing or contains only import-safe shared fields -
 	// if so, treat as a shared/imported workflow.
 	onValue, hasOnField := frontmatterForValidation["on"]
+	if parser.HasConnectorTriggers(frontmatterForValidation) {
+		return nil, false, nil
+	}
 	if hasOnField && !parser.IsImportSafeSharedWorkflowOn(onValue) {
 		return nil, false, nil
 	}

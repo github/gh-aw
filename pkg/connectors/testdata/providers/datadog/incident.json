@@ -1,0 +1,14 @@
+{
+  "data": {
+    "type": "incidents",
+    "id": "11111111-2222-4333-8444-555555555555",
+    "attributes": {
+      "title": "Build latency investigation",
+      "customer_impact_scope": "synthetic-private-impact",
+      "notification_handles": [{ "handle": "synthetic-private-handle" }],
+      "fields": { "state": { "type": "dropdown", "value": "active" } }
+    },
+    "relationships": { "commander_user": { "data": { "id": "synthetic-private-user", "type": "users" } } }
+  },
+  "included": [{ "type": "users", "id": "synthetic-private-user" }]
+}

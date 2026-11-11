@@ -1,0 +1,24 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: microsoft.com/teams
+authenticationMode: application-graph-send
+endpoints:
+  graph: https://graph.microsoft.com
+credentials:
+  writer:
+    phase: safe-output
+    header: Authorization
+    scheme: bearer
+    scopes: [Teamwork.Migrate.All]
+safeOutputs:
+  ordinary-reply:
+    credential: writer
+    request:
+      endpoint: graph
+      method: POST
+      path: /v1.0/teams/example/channels/example/messages/example/replies
+      body:
+        body:
+          literal:
+            content: This unsupported auth mode must not be accepted.
+    maxResponseBytes: 16384

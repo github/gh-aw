@@ -1,0 +1,4 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: atlassian.com/jira-cloud
+script: "throw new Error('provider scripts are not part of this contract')"

@@ -417,6 +417,7 @@ func (c *Compiler) finalizeBuiltJobs(data *WorkflowData) error {
 	}
 
 	c.ensureOTLPOIDCJobPermissions(data)
+	c.ensureConnectorOIDCJobPermissions(data)
 	c.ensureDriveMemoryJobPermissions(data)
 	c.ensureDurableArtifactJobPermissions(data)
 	c.annotateGeneratedJobs(data)

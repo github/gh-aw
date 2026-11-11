@@ -141,7 +141,7 @@ func TestWebhookCatalogIntegrity(t *testing.T) {
 	for name, event := range catalog {
 		authority := map[string]string{
 			"": "https://docs.github.com/", "jira": "https://developer.atlassian.com/",
-			"linear": "https://linear.app/developers/", "azure-devops": "https://learn.microsoft.com/en-us/azure/devops/",
+			"linear": "https://linear.app/developers/",
 		}[event.Provider]
 		if authority == "" || !strings.HasPrefix(event.Source, authority) || event.Description == "" || len(event.Availability) == 0 {
 			t.Errorf("missing provenance/availability for %s", name)

@@ -99,8 +99,9 @@ allPassed &= assertContains(output, "```yaml wrap", "YAML code block should have
 
 allPassed &= assertNotContains(output, "```yaml\n---\n# Workflow name", "YAML code block should NOT be plain ```yaml without wrap");
 
-allPassed &= assertContains(output, 'toolsets: ["issues","projects"]', "Linear toolset array example should be non-empty");
-allPassed &= assertContains(output, "Array items: A Linear MCP toolset name", "Linear toolset array items should resolve their schema description");
+allPassed &= assertContains(output, 'cache-memory: [{"id":"default","key":"memory-default"},{"id":"session","key":"memory-session"}]', "Array variant examples should remain non-empty");
+allPassed &= assertContains(output, "Array items: A GitHub MCP server toolset name", "Toolset array items should resolve their schema description");
+allPassed &= assertNotContains(output, "A Linear MCP toolset name", "Removed native Linear toolsets should not be documented");
 
 // Test 8: Verify that all $refs in schema can be resolved
 // Defaults is nested within safe-output configuration, not a root schema property.
@@ -162,8 +163,8 @@ allPassed &= assertContains(unwrappedOutput, "https://github.github.com/gh-aw/re
 allPassed &= assertContains(unwrappedOutput, "cost-speed prefers the fastest model and effort that meet it", "Model routing goal should explain cost-speed");
 allPassed &= assertContains(unwrappedOutput, "auto lets the classifier recommend one of these profiles per task", "Model routing mode should explain auto");
 allPassed &= assertContains(unwrappedOutput, "economy, balanced, and robust set increasing quality bars", "Model routing mode should explain the quality profiles");
-allPassed &= assertContains(unwrappedOutput, "Required Copilot models the router may select and the routed task may call", "Model routing candidates should explain selection and request policy");
-allPassed &= assertContains(unwrappedOutput, "GitHub Actions expressions are rejected when either policy is set", "Model routing candidates should explain expression restrictions");
+allPassed &= assertContains(unwrappedOutput, "This is not a request policy; put patterns such as gpt-* in models.allowed or models.blocked", "Model routing shortlist should explain selection and request policy");
+allPassed &= assertContains(unwrappedOutput, "GitHub Actions expressions are allowed only when neither models.allowed nor models.blocked is set", "Model routing shortlist should explain expression restrictions");
 
 // Summary
 console.log("\n" + "=".repeat(50));

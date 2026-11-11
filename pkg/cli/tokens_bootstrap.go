@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +25,11 @@ func newSecretsBootstrapSubcommand() *cobra.Command {
 are required, check which ones are already configured, and interactively
 prompt for any missing required secrets.
 
-Only required secrets are prompted for. Optional secrets are not shown.`,
+Only required engine/system secrets are prompted for. Optional secrets are not shown.
+Connector credentials are not automatically provisioned: inspect the discovered
+declaration/import bindings with gh aw connector <id> setup --file PATH for phase-specific
+secret names, provider scopes and acquisition/renewal guidance. Never put token values
+in workflow inputs or prompts. Presence of an Actions secret does not prove provider access.`,
 		Example: `  gh aw secrets bootstrap                        # Check and set up all required secrets
   gh aw secrets bootstrap --non-interactive      # Display missing secrets without prompting
   gh aw secrets bootstrap --engine copilot       # Check secrets for a specific engine`,
@@ -62,6 +67,15 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Analyzing workflows in %s...", repoSlug)))
+	if engine == "" {
+		root, err := gitutil.FindGitRoot()
+		if err == nil {
+			err = writeRepositoryConnectorGuidance(os.Stderr, root)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Connector setup discovery incomplete: %v", err)))
+		}
+	}
 
 	// Discover workflows in the repository
 	requirements, err := getSecretRequirements(engine)
@@ -89,7 +103,7 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 
 	if len(missing) == 0 {
 		tokensBootstrapLog.Print("All required secrets present")
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All required secrets are configured."))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All required engine/system secrets are configured; connector/provider access was not checked."))
 		return nil
 	}
 
@@ -120,7 +134,7 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 	}
 
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All required secrets have been configured."))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All required engine/system secrets have been configured; connector/provider access was not checked."))
 
 	return nil
 }

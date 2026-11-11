@@ -74,10 +74,16 @@ func CreateWorkflowMarkdownFile(workflowName string, verbose bool, force bool, e
 		return fmt.Errorf("failed to write workflow file '%s': %w", destFile, err)
 	}
 
+	reportCreatedWorkflow(destFile, workingDir)
+	return nil
+}
+
+func reportCreatedWorkflow(destFile, workingDir string) {
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created new workflow: "+destFile))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Edit the file to customize your workflow, then run '%s compile' to generate the GitHub Actions workflow", string(constants.CLIExtensionPrefix))))
-
-	return nil
+	if err := writeRepositoryConnectorGuidance(os.Stderr, workingDir); err != nil {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Connector setup discovery incomplete: %v", err)))
+	}
 }
 
 // createWorkflowTemplate generates a concise workflow template with essential options
@@ -137,6 +143,7 @@ Be clear and specific about what the AI should accomplish.
 
 - Run ` + "`" + string(constants.CLIExtensionPrefix) + " compile`" + ` to generate the GitHub Actions workflow
 - See https://github.github.com/gh-aw/ for complete configuration options and tools documentation
+- For third-party integrations, inspect an editable local connector or reviewed pinned import and its golden example before configuring tools, network or secret-name bindings; importing alone selects nothing
 `
 }
 
