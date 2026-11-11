@@ -1202,27 +1202,54 @@ describe("redact_secrets.cjs", () => {
           spy.mockRestore();
         }
       });
-      it("continues redacting artifact files when a directory is inaccessible", async () => {
-        const cache = path.join(tempDir, "aw-mcp");
+      it.each([
+        ["root", "EACCES"],
+        ["nested", "EACCES"],
+        ["nested", "EPERM"],
+      ])("fails closed when a %s directory cannot be scanned (%s)", async (location, code) => {
+        const cache = location === "root" ? tempDir : path.join(tempDir, "aw-mcp");
         const artifact = path.join(tempDir, "agent-stdio.log");
-        fs.mkdirSync(cache);
+        const sentinel = path.join(tempDir, "external.md");
+        fs.mkdirSync(cache, { recursive: true });
         fs.writeFileSync(artifact, "secret-value");
+        fs.writeFileSync(sentinel, "external-private-sentinel");
+        fs.symlinkSync(sentinel, path.join(cache, "agent-step-summary.md"));
         process.env.GH_AW_SECRET_NAMES = "TEST_SECRET";
         process.env.SECRET_TEST_SECRET = "secret-value";
         const readDir = fs.readdirSync;
         const readDirSpy = vi.spyOn(fs, "readdirSync").mockImplementation((dir, options) => {
-          if (dir === cache) throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+          if (dir === cache) throw Object.assign(new Error("permission denied"), { code });
           return readDir(dir, options);
         });
         try {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           expect(readDirSpy).toHaveBeenCalledWith(cache, expect.anything());
-          expect(fs.readFileSync(artifact, "utf8")).toBe("***REDACTED***");
-          expect(mockCore.setFailed).not.toHaveBeenCalled();
-          expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Skipping inaccessible directory"));
+          expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to scan directory"));
+          expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("Skipping inaccessible directory"));
+          expect(fs.readFileSync(sentinel, "utf8")).toBe("external-private-sentinel");
         } finally {
           readDirSpy.mockRestore();
+        }
+      });
+      it("fails closed when a planted summary symlink cannot be removed", async () => {
+        const sentinel = path.join(tempDir, "external.md");
+        const summary = path.join(tempDir, "agent-step-summary.md");
+        fs.writeFileSync(sentinel, "external-private-sentinel");
+        fs.symlinkSync(sentinel, summary);
+        const unlink = fs.unlinkSync;
+        const spy = vi.spyOn(fs, "unlinkSync").mockImplementation(file => {
+          if (file === summary) throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+          return unlink(file);
+        });
+        try {
+          const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
+          await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+          expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to scan directory"));
+          expect(fs.readFileSync(sentinel, "utf8")).toBe("external-private-sentinel");
+          expect(fs.lstatSync(summary).isSymbolicLink()).toBe(true);
+        } finally {
+          spy.mockRestore();
         }
       });
       it("redacts readable MCP artifact logs", async () => {
