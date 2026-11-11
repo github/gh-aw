@@ -102,6 +102,63 @@ assert "symlinked metadata was not replaced" test -L "${D}/.git"
 assert "existing history was preserved" test "$(git -C "${D}" rev-parse HEAD)" = "${INITIAL_COMMIT}"
 echo ""
 
+test_private_commit_diagnostics() (
+  local scenario="$1"
+  local case_root="${WORKSPACE}/diagnostics-${scenario}"
+  local cache_dir="${case_root}/cache"
+  local tmp_dir="${case_root}/tmp"
+  local real_git
+  real_git="$(command -v git)"
+  mkdir -p "$cache_dir" "$tmp_dir" "${case_root}/bin"
+  git -C "$cache_dir" init -q
+  printf 'sentinel\n' > "${case_root}/sentinel"
+  ln -s "${case_root}/sentinel" "${tmp_dir}/gh-aw-commit-err"
+  # Isolate the legacy fixed path too, so regressions never touch shared /tmp.
+  sed "s|/tmp/gh-aw-commit-err|${tmp_dir}/gh-aw-commit-err|g" "$SCRIPT" > "${case_root}/commit.sh"
+  cat > "${case_root}/bin/git" <<'EOF'
+#!/bin/bash
+if [[ " $* " == *" commit "* ]]; then
+  if [ "$FIXTURE_SCENARIO" = error ]; then
+    echo "fixture commit failure" >&2
+    exit 42
+  elif [ "$FIXTURE_SCENARIO" = benign ]; then
+    echo "nothing to commit" >&2
+    exit 1
+  fi
+fi
+exec "$FIXTURE_REAL_GIT" "$@"
+EOF
+  chmod +x "${case_root}/bin/git"
+  if [ "$scenario" = allocation-failure ]; then
+    tmp_dir="${case_root}/missing"
+  fi
+  local result=0
+  GH_AW_CACHE_DIR="$cache_dir" GITHUB_RUN_ID=test-run TMPDIR="$tmp_dir" \
+    PATH="${case_root}/bin:$PATH" FIXTURE_SCENARIO="$scenario" FIXTURE_REAL_GIT="$real_git" \
+    bash "${case_root}/commit.sh" > "${case_root}/output" 2>&1 || result=$?
+  assert "$scenario preserves sentinel" test "$(cat "${case_root}/sentinel")" = sentinel
+  assert "$scenario leaves legacy link untouched" test -L "${case_root}/tmp/gh-aw-commit-err"
+  assert "$scenario removes private diagnostics" test -z "$(find "${case_root}/tmp" -name 'gh-aw-commit.*' -print)"
+  if [ "$scenario" = allocation-failure ]; then
+    assert "allocation failure propagates" test "$result" -ne 0
+    assert "allocation failure is diagnosed" grep -q mktemp "${case_root}/output"
+  else
+    assert "$scenario preserves best-effort commit exit status" test "$result" -eq 0
+    case "$scenario" in
+      success) assert "success commits history" test "$(git -C "$cache_dir" log -1 --format=%s)" = run-test-run ;;
+      error) assert "commit failure diagnostics preserved" grep -q "fixture commit failure" "${case_root}/output" ;;
+      benign) assert "benign commit diagnostic recognized" grep -q "nothing to commit (run: test-run)" "${case_root}/output" ;;
+    esac
+  fi
+  exit "$TESTS_FAILED"
+)
+
+echo "Test 4: Private commit diagnostics preserve behavior and clean up"
+for scenario in success error benign allocation-failure; do
+  assert "$scenario diagnostics are safe" test_private_commit_diagnostics "$scenario"
+done
+echo ""
+
 echo "Tests passed: ${TESTS_PASSED}"
 echo "Tests failed: ${TESTS_FAILED}"
 
