@@ -23,6 +23,33 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
     delete process.env.GH_AW_SAFE_OUTPUTS;
   });
 
+  it.each([
+    ["add_labels", { labels: [{ name: "a".repeat(54) }] }],
+    ["remove_labels", { labels: ["a".repeat(54)] }],
+    ["replace_label", { label_to_remove: "bug", label_to_add: "a".repeat(54) }],
+  ])("rejects oversized %s labels without recording an output", async (toolName, args) => {
+    const configPath = path.join(tempDir, "config.json");
+    const toolsPath = path.join(tempDir, "tools.json");
+    const outputPath = path.join(tempDir, "output.jsonl");
+    const tools = JSON.parse(fs.readFileSync(path.join(process.cwd(), "safe_outputs_tools.json"), "utf8"));
+    fs.writeFileSync(configPath, JSON.stringify({ [toolName]: { target: "*" } }));
+    fs.writeFileSync(toolsPath, JSON.stringify(tools.filter(tool => tool.name === toolName)));
+    process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH = configPath;
+    process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH = toolsPath;
+    process.env.GH_AW_SAFE_OUTPUTS = outputPath;
+
+    const { server } = createMCPServer();
+    const response = await server.handleRequest({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: toolName, arguments: { ...args, item_number: 42 } },
+    });
+    expect(response.error.code).toBe(-32602);
+    expect(response.error.message).toContain("maximum length of 50 characters");
+    expect(fs.existsSync(outputPath)).toBe(false);
+  });
+
   it("logs when wrapped arguments are unwrapped", () => {
     const debug = vi.fn();
     const payloadKeys = ["create_discussion"];

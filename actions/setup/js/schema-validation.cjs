@@ -45,9 +45,8 @@ function validateRequiredFields(args, inputSchema) {
  * When a field declares an explicit schema maxLength, that explicit character limit is enforced here;
  * otherwise the default SM-IS-01 10KB byte limit applies.
  *
- * Scope: validates only top-level (direct) properties of the schema where `type === "string"`.
- * Nested object/array schemas are not recursively validated, consistent with the SM-IS-01
- * requirement that applies to "input parameters" (top-level tool arguments).
+ * Explicit maxLength constraints also apply to nested objects, array items, and schema
+ * alternatives. The default byte limit applies only to top-level string parameters.
  *
  * @param {Object} args - The arguments object to validate
  * @param {Object} inputSchema - The input schema describing property types
@@ -59,24 +58,39 @@ function validateStringInputLengths(args, inputSchema, maxBytes) {
   const properties = inputSchema && inputSchema.properties ? inputSchema.properties : {};
   const violations = [];
 
-  for (const [field, schema] of Object.entries(properties)) {
-    if (schema && schema.type === "string") {
-      const value = args[field];
+  function visit(value, schema, field, applyDefaultLimit = false) {
+    if (!schema || typeof schema !== "object") return;
+    if (schema.type === "string") {
       if (typeof value === "string") {
         if (typeof schema.maxLength === "number") {
           const characterLength = Array.from(value).length;
           if (characterLength > schema.maxLength) {
             violations.push({ field, actualLength: characterLength, limit: schema.maxLength, unit: "characters" });
           }
-          continue;
-        }
-
-        const byteLength = Buffer.byteLength(value, "utf8");
-        if (byteLength > limit) {
-          violations.push({ field, actualLength: byteLength, limit, unit: "bytes" });
+        } else if (applyDefaultLimit) {
+          const byteLength = Buffer.byteLength(value, "utf8");
+          if (byteLength > limit) {
+            violations.push({ field, actualLength: byteLength, limit, unit: "bytes" });
+          }
         }
       }
     }
+    if (isPlainObject(value) && isPlainObject(schema.properties)) {
+      for (const [key, propertySchema] of Object.entries(schema.properties)) {
+        if (Object.hasOwn(value, key)) visit(value[key], propertySchema, formatPath(field, key));
+      }
+    }
+    if (Array.isArray(value) && schema.items) {
+      value.forEach((item, index) => visit(item, schema.items, formatPath(field, index)));
+    }
+    for (const alternative of schema.oneOf || schema.anyOf || []) {
+      const types = Array.isArray(alternative.type) ? alternative.type : [alternative.type];
+      if (types.some(type => schemaTypeMatches(value, type))) visit(value, alternative, field);
+    }
+  }
+
+  for (const [field, schema] of Object.entries(properties)) {
+    visit(args[field], schema, field, true);
   }
 
   return violations;

@@ -352,6 +352,27 @@ describe("schema-validation.cjs", () => {
       expect(violations).toEqual([]);
     });
 
+    it("enforces explicit limits on nested label strings and object names without imposing default nested limits", async () => {
+      const { validateStringInputLengths, MAX_STRING_INPUT_BYTES } = await import("./schema-validation.cjs");
+      const schema = {
+        properties: {
+          labels: {
+            type: "array",
+            items: {
+              oneOf: [
+                { type: "string", maxLength: 50 },
+                { type: "object", properties: { name: { type: "string", maxLength: 50 }, notes: { type: "string" } } },
+              ],
+            },
+          },
+        },
+      };
+      expect(validateStringInputLengths({ labels: ["a".repeat(51), { name: "\u{1f680}".repeat(54), notes: "a".repeat(MAX_STRING_INPUT_BYTES + 1) }] }, schema)).toEqual([
+        { field: "labels[0]", actualLength: 51, limit: 50, unit: "characters" },
+        { field: "labels[1].name", actualLength: 54, limit: 50, unit: "characters" },
+      ]);
+    });
+
     it("should allow update_issue body above 10KB when schema declares maxLength", async () => {
       const { validateStringInputLengths, MAX_STRING_INPUT_BYTES } = await import("./schema-validation.cjs");
       const updateIssueSchema = loadUpdateIssueToolSchema();
