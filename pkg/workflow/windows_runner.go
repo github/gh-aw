@@ -564,8 +564,7 @@ func windowsWSLEnvironmentSetup(environmentVariables []string) []string {
 		"$processEnvironment = [System.Environment]::GetEnvironmentVariables('Process')",
 		"$environmentNames = $allowedEnvironmentVariables | Where-Object { $processEnvironment.Contains($_) }",
 		"$wslEnvironment = (($environmentNames | ForEach-Object { $value = [string]$processEnvironment[$_]; if ($pathVariableSet.Contains($_) -or $value -match '^(?:[A-Za-z]:[\\\\/]|\\\\\\\\)') { \"$_/p\" } else { $_ } }) -join ':')",
-		"if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }",
-		"$env:WSLENV = $wslEnvironment",
+		"if ($wslEnvironment.Length -gt 32767) { throw 'The Windows job environment exceeds the WSL forwarding limit.' }; $env:WSLENV = $wslEnvironment",
 	}
 }
 
