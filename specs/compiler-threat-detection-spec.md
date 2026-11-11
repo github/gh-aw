@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.99
+**Version**: 1.0.100
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.99` | Unreleased |
+| `1.0.60`–`1.0.100` | Unreleased |
 | `1.0.44`–`1.0.57` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.29`–`1.0.38` | `v0.87.9` |
@@ -44,7 +44,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 ### Current Implementation Synchronization
 
-The following implementation snapshot complements the detailed mapping in Section 7. Each row was verified against the current source and test paths on 2026-11-04.
+The following implementation snapshot complements the detailed mapping in Section 7. Each row was verified against the current source and test paths on 2026-11-11.
 
 | Requirement area | Implementation | Test reference | Verified |
 |---|---|---|---|
@@ -55,6 +55,7 @@ The following implementation snapshot complements the detailed mapping in Sectio
 | Host-side MCP compilation | `pkg/cli/mcp_server.go`, `pkg/cli/compile_pipeline.go` | `pkg/cli/mcp_server_compile_test.go`, `pkg/cli/compile_validation_no_emit_test.go` | 2026-11-04 |
 | Actions/AW AST lint subsets | `pkg/workflow/lint/` | `pkg/workflow/lint/rule_contract_test.go`, `pkg/workflow/lint/repository_workflows_test.go` | 2026-11-04 |
 | Proxy diagnostic privacy | `actions/setup/js/redact_cli_proxy_diagnostics.cjs`, `actions/setup/js/start_mcp_gateway.cjs` | `actions/setup/js/redact_cli_proxy_diagnostics.test.cjs`, `actions/setup/js/start_mcp_gateway.test.cjs` | 2026-11-04 |
+| Secret-safe agent step-summary publication | `pkg/workflow/compiler_yaml_ai_execution.go`, `actions/setup/js/redact_secrets.cjs`, `actions/setup/js/append_agent_step_summary.cjs`, `actions/setup/sh/append_agent_step_summary.sh` | `pkg/workflow/redaction_upload_gating_test.go`, `actions/setup/js/redact_secrets.test.cjs`, `actions/setup/js/append_agent_step_summary.test.cjs` | 2026-11-11 |
 | Local-only runtime imports | `pkg/workflow/runtime_import_validation.go`, `actions/setup/js/runtime_import.cjs` | `pkg/workflow/runtime_import_target_policy_test.go`, `actions/setup/js/runtime_import_target_policy.test.cjs` | 2026-11-04 |
 | Fork admission and checkout expansion | `pkg/workflow/filters.go`, `pkg/workflow/checkout_manager.go` | `pkg/workflow/filters_forks_test.go`, `pkg/workflow/checkout_multi_test.go` | 2026-11-04 |
 | CTR-032 publisher provenance | `pkg/workflow/compiler_safe_outputs_steps.go`, `actions/setup/js/execution_provenance.cjs` | `pkg/workflow/safe_outputs_job_identity_test.go`, `actions/setup/js/execution_provenance.test.cjs` | 2026-11-04 |
@@ -230,6 +231,8 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-016 Compile-Time Manifest Drift**: Reject new restricted secrets or action references absent from an existing manifest.
 - **CTR-017 Secret Leakage via Environment Variables and Telemetry**: Warn, or reject in strict mode, for uncontrolled secret-expression placement. The Actions/AW linter MUST report secret-tainted values configured as OTLP span or resource attributes, including modeled Actions environment flows, without reproducing the values in diagnostics. This lint check is advisory and does not prove the absence of hard-coded credentials or arbitrary runtime disclosures. When OTLP is enabled and the effective AWF version supports `--exclude-env`, generated agent, threat-detection, and evals AWF invocations using `--env-all` MUST exclude `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, and `GH_AW_OTLP_ENDPOINTS`. These values MUST remain available to host-side exporters. Both inline and external threat-detection paths and evals execution MUST preserve the exclusions. Workflows without OTLP MUST NOT gain these OTLP-specific exclusions unless independently required by another exclusion policy.
   Compiler-generated universal-consumer Copilot credentials MUST remain provider-scoped; OpenAI-compatible client placeholders MUST follow the startup/sandbox boundary in Section 7.6. This is a generated-configuration requirement, not an additional authored-source lint diagnostic.
+
+  Compiler-generated agent step-summary publication MUST execute only when the workflow's secret-masking success condition succeeds, while retaining `always()` semantics for prior-step outcomes. The redaction implementation MUST fail closed on permission-denied scan errors and summary-symlink unlink failures. The summary publisher MUST use the shared Linux descriptor-relative, no-follow guarded reader; accept only isolated regular files no larger than 10 MiB; preserve missing and empty files as no-ops; and fail closed for unsupported, replaced, symlinked, or non-regular files. These controls MUST NOT weaken existing secret-redaction, publication, or failure-gating obligations.
 - **CTR-018 Version Integrity Bypass**: Warn, or reject in strict mode, for `check-for-updates: false`.
 - **CTR-019 Cache-Memory Integrity Enforcement**: When detection is enabled, separate agent cache access from cache-memory publication and require successful agent and detection jobs plus explicit detector acceptance before publication, subject to the compatibility boundaries in Section 5.1.3.
 - **CTR-020 Conditional Import Security**: Reject `imports` entries containing `if`.
@@ -481,7 +484,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-014 Supply Chain Attack via Install Scripts | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
 | CTR-015 Allowed Label Glob Scope | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
 | CTR-016 Compile-Time Manifest Drift | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
-| CTR-017 Secret Leakage via Environment Variables and Telemetry | safe-update, strict env/update, cache, and expression builder; `pkg/workflow/awf_command_builder.go`, `threat_detection_external.go`, `evals_steps.go`; AST subsets: `pkg/workflow/lint/secrets.go`, `otlp_secret_leak.go`, `pkg/workflow/taint/` | corresponding enforcement, secrets, update, cache, and OTLP leak tests; `TestOTLPEnvExcludedFromAWFSandboxes` in `awf_env_test.go`, `TestEvalsOTLPEnvExcludedFromSandbox` in `evals_steps_test.go`, `TestCompiledOTLPEnvExcludedFromAgentDetectionAndEvals` in `threat_detection_isolation_test.go`; `pkg/workflow/taint/taint_test.go`, `pkg/workflow/lint/otlp_secret_leak_test.go` |
+| CTR-017 Secret Leakage via Environment Variables and Telemetry | safe-update, strict env/update, cache, and expression builder; `pkg/workflow/awf_command_builder.go`, `threat_detection_external.go`, `evals_steps.go`; summary publication in `pkg/workflow/compiler_yaml_ai_execution.go`, `actions/setup/js/redact_secrets.cjs`, `actions/setup/js/append_agent_step_summary.cjs`, `actions/setup/sh/append_agent_step_summary.sh`; AST subsets: `pkg/workflow/lint/secrets.go`, `otlp_secret_leak.go`, `pkg/workflow/taint/` | corresponding enforcement, secrets, update, cache, summary-publication, and OTLP leak tests; `pkg/workflow/redaction_upload_gating_test.go`, `actions/setup/js/redact_secrets.test.cjs`, `actions/setup/js/append_agent_step_summary.test.cjs`; `TestOTLPEnvExcludedFromAWFSandboxes` in `awf_env_test.go`, `TestEvalsOTLPEnvExcludedFromSandbox` in `evals_steps_test.go`, `TestCompiledOTLPEnvExcludedFromAgentDetectionAndEvals` in `threat_detection_isolation_test.go`; `pkg/workflow/taint/taint_test.go`, `pkg/workflow/lint/otlp_secret_leak_test.go` |
 | CTR-018 Version Integrity Bypass | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
 | CTR-019 Cache-Memory Integrity Enforcement | `pkg/workflow/compiler_main_job.go`, `cache_memory.go`, `cache_integrity.go`, `cache_steps.go`, shared `cachepolicy/events.go`, `compiler_yaml_post_agent.go`, `drive_memory.go`, `expression_builder.go`, `compiler_yaml.go`, `jobs_validation.go`; GHES configuration in `compiler.go`; native policy presence/scalar handling in `actions/parse.go`, `actions/lower.go`; AST subset: `pkg/workflow/lint/cache_poisoning.go`, `cache_write_overrides.go` | `pkg/workflow/cache_access_test.go`, `cache_integrity_test.go`, `cache_memory_threat_detection_test.go`, `cache_memory_restore_only_test.go`, `cache_memory_restore_keys_test.go`, `cache_scope_validation_test.go`, `cache_retention_days_validation_test.go`, `compiler_jobs_memory_test.go`, `compiler_development_test.go`, `jobs_cache_mode_test.go`, `drive_memory_test.go`, `expression_builder_detection_test.go`; `pkg/workflow/actions/parse_test.go`, `pkg/workflow/lint/cache_write_overrides_test.go`, `pkg/cli/lint_cache_mode_test.go` |
 | CTR-020 Conditional Import Security | `pkg/parser/import_bfs.go` | `pkg/parser/import_bfs_test.go` |
