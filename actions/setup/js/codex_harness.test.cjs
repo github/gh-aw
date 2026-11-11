@@ -150,9 +150,9 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 
 describe("codex_harness.cjs", () => {
   it.each([
-    ["1", "2000", 2, "rate_limit_error", false],
-    ["245", "60000", 1, "rate_limit_wait_exceeded", false],
+    ["1", "2000", 2, "rate_limit_error", true],
     ["245", "60000", 1, "rate_limit_wait_exceeded", true],
+    ["245", "60000", 2, null, false],
   ])("honors Retry-After=%s within cap=%s, attempts=%i, class=%s, GitHub=%s", (delay, cap, attempts, failureClass, github) => {
     const { result, calls, harnessRetry } = runHarnessFixture(
       `
@@ -163,12 +163,13 @@ describe("codex_harness.cjs", () => {
           process.exit(1);
         }
       `,
-      { env: { GH_AW_HARNESS_MAX_DELAY_MS: cap, ...(github ? { GH_AW_LLM_PROVIDER: "github", GH_AW_MODEL_AGENT_CODEX: "copilot/gpt-5" } : {}) } }
+      { env: { GH_AW_HARNESS_MAX_DELAY_MS: cap, GH_AW_LLM_PROVIDER: github ? "github" : "openai", ...(github ? { GH_AW_MODEL_AGENT_CODEX: "copilot/gpt-5" } : {}) } }
     );
     expect(result.status, result.stderr).toBe(attempts === 2 ? 0 : 1);
     expect(calls).toHaveLength(attempts);
-    expect(harnessRetry.attempt_results[0].failure_classes).toEqual([failureClass]);
-    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(1000);
+    if (failureClass) expect(harnessRetry.attempt_results[0].failure_classes).toEqual([failureClass]);
+    else expect(harnessRetry.attempt_results[0].failure_classes || []).not.toContain("rate_limit_wait_exceeded");
+    if (attempts === 2) expect(harnessRetry.attempt_results[1].backoff_ms).toBe(github ? 1000 : 1);
   });
 
   it("does not use tool output as Retry-After timing evidence", () => {

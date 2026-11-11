@@ -1,9 +1,18 @@
 // @ts-check
 "use strict";
 
+const { normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
+const { isCopilotProviderName } = require("./copilot_sdk_multi_provider.cjs");
+
 const RESPONSE_STATUS_PATTERN = /\bHTTP(?:\/\d(?:\.\d)?)?\s+(\d{3})\b|\bCAPIError:\s*(?:(\d{3})\b|Too Many Requests\b)|\b429\s+Too Many Requests\b|["']?(?:status|statusCode|status_code)["']?\s*:\s*["']?(\d{3})["']?\b/gi;
 const RETRY_AFTER_PATTERN = /(?:^|[\s{,])["']?retry-after["']?\s*:\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|(\d+)(?=\s*(?:[,}"'\r\n]|$))|([^"'\r\n}]+))/gi;
 const MONTHS = new Map(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month, index) => [month, index]));
+
+/** @param {string | undefined} provider @returns {boolean} */
+function isGitHubRetryAfterProvider(provider) {
+  const normalized = normalizeReflectProviderName(provider);
+  return REFLECT_PROVIDER_ALIASES.github.has(normalized) || isCopilotProviderName(normalized);
+}
 
 /**
  * Normalize escaped output and split it into status-specific response segments.
@@ -148,4 +157,4 @@ function parseTerminalRetryAfterMs(line, engine) {
   }
 }
 
-module.exports = { hasCopilotResponseStatus, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs };
+module.exports = { hasCopilotResponseStatus, isGitHubRetryAfterProvider, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs };

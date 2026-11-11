@@ -72,7 +72,7 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
-const { hasCopilotResponseStatus, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { hasCopilotResponseStatus, isGitHubRetryAfterProvider, parseCopilotRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { stopForPermissionDenied } = require("./harness_failure_handling.cjs");
 const {
   captureExecutionEvidenceConfiguration,
@@ -1975,6 +1975,8 @@ async function main() {
     });
   }
 
+  const honorRetryAfter = isGitHubRetryAfterProvider(copilotSDKMode ? primaryProviderName : process.env.GH_AW_LLM_PROVIDER || "github");
+
   // Merge SDK env additions into the child process env only when the SDK helper
   // returned at least one variable; otherwise leave the env undefined so that
   // runProcess inherits the full process.env (the common case).
@@ -2164,12 +2166,12 @@ async function main() {
                 durableSession.started(sessionId);
               }
               if (["error", "session.error", "turn.failed"].includes(event?.type)) {
-                observeRetryAfter(line);
+                if (honorRetryAfter) observeRetryAfter(line);
                 if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(JSON.stringify(event))) nativeTerminalRateLimitError = true;
               }
             },
             onStderrLine: line => {
-              observeStderrRetryAfter(line);
+              if (honorRetryAfter) observeStderrRetryAfter(line);
               if (NATIVE_RATE_LIMIT_ERROR_PATTERN.test(line)) nativeTerminalRateLimitError = true;
             },
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },

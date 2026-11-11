@@ -7,12 +7,24 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { parseCopilotRetryAfterMs, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
+const { isGitHubRetryAfterProvider, parseCopilotRetryAfterMs, parseTerminalRetryAfterMs } = require("./copilot_retry_after.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const harnessPath = require.resolve("./copilot_harness.cjs");
 const now = Date.parse("Wed, 11 Nov 2026 08:43:00 GMT");
 
 describe("Copilot Retry-After parsing", () => {
+  it.each([
+    ["github", true],
+    [" GitHub-Copilot ", true],
+    ["github_models", true],
+    ["copilot-responses-1", true],
+    ["openai", false],
+    ["anthropic", false],
+    ["", false],
+  ])("recognizes GitHub provider %s", (provider, expected) => {
+    expect(isGitHubRetryAfterProvider(provider)).toBe(expected);
+  });
+
   it.each([
     ["HTTP 429\nretry-after: 245", 245000],
     ["CAPIError: Too Many Requests\nretry-after: 245", 245000],
@@ -80,6 +92,7 @@ describe("Copilot Retry-After harness integration", () => {
     ["stderr:incomplete-tool-call-stream", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr:capi-too-many", "1", "2000", "", 0, 2, "rate_limit_error"],
     ["turn.failed", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
+    ["session.error", "245", "60000", "", 0, 2, "partial_execution", "openai"],
     ["stderr", "245", "60000", "", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "245", "300000", "2", 1, 1, "rate_limit_wait_exceeded"],
     ["stderr", "2147484", "3000000000", "", 1, 1, "rate_limit_wait_exceeded"],
@@ -94,7 +107,7 @@ describe("Copilot Retry-After harness integration", () => {
     ["stderr:assistant.message", "245", "1", "", 0, 2, "partial_execution"],
     ["stderr:tool.execution_complete", "245", "1", "", 0, 2, "partial_execution"],
     ["invocation-cap", "245", "300000", "", 1, 1, "invocation_cap_exceeded"],
-  ])("%s Retry-After=%s with cap=%s and timeout=%s", (source, retryAfter, maxDelay, timeout, exitCode, attempts, failureClass) => {
+  ])("%s Retry-After=%s with cap=%s and timeout=%s", (source, retryAfter, maxDelay, timeout, exitCode, attempts, failureClass, provider = "github") => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-retry-after-"));
     const callsPath = path.join(directory, "calls.jsonl");
     const stubPath = path.join(directory, "stub.cjs");
@@ -116,7 +129,7 @@ describe("Copilot Retry-After harness integration", () => {
                     ? "CAPIError: 429 Too Many Requests"
                     : failureClass === "rate_limit_error" || failureClass === "rate_limit_wait_exceeded"
                       ? "HTTP 429"
-                      : ["assistant.message", "tool.execution_complete"].includes(eventType)
+                      : ["assistant.message", "tool.execution_complete", "session.error"].includes(eventType)
                         ? "HTTP 429"
                         : "CAPIError: 429 Too Many Requests";
     const trailingOutput = source === "stderr-long-output" ? `\n${"x".repeat(70 * 1024)}` : "";
@@ -149,6 +162,7 @@ if (fs.readFileSync(callsPath, "utf8").trim().split("\\n").length === 1) {
           AWF_REFLECT_ENABLED: "",
           COPILOT_MODEL: "",
           GH_AW_COPILOT_SDK: "",
+          GH_AW_LLM_PROVIDER: provider,
           GH_AW_SKIP_IF_DECISION: "",
         },
         encoding: "utf8",
