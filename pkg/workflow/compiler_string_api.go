@@ -112,12 +112,16 @@ func (c *Compiler) parseStringFrontmatter(content, cleanPath string) (*frontmatt
 	if err := c.preprocessScheduleFields(result.Frontmatter, cleanPath, content); err != nil {
 		return nil, err
 	}
+	_, hasOnField := result.Frontmatter["on"]
+	if err := c.normalizeWorkflowConnectors(result, cleanPath, content, hasOnField || parser.HasConnectorTriggers(result.Frontmatter)); err != nil {
+		return nil, err
+	}
 
 	frontmatterForValidation := c.copyFrontmatterWithoutInternalMarkers(result.Frontmatter)
 
 	// Check if "on" field is missing - distinguish redirect-only placeholders from shared workflows
-	_, hasOnField := frontmatterForValidation["on"]
-	if !hasOnField {
+	_, hasOnField = frontmatterForValidation["on"]
+	if !hasOnField && !parser.HasConnectorTriggers(frontmatterForValidation) {
 		// Check if this is a redirect-only placeholder (has redirect field but no 'on' trigger).
 		// Redirect-only files are distinct from regular shared workflows: they are placeholders
 		// pointing to a workflow's new canonical location and should not be treated as importable components.

@@ -21,6 +21,8 @@
 //
 // Env contract:
 //   GH_AW_SAMPLES        — JSON array of replay entries (required)
+//   GH_AW_SAMPLE_BINDINGS — static paths to runtime string values supplied
+//                          separately in GH_AW_SAMPLE_VALUE_<n> env vars
 //   GH_AW_AGENT_STDIO_LOG     — path where the synthetic stdio log is written
 //   GH_AW_SAFE_OUTPUTS_CONFIG_PATH — path to the MCP server's config.json
 //                               (also read to resolve the per-tool target-repo so
@@ -87,7 +89,60 @@ function loadSamples() {
       throw new Error(`${ERR_VALIDATION}: apply_samples: entry ${i} (tool=${entry.tool}) is missing an "arguments" object`);
     }
   }
-  return parsed;
+  return bindSampleRuntimeValues(parsed);
+}
+
+/**
+ * Resolve compiler-authored string slots only after parsing replay control
+ * data. Runtime values are assigned once as strings, never parsed or expanded.
+ * @param {SampleEntry[]} samples
+ * @returns {SampleEntry[]}
+ */
+function bindSampleRuntimeValues(samples) {
+  const raw = process.env.GH_AW_SAMPLE_BINDINGS;
+  if (!raw) return samples;
+  let bindings;
+  try {
+    bindings = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`${ERR_PARSE}: apply_samples: failed to parse GH_AW_SAMPLE_BINDINGS as JSON: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (!Array.isArray(bindings)) {
+    throw new Error(`${ERR_VALIDATION}: apply_samples: GH_AW_SAMPLE_BINDINGS must be a JSON array`);
+  }
+  for (const binding of bindings) {
+    if (
+      !binding ||
+      !Number.isInteger(binding.entry) ||
+      binding.entry < 0 ||
+      binding.entry >= samples.length ||
+      !Array.isArray(binding.path) ||
+      binding.path.length < 2 ||
+      !binding.path.every(key => typeof key === "string") ||
+      !["arguments", "sidecars"].includes(binding.path[0]) ||
+      typeof binding.env !== "string" ||
+      !/^GH_AW_SAMPLE_VALUE_\d+$/.test(binding.env)
+    ) {
+      throw new Error(`${ERR_VALIDATION}: apply_samples: invalid runtime sample binding`);
+    }
+    let target = samples[binding.entry];
+    for (const key of binding.path.slice(0, -1)) {
+      if (!target || typeof target !== "object" || !Object.hasOwn(target, key)) {
+        throw new Error(`${ERR_VALIDATION}: apply_samples: runtime sample binding path does not exist`);
+      }
+      target = target[key];
+    }
+    const key = binding.path[binding.path.length - 1];
+    if (!target || typeof target !== "object" || !Object.hasOwn(target, key) || typeof target[key] !== "string") {
+      throw new Error(`${ERR_VALIDATION}: apply_samples: runtime sample binding must target an authored string`);
+    }
+    const value = process.env[binding.env];
+    if (value === undefined) {
+      throw new Error(`${ERR_CONFIG}: apply_samples: missing runtime sample value ${binding.env}`);
+    }
+    target[key] = value;
+  }
+  return samples;
 }
 
 /**
