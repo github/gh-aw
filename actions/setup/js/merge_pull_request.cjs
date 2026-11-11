@@ -815,7 +815,7 @@ async function main(config = {}) {
         failureReasons.push({
           code: "protected_files_modified",
           message: "Pull request modifies protected files; independently review and merge manually or change the trusted protected-files configuration",
-          details: { files: fileProtection.files },
+          details: { file_count: Array.isArray(fileProtection.files) ? fileProtection.files.length : 0 },
         });
       }
 

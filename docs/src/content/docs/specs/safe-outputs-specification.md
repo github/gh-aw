@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.22<br>
+**Version**: 1.29.23<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-09<br>
+**Publication Date**: 2026-11-11<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -6959,6 +6959,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.23** (2026-11-11):
+
+- **Specified**: `merge_pull_request` blocks protected-file changes by default using the shared creation rules and exclusions, complete live file evidence, and final revalidation for both live and staged execution.
+- **Clarified**: Explicit `protected-files: allowed` disables only the changed-file gate; caution vetoes and other merge requirements remain enforced. Creation-only review and issue fallback policies are unsupported.
 
 **Version 1.29.22** (2026-11-09):
 

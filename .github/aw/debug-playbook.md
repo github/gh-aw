@@ -201,6 +201,7 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 | `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
 | `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks; no bypass. |
 | `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Reviews/vetoes/threads; current-head allowlisted human approval. | Address feedback; retain independent reviewer authority. |
+| `protected_files_modified` | Complete live PR file list, including deleted paths and both rename sides; shared protected-file rules/exclusions. | Independently review and merge manually, or correct authorized scoped exclusions in trusted workflow configuration and recompile. Explicit `protected-files: allowed` disables only this file gate, not caution vetoes or other merge guards. |
 | `manual_review_caution` | PR/review detection/protected-files/caution notice. | Use independent manual review/merge; approvals/dismissals/labels/green checks cannot clear this guard. |
 | `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
 

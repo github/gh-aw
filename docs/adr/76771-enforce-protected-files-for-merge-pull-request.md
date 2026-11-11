@@ -1,54 +1,41 @@
 # ADR-76771: Enforce Protected-File Checks for merge-pull-request
 
 **Date**: 2026-11-11
-**Status**: Draft
-**Deciders**: pelikhan (PR author) [TODO: verify other reviewers involved in the decision]
+**Status**: Implemented; maintainer sign-off not recorded
+**Decision source**: User direction for [PR #76771](https://github.com/github/gh-aw/pull/76771)
 
----
+## Context
 
-### Context
+`merge-pull-request` merges a pull request on behalf of a workflow. Previously, its protected-file safeguard relied on caution notices in the PR rather than inspecting the actual changed files. A PR without those notices could therefore merge protected files into an otherwise eligible feature branch. `create-pull-request` already defines the protected set, matching rules, and exclusions; a separate merge definition would risk drift.
 
-`merge-pull-request` is a safe-output handler that merges a pull request on behalf of a workflow. Before this change it relied on protected-file caution notices in the PR rather than inspecting the actual file changes, so a PR without those notices could merge changes to protected files (workflow, engine, and manifest files) into an otherwise eligible feature branch. `create-pull-request` already defines a protected-file set, matching rules, and exclusions, and the merge path needs the same protection without a second, drifting definition. The merge path must fail closed: incomplete or unverifiable file evidence must block the merge rather than allow it.
+The user directed this change to reuse those rules, block protected-file changes by default, provide an explicit `allowed` opt-out, and exclude creation-only review and issue fallback policies. This record documents the implemented direction, not independent human approval or completed maintainer sign-off.
 
-### Decision
+## Decision
 
-We will block protected-file changes by default in `merge-pull-request`. The handler reuses the `create-pull-request` protected set, matching rules, and exclusions; lists the complete live PR file list, including deleted paths and both sides of renames; and fails closed on missing, malformed, duplicate, or incomplete evidence, including PRs over GitHub's 3000-file listing limit. The same check repeats at final revalidation before the merge API call. The primary driver is safety: the handler inspects what a merge would actually change instead of trusting notices.
+Inspect the complete live PR file list using paginated API results, including deleted paths and both sides of renames. Reuse `create-pull-request` protection matching and both handler and repository exclusions. Unless trusted configuration resolves to `protected-files: allowed`, refuse protected changes and fail closed on missing, malformed, duplicate, or incomplete evidence, including changed-file counts above GitHub's 3000-file listing limit.
 
-### Alternatives Considered
+Repeat file protection during final revalidation before either a merge API call or staged success. GitHub's merge API atomically fences only the evaluated head SHA; revalidation narrows but does not eliminate races involving other mutable policy state.
 
-#### Alternative 1: Keep relying on caution notices (status quo)
+Accept `blocked` (the default), `allowed`, GitHub Actions expressions, and the object form with `policy` and scoped `exclude` entries. Do not support `request-review` or `fallback-to-issue` for merging. Explicit `allowed` skips file inspection but preserves existing caution vetoes, branch restrictions, reviews, and other merge gates. Human approvers remain optional on eligible feature branches unless `required-approvers` is configured.
 
-Leave protected-file handling to the caution notices already present on PRs. This is the lowest-effort option and adds no API calls. We rejected it because the notices describe what a PR is supposed to contain and do not verify the diff. A PR without notices could merge protected files into an eligible branch, which is the gap this change closes.
+Treat the default-on behavior change as breaking and use a major changeset, consistent with the release policy. Existing workflows can retain blocking and use manual merge, configure scoped exclusions, or explicitly opt out when intentional; configuration changes require recompilation.
 
-#### Alternative 2: Check protected files only at evaluation time
+## Alternatives Considered
 
-Evaluate the file list once, when the merge is first evaluated, and skip re-checking before the merge call. This is simpler and needs fewer list calls. We rejected it because the PR head or file set can change between evaluation and merge. The final revalidation narrows that window, although it does not close it entirely (see Negative consequences). [TODO: verify whether single-evaluation was seriously discussed during review.]
+These are concrete design tradeoffs, not claims that each option was historically proposed or approved.
 
-#### Alternative 3: Reuse create-pull-request's request-review or fallback-to-issue policies
+- **Retain caution-only protection.** Adds no file-list API calls and preserves prior behavior, but leaves unmarked protected changes unchecked.
+- **Check files only during initial evaluation.** Reduces API calls, but misses evidence changes before live or staged success. Final revalidation provides a narrower race window.
+- **Make blocking opt-in.** Avoids a breaking default change, but leaves existing workflows exposed to the gap. It does not satisfy the user's default-blocking direction.
+- **Adopt creation-only `request-review` and `fallback-to-issue`.** Would reuse policy names, but needs a separate merge-time review or issue lifecycle rather than the creation handler's behavior. The user explicitly excluded these policies; manual merge remains available.
+- **Maintain a merge-specific protected set.** Allows independent tuning, but can drift from creation protection. Shared matching and scoped exclusions provide consistency without another definition.
 
-Support the same `request-review` and `fallback-to-issue` policies that `create-pull-request` offers when protected files are touched. We rejected these for merge-pull-request because they assume a new PR or issue can be created as a fallback, and a merge has no equivalent artifact. The PR intentionally leaves them unsupported; the handler accepts only `blocked`, `allowed`, or a GitHub Actions expression.
+## Consequences
 
-### Consequences
+Protected changes no longer depend on notice markers for enforcement. Shared matching and exclusions keep creation and merge protection consistent, and unverifiable evidence cannot authorize a merge. Existing caution vetoes remain independent of file protection, including when `allowed` is configured.
 
-#### Positive
-- Protected-file changes are blocked by default, so merges no longer depend on caution notices being present.
-- The protected set, matching rules, and exclusions are shared with `create-pull-request`, so a single definition governs both handlers.
-- Fail-closed evidence handling means a partial or malformed file list cannot authorize a merge.
-- Re-checking at final revalidation catches file changes made after the initial evaluation.
+Previously eligible merges may now be refused by default, requiring migration or manual handling. Scoped exclusions and the explicit opt-out entrust policy authors with weakening this gate; they do not establish human approval or clear caution notices. PRs exceeding 3000 changed files cannot pass the enabled file gate. Initial and final checks add paginated API calls and can refuse a merge when evidence changes or becomes unavailable.
 
-#### Negative
-- PRs with more than 3000 changed files are blocked, because the file listing cannot be verified completely.
-- Each evaluation and revalidation adds paginated file-list API calls.
-- A race window remains between final revalidation and the merge API call. GitHub atomically enforces only the evaluated head SHA, not file state.
-- `protected-files: allowed` is an explicit workflow-owned opt-out that removes this protection for that workflow.
-- Teams that need review-based handling of protected files must merge those PRs manually, since `request-review` and `fallback-to-issue` are unsupported here.
+The handler records `changed_files` in its policy snapshot and emits `protected_files_modified` for protected changes. Other mutable policy evidence can still change after final revalidation because the merge API only fences the head SHA.
 
-#### Neutral
-- Compiler configuration, the JSON schema, audit failure codes, tool descriptions, and docs are updated to match.
-- Object-form scoped exclusions (`{ policy, exclude }`) are supported for `merge-pull-request`, so changes to the exclusion list affect this handler as well as `create-pull-request`.
-- The `changed_files` count is added to the policy snapshot, so a change in file count between evaluation and revalidation is treated as a policy change.
-- The PR reports focused parser and compiler tests, focused JavaScript suites, and a full `make agent-report-progress` pass with no lock-file drift across 365 workflows. [TODO: verify these results against CI before accepting the ADR.]
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+This ADR does not certify test results, reviewer approval, or live merge validation. Validation evidence belongs in the PR; no live merge or workflow dispatch is authorized by this decision.

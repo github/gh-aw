@@ -404,6 +404,15 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 				importsLog.Printf("Merged %d accumulated protected-files exclude(s) into push-to-pull-request-branch", len(excludeFiles))
 			}
 		}
+		if result.MergePullRequest != nil {
+			if excludeFiles, ok := accumulatedExclude["merge-pull-request"]; ok && len(excludeFiles) > 0 {
+				result.MergePullRequest.ProtectedFilesExclude = sliceutil.MergeUnique(
+					result.MergePullRequest.ProtectedFilesExclude,
+					excludeFiles...,
+				)
+				importsLog.Printf("Merged %d accumulated protected-files exclude(s) into merge-pull-request", len(excludeFiles))
+			}
+		}
 	}
 
 	importsLog.Printf("Successfully merged safe-outputs from imports")
