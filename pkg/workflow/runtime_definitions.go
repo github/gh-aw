@@ -12,16 +12,17 @@ var runtimeDefLog = logger.New("workflow:runtime_definitions")
 
 // Runtime represents configuration for a runtime environment
 type Runtime struct {
-	ID                string            // Unique identifier (e.g., "node", "python")
-	Name              string            // Display name (e.g., "Node.js", "Python")
-	ActionRepo        string            // GitHub Actions repository (e.g., "actions/setup-node")
-	ActionVersion     string            // Action version (e.g., "v4", without @ prefix)
-	VersionField      string            // Field name for version in action (e.g., "node-version")
-	DefaultVersion    string            // Default version to use
-	Commands          []string          // Commands that indicate this runtime is needed
-	ExtraWithFields   map[string]string // Additional 'with' fields for the action
-	ManifestFiles     []string          // Package manifest file names for this runtime (matched by filename, no path)
-	UnverifiedCreator bool              // True if the action creator is not GitHub-verified; triggers zizmor suppression
+	ID                    string // Unique identifier (e.g., "node", "python")
+	Name                  string // Display name (e.g., "Node.js", "Python")
+	ActionRepo            string // GitHub Actions repository (e.g., "actions/setup-node")
+	ActionVersion         string // Action version (e.g., "v4", without @ prefix)
+	actionVersionExplicit bool
+	VersionField          string            // Field name for version in action (e.g., "node-version")
+	DefaultVersion        string            // Default version to use
+	Commands              []string          // Commands that indicate this runtime is needed
+	ExtraWithFields       map[string]string // Additional 'with' fields for the action
+	ManifestFiles         []string          // Package manifest file names for this runtime (matched by filename, no path)
+	UnverifiedCreator     bool              // True if the action creator is not GitHub-verified; triggers zizmor suppression
 }
 
 // RuntimeRequirement represents a detected runtime requirement

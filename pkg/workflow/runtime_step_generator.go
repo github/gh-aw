@@ -3,8 +3,10 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
@@ -171,6 +173,12 @@ func generateSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubAction
 }
 
 func resolveRuntimeSetupActionRef(runtime *Runtime, data *WorkflowData) string {
+	if runtime.actionVersionExplicit {
+		if ref, err := getActionPinWithData(runtime.ActionRepo, runtime.ActionVersion, data); err == nil && ref != "" && actionRefMatchesVersion(ref, runtime.ActionVersion) {
+			return ref
+		}
+		return fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
+	}
 	if ref := getActionPinForData(runtime.ActionRepo, data); ref != "" {
 		return ref
 	}
@@ -178,6 +186,14 @@ func resolveRuntimeSetupActionRef(runtime *Runtime, data *WorkflowData) string {
 		return fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
 	}
 	return runtime.ActionRepo
+}
+
+func actionRefMatchesVersion(ref, version string) bool {
+	_, resolvedVersion := pinnedUsesRepoAndSourceVersion(ref)
+	if resolvedVersion == "" {
+		resolvedVersion = extractActionVersion(ref)
+	}
+	return resolvedVersion == version || semverutil.IsActionVersionTag(version) && strings.HasPrefix(resolvedVersion, version+".")
 }
 
 func generateGhAWRuntimeSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubActionStep {

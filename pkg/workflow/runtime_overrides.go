@@ -22,6 +22,7 @@ func cloneRuntimeWithActionOverrides(base *Runtime, actionRepo, actionVersion st
 	}
 	if actionVersion != "" {
 		customRuntime.ActionVersion = actionVersion
+		customRuntime.actionVersionExplicit = true
 	}
 
 	return &customRuntime
