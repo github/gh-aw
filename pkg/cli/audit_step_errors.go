@@ -6,15 +6,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
-
-var ghaLogTimestampPrefixPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T`)
 
 // extractPreAgentStepErrors scans workflow step log files for actionable failure content.
 // It always prefers GitHub Actions ##[error] annotations from step logs. When no
