@@ -1891,7 +1891,7 @@ jobs:
             const { main } = require('${{ runner.temp }}/gh-aw-setup/actions/validate_recovery_envelopes.cjs');
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Append agent step summary
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'

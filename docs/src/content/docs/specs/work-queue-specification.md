@@ -991,6 +991,7 @@ Use a small operation union:
 | `Work` | Admit immutable task metadata/payload; its first commit/operation position is its FIFO position |
 | `Claim` | Record selected Work, Claim, `dispatch_id`, and local assignment handle; charge/reserve a logical Work slot and create the group's native reservation on its first Claim |
 | `Completion` | Finish only an effective Claim and establish its authorization prerequisites; optional `keep_open` retains nonterminal Work |
+| `DeliveryEvidence` | Retain bounded original-worker verifier receipts and effect inventory for fresh post-restart readback; never establish Result by itself |
 | `Result` | Record a completed node's verified result/availability barrier after its scoped effect processing succeeds |
 | `DeliveryFailure` | Close a completed node's unresolved delivery barrier after terminal-run evidence and bounded reconciliation; never authorize effects or release successors |
 | `Observation` | Record normalized trusted GitHub Issue/PR condition evidence, including identity and observation time |
@@ -2351,7 +2352,22 @@ equal to or independently verified as an ancestor of the prepared base.
 Unrelated commits, malformed SHAs, conflicting routing, and unknown fields
 remain invalid. Canonical message binding and protected in-process creation/
 delivery proofs remain required; serialized artifacts, agent assertions, and
-public PR metadata cannot reconstruct those private proofs.
+public PR metadata cannot reconstruct those private proofs. The only durable
+substitute is a `DeliveryEvidence` operation published by the authenticated
+original worker attempt after Completion and before process exit or native
+release. Maintenance MUST perform fresh independent native readback against
+that evidence and MUST NOT treat the operation itself as proof of delivery.
+
+`DeliveryEvidence` is immutable per Claim/Completion and binds the original
+Work, Claim, Dispatch, local handle, run ID and native attempt 1. Its canonical
+JSON is limited to 32 KiB, with at most 128 ordered output receipts and 256
+recorded effects. Adapter configurations and bounded adapter fields are limited
+to 8 KiB. Content digests, native identities and immutable revisions replace
+resource bodies where possible; declared REST/GraphQL field values remain
+bounded readback expectations. Queue controls are verified from fresh checked
+same-Claim ledger inventory. Checkpoints retain evidence only while its delivery
+barrier is pending and omit the evidence key when empty, preserving historical
+checkpoint digests. Result or DeliveryFailure removes the pending evidence.
 
 After exact native-run/attempt terminal evidence and exhausted reconciliation,
 publish `DeliveryFailure` when delivery cannot be established. Record the
@@ -2361,6 +2377,12 @@ evidence that effects never began; absence of a receipt is `unknown`. A terminal
 failure is a decision to abandon this delivery barrier, not proof that no
 external mutations happened. Without terminal evidence, retain pending state
 and report the unresolved run instead.
+
+Maintenance MUST attempt available durable-evidence verification before
+publishing deadline expiry. If its first terminal-run reconciliation occurs
+after the delivery deadline, it MUST allow one bounded fresh readback, capped at
+15 seconds, before failing the barrier. This does not reopen the normal retry
+budget, re-execute handlers, or rewrite an existing terminal Result or failure.
 
 When no protected delivery verifier survives, automatic maintenance MAY
 explicitly enable deadline expiry. It MUST wait until the Completion's durable

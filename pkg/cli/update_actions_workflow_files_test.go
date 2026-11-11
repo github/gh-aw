@@ -8,7 +8,43 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestFindWorkflowWithMergeConflictMarkers_DefaultDirectory(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GH_AW_WORKFLOWS_DIR", "")
+	require.NoError(t, os.MkdirAll(".github/workflows", 0o755))
+	path := filepath.Join(".github", "workflows", "conflict.md")
+	require.NoError(t, os.WriteFile(path, []byte("<<<<<<< local\n=======\n>>>>>>> upstream\n"), 0o600))
+
+	found, err := findWorkflowWithMergeConflictMarkers("")
+	require.NoError(t, err)
+	require.Equal(t, path, found)
+}
+
+func TestFindWorkflowWithMergeConflictMarkers_MissingDirectory(t *testing.T) {
+	for _, workflowsDir := range []string{"", "custom/workflows"} {
+		t.Run(workflowsDir, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			t.Setenv("GH_AW_WORKFLOWS_DIR", "")
+
+			found, err := findWorkflowWithMergeConflictMarkers(workflowsDir)
+			require.NoError(t, err)
+			require.Empty(t, found)
+		})
+	}
+}
+
+func TestFindWorkflowWithMergeConflictMarkers_ReadFailure(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Symlink(filepath.Join(dir, "missing"), filepath.Join(dir, "broken.md")))
+
+	_, err := findWorkflowWithMergeConflictMarkers(dir)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
 
 func TestUpdateActionsInWorkflowFiles_UpdatesUsesReferences(t *testing.T) {
 	t.Parallel()

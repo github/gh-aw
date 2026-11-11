@@ -1343,7 +1343,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Append agent step summary
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
       - name: Copy Safe Outputs
         if: always()

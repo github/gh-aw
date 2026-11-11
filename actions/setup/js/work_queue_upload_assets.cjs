@@ -16,6 +16,8 @@ const {
   withClaimResourceEffects,
   createClaimResourceVerification,
   withClaimResourceVerification,
+  claimDeliveryReceipt,
+  durableReceipt,
 } = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
@@ -96,15 +98,38 @@ async function main(config = {}, suppliedClient) {
     });
     const server = process.env.GITHUB_SERVER_URL || "https://github.com";
     const result = { success: true, repo: repository, branch, path: assetPath, sha: sha256, commit: commit.data.sha, url: `${server}/${repository}/blob/${branch}/${assetPath}?raw=true` };
-    receipts.set(result, { ...factoryIdentity, repository, branch, path: assetPath, sha256, blob: blob.data.sha, tree: tree.data.sha, commit: commit.data.sha, parent: head, authorityResource });
+    receipts.set(result, { ...factoryIdentity, repository, branch, path: assetPath, sha256, blob: blob.data.sha, tree: tree.data.sha, commit: commit.data.sha, parent: head, authorityResource, url: result.url });
     return result;
   };
 }
 
 async function verifyAssetDelivery(options) {
-  const { claim, result, github } = options;
+  const receipt = claimDeliveryReceipt(options, "asset", receipts);
+  return verifyAssetReceipt(options, receipt);
+}
+
+function validAssetReceipt(receipt, claim) {
+  return (
+    receiptMatchesClaim(receipt, claim) &&
+    ["repository", "branch", "path", "blob", "tree", "commit", "url"].every(key => typeof receipt[key] === "string" && receipt[key].length > 0) &&
+    /^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(receipt.repository) &&
+    /^[a-f0-9]{64}$/.test(receipt.sha256) &&
+    (receipt.parent === null || (typeof receipt.parent === "string" && receipt.parent.length > 0)) &&
+    receipt.authorityResource?.repository === receipt.repository &&
+    receipt.authorityResource.ref === `refs/heads/${receipt.branch}` &&
+    receipt.authorityResource.path === receipt.path
+  );
+}
+
+function durableAssetReceipt(result, claim) {
   const receipt = result && receipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim)) return { verified: false, diagnostics: { event: "asset.receipt_missing" } };
+  if (!validAssetReceipt(receipt, claim)) return null;
+  return durableReceipt(receipt);
+}
+
+async function verifyAssetReceipt(options, receipt) {
+  const { claim, github } = options;
+  if (!validAssetReceipt(receipt, claim)) return { verified: false, diagnostics: { event: "asset.receipt_missing" } };
   const [owner, repo] = receipt.repository.split("/");
   const ref = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
   if (ref.data.object.sha !== receipt.commit) return { verified: false, diagnostics: { event: "asset.ref_mismatch" } };
@@ -120,7 +145,7 @@ async function verifyAssetDelivery(options) {
   const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
-    resource: { kind: "asset", repository: receipt.repository, id: receipt.commit, ref: `heads/${receipt.branch}`, path: receipt.path, sha256: receipt.sha256, url: result.url },
+    resource: { kind: "asset", repository: receipt.repository, id: receipt.commit, ref: `heads/${receipt.branch}`, path: receipt.path, sha256: receipt.sha256, url: receipt.url },
     authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
     effect_resources: [
       { kind: "git_blob", repository: receipt.repository, id: receipt.blob },
@@ -133,4 +158,4 @@ async function verifyAssetDelivery(options) {
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
-module.exports = { main, verifyAssetDelivery };
+module.exports = { main, verifyAssetDelivery, durableAssetReceipt };

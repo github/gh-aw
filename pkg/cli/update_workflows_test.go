@@ -104,6 +104,17 @@ func TestResolveLatestRelease_StableReleaseSelected(t *testing.T) {
 	assert.Equal(t, "v1.2.0", result, "should select highest compatible stable release")
 }
 
+func TestResolveLatestRelease_CRLFOutput(t *testing.T) {
+	t.Parallel()
+
+	deps := mockWorkflowUpdateDeps(func(context.Context, string) ([]byte, error) {
+		return []byte("v1.2.0\r\nv1.1.0\r\nv1.0.0\r\n"), nil
+	})
+	result, err := resolveLatestReleaseWithDeps(context.Background(), deps, "owner/repo", "v1.0.0", false, false, 0)
+	require.NoError(t, err)
+	assert.Equal(t, "v1.2.0", result)
+}
+
 // TestResolveLatestRelease_MixedPrereleaseAndStable verifies correct selection when
 // releases include both prerelease and stable versions across major versions.
 func TestResolveLatestRelease_MixedPrereleaseAndStable(t *testing.T) {

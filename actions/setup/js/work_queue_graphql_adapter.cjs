@@ -4,7 +4,17 @@ const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 // @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client authorize resolved GraphQL targets before mutations.
 
 const { canonical, canonicalBytes, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
-const { assertClaimAuthorized, currentClaimHandle, claimIdentity, assertClaimIdentity, receiptMatchesClaim, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
+const {
+  assertClaimAuthorized,
+  currentClaimHandle,
+  claimIdentity,
+  assertClaimIdentity,
+  receiptMatchesClaim,
+  claimDeliveryReceipt,
+  durableReceipt,
+  createClaimResourceVerification,
+  withClaimResourceVerification,
+} = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient, graphEffectIdentity } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
@@ -145,12 +155,30 @@ function createGraphqlEffectHandler(adapter, github) {
   };
 }
 
+function durableGraphqlReceipt(result, claim) {
+  const receipt = result && receipts.get(result);
+  if (!receiptMatchesClaim(receipt, claim) || canonicalBytes(receipt.fields) > 8192) return null;
+  return durableReceipt(receipt, ["adapter"]);
+}
+
 async function verifyGraphqlAdapterDelivery(options) {
-  const { adapter, result, claim, github } = options;
+  const receipt = claimDeliveryReceipt(options, "graphql_adapter", receipts);
+  return verifyGraphqlReceipt(options, receipt);
+}
+
+async function verifyGraphqlReceipt(options, receipt) {
+  const { adapter, claim, github } = options;
   const unverified = field_index => ({ verified: false, diagnostics: { event: "graphql.readback.mismatch", field_index } });
   validateGraphqlAdapter(adapter);
-  const receipt = result && receipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return unverified(-1);
+  if (!receiptMatchesClaim(receipt, claim) || (options.durable === true ? options.result?.entry?.adapter : receipt.adapter) !== canonical(adapter)) return unverified(-1);
+  try {
+    nodeIdentity(receipt.id);
+    if (typeof receipt.effect_id !== "string" || !/^[a-f0-9]{64}$/.test(receipt.effect_id)) return unverified(-1);
+    closed(receipt.fields, [...new Set([...Object.keys(adapter.expected || {}), ...Object.keys(adapter["field-map"] || {})])], [], "GraphQL receipt fields");
+    canonical(receipt.fields);
+  } catch {
+    return unverified(-1);
+  }
   if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return unverified(-1);
   const config = adapter.graphql;
   const typed = ["Issue", "PullRequest"].includes(config["resource-type"]);
@@ -182,4 +210,4 @@ async function verifyGraphqlAdapterDelivery(options) {
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
-module.exports = { validateGraphqlAdapter, createGraphqlEffectHandler, verifyGraphqlAdapterDelivery };
+module.exports = { validateGraphqlAdapter, createGraphqlEffectHandler, verifyGraphqlAdapterDelivery, durableGraphqlReceipt };
