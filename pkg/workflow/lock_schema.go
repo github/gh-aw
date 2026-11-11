@@ -29,18 +29,23 @@ const (
 	LockSchemaV3 LockSchemaVersion = "v3"
 	// LockSchemaV4 is the current lock file schema version (adds body_hash for full stale-check coverage)
 	LockSchemaV4 LockSchemaVersion = "v4"
+
+	// CurrentSetupRuntimeContractVersion identifies the compiler/setup runtime
+	// contract required to execute the generated activation metadata.
+	CurrentSetupRuntimeContractVersion = 1
 )
 
 // LockMetadata represents the structured metadata embedded in lock files
 type LockMetadata struct {
-	SchemaVersion   LockSchemaVersion `json:"schema_version"`
-	FrontmatterHash string            `json:"frontmatter_hash,omitempty"`
-	BodyHash        string            `json:"body_hash,omitempty"`
-	StopTime        string            `json:"stop_time,omitempty"`
-	CompilerVersion string            `json:"compiler_version,omitempty"`
-	Docs            string            `json:"docs,omitempty"`
-	Strict          bool              `json:"strict,omitempty"`
-	DryRun          bool              `json:"dry_run,omitempty"`
+	SchemaVersion               LockSchemaVersion `json:"schema_version"`
+	FrontmatterHash             string            `json:"frontmatter_hash,omitempty"`
+	BodyHash                    string            `json:"body_hash,omitempty"`
+	StopTime                    string            `json:"stop_time,omitempty"`
+	CompilerVersion             string            `json:"compiler_version,omitempty"`
+	SetupRuntimeContractVersion int               `json:"setup_runtime_contract_version,omitempty"`
+	Docs                        string            `json:"docs,omitempty"`
+	Strict                      bool              `json:"strict,omitempty"`
+	DryRun                      bool              `json:"dry_run,omitempty"`
 	// AgentMetadataInfo is embedded so agent fields are declared once and
 	// serialized inline in the lock metadata JSON.
 	AgentMetadataInfo
@@ -121,12 +126,13 @@ func GenerateLockMetadata(hashInfo LockHashInfo, stopTime string, strict bool, a
 	lockSchemaLog.Printf("Generating lock metadata: schema=%s, strict=%t, hasStopTime=%t, hasBodyHash=%t", LockSchemaV4, strict, stopTime != "", hashInfo.BodyHash != "")
 
 	metadata := &LockMetadata{
-		SchemaVersion:     LockSchemaV4,
-		FrontmatterHash:   hashInfo.FrontmatterHash,
-		BodyHash:          hashInfo.BodyHash,
-		StopTime:          stopTime,
-		Strict:            strict,
-		AgentMetadataInfo: agentInfo,
+		SchemaVersion:               LockSchemaV4,
+		FrontmatterHash:             hashInfo.FrontmatterHash,
+		BodyHash:                    hashInfo.BodyHash,
+		StopTime:                    stopTime,
+		SetupRuntimeContractVersion: CurrentSetupRuntimeContractVersion,
+		Strict:                      strict,
+		AgentMetadataInfo:           agentInfo,
 	}
 
 	// Include compiler version only for release builds

@@ -42,6 +42,11 @@ Call the worker.
 
 	for name, compiled := range map[string]string{"caller": caller, "worker": worker} {
 		t.Run(name, func(t *testing.T) {
+			metadata, _, err := ExtractMetadataFromLockFile(compiled)
+			require.NoError(t, err)
+			require.NotNil(t, metadata)
+			assert.Equal(t, CurrentSetupRuntimeContractVersion, metadata.SetupRuntimeContractVersion)
+
 			var workflow struct {
 				Jobs map[string]struct {
 					Steps []struct {

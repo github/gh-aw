@@ -59,7 +59,11 @@ async function main(core, ctx, githubClient) {
   // Build awInfo from env vars (compile-time) + context (runtime)
   const model = process.env.GH_AW_INFO_MODEL || "";
   const workflowId = process.env.GH_AW_INFO_WORKFLOW_ID || "";
-  if (!process.env.GH_AW_INFO_WORKFLOW_SHA) throw new Error("Executing compiler metadata requires GH_AW_INFO_WORKFLOW_SHA; recompile this workflow");
+  if (!process.env.GH_AW_INFO_WORKFLOW_SHA) {
+    throw new Error(
+      `${ERR_CONFIG}: Activation failed before the agent started: the trusted executing workflow revision is unavailable (GH_AW_INFO_WORKFLOW_SHA is missing). Recompile this workflow to generate a lock that supplies job.workflow_sha; compiler Markdown metadata will not be loaded from an unverified revision.`
+    );
+  }
   const { loadMarkdownMetadata, metadataManifestFields } = require("./markdown_metadata.cjs");
   const markdownMetadata = await loadMarkdownMetadata(workflowId, process.env.GITHUB_WORKSPACE || "", {
     repository: ctx.repo ? `${ctx.repo.owner}/${ctx.repo.repo}` : undefined,

@@ -33,7 +33,7 @@ const mockGithub = {
   rest: {
     repos: {
       getContent: vi.fn(async ({ path }) => ({
-        data: { type: "file", path, encoding: "base64", content: Buffer.from('# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n').toString("base64") },
+        data: { type: "file", path, encoding: "base64", content: Buffer.from('# gh-aw-metadata: {"setup_runtime_contract_version":1}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n').toString("base64") },
       })),
     },
     actions: {
@@ -98,7 +98,7 @@ describe("generate_aw_info.cjs", () => {
     vi.spyOn(fs, "realpathSync").mockImplementation(filename => (String(filename).endsWith(".lock.yml") ? String(filename) : realPath(filename)));
     vi.spyOn(fs, "readFileSync").mockImplementation((filename, ...args) => {
       if (String(filename).endsWith(".lock.yml")) {
-        const header = '# gh-aw-metadata: {}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n';
+        const header = '# gh-aw-metadata: {"setup_runtime_contract_version":1}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n';
         return args[0] === "utf8" ? header : Buffer.from(header);
       }
       if (files.has(String(filename))) return files.get(String(filename));
@@ -187,6 +187,26 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.created_at).toBeTruthy();
   });
 
+  it.each([
+    ["missing", {}],
+    ["unsupported", { setup_runtime_contract_version: 2 }],
+  ])("rejects locks with %s setup runtime contract metadata", async (_name, metadata) => {
+    mockGithub.rest.repos.getContent.mockImplementationOnce(async ({ path }) => ({
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(`# gh-aw-metadata: ${JSON.stringify(metadata)}\n# gh-aw-manifest: {"version":1,"agent_metadata":{}}\n# compiled fixture\n`).toString("base64") },
+    }));
+
+    await expect(main(mockCore, mockContext)).rejects.toThrow(/Activation failed before the agent started.*setup runtime requires contract version 1.*gh aw compile/i);
+    expect(fs.existsSync(awInfoPath)).toBe(false);
+  });
+
+  it("fails safely when the trusted executing workflow revision is unavailable", async () => {
+    delete process.env.GH_AW_INFO_WORKFLOW_SHA;
+
+    await expect(main(mockCore, mockContext)).rejects.toThrow(/ERR_CONFIG.*trusted executing workflow revision is unavailable.*GH_AW_INFO_WORKFLOW_SHA.*unverified revision/i);
+    expect(mockGithub.rest.repos.getContent).not.toHaveBeenCalled();
+    expect(fs.existsSync(awInfoPath)).toBe(false);
+  });
+
   it("keeps compiler metadata in aw_info.json without dumping it to Actions logs", async () => {
     const agent = { name: "private-agent", description: "confidential-agent-description", model: "private-model", tools: ["confidential-tool"] };
     const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -198,7 +218,7 @@ describe("generate_aw_info.cjs", () => {
       metadata_errors: { [`artifact:${errorDigest}`]: "confidential-compiler-error" },
     };
     mockGithub.rest.repos.getContent.mockImplementationOnce(async ({ path }) => ({
-      data: { type: "file", path, encoding: "base64", content: Buffer.from(`# gh-aw-metadata: {}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# compiled fixture\n`).toString("base64") },
+      data: { type: "file", path, encoding: "base64", content: Buffer.from(`# gh-aw-metadata: {"setup_runtime_contract_version":1}\n# gh-aw-manifest: ${JSON.stringify(manifest)}\n# compiled fixture\n`).toString("base64") },
     }));
 
     await main(mockCore, mockContext);

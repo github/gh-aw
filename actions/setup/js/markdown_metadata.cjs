@@ -9,6 +9,7 @@ const { parseLockFileHeaders, parseMarkdownJSON } = require("./lock_file_headers
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isRateLimitError } = require("./error_recovery.cjs");
 // Metadata reads block activation, so cap rate-limit retries at about 90 seconds plus jitter.
 const MARKDOWN_METADATA_RETRY_CONFIG = { ...RATE_LIMIT_RETRY_CONFIG, maxRetries: 2, maxDelayMs: 60000, shouldRetry: isRateLimitError };
+const SETUP_RUNTIME_CONTRACT_VERSION = 1;
 
 /** @typedef {{sha256: string, kind: string, value: any, error?: string}} MetadataRecord */
 /** @typedef {{version: number, records: MetadataRecord[]}} MetadataCatalog */
@@ -272,6 +273,11 @@ function resolveMarkdownMetadata(headers) {
 
 /** @param {string} file @param {string} workspace */
 function readLocalMarkdownMetadata(file, workspace) {
+  return resolveMarkdownMetadata(readLocalLockFileHeaders(file, workspace));
+}
+
+/** @param {string} file @param {string} workspace */
+function readLocalLockFileHeaders(file, workspace) {
   const root = path.resolve(workspace);
   const absolute = path.resolve(file);
   const relative = path.relative(root, absolute);
@@ -280,11 +286,16 @@ function readLocalMarkdownMetadata(file, workspace) {
   const realRelative = path.relative(fs.realpathSync(root), fs.realpathSync(absolute));
   if (!info.isFile() || info.size > 4 * 1024 * 1024 || realRelative.startsWith("..") || path.isAbsolute(realRelative)) throw new Error("Executing workflow lock manifest must be a bounded regular workspace file");
   const content = new TextDecoder("utf8", { fatal: true }).decode(fs.readFileSync(absolute));
-  return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
+  return parseLockFileHeaders(content.split(/\r?\n/, 3));
 }
 
 /** @param {any} githubClient @param {{owner: string, repo: string, path: string, ref: string}} identity */
 async function readRemoteMarkdownMetadata(githubClient, identity) {
+  return resolveMarkdownMetadata(await readRemoteLockFileHeaders(githubClient, identity));
+}
+
+/** @param {any} githubClient @param {{owner: string, repo: string, path: string, ref: string}} identity */
+async function readRemoteLockFileHeaders(githubClient, identity) {
   if (!githubClient?.rest?.repos?.getContent) throw new Error("Compiler Markdown metadata requires the source repository's GitHub client");
   let response;
   try {
@@ -300,7 +311,18 @@ async function readRemoteMarkdownMetadata(githubClient, identity) {
   const bytes = Buffer.from(encoded, "base64");
   if (bytes.length > 4 * 1024 * 1024 || bytes.toString("base64") !== encoded) throw new Error("Executing workflow lock manifest requires bounded canonical base64");
   const content = new TextDecoder("utf8", { fatal: true }).decode(bytes);
-  return resolveMarkdownMetadata(parseLockFileHeaders(content.split(/\r?\n/, 3)));
+  return parseLockFileHeaders(content.split(/\r?\n/, 3));
+}
+
+/** @param {Record<string, unknown>|undefined} metadata @param {string} workflowPath */
+function validateSetupRuntimeContract(metadata, workflowPath) {
+  const version = metadata?.setup_runtime_contract_version;
+  if (version === SETUP_RUNTIME_CONTRACT_VERSION) return;
+  const found = Number.isSafeInteger(version) ? `contract version ${version}` : "no setup runtime contract version";
+  const sourcePath = workflowPath.replace(/\.lock\.yml$/, ".md");
+  throw new Error(
+    `Activation failed before the agent started: executing workflow lock ${workflowPath} has ${found}, but this setup runtime requires contract version ${SETUP_RUNTIME_CONTRACT_VERSION}. Recompile the workflow with: gh aw compile "${sourcePath}"`
+  );
 }
 
 /** @param {string} workflowId @param {string} workspace @param {{repository?: string, githubClient?: any, revision?: string}} [options] */
@@ -313,7 +335,9 @@ async function loadMarkdownMetadata(workflowId, workspace, { repository, githubC
   if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Invalid compiler Markdown metadata path");
   if (revision && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(revision) || /^0+$/.test(revision))) throw new Error("Executing workflow metadata requires an immutable workflow revision");
   const remote = revision || (repository && repository !== `${match[1]}/${match[2]}`);
-  const metadata = remote ? await readRemoteMarkdownMetadata(githubClient, { owner: match[1], repo: match[2], path: match[3], ref: revision || match[4] }) : readLocalMarkdownMetadata(file, workspaceRoot);
+  const headers = remote ? await readRemoteLockFileHeaders(githubClient, { owner: match[1], repo: match[2], path: match[3], ref: revision || match[4] }) : readLocalLockFileHeaders(file, workspaceRoot);
+  validateSetupRuntimeContract(headers.metadata, match[3]);
+  const metadata = resolveMarkdownMetadata(headers);
   if (!metadata) throw new Error("Executing lock manifest lacks compiler Markdown metadata; recompile this workflow");
   installMarkdownMetadata(metadata);
   ensureCheckoutMarkdownMetadata(checkoutArtifactDocuments(workspaceRoot), workspaceRoot);
