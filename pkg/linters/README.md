@@ -25,6 +25,7 @@ The method names mentioned in analyzer descriptions (such as `Err`, `Flush`, `Re
 - `errorfwrapv` — reports `fmt.Errorf` calls that pass error arguments without `%w` wrapping.
 - `excessivefuncparams` — reports function declarations that exceed a configurable parameter-count threshold.
 - `errormessage` — reports non-actionable error-message patterns in changed files; pass `-errormessage.full-repo` (or `-errormessage.changed-files=all`) to audit the whole repository.
+- `errorsnewerrorstring` — reports `errors.New(err.Error())` calls that discard the original error and break error-chain matching.
 - `errortypeassertion` — reports type assertions from `error` to concrete types and recommends `errors.As`.
 - `errstringmatch` — reports `strings.Contains(err.Error(), "...")` patterns and recommends `errors.Is` / `errors.As`.
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
@@ -203,6 +204,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `errorfwrapv` | Custom `go/analysis` analyzer that flags `fmt.Errorf` calls that pass error arguments without `%w` wrapping |
 | `excessivefuncparams` | Custom `go/analysis` analyzer that flags function declarations with too many positional parameters |
 | `errormessage` | Custom `go/analysis` analyzer that flags non-actionable error message patterns in changed files (or all files with `-errormessage.full-repo`) |
+| `errorsnewerrorstring` | Custom `go/analysis` analyzer that flags `errors.New(err.Error())` calls that discard the original error and break `errors.Is` / `errors.As` matching |
 | `errortypeassertion` | Custom `go/analysis` analyzer that flags type assertions from `error` to concrete types and recommends `errors.As` |
 | `errstringmatch` | Custom `go/analysis` analyzer that flags brittle `strings.Contains(err.Error(), "...")` checks |
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
@@ -299,6 +301,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/ctxbackground"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
 	"github.com/github/gh-aw/pkg/linters/errormessage"
+	"github.com/github/gh-aw/pkg/linters/errorsnewerrorstring"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
@@ -333,6 +336,7 @@ _ = deferinloop.Analyzer
 _ = errorfwrapv.Analyzer
 _ = excessivefuncparams.Analyzer
 _ = errormessage.Analyzer
+_ = errorsnewerrorstring.Analyzer
 _ = errstringmatch.Analyzer
 _ = execcommandwithoutcontext.Analyzer
 _ = fileclosenotdeferred.Analyzer

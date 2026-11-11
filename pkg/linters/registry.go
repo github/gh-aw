@@ -19,6 +19,7 @@ import (
 	deferrerrorunchecked "github.com/github/gh-aw/pkg/linters/deferred-error-unchecked"
 	"github.com/github/gh-aw/pkg/linters/errorfwrapv"
 	"github.com/github/gh-aw/pkg/linters/errormessage"
+	"github.com/github/gh-aw/pkg/linters/errorsnewerrorstring"
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
@@ -129,6 +130,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	fprintlnsprintf.Analyzer,
 	errstringmatch.Analyzer,
 	errorfwrapv.Analyzer,
+	errorsnewerrorstring.Analyzer,
 	execcommandwithoutcontext.Analyzer,
 	excessivefuncparams.Analyzer,
 	fileclosenotdeferred.Analyzer,
