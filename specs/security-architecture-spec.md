@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.1.9<br>
+**Version**: 1.1.10<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -24,7 +24,7 @@ The security architecture employs defense-in-depth principles including input sa
 
 This is a Candidate Recommendation specification and represents the current state of the GitHub Agentic Workflows security architecture. This specification is subject to updates based on security research, community feedback, and operational experience. Future versions may introduce additional security controls or refine existing requirements.
 
-**Publication Date**: January 29, 2026  
+**Publication Date**: November 11, 2026  
 **Governance**: This specification is maintained by GitHub Next and governed by GitHub's security and research processes.
 
 ## Table of Contents
@@ -2098,6 +2098,13 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 ---
 
 ## Change Log
+
+### Version 1.1.10 (Go Toolchain Security Baseline)
+
+**Published**: November 11, 2026
+
+- Raises the TT-03 repository Go toolchain baseline from 1.27.3 to 1.27.4 in response to GO-2026-6859.
+- Preserves release-toolchain rejection, embedded-toolchain evidence, repository pinning, user-selected runtime ownership, and `GOROOT` isolation requirements.
 
 ### Version 1.1.9 (Appendix G Test Mapping)
 
