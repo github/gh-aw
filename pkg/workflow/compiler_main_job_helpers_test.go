@@ -30,6 +30,7 @@ func TestBuildMainJobCondition(t *testing.T) {
 		activationJobCreated bool
 		rawFrontmatter       map[string]any // nil = guardrail enabled (default)
 		jobs                 map[string]any
+		continueOnError      bool
 		want                 string
 	}{
 		{
@@ -47,6 +48,12 @@ func TestBuildMainJobCondition(t *testing.T) {
 		{
 			name:                 "activation, no if, guardrail enabled — AIC guard appended",
 			activationJobCreated: true,
+			want:                 "needs.activation.outputs.daily_ai_credits_exceeded != 'true' && needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'",
+		},
+		{
+			name:                 "activation, guardrail warning mode — quota-blocked accounting stays fail-open",
+			activationJobCreated: true,
+			continueOnError:      true,
 			want:                 "needs.activation.outputs.daily_ai_credits_exceeded != 'true'",
 		},
 		{
@@ -72,6 +79,8 @@ func TestBuildMainJobCondition(t *testing.T) {
 				If:             tt.dataIf,
 				Jobs:           tt.jobs,
 				RawFrontmatter: tt.rawFrontmatter,
+
+				MaxDailyAICContinueOnError: tt.continueOnError,
 			}
 			got := c.buildMainJobCondition(data, tt.activationJobCreated)
 			assert.Equal(t, tt.want, got)

@@ -385,6 +385,12 @@ func appTokenPermissionFields(app *GitHubAppConfig, permissions *Permissions) ma
 			continue
 		}
 		level := strings.ToLower(strings.TrimSpace(val))
+		if scope == PermissionRepositoryAdvisories && level == string(PermissionNone) {
+			// Omit the denied scope from the explicit token permission set, including
+			// any inferred grant. The installation API does not accept "none".
+			delete(permissionFields, "permission-repository-advisories")
+			continue
+		}
 		tempPerms := NewPermissionsFromMap(map[PermissionScope]PermissionLevel{scope: PermissionLevel(level)})
 		maps.Copy(permissionFields, convertPermissionsToAppTokenFields(tempPerms))
 	}
@@ -557,6 +563,11 @@ func convertPermissionsToAppTokenFields(permissions *Permissions) map[string]str
 	}
 	if level, ok := permissions.GetExplicit(PermissionSecretScanningAlerts); ok && level != PermissionNone {
 		fields["permission-secret-scanning-alerts"] = string(level)
+	}
+	if level, ok := permissions.GetExplicit(PermissionRepositoryAdvisories); ok && level != PermissionNone {
+		// The pinned action reads every INPUT_PERMISSION-* environment variable,
+		// including inputs not yet declared in its action.yml.
+		fields["permission-repository-advisories"] = string(level)
 	}
 	// Organization-level
 	if level, ok := permissions.GetExplicit(PermissionOrganizationProj); ok {

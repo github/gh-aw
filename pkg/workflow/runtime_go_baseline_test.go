@@ -16,12 +16,12 @@ import (
 
 func TestRepositoryGoToolingBaseline(t *testing.T) {
 	t.Parallel()
-	require.Equal(t, "1.27.3", string(constants.DefaultGoVersion))
+	require.Equal(t, "1.27.4", string(constants.DefaultGoVersion))
 	root := filepath.Join("..", "..")
 	for _, path := range []string{"go.mod", ".github/workflows/go.mod"} {
 		data, err := os.ReadFile(filepath.Join(root, path))
 		require.NoError(t, err)
-		require.Contains(t, "\n"+string(data), "\ngo 1.27.3\n", path)
+		require.Contains(t, "\n"+string(data), "\ngo 1.27.4\n", path)
 	}
 	data, err := os.ReadFile(filepath.Join(root, ".golangci.yml"))
 	require.NoError(t, err)
@@ -31,7 +31,7 @@ func TestRepositoryGoToolingBaseline(t *testing.T) {
 		} `yaml:"run"`
 	}
 	require.NoError(t, yaml.Unmarshal(data, &lint))
-	require.Equal(t, "1.27.3", lint.Run.Go)
+	require.Equal(t, "1.27.4", lint.Run.Go)
 	data, err = os.ReadFile(filepath.Join(root, ".devcontainer", "devcontainer.json"))
 	require.NoError(t, err)
 	var devcontainer struct {
@@ -40,7 +40,7 @@ func TestRepositoryGoToolingBaseline(t *testing.T) {
 		} `json:"features"`
 	}
 	require.NoError(t, json.Unmarshal(data, &devcontainer))
-	require.Equal(t, "1.27.3", devcontainer.Features["ghcr.io/devcontainers/features/go:1"].Version)
+	require.Equal(t, "1.27.4", devcontainer.Features["ghcr.io/devcontainers/features/go:1"].Version)
 }
 
 func TestOwnedWorkflowGoVersionPins(t *testing.T) {
@@ -67,7 +67,7 @@ func TestOwnedWorkflowGoVersionPins(t *testing.T) {
 		if config.Source != "" || config.Runtimes.Go.Version == "" {
 			continue
 		}
-		require.Equal(t, "1.27.3", config.Runtimes.Go.Version, path)
+		require.Equal(t, "1.27.4", config.Runtimes.Go.Version, path)
 		checked++
 	}
 	require.Positive(t, checked, "owned runtime pins must actually be inspected")

@@ -29,6 +29,28 @@ func buildDetectionNoVerdictCondition() ConditionNode {
 	)
 }
 
+// buildDetectionQuotaBlockedSummaryStep surfaces a detection deferred by GitHub API
+// quota exhaustion in the final summary. It makes no API calls: the quota is
+// exhausted, and deferred detection is not a security pass.
+func buildDetectionQuotaBlockedSummaryStep() []string {
+	job := "needs." + string(constants.DetectionJobName)
+	condition := BuildAnd(
+		BuildFunctionCall("always"),
+		BuildEquals(BuildPropertyAccess(job+".outputs.detection_reason"), BuildStringLiteral("github_api_quota_exhausted")),
+	)
+	return []string{
+		"      - name: Report quota-blocked threat detection\n",
+		fmt.Sprintf("        if: %s\n", RenderCondition(condition)),
+		"        run: |\n",
+		"          echo \"::warning::GitHub API quota exhausted: threat detection was deferred and is not a security pass. Safe outputs were not published; agent artifacts are retained for a later run.\"\n",
+		"          {\n",
+		"            echo \"### GitHub API quota exhausted\"\n",
+		"            echo \"\"\n",
+		"            echo \"Threat detection was deferred because AWF attestation verification could not complete before the GitHub API quota reset. This is not a security pass: safe outputs were not published, and completed agent artifacts are retained. See the detection job summary for resource, limit, remaining, and reset details.\"\n",
+		"          } >> \"$GITHUB_STEP_SUMMARY\"\n",
+	}
+}
+
 // buildConclusionSetupSteps extracts the common setup, token minting, and artifact steps.
 func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	var steps []string
@@ -85,6 +107,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 			fmt.Sprintf("        if: %s\n", RenderCondition(BuildAnd(BuildFunctionCall("always"), buildDetectionNoVerdictCondition()))),
 			"        run: echo \"::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs.\"\n",
 		)
+		steps = append(steps, buildDetectionQuotaBlockedSummaryStep()...)
 		steps = append(steps, buildDetectionArtifactDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
 	}
 	steps = append(steps, buildUsageArtifactInputDownloadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin)...)

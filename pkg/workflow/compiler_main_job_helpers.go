@@ -34,7 +34,13 @@ func (c *Compiler) buildMainJobCondition(data *WorkflowData, activationJobCreate
 	}
 	if activationJobCreated && hasMaxDailyAICGuardrail(data) {
 		compilerMainJobLog.Print("Applying daily-AIC guardrail to main job condition")
-		guard := &ExpressionNode{Expression: fmt.Sprintf("needs.%s.outputs.daily_ai_credits_exceeded != 'true'", constants.ActivationJobName)}
+		guardExpression := fmt.Sprintf("needs.%s.outputs.daily_ai_credits_exceeded != 'true'", constants.ActivationJobName)
+		if !data.MaxDailyAICContinueOnError {
+			// A handled GitHub API quota stop leaves accounting unverified. It skips
+			// the agent instead of failing activation; warning mode stays fail-open.
+			guardExpression += fmt.Sprintf(" && needs.%s.outputs.daily_ai_credits_guardrail_status != 'quota_blocked'", constants.ActivationJobName)
+		}
+		guard := &ExpressionNode{Expression: guardExpression}
 		if jobCondition == "" {
 			jobCondition = RenderCondition(guard)
 		} else {

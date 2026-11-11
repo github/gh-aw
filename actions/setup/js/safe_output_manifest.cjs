@@ -38,6 +38,7 @@ const MERGE_FAILURE_CODES = new Set([
   "blocking_individual_review",
   "required_approval_missing",
   "manual_review_caution",
+  "protected_files_modified",
   "blocking_review_state",
   "unresolved_review_threads",
   "merge_not_completed",

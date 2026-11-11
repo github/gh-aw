@@ -594,6 +594,64 @@ func TestMergeSafeOutputsDescriptorMergedFieldsUnit(t *testing.T) {
 	})
 }
 
+func TestMergeSafeOutputsMergePullRequestProtectedFilesExclude(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+
+	tests := []struct {
+		name         string
+		topExclude   []string
+		importedJSON []string
+		wantExclude  []string
+	}{
+		{
+			name:         "import supplies exclusions",
+			importedJSON: []string{`{"merge-pull-request":{"protected-files":{"policy":"allowed","exclude":["AGENTS.md"]}}}`},
+			wantExclude:  []string{"AGENTS.md"},
+		},
+		{
+			name:         "import supplies rooted changeset exclusion",
+			importedJSON: []string{`{"merge-pull-request":{"protected-files":{"policy":"allowed","exclude":["/.changeset/*.md"]}}}`},
+			wantExclude:  []string{"/.changeset/*.md"},
+		},
+		{
+			name:         "main and import exclusions merge as a set",
+			topExclude:   []string{"CLAUDE.md"},
+			importedJSON: []string{`{"merge-pull-request":{"protected-files":{"exclude":["AGENTS.md","CLAUDE.md"]}}}`},
+			wantExclude:  []string{"CLAUDE.md", "AGENTS.md"},
+		},
+		{
+			name:       "multiple overridden imports contribute exclusions",
+			topExclude: []string{"AGENTS.md"},
+			importedJSON: []string{
+				`{"merge-pull-request":{"protected-files":{"exclude":["AGENTS.md","CLAUDE.md"]}}}`,
+				`{"merge-pull-request":{"protected-files":{"exclude":["CLAUDE.md","GEMINI.md"]}}}`,
+			},
+			wantExclude: []string{"AGENTS.md", "CLAUDE.md", "GEMINI.md"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			topConfig := &SafeOutputsConfig{
+				MergePullRequest: &MergePullRequestConfig{
+					ProtectedFilesPolicy:  "blocked",
+					ProtectedFilesExclude: tt.topExclude,
+					RequiredLabels:        []string{"ready-to-merge"},
+				},
+			}
+			result, err := compiler.MergeSafeOutputs(topConfig, tt.importedJSON, map[string]any{
+				"merge-pull-request": map[string]any{"protected-files": "blocked"},
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, result.MergePullRequest)
+			assert.Equal(t, tt.wantExclude, result.MergePullRequest.ProtectedFilesExclude)
+			assert.Equal(t, "blocked", result.MergePullRequest.ProtectedFilesPolicy)
+			assert.Equal(t, []string{"ready-to-merge"}, result.MergePullRequest.RequiredLabels)
+		})
+	}
+}
+
 func TestMergeSafeOutputsSteer(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
 

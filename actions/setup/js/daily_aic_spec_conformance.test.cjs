@@ -276,7 +276,6 @@ describe("daily AIC specification: basic conformance", () => {
   it.each([
     [401, {}, "structural_error", 1],
     [403, {}, "structural_error", 1],
-    [403, { "x-ratelimit-remaining": "0" }, "transient_error", 1],
     [429, {}, "transient_error", 1],
     [503, { "retry-after": "120" }, "transient_error", 1],
     [503, {}, "transient_error", 3],
@@ -284,8 +283,24 @@ describe("daily AIC specification: basic conformance", () => {
     github.rest.actions.getWorkflowRun.mockRejectedValue(apiError(status, headers, "read failed"));
     await check();
     expect(outputs).toMatchObject({ daily_ai_credits_guardrail_status: expected, daily_ai_credits_total: "", daily_ai_credits_estimated: "", daily_ai_credits_exceeded: "false" });
-    expect(global.core.setFailed).toHaveBeenCalledOnce();
+    // A quota-blocked stop skips the agent via the job condition instead of failing activation.
+    if (expected === "quota_blocked") expect(global.core.setFailed).not.toHaveBeenCalled();
+    else expect(global.core.setFailed).toHaveBeenCalledOnce();
     expect(github.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(attempts);
+    expect(client.listArtifacts).not.toHaveBeenCalled();
+  });
+
+  it("T-AIC-DG-022 quota exhaustion keeps accounting unknown for enforced startup gating", async () => {
+    github.rest.actions.getWorkflowRun.mockRejectedValue(apiError(403, { "x-ratelimit-remaining": "0" }, "rate limit"));
+    await check();
+    expect(outputs).toMatchObject({
+      daily_ai_credits_guardrail_status: "quota_blocked",
+      daily_ai_credits_total: "",
+      daily_ai_credits_estimated: "",
+      daily_ai_credits_exceeded: "false",
+    });
+    expect(global.core.setFailed).not.toHaveBeenCalled();
+    expect(github.rest.actions.getWorkflowRun).toHaveBeenCalledOnce();
     expect(client.listArtifacts).not.toHaveBeenCalled();
   });
 

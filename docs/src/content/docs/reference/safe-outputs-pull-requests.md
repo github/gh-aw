@@ -7,7 +7,7 @@ sidebar:
 
 This page covers pull-request-focused safe outputs: [`create-pull-request`](#pull-request-creation-create-pull-request), [`update-pull-request`](#pull-request-updates-update-pull-request), [`close-pull-request`](#close-pull-request-close-pull-request), [`approve-workflow-run`](#approve-workflow-run-approve-workflow-run), [`merge-pull-request`](#merge-pull-request-merge-pull-request) (experimental), [`create-pull-request-review-comment`](#pr-review-comments-create-pull-request-review-comment), [`submit-pull-request-review`](#submit-pr-review-submit-pull-request-review), [`reply-to-pull-request-review-comment`](#reply-to-pr-review-comment-reply-to-pull-request-review-comment), [`resolve-pull-request-review-thread`](#resolve-pr-review-thread-resolve-pull-request-review-thread), [`push-to-pull-request-branch`](#push-to-pr-branch-push-to-pull-request-branch), and [`add-reviewer`](#add-reviewer-add-reviewer).
 
-Code-writing types (`create-pull-request` and `push-to-pull-request-branch`) enforce [Protected Files](#protected-files) by default. For all other safe-output types, see [Safe Outputs](/gh-aw/reference/safe-outputs/).
+Code-writing types (`create-pull-request` and `push-to-pull-request-branch`) and `merge-pull-request` enforce [Protected Files](#protected-files) by default. For all other safe-output types, see [Safe Outputs](/gh-aw/reference/safe-outputs/).
 
 ## Pull Request Creation (`create-pull-request:`)
 
@@ -275,6 +275,9 @@ safe-outputs:
     required-check-apps:             # optional expected GitHub App ID for each named check
       ci/test: 15368
     required-approvers: [maintainer]  # at least one independent human approval on that head
+    protected-files:                 # blocked by default; same protected set as create-pull-request
+      policy: blocked                # blocked or allowed
+      exclude: ["/.changeset/*.md"]   # optional exceptions using standard protected-file semantics
     target: "triggering"              # "triggering" (default, current PR) or "*" (any PR with pull_request_number)
     target-repo: "owner/repo"         # cross-repository target
     allowed-repos: ["org/other-repo"] # additional repositories the agent can merge into
@@ -298,9 +301,13 @@ safe-outputs:
 
 **Authorization boundary**: Labels, titles, and branch names are filters, not human authorization. Keep approval accounts and their credentials outside the acting agent's control. Do not give the agent credentials that impersonate allowlisted humans or power to dismiss their reviews. A review reported as a human account is not proof that a person, rather than automation using that account, authored it. Workflow-owned policies must be protected from agent edits; safe-output configuration alone does not isolate credentials or revoke other tools' powers.
 
+**Protected files**: Before evaluation completes and again before merging or a staged preview, the handler reads the target PR's complete changed-file list from GitHub. Added, modified, deleted, and renamed files are checked, including both paths of a rename. The protected set, engine-specific files, top-level dot-folder protection, default `CHANGELOG.md` exception, per-handler exclusions, and repository-wide `aw.json` exclusions are the same as `create-pull-request`. Protection applies to the target PR's changes relative to its base, not unrelated historical changes on either branch.
+
+`protected-files` defaults to `blocked`. Use `protected-files: allowed` to explicitly disable this file gate, or the object form `{ policy: blocked, exclude: [...] }` for scoped exceptions. Both string and object policies accept GitHub Actions expressions; unrecognized resolved values block protected-file changes. Creation-specific `request-review` and `fallback-to-issue` policies are not supported. Missing, malformed, or incomplete file evidence blocks merging, including PRs exceeding GitHub's 3000-file listing limit. Explicit `allowed` skips file inspection but never overrides caution notices, branch restrictions, reviews, or other gates. Eligible feature-branch merges still do not require `required-approvers` unless configured.
+
 **Caution veto**: Detection warnings or failures in the current run block merging. The handler also checks the live PR body, labels, and all individual review bodies for prior threat-detected or detector-engine-error notices, protected-files review notices, and `[!CAUTION]` alerts. These notices block both live and staged merges, including cross-repository targets. Bot reviews, advisory `COMMENTED` reviews, dismissed reviews, and superseded reviews retain this veto. Missing or malformed body, label, or review evidence fails closed; an empty API body (`null`) is valid.
 
-No approval, dismissal, passing check, or label clears this veto, even with `required-approvers`. GitHub's aggregate review decision on an unprotected branch does not prove an enforceable independent-review policy, and an approval alone does not attest that a particular caution was resolved. Independently review flagged changes and merge through the repository's normal manual process rather than removing notices to enable this safe output. Ordinary unmarked merges retain the approval policy described above. This is a conservative notice-based veto, not a fresh scan of changed files or an immutable history of removed PR metadata.
+No approval, dismissal, passing check, or label clears this veto, even with `required-approvers`. GitHub's aggregate review decision on an unprotected branch does not prove an enforceable independent-review policy, and an approval alone does not attest that a particular caution was resolved. Independently review flagged changes and merge through the repository's normal manual process rather than removing notices to enable this safe output. Ordinary unmarked merges retain the approval policy described above. This notice-based veto is independent of the changed-file protection gate and is not an immutable history of removed PR metadata.
 
 **Revision and traceability**: The merge API receives the evaluated head SHA. A mismatch fails without retrying the merge; a new request must evaluate policy again. Before execution (and staged previews), the handler rechecks PR policy fields (including the complete body), branch restrictions, the open upstream PR, review evidence, approvals, and required checks. Results include `decision_evidence` with the evaluated head/base revision, configured gates, check-run IDs, review decision, approval logins/review IDs, caution reason codes, and evaluation/revalidation timestamps. Raw PR and review bodies are not returned as evidence. Already-merged results are idempotent and do not claim a new evaluation. GitHub only atomically enforces the head SHA: branch policy, reviews, checks, and base state can still change after the final reads.
 
@@ -603,7 +610,7 @@ If the initial branch API returns 403, the check logs a warning and continues (G
 
 ## Protected Files
 
-Both `create-pull-request` and `push-to-pull-request-branch` enforce protected file protection by default. Patches that modify package manifests, agent instruction files, repository security configuration, or any top-level directory whose name starts with `.` are refused unless you explicitly configure a policy.
+`create-pull-request`, `push-to-pull-request-branch`, and `merge-pull-request` enforce protected file protection by default. They check package manifests, agent instruction files, repository security configuration, and any top-level directory whose name starts with `.`. Creation and push default to requesting review; merge defaults to blocking protected changes.
 
 This protects against supply chain attacks where an AI agent could inadvertently (or through prompt injection) alter dependency definitions, CI/CD pipelines, or agent behavior files.
 
@@ -613,7 +620,7 @@ The following are always protected unless explicitly excluded: package manifests
 
 ### Policy Options
 
-The `protected-files` field accepts either a string policy value or an object with a `policy` and an `exclude` list.
+The `protected-files` field accepts either a string policy value or an object with a `policy` and an `exclude` list. The following policy table describes creation and push. For `merge-pull-request`, only `blocked` (default) and `allowed` apply; matching and exclusions are shared.
 
 **String form** — set a single policy for all protected files:
 

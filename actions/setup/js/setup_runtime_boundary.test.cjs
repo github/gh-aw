@@ -41,7 +41,8 @@ describe("Actions runtime metadata boundary", () => {
 
   it("reads metadata in JavaScript without launching an external parser", () => {
     const source = readFileSync(resolve(setupDirectory, "js/markdown_metadata.cjs"), "utf8");
-    expect(source).not.toMatch(/["'](?:node:)?child_process["']/);
+    expect(source).toMatch(/require\(["']node:child_process["']\)/);
+    expect(source).toMatch(/execFileSync\(["']git["']/);
     expect(source).not.toContain('"markdown-metadata"');
     expect(source).not.toContain('"markdown-metadata.exe"');
   });

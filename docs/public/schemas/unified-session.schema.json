@@ -484,7 +484,7 @@
     "DailyAICDecisionData": {
       "type": "object",
       "properties": {
-        "status": { "type": "string", "enum": ["disabled", "skipped", "under_budget", "exceeded", "structural_error", "transient_error"] },
+        "status": { "type": "string", "enum": ["disabled", "skipped", "under_budget", "exceeded", "structural_error", "transient_error", "quota_blocked"] },
         "exceeded": { "type": "boolean" },
         "total": { "type": "number" },
         "estimated": { "type": "number" },

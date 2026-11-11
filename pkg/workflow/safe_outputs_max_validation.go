@@ -113,6 +113,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.AddSecurityAdvisoryComment != nil {
+		if err := checkMaxField("add_security_advisory_comment", config.AddSecurityAdvisoryComment.Max); err != nil {
+			return err
+		}
+	}
 	if config.AssignMilestone != nil {
 		if err := checkMaxField("assign_milestone", config.AssignMilestone.Max); err != nil {
 			return err
@@ -198,6 +203,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 	}
 	if config.CreatePullRequests != nil {
 		if err := checkMaxField("create_pull_request", config.CreatePullRequests.Max); err != nil {
+			return err
+		}
+	}
+	if config.CreateSecurityAdvisory != nil {
+		if err := checkMaxField("create_security_advisory", config.CreateSecurityAdvisory.Max); err != nil {
 			return err
 		}
 	}

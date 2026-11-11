@@ -133,6 +133,9 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.MarkPullRequestAsReadyForReview = markPRReadyConfig
 			}
 
+			config.CreateSecurityAdvisory = c.parseCreateSecurityAdvisoryConfig(outputMap)
+			config.AddSecurityAdvisoryComment = c.parseAddSecurityAdvisoryCommentConfig(outputMap)
+
 			// Handle approve-workflow-run
 			approveWorkflowRunConfig := c.parseApproveWorkflowRunConfig(outputMap)
 			if approveWorkflowRunConfig != nil {

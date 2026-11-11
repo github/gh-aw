@@ -37,6 +37,12 @@ function classifyDetectionOutcome(reason) {
         reason,
         description: "The detector did not produce a valid result. Security assessment is incomplete; this is not evidence of a threat or a clean result.",
       };
+    case "github_api_quota_exhausted":
+      return {
+        category: "detection_deferred",
+        reason,
+        description: `${getDetectionReasonText(reason)} Safe outputs were not published; completed agent artifacts are retained for a later run.`,
+      };
     default:
       return {
         category: "detection_outcome_unknown",

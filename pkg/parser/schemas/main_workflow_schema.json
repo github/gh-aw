@@ -11244,6 +11244,38 @@
               "type": "object",
               "description": "Experimental configuration for controlled pull request merges. The merge is blocked unless all configured gates pass.",
               "properties": {
+                "protected-files": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": ["blocked", "allowed"],
+                      "default": "blocked"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\$\\{\\{.*\\}\\}$",
+                      "description": "GitHub Actions expression resolving to blocked or allowed. Unrecognized resolved values block protected-file changes."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "oneOf": [
+                            { "type": "string", "enum": ["blocked", "allowed"], "default": "blocked" },
+                            { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
+                          ]
+                        },
+                        "exclude": {
+                          "type": "array",
+                          "items": { "type": "string", "pattern": "^[^\\s]*[A-Za-z0-9_-][^\\s]*$" },
+                          "description": "Same exclusions as create-pull-request: basenames or protected directory prefixes, or repository-root globs with a leading /. Each pattern must contain a letter, digit, underscore, or hyphen and no whitespace."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Block merges modifying protected files by default, using create-pull-request's protected set and exclusions. allowed explicitly disables this file gate, not other merge gates. Creation-specific request-review and fallback-to-issue policies are not supported."
+                },
                 "max": {
                   "description": "Maximum number of pull request merges to perform per run (default: 1). Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
@@ -12735,6 +12767,65 @@
             }
           ],
           "description": "Enable AI agents to upload a code coverage report (e.g. a Cobertura XML file) to GitHub's code coverage API via actions/upload-code-coverage. The agent stages the report file and calls the tool with file/language/label; a separate job performs the actual upload with dedicated code-quality: write permissions."
+        },
+        "add-security-advisory-comment": {
+          "description": "Experimental. Add comments to repository security advisories. Requires an external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "max": {
+                  "description": "Maximum number of advisory comments per run (default: 1).",
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1, "maximum": 10 },
+                    { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
+                  ]
+                },
+                "github-token": { "$ref": "#/$defs/github_token_same_job" },
+                "github-app": { "$ref": "#/$defs/github_app" },
+                "footer": { "type": "boolean", "description": "Include the standard AI-generated attribution footer (default: true)." },
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
+                "samples": {
+                  "description": "Internal hidden feature. Declarative tool argument samples for deterministic safe-outputs replay through --use-samples or features.samples.",
+                  "oneOf": [
+                    { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    { "type": "object", "additionalProperties": true }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        },
+        "create-security-advisory": {
+          "description": "Experimental. Create draft repository security advisories only. Requires an external token or GitHub App with Repository security advisories write permission; GITHUB_TOKEN is not supported.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "max": {
+                  "description": "Maximum number of draft advisories per run (default: 1).",
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1, "maximum": 10 },
+                    { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
+                  ]
+                },
+                "github-token": { "$ref": "#/$defs/github_token_same_job" },
+                "github-app": { "$ref": "#/$defs/github_app" },
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
+                "samples": {
+                  "description": "Internal hidden feature. Declarative tool argument samples for deterministic safe-outputs replay through --use-samples or features.samples.",
+                  "oneOf": [
+                    { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    { "type": "object", "additionalProperties": true }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
         },
         "update-release": {
           "oneOf": [
@@ -17790,6 +17881,11 @@
           "type": "string",
           "enum": ["read", "none"],
           "description": "Permission level for secret scanning alerts (read/none). Forwarded as permission-secret-scanning-alerts input for actions/create-github-app-token."
+        },
+        "repository-advisories": {
+          "type": "string",
+          "enum": ["read", "none", "write"],
+          "description": "Repository security advisories permission. GitHub App-only; forwarded as permission-repository-advisories when minting a token."
         },
         "repository-hooks": {
           "type": "string",
