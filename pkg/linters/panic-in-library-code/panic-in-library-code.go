@@ -170,7 +170,7 @@ func panicMessageStartsWithBUG(pass *analysis.Pass, call *ast.CallExpr) bool {
 		return false
 	}
 
-	prefix, ok := extractConstantStringPrefix(pass, call.Args[0])
+	prefix, ok := extractConstantStringPrefix(pass, call.Args[0]) //nolint:uncheckedsliceindex // len(call.Args) is checked above.
 	if !ok {
 		return false
 	}
@@ -200,7 +200,7 @@ func extractConstantStringPrefix(pass *analysis.Pass, expr ast.Expr) (string, bo
 		if !isFmtSprintf(pass, e) {
 			return "", false
 		}
-		return extractConstantStringPrefix(pass, e.Args[0])
+		return extractConstantStringPrefix(pass, e.Args[0]) //nolint:uncheckedsliceindex // len(e.Args) is checked above.
 	default:
 		return "", false
 	}
