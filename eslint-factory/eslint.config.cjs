@@ -85,6 +85,7 @@ module.exports = [
       "gh-aw-custom/prefer-actions-exec-over-child-process": "warn",
       "gh-aw-custom/no-misplaced-error-code-definition": "warn",
       "gh-aw-custom/require-finite-check-before-date-toisostring": "warn",
+      "gh-aw-custom/require-null-check-with-typeof-object": "warn",
     },
   },
   {

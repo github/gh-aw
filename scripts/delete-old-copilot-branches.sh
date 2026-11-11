@@ -7,14 +7,15 @@ set +o histexpand
 # - Have a closed or merged PR, OR have no PR at all
 # - Last commit is at least 7 days old
 #
-# The script outputs git commands to delete these branches.
+# The script previews deletion commands by default; --delete executes them directly.
 #
 # Usage:
-#   ./scripts/delete-old-copilot-branches.sh
+#   ./scripts/delete-old-copilot-branches.sh [--delete]
 #
 # Requirements:
 #   - GitHub CLI (gh) installed and authenticated
 #   - git installed
+#   - jq installed
 #   - Run from the repository root directory
 #
 # Environment Variables:
@@ -33,6 +34,14 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
     exit 0
 fi
 
+delete_branches=false
+if [ "$#" -eq 1 ] && [ "$1" = "--delete" ]; then
+    delete_branches=true
+elif [ "$#" -ne 0 ]; then
+    echo "Usage: $0 [--delete]" >&2
+    exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
@@ -49,6 +58,11 @@ fi
 
 if ! command -v git &> /dev/null; then
     echo -e "${RED}Error: git is not installed${NC}" >&2
+    exit 1
+fi
+
+if ! command -v jq &> /dev/null; then
+    echo -e "${RED}Error: jq is not installed${NC}" >&2
     exit 1
 fi
 
@@ -88,7 +102,7 @@ git fetch origin --prune &> /dev/null || {
 }
 
 # Get all remote copilot/* branches
-remote_branches=$(git branch -r | grep "origin/copilot/" | sed 's|origin/||' | grep -v HEAD || true)
+remote_branches=$(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/copilot/)
 
 if [ -z "$remote_branches" ]; then
     echo -e "${YELLOW}No copilot/* branches found${NC}"
@@ -102,9 +116,6 @@ echo ""
 while IFS= read -r branch; do
     # Skip empty lines
     [ -z "$branch" ] && continue
-    
-    # Remove any leading/trailing whitespace
-    branch=$(echo "$branch" | xargs)
     
     echo -e "${BLUE}Checking: ${NC}$branch"
     
@@ -131,7 +142,11 @@ while IFS= read -r branch; do
     
     # Check PR status using GitHub CLI
     # Search for PRs from this branch
-    pr_status=$(gh pr list --head "$branch" --state all --json number,state,headRefName --jq '.[0] | select(.headRefName == "'"$branch"'") | .state' 2>/dev/null || echo "")
+    if ! pr_status=$(gh pr list --head "$branch" --state all --json number,state,headRefName \
+        | jq -r --arg branch "$branch" '.[0] | select(.headRefName == $branch) | .state // empty'); then
+        echo -e "${RED}Error: Failed to check PR status for $branch${NC}" >&2
+        exit 1
+    fi
     
     should_delete=false
     
@@ -182,16 +197,28 @@ else
     echo -e ":${NC}"
     echo ""
     
-    echo "# Commands to delete branches:"
+    echo "# Commands to delete branches (preview):"
     echo ""
     
     for branch in "${branches_to_delete[@]}"; do
-        echo "git push origin --delete $branch"
+        printf 'git push origin --delete -- %q\n' "$branch"
     done
     
     echo ""
-    echo -e "${YELLOW}Note: Review the commands above before executing${NC}"
-    echo "You can run them individually or pipe this output through bash"
+    if [ "$delete_branches" = true ]; then
+        deletion_failed=false
+        for branch in "${branches_to_delete[@]}"; do
+            if ! git push origin --delete -- "$branch"; then
+                echo -e "${RED}Error: Failed to delete branch $branch${NC}" >&2
+                deletion_failed=true
+            fi
+        done
+        if [ "$deletion_failed" = true ]; then
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}Note: Review the preview above, then re-run with --delete to delete branches${NC}"
+    fi
 fi
 
 echo ""

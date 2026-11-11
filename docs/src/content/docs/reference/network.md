@@ -9,6 +9,8 @@ Control network access for AI engines using the top-level `network` field to spe
 
 If no `network:` permission is specified, it defaults to `network: defaults`, which allows only certificate validation, JSON schema, and stock Ubuntu archive/keyserver hosts. The [complete baseline](#defaults-baseline) lists every allowed host.
 
+For custom CA trust when AWF's API proxy verifies upstream TLS, see [Custom CA certificate for the API proxy](/gh-aw/reference/sandbox/#custom-ca-certificate-for-the-api-proxy).
+
 > [!TIP]
 > New to network configuration? See the [Network Configuration Guide](/gh-aw/guides/network-configuration/) for practical examples and troubleshooting tips.
 

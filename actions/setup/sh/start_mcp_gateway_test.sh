@@ -403,6 +403,52 @@ EOF
   rm -rf "$tmpdir" /tmp/gh-aw/mcp-config /tmp/gh-aw/mcp-gateway-started
 }
 
+test_fallback_config_logging() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  local config_dir="$tmpdir/mcp-config"
+  local fake_home="$tmpdir/home"
+  local test_script="$tmpdir/conversion.sh"
+  mkdir -p "$config_dir" "$fake_home"
+
+  awk '/^# Convert gateway output to agent-specific format$/ { capture=1 }
+       /^# Check MCP server functionality$/ { capture=0 }
+       capture' "$SCRIPT_PATH" |
+    sed "s|/tmp/gh-aw/mcp-config|$config_dir|g" > "$test_script"
+  cat > "$config_dir/gateway-output.json" << 'EOF'
+{"gateway":{"agentId":"synthetic-agent-credential"},"mcpServers":{"remote":{"url":"https://example.invalid/mcp?token=synthetic-url-credential","headers":{"Authorization":"Bearer synthetic-header-credential"},"env":{"API_KEY":"synthetic-env-credential"}},"cli":{"url":"http://localhost:8080/cli"}}}
+EOF
+
+  local cli_servers output
+  for cli_servers in '' '["cli"]' 'invalid-json'; do
+    if output=$(HOME="$fake_home" GH_AW_ENGINE="unknown" \
+      GH_AW_MCP_CLI_SERVERS="$cli_servers" MCP_GATEWAY_AGENT_ID="synthetic-agent-credential" \
+      bash -c 'set -e; print_timing() { :; }; source "$1"' _ "$test_script" 2>&1) &&
+      grep -Fq "No agent-specific converter found for engine: unknown" <<< "$output" &&
+      grep -Fq "Using gateway output directly" <<< "$output" &&
+      ! grep -Eq 'synthetic-(agent|url|header|env)-credential' <<< "$output" &&
+      jq -e '.gateway.agentId == "synthetic-agent-credential" and
+        .mcpServers.remote.url == "https://example.invalid/mcp?token=synthetic-url-credential" and
+        .mcpServers.remote.headers.Authorization == "Bearer synthetic-header-credential" and
+        .mcpServers.remote.env.API_KEY == "synthetic-env-credential"' "$fake_home/.copilot/mcp-config.json" > /dev/null; then
+      print_result "Fallback config preserves credentials without logging them (CLI servers: $cli_servers)" "PASS"
+    else
+      print_result "Fallback config preserves credentials without logging them (CLI servers: $cli_servers)" "FAIL"
+    fi
+
+    local expected_cli=true
+    if [ "$cli_servers" = '["cli"]' ]; then
+      expected_cli=false
+    fi
+    if jq -e --argjson expected "$expected_cli" '(.mcpServers | has("cli")) == $expected' "$fake_home/.copilot/mcp-config.json" > /dev/null; then
+      print_result "Fallback preserves CLI server filtering (CLI servers: $cli_servers)" "PASS"
+    else
+      print_result "Fallback preserves CLI server filtering (CLI servers: $cli_servers)" "FAIL"
+    fi
+  done
+  rm -rf "$tmpdir"
+}
+
 # Run all tests
 echo "=== Testing start_mcp_gateway.sh ==="
 echo "Script: $SCRIPT_PATH"
@@ -418,6 +464,7 @@ test_container_missing_network_flag
 test_validation_functions_exist
 test_gateway_startup_diagnostics
 test_gateway_agent_identifier_validation
+test_fallback_config_logging
 
 # Print summary
 echo ""

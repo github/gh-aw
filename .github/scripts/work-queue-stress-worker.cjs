@@ -44,7 +44,7 @@ async function publish(branch, id, kind, parameters, context, policyProposal = u
     context,
     policyProposal,
     request: newRequest(id, kind, actorFromContext(context), parameters),
-    maxRetries: 10,
+    maxRetries: 64,
     now: () => AT,
     sleepFn: async delay => {
       counters.retry_sleeps++;

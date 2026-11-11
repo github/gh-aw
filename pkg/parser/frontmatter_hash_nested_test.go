@@ -23,6 +23,7 @@ func TestNestedImportHashResolution(t *testing.T) {
 		Frontmatter string `json:"frontmatter"`
 		Body        string `json:"body"`
 	}
+
 	var fixture struct {
 		Workflow    fixtureFile   `json:"workflow"`
 		Imports     []fixtureFile `json:"imports"`
@@ -53,7 +54,12 @@ func TestNestedImportHashResolution(t *testing.T) {
 	}))
 	expectedBody := hash(strings.Join(append([]string{fixture.Workflow.Body}, bodies...), "\n---\n"))
 
-	for _, baseDir := range []string{".github/workflows", filepath.Join(t.TempDir(), ".github", "workflows")} {
+	for _, baseDir := range []string{
+		".github/workflows",
+		filepath.Join(t.TempDir(), ".github", "workflows"),
+		filepath.Join(".github", ".github", "workflows"),
+		filepath.Join(t.TempDir(), ".github", ".github", "workflows"),
+	} {
 		t.Run(baseDir, func(t *testing.T) {
 			files := make(map[string][]byte)
 			for _, file := range append([]fixtureFile{fixture.Workflow}, fixture.Imports...) {
@@ -87,6 +93,33 @@ func TestNestedImportHashResolution(t *testing.T) {
 				assert.NotEqual(t, frontmatter, changedFrontmatter, file.Path)
 				assert.NotEqual(t, body, changedBody, file.Path)
 				files[path] = original
+			}
+		})
+	}
+}
+
+func TestHashImportPathsMatchNativeImports(t *testing.T) {
+	for _, name := range []string{"repository", ".github"} {
+		t.Run(name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), name)
+			baseDir := filepath.Join(root, ".github", "workflows")
+			for _, file := range []string{".github/workflows/workflow.md", ".github/workflows/shared/tool.md", ".github/agents/planner.md", ".agents/planner.md"} {
+				fullPath := filepath.Join(root, filepath.FromSlash(file))
+				require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0700))
+				require.NoError(t, os.WriteFile(fullPath, []byte("fixture"), 0600))
+			}
+			for _, importPath := range []string{"workflow.md", "./workflow.md", "shared/tool.md", "../agents/planner.md", ".github/workflows/workflow.md", "/.github/workflows/workflow.md", "/.agents/planner.md"} {
+				nativePath, err := ResolveIncludePath(importPath, baseDir, nil)
+				require.NoError(t, err, importPath)
+				hashPath, err := resolveHashImportPath(importPath, baseDir, baseDir)
+				require.NoError(t, err, importPath)
+				assert.Equal(t, nativePath, hashPath, importPath)
+			}
+			for _, importPath := range []string{".github/../../outside.md", "/.agents/../../outside.md", "/outside.md"} {
+				_, err := ResolveIncludePath(importPath, baseDir, nil)
+				require.ErrorContains(t, err, "security")
+				_, err = resolveHashImportPath(importPath, baseDir, baseDir)
+				require.ErrorContains(t, err, "security")
 			}
 		})
 	}

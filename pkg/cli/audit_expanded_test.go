@@ -116,6 +116,14 @@ func TestExtractEngineConfigUsesEffectiveRoutedModel(t *testing.T) {
 			requested:     "auto",
 		},
 		{
+			name:      "router model value is the requested model",
+			awInfo:    `{"engine_id":"copilot","model":"gpt-5.6-luna","requested_model":"auto","model_config":{"routing":{"enabled":true,"goal":"cost","mode":"economy","requested":"router/economy"}},"model_routing":{"status":"selected","wire_model":"gpt-5.6-luna","effort":"low","applied_effort":"low"}}`,
+			model:     "gpt-5.6-luna",
+			effort:    "low",
+			status:    "selected",
+			requested: "router/economy",
+		},
+		{
 			name:          "failed route does not expose placeholder",
 			awInfo:        `{"engine_id":"copilot","model":"auto","requested_model":"auto","model_routing":{"status":"failed","failure_code":"no_route"}}`,
 			routingRecord: `{"_schema":"model-routing/v0.28.37","stage":"failure","code":"no_route"}`,

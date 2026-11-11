@@ -89,6 +89,9 @@ enabled Bash graders, and authored OIDC permissions (including safe-output
 permissions) are rejected, including declarations from imports. Compiler-owned
 pull-request stack gates remain enabled. Remove those declarations
 from a separate diagnostic workflow; there is no unsafe dry-run override.
+Compiler-generated connector safe-output handlers are accepted with forced staging
+and no connector write credentials, even when an operation sets `staged: false`.
+This does not permit authored safe-output scripts or custom MCP servers.
 Diagnostics, summaries, and run artifacts remain available;
 `OTEL_*`, `GH_AW_OTLP_*`, `GITHUB_AW_OTEL_*`, `TRACEPARENT`, `TRACESTATE`,
 `BAGGAGE`, and `CLAUDE_CODE_ENABLE_TELEMETRY` environment variables and automatic telemetry

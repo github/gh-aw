@@ -8,7 +8,7 @@ sidebar:
 > [!WARNING]
 > Model routing is experimental, and its configuration and behavior may change. Review the [known limitations](#known-limitations) before enabling it.
 
-Model routing chooses the model and reasoning effort for each run of a workflow, based on the task that run receives. Instead of naming one model in `engine.model` and using it for everything, you state what to optimize for and which models are acceptable, and a router makes the choice for each run.
+Model routing chooses the model and reasoning effort for each run of a workflow, based on the task that run receives. Instead of naming one model and using it for everything, you set the model to a router value such as `model: router`, optionally say which models are acceptable, and a router makes the choice for each run.
 
 ## Why use model routing
 
@@ -20,7 +20,7 @@ A fixed model is still the better fit when you need the same behavior on every r
 
 ## Get started
 
-To route a workflow, add `model-routing` under `engine` with a `goal` and a `mode`:
+To route a workflow, set its model to `router`:
 
 ```aw wrap
 ---
@@ -31,11 +31,8 @@ permissions:
   contents: read
   issues: read
   copilot-requests: write
-engine:
-  id: copilot
-  model-routing:
-    goal: cost
-    mode: auto
+engine: copilot
+model: router
 safe-outputs:
   add-comment:
 ---
@@ -43,17 +40,49 @@ safe-outputs:
 Find the likely cause of issue #${{ github.event.issue.number }} and comment with a suggested fix.
 ```
 
-This explicit configuration is a good starting point for most workflows. Eligible workflows that set no model at all are already routed with `goal: cost` and `mode: auto`; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). `goal: cost` prefers the cheapest choice that is likely to succeed, and `mode: auto` lets the router judge how demanding each task is. Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
+`model: router` is a good starting point for most workflows: the router prefers the cheapest model and effort that are likely to succeed, and judges how demanding each task is. To set the bar yourself, use one of the other router values:
+
+| Value | What it does |
+|---|---|
+| `router` | The router picks the model and effort for each run, and judges how demanding each task is. |
+| `router/economy` | The cheapest model and effort that meet the lowest bar, for routine, low-risk tasks such as triage, labeling, and summaries. |
+| `router/balanced` | The cheapest model and effort that meet a medium bar, for general-purpose work. |
+| `router/robust` | The cheapest model and effort that meet the highest bar, for tasks where a failed run is costly. |
+
+Router values work anywhere the main agent's model is set: the top-level `model`, `engine.model`, and imported workflows. The usual precedence applies: `engine.model` wins over the top-level `model`, and a workflow's own model wins over an imported one. A workflow with no model at all already behaves like `model: router` when it is eligible; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model).
+
+A router value is not a model name. The compiler rejects other `router/...` values (such as `router/fast` or `router/Economy`), parameters such as `router/economy?effort=high` (the router chooses the effort; pin a model to set it), router values in `models.allowed`, `models.blocked`, `engine.fallback-models`, or a `models:` alias, and router values for sub-agents, threat detection, or evals, which are never routed. A router value can't be combined with `engine.model-routing` or `engine.fallback-models`. When the main agent's model comes from an expression or a variable, such as `${{ vars.MODEL }}` or `GH_AW_DEFAULT_MODEL_COPILOT`, and resolves to a router value at run time, the run stops before the agent starts; write the router value in the workflow instead.
+
+### Routing with `engine.model-routing`
+
+`engine.model-routing` still works and offers settings that router values don't, such as `goal: cost-speed` and a shortlist in `allowed-models`. Each router value is the same as a `model-routing` block with `goal: cost`:
+
+| Router value | Same as |
+|---|---|
+| `router` | `model-routing: {goal: cost, mode: auto}` |
+| `router/economy` | `model-routing: {goal: cost, mode: economy}` |
+| `router/balanced` | `model-routing: {goal: cost, mode: balanced}` |
+| `router/robust` | `model-routing: {goal: cost, mode: robust}` |
+
+```aw wrap
+engine:
+  id: copilot
+  model-routing:
+    goal: cost
+    mode: auto
+```
+
+Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
 
 This example routes models served through GitHub Copilot, so the workflow needs Copilot authentication, here through the [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) permission. Claude and Codex can instead route on their own provider, Anthropic or OpenAI, with the same API key they use without routing; see [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi). Routing also needs the AWF firewall, which is enabled by default.
 
 Compile and run the workflow as usual. To see which model a run used, see [Check which model was used](#check-which-model-was-used).
 
-If the workflow already sets `engine.model`, or another fixed model or reasoning effort setting, routing overrides it and the compiler warns. Remove the fixed setting once routing is enabled.
+If a workflow uses `engine.model-routing` and also sets `engine.model`, or another fixed model or reasoning effort setting, routing overrides it and the compiler warns. Remove the fixed setting once routing is enabled.
 
 ## Default routing for workflows without a model
 
-A workflow that chooses neither a model nor routing settings is routed by default with `goal: cost` and `mode: auto`, when all of the following hold:
+A workflow that chooses neither a model nor routing settings is routed by default with `goal: cost` and `mode: auto`, the same routing as `model: router`, when all of the following hold:
 
 - The engine is `copilot`, `claude`, `codex`, or `pi`, and inference runs on GitHub Copilot. For Claude and Codex that means `model-provider: github`; a `copilot-requests: write` permission alone doesn't switch the provider. Claude and Codex keep their model family, as in [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi).
 - Neither the workflow nor its imports set a top-level `model`, `engine.model` (including aliases, `auto`, and expressions), `engine.model-routing`, `engine.fallback-models`, or an `engine.env` model variable such as `COPILOT_MODEL` or `GH_AW_DEFAULT_MODEL_COPILOT`.
@@ -73,13 +102,13 @@ engine:
   model-routing: false
 ```
 
-Setting a model or an explicit `model-routing` block also replaces the default. Explicit routing settings keep their own goal, mode, and shortlist, and model variables don't disable them.
+Setting a model, a router value, or an explicit `model-routing` block also replaces the default. Explicit routing settings, including router values, keep their own goal, mode, and shortlist, and model variables don't disable them.
 
 Routing can choose a different model than the engine's previous default, so cost and output can differ from earlier runs, and between runs. Check routed runs with `gh aw audit`; see [Check which model was used](#check-which-model-was-used).
 
 ## Choose a goal and mode
 
-`goal` and `mode` are both required. Together they tell the router how to trade cost against the chance that the task succeeds.
+Router values always use `goal: cost`; `router/economy`, `router/balanced`, and `router/robust` set the mode, and `router` uses `mode: auto`. With `engine.model-routing`, `goal` and `mode` are both required. Together they tell the router how to trade cost against the chance that the task succeeds.
 
 The **mode** sets how likely the chosen model and effort should be to complete the task. Higher targets lead to stronger models and more reasoning effort, and so to higher cost:
 
@@ -97,7 +126,7 @@ The **goal** decides which of the choices that meet the target the router prefer
 | `cost` | The cheapest model and effort that meet the target. |
 | `cost-speed` | The fastest model and effort that meet the target, even when a slower choice would cost less. |
 
-When you configure routing explicitly and are unsure, start with `goal: cost` and `mode: auto`. Workflows without a model already get `goal: cost` and `mode: auto` by default; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). Set a fixed mode when you know what kind of tasks the workflow gets, for example `economy` for a labeling workflow. Choose `cost-speed` when someone is waiting on the result, such as a workflow that replies to a comment.
+When you configure routing explicitly and are unsure, start with `model: router` (`goal: cost` and `mode: auto`). Workflows without a model already get the same routing by default; see [Default routing for workflows without a model](#default-routing-for-workflows-without-a-model). Set a fixed mode when you know what kind of tasks the workflow gets, for example `economy` for a labeling workflow. Choose `cost-speed` when someone is waiting on the result, such as a workflow that replies to a comment.
 
 Targets are success rates estimated from benchmark results on similar tasks, not guarantees for a particular repository. The router can choose below the target when no candidate meets it or, with `goal: cost`, when a choice just below the target costs much less.
 
@@ -204,7 +233,15 @@ An alias is narrowed by the policy in the same way. A pattern that a `models.blo
 
 ### Shared routing settings
 
-To use the same routing settings in several workflows, put them in a shared file and import it. For example, `.github/workflows/shared/routing.md`:
+A shared file can set a router value, and workflows that import it are routed unless they set their own model. For example, `.github/workflows/shared/routing.md` with:
+
+```aw wrap
+---
+model: router/economy
+---
+```
+
+To share a shortlist or other `engine.model-routing` settings, put them in the shared file instead. For example:
 
 ```aw wrap
 ---
@@ -357,7 +394,7 @@ The agent step's log shows the selection, for example:
 inference routing: mode=awf-routed model=gpt-5.6-sol effort=high
 ```
 
-`gh aw audit <run-id>` includes a Model Routing section with the task classification, the selected model and effort, the ranked alternatives, and what the classifier, the selected model, and any other models cost. `gh aw logs` aggregates routing across runs, showing which model each kind of task received and what it cost. See [Audit](/gh-aw/reference/audit/) and [Cost Management](/gh-aw/reference/cost-management/).
+`gh aw audit <run-id>` shows the requested value, such as `router/economy`, next to the model the router picked, and includes a Model Routing section with the task classification, the selected model and effort, the ranked alternatives, and what the classifier, the selected model, and any other models cost. `gh aw logs` aggregates routing across runs, showing which model each kind of task received and what it cost. See [Audit](/gh-aw/reference/audit/) and [Cost Management](/gh-aw/reference/cost-management/).
 
 ## Known limitations
 

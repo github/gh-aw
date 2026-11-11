@@ -90,6 +90,8 @@ Decision metadata is retained in the existing harness retry artifact and as type
 
 Optional array of strings for categorizing workflows by purpose, team, or functionality. Labels appear in `gh aw status` output as `[automation ci diagnostics]` (or a JSON array in `--json` mode) and can be filtered with `gh aw status --label automation`.
 
+Each label name is limited to 50 characters. The compiler rejects longer names, including static labels configured for safe outputs.
+
 ```yaml wrap
 labels: ["automation", "ci", "diagnostics"]
 ```
@@ -275,9 +277,15 @@ engine:
 
 See [Harness Retry and Post-result Watchdog Policy](/gh-aw/reference/engines/#harness-retry-and-post-result-watchdog-policy) for defaults, units, and the equivalent `GH_AW_HARNESS_*` environment variables.
 
-### Model Routing (`engine.model-routing:`)
+### Model Routing (`model: router`, `engine.model-routing:`)
 
-Enables experimental per-run model and reasoning-effort selection for the Copilot, Claude, Codex, and pi engines when they use GitHub Copilot inference, with the AWF firewall. Requires `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`). The optional `allowed-models` list takes exact model names and limits the router's candidates for the main agent; it is not a request policy. Put patterns such as `gpt-*` in [`models.allowed` or `models.blocked`](/gh-aw/reference/glossary/#model-policy-modelsallowed-modelsblocked) instead. Overrides the fixed `engine.model` and effort settings. See [Model Routing](/gh-aw/reference/model-routing/) for value meanings, requirements, sub-agent constraints, known limitations, and logs.
+Set `model` (or `engine.model`) to a router value to route the main agent: `router` (the router judges each task), `router/economy`, `router/balanced`, or `router/robust`. Each is the same as `engine.model-routing` with `goal: cost` and the matching mode (`auto` for `router`). A workflow with no model already behaves like `model: router` when it is eligible.
+
+```yaml wrap
+model: router/economy
+```
+
+`engine.model-routing` still works and enables experimental per-run model and reasoning-effort selection for the Copilot, Claude, Codex, and pi engines when they use GitHub Copilot inference, with the AWF firewall. Requires `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`). The optional `allowed-models` list takes exact model names and limits the router's candidates for the main agent; it is not a request policy. Put patterns such as `gpt-*` in [`models.allowed` or `models.blocked`](/gh-aw/reference/glossary/#model-policy-modelsallowed-modelsblocked) instead. Overrides the fixed `engine.model` and effort settings. See [Model Routing](/gh-aw/reference/model-routing/) for value meanings, requirements, sub-agent constraints, known limitations, and logs.
 
 ### Engine Driver (`engine.driver:`)
 

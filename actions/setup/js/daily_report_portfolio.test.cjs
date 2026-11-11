@@ -87,6 +87,19 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     expect(() => buildDailyReportPlan({ ...planOptions, repositoryId: "007" })).toThrow();
   });
 
+  it("matches each report worker's compiled upload-asset limit", () => {
+    const assetLimits = { "daily-firewall-report": 3, "daily-repo-chronicle": 3, "daily-issues-report": 5 };
+    const coveredProfiles = new Set();
+    for (let day = 1; day <= 14; day++) {
+      const date = `2026-11-${String(day).padStart(2, "0")}`;
+      for (const node of buildDailyReportPlan({ ...planOptions, date }).nodes) {
+        coveredProfiles.add(node.worker_profile);
+        expect(node.payload.effect_contract.outputs.find(output => output.type === "upload_asset")?.max).toBe(assetLimits[node.worker_profile]);
+      }
+    }
+    expect(coveredProfiles).toEqual(new Set(REPORT_PROFILES));
+  });
+
   it("uses shared scheduling and all thirteen immutable AW routes without enrollment", () => {
     const policy = buildDailyReportPolicy(policyOptions);
     expect(validatePolicy(policy)).toEqual(policy);

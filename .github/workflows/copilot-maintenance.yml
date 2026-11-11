@@ -79,20 +79,13 @@ jobs:
           echo "Running copilot branch cleanup script..."
           ./scripts/delete-old-copilot-branches.sh
 
-      - name: Execute deletion commands
+      - name: Delete selected branches
         if: github.event.inputs.delete_branches == 'true' || github.event_name == 'schedule'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MAX_BRANCHES: ${{ github.event.inputs.max_branches || '10' }}
         run: |
-          echo "Executing deletion commands..."
-          ./scripts/delete-old-copilot-branches.sh | \
-            grep "git push origin --delete copilot/" | \
-            while read -r cmd; do
-              echo "Executing: $cmd"
-              eval "$cmd" || \
-                echo "Failed to delete branch (may already be deleted)"
-            done
+          ./scripts/delete-old-copilot-branches.sh --delete
           echo "✓ Copilot branch cleanup completed"
 
       - name: Preview mode notice

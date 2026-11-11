@@ -499,6 +499,10 @@ custom safe-output scripts/actions, enabled Bash graders, and authored
 Compiler-generated pull-request stack gates remain available. Remove unsupported
 declarations in a separate diagnostic workflow; there is no unsafe override.
 
+Compiler-generated connector safe-output handlers are accepted. They force staged
+execution and omit connector write credentials, including when an operation sets
+`staged: false`. Authored safe-output scripts remain unsupported.
+
 Agent shell commands, custom engine execution, custom credentials, and
 compiler-managed OIDC integrations still require review. Dry-run is not an
 execution sandbox or a guarantee of side-effect-free hosted execution.

@@ -30,6 +30,14 @@ const deliveryVerifier = new AsyncLocalStorage();
 
 function recordClaimDelivery(delivery, assignment, member, binding, inventory, options) {
   const nativeRun = inventory && controlInventories.get(inventory)?.run;
+  const attestation = {
+    binding_present: !!binding,
+    native_run_present: !!nativeRun,
+    run_matches: !!binding && !!nativeRun && binding.run_id === nativeRun.run_id && binding.run_attempt === nativeRun.run_attempt,
+    control_inventory_required: options.requireControlInventory === true,
+    controls_match: !!inventory && delivery.controls_digest === inventory.controls_digest,
+    no_effects: delivery.disposition === "none",
+  };
   if (
     !binding ||
     !nativeRun ||
@@ -43,14 +51,8 @@ function recordClaimDelivery(delivery, assignment, member, binding, inventory, o
     !claimEffectChannelMatches(options.effectChannel, options.effects || [], assignment, member.handle) ||
     (delivery.disposition === "none" && member.work.effect_contract?.kind !== "none" && member.work.effect_contract?.no_writes !== true)
   ) {
-    log.debug("delivery.receipt.not_recorded", {
-      binding_present: !!binding,
-      native_run_present: !!nativeRun,
-      run_matches: !!binding && !!nativeRun && binding.run_id === nativeRun.run_id && binding.run_attempt === nativeRun.run_attempt,
-      control_inventory_required: options.requireControlInventory === true,
-      controls_match: !!inventory && delivery.controls_digest === inventory.controls_digest,
-      no_effects: delivery.disposition === "none",
-    });
+    log.debug("delivery.receipt.not_recorded", attestation);
+    delivery.attestation = { recorded: false, ...attestation };
     return;
   }
   const record = {
@@ -69,6 +71,7 @@ function recordClaimDelivery(delivery, assignment, member, binding, inventory, o
     effects: delivery.disposition === "none" ? "none" : "partial",
     controls_digest: delivery.controls_digest,
   };
+  delivery.attestation = { recorded: true };
   deliveryReceipts.set(delivery, JSON.parse(canonical(record)));
 }
 
@@ -121,13 +124,14 @@ async function verifyClaimDelivery(member, verification) {
     typeof verification.run.run_id !== "string" ||
     !/^[1-9][0-9]{0,255}$/.test(verification.run.run_id)
   ) {
-    log.debug("delivery.verify.binding_invalid", {
+    const fields = {
       original_claim: !!original,
       contract_present: verification.contract !== undefined,
       attempt: verification.attempt,
       first_run_attempt: verification.run?.run_attempt === 1,
-    });
-    return pending;
+    };
+    log.debug("delivery.verify.binding_invalid", fields);
+    return { ...pending, reason: "recheck_binding_invalid", diagnostics: { event: "delivery.verify.binding_invalid", ...fields } };
   }
   const delivery = await trusted.recheck(original, verification);
   verification.signal?.throwIfAborted();
@@ -145,15 +149,16 @@ async function verifyClaimDelivery(member, verification) {
     record.run_attempt !== verification.run.run_attempt ||
     canonical(record.run) !== canonical(verification.run)
   ) {
-    log.debug("delivery.verify.receipt_rejected", {
+    const fields = {
       receipt_present: !!record,
       readback_verified: delivery?.verification === "verified",
       dispatch_matches: record?.dispatch_id === assignment.dispatch_id,
       claim_matches: record?.claim_id === original.claim_id && record?.claim_handle === original.handle,
       work_matches: record?.work_id === original.work_id,
       run_matches: record?.run_id === verification.run.run_id && record?.run_attempt === verification.run.run_attempt,
-    });
-    return pending;
+    };
+    log.debug("delivery.verify.receipt_rejected", fields);
+    return { ...pending, reason: "recheck_receipt_rejected", diagnostics: { event: "delivery.verify.receipt_rejected", ...fields } };
   }
   const proof = {
     verified: true,
@@ -305,15 +310,20 @@ async function inspectClaimDelivery(options) {
   const declaredOutputs = contract.outputs.map(output => ({ ...output, type: normalizeSafeOutputName(output.type) }));
   const known = new Set(declaredOutputs.map(output => output.type));
   log.debug("delivery.contract.checked", { outputs: contract.outputs.length, messages: normalized.length, no_writes: contract.no_writes === true });
-  if (normalized.some(message => !known.has(message.type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(message.type)))) {
+  const undeclaredTypes = [...new Set(normalized.map(message => message.type).filter(type => !known.has(type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(type))))].sort();
+  if (undeclaredTypes.length) {
     log.debug("delivery.contract.undeclared_output");
-    return { ...receipt, reason: "Undeclared output type in immutable effect_contract" };
+    return { ...receipt, reason: "Undeclared output type in immutable effect_contract", diagnostics: { event: "delivery.contract.undeclared_output", types: undeclaredTypes } };
   }
   for (const [index, expected] of declaredOutputs.entries()) {
     const count = normalized.filter(message => message.type === expected.type).length;
     if (count < expected.min || count > expected.max) {
       log.debug("delivery.contract.cardinality_mismatch", { index, count, min: expected.min, max: expected.max });
-      return { ...receipt, reason: "Immutable output cardinality contract was not met" };
+      return {
+        ...receipt,
+        reason: "Immutable output cardinality contract was not met",
+        diagnostics: { event: "delivery.contract.cardinality_mismatch", output_type: expected.type, count, min: expected.min, max: expected.max },
+      };
     }
   }
   if (contract.no_writes === true && normalized.some(message => !NO_WRITE_TYPES.has(message.type))) {
@@ -333,16 +343,21 @@ async function inspectClaimDelivery(options) {
     const message = normalized[index];
     const outcome = results.find(result => result.messageIndex === index);
     if (!outcome || !outcome.success || outcome.delegated || outcome.deferred || outcome.skipped || outcome.cancelled) {
-      log.debug("delivery.output.receipt_missing", {
-        index,
+      const fields = {
         receipt_present: !!outcome,
         succeeded: outcome?.success === true,
         delegated: !!outcome?.delegated,
         deferred: !!outcome?.deferred,
         skipped: !!outcome?.skipped,
         cancelled: !!outcome?.cancelled,
-      });
-      return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Missing exact nondelegated delivery receipt" };
+      };
+      log.debug("delivery.output.receipt_missing", { index, ...fields });
+      return {
+        ...receipt,
+        disposition: outputs.length ? "partial" : "unknown",
+        reason: "Missing exact nondelegated delivery receipt",
+        diagnostics: { event: "delivery.output.receipt_missing", output_index: index, output_type: message.type, ...fields },
+      };
     }
     if (outcome.claim_handle && outcome.claim_handle !== claim_handle) throw new Error(`${ERR_VALIDATION}: Foreign Claim delivery receipt`);
     const verification = declaredOutputs.find(expected => expected.type === message.type)?.verification;
@@ -363,15 +378,20 @@ async function inspectClaimDelivery(options) {
     const proof = await verify({ claim, message, result: outcome.result, context: options.context, github: options.github, signal: options.signal, ...(verification === undefined ? {} : { verification }) });
     options.signal?.throwIfAborted();
     if (!proof || proof.verified !== true || proof.claim_handle !== claim_handle || !proof.resource || typeof proof.resource !== "object" || Array.isArray(proof.resource) || !proof.evidence) {
-      log.debug("delivery.output.proof_invalid", {
-        index,
+      const fields = {
         proof_present: !!proof,
         verified: proof?.verified === true,
         claim_matches: proof?.claim_handle === claim_handle,
         resource_present: !!proof?.resource,
         evidence_present: !!proof?.evidence,
-      });
-      return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Independent scoped resource verification failed" };
+      };
+      log.debug("delivery.output.proof_invalid", { index, ...fields });
+      return {
+        ...receipt,
+        disposition: outputs.length ? "partial" : "unknown",
+        reason: "Independent scoped resource verification failed",
+        diagnostics: { output_index: index, output_type: message.type, ...(proof?.diagnostics || { event: "delivery.output.proof_invalid", ...fields }) },
+      };
     }
     if (proof.effect_resources !== undefined && !Array.isArray(proof.effect_resources)) {
       log.debug("delivery.output.effect_resources_invalid", { index });
@@ -444,18 +464,21 @@ async function inspectClaimDelivery(options) {
         return resource && effect.kind === resource.kind && effect.repository === resource.repository && (effect.id ? effect.id === resource.id : Number.isSafeInteger(effect.number) && effect.number === resource.number);
       });
     if (!covered) {
-      log.diagnostic("delivery.effect.uncovered", {
-        index,
-        effects: options.effects.length,
+      const fields = {
         graphql: effect.kind === "graphql",
         git: ["git_blob", "git_tree", "git_commit", "git_ref"].includes(effect.kind),
         succeeded: effect.outcome === "succeeded",
         claim_matches: effect.claim_handle === claim_handle && effect.claim_id === claim.claim_id,
         work_matches: effect.work_id === claim.work_id,
         dispatch_matches: effect.dispatch_id === assignment.dispatch_id,
-        verified_resources: verifiedResources.length,
-      });
-      return { ...receipt, disposition: "unknown", reason: "An auxiliary or ambiguous effect has no independently verified declared resource receipt" };
+      };
+      log.diagnostic("delivery.effect.uncovered", { index, effects: options.effects.length, ...fields, verified_resources: verifiedResources.length });
+      return {
+        ...receipt,
+        disposition: "unknown",
+        reason: "An auxiliary or ambiguous effect has no independently verified declared resource receipt",
+        diagnostics: { event: "delivery.effect.uncovered", effect_index: index, effect_kind: effect.kind, ...fields },
+      };
     }
   }
   const descriptorBytes = canonicalBytes(descriptor);
@@ -476,12 +499,12 @@ async function inspectClaimDelivery(options) {
   return delivery;
 }
 
-/** @param {Record<string, any>} options */
+/** @param {Record<string, any>} options @returns {Promise<Record<string, any>>} */
 async function verifyBuiltinDeliveryOutput(options) {
   const { claim, message, result, github } = options;
   const unverified = (event, fields = {}) => {
     log.debug(event, fields);
-    return { verified: false };
+    return { verified: false, diagnostics: { event, ...fields } };
   };
   if (["create_discussion", "create_pull_request"].includes(message.type)) return require("./work_queue_native_creation_delivery.cjs").verifyNativeCreationDelivery(options);
   // Updating branches still requires its own pinned commit/tree verifier.

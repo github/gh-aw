@@ -71,6 +71,7 @@ import { requirePerPageOnGithubListCallRule } from "./rules/require-per-page-on-
 import { noAsyncForEachCallbackRule } from "./rules/no-async-foreach-callback";
 import { noUnguardedAsyncTimerCallbackRule } from "./rules/no-unguarded-async-timer-callback";
 import { requireFiniteCheckBeforeDateToIsoStringRule } from "./rules/require-finite-check-before-date-toisostring";
+import { requireNullCheckWithTypeofObjectRule } from "./rules/require-null-check-with-typeof-object";
 import { noSplitFilterTrimWithoutTrimMapRule } from "./rules/no-split-filter-trim-without-trim-map";
 
 const plugin = {
@@ -152,6 +153,7 @@ const plugin = {
     "no-async-foreach-callback": noAsyncForEachCallbackRule,
     "no-split-filter-trim-without-trim-map": noSplitFilterTrimWithoutTrimMapRule,
     "require-finite-check-before-date-toisostring": requireFiniteCheckBeforeDateToIsoStringRule,
+    "require-null-check-with-typeof-object": requireNullCheckWithTypeofObjectRule,
   },
 };
 

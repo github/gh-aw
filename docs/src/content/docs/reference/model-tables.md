@@ -15,6 +15,8 @@ Model aliases let you write `engine: copilot` with a human-friendly model name s
 
 For details on the alias syntax, fallback resolution algorithm, and how to define your own aliases in workflow frontmatter, see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
 
+`router` and `router/*` are reserved and are not aliases. `model: router`, `router/economy`, `router/balanced`, and `router/robust` choose [model routing](/gh-aw/reference/model-routing/) for the main agent; they can't be defined in `models:` or used in `models.allowed`, `models.blocked`, or `fallback-models`.
+
 ### Vendor Aliases
 
 Vendor aliases map a short name to one or more provider-scoped glob patterns. The Copilot gateway is always tried first.

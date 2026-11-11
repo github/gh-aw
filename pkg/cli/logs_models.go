@@ -456,6 +456,7 @@ type AwInfo struct {
 	FallbackModel   string                `json:"fallback_model,omitempty"`
 	ModelRouting    *AwInfoModelRouting   `json:"model_routing,omitempty"`
 	ModelSelection  *AwInfoModelSelection `json:"model_selection,omitempty"`
+	ModelConfig     *AwInfoModelConfig    `json:"model_config,omitempty"`
 	Version         string                `json:"version"`
 	CLIVersion      string                `json:"cli_version,omitempty"` // gh-aw CLI version
 	WorkflowName    string                `json:"workflow_name"`
@@ -480,6 +481,29 @@ type AwInfo struct {
 	Actor      string    `json:"actor,omitempty"`
 	EventName  string    `json:"event_name,omitempty"`
 	TargetRepo string    `json:"target_repo,omitempty"`
+}
+
+// AwInfoModelConfig is the compiled model configuration recorded in aw_info.json.
+type AwInfoModelConfig struct {
+	Routing *AwInfoModelConfigRouting `json:"routing,omitempty"`
+}
+
+// AwInfoModelConfigRouting is the configured routing policy in aw_info.model_config.
+type AwInfoModelConfigRouting struct {
+	Enabled bool   `json:"enabled"`
+	Goal    string `json:"goal,omitempty"`
+	Mode    string `json:"mode,omitempty"`
+	// Requested is the router value the workflow set as its model, such as router/economy.
+	Requested string `json:"requested,omitempty"`
+}
+
+// requestedRouterValue returns the router value (router, router/economy, ...) that
+// configured routing for this run, or "" when routing came from engine.model-routing.
+func (a *AwInfo) requestedRouterValue() string {
+	if a == nil || a.ModelConfig == nil || a.ModelConfig.Routing == nil || !a.ModelConfig.Routing.Enabled {
+		return ""
+	}
+	return a.ModelConfig.Routing.Requested
 }
 
 type AwInfoModelSelection struct {
