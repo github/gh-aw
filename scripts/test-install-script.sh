@@ -802,6 +802,7 @@ test_private_gh_install_log() (
     mkdir -p "$fixture_bin" "$tmp_dir" "$case_root/home"
     printf 'sentinel\n' > "$case_root/sentinel"
     ln -s "$case_root/sentinel" "$tmp_dir/gh-install.log"
+    [ -L "$tmp_dir/gh-install.log" ] || fail "fixture did not create the planted legacy symlink"
     # Keep even a regression to the legacy fixed path inside this test's namespace.
     sed "s|/tmp/gh-install.log|$tmp_dir/gh-install.log|g" "$INSTALLER_PATH" > "$case_root/install.sh"
     cat > "$fixture_bin/gh" <<'EOF'
@@ -872,8 +873,15 @@ EOF
     echo "Test: private gh install log ($scenario) PASS"
 )
 
-for scenario in success error timeout allocation-failure; do
-    test_private_gh_install_log "$scenario"
-done
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo "Skipping private gh install log tests requiring Unix symlinks and permissions on Windows hosts."
+        ;;
+    *)
+        for scenario in success error timeout allocation-failure; do
+            test_private_gh_install_log "$scenario"
+        done
+        ;;
+esac
 
 echo "All installer behavior tests passed."
