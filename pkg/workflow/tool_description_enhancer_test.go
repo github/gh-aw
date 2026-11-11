@@ -216,6 +216,57 @@ func TestEnhanceToolDescriptionSubmitPullRequestReviewTargetRepo(t *testing.T) {
 	}
 }
 
+func TestEnhanceToolDescriptionSubmitPullRequestReviewAllowedEvents(t *testing.T) {
+	tests := []struct {
+		name          string
+		allowedEvents []string
+		wantContains  []string
+		wantAbsent    []string
+	}{
+		{
+			name:          "APPROVE excluded",
+			allowedEvents: []string{"COMMENT", "REQUEST_CHANGES"},
+			wantContains:  []string{"Allowed review events: COMMENT, REQUEST_CHANGES.", "(APPROVE) are rejected"},
+		},
+		{
+			name:          "only COMMENT allowed",
+			allowedEvents: []string{"COMMENT"},
+			wantContains:  []string{"Allowed review events: COMMENT.", "(APPROVE, REQUEST_CHANGES) are rejected"},
+		},
+		{
+			name:          "all events allowed",
+			allowedEvents: []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"},
+			wantContains:  []string{"Allowed review events: APPROVE, COMMENT, REQUEST_CHANGES."},
+			wantAbsent:    []string{"are rejected"},
+		},
+		{
+			name:       "allowed-events not configured",
+			wantAbsent: []string{"Allowed review events", "are rejected"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			description := enhanceToolDescription("submit_pull_request_review", "Submit a PR review.", &SafeOutputsConfig{
+				SubmitPullRequestReview: &SubmitPullRequestReviewConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: defaultIntStr(1)},
+					AllowedEvents:        tt.allowedEvents,
+				},
+			})
+			for _, want := range tt.wantContains {
+				if !strings.Contains(description, want) {
+					t.Errorf("expected %q in description, got: %s", want, description)
+				}
+			}
+			for _, absent := range tt.wantAbsent {
+				if strings.Contains(description, absent) {
+					t.Errorf("did not expect %q in description, got: %s", absent, description)
+				}
+			}
+		})
+	}
+}
+
 func TestEnhanceToolDescriptionNormalizeClosingKeywordsCreateIssue(t *testing.T) {
 	description := enhanceToolDescription("create_issue", "Create an issue.", &SafeOutputsConfig{
 		CreateIssues: &CreateIssuesConfig{
