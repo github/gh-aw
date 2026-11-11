@@ -1,29 +1,47 @@
-### Executive totals
-- Eligible Copilot PRs: 11
-- Category mix: bug 7, feature 3, test 1
-- Risk mix: low 1, medium 8, high 2
-- Priority mix: low 1, medium 8, high 2
-- Recommended actions: batch_review 8, fast_track 2, defer 1
+### PR triage report
 
-### Top-priority PRs
-- #76427 — Harden OpenAI WIF version, detection, and egress handling — score 68 — fast_track
-- #76422 — Harden Pi sub-agent invocation validation — score 68 — fast_track
-- #76428 — Authenticate setup-cli release downloads with GH_TOKEN — score 59 — batch_review
+#### Executive summary
+- Eligible Copilot PRs: 4
+- Skipped by cooldown: 2
+- Category mix: 3 bug, 1 feature
+- Risk mix: 3 medium, 1 high
+- Priority mix: 3 medium, 1 high
+- Recommended actions: 3 batch_review, 1 fast_track
 
-### Auto-merge candidates
-- None.
+#### Top-priority PRs
+1. #76753 — Raise the Go toolchain baseline to 1.27.4
+   - Category: bug | Risk: high | Score: 82/100
+   - Impact 42 + urgency 25 + quality 15
+   - Reason: security-aligned toolchain fix with passing CI; highest business value in the set.
+2. #76617 — Choose model routing with `model: router` and `router/economy|balanced|robust`
+   - Category: feature | Risk: medium | Score: 62/100
+   - Impact 35 + urgency 13 + quality 14
+   - Reason: biggest scope item and likely value driver, but still a single coherent feature slice.
+3. #76731 — Harden Windows WSL runtime setup
+   - Category: bug | Risk: medium | Score: 58/100
+   - Impact 31 + urgency 14 + quality 13
+   - Reason: targeted platform hardening with a narrow attack surface.
 
-### Fast-track items
-- #76427 — Harden OpenAI WIF version, detection, and egress handling
-- #76422 — Harden Pi sub-agent invocation validation
+#### Batch opportunities
+- pr-batch:copilot-ops: #76617, #76731, #76754
+  - These PRs share workflow/automation changes and are comparable in risk and review load.
 
-### Batch opportunities
-- pr-batch:model-routing — #76330, #76323, #76319
+#### Auto-merge candidates
+- None. All eligible PRs need human attention given the mix of feature work and platform/toolchain adjustments.
 
-### Close candidates
-- None.
+#### Fast-track items
+- #76753 (Go toolchain baseline uplift)
 
-### Key trends and next actions
-- The portfolio is dominated by workflow hardening and model-routing work, with several medium-risk fixes clustered around dependency and runtime validation changes.
-- The highest-risk items concern WIF/egress handling and Pi invocation validation and should be reviewed before merging.
-- The model-routing PRs form a clear 3-PR batch and should be reviewed together to reduce churn and avoid partial migration states.
+#### Close candidates
+- None among the eligible set.
+
+#### Key trends and next actions
+- Most open Copilot work is corrective or platform hardening rather than broad product rewrites.
+- The only high-priority item is the Go baseline increase, which should be reviewed first.
+- The medium-risk batch should be reviewed together to keep automation and routing changes consistent.
+
+**References:**
+- [PR #76617](https://github.com/github/gh-aw/pull/76617)
+- [PR #76731](https://github.com/github/gh-aw/pull/76731)
+- [PR #76753](https://github.com/github/gh-aw/pull/76753)
+- [PR #76754](https://github.com/github/gh-aw/pull/76754)
