@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/sliceutil"
@@ -13,15 +14,12 @@ import (
 const promptGitHubScriptToken = "no-authentication"
 
 func promptValueUsesCredentials(value string) bool {
-	for _, source := range interpolationReferences(value) {
-		if len(source) == 0 {
-			continue
-		}
-		if strings.EqualFold(source[0], "secrets") || (len(source) > 1 && strings.EqualFold(source[0], "github") && strings.EqualFold(source[1], "token")) { //nolint:uncheckedsliceindex // The context and property bounds are checked above.
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(interpolationReferences(value), isCredentialReference)
+}
+
+func isCredentialReference(path []string) bool {
+	return referenceHasPrefix(path, []string{"secrets"}) ||
+		referenceHasPrefix(path, []string{"github", "token"})
 }
 
 func validatePromptSecretBindings(data *WorkflowData, localImports string) error {

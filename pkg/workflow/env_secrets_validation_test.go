@@ -36,6 +36,8 @@ func TestCompileImportedEngineSupportedEnvVarKeysStrict(t *testing.T) {
 		{name: "unversioned firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "custom", wantError: "requires AWF v0.25.3 or newer"},
 		{name: "non-strict older firewall", key: "ANTHROPIC_API_KEY", awfVersion: "v0.25.0"},
 		{name: "older firewall without secrets", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "v0.25.0", envValue: "plain-value"},
+		{name: "declared key with github token", key: "ANTHROPIC_API_KEY", strict: true, envValue: "${{ github['token'] }}"},
+		{name: "github token with older firewall", key: "ANTHROPIC_API_KEY", strict: true, awfVersion: "v0.25.0", envValue: "${{ github['token'] }}", wantError: "requires AWF v0.25.3 or newer"},
 	}
 	for _, api := range []string{"file", "string"} {
 		for _, tt := range tests {
@@ -154,6 +156,103 @@ Say hello.
 	})
 }
 
+func TestCompileEnvCredentialReferences(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       string
+		engineEnv   bool
+		key         string
+		nonStrict   bool
+		awfVersion  string
+		wantSection string
+		wantError   string
+	}{
+		{name: "dot token", value: "${{ github.token }}", wantSection: "env"},
+		{name: "single quoted token", value: "${{ github['token'] }}", wantSection: "env"},
+		{name: "double quoted token", value: `${{ github["token"] }}`, wantError: "invalid expression in 'env' section"},
+		{name: "case insensitive token", value: "${{ GitHub [ 'ToKeN' ] }}", wantSection: "env"},
+		{name: "fallback token", value: "${{ vars.VALUE || github['token'] }}", wantSection: "env"},
+		{name: "formatted token", value: "${{ format('{0}', github['token']) }}", wantSection: "env"},
+		{name: "embedded token", value: "prefix-${{ github['token'] }}", wantSection: "env"},
+		{name: "secret control", value: "${{ secrets['GITHUB_TOKEN'] }}", wantSection: "env"},
+		{name: "metadata control", value: "${{ github['repository'] }}"},
+		{name: "quoted token control", value: "${{ 'github.token' }}"},
+		{name: "quoted bracket token control", value: `${{ 'github["token"]' }}`},
+		{name: "plain token control", value: "github['token']"},
+		{name: "non-strict single quoted token", value: "${{ github['token'] }}", nonStrict: true, wantSection: "env"},
+		{name: "non-strict double quoted token", value: `${{ github["token"] }}`, nonStrict: true, wantError: "invalid expression in 'env' section"},
+		{name: "unsupported engine key", value: "${{ github['token'] }}", engineEnv: true, wantSection: "engine.env"},
+		{name: "unsupported engine double quoted token", value: `${{ github["token"] }}`, engineEnv: true, wantError: "invalid expression in 'engine.env' section"},
+		{name: "supported engine key", value: "${{ github['token'] }}", engineEnv: true, key: "COPILOT_GITHUB_TOKEN"},
+		{name: "supported engine double quoted token", value: `${{ github["token"] }}`, engineEnv: true, key: "COPILOT_GITHUB_TOKEN", wantError: "invalid expression in 'engine.env' section"},
+		{name: "supported engine key older firewall", value: "${{ github['token'] }}", engineEnv: true, key: "COPILOT_GITHUB_TOKEN", awfVersion: "v0.25.0", wantError: "requires AWF v0.25.3 or newer"},
+		{name: "supported engine dot token older firewall", value: "${{ github.token }}", engineEnv: true, key: "COPILOT_GITHUB_TOKEN", awfVersion: "v0.25.0", wantError: "requires AWF v0.25.3 or newer"},
+		{name: "empty expression", value: "${{ }}", wantError: "invalid expression in 'env' section"},
+		{name: "unclosed expression", value: "${{ github['token']", wantError: "invalid expression in 'env' section"},
+	}
+	for _, api := range []string{"file", "string"} {
+		for _, tt := range tests {
+			t.Run(api+"/"+tt.name, func(t *testing.T) {
+				dir := t.TempDir()
+				path := filepath.Join(dir, "credentials.md")
+				key := tt.key
+				if key == "" {
+					key = "MY_VALUE"
+				}
+				env := fmt.Sprintf("env:\n  %s: %s\n", key, tt.value)
+				engine := "engine: copilot\n"
+				if tt.engineEnv {
+					engine = fmt.Sprintf("engine:\n  id: copilot\n  env:\n    %s: %s\n", key, tt.value)
+					env = ""
+				}
+				sandbox := ""
+				if tt.awfVersion != "" {
+					sandbox = fmt.Sprintf("sandbox:\n  agent:\n    version: %s\n", tt.awfVersion)
+				}
+				content := fmt.Sprintf("---\non: workflow_dispatch\npermissions:\n  contents: read\nstrict: %t\n%s%s%s---\nSay hello.\n", !tt.nonStrict, engine, env, sandbox)
+				require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+				var compileErr error
+				var yamlContent string
+				stderr := captureStderr(func() {
+					compiler := NewCompiler()
+					if api == "file" {
+						compileErr = compiler.CompileWorkflow(path)
+						return
+					}
+					var data *WorkflowData
+					data, compileErr = compiler.ParseWorkflowString(content, path)
+					if compileErr == nil {
+						yamlContent, compileErr = compiler.CompileToYAML(data, path)
+					}
+				})
+				if tt.wantSection != "" && !tt.nonStrict {
+					require.ErrorContains(t, compileErr, "strict mode: secrets detected in '"+tt.wantSection+"' section")
+					require.NoFileExists(t, filepath.Join(dir, "credentials.lock.yml"))
+					return
+				}
+				if tt.wantError != "" {
+					require.ErrorContains(t, compileErr, tt.wantError)
+					require.NoFileExists(t, filepath.Join(dir, "credentials.lock.yml"))
+					return
+				}
+				require.NoError(t, compileErr)
+				if api == "file" {
+					lock, err := os.ReadFile(filepath.Join(dir, "credentials.lock.yml"))
+					require.NoError(t, err)
+					yamlContent = string(lock)
+				}
+				assert.Contains(t, yamlContent, tt.value)
+				if tt.nonStrict {
+					assert.Contains(t, stderr, "secrets detected in '"+tt.wantSection+"' section")
+				}
+				if tt.engineEnv {
+					assert.Contains(t, yamlContent, "--exclude-env "+key)
+				}
+			})
+		}
+	}
+}
+
 func TestValidateEnvSecrets(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -264,10 +363,9 @@ func TestValidateEnvSecrets(t *testing.T) {
 			frontmatter: map[string]any{
 				"on": "push",
 				"env": map[string]any{
-					"NODE_ENV":     "production",
-					"WORKSPACE":    "${{ github.workspace }}",
-					"RUNNER_TEMP":  "${{ runner.temp }}",
-					"GITHUB_TOKEN": "${{ github.token }}",
+					"NODE_ENV":    "production",
+					"WORKSPACE":   "${{ github.workspace }}",
+					"RUNNER_TEMP": "${{ runner.temp }}",
 				},
 			},
 			strictMode:  true,
