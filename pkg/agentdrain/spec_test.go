@@ -13,24 +13,18 @@ import (
 	"github.com/github/gh-aw/pkg/agentdrain"
 )
 
-// TestSpec_PublicAPI_DefaultConfig validates the documented default values.
-// Spec: Depth=4, SimThreshold=0.4, MaxChildren=100, ParamToken="<*>", RareClusterThreshold=2,
-// ExcludeFields=["session_id","trace_id","span_id","timestamp"]
+// TestSpec_PublicAPI_DefaultConfig validates Public API / Functions: production
+// defaults include masking rules and excluded fields and construct a usable miner.
+// SPEC_AMBIGUITY: The README does not specify exact default configuration values.
 func TestSpec_PublicAPI_DefaultConfig(t *testing.T) {
 	t.Parallel()
 	cfg := agentdrain.DefaultConfig()
 
-	assert.Equal(t, 4, cfg.Depth, "Depth default should be 4")
-	assert.InEpsilon(t, 0.4, cfg.SimThreshold, 1e-9, "SimThreshold default should be 0.4")
-	assert.Equal(t, 100, cfg.MaxChildren, "MaxChildren default should be 100")
-	assert.Equal(t, "<*>", cfg.ParamToken, "ParamToken default should be <*>")
-	assert.Equal(t, 2, cfg.RareClusterThreshold, "RareClusterThreshold default should be 2")
-	assert.ElementsMatch(t,
-		[]string{"session_id", "trace_id", "span_id", "timestamp"},
-		cfg.ExcludeFields,
-		"ExcludeFields should match documented defaults",
-	)
-	assert.NotEmpty(t, cfg.MaskRules, "DefaultConfig should include MaskRules")
+	assert.NotEmpty(t, cfg.MaskRules, "production defaults should include masking rules")
+	assert.NotEmpty(t, cfg.ExcludeFields, "production defaults should include excluded fields")
+	miner, err := agentdrain.NewMiner(cfg)
+	require.NoError(t, err, "the documented default configuration should construct a miner")
+	require.NotNil(t, miner, "the default configuration should produce a usable miner")
 }
 
 // TestSpec_PublicAPI_NewMiner validates that NewMiner creates a usable miner.
@@ -111,6 +105,13 @@ func TestSpec_PublicAPI_Miner_Persistence(t *testing.T) {
 	require.NoError(t, err)
 	err = restored.LoadJSON(data)
 	require.NoError(t, err, "LoadJSON should not error with valid data")
+	assert.Equal(t, miner.Clusters(), restored.Clusters(), "loading saved state should preserve cluster contents")
+
+	replacement := agentdrain.AgentEvent{Stage: "finish", Fields: map[string]string{"result": "success"}}
+	_, err = restored.TrainEvent(replacement)
+	require.NoError(t, err, "the restored miner should accept further training")
+	require.NoError(t, restored.LoadJSON(data), "loading a snapshot should replace existing miner state")
+	assert.Equal(t, miner.Clusters(), restored.Clusters(), "loading should replace subsequent training with saved cluster state")
 }
 
 // TestSpec_PublicAPI_NewCoordinator validates that NewCoordinator creates a coordinator for given stages.
@@ -155,10 +156,14 @@ func TestSpec_PublicAPI_Coordinator_Snapshots(t *testing.T) {
 	require.NoError(t, err, "SaveSnapshots should not error")
 	assert.NotEmpty(t, snapshots, "SaveSnapshots should return non-empty map")
 
-	coord2, err := agentdrain.NewCoordinator(cfg, stages)
+	coord2, err := agentdrain.NewCoordinator(cfg, []string{"tool_call"})
 	require.NoError(t, err)
 	err = coord2.LoadSnapshots(snapshots)
 	require.NoError(t, err, "LoadSnapshots should not error with valid snapshots")
+	for _, stage := range stages {
+		assert.Equal(t, coord.AllClusters()[stage], coord2.AllClusters()[stage],
+			"LoadSnapshots should restore cluster contents for previously unknown stage %q", stage)
+	}
 }
 
 // TestSpec_PublicAPI_Utility_Tokenize validates that Tokenize splits on whitespace boundaries.
@@ -322,14 +327,6 @@ func TestSpec_Types_MaskRule(t *testing.T) {
 	assert.Equal(t, "<NUM>", rule.Replacement)
 }
 
-// TestSpec_DesignDecision_SimThreshold validates that SimThreshold=0.4 means 40% token match.
-// Spec: "SimThreshold of 0.4 means at least 40% of tokens must match exactly"
-func TestSpec_DesignDecision_SimThreshold(t *testing.T) {
-	t.Parallel()
-	cfg := agentdrain.DefaultConfig()
-	assert.InEpsilon(t, 0.4, cfg.SimThreshold, 1e-9, "40%% token match threshold as documented")
-}
-
 // TestSpec_DesignDecision_CoordinatorRouting validates that events from different stages
 // are routed to separate miners so templates do not interfere.
 // Spec: "The Coordinator routes each AgentEvent to its stage-specific Miner"
@@ -394,6 +391,60 @@ func TestSpec_PublicAPI_Coordinator_WeightsPersistence(t *testing.T) {
 	require.NoError(t, err)
 	err = coord2.LoadWeightsJSON(data)
 	require.NoError(t, err, "LoadWeightsJSON should not error with valid data")
+	assert.Equal(t, coord.AllClusters(), coord2.AllClusters(), "combined weights should preserve all stages and cluster contents")
+}
+
+// TestSpec_PublicAPI_MaskerRuleOrder validates Public API / Functions: all
+// configured regex substitutions run in order.
+func TestSpec_PublicAPI_MaskerRuleOrder(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		rules    []agentdrain.MaskRule
+		expected string
+	}{
+		{
+			name: "later rule consumes the earlier replacement",
+			rules: []agentdrain.MaskRule{
+				{Name: "number", Pattern: `\d+`, Replacement: "<NUM>"},
+				{Name: "label", Pattern: "<NUM>", Replacement: "<VALUE>"},
+			},
+			expected: "step <VALUE> completed",
+		},
+		{
+			name: "reversed rules produce a different result",
+			rules: []agentdrain.MaskRule{
+				{Name: "label", Pattern: "<NUM>", Replacement: "<VALUE>"},
+				{Name: "number", Pattern: `\d+`, Replacement: "<NUM>"},
+			},
+			expected: "step <NUM> completed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			masker, err := agentdrain.NewMasker(tt.rules)
+			require.NoError(t, err, "documented regex substitution rules should compile")
+			assert.Equal(t, tt.expected, masker.Mask("step 42 completed"), "masking should apply rules in their configured order")
+		})
+	}
+}
+
+// TestSpec_DesignDecision_AnomalyFlags validates Design Decisions: a new
+// template is never double-counted as a low-similarity match.
+func TestSpec_DesignDecision_AnomalyFlags(t *testing.T) {
+	t.Parallel()
+	miner, err := agentdrain.NewMiner(agentdrain.DefaultConfig())
+	require.NoError(t, err, "default configuration should construct a miner")
+	event := agentdrain.AgentEvent{Stage: "plan", Fields: map[string]string{"action": "start"}}
+	_, report, err := miner.AnalyzeEvent(event)
+	require.NoError(t, err, "analysis should train and score the documented event")
+	require.NotNil(t, report, "analysis should return an anomaly report")
+	assert.True(t, report.IsNewTemplate, "the first event in an empty miner should create a new template")
+	assert.False(t, report.LowSimilarity, "a new template must not also be flagged as low similarity")
+	clusters := miner.Clusters()
+	require.Len(t, clusters, 1, "analysis should train on the same event")
+	assert.Equal(t, event.Stage, clusters[0].Stage, "training should propagate the event stage into its cluster")
 }
 
 // TestSpec_PublicAPI_AnomalyDetector_Analyze validates that AnomalyDetector.Analyze
