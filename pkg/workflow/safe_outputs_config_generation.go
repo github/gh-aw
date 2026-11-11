@@ -229,6 +229,60 @@ func addSafeScriptsConfig(safeOutputsConfig map[string]any, scripts map[string]*
 		safeOutputsConfigLog.Printf("Generating config for safe script: %s (normalized: %s)", scriptName, normalizedName)
 		safeOutputsConfig[normalizedName] = buildSafeToolConfigFields(scriptConfig.Description, scriptConfig.Max, scriptConfig.Inputs)
 	}
+	addConnectorThreatWarningPolicies(safeOutputsConfig, scripts)
+}
+
+func addConnectorThreatWarningPolicies(config map[string]any, scripts map[string]*SafeScriptConfig) {
+	for name, script := range scripts {
+		if script.connectorInputSchema == nil {
+			continue
+		}
+		normalizedName := stringutil.NormalizeSafeOutputIdentifier(name)
+		handler, ok := config[normalizedName].(map[string]any)
+		if !ok {
+			handler = map[string]any{}
+		}
+		handler["threat_warning_policy"] = "abort"
+		if field, ok := script.connectorInputSchema["x-gh-aw-temporary-id"].(string); ok {
+			handler["temporary_id_field"] = field
+		}
+		if files := connectorStagedFilePolicies(script.connectorInputSchema); len(files) != 0 {
+			handler["staged_files"] = files
+		}
+		if script.connectorOptions != nil {
+			handler["connector_operation"] = true
+			handler["max"] = script.connectorOptions.Max
+			if script.connectorOptions.Staged != nil {
+				staged := script.connectorOptions.Staged
+				if isExpression(staged.String()) {
+					// Only interpolate a canonical boolean into the JSON config.
+					// An arbitrary expression result must not inject policy fields.
+					handler["staged"] = "${{ format('{0}', " + stripExpressionWrapper(staged.String()) + ") == 'true' }}"
+				} else {
+					handler["staged"] = templatableBoolIsTrue(staged)
+				}
+			}
+		}
+		config[normalizedName] = handler
+	}
+}
+
+func connectorStagedFilePolicies(schema map[string]any) map[string]any {
+	result := map[string]any{}
+	properties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		if schema != nil {
+			safeOutputsConfigLog.Printf("connector staging metadata has no object properties")
+		}
+		return result
+	}
+	for name, raw := range properties {
+		property, ok := raw.(map[string]any)
+		if ok && property["x-gh-aw-staged-file"] != nil {
+			result[name] = property["x-gh-aw-staged-file"]
+		}
+	}
+	return result
 }
 
 func buildSafeToolConfigFields(description string, max int, inputs map[string]*InputDefinition) map[string]any {

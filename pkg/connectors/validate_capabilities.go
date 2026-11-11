@@ -1,0 +1,144 @@
+package connectors
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"regexp"
+	"slices"
+	"strings"
+)
+
+var toolPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]{0,127}$`)
+var argumentPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]{0,127}$`)
+var writeGraphQLPattern = regexp.MustCompile(`\b(mutation|subscription)\b`)
+
+func validatePayload(op Operation, phase string) error {
+	request := op.Request
+	patches := append(slices.Clone(request.Patch), request.AdditionalPatch...)
+	if len(request.AdditionalPatch) > 32 {
+		return errors.New("additionalPatch supports at most 32 authored fixed-path entries")
+	}
+	if request.Method == http.MethodGet && (len(request.Body) != 0 || request.GraphQL != "" || len(patches) != 0) {
+		return errors.New("GET requests cannot contain a body, GraphQL document or JSON Patch")
+	}
+	if request.GraphQL != "" && phase != "safe-output" && writeGraphQLPattern.MatchString(request.GraphQL) {
+		return errors.New("read GraphQL documents cannot contain mutation or subscription tokens")
+	}
+	if len(patches) != 0 {
+		if phase != "safe-output" || request.GraphQL != "" || len(request.Body) != 0 || (request.Method != http.MethodPatch && request.Method != http.MethodPost) {
+			return errors.New("JSON Patch requires safe-output POST/PATCH without another body")
+		}
+		seen := map[string]struct{}{}
+		for _, patch := range patches {
+			if patch.Op != "add" && patch.Op != "replace" && patch.Op != "test" {
+				return errors.New("JSON Patch supports only fixed-path add, replace and test operations")
+			}
+			if !validPointer(patch.Path) || strings.ContainsAny(patch.Path, "{}$") {
+				return errors.New("JSON Patch paths must be fixed JSON Pointers")
+			}
+			key := strings.ToLower(patch.Path)
+			_, duplicate := seen[key]
+			if duplicate && len(request.AdditionalPatch) != 0 {
+				return errors.New("additionalPatch cannot override an existing patch path")
+			}
+			seen[key] = struct{}{}
+		}
+	}
+	for pointer := range op.ResponseChecks {
+		if !validPointer(pointer) {
+			return errors.New("responseChecks keys must be JSON Pointers")
+		}
+	}
+	for pointer, resource := range op.ResponseResources {
+		if !validPointer(pointer) || !namePattern.MatchString(resource) {
+			return errors.New("responseResources requires JSON Pointer keys and resource names")
+		}
+	}
+	for _, pointer := range op.ResponseRequired {
+		if !validPointer(pointer) {
+			return errors.New("responseRequired entries must be JSON Pointers")
+		}
+	}
+	for name, pointer := range op.Project {
+		if !namePattern.MatchString(name) || !validPointer(pointer) {
+			return errors.New("project requires named fields with JSON Pointer values")
+		}
+	}
+	return validateResponseConstraints(op)
+}
+
+func validateResponseConstraints(op Operation) error {
+	if op.ResponseWhen != nil {
+		if err := ValidateEventPredicate(*op.ResponseWhen); err != nil {
+			return err
+		}
+	}
+	if err := validatePrimitiveTypes(op.ResponseTypes); err != nil {
+		return err
+	}
+	for pointer, input := range op.ResponseInputs {
+		field, ok := op.Inputs[input]
+		if !validPointer(pointer) || !ok || !field.Required {
+			return errors.New("responseInputs requires JSON Pointers referencing declared required inputs")
+		}
+	}
+	return nil
+}
+
+func validatePrimitiveTypes(types map[string]string) error {
+	for pointer, kind := range types {
+		if !validPointer(pointer) || (kind != "string" && kind != "number" && kind != "integer" && kind != "boolean") {
+			return errors.New("responseTypes requires JSON Pointers and primitive string/number/integer/boolean types")
+		}
+	}
+	return nil
+}
+
+func validateValue(value Value, inputs map[string]Input) error {
+	return validateValueDepth(value, inputs, 0)
+}
+
+func (s *ConnectorSpec) validateHTTPMCP() error {
+	for name, server := range s.HTTPMCP {
+		u, err := url.Parse(server.URL)
+		if !namePattern.MatchString(name) || err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(server.URL, "{}$\\") {
+			return fmt.Errorf("HTTP MCP %q requires a fixed HTTPS URL", name)
+		}
+		credential, ok := s.Credentials[server.Credential]
+		if !ok || credential.Phase != "agent" || !server.ReadOnly || len(server.Tools) == 0 {
+			return fmt.Errorf("HTTP MCP %q requires an agent credential, readOnly: true and exact tools", name)
+		}
+		if server.MaxResponseBytes < 1 || server.MaxResponseBytes > 1024*1024 {
+			return fmt.Errorf("HTTP MCP %q requires maxResponseBytes between 1 and 1048576", name)
+		}
+		if err := validateMCPHeaders(server.Headers); err != nil {
+			return err
+		}
+		for tool, constraints := range server.Tools {
+			if !toolPattern.MatchString(tool) {
+				return fmt.Errorf("HTTP MCP %q has invalid exact tool name %q", name, tool)
+			}
+			if err := validateInputs(constraints.Inputs); err != nil {
+				return err
+			}
+			for input, resource := range constraints.Resources {
+				field, ok := constraints.Inputs[input]
+				if !ok || field.Type != "string" || !field.Required || !namePattern.MatchString(resource) {
+					return fmt.Errorf("HTTP MCP %q resource constraints must reference required string inputs", name)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateMCPHeaders(headers map[string]string) error {
+	for name, value := range headers {
+		if !strings.HasPrefix(name, "X-MCP-") || strings.ContainsAny(name+value, "\r\n$") {
+			return errors.New("HTTP MCP fixed headers must use X-MCP-* names without expressions or line breaks")
+		}
+	}
+	return nil
+}

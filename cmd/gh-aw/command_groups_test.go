@@ -31,6 +31,7 @@ func TestCommandGroupAssignments(t *testing.T) {
 		// Development Commands
 		{name: "compile command in development group", commandName: "compile", expectedGroup: "development", shouldHaveGroup: true},
 		{name: "validate command in development group", commandName: "validate", expectedGroup: "development", shouldHaveGroup: true},
+		{name: "connectors command in development group", commandName: "connectors", expectedGroup: "development", shouldHaveGroup: true},
 		{name: "mcp command in development group", commandName: "mcp", expectedGroup: "development", shouldHaveGroup: true},
 		{name: "fix command in development group", commandName: "fix", expectedGroup: "development", shouldHaveGroup: true},
 		{name: "format command in development group", commandName: "format", expectedGroup: "development", shouldHaveGroup: true},

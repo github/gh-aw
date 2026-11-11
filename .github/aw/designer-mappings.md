@@ -31,16 +31,16 @@ Quick-reference mapping tables for `.github/aw/designer.md`. Load this file duri
 | "post a comment" | `add-comment` |
 | "create an issue" | `create-issue` |
 | "update issue title/body" | `update-issue` |
-| "create a Jira issue" | `jira-create-issue` |
-| "update Jira issue ENG-123" | `jira-update-issue` |
-| "comment on Jira issue ENG-123" | `jira-add-comment` |
-| "add a Jira label" | `jira-add-label` |
-| "create a Linear issue" | `linear-create-issue` (experimental) |
-| "update Linear issue" | `linear-update-issue` (experimental) |
-| "comment on Linear issue" | `linear-add-comment` (experimental) |
-| "create an Azure DevOps work item" | `ado-create-work-item` (experimental) |
-| "update an Azure DevOps work item" | `ado-update-work-item` (experimental) |
-| "comment/assign/link Azure DevOps work items" | `ado-comment-on-work-item`, `ado-assign-work-item`, `ado-link-work-items` (experimental) |
+| "create a Jira issue" | Import `.github/workflows/connectors/jira.md`, approve project grants, select `jira-create-issue` |
+| "update Jira issue ENG-123" | Imported connector `jira-update-issue` with an exact issue grant or authenticated created reference |
+| "comment on Jira issue ENG-123" | Imported connector `jira-add-comment` with an exact issue grant or authenticated created reference |
+| "add a Jira label" | Imported connector `jira-add-label` (additive) |
+| "create a Linear issue" | Import `.github/workflows/connectors/linear.md`, approve resource arrays, select `linear-create-issue` |
+| "update Linear issue" | Imported connector `linear-update-issue` (requires title and body) |
+| "comment on Linear issue" | Imported connector `linear-add-comment` |
+| "create an Azure DevOps work item" | `azure-devops-create-work-item` via `".github/workflows/connectors/azure-devops.md"` |
+| "update an Azure DevOps work item" | `azure-devops-update-work-item` (title only; imported connector) |
+| "comment/assign/link Azure DevOps work items" | `azure-devops-comment-on-work-item`, `azure-devops-assign-work-item`, `azure-devops-link-work-items` (imported connector) |
 | "close the issue" | `close-issue` |
 | "assign someone", "remove assignment" | `assign-to-user`, `unassign-from-user` |
 | "set issue type/field/milestone" | `set-issue-type`, `set-issue-field`, `assign-milestone` |

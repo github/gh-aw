@@ -1,5 +1,14 @@
 {
   "root": {
+    "connectors": {
+      "type": "object",
+      "desc": "Experimental."
+    },
+    "skip-if-decision": {
+      "type": "array",
+      "desc": "Experimental.",
+      "array": true
+    },
     "token-broker": {
       "type": "object",
       "desc": "Experimental.",
@@ -246,8 +255,6 @@
         "slash-command": {},
         "label-command": {},
         "jira-issue": {},
-        "linear-issue": {},
-        "azure-devops-issue": {},
         "gateway-dispatch": {
           "type": "object",
           "desc": "Experimental exclusive trigger."
@@ -746,12 +753,18 @@
     },
     "runner": {
       "type": "object",
-      "desc": "Runner topology configuration.",
+      "desc": "Runner configuration.",
       "children": {
         "topology": {
           "type": "string",
           "desc": "Runner execution topology.",
           "enum": ["arc-dind"],
+          "leaf": true
+        },
+        "installation": {
+          "type": "string",
+          "desc": "Installation privilege for Copilot CLI and threat-detect in the agent and detection jobs.",
+          "enum": ["rootless", "privileged"],
           "leaf": true
         }
       }
@@ -1752,6 +1765,17 @@
             }
           }
         },
+        "durable": {
+          "type": "object",
+          "desc": "Experimental.",
+          "children": {
+            "retention-days": {
+              "type": "integer",
+              "desc": "Number of days to retain durable checkpoint artifacts, subject to repository and organization artifact retention policy.",
+              "leaf": true
+            }
+          }
+        },
         "extensions": {
           "type": "array",
           "desc": "Engine-specific plugin names to install before launching the engine.",
@@ -2267,64 +2291,6 @@
             }
           }
         },
-        "linear": {
-          "type": "null|object",
-          "desc": "Linear tools provided by Linear's official hosted MCP server",
-          "children": {
-            "token": {
-              "type": "string",
-              "desc": "Optional Linear API key or OAuth access token secret reference.",
-              "leaf": true
-            },
-            "toolsets": {
-              "type": "string|array",
-              "desc": "Linear MCP toolset name(s) to enable.",
-              "enum": ["all", "attachments", "comments", "customers", "cycles", "diffs", "documentation", "documents", "initiatives", "issues", "milestones", "projects", "status_updates", "teams", "users"],
-              "leaf": true,
-              "array": true
-            },
-            "allowed": {
-              "type": "array",
-              "desc": "List of allowed Linear MCP tool names or wildcard patterns.",
-              "array": true
-            },
-            "required": {
-              "type": "boolean",
-              "desc": "Whether failure to connect to Linear should fail MCP gateway startup.",
-              "enum": [true, false],
-              "leaf": true
-            }
-          }
-        },
-        "jira": {
-          "type": "boolean|object",
-          "desc": "Jira tools provided by Atlassian's remote Rovo MCP service.",
-          "enum": [false],
-          "children": {
-            "url": {
-              "type": "string",
-              "desc": "Atlassian Rovo MCP endpoint.",
-              "leaf": true
-            },
-            "allowed": {
-              "type": "array",
-              "desc": "Approved read-only Jira MCP tools the agent may call.",
-              "array": true
-            },
-            "auth": {
-              "type": "object",
-              "desc": "Non-interactive authentication for GitHub Actions.",
-              "children": {
-                "type": {},
-                "token": {
-                  "type": "string",
-                  "desc": "Atlassian service account API key, sent with the HTTP bearer scheme.",
-                  "leaf": true
-                }
-              }
-            }
-          }
-        },
         "bash": {
           "type": "null|boolean|array",
           "desc": "Bash shell command execution tool.",
@@ -2676,6 +2642,42 @@
           "type": "boolean|null|object|array",
           "desc": "Repo memory configuration for git-based persistent storage",
           "children": {
+            "github-app": {
+              "type": "object",
+              "desc": "GitHub App credentials for repo-memory.",
+              "children": {
+                "client-id": {},
+                "app-id": {},
+                "private-key": {},
+                "owner": {},
+                "repositories": {},
+                "ignore-if-missing": {}
+              }
+            },
+            "github-app-read": {
+              "type": "object",
+              "desc": "GitHub App for memory restores and daily-credit ledger clones.",
+              "children": {
+                "client-id": {},
+                "app-id": {},
+                "private-key": {},
+                "owner": {},
+                "repositories": {},
+                "ignore-if-missing": {}
+              }
+            },
+            "github-app-write": {
+              "type": "object",
+              "desc": "GitHub App for memory pushes.",
+              "children": {
+                "client-id": {},
+                "app-id": {},
+                "private-key": {},
+                "owner": {},
+                "repositories": {},
+                "ignore-if-missing": {}
+              }
+            },
             "branch-prefix": {
               "type": "string",
               "desc": "Branch prefix for memory storage (default: 'memory').",
@@ -2947,34 +2949,6 @@
           "desc": "Enable AI agents to approve pending workflow runs in the action required state.",
           "leaf": true
         },
-        "jira-create-issue": {
-          "type": "object|null",
-          "leaf": true
-        },
-        "jira-update-issue": {
-          "type": "object|null",
-          "leaf": true
-        },
-        "jira-add-comment": {
-          "type": "object|null",
-          "leaf": true
-        },
-        "jira-add-label": {
-          "type": "object|null",
-          "leaf": true
-        },
-        "linear-create-issue": {
-          "type": "object",
-          "desc": "Experimental."
-        },
-        "linear-add-comment": {
-          "type": "object",
-          "desc": "Experimental."
-        },
-        "linear-update-issue": {
-          "type": "object",
-          "desc": "Experimental."
-        },
         "add-comment": {
           "type": "object|null",
           "desc": "Enable AI agents to add comments to GitHub issues, pull requests, or discussions.",
@@ -3019,36 +2993,6 @@
         "autofix-code-scanning-alert": {
           "type": "object|null",
           "desc": "Enable AI agents to create autofixes for code scanning alerts using the GitHub REST API.",
-          "leaf": true
-        },
-        "ado-create-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-update-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-comment-on-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-assign-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-link-work-items": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-upload-workitem-attachment": {
-          "type": "object|null",
-          "desc": "Experimental.",
           "leaf": true
         },
         "create-check-run": {
@@ -3205,11 +3149,6 @@
         "github-token": {
           "type": "string",
           "desc": "GitHub token to use for safe output jobs.",
-          "leaf": true
-        },
-        "linear-token": {
-          "type": "string",
-          "desc": "Linear personal API key expression used only by the trusted safe_outputs job.",
           "leaf": true
         },
         "github-app": {

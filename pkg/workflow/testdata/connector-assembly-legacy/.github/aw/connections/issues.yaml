@@ -1,0 +1,9 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: example.com/issues
+credentials:
+  reader: {secret: ASSEMBLY_READ_TOKEN}
+  context-reader: {secret: ASSEMBLY_CONTEXT_TOKEN}
+  writer: {secret: ASSEMBLY_WRITE_TOKEN}
+resources:
+  issues: [ISSUE-1]

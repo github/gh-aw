@@ -198,7 +198,7 @@ func validateSafeOutputsSamples(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
-	return nil
+	return validateConnectorSamples(config)
 }
 
 // extractBaseSafeOutputConfig returns the embedded BaseSafeOutputConfig of the
@@ -239,7 +239,39 @@ func validateSamplesForTool(toolName string, samples []map[string]any) error {
 		return fmt.Errorf("samples: no MCP tool schema found for %q (yaml key %q). Available tools come from pkg/workflow/js/safe_outputs_tools.json", toolName, toolDisplayKey(toolName))
 	}
 	displayKey := toolDisplayKey(toolName)
-	sidecars := sampleSidecarFields[toolName]
+	return validateSamplesAgainstSchema(displayKey, samples, entry, sampleSidecarFields[toolName])
+}
+
+func validateConnectorSamples(config *SafeOutputsConfig) error {
+	for _, name := range sliceutil.SortedKeys(config.Scripts) {
+		script := config.Scripts[name]
+		if script == nil || script.connectorOptions == nil || len(script.connectorOptions.Samples) == 0 {
+			continue
+		}
+		if script.connectorInputSchema == nil {
+			return fmt.Errorf("safe-outputs.%s.samples: missing generated connector tool schema", name)
+		}
+		data, err := json.Marshal(script.connectorInputSchema)
+		if err != nil {
+			return fmt.Errorf("safe-outputs.%s.samples: encode tool schema: %w", name, err)
+		}
+		schema, err := compileSchema(string(data), "inmem://connector-samples/"+name+".json")
+		if err != nil {
+			return fmt.Errorf("safe-outputs.%s.samples: compile tool schema: %w", name, err)
+		}
+		var raw map[string]any
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return fmt.Errorf("safe-outputs.%s.samples: decode tool schema: %w", name, err)
+		}
+		entry := toolSchemaEntry{raw: raw, compiled: schema}
+		if err := validateSamplesAgainstSchema(name, script.connectorOptions.Samples, entry, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateSamplesAgainstSchema(displayKey string, samples []map[string]any, entry toolSchemaEntry, sidecars map[string]struct{}) error {
 	for i, sample := range samples {
 		stripped := stripSidecarFields(sample, sidecars)
 		substituted, ok := substituteRuntimeExpressionsForValidation(stripped, entry.raw).(map[string]any)

@@ -1,0 +1,7 @@
+{
+  "event": "record.updated",
+  "instance": "https://example.service-now.com",
+  "table": "sc_req_item",
+  "sys_id": "fedcba9876543210fedcba9876543210",
+  "delivery_id": "example-requested-item-delivery-1"
+}

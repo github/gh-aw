@@ -1445,7 +1445,12 @@ jobs:
         id: agentic_execution
         env:
           GH_AW_SAMPLES: |
-            [{"tool":"add_comment","arguments":{"body":"smoke-ci samples replay comment for run ${{ github.run_id }}.","item_number":"#aw_smokeci"}},{"tool":"add_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"create_issue","arguments":{"body":"Deterministic samples replay for run ${{ github.run_id }}.\n\nThis issue is produced by `safe-outputs.create-issue.samples`, not by an agent.\n","temporary_id":"#aw_smokeci","title":"safe-outputs samples replay"}},{"tool":"remove_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"update_issue","arguments":{"body":"smoke-ci samples replay confirmed the update-issue handler for run ${{ github.run_id }}.","issue_number":"#aw_smokeci","operation":"append"}}]
+            [{"tool":"add_comment","arguments":{"body":"smoke-ci samples replay comment for run \u0024{{ github.run_id }}.","item_number":"#aw_smokeci"}},{"tool":"add_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"create_issue","arguments":{"body":"Deterministic samples replay for run \u0024{{ github.run_id }}.\n\nThis issue is produced by `safe-outputs.create-issue.samples`, not by an agent.\n","temporary_id":"#aw_smokeci","title":"safe-outputs samples replay"}},{"tool":"remove_labels","arguments":{"item_number":"#aw_smokeci","labels":["ai-generated"]}},{"tool":"update_issue","arguments":{"body":"smoke-ci samples replay confirmed the update-issue handler for run \u0024{{ github.run_id }}.","issue_number":"#aw_smokeci","operation":"append"}}]
+          GH_AW_SAMPLE_BINDINGS: |
+            [{"entry":0,"path":["arguments","body"],"env":"GH_AW_SAMPLE_VALUE_0"},{"entry":2,"path":["arguments","body"],"env":"GH_AW_SAMPLE_VALUE_1"},{"entry":4,"path":["arguments","body"],"env":"GH_AW_SAMPLE_VALUE_2"}]
+          GH_AW_SAMPLE_VALUE_0: "smoke-ci samples replay comment for run ${{ github.run_id }}."
+          GH_AW_SAMPLE_VALUE_1: "Deterministic samples replay for run ${{ github.run_id }}.\n\nThis issue is produced by `safe-outputs.create-issue.samples`, not by an agent.\n"
+          GH_AW_SAMPLE_VALUE_2: "smoke-ci samples replay confirmed the update-issue handler for run ${{ github.run_id }}."
           GH_AW_AGENT_STDIO_LOG: /tmp/gh-aw/agent-stdio.log
           GH_AW_SAFE_OUTPUTS_CONFIG_PATH: ${{ runner.temp }}/gh-aw/safeoutputs/config.json
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
