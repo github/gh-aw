@@ -222,6 +222,8 @@
                 "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
                 "sourceEngine": { "type": "string" },
+                "agentVersion": { "type": "string" },
+                "provider": { "type": "string" },
                 "model": { "type": "string" },
                 "cwd": { "type": "string" },
                 "reasoningEffort": { "type": "string" }
@@ -268,6 +270,8 @@
                 "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
                 "sourceEngine": { "type": "string" },
+                "agentVersion": { "type": "string" },
+                "provider": { "type": "string" },
                 "model": { "type": "string" },
                 "cwd": { "type": "string" },
                 "reasoningEffort": { "type": "string" }

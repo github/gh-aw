@@ -774,8 +774,8 @@ export interface UnifiedSessionEventDataMap {
   "skill.context_delivered_ref": { interactionId?: JsonValue; source?: JsonValue; contentId?: JsonValue };
   "session.format": SessionFileFormatData;
   "agent.execution": AgentExecutionData;
-  "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedSessionContextData;
-  "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedSessionContextData;
+  "session.init": Pick<SessionInitData, "sourceEngine" | "agentVersion" | "provider" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedSessionContextData;
+  "session.start": Pick<SessionInitData, "sourceEngine" | "agentVersion" | "provider" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedSessionContextData;
   "session.error": {
     error?: JsonValue;
     message?: JsonValue;
