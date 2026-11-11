@@ -30,6 +30,7 @@ safe-outputs:
     labels: [report, daily-status]
     close-older-issues: true
 source: githubnext/agentics/workflows/team-status.md@main
+source-sha: "139fa09ef17cde4135e696ff8e7af09bc5ddfa6e"
 ---
 
 # Team Status
