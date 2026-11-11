@@ -1392,7 +1392,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '7' }}
           if-no-files-found: error
       - name: Append agent step summary
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
       - name: Copy Safe Outputs
         if: always()
