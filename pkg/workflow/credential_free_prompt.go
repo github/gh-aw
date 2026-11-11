@@ -21,7 +21,19 @@ func promptValueUsesCredentials(value string) bool {
 func isCredentialReference(path []string) bool {
 	return referenceHasPrefix(path, []string{"secrets"}) ||
 		referenceHasPrefix(path, []string{"github", "token"}) ||
-		len(path) == 1 && strings.EqualFold(path[0], "github")
+		slices.EqualFunc(path, []string{"github"}, strings.EqualFold)
+}
+
+func isSecretsSerializationCall(node *actionslanguageservice.Expression) bool {
+	if node.Kind != "call" || !strings.EqualFold(node.Token.Text, "toJSON") || len(node.Children) != 1 {
+		return false
+	}
+	argument := node.Child(0)
+	for argument.Kind == "group" && len(argument.Children) == 1 {
+		argument = argument.Child(0)
+	}
+	path, ok := actionslanguageservice.Reference(argument)
+	return ok && slices.EqualFunc(path, []string{"secrets"}, strings.EqualFold)
 }
 
 func expressionUsesCredentialReference(expression *actionslanguageservice.Expression, ignoreSecretsSerialization bool) bool {
