@@ -30,13 +30,14 @@ func GenerateNodeJsSetupStep() GitHubActionStep {
 }
 
 func generateNodeJsSetupStep(data *WorkflowData) GitHubActionStep {
-	return GitHubActionStep{
+	step := GitHubActionStep{
 		"      - name: Setup Node.js",
 		"        uses: " + getActionPinForData("actions/setup-node", data),
 		"        with:",
 		fmt.Sprintf("          node-version: '%s'", constants.DefaultNodeVersion),
 		"          package-manager-cache: false",
 	}
+	return rewriteNodeSetupStep(step, "", resolveNodeSetupVersion(data))
 }
 
 // resolveNodeSetupActionOverride returns the runtimes.node.action-repo and
@@ -235,7 +236,7 @@ func buildStandardNpmEngineInstallSteps(
 			CooldownDays:      configuredDays,
 		},
 	)
-	steps = append([]GitHubActionStep{generateNodeJsSetupStep(workflowData)}, steps...)
+	steps = append([]GitHubActionStep{generateNodeJsSetupStepForWorkflow(workflowData)}, steps...)
 	if isNVXRuntime(workflowData) {
 		steps = append(steps, GenerateMicroVMNpmCLIInstallStep(
 			packageName, version, stepName+" in microVM path", cacheKeyPrefix, false, cooldownEnabled, days,
@@ -248,9 +249,8 @@ func buildStandardNpmEngineInstallSteps(
 // setup step and the CLI install steps when the firewall is enabled. This eliminates the
 // duplicated AWF-injection pattern shared by npm-based engines. It never stages Copilot CLI.
 //
-// The expected layout of npmSteps is:
-//   - npmSteps[0]  – Node.js setup step
-//   - npmSteps[1:] – CLI installation step(s)
+// npmSteps may start with a Node.js setup step, followed by CLI installation steps.
+// The Copilot installer starts directly with its CLI installation step.
 //
 // Parameters:
 //   - npmSteps: Pre-computed npm installation steps (from BuildStandardNpmEngineInstallSteps
@@ -258,7 +258,7 @@ func buildStandardNpmEngineInstallSteps(
 //   - workflowData: The workflow data (used to determine firewall configuration)
 //
 // Returns:
-//   - []GitHubActionStep: Steps in order: Node.js setup, AWF (if enabled), CLI install
+//   - []GitHubActionStep: First npm step, AWF (if enabled), remaining npm steps
 func BuildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData *WorkflowData) []GitHubActionStep {
 	return buildNpmEngineInstallStepsWithAWF(npmSteps, workflowData, false)
 }
@@ -267,7 +267,11 @@ func buildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData
 	var steps []GitHubActionStep
 
 	if len(npmSteps) > 0 {
-		steps = append(steps, npmSteps[0]) // Node.js setup step
+		firstStep := npmSteps[0]
+		if extractStepName(strings.Join(firstStep, "\n")) == "Setup Node.js" {
+			firstStep = rewriteNodeSetupStep(firstStep, resolveNodeSetupActionRef(workflowData), resolveNodeSetupVersion(workflowData))
+		}
+		steps = append(steps, firstStep)
 	}
 
 	steps = appendAWFInstallationSteps(steps, workflowData)

@@ -414,6 +414,14 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 			version:      "22.13.0",
 		},
 		{
+			name: "configured action version override",
+			data: &WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"action-version": "v6.0.0"},
+			}},
+			expectedUses: "uses: actions/setup-node@v6.0.0",
+			version:      string(constants.DefaultNodeVersion),
+		},
+		{
 			name: "merged node entry without action override supersedes typed override",
 			data: &WorkflowData{
 				Runtimes: map[string]any{"node": map[string]any{"version": "22"}},
@@ -471,6 +479,19 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			agentStep := strings.Join(generateNodeJsSetupStep(tt.data), "\n")
+			if !strings.Contains(agentStep, "node-version: '"+tt.version+"'") {
+				t.Errorf("expected Node version %q in agent setup step:\n%s", tt.version, agentStep)
+			}
+			data := tt.data
+			if data == nil {
+				data = &WorkflowData{}
+			}
+			installSteps := NewClaudeEngine().GetInstallationSteps(data)
+			installStep := strings.Join(installSteps[0], "\n")
+			if !strings.Contains(installStep, "node-version: '"+tt.version+"'") {
+				t.Errorf("expected Node version %q in Claude installation step:\n%s", tt.version, installStep)
+			}
 			step := strings.Join(generateNodeJsSetupStepForWorkflow(tt.data), "\n")
 			if !strings.Contains(step, tt.expectedUses) {
 				t.Errorf("expected %q in step:\n%s", tt.expectedUses, step)
@@ -480,6 +501,68 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 			}
 			if tt.data == nil && step != defaultStep {
 				t.Errorf("expected default step, got:\n%s", step)
+			}
+		})
+	}
+}
+
+func TestEngineInstallationStepsHonorNodeRuntimeOverrides(t *testing.T) {
+	tests := []struct {
+		name            string
+		getSteps        func(*WorkflowData) []GitHubActionStep
+		expectNodeSetup bool
+	}{
+		{name: "Claude", getSteps: NewClaudeEngine().GetInstallationSteps, expectNodeSetup: true},
+		{name: "Codex", getSteps: NewCodexEngine().GetInstallationSteps, expectNodeSetup: true},
+		{name: "Gemini", getSteps: NewGeminiEngine().GetInstallationSteps, expectNodeSetup: true},
+		{name: "Pi", getSteps: NewPiEngine().GetInstallationSteps, expectNodeSetup: true},
+		{name: "Copilot", getSteps: NewCopilotEngine().GetInstallationSteps},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{
+				Name: tt.name,
+				Runtimes: map[string]any{
+					"node": map[string]any{
+						"action-repo":    "myorg/setup-node",
+						"action-version": "v1",
+						"version":        "24.22.1",
+					},
+				},
+			}
+			steps := tt.getSteps(data)
+
+			var setupNodeStep GitHubActionStep
+			for _, step := range steps {
+				if extractStepName(strings.Join(step, "\n")) == "Setup Node.js" {
+					setupNodeStep = step
+					break
+				}
+			}
+
+			if !tt.expectNodeSetup {
+				if setupNodeStep != nil {
+					t.Fatalf("unexpected Setup Node.js step:\n%s", strings.Join(setupNodeStep, "\n"))
+				}
+				if len(steps) == 0 || !strings.Contains(strings.Join(steps[0], "\n"), "Install GitHub Copilot CLI") {
+					t.Fatalf("Copilot installer step was not preserved:\n%s", strings.Join(flattenSteps(steps), "\n"))
+				}
+				if strings.Contains(strings.Join(flattenSteps(steps), "\n"), "myorg/setup-node@v1") {
+					t.Fatalf("unrelated Copilot installer step was rewritten with the Node action override:\n%s", strings.Join(flattenSteps(steps), "\n"))
+				}
+				return
+			}
+
+			if setupNodeStep == nil {
+				t.Fatalf("Setup Node.js step not found:\n%s", strings.Join(flattenSteps(steps), "\n"))
+			}
+			nodeSetup := strings.Join(setupNodeStep, "\n")
+			if !strings.Contains(nodeSetup, "uses: myorg/setup-node@v1") {
+				t.Errorf("expected Node action override in engine installation:\n%s", nodeSetup)
+			}
+			if !strings.Contains(nodeSetup, "node-version: '24.22.1'") {
+				t.Errorf("expected Node version override in engine installation:\n%s", nodeSetup)
 			}
 		})
 	}
@@ -505,7 +588,9 @@ func TestRewriteNodeSetupStepSafelySerializesNodeVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			step := rewriteNodeSetupStep(GenerateNodeJsSetupStep(), "", tt.version)
+			step := generateNodeJsSetupStep(&WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"version": tt.version},
+			}})
 			var workflow struct {
 				Steps []struct {
 					Name string         `yaml:"name"`

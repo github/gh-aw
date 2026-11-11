@@ -583,7 +583,7 @@ func TestNodeSetupSteps_ActionPins(t *testing.T) {
 			data.Runtimes = map[string]any{"node": map[string]any{"version": "22"}}
 			steps := buildStandardNpmEngineInstallSteps("test-cli", "1.0.0", "Install CLI", "test-cli", data, true)
 			require.NotEmpty(t, steps)
-			assert.Contains(t, steps[0], "          node-version: '"+string(constants.DefaultNodeVersion)+"'")
+			assert.Contains(t, steps[0], "          node-version: '22'")
 			return steps[0]
 		}},
 		{name: "existing installation step", generate: func(data *WorkflowData) GitHubActionStep {
@@ -592,6 +592,19 @@ func TestNodeSetupSteps_ActionPins(t *testing.T) {
 		{name: "runtime action override", generate: func(data *WorkflowData) GitHubActionStep {
 			data.Runtimes = map[string]any{"node": map[string]any{"action-repo": repo}}
 			return generateNodeJsSetupStepForWorkflow(data)
+		}},
+		{name: "runtime action-version override", generate: func(data *WorkflowData) GitHubActionStep {
+			data.Runtimes = map[string]any{"node": map[string]any{"action-repo": repo, "action-version": version}}
+			return generateNodeJsSetupStepForWorkflow(data)
+		}},
+		{name: "runtime setup action-version override", generate: func(data *WorkflowData) GitHubActionStep {
+			requirements := map[string]*RuntimeRequirement{
+				"node": {Runtime: findRuntimeByID("node"), Version: "22"},
+			}
+			applyRuntimeOverrides(map[string]any{"node": map[string]any{"action-repo": repo, "action-version": version}}, requirements)
+			steps := GenerateRuntimeSetupSteps([]RuntimeRequirement{*requirements["node"]}, data)
+			require.NotEmpty(t, steps)
+			return steps[0]
 		}},
 	}
 	for _, tt := range tests {
