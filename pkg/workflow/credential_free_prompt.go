@@ -3,9 +3,11 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/goccy/go-yaml"
 )
 
@@ -13,11 +15,54 @@ import (
 const promptGitHubScriptToken = "no-authentication"
 
 func promptValueUsesCredentials(value string) bool {
-	for _, source := range interpolationReferences(value) {
-		if len(source) == 0 {
-			continue
+	return slices.ContainsFunc(interpolationReferences(value), isCredentialReference)
+}
+
+func isCredentialReference(path []string) bool {
+	return referenceHasPrefix(path, []string{"secrets"}) ||
+		referenceHasPrefix(path, []string{"github", "token"}) ||
+		slices.EqualFunc(path, []string{"github"}, strings.EqualFold)
+}
+
+func isSecretsSerializationCall(node *actionslanguageservice.Expression) bool {
+	if node.Kind != "call" || !strings.EqualFold(node.Token.Text, "toJSON") || len(node.Children) != 1 {
+		return false
+	}
+	argument := node.Child(0)
+	for argument.Kind == "group" && len(argument.Children) == 1 {
+		argument = argument.Child(0)
+	}
+	path, ok := actionslanguageservice.Reference(argument)
+	return ok && slices.EqualFunc(path, []string{"secrets"}, strings.EqualFold)
+}
+
+func expressionUsesCredentialReference(expression *actionslanguageservice.Expression, ignoreSecretsSerialization bool) bool {
+	found := false
+	actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+		if ignoreSecretsSerialization && isSecretsSerializationCall(node) {
+			return false
 		}
-		if strings.EqualFold(source[0], "secrets") || (len(source) > 1 && strings.EqualFold(source[0], "github") && strings.EqualFold(source[1], "token")) { //nolint:uncheckedsliceindex // The context and property bounds are checked above.
+		path, ok := actionslanguageservice.Reference(node)
+		if !ok {
+			return true
+		}
+		found = found || isCredentialReference(path)
+		return false
+	})
+	return found
+}
+
+func valueUsesCredentialReference(value string) bool {
+	spans, err := actionslanguageservice.ExtractExpressions(value)
+	if err != nil {
+		return true
+	}
+	for _, span := range spans {
+		expression, err := actionslanguageservice.ParseSyntax(span.Content)
+		if err != nil || expression == nil {
+			return true
+		}
+		if expressionUsesCredentialReference(expression, false) {
 			return true
 		}
 	}

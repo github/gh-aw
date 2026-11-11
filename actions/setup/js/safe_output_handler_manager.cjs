@@ -374,6 +374,9 @@ const PR_REVIEW_HANDLER_TYPES = new Set(["create_pull_request_review_comment", "
  */
 const handlerLoadErrorsByHandlerMap = new WeakMap();
 
+/** @type {WeakSet<Function>} Only built-in local diagnostics may bypass publication checks. */
+const localDiagnosticHandlers = new WeakSet();
+
 /**
  * Wrap a handler so project-safe-output execution can temporarily bind global.github
  * to the handler-specific authenticated client.
@@ -539,7 +542,9 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
                   : value;
             }
           }
-          messageHandlers.set(type, factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable));
+          const loadedHandler = factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable);
+          if (type === "report_incomplete") localDiagnosticHandlers.add(loadedHandler);
+          messageHandlers.set(type, loadedHandler);
           core.info(`✓ Loaded and initialized handler for: ${type}`);
         } else {
           handlerLoadErrors.set(type, "handler module does not export a main function");
@@ -1311,7 +1316,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
 
       // Call the message handler with the individual message and resolved temp IDs
       await assertClaimAuthorized(effectiveMessage);
-      const stalePRReason = await getStalePullRequestReason(global.github, global.context);
+      // Incomplete signals only record local diagnostics; they do not publish to the PR.
+      const stalePRReason = localDiagnosticHandlers.has(messageHandler) ? null : await getStalePullRequestReason(global.github, global.context);
       if (stalePRReason) {
         core.info(stalePRReason);
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
@@ -1538,7 +1544,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
 
           // Call the handler again with updated temp ID map
           await assertClaimAuthorized(deferred.message);
-          const stalePRReason = await getStalePullRequestReason(global.github, global.context);
+          const stalePRReason = localDiagnosticHandlers.has(deferred.handler) ? null : await getStalePullRequestReason(global.github, global.context);
           const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
 
           if (result && result.skipped === true && !result.deferred) {

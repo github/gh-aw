@@ -5,7 +5,7 @@ sidebar:
   order: 600
 ---
 
-An engine runs a workflow's Markdown instructions with its configured tools, sandbox, and safe outputs. This page covers selection and shared configuration. Use the individual references for engine-specific settings.
+An engine runs a workflow's Markdown instructions with its configured tools, sandbox, and safe outputs. This page covers selection and shared settings; engine-specific settings are in the individual references.
 
 <span id="which-engine-should-i-choose"></span>
 
@@ -24,7 +24,7 @@ For imported engine definitions and third-party samples, see [Custom AI engines]
 
 ## Data handling before setup
 
-The engine, inference provider, and enabled tools determine where repository context is processed. Review provider terms, retention, accessible repository content, outbound destinations, and artifact access before enabling a workflow. Credentials and identity mechanisms are documented in [Authentication](/gh-aw/reference/auth/).
+The engine, inference provider, and enabled tools determine where repository context is processed. Before enabling a workflow, review provider terms, retention, accessible content, outbound destinations, and artifact access. Credentials are covered in [Authentication](/gh-aw/reference/auth/).
 
 ## Engine Feature Comparison
 
@@ -65,9 +65,9 @@ engine:
 | `model` | Exact model ID, alias, or provider-prefixed selection; may also be top-level `model`. |
 | `version` | Override the compiler-pinned CLI version. |
 | `cooldown` | Minimum release age in nonnegative integer days; defaults to `3`. Explicit `0` is rejected in strict mode. |
-| `env` | Runtime environment values; [scope and precedence](/gh-aw/reference/environment-variables/) still apply. |
-| `args` | Ordered arguments passed to the native CLI before its prompt argument. |
-| `command` | Replacement executable; skips the engine installer, not AWF installation. |
+| `env` | Engine-only runtime values; use top-level `env` for all steps. [Scope and precedence](/gh-aw/reference/environment-variables/) apply. |
+| `args` | Ordered native CLI arguments placed before the prompt. Agy rejects it. |
+| `command` | Replacement executable that skips the engine installer, not AWF installation. Provision it in setup steps; Agy checks the verified version, and Copilot checksum pins cannot be combined with it. |
 | `api-target` | Endpoint hostname, where supported; see below. |
 | `harness` | Replacement wrapper or retry settings for Copilot, Claude, and Codex. |
 | `durable` | Artifact-backed session continuation with optional `retention-days` (1–90, default `7`). |
@@ -90,7 +90,7 @@ engine:
     retention-days: 7
 ```
 
-The compiler restores an explicit parent from `aw_context`, or the last successful run of the same workflow on the same branch. Reruns prefer a checkpoint from an earlier attempt of the same run. Retention remains subject to repository and organization policy. No memory tool is required, and durable mode does not dispatch another run automatically.
+The compiler restores an explicit parent from `aw_context`, or otherwise the last successful run of the same workflow on the same branch. Reruns prefer a checkpoint from an earlier attempt of the same run. Retention follows repository and organization policy. Durable mode needs no memory tool and never dispatches another run.
 
 | Engine | Persisted state | Continuation |
 | --- | --- | --- |
@@ -101,29 +101,17 @@ The compiler restores an explicit parent from `aw_context`, or the last successf
 | Agy | Native conversation databases | Prompt points to restored session files |
 | Pi CLI, SDK and RPC | Native JSONL conversation session | CLI/RPC `--session`; SDK `SessionManager.open` |
 
-Copilot, Claude, Codex, and Pi resume the exact recorded native session with the current workflow prompt and freshly configured credentials, models, and tool policy. Gemini and Agy receive restoration metadata without a forced CLI continuation argument. Continuation guidance limits use to metadata unless historical facts are independently verified against trusted sources for the current task. It does not direct the agent to ingest restored text as prompts or instructions.
+Copilot, Claude, Codex, and Pi resume the exact recorded session with the current prompt, credentials, models, and tool policy. Gemini and Agy receive restoration metadata instead of a forced continuation argument. Restored history counts as metadata unless facts are verified against trusted sources, and restored text is never treated as an instruction.
 
-Enabling `engine.durable` opts into reusing potentially attacker-influenced history across runs. Guidance to treat restored files as untrusted factual data is advisory, not deterministic instruction/data isolation; native session resume also reintroduces prior history. Durable continuation does not eliminate cross-run prompt injection.
+Durable mode reuses potentially attacker-influenced history across runs. The untrusted-data guidance is advisory, not enforced isolation, and does not eliminate cross-run prompt injection.
 
-The first run creates a new session when no prior run or implicit checkpoint exists. No continuation notice is added without history. Missing explicit-parent artifacts, corrupt restored sessions, and API authorization failures remain errors rather than silently starting unrelated conversations.
+Only session files are restored, not workspace edits, credentials, pending task phases, or exactly-once tool execution. Restored Copilot events are excluded from current-run capture and model verification. With no prior run or checkpoint, the first run starts a new session. Missing explicit-parent artifacts, corrupt sessions, and authorization failures remain errors; they never silently start an unrelated conversation.
 
-This restores session files, not workspace edits, credentials, pending task phases, or exactly-once tool execution. Existing unified session capture and trace propagation remain enabled; restored Copilot events are excluded from current-run capture and model verification.
+The unified session records `durable.restore` (`restored`, `fresh`, or `failed`) and, for Copilot, Claude, Codex, and Pi, `durable.session` (`resumed` or `fresh`). These records hold metadata only, and restoration alone does not prove native continuation for Gemini, Agy, or imported engines. Recording is best effort; missing records mean evidence is unavailable, not a fresh start or a failed restore. `gh aw audit RUN --artifacts info,usage --json` and `gh aw health WORKFLOW --json --logs-dir DIRECTORY` report this evidence; see the [audit reference](/gh-aw/reference/audit/). Spans and durable session logs carry the checkpoint parent as `gh-aw.durable.parent_run_id`; fresh runs omit it.
 
-The unified session records `durable.restore` with `restored`, `fresh`, or `failed` status and available parent-run and artifact IDs. Copilot, Claude, Codex, and Pi additionally record `durable.session` after native session startup, with `resumed` or `fresh` status and the selected session ID. These records contain metadata, not historical conversation content. Restoration alone does not establish native continuation for Gemini, Agy, or imported engines.
+Built-in durable mode rejects replacement commands, custom drivers, and harnesses. Pi's SDK and RPC drivers remain supported. Ordinary CLI arguments work, but session selectors and persistence-disabling flags cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME`. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs), and [imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files. Threat detection uses a separate fresh session.
 
-Metadata recording and collection are best effort: failures emit warnings without changing restoration or native startup outcomes. Missing records leave continuation evidence unavailable; they do not establish a fresh start or a failed restore.
-
-`gh aw audit RUN --artifacts info,usage --json` exposes this evidence as `durable_session`. `gh aw health WORKFLOW --json --logs-dir DIRECTORY` summarizes cached current-revision evidence under `durable_sessions`, without downloading artifacts. Missing historical events or uncached sessions are unavailable evidence, not fresh starts. An Actions success does not by itself verify continuation.
-
-OpenTelemetry agent spans and exported durable session log records expose the validated checkpoint parent as the string attribute `gh-aw.durable.parent_run_id`, including Pi native sessions. This identifies the parent Actions run; it does not replace OTel trace/span parentage or prove native startup by itself. Fresh runs omit the attribute.
-
-Threat detection uses a separate fresh session and does not inherit the primary agent's durable state.
-
-Built-in session-based durable mode rejects replacement commands, custom drivers, and harnesses because their session files may differ. Pi's built-in SDK and RPC drivers remain supported. Ordinary CLI arguments remain supported, but native session selectors and flags that disable persistence cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME` because durable mode collects its standard native session directory. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs). [Imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files and execution behavior; unsupported definitions still fail compilation.
-
-Checkpoint artifacts are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication; only the last published checkpoint can be restored.
-
-Artifacts contain restorable session content, not just integrity metadata, and may expose sensitive history to anyone with artifact access. Secret scanning and redaction are heuristic: they do not guarantee removal of PII, unknown token formats, or secrets in unsupported encodings. Enable durable mode only when the workflow's session content is suitable for the repository's artifact access and retention policies.
+Checkpoints are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication. Artifacts contain restorable session content that may expose sensitive history to anyone with artifact access, and redaction is heuristic. Enable durable mode only where that suits the repository's artifact access and retention policies.
 
 ### Pinning a Specific Engine Version
 
@@ -137,7 +125,7 @@ engine:
 
 <span id="parameterized-versions"></span>
 
-Versions can use GitHub Actions expressions; the runtime passes them through environment variables rather than shell interpolation. Copilot expression values must resolve to trusted cached releases or built-in manifest pins. Other Copilot releases require a literal version and [checksum pin](/gh-aw/reference/engines/copilot/#copilot-release-checksum-pins). Agy accepts only its verified releases.
+Versions may use Actions expressions, passed through environment variables rather than shell interpolation. Copilot expressions must resolve to trusted cached releases or built-in manifest pins; other Copilot releases need a literal version and a [checksum pin](/gh-aw/reference/engines/copilot/#copilot-release-checksum-pins). Agy accepts only verified releases.
 
 ### Engine release-age cooldown
 
@@ -149,19 +137,11 @@ engine:
   cooldown: 7
 ```
 
-The value must be a nonnegative integer number of days, not a boolean, string, duration, or expression. `cooldown: 0` disables the age check only when `strict: false`; strict mode rejects explicit zero. Omitting the field retains the default, including string-form and inline engine configurations.
+The value must be a nonnegative integer number of days; booleans, strings, durations, and expressions are rejected. `cooldown: 0` disables the check only with `strict: false`. Omitting the field keeps the default.
 
-Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass this age to npm through `NPM_CONFIG_MIN_RELEASE_AGE`, including compiler-managed microVM staging. Copilot's native installer checks GitHub release publication metadata before activating a cached CLI or downloading an archive, including musl guest binaries. Missing or invalid metadata fails the installation. The cooldown also applies to pinned versions and runtime version expressions; it does not replace checksum verification or version pins.
+Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass the age to npm via `NPM_CONFIG_MIN_RELEASE_AGE`, including microVM staging. npm enforces it with its built-in `min-release-age` setting, so runtime overrides need npm **11.10.0 or later**. Copilot's installer checks GitHub release publication metadata before activating a cached CLI or downloading an archive; missing or invalid metadata fails the install. The cooldown does not replace checksum verification or pins.
 
-npm enforces the cooldown through its built-in `min-release-age` setting at installation time; no custom version-check script is generated. Node.js runtime overrides must provide npm **11.10.0 or later** to support this setting. Older npm versions may ignore it.
-
-The policy covers compiler-managed npm and Copilot release installs, not arbitrary shell installers, custom `engine.command` executables, pre-agent steps, extensions, or other externally managed installation methods. Runtime dependency cooldowns remain separately configured by `runtimes.<id>.cooldown` (a boolean).
-
-Engine definitions that set `behaviors.installation.cooldown` use deprecated metadata that is ignored. Set `engine.cooldown` in the workflow instead. A value of `0` disables the policy only outside strict mode; strict mode rejects zero.
-
-### Engine Environment Variables
-
-Use `engine.env` for engine-only runtime values. Use top-level `env` for all workflow steps; see [environment variable scope and precedence](/gh-aw/reference/environment-variables/).
+The policy does not cover shell installers, `engine.command` executables, pre-agent steps, or extensions. Runtime dependency cooldowns use `runtimes.<id>.cooldown` (a boolean). Imported definitions that set `behaviors.installation.cooldown` are ignored; set `engine.cooldown` in the workflow instead.
 
 ### Enterprise API Endpoint (`api-target`)
 
@@ -188,15 +168,7 @@ For GHES Copilot use `api.enterprise.githubcopilot.com`. See [GHE Cloud troubles
 
 Set the URL through `engine.env` and allow its domain in `network.allowed`. AWF derives the proxy target from it. Copilot's `api-target` takes precedence over `GITHUB_COPILOT_BASE_URL`. Pi's additional provider routing is in its [reference](/gh-aw/reference/engines/pi/#additional-providers).
 
-For `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL`, gh-aw disables automatic model fallback by default so provider-specific model IDs pass through unchanged. Explicit [`sandbox.agent.model-fallback`](/gh-aw/reference/sandbox/#model-fallback-sandboxagentmodel-fallback) overrides that default. If proxy-side model steering is incompatible with the endpoint, use [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering).
-
-### Engine Command-Line Arguments
-
-`engine.args` is an ordered array of native CLI arguments, inserted before the prompt argument. Consult the selected CLI's documentation for available flags; Agy rejects this setting.
-
-### Custom Engine Command
-
-`engine.command` replaces the executable and skips the engine installer, not AWF installation. Provision it in setup steps and ensure it satisfies the selected engine's version/configuration contract. Agy checks the verified executable version; Copilot checksum pins cannot be combined with `command`.
+For `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL`, model fallback is off by default so provider model IDs pass through; override with [`sandbox.agent.model-fallback`](/gh-aw/reference/sandbox/#model-fallback-sandboxagentmodel-fallback). If proxy steering conflicts with the endpoint, set [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering).
 
 ### Custom Harness Script (`harness`)
 
@@ -209,7 +181,7 @@ engine:
     use: custom_copilot_harness.cjs
 ```
 
-`use` must start with a letter, digit, or underscore, end in `.js`, `.cjs`, or `.mjs`, and contain no directory separators, `..`, or shell metacharacters. Selecting it does not copy a repository file. Node 24 is provisioned automatically. A replacement owns its retry, timeout, prompt-delivery, and tool-policy behavior.
+`use` must start with a letter, digit, or underscore, end in `.js`, `.cjs`, or `.mjs`, and contain no directory separators, `..`, or shell metacharacters. Node 24 is provisioned automatically. A replacement owns its retry, timeout, prompt-delivery, and tool-policy behavior.
 
 ### Harness Retry and Post-result Watchdog Policy
 
@@ -225,22 +197,22 @@ The built-in Copilot, Claude, and Codex harnesses accept:
 
 All accept integers or Actions expressions. A watchdog expression must already be in milliseconds. Explicit `engine.env.GH_AW_HARNESS_*` values override these fields; see [runtime tuning variables](/gh-aw/reference/environment-variables/#harness-settings-and-runtime-tuning-variables).
 
-The watchdog arms after a terminal safe output, not diagnostic reports such as `report_incomplete`. Any stdout/stderr activity resets it. It can terminate a quiet process still doing useful work and treat that termination as success if a terminal output exists. Claude counts only terminal outputs from the current attempt; its [resume rules](/gh-aw/reference/engines/claude/#harness-recovery) also apply.
+The watchdog arms after a terminal safe output (not diagnostic reports such as `report_incomplete`) and resets on any stdout or stderr activity. It can end a quiet process that is still working and count that as success. Claude counts only current-attempt terminal outputs; its [resume rules](/gh-aw/reference/engines/claude/#harness-recovery) also apply.
 
 Threat detection defaults to zero retries; configure its engine explicitly to change that. Model fallback below retries individual inference requests, not whole agent attempts.
 
 ### Model aliases
 
 > [!NOTE]
-> The Copilot model catalog offered to a workflow can differ by organization and lag the models available to that organization's Copilot seats. Availability depends on the agentic-workflows integration, not just organization policy; a model listed by this repository's daily inventory is not necessarily offered to another workflow. An exact Copilot ID missing from a complete live catalog means that model is **not offered to this workflow**. Prefer aliases such as `opus` and `sonnet` over exact Copilot IDs so resolution selects an available model. Run `gh aw audit <run-url> --models` for a detailed report of that run's model information, including its catalog, discovery status, supported endpoints, and recorded routing and usage. Missing or incomplete discovery does not confirm model absence.
+> Copilot catalogs vary by organization and can lag seat offerings, so another workflow's model inventory does not prove availability here. An exact Copilot ID missing from a complete live catalog is **not offered to this workflow**; prefer `opus` or `sonnet`. Run `gh aw audit <run-url> --models` for run-specific catalog and routing details. Incomplete discovery does not confirm absence.
 
 Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provider's live AWF `/reflect` catalog before execution:
 
-- Built-in aliases such as `opus`/`small`, workflow-defined `models:`, and their globs select the newest live match.
+- Built-in aliases (such as `opus`/`small`), workflow-defined `models:`, and their globs select the newest live match.
 - A `provider/` prefix restricts the lookup; otherwise the engine's configured provider applies.
-- Exact live IDs take precedence over an alias of the same name. Unrecognized exact IDs are not rewritten by alias resolution. Pi checks exact IDs before launch; Copilot, Claude, and Codex fail on the first unavailable-model request.
-- Parameters such as `?effort=` are retained. `auto` keeps its engine/provider-specific meaning.
-- Missing alias matches fail with `model_unavailable`; incomplete discovery fails alias resolution with `catalog_unavailable`.
+- Exact live IDs take precedence over same-named aliases, and unrecognized IDs are not rewritten. Pi checks exact IDs before launch; Copilot, Claude, and Codex fail on the first unavailable-model request.
+- `?effort=` parameters are retained; `auto` keeps its engine-specific meaning.
+- Missing matches fail with `model_unavailable`; incomplete discovery fails with `catalog_unavailable`.
 
 Gemini and declarative engines pass model names through unchanged and warn about gh-aw aliases. AWF can independently rewrite unrecognized models on non-Copilot providers; disable [`sandbox.agent.model-fallback`](/gh-aw/reference/sandbox/#model-fallback-sandboxagentmodel-fallback) when exact routing is required.
 
@@ -248,7 +220,7 @@ Resolution produces `model.resolution` evidence in `usage/aw_session.jsonl`. See
 
 ### Default model routing
 
-When a `copilot`, `claude`, `codex`, or `pi` workflow on GitHub Copilot inference chooses no model and no routing settings, the compiler routes its main agent with `goal: cost` and `mode: auto`, the same as `model: router`. For Claude and Codex, that requires `model-provider: github`. Any explicit `model` (including a router value), `engine.model`, `engine.model-routing`, `engine.fallback-models`, or `engine.env` model variable, including from imports, keeps today's behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable bypasses the default at run time for Copilot, Claude, and Codex. Opt out with `engine.model-routing: false`. See [Default routing for workflows without a model](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
+On GitHub Copilot inference, `copilot`, `claude`, `codex`, and `pi` workflows that set no model or routing use `goal: cost` and `mode: auto`, the same as `model: router` (Claude and Codex also require `model-provider: github`). Any explicit `model` (including a router value), `engine.model`, `engine.model-routing`, `engine.fallback-models`, or model `engine.env` variable, including from imports, keeps existing behavior, as do unsupported or uncertain configurations. A nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` variable overrides the default at run time for Copilot, Claude, and Codex. Opt out with `engine.model-routing: false`; see [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model).
 
 ### Ordered model fallback (`fallback-models`)
 
@@ -259,17 +231,17 @@ engine:
   fallback-models: [gpt-5.6-luna, mai-code-1.1-flash]
 ```
 
-All built-in engines accept ordered, concrete same-provider alternatives with AWF v0.28.31+ and a compatible API-proxy image. AWF retries the failed request without restarting the agent, preserving policy and budget checks. An explicit chain disables automatic middle-power substitution.
+All built-in engines accept ordered same-provider alternatives with AWF v0.28.31+ and a compatible API-proxy image. AWF retries the failed request without restarting the agent, keeping policy and budget checks. An explicit chain disables automatic middle-power substitution.
 
 Fallback covers server errors, request timeouts, unsupported models, and model-availability HTTP 400 errors. Authentication failures, HTTP 429, policy/guardrail failures, cancellation, and job timeouts do not switch models. Exhausted chains fail the run.
 
-Unqualified alternatives inherit the primary provider. Prefixes must match it; credentials follow that provider's normal configuration. Cross-provider chains, fallback aliases, missing compatible AWF, and combinations with `engine.model-routing` fail compilation. Custom harnesses/drivers can use AWF fallback without implementing switching.
+Unqualified alternatives inherit the primary provider; prefixes must match it, and credentials follow that provider's configuration. Cross-provider chains, fallback aliases, missing compatible AWF, and combinations with `engine.model-routing` fail compilation. Custom harnesses and drivers can use AWF fallback without implementing switching.
 
-`token-usage.jsonl` records the serving model and `model_fallback` evidence for post-run attribution. This does not change harness retries or prove that every configured alternative was exercised.
+`token-usage.jsonl` records the serving model and `model_fallback` evidence, without changing harness retries or proving every alternative ran.
 
 ### Bare Mode (`bare`)
 
-`engine.bare: true` disables ambient discovery in Copilot, Claude, and Pi; default false. Copilot suppresses custom instructions. Claude skips ambient discovery but keeps explicitly installed workflow skills/plugins, with a minimal native tool set. Pi retains managed infrastructure and explicitly loaded workflow skills. See individual references for delegation and dynamic-workflow restrictions.
+`engine.bare: true` (default `false`) disables ambient discovery in Copilot, Claude, and Pi. Copilot suppresses custom instructions; Claude keeps explicitly installed skills and plugins with a minimal tool set; Pi keeps managed infrastructure and explicitly loaded skills. See the individual references for restrictions.
 
 <span id="job-level-timeout-timeout-minutes"></span>
 <span id="per-tool-call-timeout-toolstimeout"></span>
@@ -289,7 +261,7 @@ Claude receives top-level `max-turns` automatically; no duplicate `CLAUDE_CODE_M
 
 ## Configuration conformance workflows
 
-Repository `engine-conformance-<id>.md` workflows are manual configuration smoke tests. They check file/shell/MCP probes and typed results using recorded receipts, not an agent's success claim. Safe outputs are staged; missing credentials fail activation. Reports are retained for two days.
+Repository `engine-conformance-<id>.md` workflows are manual smoke tests. They check file, shell, and MCP probes using recorded receipts, not an agent's success claim. Missing credentials fail activation. Reports are kept for two days.
 
 These tests do not establish security, model quality, SDK/driver coverage, or provider compliance with a requested model. Agy's [production gate](/gh-aw/reference/engines/agy/#troubleshooting-and-conformance) is separate from its native authentication probe.
 
@@ -300,41 +272,7 @@ These tests do not establish security, model quality, SDK/driver coverage, or pr
 
 The following anchors retain links to sections moved from this page.
 
-### Copilot Custom Configuration
-
-See [Copilot custom agents](/gh-aw/reference/engines/copilot/#copilot-custom-configuration).
-
-### Copilot release checksum pins
-
-See [Copilot release integrity](/gh-aw/reference/engines/copilot/#copilot-release-checksum-pins).
-
-<span id="azure-foundry-openai"></span>
-
-### Copilot Bring Your Own Key (BYOK) Mode
-
-See [Copilot BYOK](/gh-aw/reference/engines/copilot/#copilot-bring-your-own-key-byok-mode).
-
-### Copilot SDK Support
-
-<span id="sdk-driver-environment-variables"></span>
-
-See [Copilot SDK configuration](/gh-aw/reference/engines/copilot/#copilot-sdk-support).
-
-### Pi Extensions (`extensions`)
-
-See [Pi packages](/gh-aw/reference/engines/pi/#pi-extensions-extensions).
-
-### Claude Tool Enforcement Security Model
-
-<span id="gateway-side-enforcement"></span>
-
-See [Claude permissions and gateway enforcement](/gh-aw/reference/engines/claude/#claude-tool-enforcement-security-model).
-
-### Shared imported engines
-
-See [Custom AI engines](/gh-aw/reference/third-party-agent/#shared-imported-engines).
-
-### Unsupported engine samples
-
-See [third-party samples](/gh-aw/reference/third-party-agent/#unsupported-engine-samples),
-including the experimental Atomic and mini-SWE-agent declarative engines.
+- Copilot custom agents, release integrity, BYOK, and SDK: see the [Copilot reference](/gh-aw/reference/engines/copilot/#copilot-custom-configuration), including [checksum pins](/gh-aw/reference/engines/copilot/#copilot-release-checksum-pins), [BYOK](/gh-aw/reference/engines/copilot/#copilot-bring-your-own-key-byok-mode), and [SDK support](/gh-aw/reference/engines/copilot/#copilot-sdk-support).
+- Pi `extensions`: [Pi packages](/gh-aw/reference/engines/pi/#pi-extensions-extensions).
+- Claude tool enforcement: [Claude permissions and gateway enforcement](/gh-aw/reference/engines/claude/#claude-tool-enforcement-security-model).
+- Shared imported engines and samples: [Custom AI engines](/gh-aw/reference/third-party-agent/#shared-imported-engines) and [third-party samples](/gh-aw/reference/third-party-agent/#unsupported-engine-samples), including the experimental Atomic and mini-SWE-agent declarative engines.

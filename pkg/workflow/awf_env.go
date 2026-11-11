@@ -154,7 +154,7 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	if workflowData.MCPScripts != nil {
 		for _, toolConfig := range workflowData.MCPScripts.Tools {
 			for envName, envValue := range toolConfig.Env {
-				if len(ExtractSecretsFromValue(envValue)) > 0 || ContainsJobOutputExpr(envValue) {
+				if valueUsesCredentialReference(envValue) || ContainsJobOutputExpr(envValue) {
 					addUnique(envName)
 				}
 			}
@@ -164,7 +164,7 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	// engine.env vars that contain a secret reference or a job-output expression.
 	if workflowData.EngineConfig != nil {
 		for varName, varValue := range workflowData.EngineConfig.Env {
-			if len(ExtractSecretsFromValue(varValue)) > 0 || ContainsJobOutputExpr(varValue) {
+			if valueUsesCredentialReference(varValue) || ContainsJobOutputExpr(varValue) {
 				addUnique(varName)
 			}
 		}
@@ -177,7 +177,7 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 			addUnique("GH_TOKEN")
 		}
 		for varName, varValue := range agentConfig.Env {
-			if len(ExtractSecretsFromValue(varValue)) > 0 || ContainsJobOutputExpr(varValue) {
+			if valueUsesCredentialReference(varValue) || ContainsJobOutputExpr(varValue) {
 				addUnique(varName)
 			}
 		}

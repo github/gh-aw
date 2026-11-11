@@ -483,6 +483,13 @@ func (c *Compiler) mergeWorkflowEnv(frontmatter map[string]any, workflowData *Wo
 	if err := validateTopLevelEnvExpressions(mergedEnvMap); err != nil {
 		return err
 	}
+	if frontmatterDeclaresImports(frontmatter) {
+		if err := c.withEffectiveStrictMode(frontmatter, func() error {
+			return c.validateEnvSecretsSection(map[string]any{"env": mergedEnvMap}, "env", nil)
+		}); err != nil {
+			return err
+		}
+	}
 	if len(mergedEnvMap) == 0 {
 		return nil
 	}
