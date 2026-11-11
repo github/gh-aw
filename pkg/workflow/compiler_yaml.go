@@ -23,7 +23,7 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 	c.agentCheckoutLintBlocks = nil
 
 	// Build all jobs
-	if err := c.validateDryRunEffectsWithConnectors(data); err != nil {
+	if err := c.validateDryRunEffects(data); err != nil {
 		return err
 	}
 	data, err := c.prepareDryRunWorkflowData(data)
