@@ -476,7 +476,8 @@ function sanitizeUrlDomains(s, allowed) {
       return match; // Keep the full URL as-is
     } else {
       // Redact the domain but preserve the protocol and structure for debugging
-      const sanitized = sanitizeDomainName(hostname);
+      // A redacted www. hostname must not itself become a GFM autolink.
+      const sanitized = sanitizeDomainName(hostname).replace(/^www\./i, "www[.]");
       const truncated = hostname.length > 12 ? hostname.substring(0, 12) + "..." : hostname;
       core.info(`Redacted URL: ${truncated}`);
       addRedactedDomain(hostname);
@@ -544,7 +545,73 @@ function sanitizeUrlDomains(s, allowed) {
     return prefix + applyDomainFilter(url, hostnameWithPort);
   });
 
-  return s;
+  /**
+   * @param {string} prefix
+   * @param {string} candidate
+   * @returns {string}
+   */
+  function filterWwwUrl(prefix, candidate) {
+    // Leave prose punctuation and unbalanced closing parentheses outside the URL.
+    const opening = (candidate.match(/\(/g) || []).length;
+    let closing = (candidate.match(/\)/g) || []).length;
+    let end = candidate.length;
+    while (end > 0) {
+      const last = candidate[end - 1];
+      if (last === ")" && closing > opening) closing--;
+      else if (!/[?!.,:;*_~]/.test(last)) break;
+      end--;
+    }
+    const url = candidate.slice(0, end);
+    const suffix = candidate.slice(end);
+    const normalized = stripUrlUserinfo(`https://${url}`).slice("https://".length);
+    let parsed;
+    try {
+      parsed = new URL(`https://${normalized}`);
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      core.info("Redacted invalid scheme-less www URL");
+      return prefix + "(redacted)" + suffix;
+    }
+    return prefix + applyDomainFilter(normalized, parsed.hostname) + suffix;
+  }
+
+  // GFM links www. tokens after whitespace or emphasis/opening delimiters.
+  // Include backticks for allowed-only filtering, and skip existing URLs as a
+  // unit so www. text in an allowed URL's path is not mistaken for a new link.
+  const wwwUrlRegex = /(\]\(\s*)?((?:https:\/\/|[/\\]{2})[\w.-]+[^\s<>`]*)|(^|[\s*_~(`])(www\.[^\s<>`]+)/gi;
+  const parts = [];
+  let position = 0;
+  let match;
+  while ((match = wwwUrlRegex.exec(s))) {
+    parts.push(s.slice(position, match.index));
+    const [full, destinationPrefix, explicitUrl, prefix, candidate] = match;
+    if (explicitUrl !== undefined) {
+      let end = full.length;
+      if (destinationPrefix !== undefined) {
+        // A Markdown destination ends at its unmatched closing parenthesis.
+        // Resume there so an adjacent www. autolink is still checked.
+        let depth = 0;
+        for (let i = destinationPrefix.length; i < full.length; i++) {
+          if (full[i] === "\\") i++;
+          else if (full[i] === "(") depth++;
+          else if (full[i] === ")") {
+            if (depth === 0) {
+              end = i;
+              break;
+            }
+            depth--;
+          }
+        }
+      }
+      parts.push(full.slice(0, end));
+      wwwUrlRegex.lastIndex = match.index + end;
+    } else {
+      parts.push(filterWwwUrl(prefix, candidate));
+    }
+    position = wwwUrlRegex.lastIndex;
+  }
+
+  return parts.join("") + s.slice(position);
 }
 
 /**
