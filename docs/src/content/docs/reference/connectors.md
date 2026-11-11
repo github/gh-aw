@@ -136,6 +136,7 @@ GitHub methods for duplicate detection.
 | Datadog | Alert/Warn monitor metadata to a GitHub investigation issue | [datadog-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/datadog-golden.md) |
 | Zendesk | Unresolved-ticket metadata to a private engineering-ownership handoff | [zendesk-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/zendesk-golden.md) |
 | Notion | Older page-edit metadata to a human reference-maintenance request | [notion-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/notion-golden.md) |
+| Asana | Approved task description to a staged next-step comment | [asana-golden.md](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md) |
 
 All effects are staged by default; reads still require authorized provider
 credentials and inference access. The fixture harness copies unmodified consumers
@@ -1125,6 +1126,38 @@ content defect, and a recent edit does not establish a review. There is no
 comment-history read or cross-run deduplication. Use this consumer rather than
 the disabled legacy `shared/mcp/notion.md` surface; legacy issue-summary examples
 are not proof of working declarative integration.
+
+## Asana
+
+Declaration: `.github/workflows/connectors/asana.md`.
+
+Bind exact string `tasks` and `workspaces` GIDs; defaults grant nothing.
+`tools.asana: [get-task]` exposes `get_task(task, workspace)` through the shared
+REST-backed MCP adapter. It checks the returned task/workspace pair and projects
+the task's name, plain description, completion flag and last-modified time as
+untrusted evidence. It does not read projects, assignees or discussion history.
+
+`safe-outputs.asana-add-comment: {max: 1}` proposes a top-level comment; start
+with global `staged: true`. The live host uses a writer-authenticated task read
+to verify workspace membership before appending a story. Required `text` uses
+plain-text publication with mandatory attribution and a 4000-code-point limit,
+including attribution. The bounded response must identify the requested task
+and comment story, and echo the exact published text. This is not an atomic
+transaction, independent persistence verification or an exactly-once guarantee.
+Never retry an uncertain append.
+
+[Asana OAuth](https://developers.asana.com/docs/oauth) consent and renewal stay
+external. Store separate raw access tokens as `ASANA_READ_ACCESS_TOKEN`
+(`tasks:read`) and `ASANA_WRITE_ACCESS_TOKEN` (`tasks:read`, `stories:write`);
+`reader-secret`/`writer-secret` change names only. OAuth access tokens normally
+expire after one hour. A [PAT](https://developers.asana.com/docs/personal-access-token)
+instead carries its owner's privileges; scope labels do not constrain it.
+`gh aw connector asana setup` prints the acquisition/renewal recipe.
+No hosted Asana MCP profile, task updates, attachments, search, threaded replies,
+webhook receiver or trigger is included. The
+[golden consumer](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/asana-golden.md)
+stages one next-step suggestion; its selected task read is real when run.
+Offline compilation and mocks do not establish live authorization or delivery.
 
 ## Validation and runtime boundaries
 

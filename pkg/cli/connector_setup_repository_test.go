@@ -151,7 +151,7 @@ func TestConnectorSetupCanonicalGoldens(t *testing.T) {
 	require.NoError(t, err)
 	for _, provider := range []string{
 		"linear", "jira", "azure-devops", "slack", "teams", "confluence", "sentry",
-		"servicenow", "gitlab", "pagerduty", "datadog", "zendesk", "notion",
+		"servicenow", "gitlab", "pagerduty", "datadog", "zendesk", "notion", "asana",
 	} {
 		t.Run(provider, func(t *testing.T) {
 			path := repositoryConnectorFixtureDirectory + "/" + provider + "-golden.md"

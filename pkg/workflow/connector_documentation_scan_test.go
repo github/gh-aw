@@ -40,7 +40,7 @@ func commentedConnectorDocumentation(t *testing.T, content string) string {
 func TestConnectorDocumentationDeclarations(t *testing.T) {
 	paths, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
-	require.Len(t, paths, 13)
+	require.Len(t, paths, 14)
 	runtimePath, err := filepath.Abs("../../actions/setup/js/runtime_import.cjs")
 	require.NoError(t, err)
 	workspace, err := filepath.Abs("../..")

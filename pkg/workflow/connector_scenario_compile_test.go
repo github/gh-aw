@@ -24,6 +24,7 @@ type connectorCompilerScenario struct {
 }
 
 var connectorCompilerScenarios = []connectorCompilerScenario{
+	{"asana", []string{"get_task"}, "ASANA_READ_ACCESS_TOKEN", "asana-add-comment"},
 	{"linear", []string{"get-issue", "list-comments"}, "LINEAR_READ_API_KEY", "linear-add-comment"},
 	{"jira", []string{"personal__getJiraIssue"}, "JIRA_MCP_PERSONAL_BASIC_AUTH", "jira-add-comment"},
 	{"azure-devops", []string{"get_work_item_description"}, "AZURE_DEVOPS_READ_TOKEN", "azure-devops-comment-on-work-item"},

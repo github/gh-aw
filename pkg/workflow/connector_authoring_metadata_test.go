@@ -17,7 +17,7 @@ import (
 func TestBundledConnectorImportMetadata(t *testing.T) {
 	files, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
-	require.Len(t, files, 13)
+	require.Len(t, files, 14)
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
 			source, err := os.ReadFile(file)
@@ -109,7 +109,7 @@ func checkConnectorOperationOrder(t *testing.T, operation *nodeyaml.Node) {
 func TestBundledConnectorAuthoringOrder(t *testing.T) {
 	files, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
-	require.Len(t, files, 13)
+	require.Len(t, files, 14)
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
 			source, err := os.ReadFile(file)

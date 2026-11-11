@@ -63,6 +63,21 @@ func TestConnectorJiraSetupExampleUsesDeclaredInput(t *testing.T) {
 	require.NotContains(t, guidance, "input description specifies")
 }
 
+func TestConnectorAsanaSetupCredentialRecipe(t *testing.T) {
+	repository, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	output, err := executeDevelopmentCommand("asana", "setup", "--root", repository)
+	require.NoError(t, err)
+	for _, expected := range []string{
+		"ASANA_READ_ACCESS_TOKEN", "ASANA_WRITE_ACCESS_TOKEN", "tasks:read",
+		"stories:write", "authorization-code", "OAuth access tokens normally last one hour",
+		"refresh-token flow", "https://app.asana.com/0/my-apps", "not an independently scoped",
+		"not Full permissions", "distribution settings", "explicit URL-encoded scope parameter",
+	} {
+		require.Contains(t, connectorConsoleText(output), expected)
+	}
+}
+
 func TestConnectorsSchemaCommand(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []string{"ConnectorSpec", "ConnectorConnection", "ConnectorBinding"} {
@@ -158,7 +173,7 @@ func TestConnectorsValidatePublicProviderSpecs(t *testing.T) {
 	require.NoError(t, err)
 	declarations, err := filepath.Glob(filepath.Join(repository, ".github", "workflows", "connectors", "*.md"))
 	require.NoError(t, err)
-	require.Len(t, declarations, 13)
+	require.Len(t, declarations, 14)
 	args := []string{"connectors", "validate", "--json"}
 	var expectedIDs []string
 	directory := t.TempDir()
