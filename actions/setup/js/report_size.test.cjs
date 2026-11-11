@@ -82,6 +82,22 @@ describe("automatic report size redaction", () => {
       expect(() => renderSizedReport(input, protectedBody.length)).toThrow("cannot be reduced");
     });
 
+    it("fits oversized agent reference definitions while preserving framework markers", () => {
+      const agentDefinitions = Array.from({ length: 3000 }, (_, index) => ({
+        type: "reference_definition",
+        value: `[agent-${index}]: #${"payload".repeat(8)}`,
+        agentTainted: true,
+      }));
+      const frameworkDefinition = { type: "reference_definition", value: "[framework-state]: #required", agentTainted: false };
+      const body = renderSizedReport(report([...agentDefinitions, frameworkDefinition]), 65536).body;
+
+      expect(body.length).toBeLessThanOrEqual(65536);
+      expect(body).toContain(SIZE_NOTICE);
+      expect(body).toContain("[framework-state]: #required");
+      expect((body.match(/\[agent-/g) ?? []).length).toBeLessThan(agentDefinitions.length);
+      expect(() => renderSizedReport(report([frameworkDefinition]), renderReport(report([frameworkDefinition])).body.trimEnd().length - 1)).toThrow("cannot be reduced");
+    });
+
     it.each(["paragraph", "table", "list", "details"])("preserves protected inline siblings through %s normalization and fitting", kind => {
       const children = [
         { type: "text", value: "PRIVATE-AGENT-PAYLOAD".repeat(1000), agentTainted: true },

@@ -591,6 +591,8 @@ safe-outputs:
 
 Adds labels to issues or PRs. Specify `allowed` to restrict to specific labels or glob patterns, or `blocked` to deny specific label patterns regardless of the allow list.
 
+The safe-outputs MCP server rejects label names longer than 50 characters before recording an operation. This limit applies to string labels and structured label `name` fields, including labels in issue, discussion, and pull request tools.
+
 `max` limits the number of `add_labels` calls (default: 5); `max-labels` limits the labels in each call (default: 10). Calls exceeding `max-labels` are rejected without adding any labels.
 
 Use `required-labels` to only add labels to issues/PRs that already have **all** of the specified labels. Use `required-title-prefix` to only add labels to issues/PRs whose title starts with the given prefix.

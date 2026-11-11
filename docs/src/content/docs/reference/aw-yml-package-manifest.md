@@ -143,6 +143,8 @@ The `resources` field copies repository assets as-is without executing them duri
 
 Resource destinations must be unique, including case-insensitive comparisons. Path traversal, symbolic links, non-regular local files, and destinations outside the allowlist are rejected. Installed resources are tracked with package-scoped ownership metadata in `.github/aw/packages/*.json`.
 
+When the last workflow from a package is removed, unchanged package-owned files are deleted; locally modified files are retained. Cleanup rejects malformed ownership records and destinations that escape the repository, including through symbolic links, before hashing or deleting any recorded file. Recorded hashes detect local modifications; they do not authorize deletion outside the repository.
+
 ## Package documentation
 
 Package documentation must be `README.md` at the package root.

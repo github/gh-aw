@@ -38,6 +38,11 @@ describe("historical diagnostic delivery contracts", () => {
     expect(() => createClaimDeliveryVerifier({ assignment: assignment([]) })).toThrow("ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED: Claim delivery verifier requires trusted independent readback");
   });
 
+  it("identifies undeclared output types in delivery diagnostics", async () => {
+    const original = assignment([{ type: "missing_tool", min: 1, max: 1 }]);
+    expect((await deliver(original, [{ type: "report_incomplete" }])).diagnostics).toEqual({ event: "delivery.contract.undeclared_output", types: ["report_incomplete"] });
+  });
+
   for (const legacy of ["missing_tool", "missing_data"]) {
     const canonical = `report_${legacy}`;
 
@@ -106,7 +111,9 @@ describe("historical diagnostic delivery contracts", () => {
       const original = assignment([{ type: legacy, min: 1, max: 1 }]);
       expect((await deliver(original, [{ type: "report_incomplete" }])).reason).toMatch(/Undeclared output/);
       for (const outcome of [{ success: false }, { success: true, delegated: true }, { success: true, skipped: true }]) {
-        expect((await deliver(original, [{ type: canonical }], { results: [{ messageIndex: 0, ...outcome }] })).reason).toMatch(/Missing exact nondelegated delivery receipt/);
+        const delivery = await deliver(original, [{ type: canonical }], { results: [{ messageIndex: 0, ...outcome }] });
+        expect(delivery.reason).toMatch(/Missing exact nondelegated delivery receipt/);
+        expect(delivery.diagnostics.output_type).toBe(canonical);
       }
     });
   }

@@ -1,8 +1,10 @@
 // @ts-check
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import Ajv from "ajv";
+import mcpCore from "./mcp_server_core.cjs";
+import { normalizeSafeOutputToolArguments } from "./safe_outputs_mcp_arguments.cjs";
 
 /**
  * Tests for MCP tool schema validation
@@ -22,6 +24,59 @@ describe("Safe Outputs MCP Schema Validation", () => {
   const toolsPath = path.join(process.cwd(), "safe_outputs_tools.json");
   const toolsContent = fs.readFileSync(toolsPath, "utf8");
   tools = JSON.parse(toolsContent);
+
+  describe("Label name limits", () => {
+    const cases = [
+      { tool: "add_labels", args: name => ({ labels: [name] }), field: "labels[0]" },
+      { tool: "add_labels", args: name => ({ labels: [{ name }] }), field: "labels[0].name" },
+      { tool: "remove_labels", args: name => ({ labels: [name] }), field: "labels[0]" },
+      { tool: "remove_labels", args: name => ({ labels: [{ name }] }), field: "labels[0].name" },
+      { tool: "replace_label", args: name => ({ label_to_add: name, label_to_remove: "bug" }), field: "label_to_add" },
+      { tool: "replace_label", args: name => ({ label_to_remove: name, label_to_add: "bug" }), field: "label_to_remove" },
+      { tool: "update_issue", args: name => ({ labels: [name] }), field: "labels[0]" },
+      { tool: "update_issue", args: name => ({ labels: [{ name }] }), field: "labels[0].name" },
+      { tool: "update_discussion", args: name => ({ labels: [name] }), field: "labels[0]" },
+      { tool: "create_pull_request", args: name => ({ title: "Fix label validation", body: "Reject oversized labels.", labels: [name] }), field: "labels[0]" },
+      { tool: "create_issue", args: name => ({ title: "Fix label validation", body: "Reject oversized labels.", labels: [name] }), field: "labels[0]" },
+      { tool: "create_issue", args: name => ({ title: "Fix label validation", body: "Reject oversized labels.", labels: `${name}, bug` }), field: "labels[0]" },
+      { tool: "create_issue", args: name => ({ title: "Fix label validation", body: "Reject oversized labels.", labels: JSON.stringify([name, "bug"]) }), field: "labels[0]" },
+    ];
+
+    describe.each(["HTTP", "stdio"])("%s", transport => {
+      for (const testCase of cases) {
+        it.each([
+          ["a".repeat(50), true],
+          ["a".repeat(51), false],
+          ["a".repeat(54), false],
+          ["\u{1f680}".repeat(50), true],
+          ["\u{1f680}".repeat(51), false],
+        ])(`${testCase.tool} ${testCase.field} validates %s`, async (name, valid) => {
+          const server = mcpCore.createServer({ name: "safeoutputs", version: "1.0.0" }, { normalizeArguments: (toolName, args, tool) => normalizeSafeOutputToolArguments(toolName, args, undefined, tool.inputSchema) });
+          const handler = vi.fn(() => ({ content: [{ type: "text", text: "Recorded" }] }));
+          mcpCore.registerTool(server, { ...tools.find(tool => tool.name === testCase.tool), handler });
+          const request = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: testCase.tool, arguments: testCase.args(name) } };
+          let response;
+          if (transport === "HTTP") {
+            response = await mcpCore.handleRequest(server, request);
+          } else {
+            server.writeMessage = message => {
+              response = message;
+            };
+            await mcpCore.handleMessage(server, request);
+          }
+          if (valid) {
+            expect(response.error).toBeUndefined();
+            expect(handler).toHaveBeenCalledOnce();
+          } else {
+            expect(response.error.code).toBe(-32602);
+            expect(response.error.message).toContain(testCase.field);
+            expect(response.error.message).toContain("maximum length of 50 characters");
+            expect(handler).not.toHaveBeenCalled();
+          }
+        });
+      }
+    });
+  });
 
   describe("Draft security advisories", () => {
     const schema = tools.find(tool => tool.name === "create_security_advisory").inputSchema;

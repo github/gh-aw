@@ -26,6 +26,8 @@ describe("local work queue stress CI", () => {
     }
     expect(workflow.on.push.branches).toEqual(["main"]);
     expect(workflow.on.pull_request_target).toBeUndefined();
+    expect(workflow.on.workflow_dispatch.inputs.lifecycle_items.default).toBe("1024");
+    expect(workflow.on.workflow_dispatch.inputs.history_items.default).toBe("100000");
     expect(Object.keys(workflow.jobs)).toEqual(["stress"]);
     expect(workflow.jobs.stress.needs).toBeUndefined();
   });
@@ -50,8 +52,8 @@ describe("local work queue stress CI", () => {
 
   it("separates retained-history scale from live completions and admission limits", () => {
     expect(workflow.jobs.stress.env).toEqual({
-      HISTORY_ITEMS: "${{ github.event_name == 'pull_request' && '256' || '100000' }}",
-      LIFECYCLE_ITEMS: "${{ github.event_name == 'pull_request' && '16' || '1024' }}",
+      HISTORY_ITEMS: "${{ github.event_name == 'workflow_dispatch' && inputs.history_items || github.event_name == 'pull_request' && '256' || '100000' }}",
+      LIFECYCLE_ITEMS: "${{ github.event_name == 'workflow_dispatch' && inputs.lifecycle_items || github.event_name == 'pull_request' && '128' || '1024' }}",
     });
     const commands = workflow.jobs.stress.steps.filter(step => step.run).map(step => step.run);
     expect(commands.some(command => command.includes('--mode history --items "$HISTORY_ITEMS" --workers 2') && command.includes("--timeout-seconds 600"))).toBe(true);
