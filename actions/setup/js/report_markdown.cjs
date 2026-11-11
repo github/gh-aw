@@ -1,6 +1,6 @@
 // @ts-check
 
-const { normalizeReportText, normalizeReportAllowedURL, normalizeReportImage } = require("./report_ast.cjs");
+const { normalizeReportText, normalizeReportAllowedURL, normalizeReportImage, isReportReferenceDefinition } = require("./report_ast.cjs");
 const { buildAllowedDomains, buildAllowedGitHubReferences, getCurrentRepoSlug, sanitizeUrlProtocols, sanitizeUrlDomains } = require("./sanitize_content_core.cjs");
 const { isRepoAllowed } = require("./repo_helpers.cjs");
 
@@ -401,7 +401,7 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
     /^(?:#{1,6}\s|>|<details(?:\s+open)?>(?:\s*$|\s*<summary>)|<\/details>\s*$|[-*+]\s|\d+\.\s|---\s*$)/.test(line) ||
     isFieldLine(line) ||
     isBlockSlot(line) ||
-    (allowMetadata && /^(?:<!--|\[gh-aw-workflow-call-id\]: # ")/.test(line.trim())) ||
+    (allowMetadata && (/^(?:<!--|\[gh-aw-workflow-call-id\]: # ")/.test(line.trim()) || isReportReferenceDefinition(line))) ||
     (allowFlagMarkers && /^<!-- (?:gh-aw-threat-detected|gh-aw-threat-engine-error) -->$/.test(line.trim()));
   /** @param {string} line */
   function cells(line) {
@@ -447,6 +447,9 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
           if (!(error instanceof URIError)) throw error;
           nodes.push(fromSource({ type: "paragraph", children: inline(line) }));
         }
+        index++;
+      } else if (allowMetadata && isReportReferenceDefinition(line)) {
+        nodes.push(fromSource({ type: "reference_definition", value: line }));
         index++;
       } else if (allowMetadata && (match = /^<!-- ([a-zA-Z][a-zA-Z0-9_-]*)(?:: ?([\s\S]*))? -->$/.exec(line.trim()))) {
         if (["gh-aw-execution", "aw-essential-meta"].includes(match[1])) {
