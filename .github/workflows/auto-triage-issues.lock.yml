@@ -911,6 +911,7 @@ jobs:
                       },
                       "name": {
                         "description": "Label name to apply.",
+                        "maxLength": 50,
                         "type": "string"
                       },
                       "rationale": {
