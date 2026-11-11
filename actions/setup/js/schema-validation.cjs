@@ -45,9 +45,8 @@ function validateRequiredFields(args, inputSchema) {
  * When a field declares an explicit schema maxLength, that explicit character limit is enforced here;
  * otherwise the default SM-IS-01 10KB byte limit applies.
  *
- * Scope: validates only top-level (direct) properties of the schema where `type === "string"`.
- * Nested object/array schemas are not recursively validated, consistent with the SM-IS-01
- * requirement that applies to "input parameters" (top-level tool arguments).
+ * Explicit maxLength constraints also apply to nested objects, array items, and schema
+ * alternatives. The default byte limit applies only to top-level string parameters.
  *
  * @param {Object} args - The arguments object to validate
  * @param {Object} inputSchema - The input schema describing property types
@@ -59,24 +58,47 @@ function validateStringInputLengths(args, inputSchema, maxBytes) {
   const properties = inputSchema && inputSchema.properties ? inputSchema.properties : {};
   const violations = [];
 
-  for (const [field, schema] of Object.entries(properties)) {
-    if (schema && schema.type === "string") {
-      const value = args[field];
+  function visit(value, schema, field, applyDefaultLimit = false) {
+    const nodeViolations = [];
+    if (!schema || typeof schema !== "object") return nodeViolations;
+    if (schema.type === "string") {
       if (typeof value === "string") {
         if (typeof schema.maxLength === "number") {
           const characterLength = Array.from(value).length;
           if (characterLength > schema.maxLength) {
-            violations.push({ field, actualLength: characterLength, limit: schema.maxLength, unit: "characters" });
+            nodeViolations.push({ field, actualLength: characterLength, limit: schema.maxLength, unit: "characters" });
           }
-          continue;
-        }
-
-        const byteLength = Buffer.byteLength(value, "utf8");
-        if (byteLength > limit) {
-          violations.push({ field, actualLength: byteLength, limit, unit: "bytes" });
+        } else if (applyDefaultLimit) {
+          const byteLength = Buffer.byteLength(value, "utf8");
+          if (byteLength > limit) {
+            nodeViolations.push({ field, actualLength: byteLength, limit, unit: "bytes" });
+          }
         }
       }
     }
+    if (isPlainObject(value) && isPlainObject(schema.properties)) {
+      for (const [key, propertySchema] of Object.entries(schema.properties)) {
+        if (Object.hasOwn(value, key)) nodeViolations.push(...visit(value[key], propertySchema, formatPath(field, key)));
+      }
+    }
+    if (Array.isArray(value) && schema.items) {
+      value.forEach((item, index) => nodeViolations.push(...visit(item, schema.items, formatPath(field, index))));
+    }
+    for (const alternatives of [schema.oneOf, schema.anyOf]) {
+      if (!Array.isArray(alternatives)) continue;
+      const applicable = alternatives.filter(alternative => !validateSchemaNode(value, alternative, field));
+      const alternativeViolations = applicable.map(alternative => visit(value, alternative, field));
+      // Shape and oneOf cardinality errors are handled by the schema validator.
+      // A length failure matters only when every applicable alternative fails.
+      if (alternativeViolations.length > 0 && alternativeViolations.every(errors => errors.length > 0)) {
+        nodeViolations.push(...alternativeViolations.flat());
+      }
+    }
+    return nodeViolations;
+  }
+
+  for (const [field, schema] of Object.entries(properties)) {
+    violations.push(...visit(args[field], schema, field, true));
   }
 
   return violations;
@@ -163,17 +185,31 @@ function validateSchemaNode(value, schema, path, options = {}) {
     return null;
   }
 
+  if (options.checkStringLengths && schema.type === "string" && typeof value === "string" && typeof schema.maxLength === "number" && Array.from(value).length > schema.maxLength) {
+    return { path, message: `must not exceed ${schema.maxLength} characters` };
+  }
+
   if (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
     let successCount = 0;
+    let lengthFailureCount = 0;
     /** @type {Array<{path: string, message: string, expected?: string, received?: string}>} */
     const errors = [];
     for (const subSchema of schema.oneOf) {
       const error = validateSchemaNode(value, subSchema, path, { ...options, skipRequiredAtRoot: false });
       if (!error) {
+        if (!options.checkStringLengths && validateSchemaNode(value, subSchema, path, { ...options, skipRequiredAtRoot: false, checkStringLengths: true })) {
+          lengthFailureCount += 1;
+          continue;
+        }
         successCount += 1;
         continue;
       }
       errors.push(error);
+    }
+    // Let the dedicated length validator retain E006 and precise field paths when
+    // otherwise-applicable alternatives all fail their explicit length limits.
+    if (successCount === 0 && lengthFailureCount > 0) {
+      return null;
     }
     if (successCount !== 1) {
       if (errors.length > 0) {

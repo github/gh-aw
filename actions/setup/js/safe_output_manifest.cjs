@@ -478,6 +478,17 @@ function writeTemporaryIdMapFile(temporaryIdMap, filePath = TEMPORARY_ID_MAP_FIL
   }
 }
 
+const DIAGNOSTIC_IDENTIFIER = /^[a-z0-9_.:-]{1,64}$/;
+
+function safeFailureDiagnostics(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return false;
+  return Object.values(value).every(item => {
+    if (typeof item === "boolean" || Number.isSafeInteger(item)) return true;
+    if (typeof item === "string") return DIAGNOSTIC_IDENTIFIER.test(item);
+    return Array.isArray(item) && item.length <= 32 && item.every(entry => typeof entry === "string" && DIAGNOSTIC_IDENTIFIER.test(entry));
+  });
+}
+
 /**
  * Write a structured safe-output error report for artifact upload.
  *
@@ -490,7 +501,7 @@ function writeTemporaryIdMapFile(temporaryIdMap, filePath = TEMPORARY_ID_MAP_FIL
  * after redaction succeeds for Claim workers), so failures of the "Process
  * Safe Outputs" step remain diagnosable without uploading raw error text.
  *
- * @param {{status?: string, errorCode?: string, message?: string, failures?: Array<{type?: string, errorCode?: string, error?: string}>}} report - Failure diagnostics
+ * @param {{status?: string, errorCode?: string, message?: string, failures?: Array<{type?: string, errorCode?: string, error?: string, verifier?: string, diagnostics?: Record<string, boolean | number | string | string[]>}>}} report - Failure diagnostics
  * @param {string} [filePath] - Path to the output file (defaults to SAFE_OUTPUT_ERRORS_FILE_PATH)
  */
 function writeSafeOutputErrorReport(report, filePath = SAFE_OUTPUT_ERRORS_FILE_PATH) {
@@ -509,6 +520,8 @@ function writeSafeOutputErrorReport(report, filePath = SAFE_OUTPUT_ERRORS_FILE_P
           ...(f?.type ? { type: f.type } : {}),
           ...(f?.errorCode ? { errorCode: f.errorCode } : {}),
           ...(f?.error ? { error: f.error } : {}),
+          ...(typeof f?.verifier === "string" && /^[a-z0-9_.-]{1,64}$/.test(f.verifier) ? { verifier: f.verifier } : {}),
+          ...(safeFailureDiagnostics(f?.diagnostics) ? { diagnostics: f.diagnostics } : {}),
         }))
       : [],
   };

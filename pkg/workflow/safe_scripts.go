@@ -24,6 +24,7 @@ type SafeScriptConfig struct {
 	Max                  int                         `yaml:"-"`
 	connectorInputSchema map[string]any
 	connectorOptions     *ConnectorOperationOptions
+	connectorDryRun      bool
 }
 
 // parseSafeScriptsConfig parses safe-scripts configuration from a scripts map.

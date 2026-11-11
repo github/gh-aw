@@ -429,20 +429,23 @@ function registerTests({ describe, it }) {
     it("publishes isolated assets with exact immutable git evidence and never trusts copied receipts", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-assets");
       const scoped = assignment();
+      const namespace = path.basename(claimArtifactPath("", "h1", scoped));
       const sourcePath = "image.png";
       const content = Buffer.from("claim-only-asset");
       const sha = createHash("sha256").update(content).digest("hex");
       const effects = [];
       const calls = [];
-      let ref, file;
+      let ref, file, createdRef;
       let incorrect = false;
       const source = {
         rest: {
           repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
           git: {
-            getRef: async () => {
-              if (!ref) throw Object.assign(new Error("missing"), { status: 404 });
-              return { data: { object: { sha: ref } } };
+            getRef: async (...parameters) => {
+              const requested = parameters[0]?.ref;
+              if (requested === "heads/assets/trusted") return { data: { object: { sha: "legacy-sha" } } };
+              if (createdRef && requested === createdRef.replace(/^refs\//, "")) return { data: { object: { sha: ref } } };
+              throw Object.assign(new Error("missing"), { status: 404 });
             },
             createBlob: async args => {
               calls.push("blob");
@@ -461,7 +464,8 @@ function registerTests({ describe, it }) {
             },
             createRef: async args => {
               calls.push("ref");
-              assert.match(args.ref, /^refs\/heads\/assets\/trusted\/claims\//);
+              assert.equal(args.ref, `refs/heads/assets/trusted-claims/${namespace}`);
+              createdRef = args.ref;
               ref = args.sha;
               return { data: { object: { sha: ref } } };
             },
@@ -488,10 +492,13 @@ function registerTests({ describe, it }) {
         await withClaimExecution({ assignment: scoped, claim_handle: "h1", authorize, effects }, async () => {
           const client = wrapClaimEffectClient(source, { claim_handle: "h1", authorize });
           const handler = await createAssetHandler({ "target-repo": "owner/repo", branch: "assets/trusted", "assets-dir": root }, client);
+          assert.equal((await source.rest.git.getRef({ ref: "heads/assets/trusted" })).data.object.sha, "legacy-sha");
           const message = { type: "upload_asset", claim_handle: "h1", path: sourcePath, sha };
           const result = await handler(message);
           assert.equal(result.sha, sha);
           assert.deepEqual(calls, ["blob", "tree", "commit", "ref"]);
+          assert.equal(createdRef, `refs/heads/assets/trusted-claims/${namespace}`);
+          assert.equal((await verifyAssetDelivery({ claim: scoped.claims[0], result, github: source, authorize, context: trustedContext })).verified, true);
           assert.equal((await verifyAssetDelivery({ claim: scoped.claims[0], result: structuredClone(result), github: source })).verified, false);
           const options = {
             assignment: scoped,
