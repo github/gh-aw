@@ -97,6 +97,19 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("`opened` and process that event only when `github.event.issue.milestone != null`", triggers)
         self.assertIn("events-that-trigger-workflows#issues", triggers)
 
+    def test_workflow_guidance_covers_deterministic_checks_outputs_and_pr_diffs(self):
+        patterns = normalized((ROOT / ".github/aw/workflow-patterns.md").read_text())
+        self.assertIn("Prefer `steps:` for fixed checks such as status probes, deterministic diffs, or policy tests", patterns)
+
+        safe_outputs = normalized((ROOT / ".github/aw/safe-outputs.md").read_text())
+        self.assertIn("Set `max` explicitly for `create-issue` and `add-comment`", safe_outputs)
+        self.assertIn("state the reason in the workflow instructions", safe_outputs)
+
+        triggers = normalized((ROOT / ".github/aw/triggers.md").read_text())
+        for contract in ("`previous_filename`", "`fetch-depth: 0`", "three-dot diff"):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, triggers)
+
     def test_local_sdlc_routes_to_squad_alongside_workflow_creation(self):
         for path, workflow_route in (
             (".github/skills/agentic-workflows/SKILL.md", "- Design workflows from scratch"),

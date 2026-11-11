@@ -201,6 +201,8 @@ Use deterministic `steps:` for fixed runner-side work before AI execution, such 
 
 These `steps:` run on the GitHub Actions runner, outside the AWF agent sandbox, so `network.allowed` does not constrain their network access. Agent tools and commands run inside the sandbox and are limited by the AWF network policy. `pre-agent-steps:` also run on the runner before MCP gateway startup; use them for required MCP setup, not agentic analysis. Keep runner-side steps deterministic and use the smallest necessary inputs and permissions.
 
+Prefer `steps:` for fixed checks such as status probes, deterministic diffs, or policy tests, and pass their compact results to the agent instead of asking it to reproduce them in agent-side shell. Reserve agent-side shell for exploratory work that needs the agent's judgment.
+
 ## Pre-Step Data Fetching Pattern
 
 Use deterministic `steps:` when the workflow needs large external data before the agent runs.
