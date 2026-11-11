@@ -21,6 +21,7 @@ func promptValueUsesCredentials(value string) bool {
 func isCredentialReference(path []string) bool {
 	return referenceHasPrefix(path, []string{"secrets"}) ||
 		referenceHasPrefix(path, []string{"github", "token"}) ||
+		referenceHasPrefix(path, []string{"github", "*"}) ||
 		slices.EqualFunc(path, []string{"github"}, strings.EqualFold)
 }
 

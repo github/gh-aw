@@ -112,6 +112,36 @@ func TestPromptValueUsesCredentials(t *testing.T) {
 	}
 }
 
+func TestCredentialWildcardReferences(t *testing.T) {
+	for _, test := range []struct {
+		value      string
+		credential bool
+	}{
+		{value: "${{ github.* }}", credential: true},
+		{value: "${{ (GitHub).* }}", credential: true},
+		{value: "${{ ((GITHUB.*)) }}", credential: true},
+		{value: "${{ toJSON(github.*) }}", credential: true},
+		{value: "${{ github.*.value }}", credential: true},
+		{value: "${{ github.token }}", credential: true},
+		{value: "${{ github }}", credential: true},
+		{value: "${{ secrets.* }}", credential: true},
+		{value: "${{ secrets.*.value }}", credential: true},
+		{value: "${{ github.repository }}"},
+		{value: "${{ github.event.* }}"},
+		{value: "${{ 'github.*' }}"},
+		{value: "${{ 'toJSON(github.*)' }}"},
+		{value: "${{ vars.VALUE }}"},
+		{value: "${{ vars.* }}"},
+		{value: "${{ vars.*.value }}"},
+		{value: "${{ needs.*.result }}"},
+	} {
+		t.Run(test.value, func(t *testing.T) {
+			assert.Equal(t, test.credential, promptValueUsesCredentials(test.value))
+			assert.Equal(t, test.credential, valueUsesCredentialReference(test.value))
+		})
+	}
+}
+
 func TestCompilerPromptConfigurationVariableBoundary(t *testing.T) {
 	for _, strict := range []string{"true", "false"} {
 		for _, location := range []string{"main", "local-import"} {
