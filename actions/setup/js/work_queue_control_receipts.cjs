@@ -160,10 +160,32 @@ async function verifyClaimQueueControl(options) {
   return { verified: true, claim_handle: message.claim_handle, resource: { kind: "queue_commit", repository: facts.context.repository, id: prior.id }, evidence: receipt };
 }
 
+async function verifyCommittedClaimQueueControl(options) {
+  const assignment = normalizeAssignment(options.assignment);
+  const { claim_handle } = normalizeClaimScope({ claim_handle: options.claim_handle }, assignment);
+  const inventory = options.inventory === undefined ? await readClaimQueueControls({ ...options, assignment, claim_handle }) : options.inventory;
+  const facts = inventories.get(inventory);
+  if (!facts || !isTrustedClaimQueueControlInventory(inventory, assignment, claim_handle)) throw new Error("work_queue_control_inventory_untrusted");
+  const prior = facts.state.requests.get(options.request_id);
+  const receipt = inventory.controls.find(control => control.request_id === options.request_id);
+  if (!prior || !receipt || TYPES[prior.request.kind] !== receipt.type || prior.actor.role !== "worker" || prior.actor.dispatch_id !== assignment.dispatch_id || prior.actor.claim_handle !== claim_handle)
+    return { verified: false, effects: "unknown", reason: "queue_control_not_committed" };
+  return { verified: true, claim_handle, resource: { kind: "queue_commit", repository: facts.context.repository, id: prior.id }, evidence: receipt };
+}
+
 function claimQueueControlRun(inventory) {
   const facts = inventory && inventories.get(inventory);
   if (!facts) throw new Error("work_queue_control_inventory_untrusted");
   return JSON.parse(canonical(facts.state.dispatches.get(facts.assignment.dispatch_id).run));
 }
 
-module.exports = { controlReceiptForRequest, claimControlReceipts, readClaimQueueControls, isTrustedClaimQueueControlInventory, isUncommittedClaimDispatchNext, verifyClaimQueueControl, claimQueueControlRun };
+module.exports = {
+  controlReceiptForRequest,
+  claimControlReceipts,
+  readClaimQueueControls,
+  isTrustedClaimQueueControlInventory,
+  isUncommittedClaimDispatchNext,
+  verifyClaimQueueControl,
+  verifyCommittedClaimQueueControl,
+  claimQueueControlRun,
+};

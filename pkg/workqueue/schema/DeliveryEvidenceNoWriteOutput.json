@@ -1,0 +1,39 @@
+{
+  "$defs": {
+    "DeliveryEvidenceNoWriteOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "maxLength": 8192,
+          "type": "string"
+        },
+        "index": {
+          "maximum": 127,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/$defs/Identity",
+          "maxLength": 128,
+          "x-utf8-max-bytes": 128
+        },
+        "verifier": {
+          "const": "none"
+        }
+      },
+      "required": ["index", "type", "verifier"],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    }
+  },
+  "$id": "DeliveryEvidenceNoWriteOutput.json",
+  "$ref": "#/$defs/DeliveryEvidenceNoWriteOutput",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliveryEvidenceNoWriteOutput"
+}

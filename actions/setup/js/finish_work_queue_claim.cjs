@@ -157,34 +157,40 @@ function trustedClaimFooterLinks(handle, configured) {
   }
 }
 
-async function authorizeWorkerClaim(options = {}) {
-  log.debug("claim.authorize.start");
+async function loadClaimAuthorization(options, { role, allowReleased }) {
   const configured = runtimeOptions(options);
   const assignment = normalizeAssignment(options.assignment);
   const normalized = normalizeClaimScope(Object.hasOwn(options, "message") ? options.message : Object.hasOwn(options, "claim_handle") ? { claim_handle: options.claim_handle } : {}, assignment);
   if (Object.hasOwn(options, "claim_handle") && normalized.claim_handle !== options.claim_handle) throw new Error("work_queue_claim_scope_invalid");
   const member = assignment.claims.find(claim => claim.handle === normalized.claim_handle);
   const latest = await loadQueue(configured);
-  const { dispatch, profile } = validateStoredAssignment(latest.projection, assignment);
-  const trustedContext = await authenticatePublisher({ ...configured, role: "worker", dispatch_id: assignment.dispatch_id, claim_handle: member.handle });
+  const { dispatch, profile } = validateStoredAssignment(latest.projection, assignment, { allowReleased });
+  const trustedContext = await authenticatePublisher({ ...configured, role, dispatch_id: assignment.dispatch_id, claim_handle: member.handle });
+  const claim = latest.projection.claims.get(member.claim_id);
+  const work = latest.projection.works.get(member.work_id);
+  return { configured, assignment, normalized, member, latest, dispatch, profile, trustedContext, claim, work };
+}
+
+function claimEffectTarget(normalized, resource, effectScope) {
+  const targets = [normalized.repository, normalized.repo, normalized.target_repo, normalized["target-repo"]].filter(value => value !== undefined);
+  if (targets.some(target => typeof target !== "string" || target !== effectScope)) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
+  if (resource === undefined) return undefined;
+  if (!resource || typeof resource !== "object" || Array.isArray(resource)) throw new Error("work_queue_effect_scope_denied");
+  const resourceTargets = [resource.repository, resource.repo].filter(value => value !== undefined);
+  if (!resourceTargets.length || resourceTargets.some(target => typeof target !== "string" || target !== effectScope)) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
+  const canonicalResource = { ...resource, repository: resourceTargets[0] };
+  delete canonicalResource.repo;
+  return canonicalResource;
+}
+
+async function authorizeWorkerClaim(options = {}) {
+  log.debug("claim.authorize.start");
+  const { configured, assignment, normalized, member, latest, dispatch, profile, trustedContext, claim, work } = await loadClaimAuthorization(options, { role: "worker", allowReleased: false });
   const expected = expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository, dispatchPrincipal(dispatch));
   const native = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
   if (!dispatch.run || dispatch.state !== "bound" || canonical(dispatch.run) !== canonical(bindingForRun(native, expected))) throw new Error("work_queue_binding_not_durable");
-  const targets = [normalized.repository, normalized.repo, normalized.target_repo, normalized["target-repo"]].filter(value => value !== undefined);
-  const allowedRepos = [profile.effect_scope];
-  if (targets.some(target => typeof target !== "string" || !allowedRepos.includes(target))) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
-  const claim = latest.projection.claims.get(member.claim_id);
-  const work = latest.projection.works.get(member.work_id);
+  const resource = claimEffectTarget(normalized, options.resource, profile.effect_scope);
   const base = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, run_id: native.run_id, run_attempt: 1, effect_scope: profile.effect_scope };
-  let resource;
-  if (options.resource !== undefined) {
-    const suppliedResource = options.resource;
-    if (!suppliedResource || typeof suppliedResource !== "object" || Array.isArray(suppliedResource)) throw new Error("work_queue_effect_scope_denied");
-    const resourceTargets = [suppliedResource.repository, suppliedResource.repo].filter(value => value !== undefined);
-    if (!resourceTargets.length || resourceTargets.some(target => typeof target !== "string" || !allowedRepos.includes(target))) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
-    resource = { ...suppliedResource, repository: resourceTargets[0] };
-    delete resource.repo;
-  }
   if (claim?.state === "cancelled") return { ...base, authorized: false, suppressed: true, state: "cancelled" };
   if (options.requireCompletion !== false && claim?.state !== "completed") return { ...base, authorized: false, state: "open" };
   if (options.requireCompletion !== false && claim?.keep_open && claim.barrier !== "pending")
@@ -207,6 +213,27 @@ async function authorizeWorkerClaim(options = {}) {
     }
   }
   return { ...base, authorized: true, state: options.requireCompletion === false ? "open" : "completed", ...(footer_links ? { footer_links } : {}) };
+}
+
+async function authorizeReconcilerClaimReadback(options = {}) {
+  const { configured, normalized, member, latest, dispatch, profile, claim, work } = await loadClaimAuthorization(options, { role: "reconciler", allowReleased: true });
+  const evidence = latest.projection.deliveryEvidence.get(member.claim_id);
+  const pending = claim?.keep_open ? claim.barrier === "pending" : work?.barrier === "pending";
+  if (!dispatch.run || claim?.state !== "completed" || work?.claim_id !== member.claim_id || !pending || evidence?.completion_id !== work?.completion_id || evidence?.run_id !== dispatch.run.run_id)
+    throw new Error("work_queue_claim_ineffective");
+  const resource = claimEffectTarget(normalized, options.resource, profile.effect_scope);
+  if (resource !== undefined) require("./work_queue_resource_scope.cjs").validateEffectResourceAuthority(latest.projection, { claim, work, dispatch }, resource);
+  return {
+    claim_handle: member.handle,
+    claim_id: member.claim_id,
+    work_id: member.work_id,
+    run_id: dispatch.run.run_id,
+    run_attempt: 1,
+    effect_scope: profile.effect_scope,
+    authorized: true,
+    state: "completed",
+    footer_links: trustedClaimFooterLinks(member.handle, configured),
+  };
 }
 
 async function reconcileWorkerClaim(options = {}) {
@@ -381,6 +408,10 @@ async function finalizeWorkerResults(options = {}) {
       const verificationStarted = Date.now();
       integer(work.completion_at, 0, Number.MAX_SAFE_INTEGER, "Completion timestamp");
       const remainingDeadline = policy.deadline_ms - Math.max(0, (options.now ?? verificationStarted) - work.completion_at);
+      // Maintenance can first observe a terminal worker after the deadline.
+      // Give its persisted receipts one bounded readback before expiring them;
+      // this does not replay effects or reopen the normal retry budget.
+      const finalEvidenceReadback = options.expireUnverified === true && latest.projection.deliveryEvidence.has(member.claim_id);
       log.debug("delivery.verifier.budget", {
         max_attempts: policy.max_attempts,
         remaining_ms: Math.max(0, remainingDeadline),
@@ -394,10 +425,11 @@ async function finalizeWorkerResults(options = {}) {
         results[member.handle] = { state: "pending", effects: "unknown", reason: "verification_unavailable" };
         continue;
       }
-      for (; attempts < policy.max_attempts && Date.now() - verificationStarted < remainingDeadline; attempts++) {
+      for (; attempts < policy.max_attempts && ((attempts === 0 && finalEvidenceReadback) || Date.now() - verificationStarted < remainingDeadline); attempts++) {
         log.debug("delivery.verifier.attempt", { attempt: attempts + 1 });
         try {
-          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts + 1, run: dispatch.run }, remainingDeadline - (Date.now() - verificationStarted));
+          const remaining = remainingDeadline - (Date.now() - verificationStarted);
+          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts + 1, run: dispatch.run }, attempts === 0 && finalEvidenceReadback && remaining <= 0 ? 15000 : remaining);
         } catch (error) {
           log.failure("delivery.verifier.failed", error);
           verification = null;
@@ -570,6 +602,7 @@ module.exports = {
   readWorkerSnapshot,
   reconcileWorkerClaim,
   authorizeWorkerClaim,
+  authorizeReconcilerClaimReadback,
   verifyWithinBudget,
   finalizeWorkerResults,
   renderSummary,

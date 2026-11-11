@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "DeliveryEvidenceWriteOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "maxLength": 8192,
+          "type": "string"
+        },
+        "index": {
+          "maximum": 127,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receipt": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "type": {
+          "$ref": "#/$defs/Identity",
+          "maxLength": 128,
+          "x-utf8-max-bytes": 128
+        },
+        "verifier": {
+          "anyOf": [
+            {
+              "const": "builtin"
+            },
+            {
+              "const": "native_creation"
+            },
+            {
+              "const": "asset"
+            },
+            {
+              "const": "code_scanning"
+            },
+            {
+              "const": "code_coverage"
+            },
+            {
+              "const": "artifact"
+            },
+            {
+              "const": "rest_adapter"
+            },
+            {
+              "const": "graphql_adapter"
+            },
+            {
+              "const": "git_tree_adapter"
+            },
+            {
+              "const": "prepared_builtin"
+            },
+            {
+              "const": "declared_builtin"
+            },
+            {
+              "const": "queue_control"
+            }
+          ]
+        }
+      },
+      "required": ["index", "type", "verifier", "receipt"],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    }
+  },
+  "$id": "DeliveryEvidenceWriteOutput.json",
+  "$ref": "#/$defs/DeliveryEvidenceWriteOutput",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliveryEvidenceWriteOutput"
+}

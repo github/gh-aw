@@ -67,6 +67,7 @@ const { withClaimEffectClients, wrapClaimEffectClient } = require("./work_queue_
 const { readClaimControlMessages } = require("./work_queue_control_delivery.cjs");
 const { readDeliveryControlInventory, inspectClaimDelivery, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput, validateDeliveryContract, NO_WRITE_TYPES } = require("./work_queue_delivery.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
+const { collectDeliveryEvidence, publishDeliveryEvidence } = require("./work_queue_delivery_evidence.cjs");
 const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
 
@@ -2055,6 +2056,15 @@ async function settleClaimDelivery(scope, messages, results, options = {}) {
   for (const result of results) result.claim_handle = handle;
   if (options.registerVerification) options.registerVerification(messages, results);
   const controls = options.controlMessages || [];
+  if (options.registerVerification !== undefined && !isStagedMode()) {
+    try {
+      const evidence = collectDeliveryEvidence({ assignment: scope.assignment, claim_handle: handle, messages, results, effects: options.effects || [], controls, config: loadConfig(), context: verificationContext });
+      if (evidence.unsupported) core.info(`Claim ${handle}: durable delivery evidence not published (${evidence.unsupported})`);
+      else await publishDeliveryEvidence({ assignment: scope.assignment, claim_handle: handle, ...evidence, github: options.queueClient || github, context: verificationContext, core });
+    } catch (error) {
+      core.error(`Claim ${handle}: durable delivery evidence publication failed: ${getErrorMessage(error)}`);
+    }
+  }
   const controlProofs = new Map();
   const outcomes = [...results, ...controls.map((message, index) => ({ messageIndex: messages.length + index, success: true, claim_handle: handle, result: null }))];
   const queueControls = require("./work_queue_control_receipts.cjs");

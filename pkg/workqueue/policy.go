@@ -225,6 +225,7 @@ func newProjection() Projection {
 		RequestOrder: []string{}, WorkCreators: map[string]Actor{}, ClaimExplanations: map[string]ClaimExplanation{},
 		SeenEpochs: map[string]bool{}, SeenGenerations: map[string]bool{"initial": true},
 		ObservationIDs: map[string]*Observation{}, TerminalBarriers: map[string]Operation{}, Cancellations: map[string]Operation{},
+		DeliveryEvidence: map[string]Operation{},
 	}
 }
 
@@ -257,7 +258,7 @@ func permitted(role, kind string) bool {
 		return role == "producer" || role == "dispatcher" || role == "worker" || role == "administrator"
 	case "Claim":
 		return role == "dispatcher" || role == "administrator" || role == "worker"
-	case "Completion":
+	case "Completion", "DeliveryEvidence":
 		return role == "worker"
 	case "Result", "DeliveryFailure", "Release":
 		return role == "reconciler"
@@ -289,7 +290,7 @@ func validateRequest(commit QueueCommit) error {
 		"policy": {"Policy"}, "pool_install": {"PoolInstall"}, "deployment": {"Deployment"}, "control": {"Control", "WorkPriority"}, "submit": {"Policy", "Work"},
 		"dispatch_next": {"Observation", "Claim"}, "finish": {"Completion", "ClaimCancellation", "WorkCancellation"},
 		"observe": {"Observation"}, "dispatch": {"Dispatch"}, "release": {"ClaimCancellation", "WorkCancellation", "Release"},
-		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"},
+		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"}, "delivery_evidence": {"DeliveryEvidence"},
 		"cancel_work": {"WorkCancellation"}, "cancel_claim": {"ClaimCancellation", "WorkCancellation"},
 		"checkpoint": {"Checkpoint"},
 		"issue_link": {"IssueLink", "IssueComment"},

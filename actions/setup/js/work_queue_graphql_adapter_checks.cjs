@@ -6,6 +6,9 @@ const path = require("node:path");
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
 const { validateAdapter, createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
+const scope = require("./work_queue_claim_scope.cjs");
+const graphql = require("./work_queue_graphql_adapter.cjs");
+const { canonical, canonicalBytes } = require("./work_queue_codec.cjs");
 
 const adapter = {
   mode: "prepared",
@@ -38,9 +41,114 @@ function assignment() {
     claims: ["h1", "h2"].map(handle => ({ handle, claim_id: `claim:${handle}`, work_id: `work:${handle}`, work: { effect_contract: { version: 1, outputs: [{ type: "custom", min: 1, max: 1 }] } }, result_refs: [] })),
   };
 }
+function durableFixture() {
+  const scoped = assignment();
+  /** @type {{observed: {body: string, repository: {nameWithOwner: string, databaseId: number}, [field: string]: unknown} | null, reads: number, writes: number}} */
+  const state = { observed: null, reads: 0, writes: 0 };
+  const authorize = async request => ({ claim_handle: request.claim_handle, authorized: true });
+  const github = {
+    graphql: async (query, variables) => {
+      if (query.startsWith("query ClaimAdapterRepository")) return { repository: { id: "repository", nameWithOwner: "owner/repo" } };
+      if (query.startsWith("query WorkQueueEffectTargets")) return { nodes: variables.ids.map(id => ({ id, __typename: "Repository", nameWithOwner: "owner/repo", databaseId: 7 })) };
+      if (query.startsWith("mutation")) {
+        state.writes++;
+        state.observed = {
+          id: "discussion",
+          __typename: "Discussion",
+          number: 42,
+          repository: { nameWithOwner: "owner/repo", databaseId: 7 },
+          title: variables.input.title,
+          body: variables.input.body,
+          category: { id: variables.input.categoryId },
+        };
+        return { createDiscussion: { discussion: structuredClone(state.observed) } };
+      }
+      assert.ok(query.startsWith("query ClaimAdapterReadback"));
+      assert.equal(variables.id, "discussion");
+      state.reads++;
+      return { node: structuredClone(state.observed) };
+    },
+  };
+  return { assignment: scoped, claim: scoped.claims[0], state, authorize, github };
+}
 
 function registerTests({ describe, it }) {
   describe("trusted per-Claim GraphQL delivery", () => {
+    it("resumes serialized GraphQL receipts with exact fields, effect identity and protected independent readback", async () => {
+      const f = durableFixture();
+      const fields = { title: "Exact title", body: "Exact body", categoryId: "category" };
+      let receipt;
+      let result;
+      await withClaimExecution({ assignment: f.assignment, claim_handle: "h1", authorize: f.authorize }, async () => {
+        result = await graphql.createGraphqlEffectHandler(adapter, f.github)({ type: "custom", claim_handle: "h1", ...fields });
+        receipt = graphql.durableGraphqlReceipt(result, f.claim);
+        assert.deepEqual(Object.keys(receipt).sort(), ["effect_id", "fields", "id"]);
+        assert.deepEqual(receipt.fields, fields);
+        assert.match(receipt.effect_id, /^[a-f0-9]{64}$/);
+        assert.equal(graphql.durableGraphqlReceipt(structuredClone(result), f.claim), null);
+        assert.equal(graphql.durableGraphqlReceipt(result, f.assignment.claims[1]), null);
+        receipt.fields.body = "cannot mutate the private receipt";
+        receipt = JSON.parse(JSON.stringify(graphql.durableGraphqlReceipt(result, f.claim)));
+      });
+      const filename = require.resolve("./work_queue_graphql_adapter.cjs");
+      const cached = require.cache[filename];
+      delete require.cache[filename];
+      try {
+        const restarted = require(filename);
+        await withClaimExecution({ assignment: f.assignment, claim_handle: "h1", authorize: f.authorize }, async () => {
+          const options = {
+            adapter,
+            claim: f.claim,
+            github: f.github,
+            authorize: f.authorize,
+            verification: { verifier_id: "custom", expected: fields },
+            durable: true,
+            result: { entry: { verifier: "graphql_adapter", adapter: canonical(adapter), receipt } },
+          };
+          assert.equal((await restarted.verifyGraphqlAdapterDelivery({ ...options, durable: false, result })).verified, false);
+          const proof = await restarted.verifyGraphqlAdapterDelivery(options);
+          assert.equal(proof.verified, true);
+          assert.equal(f.state.reads, 1);
+          assert.deepEqual(proof.effect_resources, [{ kind: "graphql", repository: "owner/repo", id: receipt.effect_id }]);
+          await assert.rejects(
+            scope.withClaimResourceVerification(structuredClone(proof), () => true),
+            /private in-process/
+          );
+          assert.equal((await restarted.verifyGraphqlAdapterDelivery({ ...options, verification: { verifier_id: "custom", expected: { ...fields, body: "different" } } })).verified, false);
+          const reads = f.state.reads;
+          for (const invalid of [{}, { ...receipt, id: undefined }, { ...receipt, effect_id: undefined }, { ...receipt, fields: {} }, { ...receipt, fields: { ...fields, body: undefined } }]) {
+            assert.equal((await restarted.verifyGraphqlAdapterDelivery({ ...options, result: { entry: { ...options.result.entry, receipt: invalid } } })).verified, false);
+          }
+          assert.equal((await restarted.verifyGraphqlAdapterDelivery({ ...options, result: { entry: { ...options.result.entry, adapter: canonical({ ...adapter, "target-repo": "other/repo" }) } } })).verified, false);
+          assert.equal((await restarted.verifyGraphqlAdapterDelivery({ ...options, result: { entry: { ...options.result.entry, verifier: "rest_adapter" } } })).verified, false);
+          assert.equal(f.state.reads, reads);
+          assert.ok(f.state.observed);
+          f.state.observed.body = "changed after the worker exited";
+          assert.equal((await restarted.verifyGraphqlAdapterDelivery(options)).verified, false);
+          f.state.observed.body = fields.body;
+          f.state.observed.repository.nameWithOwner = "other/repo";
+          assert.equal((await restarted.verifyGraphqlAdapterDelivery(options)).verified, false);
+        });
+        assert.equal(f.state.writes, 1);
+      } finally {
+        require.cache[filename] = cached;
+      }
+    });
+
+    it("bounds serialized GraphQL fields without changing the private receipt limit", async () => {
+      const f = durableFixture();
+      await withClaimExecution({ assignment: f.assignment, claim_handle: "h1", authorize: f.authorize }, async () => {
+        const handler = graphql.createGraphqlEffectHandler(adapter, f.github);
+        const fields = { title: "Title", body: "", categoryId: "category" };
+        fields.body = "x".repeat(8192 - canonicalBytes(fields));
+        const result = await handler({ type: "custom", claim_handle: "h1", ...fields });
+        assert.equal(canonicalBytes(graphql.durableGraphqlReceipt(result, f.claim).fields), 8192);
+        const oversized = await handler({ type: "custom", claim_handle: "h1", ...fields, body: `${fields.body}x` });
+        assert.equal(graphql.durableGraphqlReceipt(oversized, f.claim), null);
+        assert.equal((await graphql.verifyGraphqlAdapterDelivery({ adapter, claim: f.claim, github: f.github, result: oversized })).verified, true);
+      });
+    });
+
     it("verifies complete independent native fields and actual graph effects without trusting copied receipts or job success", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-graphql");
       const scoped = assignment();

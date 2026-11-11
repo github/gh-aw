@@ -229,6 +229,201 @@
       "pattern": "^[1-9][0-9]*$",
       "type": "string"
     },
+    "DeliveryEvidenceEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/Revision"
+        },
+        "expected": {
+          "$ref": "#/$defs/DeliveryEvidenceExpected"
+        },
+        "id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "$ref": "#/$defs/Identity"
+        },
+        "number": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "succeeded"
+            },
+            {
+              "const": "unknown"
+            }
+          ]
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "repository", "outcome"],
+      "type": "object"
+    },
+    "DeliveryEvidenceExpected": {
+      "additionalProperties": false,
+      "properties": {
+        "assignees": {},
+        "labels": {},
+        "ref": {},
+        "sha": {}
+      },
+      "required": [],
+      "type": "object"
+    },
+    "DeliveryEvidenceNoWriteOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "maxLength": 8192,
+          "type": "string"
+        },
+        "index": {
+          "maximum": 127,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/$defs/Identity",
+          "maxLength": 128,
+          "x-utf8-max-bytes": 128
+        },
+        "verifier": {
+          "const": "none"
+        }
+      },
+      "required": ["index", "type", "verifier"],
+      "type": "object"
+    },
+    "DeliveryEvidenceOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "completion_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "controls_digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effects": {
+          "items": {
+            "$ref": "#/$defs/DeliveryEvidenceEffect"
+          },
+          "maxItems": 256,
+          "type": "array"
+        },
+        "kind": {
+          "const": "DeliveryEvidence"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/DeliveryEvidenceOutput"
+          },
+          "maxItems": 128,
+          "type": "array"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "completion_id", "run_id", "run_attempt", "outputs", "effects"],
+      "type": "object"
+    },
+    "DeliveryEvidenceOutput": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DeliveryEvidenceNoWriteOutput"
+        },
+        {
+          "$ref": "#/$defs/DeliveryEvidenceWriteOutput"
+        }
+      ]
+    },
+    "DeliveryEvidenceWriteOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "maxLength": 8192,
+          "type": "string"
+        },
+        "index": {
+          "maximum": 127,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receipt": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "type": {
+          "$ref": "#/$defs/Identity",
+          "maxLength": 128,
+          "x-utf8-max-bytes": 128
+        },
+        "verifier": {
+          "anyOf": [
+            {
+              "const": "builtin"
+            },
+            {
+              "const": "native_creation"
+            },
+            {
+              "const": "asset"
+            },
+            {
+              "const": "code_scanning"
+            },
+            {
+              "const": "code_coverage"
+            },
+            {
+              "const": "artifact"
+            },
+            {
+              "const": "rest_adapter"
+            },
+            {
+              "const": "graphql_adapter"
+            },
+            {
+              "const": "git_tree_adapter"
+            },
+            {
+              "const": "prepared_builtin"
+            },
+            {
+              "const": "declared_builtin"
+            },
+            {
+              "const": "queue_control"
+            }
+          ]
+        }
+      },
+      "required": ["index", "type", "verifier", "receipt"],
+      "type": "object"
+    },
     "DeliveryFailureOperation": {
       "additionalProperties": false,
       "properties": {
@@ -925,6 +1120,9 @@
           "$ref": "#/$defs/CompletionOperation"
         },
         {
+          "$ref": "#/$defs/DeliveryEvidenceOperation"
+        },
+        {
           "$ref": "#/$defs/ResultOperation"
         },
         {
@@ -1068,6 +1266,9 @@
             },
             {
               "const": "delivery_failure"
+            },
+            {
+              "const": "delivery_evidence"
             },
             {
               "const": "cancel_work"

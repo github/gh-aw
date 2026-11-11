@@ -446,6 +446,7 @@ type Projection struct {
 	SeenGenerations      map[string]bool                         `json:"-"`
 	ObservationIDs       map[string]*Observation                 `json:"-"`
 	TerminalBarriers     map[string]Operation                    `json:"-"`
+	DeliveryEvidence     map[string]Operation                    `json:"-"`
 	Cancellations        map[string]Operation                    `json:"-"`
 }
 
