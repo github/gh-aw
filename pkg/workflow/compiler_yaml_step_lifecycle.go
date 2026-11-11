@@ -186,7 +186,7 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	if IsReleasedVersion(c.version) {
 		writeFormattedYAML(yaml, "          GH_AW_INFO_CLI_VERSION: \"%s\"\n", c.version)
 	}
-	writeFormattedYAML(yaml, "          GH_AW_INFO_WORKFLOW_NAME: \"%s\"\n", data.Name)
+	writeFormattedYAML(yaml, "          GH_AW_INFO_WORKFLOW_NAME: %q\n", data.Name)
 	// Unlike github.workflow_ref, job.workflow_ref identifies the executing reusable workflow.
 	yaml.WriteString("          GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}\n")
 	yaml.WriteString("          GH_AW_INFO_WORKFLOW_SHA: ${{ job.workflow_sha }}\n")

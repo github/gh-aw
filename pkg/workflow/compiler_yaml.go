@@ -80,7 +80,7 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 // permissions, concurrency, run-name, environment variables, cache comments, and jobs.
 func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowData) {
 	// Write basic workflow structure
-	fmt.Fprintf(yaml, "name: \"%s\"\n", data.Name) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(yaml, "name: %q\n", data.Name) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 
 	// Inject on.workflow_call.outputs when workflow_call is configured and safe-outputs are present
 	onSection := data.On

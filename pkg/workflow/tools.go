@@ -43,7 +43,7 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 	data.Concurrency = GenerateConcurrencyConfig(data, isCommandTrigger || isLabelCommandTrigger)
 
 	if data.RunName == "" {
-		data.RunName = fmt.Sprintf(`run-name: "%s"`, data.Name)
+		data.RunName = fmt.Sprintf("run-name: %q", data.Name)
 	}
 
 	if data.TimeoutMinutes == "" {
