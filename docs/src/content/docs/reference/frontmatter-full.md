@@ -2883,8 +2883,9 @@ sandbox:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     model-fallback: "example-value"
 
-    # Enable or disable API proxy token steering. Set to false to preserve the
-    # explicitly configured provider and model.
+    # Enable or disable AWF budget notices, which warn the agent when the run's AI
+    # credits or time are nearly spent. Notices are on by default; set to false to
+    # turn them off. Steering never changes the provider or model.
     # (optional)
     token-steering: true
 
@@ -4401,8 +4402,9 @@ max-tool-calls: 1
 max-tool-calls: "example-value"
 
 # Per-run AI Credits budget control for firewall cost enforcement. Enabled by
-# default at 1000 (1k) when omitted. Set to -1 to disable both budget enforcement
-# and token steering. Supports GitHub Actions expressions.
+# default at 1000 (1k) when omitted. Set to -1 to disable budget enforcement; with
+# AWF releases after v0.29.11, budget notices continue unless
+# sandbox.agent.token-steering is false. Supports GitHub Actions expressions.
 # (optional)
 # Accepted formats:
 

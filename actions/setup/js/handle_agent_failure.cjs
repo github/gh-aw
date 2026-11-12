@@ -1902,14 +1902,14 @@ function loadReportIncompleteMessages(items) {
 }
 
 /**
- * Build report_incomplete context string for display in failure issues/comments.
+ * Build report_incomplete context for display in failure issues/comments.
  * This surfaces the agent's structured incompletion signal so maintainers can
  * distinguish an incomplete task from a confirmed task outcome.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
- * @param {{collectorEmptyOutputCause?: string, rootDir?: string}} [options]
+ * @param {{collectorEmptyOutputCause?: string, rootDir?: string, runId?: number}} [options]
  * @returns {ReportBlock[]}
  */
-function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDir } = {}) {
+function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDir, runId } = {}) {
   const trustedCollectorCause = typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause) ? collectorEmptyOutputCause : undefined;
   const messages = loadReportIncompleteMessages(items).filter(message => message.reason !== trustedCollectorCause);
 
@@ -1939,11 +1939,34 @@ function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDi
   }
   context.push(
     nodes.paragraph([
-      nodes.text("A comment or other safe output does not confirm that the requested task was completed. Reported reasons are not verified causes; runtime evidence is shown separately and agent diagnostic details are excluded."),
+      nodes.text(
+        "This run needs a follow-up: the agent reported that it could not finish. A successful agent job only confirms a clean process exit, not that the requested work was completed. Treat the agent-declared reason as a lead, not a confirmed root cause; agent diagnostic details are excluded, so compare the note with the runtime evidence below."
+      ),
     ])
   );
+  if (typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0) {
+    context.push(nodes.paragraph([nodes.text("For a runtime-focused investigation, run "), nodes.code(`gh aw audit ${runId}`), nodes.text(".")]));
+  }
 
   return context;
+}
+
+/**
+ * Build safe next-step guidance for an agent-reported incomplete task.
+ * @param {Array<any>} items
+ * @param {{runId?: number, secretRedactionFailed?: boolean}} [options]
+ * @returns {string}
+ */
+function buildReportIncompleteFailureMessage(items, { runId, secretRedactionFailed = false } = {}) {
+  const hasUsableReason = loadReportIncompleteMessages(items).length > 0;
+  const diagnosticNextStep = !hasUsableReason
+    ? "The report_incomplete signal had no usable reason; inspect agent_output.json in the agent artifact."
+    : secretRedactionFailed
+      ? "The conclusion job summary was suppressed because secret redaction failed; inspect agent_output.json in the agent artifact."
+      : "If available, check the conclusion job summary for the reported reason and inspect agent_output.json in the agent artifact.";
+  const auditCommand = typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0 ? `gh aw audit ${runId}` : "gh aw audit <run-id>";
+
+  return `Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. ${diagnosticNextStep} Run ${auditCommand} for runtime evidence.`;
 }
 
 /**
@@ -4473,6 +4496,7 @@ async function main() {
     let hasMissingSafeOutputs = false;
     let hasOnlyNoopOutputs = false;
     let hasReportIncomplete = false;
+    let reportIncompleteItems = [];
     // Tracks the case where agentConclusion is "failure" but the agent completed its work
     // successfully (terminal_reason: completed) and produced valid non-noop safe outputs.
     // This is a false-positive failure caused by a transient error after the agent's task
@@ -4544,16 +4568,13 @@ async function main() {
     // classified as a successful review or other completed task.
     if (agentOutputResult.success && agentOutputResult.items && agentOutputResult.items.length > 0) {
       // Cancellation can interrupt the agent before it starts or emits a terminal safe output.
-      const reportIncompleteItems = agentOutputResult.items.filter(item => item.type === "report_incomplete" && !(isCancelledEmptyOutput && item.reason === collectorEmptyOutputCause));
+      reportIncompleteItems = agentOutputResult.items.filter(item => item.type === "report_incomplete" && !(isCancelledEmptyOutput && item.reason === collectorEmptyOutputCause));
       if (reportIncompleteItems.length > 0) {
         if (taskCompleteRegistrationIssueOnlyReportIncomplete) {
           core.info("Ignoring report_incomplete signal(s) caused only by task_complete registration trouble after successful task-level outputs");
         } else {
           hasReportIncomplete = true;
           core.info(`Agent emitted ${reportIncompleteItems.length} report_incomplete signal(s) - activating failure handling`);
-          // Continue after marking the step failed so optional issue reporting can still run.
-          // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
-          core.setFailed("Agent reported that it could not complete the task");
         }
       }
     }
@@ -4653,6 +4674,11 @@ async function main() {
     }
 
     failureDiagnostics ??= await getFailedAgentDiagnostics({ startupFailure: collectorEmptyOutputCause === "agent_startup_failure" });
+    if (hasReportIncomplete) {
+      // Continue after marking the step failed so optional issue reporting can still run.
+      // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
+      core.setFailed(buildReportIncompleteFailureMessage(reportIncompleteItems, { runId: context.runId, secretRedactionFailed: failureDiagnostics.secretRedactionFailed }));
+    }
     if (failureDiagnostics.hasNoJobs && !hasCheckoutFailure) {
       core.info("Skipping failure reporting: no workflow jobs started; the run may not have been approved.");
       return;
@@ -4701,7 +4727,7 @@ async function main() {
         !(isCancelledEmptyOutput && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause)
     );
     const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
-    const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()) });
+    const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()), runId: context.runId });
     if (hasReportedIncomplete && reportIncompleteContext.length > 0 && !failureDiagnostics.secretRedactionFailed) {
       try {
         const summary = renderSizedReport({ type: "report", title: "Incomplete result", children: reportIncompleteContext, agentTainted: false }).body;
