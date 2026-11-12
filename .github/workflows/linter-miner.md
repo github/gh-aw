@@ -36,6 +36,7 @@ tools:
     - "*"
   edit:
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/mcp/serena-go.md
   - shared/otlp.md
   - shared/reporting.md
@@ -65,7 +66,6 @@ pre-agent-steps:
         echo "[]" > /tmp/gh-aw/agent/prior-linters.json
       fi
 safe-outputs:
-  steer: true
   create-pull-request:
     title-prefix: "[linter-miner] "
     labels: [automation, go-linters, cookie]

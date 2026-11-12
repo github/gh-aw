@@ -28,16 +28,14 @@ tools:
   cache-memory: true
   edit:
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[mcp-tools] "
     labels: [documentation, automation]
     reviewers: copilot
-    draft: false
     protected-files: fallback-to-issue
 timeout-minutes: 15
 imports:
+  - shared/pr-safe-output-defaults.md
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[mcp-tools-report] "

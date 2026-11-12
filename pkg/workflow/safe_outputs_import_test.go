@@ -674,6 +674,53 @@ func TestMergeSafeOutputsSteer(t *testing.T) {
 	})
 }
 
+func TestMergeSafeOutputsCreatePullRequestDefaults(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+	imported := []string{`{"create-pull-request":{"expires":"2d","draft":false,"title-prefix":"[imported] "}}`}
+
+	t.Run("fills omitted defaults without replacing local options", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{TitlePrefix: "[local] "},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": map[string]any{"title-prefix": "[local] "},
+		}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, imported, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Equal(t, 48, result.CreatePullRequests.Expires)
+		assert.Equal(t, strPtr("false"), result.CreatePullRequests.Draft)
+		assert.Equal(t, "[local] ", result.CreatePullRequests.TitlePrefix)
+	})
+
+	t.Run("local defaults take precedence", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{
+				TitlePrefix: "[local] ",
+				Expires:     72,
+				Draft:       strPtr("true"),
+			},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": map[string]any{
+				"title-prefix": "[local] ",
+				"expires":      "3d",
+				"draft":        true,
+			},
+		}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, imported, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Equal(t, 72, result.CreatePullRequests.Expires)
+		assert.Equal(t, strPtr("true"), result.CreatePullRequests.Draft)
+		assert.Equal(t, "[local] ", result.CreatePullRequests.TitlePrefix)
+	})
+}
+
 // TestMergeSafeOutputsMessagesUnit tests the MergeSafeOutputs function for messages field
 func TestMergeSafeOutputsMessagesUnit(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))

@@ -46,19 +46,18 @@ tools:
     wiki: true
     description: "Tracks persona/style rotation and recently featured workflows to keep daily entries varied"
 safe-outputs:
-  steer: true
   create-pull-request:
     expires: 7d
     title-prefix: "[blog] "
     labels: [blog]
     reviewers: [copilot]
-    draft: false
     allowed-files:
       - "docs/src/content/docs/**"
   upload-asset:
     max: 3
     allowed-exts: [.png, .jpg, .jpeg, .svg]
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/github-guard-policy.md
   - shared/otlp.md
   - shared/reporting.md

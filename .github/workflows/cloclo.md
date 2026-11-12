@@ -34,6 +34,7 @@ engine:
     goal: cost
     mode: balanced
 imports:
+  - shared/pr-safe-output-defaults.md
   - ../skills/jqschema/SKILL.md
   - shared/mcp/serena-go.md
   - shared/reporting.md
@@ -48,9 +49,7 @@ tools:
   cache-memory:
     key: cloclo-memory-${{ github.workflow }}
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[cloclo] "
     labels: [automation, cloclo]
     excluded-files:

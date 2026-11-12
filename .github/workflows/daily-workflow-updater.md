@@ -32,12 +32,10 @@ network:
     - go
 
 safe-outputs:
-  steer: true
   create-pull-request:
     expires: 1d
     title-prefix: "[actions] "
     labels: [dependencies, automation]
-    draft: false
     protected-files: allowed
 
 tools:
@@ -50,6 +48,7 @@ tools:
 timeout-minutes: 15
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
 evals:
   - id: action_versions_checked

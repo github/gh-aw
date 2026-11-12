@@ -111,9 +111,7 @@ steps:
   - name: Install development dependencies
     run: make deps-dev
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[avenger] "
     labels: [automated, ci-fix]
     protected-files: fallback-to-issue
@@ -122,6 +120,7 @@ safe-outputs:
   missing-tool:
 timeout-minutes: 45
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
   - shared/graders.md
 features:

@@ -51,7 +51,6 @@ safe-outputs:
     close-older-issues: true
     expires: 7d
     max: 1
-  steer: true
   create-pull-request:
     expires: 7d
     title-prefix: "[architecture] "
@@ -59,6 +58,7 @@ safe-outputs:
   noop:
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[architecture-diagram] "

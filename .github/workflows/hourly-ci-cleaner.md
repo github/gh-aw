@@ -105,14 +105,13 @@ steps:
   - name: Install development dependencies
     run: make deps-dev
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[ca] "
     protected-files: fallback-to-issue
   missing-tool:
 timeout-minutes: 45
 imports:
+  - shared/pr-safe-output-defaults.md
   - ../agents/ci-cleaner.agent.md
 
 

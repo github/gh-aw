@@ -35,7 +35,6 @@ tools:
     retention-days: 90
     allowed-extensions: [".json"]
 safe-outputs:
-  steer: true
   create-pull-request:
     title-prefix: "[declarative-engine] "
     labels: [automation, engines]
@@ -76,6 +75,7 @@ safe-outputs:
       - pkg/workflow/*_test.go
   noop:
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/reporting.md
 ---
 

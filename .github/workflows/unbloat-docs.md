@@ -77,9 +77,7 @@ tools:
 
 # Safe outputs configuration
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[docs] "
     labels: [documentation, automation, doc-unbloat]
     reviewers: [copilot]

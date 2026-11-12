@@ -290,6 +290,7 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 	// Track types defined in imported configs for conflict detection
 	importedDefinedTypes := make(map[string]struct {
 	})
+	importedCreatePullRequestDefaults := make(map[string]any)
 
 	// Collect all imported configs. This includes configs with only meta fields (like allowed-domains,
 	// staged, env, github-token, max-patch-size, runs-on) as well as those defining safe output types.
@@ -319,6 +320,22 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 		for _, key := range typeKeys {
 			if _, exists := config[key]; exists {
 				if setutil.Contains(topDefinedTypes, key) {
+					if key == "create-pull-request" && topRawSafeOutputs != nil {
+						if localConfig, ok := topRawSafeOutputs[key].(map[string]any); ok {
+							if importedConfig, ok := config[key].(map[string]any); ok {
+								for _, field := range []string{"expires", "draft"} {
+									if _, defined := localConfig[field]; defined {
+										continue
+									}
+									if value, defined := importedConfig[field]; defined {
+										if _, captured := importedCreatePullRequestDefaults[field]; !captured {
+											importedCreatePullRequestDefaults[field] = value
+										}
+									}
+								}
+							}
+						}
+					}
 					// Main workflow overrides imported definition — extract protected-files
 					// exclude lists before removing the type entry.
 					if handlerCfg, ok := config[key].(map[string]any); ok {
@@ -368,6 +385,24 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 		result, err = mergeSafeOutputConfig(result, config, topRawSafeOutputs, c)
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	if len(importedCreatePullRequestDefaults) > 0 && result.CreatePullRequests != nil {
+		importedConfig := c.extractSafeOutputsConfig(map[string]any{
+			"safe-outputs": map[string]any{
+				"create-pull-request": importedCreatePullRequestDefaults,
+			},
+		})
+		if importedConfig != nil && importedConfig.CreatePullRequests != nil {
+			if localConfig, ok := topRawSafeOutputs["create-pull-request"].(map[string]any); ok {
+				if _, defined := localConfig["expires"]; !defined {
+					result.CreatePullRequests.Expires = importedConfig.CreatePullRequests.Expires
+				}
+				if _, defined := localConfig["draft"]; !defined {
+					result.CreatePullRequests.Draft = importedConfig.CreatePullRequests.Draft
+				}
+			}
 		}
 	}
 

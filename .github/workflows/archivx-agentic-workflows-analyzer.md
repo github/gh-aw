@@ -8,6 +8,7 @@ evals:
 - id: pull_request_created
   question: Was a pull request created with the generated SVG diagram committed?
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/graders.md
 features:
   gh-aw-detection: true
@@ -27,7 +28,6 @@ safe-outputs:
     expires: 30d
     max: 1
     title-prefix: "[archivx] "
-  steer: true
   create-pull-request:
     expires: 30d
     title-prefix: "[archivx] "

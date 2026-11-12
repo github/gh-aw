@@ -34,6 +34,7 @@ engine:
 
 # Import shared reporting guidelines
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/reporting.md
   - shared/otlp.md
 
@@ -95,13 +96,10 @@ safe-outputs:
     max: 5
 
   # Pull request creation
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[🎨 POETRY] "
     labels: [poetry, automation, creative-writing]
     reviewers: copilot
-    draft: false
 
   # Close pull requests with poetry filtering
   close-pull-request:

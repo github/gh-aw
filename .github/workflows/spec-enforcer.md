@@ -21,12 +21,11 @@ network:
   - go
   - node
 imports:
+- shared/pr-safe-output-defaults.md
 - shared/reporting.md
 - shared/otlp.md
 safe-outputs:
-  steer: true
   create-pull-request:
-    draft: false
     expires: 3d
     labels:
     - pkg-specifications

@@ -131,6 +131,8 @@ post-steps:
       overwrite: true
       retention-days: 1
       if-no-files-found: error
+imports:
+  - shared/pr-safe-output-defaults.md
 safe-outputs:
   create-issue:
     title-prefix: "[git-sim] "
@@ -138,7 +140,6 @@ safe-outputs:
     max: 10
     close-older-issues: false
     deduplicate-by-title: 3
-  steer: true
   create-pull-request:
     draft: true
     expires: 1d

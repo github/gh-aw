@@ -25,14 +25,15 @@ network:
     - github.com
     - api.github.com
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/lock-safe-pull-request.md
   - shared/go-source-analysis.md
   - shared/otlp.md
   - shared/reporting.md
 safe-outputs:
+  steer: false
   create-pull-request:
     exclude-lock-yml: true
-    expires: 2d
     title-prefix: "[duplicate-code] "
     labels: [code-quality, automated-analysis, cookie]
     max: 3

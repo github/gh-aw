@@ -10,15 +10,14 @@ permissions:
   pull-requests: read
   security-events: read
 imports:
+- shared/pr-safe-output-defaults.md
 - uses: shared/daily-audit-base.md
   with:
     expires: 3d
     title-prefix: "[compiler-threat-spec] "
 - shared/otlp.md
 safe-outputs:
-  steer: true
   create-pull-request:
-    draft: false
     expires: 7d
     labels:
     - security

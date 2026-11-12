@@ -23,8 +23,9 @@ tools:
   edit:
   bash:
     - "*"
+imports:
+  - shared/pr-safe-output-defaults.md
 safe-outputs:
-  steer: true
   create-pull-request:
     title-prefix: "[docs-diagram] "
     labels: [documentation, automation]

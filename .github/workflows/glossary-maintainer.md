@@ -34,6 +34,7 @@ network:
     - node
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - ../skills/documentation/SKILL.md
   - ../agents/technical-doc-writer.agent.md
   - shared/ai-coding-dictionary.md
@@ -41,12 +42,9 @@ imports:
   - shared/otlp.md
   - shared/reporting.md
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[docs] "
     labels: [documentation, glossary]
-    draft: false
 
 tools:
   cli-proxy: true

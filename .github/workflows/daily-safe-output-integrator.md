@@ -20,15 +20,14 @@ sandbox:
   agent:
     id: awf
 imports:
+- shared/pr-safe-output-defaults.md
 - uses: shared/daily-audit-base.md
   with:
     expires: 3d
     title-prefix: "[safe-output-integrator] "
 - shared/otlp.md
 safe-outputs:
-  steer: true
   create-pull-request:
-    draft: false
     expires: 3d
     labels:
     - safe-outputs

@@ -34,6 +34,7 @@ network:
     - node
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
   - shared/reporting.md
 tools:
@@ -44,9 +45,7 @@ tools:
   web-fetch:
 
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[docs] "
     labels: [documentation, dependencies]
     protected-files: allowed

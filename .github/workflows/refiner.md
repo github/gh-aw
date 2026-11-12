@@ -12,6 +12,7 @@ engine:
   id: copilot
   copilot-sdk: true
 imports:
+  - shared/pr-safe-output-defaults.md
   - uses: shared/pr-review-base.md
     with:
       min-integrity: approved
@@ -23,12 +24,10 @@ tools:
     mode: local
     toolsets: [pull_requests, repos, issues]
 safe-outputs:
-  steer: true
   create-pull-request:
     title-prefix: "[refiner] "
     labels: [automation, refine-improvements]
     reviewers: [copilot]
-    draft: false
   add-comment:
     max: 1
   messages:

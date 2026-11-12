@@ -29,13 +29,12 @@ tools:
     toolsets: [issues, pull_requests]
   edit:
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[ci-coach] "
     protected-files: fallback-to-issue
 timeout-minutes: 30
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/ci-data-analysis.md
   - shared/ci-optimization-strategies.md
   - shared/reporting.md
