@@ -1014,9 +1014,22 @@ jobs:
           mkdir -p /tmp/gh-aw && (umask 177 && touch /tmp/gh-aw/claude-debug.log) && touch /tmp/gh-aw/agent-step-summary.md
           (umask 177 && touch /tmp/gh-aw/agent-stdio.log)
           GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-1000}"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then
-            GH_AW_MAX_AI_CREDITS="1000"
+          GH_AW_AIC_LIMIT=""
+          if [[ "$GH_AW_MAX_AI_CREDITS" =~ ^[[:space:]]*(-1|[+]?0*([1-9][0-9]{0,18})([kKmM]?))[[:space:]]*$ ]]; then
+            case "${BASH_REMATCH[3]}" in [kK]) GH_AW_AIC_SCALE=1000 ;; [mM]) GH_AW_AIC_SCALE=1000000 ;; *) GH_AW_AIC_SCALE=1 ;; esac
+            if [[ "${BASH_REMATCH[1]}" == "-1" ]]; then
+              GH_AW_AIC_LIMIT="-1"
+              echo "Per-run AI credits budget disabled at runtime; maxAiCredits omitted from the AWF config."
+            elif [[ "${#BASH_REMATCH[2]}" -lt 19 || "${BASH_REMATCH[2]}" < "9223372036854775808" ]] && (( BASH_REMATCH[2] <= 9223372036854775807 / GH_AW_AIC_SCALE )); then
+              GH_AW_AIC_LIMIT="$(( BASH_REMATCH[2] * GH_AW_AIC_SCALE ))"
+            fi
           fi
+          if [[ -z "$GH_AW_AIC_LIMIT" ]]; then
+            echo "::warning::Ignoring invalid vars.GH_AW_DEFAULT_MAX_AI_CREDITS (value withheld); expected a positive whole number, a K/M suffix value such as 100M, or -1. Using the default budget of 1000 AI credits."
+            GH_AW_AIC_LIMIT="1000"
+          fi
+          GH_AW_MAX_AI_CREDITS="$GH_AW_AIC_LIMIT"
+          unset GH_AW_AIC_LIMIT GH_AW_AIC_SCALE
           if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -z "${GH_AW_ADMISSION_MAX_AI_CREDITS:-}" ]]; then
             echo "ERR_ADMISSION: Missing required runtime admission allowance." >&2
             exit 1
@@ -1034,6 +1047,13 @@ jobs:
           fi
           unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS
           printf '%s\n' "AWF_CONFIG_PAYLOAD" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
+          if [[ "$GH_AW_MAX_AI_CREDITS" == "-1" ]]; then
+            GH_AW_AWF_CONFIG_JSON="$(<"${RUNNER_TEMP}/gh-aw/awf-config.json")"
+            GH_AW_AWF_CONFIG_JSON="${GH_AW_AWF_CONFIG_JSON/,\"maxAiCredits\":-1/}"
+            GH_AW_AWF_CONFIG_JSON="${GH_AW_AWF_CONFIG_JSON/\"maxAiCredits\":-1,/}"
+            printf '%s\n' "$GH_AW_AWF_CONFIG_JSON" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
+            unset GH_AW_AWF_CONFIG_JSON
+          fi
           cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json
           export GH_AW_MODELS_JSON_PATH="/tmp/gh-aw/models.json"
           GH_AW_DOCKER_HOST=""

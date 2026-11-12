@@ -2396,11 +2396,12 @@ func TestBuildAWFCommand_ResolvesMaxAICreditsFromEnv(t *testing.T) {
 
 			command := BuildAWFCommand(config)
 			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-%d}"`, tt.defaultBudget))
-			assert.Contains(t, command, `if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then`)
-			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="%d"`, tt.defaultBudget))
+			assert.NotContains(t, command, `if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then`, "runtime values must accept -1 and K/M suffixes")
+			assert.Contains(t, command, fmt.Sprintf(`GH_AW_AIC_LIMIT="%d"`, tt.defaultBudget))
+			assert.Contains(t, command, `if [[ "$GH_AW_MAX_AI_CREDITS" == "-1" ]]; then`)
 			assert.Contains(t, command, `\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS}`)
-			assert.NotContains(t, command, "vars.GH_AW_DEFAULT_MAX_AI_CREDITS")
-			assert.NotContains(t, command, "vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS")
+			assert.NotContains(t, command, "${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS")
+			assert.NotContains(t, command, "${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS")
 			assert.NotContains(t, command, "${{")
 		})
 	}

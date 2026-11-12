@@ -257,7 +257,7 @@ For max AI credits, precedence is:
 3. `vars.GH_AW_DEFAULT_MAX_AI_CREDITS` GitHub Actions variable (action runtime)
 4. Built-in constant default: `1000` AIC
 
-The compiler emits `${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}` in a runtime patch script when no frontmatter or imported value is set, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` disables AWF budget steering at runtime. Positive values accept `K`/`M` suffixes such as `100M`.
+The compiler emits `${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}` in a runtime patch script when no frontmatter or imported value is set, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` removes the per-run budget at runtime and omits `maxAiCredits` from the firewall configuration. Positive values accept `K`/`M` suffixes such as `100M`. Any other value falls back to the `1000` AIC default, and the agent step log shows a warning that names the variable without printing its value.
 
 For max turn cache misses, precedence is:
 
@@ -273,7 +273,7 @@ For threat-detection max AI credits, precedence is:
 2. `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS` GitHub Actions variable (action runtime)
 3. Built-in constant default: `400` AIC
 
-The compiler emits `${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}` for threat-detection runs when `safe-outputs.threat-detection.max-ai-credits` is unset, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` disables AWF budget steering for detection runs at runtime. Positive values accept `K`/`M` suffixes such as `100M`.
+The compiler emits `${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}` for threat-detection runs when `safe-outputs.threat-detection.max-ai-credits` is unset, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` removes the detection budget at runtime and omits `maxAiCredits` from the firewall configuration. Positive values accept `K`/`M` suffixes such as `100M`. Any other value falls back to the `400` AIC default, and the detection step log shows a warning that names the variable without printing its value.
 
 For daily AI credits workflow guardrails, precedence is:
 
