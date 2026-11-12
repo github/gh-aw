@@ -36,6 +36,7 @@ safe-outputs:
       hide-older-comments: true
       max: 2
     create-pull-request:
+      draft: true
       title-prefix: "[smoke-project] "
       if-no-changes: "warn"
       labels: [ai-generated]

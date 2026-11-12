@@ -31,6 +31,7 @@ safe-outputs:
     title-prefix: "[doc-healer] "
   create-pull-request:
     expires: 3d
+    draft: true
     labels:
     - documentation
     - automation

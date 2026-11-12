@@ -28,6 +28,7 @@ engine:
 safe-outputs:
   steer: false
   create-pull-request:
+    draft: true
     exclude-lock-yml: true
     title-prefix: "[safeoutputs] "
     labels: [bug, safe-outputs, tool-improvement, automated-analysis, cookie]

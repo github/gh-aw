@@ -38,6 +38,7 @@ tools:
 safe-outputs:
   steer: false
   create-pull-request:
+    draft: true
     exclude-lock-yml: true
     title-prefix: "[ca] "
     labels: [automation, dependencies, cookie]

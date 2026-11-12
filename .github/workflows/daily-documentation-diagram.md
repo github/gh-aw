@@ -27,6 +27,7 @@ imports:
   - shared/pr-safe-output-defaults.md
 safe-outputs:
   create-pull-request:
+    expires: false
     title-prefix: "[docs-diagram] "
     labels: [documentation, automation]
     draft: true

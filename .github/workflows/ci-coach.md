@@ -30,6 +30,7 @@ tools:
   edit:
 safe-outputs:
   create-pull-request:
+    draft: true
     title-prefix: "[ci-coach] "
     protected-files: fallback-to-issue
 timeout-minutes: 30

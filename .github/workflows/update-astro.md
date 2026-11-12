@@ -46,6 +46,7 @@ tools:
 
 safe-outputs:
   create-pull-request:
+    draft: true
     title-prefix: "[docs] "
     labels: [documentation, dependencies]
     protected-files: allowed

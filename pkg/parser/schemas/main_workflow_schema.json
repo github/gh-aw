@@ -8733,9 +8733,14 @@
                       "type": "string",
                       "pattern": "^[0-9]+[hHdDwWmMyY]$",
                       "description": "Relative time (e.g., '2h', '7d', '2w', '1m', '1y'); minimum 2h for hour values"
+                    },
+                    {
+                      "type": "boolean",
+                      "enum": [false],
+                      "description": "Set to false to explicitly disable expiration"
                     }
                   ],
-                  "description": "Time until the pull request expires and should be automatically closed (only for same-repo PRs without target-repo). Supports integer (days) or relative time format. Minimum duration: 2 hours."
+                  "description": "Time until the pull request expires and should be automatically closed (only for same-repo PRs without target-repo). Supports integer (days), relative time format, or false to disable expiration. Minimum duration: 2 hours."
                 },
                 "auto-merge": {
                   "description": "Enable auto-merge for the pull request. Accepts true/false, an explicit merge method (squash, merge, rebase), or a GitHub Actions expression resolving to any of those values. When enabled, the PR will be automatically merged once all required checks pass and required approvals are met. Auto-merge is withheld and independent review is required when protected-file changes trigger the request-review policy, detection produces a caution (including detection engine errors), or a required review fails (including when the bot authored the PR). Configured reviewers or a successful REQUEST_CHANGES review do not bypass these gates. Defaults to false.",

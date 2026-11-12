@@ -719,6 +719,22 @@ func TestMergeSafeOutputsCreatePullRequestDefaults(t *testing.T) {
 		assert.Equal(t, strPtr("true"), result.CreatePullRequests.Draft)
 		assert.Equal(t, "[local] ", result.CreatePullRequests.TitlePrefix)
 	})
+
+	t.Run("does not add an omitted draft without an imported default", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{TitlePrefix: "[local] "},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": map[string]any{"title-prefix": "[local] "},
+		}
+		importedWithoutDraft := []string{`{"create-pull-request":{"title-prefix":"[imported] "}}`}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, importedWithoutDraft, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Nil(t, result.CreatePullRequests.Draft)
+	})
 }
 
 // TestMergeSafeOutputsMessagesUnit tests the MergeSafeOutputs function for messages field

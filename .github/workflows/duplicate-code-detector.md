@@ -33,6 +33,7 @@ imports:
 safe-outputs:
   steer: false
   create-pull-request:
+    draft: true
     exclude-lock-yml: true
     title-prefix: "[duplicate-code] "
     labels: [code-quality, automated-analysis, cookie]

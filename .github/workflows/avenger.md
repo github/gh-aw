@@ -112,6 +112,7 @@ steps:
     run: make deps-dev
 safe-outputs:
   create-pull-request:
+    draft: true
     title-prefix: "[avenger] "
     labels: [automated, ci-fix]
     protected-files: fallback-to-issue

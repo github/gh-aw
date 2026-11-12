@@ -31,6 +31,7 @@ tools:
 safe-outputs:
   steer: false
   create-pull-request:
+    expires: false
     max: 1
     allowed-files:
       - "pkg/**/aider_coverage_test.go"

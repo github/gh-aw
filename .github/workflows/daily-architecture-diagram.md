@@ -53,6 +53,7 @@ safe-outputs:
     max: 1
   create-pull-request:
     expires: 7d
+    draft: true
     title-prefix: "[architecture] "
     labels: [architecture, diagram, documentation]
   noop:

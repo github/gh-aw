@@ -25,6 +25,7 @@ tools:
     toolsets: [pull_requests, repos, issues]
 safe-outputs:
   create-pull-request:
+    expires: false
     title-prefix: "[refiner] "
     labels: [automation, refine-improvements]
     reviewers: [copilot]

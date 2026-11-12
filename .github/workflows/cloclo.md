@@ -50,6 +50,7 @@ tools:
     key: cloclo-memory-${{ github.workflow }}
 safe-outputs:
   create-pull-request:
+    draft: true
     title-prefix: "[cloclo] "
     labels: [automation, cloclo]
     excluded-files:
