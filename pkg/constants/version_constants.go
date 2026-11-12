@@ -78,7 +78,7 @@ const DefaultGitHubMCPServerVersion Version = "v2.1.0"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.29.11"
+const DefaultFirewallVersion Version = "v0.29.12"
 
 // AWFOpenAIWIFMinVersion is the first AWF release whose API proxy supports
 // OpenAI Workload Identity Federation.
@@ -274,7 +274,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.5.6"
+const DefaultMCPGatewayVersion Version = "v0.5.8"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

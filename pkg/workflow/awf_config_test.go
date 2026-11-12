@@ -827,7 +827,7 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 
 		jsonStr, err := BuildAWFConfigJSON(config)
 		require.NoError(t, err)
-		assert.NotContains(t, jsonStr, `"enableTokenSteering"`, "apiProxy should omit enableTokenSteering when max-ai-credits is negative")
+		assert.Contains(t, jsonStr, `"enableTokenSteering":false`, "apiProxy should explicitly disable steering when max-ai-credits is negative")
 		assert.NotContains(t, jsonStr, `"maxAiCredits"`, "apiProxy should omit maxAiCredits when negative (disabled)")
 	})
 
@@ -2118,6 +2118,10 @@ func TestValidateAWFConfigJSON_RejectsInvalidJSON(t *testing.T) {
 func TestValidateAWFConfigJSON_AllowsTemplatableModelFallbackEnabled(t *testing.T) {
 	err := validateAWFConfigJSON(`{"apiProxy":{"enabled":true,"modelFallback":{"enabled":"${{ inputs.model-fallback }}"}}}`)
 	require.NoError(t, err, "modelFallback.enabled expressions should pass compile-time schema validation")
+}
+
+func TestValidateAWFConfigJSON_AllowsBudgetSteeringConfig(t *testing.T) {
+	require.NoError(t, validateAWFConfigJSON(`{"apiProxy":{"steering":{"budget":false}}}`))
 }
 
 func TestValidateAWFConfigJSON_AllowsMaxTurnCacheMisses(t *testing.T) {

@@ -136,19 +136,23 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		maxTurnCacheMisses = config.WorkflowData.EngineConfig.GetMaxTurnCacheMisses()
 	}
 
-	// Token steering is enabled by default. Setting max-ai-credits to a negative
-	// value (-1) omits that budget from the AWF config and disables token steering.
-	// When maxAICredits is 0 (runtime default), token steering stays enabled here.
+	// Token steering (AWF budget notices) is enabled by default. Setting
+	// max-ai-credits to a negative value (-1) omits that budget and the
+	// enableTokenSteering setting from the AWF config; AWF releases after v0.29.11
+	// turn notices on by default, so only sandbox.agent.token-steering: false
+	// turns them off. When maxAICredits is 0 (runtime default), token steering
+	// stays enabled here.
 	enableTokenSteering := maxAICredits >= 0
 	if config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil {
 		enableTokenSteering = *config.WorkflowData.SandboxConfig.Agent.TokenSteering
 	}
-	if maxAICredits < 0 {
+	tokenSteeringDisabledByBudget := maxAICredits < 0
+	if tokenSteeringDisabledByBudget {
 		// Negative signals "disabled" — omit the budget from the AWF config.
 		maxAICredits = 0
 	}
 	var tokenSteeringEnabled *bool
-	if awfSupportsTokenSteering(firewallConfig) && (enableTokenSteering || (config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil)) {
+	if awfSupportsTokenSteering(firewallConfig) && (enableTokenSteering || tokenSteeringDisabledByBudget || (config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil)) {
 		tokenSteeringEnabled = &enableTokenSteering
 	}
 
