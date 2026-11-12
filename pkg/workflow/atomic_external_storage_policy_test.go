@@ -40,9 +40,9 @@ func TestValidateAtomicExternalStoragePolicy(t *testing.T) {
 
 			if test.wantError {
 				require.Error(t, err)
-				assert.ErrorContains(t, err, "engine.env.ATOMIC_STORAGE")
-				assert.ErrorContains(t, err, "strict mode")
-				assert.ErrorContains(t, err, "before post-run threat detection")
+				require.ErrorContains(t, err, "engine.env.ATOMIC_STORAGE")
+				require.ErrorContains(t, err, "strict mode")
+				require.ErrorContains(t, err, "before post-run threat detection")
 			} else {
 				require.NoError(t, err)
 			}
