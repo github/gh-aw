@@ -567,7 +567,7 @@ max-ai-credits: 500
 ```
 
 ```yaml wrap
-# Disable budget enforcement (notices continue unless token-steering is false)
+# Disable budget enforcement (with AWF releases after v0.29.11, notices continue unless token-steering is false)
 max-ai-credits: -1
 ```
 

@@ -651,7 +651,7 @@ This expression MUST be embedded in the compiled YAML (not pre-evaluated at comp
 
 ### 10.5 Disable Sentinel
 
-A `max-ai-credits` frontmatter value of `-1` MUST disable the per-run budget. When this sentinel is present at runtime (via the organization variable resolving to `-1`), a conforming implementation MUST disable AWF budget steering and omit the `maxAiCredits` field from the firewall configuration.
+A `max-ai-credits` frontmatter value of `-1` MUST disable the per-run budget. When this sentinel is present at runtime (via the organization variable resolving to `-1`), a conforming implementation MUST disable AWF budget enforcement and omit the `maxAiCredits` field from the firewall configuration. Budget notices are controlled separately by `sandbox.agent.token-steering`; with AWF releases after v0.29.11 they remain on by default when the budget is disabled.
 
 ### 10.6 Value Validation
 
@@ -669,7 +669,7 @@ A conforming implementation MUST enforce the following at compile time when a fr
 |---------|-------------|-------------|
 | T-AIC-PR-001 | Frontmatter value baked into AWF config JSON at compile time | §10.3 (1) |
 | T-AIC-PR-002 | No frontmatter, no imports: emitted expression is `${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS \|\| '1000' }}` | §10.4 |
-| T-AIC-PR-003 | Org variable `-1` disables budget steering at runtime | §10.5 |
+| T-AIC-PR-003 | Org variable `-1` disables budget enforcement at runtime | §10.5 |
 | T-AIC-PR-004 | `K`/`M` suffix values expanded in compile-time literal | §10.6 |
 | T-AIC-PR-005 | Values below `-1` rejected at compile time | §10.6 |
 | T-AIC-PR-006 | Runtime variable resolved by GitHub Actions runner, not compiler process | §10.3 (3) |

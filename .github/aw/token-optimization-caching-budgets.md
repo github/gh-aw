@@ -24,7 +24,7 @@ Two top-level frontmatter fields enforce AI Credit budgets directly, independent
 
 Do not treat a workflow exhausting its per-run budget as a reason to increase `max-ai-credits` immediately. First apply and measure every applicable cost optimization in this guide. Increase the limit only as a last resort when the workflow still cannot complete with acceptable quality within the existing budget.
 
-- **`max-ai-credits:`** — Per-run AI credit budget enforced by the AWF firewall/API proxy (default `1000`). The agent is steered to stay within budget; set a negative value to disable enforcement and steering.
+- **`max-ai-credits:`** — Per-run AI credit budget enforced by the AWF firewall/API proxy (default `1000`). The agent is steered to stay within budget; set a negative value to disable enforcement. With AWF releases after v0.29.11, budget notices continue unless `sandbox.agent.token-steering: false`.
 - **`max-daily-ai-credits:`** — Per-user 24-hour guardrail. At activation, gh-aw sums the triggering user's AI credits across their runs of this workflow over the last 24 hours and blocks execution once the total exceeds the threshold. Enabled by default with a system default threshold; set `-1` to disable, or an explicit value to override the default.
 
 ```yaml
