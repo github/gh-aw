@@ -20,6 +20,11 @@ Values are read when a resolver is called. The package also builds GitHub Action
 | `ResolveDefaultDetectionModel`, `ResolveDefaultEvalsModel` | Resolve model defaults for detection and evaluation jobs. |
 | `ResolveDefaultUTC` | Resolves the configured project timezone override. |
 | `ResolvePolicyModelsAllowed`, `ResolvePolicyModelsBlocked` | Resolve model allow/block policies and report whether an override was supplied. |
-| `Build*Expression` | Builds Actions expressions for compile-time fallbacks that need runtime resolution. |
+| `BuildTimeoutMinutesExpression` | Builds a timeout expression with a compiled-in fallback. |
+| `BuildDefaultMaxDailyAICreditsExpression`, `BuildDefaultMaxAICreditsExpression` | Resolve daily and per-run AIC credit defaults from GitHub variables. |
+| `BuildDefaultDetectionMaxAICreditsExpression`, `BuildDefaultEvalsMaxAICreditsExpression` | Resolve detection and evaluation AIC credit defaults from GitHub variables. |
+| `BuildDefaultMaxTurnsExpression` | Resolves the max-turns variable, using an empty fallback to preserve an unlimited setting. |
+| `BuildDefaultOTLPEndpointExpression`, `BuildDefaultOTLPHeadersExpression` | Resolve OTLP endpoint and headers at workflow runtime from secrets, with endpoint variable compatibility fallback. |
+| `BuildModelOverrideExpression`, `BuildModelOverrideExpressionEmptyFallback` | Build phase model expressions with either a built-in fallback or an empty fallback for runtime selection. |
 
 The exported variable-name constants identify the corresponding enterprise overrides and policy variables. Configuration precedence and individual override behavior are documented in the parent [`workflow` package specification](../README.md).

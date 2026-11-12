@@ -54,7 +54,7 @@ func analyzeBlock(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.Gene
 		}
 		for offset, stmt := range block.List[i+1:] {
 			j := i + 1 + offset
-			if rangeStmt, ok := stmt.(*ast.RangeStmt); ok {
+			if rangeStmt, ok := unlabeledStmt(stmt).(*ast.RangeStmt); ok {
 				if hasKnownRangeSize(pass, rangeStmt.X) && !containsReference(pass, rangeStmt.X, target) &&
 					appendsOneElement(pass, rangeStmt, target) && rangeAvailableBefore(pass, rangeStmt.X, block.List[i+1:j]) {
 					reportDiagnostic(pass, call, sliceType, rangeStmt.X, generatedFiles, noLintIndex)
@@ -65,6 +65,18 @@ func analyzeBlock(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.Gene
 				break
 			}
 		}
+	}
+}
+
+// unlabeledStmt strips any labels (e.g. "outer:") from stmt so that labeled
+// range loops are analyzed the same way as unlabeled ones.
+func unlabeledStmt(stmt ast.Stmt) ast.Stmt {
+	for {
+		labeled, ok := stmt.(*ast.LabeledStmt)
+		if !ok {
+			return stmt
+		}
+		stmt = labeled.Stmt
 	}
 }
 
@@ -194,7 +206,7 @@ func appendsOneElement(pass *analysis.Pass, rangeStmt *ast.RangeStmt, target typ
 	if !ok || len(call.Args) != 2 || call.Ellipsis.IsValid() || !refersTo(pass, call.Args[0], target) { //nolint:uncheckedsliceindex // len(call.Args) is checked before indexing
 		return false
 	}
-	ident, ok := call.Fun.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.Ident)
 	return ok && pass.TypesInfo.ObjectOf(ident) == types.Universe.Lookup("append")
 }
 

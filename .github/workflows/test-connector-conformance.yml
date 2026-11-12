@@ -1,0 +1,65 @@
+name: Connector conformance (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      provider:
+        description: Connector declaration ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: ${{ inputs.provider }} offline conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROVIDER: ${{ inputs.provider }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Validate provider selection
+        shell: bash
+        run: |
+          [[ "$PROVIDER" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]] || { echo "::error::Invalid connector provider name"; exit 1; }
+          test -f ".github/workflows/connectors/$PROVIDER.md"
+          echo "PROVIDER_TEST_PATTERN=${PROVIDER//-/}" >> "$GITHUB_ENV"
+      # Fixtures check registration contracts, not receiver enrollment or live ingress.
+      # Providers without triggers still validate their declaration and daily workflow.
+      - name: Check declarations and declared trigger registrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/connector-registration-tests.log"
+          go test ./pkg/workflow \
+            -run "^(TestBundledConnectorImportMetadata|TestConnectorGatewayImportedProviderSubscriptions|TestConnectorConformanceWorkflows)$/${PROVIDER}(\\.md)?$" \
+            -v -count=1 -timeout=5m | tee "$log"
+          grep -q '^=== RUN' "$log" || { echo "No declaration or trigger tests ran for $PROVIDER"; exit 1; }
+      - name: Check selected MCP tools and staged workflow compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/connector-compilation-tests.log"
+          go test ./pkg/workflow \
+            -run "^(TestConnectorGoldenWorkflows|TestConnectorScenarioImports|TestConnectorScenarioImportDoesNotSelectCapabilities|TestConnectorScenarioIndependentPhases|TestConnectorScenarioRejectsInvalidConfiguration)$/${PROVIDER}$" \
+            -v -count=1 -timeout=5m | tee "$log"
+          grep -q '^=== RUN' "$log" || { echo "No compilation or MCP selection tests ran for $PROVIDER"; exit 1; }
+      # Provider runtime tests live in pkg/workflow; pkg/connectors is covered by
+      # the aggregate offline job. These fixtures use synthetic credentials/mocks.
+      - name: Check provider MCP and safe-output runtimes
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/connector-runtime-tests.log"
+          go test ./pkg/workflow -run "(?i)${PROVIDER_TEST_PATTERN}" -v -count=1 -timeout=5m | tee "$log"
+          grep -q '^=== RUN' "$log" || { echo "No provider runtime tests ran for $PROVIDER"; exit 1; }

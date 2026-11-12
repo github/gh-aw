@@ -1804,6 +1804,10 @@ A native, Git-backed queue for fair scheduling of [Work](#claim-work-queue) with
 
 Authorization for one attempt at a Work item in a native [work queue](#work-queue-toolswork-queue), identified by its original `claim_handle`. Worker effects are scoped to the Claim, and a Result is recorded only after independently verified delivery of those effects. See [Work Queues](/gh-aw/reference/work-queue/).
 
+### Delivery Evidence (Work Queue)
+
+A ledger record of delivery observations for a [Claim](#claim-work-queue)'s effects, persisted in the `work-queue.jsonl` transaction log so verification survives restarts and checkpoints. Delivery Evidence alone does not establish a Result: maintenance must perform fresh, independent native readback, and changed or unavailable resources remain unverified. Pending Delivery Evidence keeps the delivery barrier in place until bounded verification records a Result or a `DeliveryFailure`; uncertain delivery is never retried by rerunning effects. See [Work Queues](/gh-aw/reference/work-queue/).
+
 ## Operational Patterns
 
 Operational patterns (suffixed with "-Ops") are established workflow architectures for common automation scenarios. Each pattern addresses specific use cases with recommended triggers, tools, and safe outputs.
