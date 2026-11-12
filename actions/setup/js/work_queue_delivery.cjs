@@ -13,12 +13,14 @@ const {
   assertClaimAuthorized,
   currentClaimHandle,
   currentClaimAssignment,
+  receiptMatchesClaim,
   withClaimExecution,
   claimEffectChannelMatches,
   createClaimResourceVerification,
   withClaimResourceVerification,
+  claimDeliveryReceipt,
 } = require("./work_queue_claim_scope.cjs");
-const { digest, canonical, canonicalBytes } = require("./work_queue_codec.cjs");
+const { digest, canonical, canonicalBytes, closed } = require("./work_queue_codec.cjs");
 const { BUILTIN_EFFECT_FIELDS, builtinTargetNumber } = require("./work_queue_declared_verification.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 
@@ -375,7 +377,16 @@ async function inspectClaimDelivery(options) {
       return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Independent delivery verifier unavailable" };
     }
     await assertClaimAuthorized(message, { authorize, context: options.context, github: options.github });
-    const proof = await verify({ claim, message, result: outcome.result, context: options.context, github: options.github, signal: options.signal, ...(verification === undefined ? {} : { verification }) });
+    const proof = await verify({
+      claim,
+      message,
+      result: outcome.result,
+      context: options.context,
+      github: options.github,
+      signal: options.signal,
+      ...(options.durable === true ? { durable: true, assignment, inventory: controlInventory } : {}),
+      ...(verification === undefined ? {} : { verification }),
+    });
     options.signal?.throwIfAborted();
     if (!proof || proof.verified !== true || proof.claim_handle !== claim_handle || !proof.resource || typeof proof.resource !== "object" || Array.isArray(proof.resource) || !proof.evidence) {
       const fields = {
@@ -414,7 +425,11 @@ async function inspectClaimDelivery(options) {
         log.debug("delivery.output.control_receipt_invalid", { index, control_present: !!control, duplicate: !!control && verifiedControls.has(control.request_id) });
         return { ...receipt, reason: "Queue-control delivery has no exact independent completed-Claim ledger receipt" };
       }
-      const checked = await require("./work_queue_control_receipts.cjs").verifyClaimQueueControl({ assignment, claim_handle, message, inventory: controlInventory });
+      const controls = require("./work_queue_control_receipts.cjs");
+      const checked =
+        options.durable === true
+          ? await controls.verifyCommittedClaimQueueControl({ assignment, claim_handle, request_id: message.request_id, inventory: controlInventory })
+          : await controls.verifyClaimQueueControl({ assignment, claim_handle, message, inventory: controlInventory });
       if (checked.verified !== true || checked.claim_handle !== claim_handle || canonical(checked.resource) !== canonical(proof.resource) || canonical(checked.evidence) !== canonical(proof.evidence)) {
         log.debug("delivery.output.control_intent_mismatch", { index });
         return { ...receipt, reason: "Queue-control delivery does not match its independently checked original intent" };
@@ -499,95 +514,178 @@ async function inspectClaimDelivery(options) {
   return delivery;
 }
 
+const BUILTIN_DELIVERY_KINDS = Object.freeze({
+  create_issue: "issue",
+  update_issue: "issue",
+  close_issue: "issue",
+  add_labels: "issue",
+  remove_labels: "issue",
+  replace_label: "issue",
+  close_pull_request: "pull_request",
+  merge_pull_request: "pull_request",
+  mark_pull_request_as_ready_for_review: "pull_request",
+  add_comment: "comment",
+});
+
+const builtinNames = values => values.map(value => (typeof value === "string" ? value : value.name || value.login).toLowerCase()).sort();
+
+/** Build serializable expectations without a client or native readback. */
+function builtinDeliveryExpectation(options) {
+  const { claim, message, result } = options;
+  const kind = Object.hasOwn(BUILTIN_DELIVERY_KINDS, message.type) ? BUILTIN_DELIVERY_KINDS[message.type] : undefined;
+  // Updating branches still requires its own pinned commit/tree verifier.
+  if (!kind || !result || result.staged || message.data !== undefined || message.duplicate_of !== undefined) return null;
+  const verifiedFields = new Set(["type", "output_id", "depends-on", "claim_handle", "claim_id", "work_id", "repo", "item_number", "issue_number", "pull_request_number", "temporary_id", ...(BUILTIN_EFFECT_FIELDS[message.type] || [])]);
+  if (Object.keys(message).some(field => !verifiedFields.has(field))) return null;
+  const repository = result.repo || message.repo || options.config?.["target-repo"] || options.context?.payload?.repository?.full_name;
+  const pieces = typeof repository === "string" ? repository.split("/") : [];
+  if (pieces.length !== 2 || pieces.some(piece => !piece)) return null;
+  const requestedNumber = builtinTargetNumber(message);
+  const number = Number(result.number || result.issue_number || result.pull_request_number || message.item_number || message.issue_number || message.pull_request_number);
+  if (!Number.isSafeInteger(number) || number < 1 || (requestedNumber !== undefined && requestedNumber !== String(number))) return null;
+  const commentId = kind === "comment" ? Number(result.comment_id || result.commentId || result.id) : undefined;
+  if (kind === "comment" && (commentId === undefined || !Number.isSafeInteger(commentId) || commentId < 1)) return null;
+  let id = kind === "comment" ? String(commentId) : result.id ? String(result.id) : undefined;
+  const expected = {};
+  for (const effect of options.effects || []) {
+    if (effect.claim_handle !== claim.handle || effect.outcome !== "succeeded" || effect.kind !== kind || effect.repository !== repository) continue;
+    // Handlers can return only the number; the effect channel retains the API
+    // identity and fully rendered content, including trusted attribution footers.
+    if (effect.id && id !== undefined ? effect.id !== id : effect.number !== number && !(effect.id && effect.number === undefined)) continue;
+    if (effect.id) {
+      if (typeof effect.id !== "string" || !/^[1-9][0-9]{0,255}$/.test(effect.id)) return null;
+      id = effect.id;
+    }
+    Object.assign(expected, effect.expected || {});
+  }
+  /** @type {Record<string, any>} */
+  const desired = {
+    exact_labels: Object.hasOwn(expected, "labels") || options.verification !== undefined || message.type === "update_issue",
+    exact_assignees: Object.hasOwn(expected, "assignees") || options.verification !== undefined || message.type === "update_issue",
+  };
+  for (const field of ["title", "body"]) {
+    const value = Object.hasOwn(expected, field) ? expected[field] : message[field];
+    if (value !== undefined) desired[`${field}_digest`] = digest(value);
+  }
+  for (const field of ["state", "state_reason"]) {
+    const requested = field === "state" ? message.state || message.status : message.state_reason;
+    // Both checks used to run independently. Collapsing them must not turn a
+    // contradictory message/effect pair into an accepted precedence rule.
+    if (expected[field] !== undefined && requested && expected[field] !== requested) return null;
+    const value = expected[field] !== undefined ? expected[field] : requested;
+    if (value) desired[field] = value;
+    else if (expected[field] !== undefined) desired[field] = expected[field];
+  }
+  if (message.type.startsWith("close_") && desired.state !== undefined && desired.state !== "closed") return null;
+  if (message.milestone !== undefined && message.milestone !== null && !Number.isSafeInteger(Number(message.milestone))) return null;
+  if (expected.milestone !== undefined && message.milestone !== undefined) {
+    if (expected.milestone === null || message.milestone === null ? expected.milestone !== message.milestone : Number(expected.milestone) !== Number(message.milestone)) return null;
+  }
+  const milestone = expected.milestone !== undefined ? expected.milestone : message.milestone;
+  if (milestone !== undefined) desired.milestone = milestone === null ? null : Number(milestone);
+  const labels = Object.hasOwn(expected, "labels") ? expected.labels : message.labels;
+  if (labels !== undefined && ["create_issue", "update_issue"].includes(message.type)) desired.labels = builtinNames(labels);
+  const assignees = Object.hasOwn(expected, "assignees") ? expected.assignees : message.assignees;
+  if (assignees !== undefined) desired.assignees = builtinNames(assignees);
+  if (["add_labels", "remove_labels"].includes(message.type)) desired.labels_change = (message.labels || []).map(label => (typeof label === "string" ? label : label.name).toLowerCase());
+  if (message.type === "replace_label") {
+    if (message.label_to_add) desired.label_to_add = String(message.label_to_add).trim().toLowerCase();
+    if (message.label_to_remove) desired.label_to_remove = String(message.label_to_remove).trim().toLowerCase();
+  }
+  const expectation = { type: message.type, kind, repository, number, ...(id === undefined ? {} : { id }), ...(commentId === undefined ? {} : { comment_id: commentId }), expected: desired };
+  return validBuiltinExpectation(expectation) ? expectation : null;
+}
+
+function durableBuiltinReceipt(options) {
+  return builtinDeliveryExpectation(options);
+}
+
+function validBuiltinExpectation(expectation) {
+  try {
+    closed(expectation, ["type", "kind", "repository", "number", "expected"], ["id", "comment_id", "dispatch_id", "claim_id", "work_id", "claim_handle"], "builtin delivery expectation");
+    const { type, kind, repository, number, expected } = expectation;
+    if (!Object.hasOwn(BUILTIN_DELIVERY_KINDS, type) || BUILTIN_DELIVERY_KINDS[type] !== kind || typeof repository !== "string" || repository.split("/").length !== 2 || repository.split("/").some(piece => !piece)) return false;
+    if (!Number.isSafeInteger(number) || number < 1) return false;
+    if (expectation.id !== undefined && (typeof expectation.id !== "string" || !/^[1-9][0-9]{0,255}$/.test(expectation.id))) return false;
+    if (kind === "comment" ? !Number.isSafeInteger(expectation.comment_id) || expectation.comment_id < 1 : expectation.comment_id !== undefined) return false;
+    closed(expected, ["exact_labels", "exact_assignees"], ["title_digest", "body_digest", "state", "state_reason", "milestone", "labels", "assignees", "labels_change", "label_to_add", "label_to_remove"], "builtin expected fields");
+    if (typeof expected.exact_labels !== "boolean" || typeof expected.exact_assignees !== "boolean") return false;
+    for (const field of ["title_digest", "body_digest"]) if (Object.hasOwn(expected, field) && (typeof expected[field] !== "string" || !/^[0-9a-f]{64}$/.test(expected[field]))) return false;
+    for (const field of ["state", "state_reason"]) if (Object.hasOwn(expected, field) && expected[field] !== null && typeof expected[field] !== "string") return false;
+    for (const field of ["label_to_add", "label_to_remove"]) if (Object.hasOwn(expected, field) && typeof expected[field] !== "string") return false;
+    if (Object.hasOwn(expected, "milestone") && expected.milestone !== null && !Number.isSafeInteger(expected.milestone)) return false;
+    for (const field of ["labels", "assignees", "labels_change"]) if (Object.hasOwn(expected, field) && (!Array.isArray(expected[field]) || expected[field].some(value => typeof value !== "string"))) return false;
+    if (["add_labels", "remove_labels"].includes(type) !== Object.hasOwn(expected, "labels_change")) return false;
+    if (Object.hasOwn(expected, "labels") && !["create_issue", "update_issue"].includes(type)) return false;
+    if ((Object.hasOwn(expected, "label_to_add") || Object.hasOwn(expected, "label_to_remove")) && type !== "replace_label") return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** @param {Record<string, any>} options @returns {Promise<Record<string, any>>} */
 async function verifyBuiltinDeliveryOutput(options) {
-  const { claim, message, result, github } = options;
+  if (options.durable !== true && ["create_discussion", "create_pull_request"].includes(options.message.type)) return require("./work_queue_native_creation_delivery.cjs").verifyNativeCreationDelivery(options);
+  const expectation = claimDeliveryReceipt(options, "builtin", () => builtinDeliveryExpectation(options));
+  if (options.durable === true && (!receiptMatchesClaim(expectation, options.claim) || expectation.type !== options.message.type)) return { verified: false };
+  return verifyBuiltinExpectation(expectation, options);
+}
+
+async function verifyBuiltinExpectation(expectation, options) {
+  const { claim, github } = options;
   const unverified = (event, fields = {}) => {
     log.debug(event, fields);
     return { verified: false, diagnostics: { event, ...fields } };
   };
-  if (["create_discussion", "create_pull_request"].includes(message.type)) return require("./work_queue_native_creation_delivery.cjs").verifyNativeCreationDelivery(options);
-  // Updating branches still requires its own pinned commit/tree verifier.
-  if (message.type === "update_pull_request") return unverified("delivery.builtin.pinned_verifier_required");
-  const verifiedFields = new Set(["type", "output_id", "depends-on", "claim_handle", "claim_id", "work_id", "repo", "item_number", "issue_number", "pull_request_number", "temporary_id", ...(BUILTIN_EFFECT_FIELDS[message.type] || [])]);
-  if (Object.keys(message).some(field => !verifiedFields.has(field))) return unverified("delivery.builtin.undeclared_fields");
-  if (!result || result.staged || !github?.rest || message.data !== undefined || message.duplicate_of !== undefined)
-    return unverified("delivery.builtin.readback_unavailable", { result_present: !!result, staged: !!result?.staged, client_present: !!github?.rest, data_present: message.data !== undefined, duplicate: message.duplicate_of !== undefined });
-  const repository = result.repo || message.repo || options.config?.["target-repo"] || options.context?.payload?.repository?.full_name;
-  const pieces = typeof repository === "string" ? repository.split("/") : [];
-  if (pieces.length !== 2) return unverified("delivery.builtin.repository_invalid");
-  await assertClaimAuthorized({ ...message, repo: repository }, { authorize: options.authorize, context: options.context, github });
-  const [owner, repo] = pieces;
-  const requestedNumber = builtinTargetNumber(message);
-  const number = Number(result.number || result.issue_number || result.pull_request_number || message.item_number || message.issue_number || message.pull_request_number);
-  if (requestedNumber !== undefined && requestedNumber !== String(number)) return unverified("delivery.builtin.target_mismatch");
+  if (!validBuiltinExpectation(expectation)) return unverified("delivery.builtin.expectation_invalid");
+  if (!github?.rest) return unverified("delivery.builtin.readback_unavailable", { client_present: false });
+  const { type, kind, repository, number, expected } = expectation;
+  await assertClaimAuthorized({ ...options.message, repo: repository }, { authorize: options.authorize, context: options.context, github });
+  const [owner, repo] = repository.split("/");
   let data;
-  let kind;
-  if (["create_issue", "update_issue", "close_issue", "add_labels", "remove_labels", "replace_label"].includes(message.type) && Number.isSafeInteger(number) && number > 0) {
+  if (kind === "issue") {
     ({ data } = await github.rest.issues.get({ owner, repo, issue_number: number }));
-    kind = "issue";
-  } else if (["close_pull_request", "merge_pull_request", "mark_pull_request_as_ready_for_review"].includes(message.type) && Number.isSafeInteger(number) && number > 0) {
+  } else if (kind === "pull_request") {
     ({ data } = await github.rest.pulls.get({ owner, repo, pull_number: number }));
-    kind = "pull_request";
-  } else if (message.type === "add_comment" && Number.isSafeInteger(Number(result.comment_id || result.commentId || result.id))) {
-    if (!Number.isSafeInteger(number) || number < 1) return unverified("delivery.builtin.comment_target_invalid");
-    ({ data } = await github.rest.issues.getComment({ owner, repo, comment_id: Number(result.comment_id || result.commentId || result.id) }));
+  } else {
+    ({ data } = await github.rest.issues.getComment({ owner, repo, comment_id: expectation.comment_id }));
     const api = (process.env.GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "");
     if (data?.issue_url !== `${api}/repos/${repository}/issues/${number}`) return unverified("delivery.builtin.comment_parent_mismatch");
-    kind = "comment";
-  } else {
-    return unverified("delivery.builtin.unsupported_output");
   }
   if (!data || !data.id || !data.html_url || (data.number !== undefined && data.number !== number))
     return unverified("delivery.builtin.resource_mismatch", { resource_present: !!data, identity_present: !!data?.id, url_present: !!data?.html_url, number_matches: data?.number === number });
   if (typeof data.id === "number" ? !Number.isSafeInteger(data.id) || data.id < 1 : typeof data.id !== "string" || !/^[1-9][0-9]{0,255}$/.test(data.id)) return unverified("delivery.builtin.resource_identity_invalid");
-  const expected = {};
-  for (const effect of options.effects || []) {
-    if (effect.claim_handle === claim.handle && effect.outcome === "succeeded" && effect.kind === kind && effect.repository === repository && (effect.id ? effect.id === String(data.id) : effect.number === number)) {
-      Object.assign(expected, effect.expected || {});
-    }
-  }
   for (const field of ["title", "body"]) {
-    const value = Object.prototype.hasOwnProperty.call(expected, field) ? expected[field] : message[field];
-    if (value !== undefined && data[field] !== value) return unverified("delivery.builtin.content_mismatch", { title: field === "title", body: field === "body" });
+    if (expected[`${field}_digest`] !== undefined && (data[field] === undefined || digest(data[field]) !== expected[`${field}_digest`]))
+      return unverified("delivery.builtin.content_mismatch", { title: field === "title", body: field === "body" });
   }
   for (const field of ["state", "state_reason"])
     if (expected[field] !== undefined && data[field] !== expected[field]) return unverified("delivery.builtin.expected_state_mismatch", { state: field === "state", state_reason: field === "state_reason" });
-  if (expected.milestone !== undefined && (expected.milestone === null ? data.milestone != null : data.milestone?.number !== Number(expected.milestone))) return unverified("delivery.builtin.milestone_mismatch");
-  if ((message.state || message.status) && data.state !== (message.state || message.status)) return unverified("delivery.builtin.state_mismatch");
-  if (message.state_reason && data.state_reason !== message.state_reason) return unverified("delivery.builtin.state_reason_mismatch");
-  if (message.type.startsWith("close_") && data.state !== "closed") return unverified("delivery.builtin.close_not_observed");
-  if (message.type === "merge_pull_request" && data.merged !== true) return unverified("delivery.builtin.merge_not_observed");
-  if (message.type === "mark_pull_request_as_ready_for_review" && data.draft !== false) return unverified("delivery.builtin.ready_not_observed");
-  if (["add_labels", "remove_labels"].includes(message.type)) {
+  if (expected.milestone !== undefined && (expected.milestone === null ? data.milestone != null : data.milestone?.number !== expected.milestone)) return unverified("delivery.builtin.milestone_mismatch");
+  if (type.startsWith("close_") && data.state !== "closed") return unverified("delivery.builtin.close_not_observed");
+  if (type === "merge_pull_request" && data.merged !== true) return unverified("delivery.builtin.merge_not_observed");
+  if (type === "mark_pull_request_as_ready_for_review" && data.draft !== false) return unverified("delivery.builtin.ready_not_observed");
+  if (expected.labels_change !== undefined) {
     const actual = new Set((data.labels || []).map(label => (typeof label === "string" ? label : label.name).toLowerCase()));
-    for (const label of message.labels || []) {
-      const name = (typeof label === "string" ? label : label.name).toLowerCase();
-      if (actual.has(name) !== (message.type === "add_labels")) return unverified("delivery.builtin.label_change_not_observed");
-    }
+    for (const label of expected.labels_change) if (actual.has(label) !== (type === "add_labels")) return unverified("delivery.builtin.label_change_not_observed");
   }
-  const names = values => values.map(value => (typeof value === "string" ? value : value.name || value.login).toLowerCase()).sort();
-  const desiredLabels = Object.hasOwn(expected, "labels") ? expected.labels : message.labels;
-  if (desiredLabels !== undefined && ["create_issue", "update_issue"].includes(message.type)) {
-    const desired = names(desiredLabels);
-    const actual = names(data.labels || []);
-    const exact = Object.hasOwn(expected, "labels") || options.verification !== undefined || message.type === "update_issue";
+  if (expected.labels !== undefined) {
+    const desired = expected.labels;
+    const actual = builtinNames(data.labels || []);
+    const exact = expected.exact_labels;
     if (!desired.every(value => actual.includes(value)) || (exact && JSON.stringify(desired) !== JSON.stringify(actual))) return unverified("delivery.builtin.labels_mismatch", { expected: desired.length, actual: actual.length, exact });
   }
-  const desiredAssignees = Object.hasOwn(expected, "assignees") ? expected.assignees : message.assignees;
-  if (desiredAssignees !== undefined) {
-    const desired = names(desiredAssignees);
-    const actual = names(data.assignees || []);
-    const exact = Object.hasOwn(expected, "assignees") || options.verification !== undefined || message.type === "update_issue";
+  if (expected.assignees !== undefined) {
+    const desired = expected.assignees;
+    const actual = builtinNames(data.assignees || []);
+    const exact = expected.exact_assignees;
     if (!desired.every(value => actual.includes(value)) || (exact && JSON.stringify(desired) !== JSON.stringify(actual))) return unverified("delivery.builtin.assignees_mismatch", { expected: desired.length, actual: actual.length, exact });
   }
-  if (message.milestone !== undefined) {
-    if (message.milestone === null ? data.milestone != null : !Number.isSafeInteger(Number(message.milestone)) || data.milestone?.number !== Number(message.milestone)) return unverified("delivery.builtin.milestone_mismatch");
-  }
-  if (message.type === "replace_label") {
-    const actual = new Set(names(data.labels || []));
-    if (message.label_to_remove && actual.has(String(message.label_to_remove).trim().toLowerCase())) return unverified("delivery.builtin.label_removal_not_observed");
-    if (message.label_to_add && !actual.has(String(message.label_to_add).trim().toLowerCase())) return unverified("delivery.builtin.label_addition_not_observed");
+  if (type === "replace_label") {
+    const actual = new Set(builtinNames(data.labels || []));
+    if (expected.label_to_remove !== undefined && actual.has(expected.label_to_remove)) return unverified("delivery.builtin.label_removal_not_observed");
+    if (expected.label_to_add !== undefined && !actual.has(expected.label_to_add)) return unverified("delivery.builtin.label_addition_not_observed");
   }
   const resource = { kind, repository, number: data.number || number || null, id: String(data.id), url: data.html_url };
   let authorityResource = ["issue", "pull_request"].includes(kind) ? await resolveParentResourceTarget(github, { repository, kind, number: resource.number }, data) : await resolveRepositoryTarget(github, resource);
@@ -596,6 +694,12 @@ async function verifyBuiltinDeliveryOutput(options) {
     const { data: parent } = await github.rest.issues.get({ owner, repo, issue_number: number });
     if (!parent || parent.number !== number) return unverified("delivery.builtin.parent_mismatch");
     authorityResource = { ...authorityResource, ...(await resolveParentResourceTarget(github, { repository, kind: "issue", number }, parent)) };
+  }
+  if ((expectation.id !== undefined && String(data.id) !== expectation.id) || (kind === "comment" && String(data.id) !== String(expectation.comment_id))) {
+    // Preserve hard scope rejection when readback replaced a frozen native
+    // subject; a different allowed resource is still not this delivery.
+    await assertClaimAuthorized({ ...options.message, repo: repository }, { authorize: options.authorize, context: options.context, github, resource: canonicalResourceTarget(authorityResource) });
+    return unverified("delivery.builtin.resource_identity_mismatch");
   }
   const observed = {
     id: resource.id,
@@ -620,4 +724,16 @@ async function verifyBuiltinDeliveryOutput(options) {
   return currentClaimHandle() ? createClaimResourceVerification(proof) : proof;
 }
 
-module.exports = { NO_WRITE_TYPES, validateDeliveryContract, readDeliveryControlInventory, inspectClaimDelivery, createClaimDeliveryVerifier, verifyClaimDelivery, isTrustedClaimDelivery, verifyBuiltinDeliveryOutput };
+module.exports = {
+  NO_WRITE_TYPES,
+  validateDeliveryContract,
+  readDeliveryControlInventory,
+  inspectClaimDelivery,
+  createClaimDeliveryVerifier,
+  verifyClaimDelivery,
+  isTrustedClaimDelivery,
+  verifyBuiltinDeliveryOutput,
+  builtinDeliveryExpectation,
+  durableBuiltinReceipt,
+  verifyBuiltinExpectation,
+};

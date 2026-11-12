@@ -26,6 +26,8 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.101 | Audit-only normative clarification that whole-context, `github.*`, `github.token`, and `secrets` references (including wildcard and computed forms) are credential-bearing for prompt bindings and workflow/engine environment validation, while `github.event.*`, `vars.*`, and quoted literals are not. Maps existing implementation (`credential_free_prompt.go`, `awf_env.go`) to `TestCompileEnvCredentialReferences`. No new threat identifier, permission, or compiler behavior change. |
+| 1.0.100 | Closes security alert 1093 in the existing CTR-017 secret-leakage/publication boundary. Generated agent step-summary publication now runs only under `always()` plus the successful secret-masking condition. Redaction fails closed on EACCES/EPERM scan errors and summary-symlink unlink failures. The summary publisher uses the shared Linux descriptor-relative no-follow reader, accepts only isolated regular files up to 10 MiB, preserves missing/empty no-op behavior, and rejects symlinks, non-regular files, and replacement races. Evidence includes compiler gating, redaction regressions, guarded-reader regressions, and wrapper coverage. No new threat identifier, permission, workflow schema, or Safe Outputs contract is introduced. |
 | 1.0.99 | Specifies AWF-resident advisory invocation decisions, compiler-validated data-only question transport, guarded runtime file evidence, deterministic aggregation and failure abstention, and separate sanitized session/audit accounting. Review corrections reject nonempty lists with protected session capture, normalize nested working directories, and record harness initialization before billable decision requests without claiming a CLI invocation. Heuristic credential screening withholds matching questions as unknown; JSON-escaped evidence records separate file data without claiming semantic instruction isolation or complete secret detection. Preserves safe-output publication authority and existing retry/budget/detection boundaries. Requires matching compiler/setup runtime for configured workflows; absent/empty lists retain existing behavior. Maps local and mocked regression evidence without claiming live deployment or semantic prompt-injection isolation. No new threat identifier or permission grant. |
 | 1.0.98 | Applies validated effective runner UID:GID defaults to both built-in `agenticworkflows` and `safeoutputs` backend containers, while retaining explicit user, HOME, and supplementary group settings. Requires owner-only no-follow writes for generated safeoutputs config, tools, metadata, validation, and output files, including replacements; no new threat identifier, permission grant, or lock-file schema change. |
 | 1.0.97 | Extends CTR-006 validation to raw `run:` content, including comments and quoted heredocs, while retaining Bash-aware sanitizer and codemod behavior. Clarifies manual migration for prohibited expressions in preserved regions and documents `env:` plus an unquoted heredoc for values. No new threat identifier, permission grant, or lock-file schema change. |
@@ -106,6 +108,18 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-11-12)
+
+Reviewed commits from the last two days touching compiler, parser, and runtime security boundaries.
+
+Findings and disposition:
+
+- Credential-bearing wildcard projections (#76980): already implemented by `isCredentialReference` and `valueUsesCredentialReference` and covered by `TestCompileEnvCredentialReferences`. Added the explicit requirement and test mapping to CTR-010/017 (spec 1.0.101).
+- Temporary-file, symlink, shell-data, and fallback-config log hardening (#76954, #76958, #76951, #76952, #76955, #76956, #76974): runtime and CLI hardening that the compiler does not detect in authored workflows. Existing CTR-017 summary-publication coverage already maps the step-summary change. No new `CTR-*` rule.
+- Label-length compile-time rejection (#76941): input validation without a new threat class; no rule change.
+- Open high-severity code-scanning alerts: none returned (one item was withheld by the secrecy policy). No `threat-detection-suppress` annotations exist in workflow sources, so no suppression SLA action applies.
+- Go tests could not be executed in this environment (the required Go 1.27.4 toolchain could not be downloaded); no implementation changed.
 
 ### Mapping Audit (2026-11-04)
 

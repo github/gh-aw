@@ -1226,66 +1226,169 @@ function convertXmlTags(s) {
     return /^https:\/\/[\w.-]+(?::\d+)?(\/[^\s<>|]*)?(?:\|[^<>]*)?$/.test(tagContent);
   }
 
-  // First, process CDATA sections specially - convert tags inside them and the CDATA markers
-  s = s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content) => {
-    // Convert tags inside CDATA content
-    const convertedContent = content.replace(/<(\/?[A-Za-z][A-Za-z0-9]*(?:[^>]*?))>/g, "($1)");
-    // Return with CDATA markers also converted to parentheses
+  function createTagScanner(source) {
+    const length = source.length;
+    const normal = new Int32Array(length + 1);
+    const expectValue = new Int32Array(length + 1);
+    const unquotedValue = new Int32Array(length + 1);
+    const singleQuotedValue = new Int32Array(length + 1);
+    const doubleQuotedValue = new Int32Array(length + 1);
+    const nextGreaterThan = new Int32Array(length + 1);
+    nextGreaterThan[length] = -1;
+
+    for (let index = length - 1; index >= 0; index--) {
+      const character = source[index];
+      nextGreaterThan[index] = character === ">" ? index : nextGreaterThan[index + 1];
+
+      normal[index] = character === ">" ? index + 1 : character === "=" ? expectValue[index + 1] : normal[index + 1];
+      if (/\s/.test(character)) {
+        expectValue[index] = expectValue[index + 1];
+        unquotedValue[index] = normal[index + 1];
+      } else if (character === ">") {
+        expectValue[index] = index + 1;
+        unquotedValue[index] = index + 1;
+      } else {
+        expectValue[index] = character === "'" ? singleQuotedValue[index + 1] : character === '"' ? doubleQuotedValue[index + 1] : unquotedValue[index + 1];
+        unquotedValue[index] = unquotedValue[index + 1];
+      }
+
+      singleQuotedValue[index] = character === "'" ? normal[index + 1] : singleQuotedValue[index + 1] > 0 ? singleQuotedValue[index + 1] : character === ">" ? -(index + 1) : singleQuotedValue[index + 1];
+      doubleQuotedValue[index] = character === '"' ? normal[index + 1] : doubleQuotedValue[index + 1] > 0 ? doubleQuotedValue[index + 1] : character === ">" ? -(index + 1) : doubleQuotedValue[index + 1];
+    }
+
+    return {
+      nextGreaterThan,
+      findTagEnd(start) {
+        const result = normal[start + 1];
+        return result > 0 ? { end: result - 1, malformed: false } : result < 0 ? { end: -result - 1, malformed: true } : { end: -1, malformed: false };
+      },
+    };
+  }
+
+  /**
+   * Applies a transformation to tag-like markup while respecting quoted values.
+   * @param {string} source
+   * @param {(tagContent: string, match: string, malformed: boolean) => string} transform
+   * @param {boolean} [preserveAutolinks]
+   * @returns {string}
+   */
+  function replaceTagMarkup(source, transform, preserveAutolinks = false) {
+    const scanner = createTagScanner(source);
+    let output = "";
+    let written = 0;
+    for (let index = 0; index < source.length; index++) {
+      if (source[index] !== "<") continue;
+      const firstCharacter = source[index + 1] === "/" ? source[index + 2] : source[index + 1];
+      if (!firstCharacter || !/[A-Za-z!]/.test(firstCharacter)) continue;
+
+      const firstGreaterThan = scanner.nextGreaterThan[index + 1];
+      if (preserveAutolinks && firstGreaterThan >= 0 && isHttpsAngleBracketAutolink(source.slice(index + 1, firstGreaterThan))) {
+        output += source.slice(written, firstGreaterThan + 1);
+        written = firstGreaterThan + 1;
+        index = firstGreaterThan;
+        continue;
+      }
+
+      const boundary = scanner.findTagEnd(index);
+      if (boundary.end < 0) {
+        output += source.slice(written, index + 1);
+        written = index + 1;
+        continue;
+      }
+      const end = boundary.end + 1;
+      const match = source.slice(index, end);
+      const tagContent = source.slice(index + 1, boundary.end);
+      output += source.slice(written, index) + transform(tagContent, match, boundary.malformed);
+      written = end;
+      index = boundary.end;
+    }
+    return written ? output + source.slice(written) : source;
+  }
+
+  function escapeAngleBrackets(text) {
+    return text.replace(/[<>]/g, character => (character === "<" ? "&lt;" : "&gt;"));
+  }
+
+  /**
+   * Strips on* event handlers, style, title, and data-* attributes from tag content.
+   * Attribute values are consumed as quoted or unquoted tokens before the next
+   * attribute is considered, including when a quoted value is immediately followed
+   * by another attribute without whitespace.
+   * @param {string} tagContent
+   * @returns {string}
+   */
+  function stripDangerousAttributes(tagContent) {
+    const tagNameMatch = tagContent.match(/^\/?\s*([A-Za-z][A-Za-z0-9]*)/);
+    if (!tagNameMatch) return tagContent;
+
+    let position = tagNameMatch[0].length;
+    let written = 0;
+    let output = "";
+    while (position < tagContent.length) {
+      const separatorStart = position;
+      while (position < tagContent.length && (/\s/.test(tagContent[position]) || tagContent[position] === "/")) {
+        position++;
+      }
+      if (position >= tagContent.length) break;
+
+      const nameStart = position;
+      while (position < tagContent.length && !/[\s/=>"'`<]/.test(tagContent[position])) {
+        position++;
+      }
+      if (position === nameStart) {
+        position++;
+        continue;
+      }
+      const attributeName = tagContent.slice(nameStart, position);
+      let attributeEnd = position;
+      let valueStart = position;
+      while (valueStart < tagContent.length && /\s/.test(tagContent[valueStart])) valueStart++;
+      if (tagContent[valueStart] === "=") {
+        valueStart++;
+        while (valueStart < tagContent.length && /\s/.test(tagContent[valueStart])) valueStart++;
+        if (tagContent[valueStart] === '"' || tagContent[valueStart] === "'") {
+          const quote = tagContent[valueStart];
+          const closingQuote = tagContent.indexOf(quote, valueStart + 1);
+          attributeEnd = closingQuote < 0 ? tagContent.length : closingQuote + 1;
+        } else {
+          attributeEnd = valueStart;
+          while (attributeEnd < tagContent.length && !/\s/.test(tagContent[attributeEnd])) {
+            attributeEnd++;
+          }
+        }
+      }
+
+      if (/^(?:on\w+|style$|title$|data-)/i.test(attributeName)) {
+        output += tagContent.slice(written, separatorStart);
+        written = attributeEnd;
+      }
+      position = Math.max(attributeEnd, position);
+    }
+    return written ? output + tagContent.slice(written) : tagContent;
+  }
+
+  // Convert tags inside CDATA sections, then convert the CDATA markers themselves.
+  s = s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_match, content) => {
+    const convertedContent = replaceTagMarkup(content, tagContent => `(${escapeAngleBrackets(tagContent)})`);
     return `(![CDATA[${convertedContent}]])`;
   });
 
-  /**
-   * Strips dangerous HTML attributes from an allowed tag's content string.
-   * Removes on* event handler attributes (e.g. onclick, ontoggle), style,
-   * title, and data-* attributes in all quoting forms (double-quoted,
-   * single-quoted, unquoted, bare).
-   *
-   * title= and data-* are stripped because their values are invisible in
-   * GitHub's rendered markdown (title= appears only as a hover-tooltip;
-   * data-* attributes are stripped by GFM's sanitizer) but arrive at the
-   * agent verbatim in raw text, creating a steganographic injection channel
-   * structurally identical to the one fixed for markdown link titles.
-   *
-   * Safe attributes such as class, open, lang, id, etc. are preserved.
-   *
-   * Note: `\s+` (requiring at least one whitespace before the attribute name) is
-   * intentional — HTML attributes are always separated from the tag name and from
-   * each other by at least one whitespace character. Using `\s*` would risk false
-   * matches inside tag names (e.g. matching "ong" inside "strong").
-   *
-   * @param {string} tagContent - Tag content without surrounding angle brackets
-   * @returns {string} Tag content with dangerous attributes removed
-   */
-  function stripDangerousAttributes(tagContent) {
-    // Match: one-or-more whitespace-or-slash + (on* | style | title | data-*) + optional =value
-    // Value forms: "...", '...', or unquoted (no whitespace / > / quote chars), or bare (no =)
-    // The unquoted form excludes >, whitespace, and all quote characters (', ", `) so it
-    // cannot consume the closing > of the tag or straddle other attribute values.
-    // Using [\s/]+ (instead of \s+) also strips dangerous attributes that are immediately
-    // preceded by a "/" with no space — e.g. the malformed <img/onerror=alert(1) src=x>.
-    return tagContent.replace(/[\s/]+(?:on\w+|style|title|data-[\w-]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"'`]*))?/gi, "");
-  }
+  // Convert opening, closing, and self-closing tags while retaining only allowed tags.
+  // Malformed quoted markup is always neutralized rather than repaired into an allowed tag.
+  return replaceTagMarkup(
+    s,
+    (tagContent, match, malformed) => {
+      if (malformed) return `(${escapeAngleBrackets(tagContent)})`;
 
-  // Convert opening tags: <tag> or <tag attr="value"> to (tag) or (tag attr="value")
-  // Convert closing tags: </tag> to (/tag)
-  // Convert self-closing tags: <tag/> or <tag /> to (tag/) or (tag /)
-  // But preserve allowed safe tags (with dangerous attributes stripped)
-  return s.replace(/<(\/?[A-Za-z!][^>]*?)>/g, (match, tagContent) => {
-    if (isHttpsAngleBracketAutolink(tagContent)) {
-      return match;
-    }
-    // Extract tag name from the content (handle closing tags and attributes)
-    const tagNameMatch = tagContent.match(/^\/?\s*([A-Za-z][A-Za-z0-9]*)/);
-    if (tagNameMatch) {
-      const tagName = tagNameMatch[1].toLowerCase();
-      if (allowedTags.includes(tagName)) {
-        // Strip dangerous attributes (on* event handlers, style, title, data-*) before preserving
-        const sanitizedContent = stripDangerousAttributes(tagContent);
-        return `<${sanitizedContent}>`;
+      const tagNameMatch = tagContent.match(/^\/?\s*([A-Za-z][A-Za-z0-9]*)/);
+      const tagNameDelimiter = tagNameMatch ? tagContent[tagNameMatch[0].length] : undefined;
+      if (tagNameMatch && (tagNameDelimiter === undefined || /[\s/]/.test(tagNameDelimiter)) && allowedTags.includes(tagNameMatch[1].toLowerCase())) {
+        return `<${stripDangerousAttributes(tagContent)}>`;
       }
-    }
-    return `(${tagContent})`; // Convert other tags to parentheses
-  });
+      return `(${escapeAngleBrackets(tagContent)})`;
+    },
+    true
+  );
 }
 
 /**

@@ -13,7 +13,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/github/gh-aw/pkg/agentdrain"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var auditSearchLog = logger.New("cli:audit_search")
 
 const (
 	defaultAuditSearchLimit = 5
@@ -182,6 +185,7 @@ func searchAuditSession(ctx context.Context, runDir string, runID int64, query s
 	if err := validateAuditSearch(query, limit); err != nil {
 		return nil, err
 	}
+	auditSearchLog.Printf("Searching audit session: run_id=%d, dir=%s, limit=%d", runID, runDir, limit)
 	docs, source, err := readAuditSearchSession(ctx, runDir)
 	if err != nil {
 		return nil, err
@@ -190,6 +194,7 @@ func searchAuditSession(ctx context.Context, runDir string, runID int64, query s
 	if err != nil {
 		return nil, err
 	}
+	auditSearchLog.Printf("Ranked audit evidence: source=%s, documents=%d, ranked=%d", source, len(docs), len(ranked))
 	clusters, err := groupAuditEvidence(ctx, docs, ranked, query, limit)
 	if err != nil {
 		return nil, err
@@ -209,6 +214,7 @@ func clusterAuditEvidence(ctx context.Context, docs []auditSearchDocument) (map[
 	for _, doc := range docs {
 		stages[doc.stage] = struct{}{}
 	}
+	auditSearchLog.Printf("Clustering audit evidence: documents=%d, stages=%d", len(docs), len(stages))
 	if len(stages) > 256 {
 		return nil, errors.New("unified session exceeds the 256-stage search input limit")
 	}

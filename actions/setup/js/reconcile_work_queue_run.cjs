@@ -4,6 +4,7 @@
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("run");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { digest } = require("./work_queue_codec.cjs");
+const { createDurableDeliveryVerifier } = require("./work_queue_delivery_recovery.cjs");
 const { API_VERSION, nativeId, authenticatePublisher, fetchNativeRunAttempt, validateNativeRun } = require("./work_queue_native.cjs");
 const { loadQueue, validateStoredAssignment, expectedWorkerRun } = require("./work_queue_binding.cjs");
 const { dispatchPrincipal } = require("./work_queue_policy.cjs");
@@ -124,10 +125,15 @@ async function maintenance(options = {}) {
     log.failure("maintenance.obsolete.failed", error, true);
     configured.core?.warning("Work queue obsolete-work reconciliation failed; core recovery will continue. Inspect safe API diagnostics and the checked ledger before retrying maintenance.");
   }
-  const result = await reconcileQueue({ ...configured, requestCancellation: false, expireUnverified: true });
+  const result = await reconcileQueue({ ...configured, requestCancellation: false, expireUnverified: true, verifyEffectsFor: options.verifyEffectsFor || (assignment => createDurableDeliveryVerifier({ ...configured, assignment })) });
   const released = result.results.filter(entry => entry.released).length;
   const unresolved = result.results.filter(entry => ["launch_unresolved", "run_binding_conflict"].includes(entry.state) || Object.values(entry.delivery?.claims || {}).some(claim => claim.reason === "verification_unresolved")).length;
-  log.diagnostic("maintenance.reconcile.complete", { reconciled: result.reconciled, released, unresolved });
+  log.diagnostic("maintenance.reconcile.complete", {
+    reconciled: result.reconciled,
+    released,
+    unresolved,
+    durable_verified: result.results.filter(entry => Object.values(entry.delivery?.claims || {}).some(claim => claim.state === "result")).length,
+  });
   const pending = [];
   if (options.projectIssues === true) {
     try {

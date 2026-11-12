@@ -275,6 +275,8 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 		return state.recordObservation(observation, commit)
 	case "Completion":
 		return state.applyCompletion(operation, commit)
+	case "DeliveryEvidence":
+		return state.applyDeliveryEvidence(operation, commit)
 	case "ClaimCancellation", "WorkCancellation":
 		return state.replayCancellation(operation, kind, commit)
 	case "WorkPriority":
@@ -360,6 +362,7 @@ func (state *Projection) replayTerminalResult(operation Operation, kind string, 
 		return err
 	}
 	state.TerminalBarriers[value.WorkID] = operation
+	delete(state.DeliveryEvidence, value.ClaimID)
 	if claim := state.Claims[value.ClaimID]; claim != nil && claim.KeepOpen {
 		state.TerminalBarriers[value.ClaimID] = operation
 	}

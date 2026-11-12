@@ -5,7 +5,7 @@ const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 
 const crypto = require("crypto");
 const path = require("path");
-const { canonical, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
+const { canonical, canonicalBytes, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
 const {
   assertClaimAuthorized,
   currentClaimHandle,
@@ -16,6 +16,8 @@ const {
   withClaimResourceEffects,
   createClaimResourceVerification,
   withClaimResourceVerification,
+  claimDeliveryReceipt,
+  durableReceipt,
 } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
@@ -23,6 +25,7 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 const privateReceipts = new WeakMap();
 const REVISION = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const DIGEST = /^[a-f0-9]{64}$/;
 
 function validateGitTreeAdapter(adapter) {
   closed(adapter["git-tree"], ["base-revision", "branch-prefix"], ["pull-request", "base-branch"], "trusted code adapter");
@@ -169,7 +172,7 @@ function createGitTreeEffectHandler(adapter, suppliedClient) {
         const entry = { path: file.path, mode: file.mode, type: "blob", sha };
         expected.set(file.path, entry);
         tree.push(entry);
-        blobs.push({ sha, content: file.content.toString("base64") });
+        blobs.push({ sha, sha256: crypto.createHash("sha256").update(file.content).digest("hex") });
       }
       const createdTree = await github.rest.git.createTree({ owner, repo, base_tree: base.tree.sha, tree });
       if (!REVISION.test(createdTree.data?.sha)) throw new Error("Native code tree has no immutable identity");
@@ -181,7 +184,7 @@ function createGitTreeEffectHandler(adapter, suppliedClient) {
       if (config["pull-request"]) {
         const { data } = await github.rest.pulls.create({ owner, repo, head: branch, base: config["base-branch"], title: message.title, body: message.body || "" });
         if (!data || !Number.isSafeInteger(data.number) || data.number < 1) throw new Error("Native code pull request has no exact resource number");
-        pull = { id: nativeId(data.id), number: data.number, title: message.title, body: message.body || "" };
+        pull = { id: nativeId(data.id), number: data.number, title_digest: digest(message.title), body_digest: digest(message.body || "") };
       }
       const result = { success: true, repo: repository, branch, commit: commit.data.sha, ...(pull ? { number: pull.number, id: pull.id } : {}) };
       privateReceipts.set(result, {
@@ -191,13 +194,12 @@ function createGitTreeEffectHandler(adapter, suppliedClient) {
         parent: base.sha,
         tree: createdTree.data.sha,
         commit: commit.data.sha,
-        commitMessage,
+        commit_message_digest: digest(commitMessage),
         expected: [...expected.values()].sort((a, b) => utf8Compare(a.path, b.path)),
         blobs,
-        pull,
-        baseBranch: config["base-branch"],
+        ...(pull ? { pull, baseBranch: config["base-branch"] } : {}),
         adapter: canonical(adapter),
-        declaredFields,
+        declared_fields_digest: digest(Object.fromEntries(Object.entries(declaredFields).filter(([, value]) => value !== undefined))),
         authorityResources,
       });
       return result;
@@ -205,23 +207,97 @@ function createGitTreeEffectHandler(adapter, suppliedClient) {
   };
 }
 
-async function verifyGitTreeDelivery(options) {
-  const { adapter, result, claim, github, verification = undefined } = options;
-  validateGitTreeAdapter(adapter);
+function durableGitTreeReceipt(result, claim) {
   const receipt = result && privateReceipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
-  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.declaredFields, verification)) return { verified: false };
+  if (!receiptMatchesClaim(receipt, claim)) return null;
+  const durable = durableReceipt(receipt, ["adapter"]);
+  return canonicalBytes(durable) <= 8192 ? durable : null;
+}
+
+async function verifyGitTreeDelivery(options) {
+  const receipt = claimDeliveryReceipt(options, "git_tree_adapter", privateReceipts);
+  return verifyGitTreeReceipt(options, receipt);
+}
+
+async function verifyGitTreeReceipt(options, receipt) {
+  const { adapter, claim, github, verification = undefined } = options;
+  validateGitTreeAdapter(adapter);
+  if (!receiptMatchesClaim(receipt, claim) || (options.durable === true ? options.result?.entry?.adapter : receipt.adapter) !== canonical(adapter)) return { verified: false };
+  const config = adapter["git-tree"];
+  try {
+    closed(
+      receipt,
+      ["dispatch_id", "claim_id", "work_id", "claim_handle", "repository", "branch", "parent", "tree", "commit", "commit_message_digest", "expected", "blobs", "declared_fields_digest", "authorityResources"],
+      ["adapter", "pull", "baseBranch"],
+      "Git tree receipt"
+    );
+    if (
+      receipt.repository !== adapter["target-repo"] ||
+      receipt.branch !== `${config["branch-prefix"]}/claims/${path.basename(claimArtifactPath("", claim.handle))}` ||
+      receipt.parent !== config["base-revision"] ||
+      !REVISION.test(receipt.tree) ||
+      !REVISION.test(receipt.commit) ||
+      !DIGEST.test(receipt.commit_message_digest) ||
+      !DIGEST.test(receipt.declared_fields_digest) ||
+      !Array.isArray(receipt.expected) ||
+      receipt.expected.length > 4096 ||
+      !Array.isArray(receipt.blobs) ||
+      receipt.blobs.length > 128 ||
+      !Array.isArray(receipt.authorityResources) ||
+      !receipt.authorityResources.length ||
+      receipt.authorityResources.length > 128
+    )
+      return { verified: false };
+    for (const entry of receipt.expected) {
+      closed(entry, ["path", "mode", "type", "sha"], [], "Git tree receipt file");
+      if (!validPath(entry.path) || !REVISION.test(entry.sha) || !((entry.type === "blob" && ["100644", "100755", "120000"].includes(entry.mode)) || (entry.type === "commit" && entry.mode === "160000"))) return { verified: false };
+    }
+    for (const blob of receipt.blobs) {
+      closed(blob, ["sha", "sha256"], [], "Git tree receipt blob");
+      if (!REVISION.test(blob.sha) || !DIGEST.test(blob.sha256)) return { verified: false };
+    }
+    for (const target of receipt.authorityResources) {
+      if (!target || target.repository !== receipt.repository || !validPath(target.path) || target.ref !== `refs/heads/${receipt.branch}`) return { verified: false };
+    }
+    if (config["pull-request"] === true) {
+      closed(receipt.pull, ["id", "number", "title_digest", "body_digest"], [], "Git tree receipt pull request");
+      if (
+        typeof receipt.pull.id !== "string" ||
+        !Number.isSafeInteger(receipt.pull.number) ||
+        receipt.pull.number < 1 ||
+        !DIGEST.test(receipt.pull.title_digest) ||
+        !DIGEST.test(receipt.pull.body_digest) ||
+        receipt.baseBranch !== config["base-branch"]
+      )
+        return { verified: false };
+      nativeId(receipt.pull.id);
+    } else if (receipt.pull !== undefined || receipt.baseBranch !== undefined) return { verified: false };
+  } catch {
+    return { verified: false };
+  }
+  if (verification !== undefined) {
+    require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, verification.expected, verification);
+    if (digest(verification.expected) !== receipt.declared_fields_digest) return { verified: false };
+  }
   const [owner, repo] = receipt.repository.split("/");
   const { data: ref } = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
   if (ref?.object?.sha !== receipt.commit) return { verified: false };
   const { data: commit } = await github.rest.git.getCommit({ owner, repo, commit_sha: receipt.commit });
-  if (commit?.sha !== receipt.commit || commit.tree?.sha !== receipt.tree || commit.message !== receipt.commitMessage || commit.parents?.length !== 1 || commit.parents[0].sha !== receipt.parent) return { verified: false };
+  if (
+    commit?.sha !== receipt.commit ||
+    commit.tree?.sha !== receipt.tree ||
+    typeof commit.message !== "string" ||
+    digest(commit.message) !== receipt.commit_message_digest ||
+    commit.parents?.length !== 1 ||
+    commit.parents[0].sha !== receipt.parent
+  )
+    return { verified: false };
   const { data: tree } = await github.rest.git.getTree({ owner, repo, tree_sha: receipt.tree, recursive: "1" });
   const leaves = [...treeLeaves(tree, receipt.tree).values()].sort((a, b) => utf8Compare(a.path, b.path));
   if (canonical(leaves) !== canonical(receipt.expected)) return { verified: false };
   for (const expected of receipt.blobs) {
     const { data: blob } = await github.rest.git.getBlob({ owner, repo, file_sha: expected.sha });
-    if (blob?.sha !== expected.sha || blob.encoding !== "base64" || !Buffer.from(blob.content, "base64").equals(Buffer.from(expected.content, "base64"))) return { verified: false };
+    if (blob?.sha !== expected.sha || blob.encoding !== "base64" || typeof blob.content !== "string" || crypto.createHash("sha256").update(Buffer.from(blob.content, "base64")).digest("hex") !== expected.sha256) return { verified: false };
   }
   const effects = [
     ...receipt.blobs.map(blob => ({ kind: "git_blob", repository: receipt.repository, id: blob.sha })),
@@ -236,8 +312,10 @@ async function verifyGitTreeDelivery(options) {
     if (
       nativeId(data?.id) !== receipt.pull.id ||
       data.number !== receipt.pull.number ||
-      data.title !== receipt.pull.title ||
-      data.body !== receipt.pull.body ||
+      typeof data.title !== "string" ||
+      digest(data.title) !== receipt.pull.title_digest ||
+      typeof data.body !== "string" ||
+      digest(data.body) !== receipt.pull.body_digest ||
       data.head?.sha !== receipt.commit ||
       data.head.ref !== receipt.branch ||
       data.head.repo?.full_name !== receipt.repository ||
@@ -264,4 +342,4 @@ async function verifyGitTreeDelivery(options) {
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
-module.exports = { validateGitTreeAdapter, createGitTreeEffectHandler, verifyGitTreeDelivery };
+module.exports = { validateGitTreeAdapter, createGitTreeEffectHandler, verifyGitTreeDelivery, durableGitTreeReceipt };

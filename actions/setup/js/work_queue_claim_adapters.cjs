@@ -16,8 +16,9 @@ const {
   assertClaimIdentity,
   receiptMatchesClaim,
   createClaimResourceVerification,
+  claimDeliveryReceipt,
 } = require("./work_queue_claim_scope.cjs");
-const { verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
+const { verifyBuiltinDeliveryOutput, builtinDeliveryExpectation, verifyBuiltinExpectation } = require("./work_queue_delivery.cjs");
 const { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery } = require("./work_queue_rest_adapter.cjs");
 const { validateGitTreeAdapter, createGitTreeEffectHandler, verifyGitTreeDelivery } = require("./work_queue_git_tree_adapter.cjs");
 const { validateGraphqlAdapter, createGraphqlEffectHandler, verifyGraphqlAdapterDelivery } = require("./work_queue_graphql_adapter.cjs");
@@ -87,22 +88,42 @@ function createDeclaredAdapterVerifier(adapters = {}, nativeConfig = {}, effects
     if (!adapter || !DECLARED_EFFECT_TYPES.has(adapter["effect-type"]) || verification?.verifier_id !== adapterVerifierId(adapter, message.type)) return { verified: false };
     let proof;
     if (adapter.native) {
-      const receipt = options.result && builtinReceipts.get(options.result);
-      if (
-        !receiptMatchesClaim(receipt, options.claim) ||
-        receipt.message.type !== message.type ||
-        (Object.hasOwn(message, "repo") && message.repo !== receipt.message.repo) ||
-        !matchesBuiltinExpected(message, verification) ||
-        !matchesBuiltinExpected(receipt.message, verification)
-      )
-        return { verified: false };
-      proof = await verifyBuiltinDeliveryOutput({ ...options, message: receipt.message, effects });
+      if (options.durable === true) {
+        const receipt = claimDeliveryReceipt(options, "declared_builtin", builtinReceipts);
+        if (!receiptMatchesClaim(receipt, options.claim) || receipt.expectation?.type !== message.type || receipt.expected_digest !== digest(verification.expected)) return { verified: false };
+        proof = await verifyBuiltinExpectation(receipt.expectation, { ...options, effects });
+      } else {
+        const receipt = options.result && builtinReceipts.get(options.result);
+        if (
+          !receiptMatchesClaim(receipt, options.claim) ||
+          receipt.message.type !== message.type ||
+          (Object.hasOwn(message, "repo") && message.repo !== receipt.message.repo) ||
+          !matchesBuiltinExpected(message, verification) ||
+          !matchesBuiltinExpected(receipt.message, verification)
+        )
+          return { verified: false };
+        proof = await verifyBuiltinDeliveryOutput({ ...options, message: receipt.message, effects });
+      }
     } else proof = await verifyClaimAdapterOutput({ ...options, adapter });
     if (proof.verified !== true) return proof;
     return createClaimResourceVerification({ ...proof, evidence: { ...proof.evidence, verifier_id: verification.verifier_id, expected_digest: digest(verification.expected) } });
   };
   declaredVerifiers.set(verify, registry);
   return verify;
+}
+
+function durableDeclaredBuiltinReceipt(options) {
+  const receipt = options.result && builtinReceipts.get(options.result);
+  if (!receiptMatchesClaim(receipt, options.claim) || receipt.message.type !== options.message.type || !matchesBuiltinExpected(receipt.message, options.verification) || !matchesBuiltinExpected(options.message, options.verification))
+    return null;
+  const expectation = builtinDeliveryExpectation({ ...options, message: receipt.message });
+  return expectation ? { expectation, expected_digest: digest(builtinMessageFields(receipt.message)) } : null;
+}
+
+function createDurableDeclaredVerifier(entries, effects) {
+  const adapters = Object.fromEntries(entries.filter(entry => entry.adapter !== undefined).map(entry => [entry.type, parseStrictJSON(entry.adapter)]));
+  const nativeTypes = Object.fromEntries(entries.filter(entry => entry.verifier === "declared_builtin").map(entry => [entry.type, true]));
+  return createDeclaredAdapterVerifier(adapters, nativeTypes, effects);
 }
 
 function isDeclaredAdapterVerifier(verify, type, verification) {
@@ -221,13 +242,49 @@ async function createClaimAdapterHandler(options) {
 
 async function verifyClaimAdapterOutput(options) {
   const adapter = validateAdapter(options.adapter);
-  const receipt = options.result && privateReceipts.get(options.result);
-  if (!receiptMatchesClaim(receipt, options.claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
+  const entry = options.result?.entry;
+  const receipt = claimDeliveryReceipt(options, entry?.verifier, privateReceipts);
+  if (!receiptMatchesClaim(receipt, options.claim) || (options.durable === true ? entry.adapter : receipt.adapter) !== canonical(adapter)) return { verified: false };
   if (adapter["effect-type"] === "github_rest") return verifyRestAdapterDelivery(options);
   if (adapter["effect-type"] === "git_tree") return verifyGitTreeDelivery(options);
   if (adapter["effect-type"] === "github_graphql") return verifyGraphqlAdapterDelivery(options);
+  if (options.durable === true) {
+    if (entry.verifier !== "prepared_builtin" || receipt.expectation?.type !== adapter["effect-type"] || receipt.expectation?.repository !== adapter["target-repo"]) return { verified: false };
+    if (options.verification !== undefined) {
+      closed(options.verification, ["verifier_id", "expected"], [], "declared adapter verification");
+      closed(options.verification.expected, [...Object.keys(adapter.expected || {}), ...Object.keys(adapter["field-map"] || {})], [], "declared adapter expected effect fields");
+      if (receipt.expected_digest !== digest(options.verification.expected)) return { verified: false };
+    }
+    return verifyBuiltinExpectation(receipt.expectation, options);
+  }
   if (!matchesDeclaredAdapterExpected(adapter, adapterEffectFields(adapter, receipt.message), options.verification)) return { verified: false };
   return verifyBuiltinDeliveryOutput({ ...options, message: receipt.message });
+}
+
+function durableClaimAdapterEntry(options) {
+  const adapter = validateAdapter(options.adapter);
+  const stored = options.result && privateReceipts.get(options.result);
+  if (!receiptMatchesClaim(stored, options.claim) || stored.adapter !== canonical(adapter)) return null;
+  let verifier;
+  let receipt;
+  if (adapter["effect-type"] === "github_rest") {
+    verifier = "rest_adapter";
+    receipt = require("./work_queue_rest_adapter.cjs").durableRestReceipt(options.result, options.claim);
+  } else if (adapter["effect-type"] === "github_graphql") {
+    verifier = "graphql_adapter";
+    receipt = require("./work_queue_graphql_adapter.cjs").durableGraphqlReceipt(options.result, options.claim);
+  } else if (adapter["effect-type"] === "git_tree") {
+    verifier = "git_tree_adapter";
+    receipt = require("./work_queue_git_tree_adapter.cjs").durableGitTreeReceipt(options.result, options.claim);
+  } else {
+    if (!matchesDeclaredAdapterExpected(adapter, adapterEffectFields(adapter, stored.message), options.verification)) return null;
+    const expectation = builtinDeliveryExpectation({ ...options, message: stored.message });
+    if (!expectation) return null;
+    verifier = "prepared_builtin";
+    receipt = { expectation, expected_digest: digest(adapterEffectFields(adapter, stored.message)) };
+  }
+  if (!receipt || Buffer.byteLength(stored.adapter, "utf8") > 8192) return null;
+  return { verifier, adapter: stored.adapter, receipt };
 }
 
 // @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates a literal configured repository; projection fixes that destination and assertClaimAuthorized enforces the per-Claim profile allowlist before effects.
@@ -243,4 +300,7 @@ module.exports = {
   verifyClaimAdapterOutput,
   createDeclaredAdapterVerifier,
   isDeclaredAdapterVerifier,
+  durableDeclaredBuiltinReceipt,
+  durableClaimAdapterEntry,
+  createDurableDeclaredVerifier,
 };

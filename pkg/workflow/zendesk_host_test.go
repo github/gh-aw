@@ -136,8 +136,7 @@ func TestZendeskConnectorStagedHostDoesNotReadSecrets(t *testing.T) {
 	source, err := json.Marshal(script)
 	require.NoError(t, err)
 	plan := data.Connectors["zendesk"].SafeOutputs
-	encoded, err := plan.Encode()
-	require.NoError(t, err)
+	encoded := data.Connectors["zendesk"].SafeOutputPlan
 	encodedJSON, err := json.Marshal(encoded)
 	require.NoError(t, err)
 	proposal, err := plan.PrepareSafeOutput("add-internal-note", zendeskNoteArgs())
@@ -179,6 +178,7 @@ const adaptedRequire = name => {
 };
 const env = new Proxy({}, {get: (_, key) => {
   if (key === 'RUNNER_TEMP') return runnerTemp;
+  if (key === 'GH_AW_CONNECTOR_7_ZENDESK_PLAN') return encoded;
   throw new Error('staging must not read provider credentials: ' + key);
 }});
 const result = new Function('item','require','process','temporaryIdMap', %s)(

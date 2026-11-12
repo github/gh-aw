@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "DeliveryEvidenceEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/Revision"
+        },
+        "expected": {
+          "$ref": "#/$defs/DeliveryEvidenceExpected"
+        },
+        "id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "$ref": "#/$defs/Identity"
+        },
+        "number": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "succeeded"
+            },
+            {
+              "const": "unknown"
+            }
+          ]
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "repository", "outcome"],
+      "type": "object"
+    },
+    "DeliveryEvidenceExpected": {
+      "additionalProperties": false,
+      "properties": {
+        "assignees": {},
+        "labels": {},
+        "ref": {},
+        "sha": {}
+      },
+      "required": [],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "DeliveryEvidenceEffect.json",
+  "$ref": "#/$defs/DeliveryEvidenceEffect",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliveryEvidenceEffect"
+}

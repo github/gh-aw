@@ -78,6 +78,50 @@ func TestResolveRefToSHAAcceptsUppercaseFullSHA(t *testing.T) {
 	}
 }
 
+func TestResolveRefToSHAViaGit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake git uses a POSIX shell")
+	}
+	const commitSHA = "3a2844b7e9c422d3c10d287c895573f7108da1b3"
+	const tagSHA = "d746ffe35508b1917358783b479e04febd2b8f71"
+	tests := []struct {
+		name    string
+		ref     string
+		output  string
+		wantErr string
+	}{
+		{"branch", "main", commitSHA + "\trefs/heads/main\n", ""},
+		{"lightweight tag", "v1", commitSHA + "\trefs/tags/v1\n", ""},
+		{"annotated tag", "v1", tagSHA + "\trefs/tags/v1\n" + commitSHA + "\trefs/tags/v1^{}\n", ""},
+		{"peeled first", "v1", commitSHA + "\trefs/tags/v1^{}\n" + tagSHA + "\trefs/tags/v1\n", ""},
+		{"missing ref", "missing", "", "no matching ref"},
+		{"invalid peeled SHA", "v1", tagSHA + "\trefs/tags/v1\ninvalid\trefs/tags/v1^{}\n", "invalid SHA format"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			script := "#!/bin/sh\n[ \"$4\" = \"$3^{}\" ] || exit 1\nprintf '%s' '" + tt.output + "'\n"
+			if err := os.WriteFile(filepath.Join(dir, "git"), []byte(script), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			got, err := resolveRefToSHAViaGit(t.Context(), "owner", "repo", tt.ref, "github.com")
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("resolveRefToSHAViaGit() error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != commitSHA {
+				t.Fatalf("resolveRefToSHAViaGit() = %q, want %q", got, commitSHA)
+			}
+		})
+	}
+}
+
 func TestBuildContentsAPIPath(t *testing.T) {
 	t.Run("escapes refs with reserved query chars", func(t *testing.T) {
 		got := buildContentsAPIPath("owner", "repo", ".github/workflows/demo.md", "release+candidate#1")

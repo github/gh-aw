@@ -7,8 +7,10 @@ const crypto = require("node:crypto");
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
 const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, validateAdapter, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
-const { canonical } = require("./work_queue_codec.cjs");
+const { canonical, canonicalBytes, digest } = require("./work_queue_codec.cjs");
 const { prepareAdapterContext } = require("./work_queue_prepare_claim_adapter.cjs");
+const scope = require("./work_queue_claim_scope.cjs");
+const gitTree = require("./work_queue_git_tree_adapter.cjs");
 
 const BASE = "a".repeat(40);
 const BASE_TREE = "b".repeat(40);
@@ -143,6 +145,120 @@ async function prepare(root, assignment, handle, adapter, message, github) {
 
 function registerTests({ describe, it }) {
   describe("immutable per-Claim prepared code delivery", () => {
+    for (const pullRequest of [false, true]) {
+      it(`resumes ${pullRequest ? "PR" : "branch-only"} receipts after losing private maps without persisting source or PR content`, async () => {
+        const assignment = assigned();
+        const claim = assignment.claims[0];
+        const adapter = configured(pullRequest);
+        const host = native();
+        const authorize = async request => ({ claim_handle: request.claim_handle, authorized: true });
+        const content = "private source line\n".repeat(1024);
+        const fields = { files: [{ path: "source.txt", content }], ...(pullRequest ? { title: "Private PR title", body: "Private PR body" } : {}) };
+        let receipt;
+        let result;
+        await withClaimExecution({ assignment, claim_handle: "h1", authorize }, async () => {
+          result = await gitTree.createGitTreeEffectHandler(adapter, host.github)({ type: "code", claim_handle: "h1", ...fields });
+          receipt = gitTree.durableGitTreeReceipt(result, claim);
+          assert.ok(receipt);
+          assert.ok(canonicalBytes(receipt) <= 8192);
+          for (const field of ["adapter", "dispatch_id", "claim_id", "work_id", "claim_handle", "declaredFields", "commitMessage"]) assert.equal(Object.hasOwn(receipt, field), false);
+          assert.deepEqual(receipt.blobs, [{ sha: blobHash(content), sha256: crypto.createHash("sha256").update(content).digest("hex") }]);
+          assert.equal(receipt.declared_fields_digest, digest(fields));
+          const nativeCommit = host.commits.get(result.commit);
+          assert.ok(nativeCommit);
+          assert.equal(receipt.commit_message_digest, digest(nativeCommit.message));
+          if (pullRequest) assert.deepEqual(receipt.pull, { id: result.id, number: result.number, title_digest: digest(fields.title), body_digest: digest(fields.body) });
+          const serialized = JSON.stringify(receipt);
+          for (const raw of [content, Buffer.from(content).toString("base64"), "Private PR title", "Private PR body", nativeCommit.message]) assert.equal(serialized.includes(raw), false);
+          assert.equal(gitTree.durableGitTreeReceipt(structuredClone(result), claim), null);
+          assert.equal(gitTree.durableGitTreeReceipt(result, assignment.claims[1]), null);
+          receipt.blobs[0].sha256 = "f".repeat(64);
+          receipt = JSON.parse(JSON.stringify(gitTree.durableGitTreeReceipt(result, claim)));
+        });
+        const filename = require.resolve("./work_queue_git_tree_adapter.cjs");
+        const cached = require.cache[filename];
+        delete require.cache[filename];
+        try {
+          const restarted = require(filename);
+          await withClaimExecution({ assignment, claim_handle: "h1", authorize }, async () => {
+            const options = {
+              adapter,
+              claim,
+              github: host.github,
+              authorize,
+              verification: { verifier_id: "code", expected: fields },
+              durable: true,
+              result: { entry: { verifier: "git_tree_adapter", adapter: canonical(adapter), receipt } },
+            };
+            assert.equal((await restarted.verifyGitTreeDelivery({ ...options, durable: false, result })).verified, false);
+            const proof = await restarted.verifyGitTreeDelivery(options);
+            assert.equal(proof.verified, true);
+            assert.equal(proof.resource.kind, pullRequest ? "pull_request" : "git_commit");
+            await assert.rejects(
+              scope.withClaimResourceVerification(structuredClone(proof), () => true),
+              /private in-process/
+            );
+            assert.equal((await restarted.verifyGitTreeDelivery({ ...options, verification: { verifier_id: "code", expected: { ...fields, files: [{ path: "source.txt", content: "other" }] } } })).verified, false);
+            await assert.rejects(restarted.verifyGitTreeDelivery({ ...options, verification: { verifier_id: "code", expected: {} } }), /missing or unknown fields/);
+            for (const field of ["expected", "blobs", "commit_message_digest", "declared_fields_digest", "authorityResources", ...(pullRequest ? ["pull", "baseBranch"] : [])]) {
+              const invalid = structuredClone(receipt);
+              delete invalid[field];
+              assert.equal((await restarted.verifyGitTreeDelivery({ ...options, result: { entry: { ...options.result.entry, receipt: invalid } } })).verified, false);
+            }
+            const invalidBlob = structuredClone(receipt);
+            delete invalidBlob.blobs[0].sha256;
+            assert.equal((await restarted.verifyGitTreeDelivery({ ...options, result: { entry: { ...options.result.entry, receipt: invalidBlob } } })).verified, false);
+            assert.equal((await restarted.verifyGitTreeDelivery({ ...options, result: { entry: { ...options.result.entry, adapter: canonical({ ...adapter, "target-repo": "other/repo" }) } } })).verified, false);
+            assert.equal((await restarted.verifyGitTreeDelivery({ ...options, result: { entry: { ...options.result.entry, verifier: "rest_adapter" } } })).verified, false);
+            host.refs.set(`heads/${result.branch}`, BASE);
+            assert.equal((await restarted.verifyGitTreeDelivery(options)).verified, false);
+            host.refs.set(`heads/${result.branch}`, result.commit);
+            const commit = host.commits.get(result.commit);
+            assert.ok(commit);
+            const message = commit.message;
+            commit.message = "Different commit message";
+            assert.equal((await restarted.verifyGitTreeDelivery(options)).verified, false);
+            commit.message = message;
+            host.blobs.set(blobHash(content), "different native bytes");
+            assert.equal((await restarted.verifyGitTreeDelivery(options)).verified, false);
+            host.blobs.set(blobHash(content), content);
+            host.state.mutateReadback = tree => tree.tree.push({ path: "undeclared.txt", mode: "100644", type: "blob", sha: blobHash("unexpected") });
+            assert.equal((await restarted.verifyGitTreeDelivery(options)).verified, false);
+            host.state.mutateReadback = null;
+            if (pullRequest) {
+              const pull = host.pulls.get(result.number);
+              for (const field of ["title", "body"]) {
+                const original = pull[field];
+                pull[field] = "Changed after worker exit";
+                assert.equal((await restarted.verifyGitTreeDelivery(options)).verified, false);
+                pull[field] = original;
+              }
+              pull.head.sha = BASE;
+              assert.equal((await restarted.verifyGitTreeDelivery(options)).verified, false);
+              pull.head.sha = result.commit;
+            }
+            assert.equal((await restarted.verifyGitTreeDelivery(options)).verified, true);
+          });
+          assert.deepEqual(host.writes, ["blob", "tree", "commit", "ref", ...(pullRequest ? ["pull"] : [])]);
+        } finally {
+          require.cache[filename] = cached;
+        }
+      });
+    }
+
+    it("declines oversized complete Git receipts while preserving private readback", async () => {
+      const assignment = assigned();
+      const adapter = configured(false);
+      const host = native();
+      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: true });
+      await withClaimExecution({ assignment, claim_handle: "h1", authorize }, async () => {
+        const files = Array.from({ length: 64 }, (_, index) => ({ path: `file-${index}.txt`, content: `content-${index}` }));
+        const result = await gitTree.createGitTreeEffectHandler(adapter, host.github)({ type: "code", claim_handle: "h1", files });
+        assert.equal(gitTree.durableGitTreeReceipt(result, assignment.claims[0]), null);
+        assert.equal((await gitTree.verifyGitTreeDelivery({ adapter, claim: assignment.claims[0], github: host.github, result })).verified, true);
+      });
+    });
+
     for (const count of [1, 2]) {
       it(`prepares and independently settles every member of an original ${count}-Claim assignment`, async () => {
         const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code-matrix");

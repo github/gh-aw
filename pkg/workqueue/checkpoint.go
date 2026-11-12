@@ -37,6 +37,7 @@ type checkpointSnapshot struct {
 	ObservationIDs   map[string]*Observation `json:"observation_ids"`
 	TerminalBarriers map[string]Operation    `json:"terminal_barriers"`
 	Cancellations    map[string]Operation    `json:"cancellations"`
+	DeliveryEvidence map[string]Operation    `json:"delivery_evidence,omitempty"`
 	CompletionTimes  map[string]int64        `json:"completion_times"`
 	LastAt           int64                   `json:"last_at"`
 }
@@ -157,12 +158,15 @@ func decodeCheckpointSnapshot(data []byte) (checkpointSnapshot, []byte, error) {
 	return snapshot, logical, nil
 }
 
-func checkpointState(ordered []QueueCommit, state Projection, lastAt int64) (checkpointSnapshot, error) {
+func checkpointState(ordered []QueueCommit, state Projection, lastAt int64) (checkpointSnapshot, error) { //nolint:largefunc // Checkpoint construction stays in one validation sequence.
 	snapshot := checkpointSnapshot{
 		Projection: state, Requests: []checkpointReceipt{},
 		SeenEpochs: state.SeenEpochs, SeenGenerations: state.SeenGenerations,
 		ObservationIDs: state.ObservationIDs, TerminalBarriers: state.TerminalBarriers,
 		Cancellations: state.Cancellations, CompletionTimes: map[string]int64{}, LastAt: lastAt,
+	}
+	if len(state.DeliveryEvidence) > 0 {
+		snapshot.DeliveryEvidence = state.DeliveryEvidence
 	}
 	for id, work := range state.Works {
 		if work.CompletionID != "" {
@@ -212,7 +216,7 @@ func checkpointState(ordered []QueueCommit, state Projection, lastAt int64) (che
 		} else if original, ok := commits[id]; ok {
 			if original.Request.Kind == "checkpoint" {
 				var checkpoint CheckpointOperation
-				if len(original.Operations) != 1 || json.Unmarshal(original.Operations[0], &checkpoint) != nil {
+				if len(original.Operations) != 1 || json.Unmarshal(original.Operations[0], &checkpoint) != nil { //nolint:uncheckedsliceindex // len is checked in the same condition
 					return checkpointSnapshot{}, queueError("checkpoint_invalid", "checkpoint receipt omits its prior tip")
 				}
 				priorTip = checkpoint.PriorTip
@@ -410,7 +414,7 @@ func encodeCheckpointForHost(snapshot checkpointSnapshot, state Projection, data
 	return []QueueCommit{checkpoint}, nil
 }
 
-func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, error) {
+func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, error) { //nolint:largefunc // Checkpoint restoration stays in one validation sequence.
 	invalid := func() (Projection, error) {
 		return Projection{}, queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection")
 	}
@@ -419,7 +423,7 @@ func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, erro
 		return invalid()
 	}
 	var op CheckpointOperation
-	if err := json.Unmarshal(commit.Operations[0], &op); err != nil ||
+	if err := json.Unmarshal(commit.Operations[0], &op); err != nil || //nolint:uncheckedsliceindex // len is checked above
 		op.Kind != "Checkpoint" || !revisionPattern.MatchString(op.PriorGitSHA) {
 		return invalid()
 	}
@@ -454,22 +458,29 @@ func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, erro
 	state.RequestOrder = []string{}
 	state.WorkCreators = map[string]Actor{}
 	state.ClaimExplanations = map[string]ClaimExplanation{}
-	commitIDs := map[string]bool{}
+	commitIDs := map[string]struct{}{}
 	state.SeenEpochs, state.SeenGenerations = snapshot.SeenEpochs, snapshot.SeenGenerations
 	state.ObservationIDs, state.TerminalBarriers, state.Cancellations = snapshot.ObservationIDs, snapshot.TerminalBarriers, snapshot.Cancellations
+	state.DeliveryEvidence = snapshot.DeliveryEvidence
+	if state.DeliveryEvidence == nil {
+		state.DeliveryEvidence = map[string]Operation{}
+	}
 	if !state.SeenEpochs[state.PolicyEpoch] || !state.SeenGenerations[state.CredentialGeneration] {
 		return invalid()
 	}
 	for _, receipt := range snapshot.Requests {
+		if _, seen := commitIDs[receipt.ID]; seen {
+			return invalid()
+		}
 		if receipt.ID == "" || receipt.RequestID == "" || !checkpointDigestPattern.MatchString(receipt.Fingerprint) ||
 			!checkpointDigestPattern.MatchString(receipt.ParametersDigest) ||
 			receipt.Actor.Repository != state.Repository || receipt.Kind == "" ||
 			receipt.At < 0 || receipt.At > MaxTimestamp || receipt.PolicyEpoch == "" ||
-			state.Requests[receipt.RequestID].ID != "" || commitIDs[receipt.ID] ||
+			state.Requests[receipt.RequestID].ID != "" ||
 			validateActorOrigin(receipt.Actor) != nil || validateRequestRole(receipt.Actor, receipt.Kind) != nil {
 			return invalid()
 		}
-		commitIDs[receipt.ID] = true
+		commitIDs[receipt.ID] = struct{}{}
 		claims := []Operation{}
 		for _, operation := range receipt.Events {
 			kind, err := operationKind(operation)
@@ -500,7 +511,7 @@ func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, erro
 			if json.Unmarshal(operation, &claim) != nil {
 				return invalid()
 			}
-			explanation := receipt.ClaimExplanations[index]
+			explanation := receipt.ClaimExplanations[index] //nolint:uncheckedsliceindex // len is checked above
 			if explanation.ClaimID != claim.ClaimID || explanation.CommitID != receipt.ID ||
 				explanation.RequestID != receipt.RequestID || explanation.WorkID != claim.WorkID {
 				return invalid()
@@ -681,6 +692,9 @@ func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, erro
 				}
 			}
 		}
+	}
+	if err := state.validateDeliveryEvidenceCheckpoint(); err != nil {
+		return invalid()
 	}
 	type checkpointStart struct {
 		principal string

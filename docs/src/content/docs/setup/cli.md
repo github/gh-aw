@@ -1267,6 +1267,10 @@ gh aw remove my-workflow --no-remove-orphans    # Remove but keep orphaned inclu
 
 Update workflows based on `source` field (`owner/repo/path@ref`). By default, performs a 3-way merge to preserve local changes; use `--no-merge` to override with upstream. Semantic versions update within same major version.
 
+Merge conflicts leave the existing workflow and lock file unchanged by default. With `--no-compile`, conflicted merges are written with conflict markers for manual resolution. Conflicts and other workflow update failures produce a nonzero exit status and prevent pull request creation even when other workflows update successfully; rate-limit-only failures remain non-fatal.
+
+Before updating action, skill, and plugin pins, `update` scans workflow Markdown files for conflict markers. A missing workflow directory is treated as empty. Other scan errors, including unreadable files or broken symlinks inside an existing directory, fail the command and skip these pin updates because the absence of conflict markers cannot be verified.
+
 By default, `update` also force-updates all GitHub Actions referenced in your workflows (both in `actions-lock.json` and workflow files) to their latest major version. Use `--no-release-bump` to restrict force-updates to core `actions/*` actions only.
 
 Container digest pins are refreshed on a best-effort basis using Docker Buildx or `crane`. If a lookup fails, `update` prints one short informational message with the reason and preserves existing pins. Set `DEBUG=cli:update_container_pins` for per-image diagnostics.

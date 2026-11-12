@@ -188,7 +188,8 @@ func TestGitLabConnectorGeneratedNodeHostStagesWithoutSecretsOrNetwork(t *testin
 			require.NotNil(t, script)
 			configuration, err := json.Marshal(map[string]any{
 				"script": script.Script, "root": root, "assets": assets, "authored": mode == "authored-staged",
-				"secret": connectorCredentialEnvPrefix("gitlab") + "APPROVED_GITLAB_WRITER",
+				"secret":  connectorCredentialEnvPrefix("gitlab") + "APPROVED_GITLAB_WRITER",
+				"planEnv": connectorEnvPrefix("gitlab") + "PLAN", "plan": data.Connectors["gitlab"].SafeOutputPlan,
 			})
 			require.NoError(t, err)
 			command := exec.CommandContext(t.Context(), node, "-e", `
@@ -207,7 +208,7 @@ fs.writeFileSync(guard, [
   "  return target[name];",
   "} });"
 ].join("\n"));
-const env = {RUNNER_TEMP:config.root};
+const env = {RUNNER_TEMP:config.root, [config.planEnv]:config.plan};
 Object.defineProperty(env, config.secret, {get() { throw new Error("Generated host accessed writer secret"); }});
 let calls = 0, formatted;
 const adaptedRequire = name => {

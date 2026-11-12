@@ -43,7 +43,7 @@ tools:
         return true;
 pre-agent-steps:
   - name: Isolate simulator memory and read-only ledger signals
-    uses: actions/github-script@v9
+    uses: actions/github-script@v9.0.0
     env:
       GH_TOKEN: ${{ github.token }}
     with:
@@ -99,7 +99,7 @@ post-steps:
   - name: Restore producer evidence and validate final memory
     id: restore_simulator_evidence
     if: ${{ always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' }}
-    uses: actions/github-script@v9
+    uses: actions/github-script@v9.0.0
     with:
       script: |
         const path = require("node:path");
@@ -124,7 +124,7 @@ post-steps:
         main({ roots: [memoryDir], core });
   - name: Replace staged memory with reconstructed producer evidence
     if: ${{ always() && steps.restore_simulator_evidence.outcome == 'success' }}
-    uses: actions/upload-artifact@v7
+    uses: actions/upload-artifact@v7.0.2
     with:
       name: repo-memory-default
       path: /tmp/gh-aw/repo-memory/default

@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"48b6b8bf8dbf1d8a582a1c5cc2d1a575f0e39e4ce6f70aad3b3542bde678d923","body_hash":"7db1327445bd4c8f6292ac7598d9b0b537c1cc5cb6f33ea724ebab8c56cb54ea","strict":true,"agent_id":"codex","engine_versions":{"codex":"0.167.0"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"skills":["DietrichGebert/ponytail/skills/ponytail-review@09c434ab73ca43761c5d8b0c5d341926c2fba710"],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11@sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11@sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.11@sha256:97782bc0d8ff7f80f19ae2fdc5e1668517aa732a6fa077e64b8d3919238496d2"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.11@sha256:51de2cdeaaa7a2c039df7beed34472b8598cf9296bd2365ab08045142b67b1fe"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11@sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.6","digest":"sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.6@sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"has_pull_request":true,"mcp_servers":[{"name":"safeoutputs","tools":["create_check_run","create_pull_request_review_comment","noop","report_incomplete","report_missing_data","report_missing_tool","submit_pull_request_review"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"23a84b506499f761818d9814e9b2865303945dca20d9084aebb747694c46758d","body_hash":"7db1327445bd4c8f6292ac7598d9b0b537c1cc5cb6f33ea724ebab8c56cb54ea","strict":true,"agent_id":"codex","engine_versions":{"codex":"0.167.0"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"skills":["DietrichGebert/ponytail/skills/ponytail-review@96608e078b2d5ea607c5c3b8b5a54d1c1fba6846"],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11@sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11@sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.11@sha256:97782bc0d8ff7f80f19ae2fdc5e1668517aa732a6fa077e64b8d3919238496d2"},{"image":"ghcr.io/github/gh-aw-firewall/router:0.29.11@sha256:51de2cdeaaa7a2c039df7beed34472b8598cf9296bd2365ab08045142b67b1fe"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11@sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.6","digest":"sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.6@sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.1.0","digest":"sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a","pinned_image":"ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a"}],"has_pull_request":true,"mcp_servers":[{"name":"safeoutputs","tools":["create_check_run","create_pull_request_review_comment","noop","report_incomplete","report_missing_data","report_missing_tool","submit_pull_request_review"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -204,7 +204,7 @@ jobs:
           GH_AW_INFO_FRONTMATTER_EMOJI: "✂️"
           GH_AW_COMPILED_STRICT: "true"
           GH_AW_INFO_FEATURES: '{"gh-aw-detection":true}'
-          GH_AW_INFO_SKILLS: '["DietrichGebert/ponytail/skills/ponytail-review@09c434ab73ca43761c5d8b0c5d341926c2fba710"]'
+          GH_AW_INFO_SKILLS: '["DietrichGebert/ponytail/skills/ponytail-review@96608e078b2d5ea607c5c3b8b5a54d1c1fba6846"]'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -358,7 +358,7 @@ jobs:
           GH_AW_GH_SKILL_AGENT_NAME: "codex"
           GH_AW_SKILL_DIR: ".codex/skills"
           GH_AW_SKILL_INSTALL_INDEX: "1"
-          GH_AW_FRONTMATTER_SKILLS: "DietrichGebert/ponytail/skills/ponytail-review@09c434ab73ca43761c5d8b0c5d341926c2fba710"
+          GH_AW_FRONTMATTER_SKILLS: "DietrichGebert/ponytail/skills/ponytail-review@96608e078b2d5ea607c5c3b8b5a54d1c1fba6846"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -388,12 +388,8 @@ jobs:
         with:
           github-token: no-authentication
           script: |
-            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_799BE623","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_WORKSPACE","GH_AW_INCLUDE_PR_CONTEXT","GH_AW_PROMPT","GH_AW_PROMPT_CONFIG","GH_AW_PROMPT_CONTENT_0000","GH_AW_PROMPT_CONTENT_0001","GH_AW_PROMPT_CONTENT_0002","GH_AW_PROMPT_CONTENT_0003","GH_AW_PROMPT_CONTENT_0004","GH_AW_PROMPT_CONTENT_0005","GH_AW_PROMPT_CONTENT_0006","GH_AW_PROMPT_CONTENT_0007","GH_AW_PROMPT_CONTENT_0008","GH_AW_SAFE_OUTPUTS","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
-            for (const name of Object.keys(process.env)) {
-              if (!promptEnvironment.has(name)) delete process.env[name];
-            }
-            global.core = core;
-            global.context = context;
+            const { setupPromptGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_prompt_globals.cjs');
+            setupPromptGlobals(core, context);
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
         env:
@@ -459,6 +455,7 @@ jobs:
             {{#runtime-import .github/workflows/shared/github-guard-policy.md}}
           GH_AW_PROMPT_CONTENT_0008: |
             {{#runtime-import .github/workflows/shared/pr-code-review-config.md}}
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_799BE623\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_PROMPT_CONTENT_0005\",\"GH_AW_PROMPT_CONTENT_0006\",\"GH_AW_PROMPT_CONTENT_0007\",\"GH_AW_PROMPT_CONTENT_0008\",\"GH_AW_SAFE_OUTPUTS\"]"
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -470,12 +467,8 @@ jobs:
         with:
           github-token: no-authentication
           script: |
-            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_ENGINE_ID","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_799BE623","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_WORKSPACE","GH_AW_INCLUDE_PR_CONTEXT","GH_AW_MCP_CLI_SERVERS_LIST","GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED","GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND","GH_AW_PROMPT","GH_AW_SKILL_DIR","GH_AW_SKILL_EXT","GH_AW_SUB_AGENT_DIR","GH_AW_SUB_AGENT_EXT","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
-            for (const name of Object.keys(process.env)) {
-              if (!promptEnvironment.has(name)) delete process.env[name];
-            }
-            global.core = core;
-            global.context = context;
+            const { setupPromptGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_prompt_globals.cjs');
+            setupPromptGlobals(core, context);
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
             await main({ authorExpressions: {"github.event.issue.number || github.event.pull_request.number":"GH_AW_EXPR_799BE623","github.repository":"GH_AW_GITHUB_REPOSITORY","needs.pre_activation.outputs.activated":"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED","needs.pre_activation.outputs.matched_command":"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND"} });
         env:
@@ -499,6 +492,7 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ENGINE_ID\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_799BE623\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND\",\"GH_AW_PROMPT\",\"GH_AW_SKILL_DIR\",\"GH_AW_SKILL_EXT\",\"GH_AW_SUB_AGENT_DIR\",\"GH_AW_SUB_AGENT_EXT\"]"
           GH_AW_SKILL_DIR: .codex/skills
           GH_AW_SKILL_EXT: /SKILL.md
           GH_AW_SUB_AGENT_DIR: .codex/agents
@@ -513,12 +507,8 @@ jobs:
         with:
           github-token: no-authentication
           script: |
-            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_EXPR_76DF9333","GH_AW_EXPR_77C1A4D2","GH_AW_EXPR_799BE623","GH_AW_EXPR_7C248226","GH_AW_EXPR_C19C384F","GH_AW_GITHUB_ACTOR","GH_AW_GITHUB_REPOSITORY","GH_AW_GITHUB_RUN_ID","GH_AW_GITHUB_WORKSPACE","GH_AW_INCLUDE_PR_CONTEXT","GH_AW_MCP_CLI_SERVERS_LIST","GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED","GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND","GH_AW_PROMPT","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
-            for (const name of Object.keys(process.env)) {
-              if (!promptEnvironment.has(name)) delete process.env[name];
-            }
-            global.core = core;
-            global.context = context;
+            const { setupPromptGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_prompt_globals.cjs');
+            setupPromptGlobals(core, context);
 
             const substitutePlaceholders = require(process.env.GH_AW_ACTIONS_DIR + '/substitute_placeholders.cjs');
 
@@ -561,6 +551,7 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_ENV: "[\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_799BE623\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_INCLUDE_PR_CONTEXT\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED\",\"GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND\",\"GH_AW_PROMPT\"]"
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
           OTEL_EXPORTER_OTLP_PROTOCOL: ""
@@ -689,7 +680,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "48b6b8bf8dbf1d8a582a1c5cc2d1a575f0e39e4ce6f70aad3b3542bde678d923:7db1327445bd4c8f6292ac7598d9b0b537c1cc5cb6f33ea724ebab8c56cb54ea"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "23a84b506499f761818d9814e9b2865303945dca20d9084aebb747694c46758d:7db1327445bd4c8f6292ac7598d9b0b537c1cc5cb6f33ea724ebab8c56cb54ea"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -1488,7 +1479,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
             main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });
       - name: Append agent step summary
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
       - name: Copy Safe Outputs
         if: always()
@@ -2168,7 +2159,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "48b6b8bf8dbf1d8a582a1c5cc2d1a575f0e39e4ce6f70aad3b3542bde678d923:7db1327445bd4c8f6292ac7598d9b0b537c1cc5cb6f33ea724ebab8c56cb54ea"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "23a84b506499f761818d9814e9b2865303945dca20d9084aebb747694c46758d:7db1327445bd4c8f6292ac7598d9b0b537c1cc5cb6f33ea724ebab8c56cb54ea"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}

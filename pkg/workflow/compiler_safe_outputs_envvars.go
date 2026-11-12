@@ -6,6 +6,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
 var consolidatedSafeOutputsEnvvarsLog = logger.New("workflow:compiler_safe_outputs_envvars")
@@ -20,6 +21,11 @@ func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID
 	addJobLevelEngineMetadata(envVars, data)
 	addJobLevelCommandMetadata(envVars, data)
 	c.addJobLevelSafeOutputConfig(envVars, data)
+	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
+		if plan := data.Connectors[alias].SafeOutputPlan; plan != "" {
+			envVars[connectorEnvPrefix(alias)+"PLAN"] = quoteYAMLEnvValue(plan)
+		}
+	}
 	return envVars
 }
 

@@ -245,7 +245,9 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	actionDeps := defaultActionUpdateDeps()
 
 	if err := UpdateWorkflows(ctx, opts); err != nil {
-		firstErr = fmt.Errorf("workflow update failed: %w", err)
+		// Preserved sources have no conflict markers, so scanning later phases
+		// cannot prevent them from rewriting a workflow whose update failed.
+		return fmt.Errorf("workflow update failed: %w", err)
 	}
 
 	// Update GitHub Actions versions in actions-lock.json.
@@ -290,7 +292,9 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	updateLog.Print("Updating container image digest pins")
 	newContainerPins := false
 	var err error
-	if conflictedWorkflow, scanErr := findWorkflowWithMergeConflictMarkers(opts.WorkflowsDir); scanErr == nil && conflictedWorkflow != "" {
+	if conflictedWorkflow, scanErr := findWorkflowWithMergeConflictMarkers(opts.WorkflowsDir); scanErr != nil {
+		firstErr = errors.Join(firstErr, fmt.Errorf("unable to scan workflows for merge conflicts: %w", scanErr))
+	} else if conflictedWorkflow != "" {
 		message := "Skipping container pin updates and recompilation because merge conflict markers are present in " + conflictedWorkflow
 		updateLog.Print(message)
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
