@@ -285,7 +285,7 @@ Set `model` (or `engine.model`) to a router value to route the main agent: `rout
 model: router/economy
 ```
 
-`engine.model-routing` still works and enables experimental per-run model and reasoning-effort selection for the Copilot, Claude, Codex, and pi engines when they use GitHub Copilot inference, with the AWF firewall. Requires `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`). The optional `allowed-models` list takes exact model names and limits the router's candidates for the main agent; it is not a request policy. Put patterns such as `gpt-*` in [`models.allowed` or `models.blocked`](/gh-aw/reference/glossary/#model-policy-modelsallowed-modelsblocked) instead. Overrides the fixed `engine.model` and effort settings. See [Model Routing](/gh-aw/reference/model-routing/) for value meanings, requirements, sub-agent constraints, known limitations, and logs.
+For shortlists and other settings, see [advanced model routing](/gh-aw/reference/model-routing/#advanced-engine-model-routing).
 
 ### Engine Driver (`engine.driver:`)
 

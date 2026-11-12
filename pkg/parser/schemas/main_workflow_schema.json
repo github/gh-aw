@@ -1543,7 +1543,8 @@
                       "typed",
                       "untyped",
                       "field_added",
-                      "field_removed"
+                      "field_removed",
+                      "status_changed"
                     ]
                   }
                 },
