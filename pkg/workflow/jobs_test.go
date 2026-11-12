@@ -354,6 +354,8 @@ func TestRenderStepForRunner(t *testing.T) {
 		"${{ steps.wsl_setup_node.outputs.node-version }}",
 		"SHASUMS256.txt.asc",
 		"gpgv --keyring",
+		"# runner-guard:ignore RGS-006 --",
+		"# runner-guard:ignore RGS-012 --",
 		"https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg/pubring.kbx",
 		"ln -sfn \"$install_dir\" /usr/local/lib/nodejs/current",
 		`export PATH="/usr/local/lib/nodejs/current/bin:$PATH"`,
