@@ -20,7 +20,18 @@ func countBlockedSafeOutputsCommands(logsPath string) int {
 	if err != nil {
 		return 0
 	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditReportLog.Printf("Failed to close Claude agent log: %v", err)
+		}
+	}()
 
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), maxClaudeAuditLogLine)
+	return countBlockedSafeOutputsFromScanner(scanner)
+}
+
+func countBlockedSafeOutputsFromScanner(scanner *bufio.Scanner) int {
 	type toolUse struct {
 		Type  string `json:"type"`
 		ID    string `json:"id"`
@@ -41,8 +52,6 @@ func countBlockedSafeOutputsCommands(logsPath string) int {
 		PermissionDenials []permissionDenial `json:"permission_denials"`
 	}
 
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 64*1024), maxClaudeAuditLogLine)
 	safeOutputsToolUses := make(map[string]struct{})
 	blockedCalls := make(map[string]struct{})
 	for scanner.Scan() {
@@ -69,9 +78,7 @@ func countBlockedSafeOutputsCommands(logsPath string) int {
 			}
 		}
 	}
-	scanErr := scanner.Err()
-	closeErr := file.Close()
-	if scanErr != nil || closeErr != nil {
+	if scanner.Err() != nil {
 		return len(blockedCalls)
 	}
 	return len(blockedCalls)
@@ -79,18 +86,14 @@ func countBlockedSafeOutputsCommands(logsPath string) int {
 
 func isSafeOutputsCommand(command string) bool {
 	command = strings.TrimSpace(command)
-	if !strings.HasPrefix(command, "safeoutputs") {
-		return false
-	}
-	if len(command) <= len("safeoutputs") {
-		return len(command) == len("safeoutputs")
-	}
-	switch command[len("safeoutputs")] {
-	case ' ', '\t', '\n', '\r', ';', '&', '|':
-		return true
-	default:
-		return false
-	}
+	return command == "safeoutputs" ||
+		strings.HasPrefix(command, "safeoutputs ") ||
+		strings.HasPrefix(command, "safeoutputs\t") ||
+		strings.HasPrefix(command, "safeoutputs\n") ||
+		strings.HasPrefix(command, "safeoutputs\r") ||
+		strings.HasPrefix(command, "safeoutputs;") ||
+		strings.HasPrefix(command, "safeoutputs&") ||
+		strings.HasPrefix(command, "safeoutputs|")
 }
 
 func generateSafeOutputsBlockedFindings(processedRun ProcessedRun) []AuditFinding {
