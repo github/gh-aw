@@ -263,7 +263,11 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 			CooldownDays:      &cooldownDays,
 		},
 	)
-	for _, packageName := range install.AdditionalPackageNames {
+	additionalPackageNames := install.AdditionalPackageNames
+	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil && behavior.Durable != nil {
+		additionalPackageNames = append(append([]string(nil), additionalPackageNames...), behavior.Durable.DurablePackages...)
+	}
+	for _, packageName := range additionalPackageNames {
 		npmSteps = append(npmSteps, GenerateNpmInstallSteps(
 			packageName,
 			version,
@@ -1051,6 +1055,7 @@ func deepCopyEngineBehaviorDefinition(src EngineBehaviorDefinition) EngineBehavi
 		durable := *src.Durable
 		durable.Installation = append([]EngineInstallationDefinition(nil), src.Durable.Installation...)
 		durable.Files = append([]string(nil), src.Durable.Files...)
+		durable.DurablePackages = append([]string(nil), src.Durable.DurablePackages...)
 		for i := range durable.Installation {
 			if cooldown := durable.Installation[i].Cooldown; cooldown != nil {
 				copy := *cooldown

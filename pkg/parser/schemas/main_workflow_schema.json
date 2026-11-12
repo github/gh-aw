@@ -16298,6 +16298,11 @@
                       "items": { "type": "string", "minLength": 1 },
                       "description": "Explicit files or directories under /tmp/gh-aw/agent/ to persist. $GH_AW_DURABLE_CHECKPOINT refers to the compiler-managed native checkpoint file. Globs and overlapping paths are unsupported."
                     },
+                    "durable-packages": {
+                      "type": "array",
+                      "items": { "type": "string", "minLength": 1 },
+                      "description": "Additional npm packages installed globally at the engine CLI version only when engine.durable is enabled."
+                    },
                     "installation": {
                       "type": "array",
                       "minItems": 1,

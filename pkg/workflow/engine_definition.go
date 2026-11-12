@@ -300,10 +300,13 @@ type EngineBehaviorDefinition struct {
 // EngineDurableDefinition reuses normal installation and execution behavior for
 // engines whose durable harness differs from their ordinary invocation.
 type EngineDurableDefinition struct {
-	Files         []string                       `yaml:"files,omitempty"`
-	Installation  []EngineInstallationDefinition `yaml:"installation,omitempty"`
-	Execution     *EngineExecutionDefinition     `yaml:"execution,omitempty"`
-	HarnessScript string                         `yaml:"harness-script,omitempty"`
+	Files []string `yaml:"files,omitempty"`
+	// DurablePackages are npm packages installed at the engine CLI version only
+	// when the workflow enables durable execution.
+	DurablePackages []string                       `yaml:"durable-packages,omitempty"`
+	Installation    []EngineInstallationDefinition `yaml:"installation,omitempty"`
+	Execution       *EngineExecutionDefinition     `yaml:"execution,omitempty"`
+	HarnessScript   string                         `yaml:"harness-script,omitempty"`
 }
 
 // AuthBinding maps a logical authentication role to a secret name.

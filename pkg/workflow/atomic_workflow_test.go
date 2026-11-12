@@ -41,7 +41,8 @@ func TestAtomicSampleExecution(t *testing.T) {
 	assert.False(t, engine.GetCapabilities().MaxTurns)
 	assert.Empty(t, def.Auth)
 	assert.Equal(t, "universal-llm-consumer", def.Behaviors.SecretStrategy)
-	assert.Equal(t, []string{"@bastani/atomic-storage-libsql"}, def.Behaviors.Installation.AdditionalPackageNames)
+	assert.Empty(t, def.Behaviors.Installation.AdditionalPackageNames)
+	assert.Equal(t, []string{"@bastani/atomic-storage-libsql"}, def.Behaviors.Durable.DurablePackages)
 	expectedArgs := []string{"--print", "--mode", "text", "--no-themes", "--approve", "--exclude-tools", "ask_user_question"}
 	assert.Equal(t, expectedArgs, def.Behaviors.Execution.Args)
 	assert.Empty(t, engine.GetLogParserScriptId())
@@ -55,9 +56,20 @@ func TestAtomicSampleExecution(t *testing.T) {
 		installation.WriteString(strings.Join(step, "\n"))
 	}
 	assert.Contains(t, installation.String(), "@bastani/atomic@"+def.Version)
-	assert.Contains(t, installation.String(), "@bastani/atomic-storage-libsql@"+def.Version)
+	assert.NotContains(t, installation.String(), "@bastani/atomic-storage-libsql@")
 	assert.Contains(t, installation.String(), "NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
 	assert.Contains(t, installation.String(), "atomic --version")
+	durableData := *data
+	durableConfig := *data.EngineConfig
+	durableConfig.Durable = &DurableConfig{RetentionDays: 7}
+	durableData.EngineConfig = &durableConfig
+	var durableInstallation strings.Builder
+	for _, step := range engine.GetInstallationSteps(&durableData) {
+		durableInstallation.WriteString(strings.Join(step, "\n"))
+	}
+	assert.Contains(t, durableInstallation.String(), "@bastani/atomic-storage-libsql@"+def.Version)
+	_, err = engine.GetDurableExecutionPlan(&durableData, "/tmp/atomic.log")
+	assert.NoError(t, err)
 	overrideData := &WorkflowData{
 		EngineConfig: &EngineConfig{ID: "atomic", Version: "0.9.80"},
 	}
@@ -66,7 +78,15 @@ func TestAtomicSampleExecution(t *testing.T) {
 		overrideInstallation.WriteString(strings.Join(step, "\n"))
 	}
 	assert.Contains(t, overrideInstallation.String(), "@bastani/atomic@0.9.80")
-	assert.Contains(t, overrideInstallation.String(), "@bastani/atomic-storage-libsql@0.9.80")
+	assert.NotContains(t, overrideInstallation.String(), "@bastani/atomic-storage-libsql@")
+	overrideDurableData := &WorkflowData{
+		EngineConfig: &EngineConfig{ID: "atomic", Version: "0.9.80", Durable: &DurableConfig{RetentionDays: 7}},
+	}
+	var overrideDurableInstallation strings.Builder
+	for _, step := range engine.GetInstallationSteps(overrideDurableData) {
+		overrideDurableInstallation.WriteString(strings.Join(step, "\n"))
+	}
+	assert.Contains(t, overrideDurableInstallation.String(), "@bastani/atomic-storage-libsql@0.9.80")
 	for _, step := range engine.GetExecutionSteps(data, "/tmp/atomic.log") {
 		execution.WriteString(strings.Join(step, "\n"))
 	}
@@ -499,9 +519,10 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 	assert.Equal(t, "/tmp/gh-aw/agent/atomic-store", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORE_DIR"])
 	assert.NotContains(t, def.Behaviors.Execution.Env, "GH_AW_ATOMIC_STORAGE_ADAPTER")
 	assert.Equal(t, "/tmp/gh-aw/atomic-storage-staging.json", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORAGE_STAGING"])
-	assert.Equal(t, []string{"@bastani/atomic-storage-libsql"}, def.Behaviors.Installation.AdditionalPackageNames)
+	assert.Empty(t, def.Behaviors.Installation.AdditionalPackageNames)
 
 	require.NotNil(t, def.Behaviors.Durable)
+	assert.Equal(t, []string{"@bastani/atomic-storage-libsql"}, def.Behaviors.Durable.DurablePackages)
 	assert.Equal(t, []string{"/tmp/gh-aw/agent/atomic-store"}, def.Behaviors.Durable.Files)
 	assert.Equal(t, def.Behaviors.Execution, def.Behaviors.Durable.Execution)
 	assert.Equal(t, def.Behaviors.HarnessScript, def.Behaviors.Durable.HarnessScript)
@@ -561,7 +582,9 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 		{def.Version},
 		{"0.9.80"},
 	} {
-		data := &WorkflowData{EngineConfig: &EngineConfig{ID: "atomic", Version: test.version}}
+		data := &WorkflowData{EngineConfig: &EngineConfig{
+			ID: "atomic", Version: test.version, Durable: &DurableConfig{RetentionDays: 7},
+		}}
 		var installation strings.Builder
 		for _, installStep := range engine.GetInstallationSteps(data) {
 			installation.WriteString(strings.Join(installStep, "\n"))

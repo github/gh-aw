@@ -44,6 +44,9 @@ func (e *BehaviorDefinedEngine) GetDurableExecutionPlan(data *WorkflowData, logF
 		return nil, fmt.Errorf("engine %q behaviors.durable.files: %w", e.GetID(), err)
 	}
 	plan := &DurableExecutionPlan{Files: files, ExecutionSteps: engine.GetExecutionSteps(data, logFile)}
+	if err := validateDurablePackages(e.GetID(), behavior.Installation, durable.DurablePackages); err != nil {
+		return nil, err
+	}
 	for _, dependency := range durable.Installation {
 		if dependency.PackageManager != "npm" || !durableDependencyVersion.MatchString(dependency.Version) ||
 			dependency.PackageName == "" || dependency.VerifyCommand == "" {
@@ -65,6 +68,21 @@ func (e *BehaviorDefinedEngine) GetDurableExecutionPlan(data *WorkflowData, logF
 		plan.InstallationSteps = append(plan.InstallationSteps, depEngine.GetInstallationSteps(&depData)...)
 	}
 	return plan, nil
+}
+
+func validateDurablePackages(engineID string, installation *EngineInstallationDefinition, packages []string) error {
+	if len(packages) == 0 {
+		return nil
+	}
+	if installation == nil || installation.PackageManager != "npm" {
+		return fmt.Errorf("engine %q behaviors.durable.durable-packages requires behaviors.installation.package-manager: npm", engineID)
+	}
+	for _, packageName := range packages {
+		if err := validateNpmPackageName(packageName); err != nil {
+			return fmt.Errorf("engine %q durable package: %w", engineID, err)
+		}
+	}
+	return nil
 }
 
 func resolveDurableFilePaths(declared []string, checkpoint string) ([]string, error) {

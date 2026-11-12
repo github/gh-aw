@@ -61,8 +61,6 @@ engine:
     installation:
       package-manager: npm
       package-name: "@bastani/atomic"
-      additional-package-names:
-        - "@bastani/atomic-storage-libsql"
       binary-name: atomic
       step-name: Install Atomic CLI
       include-node-setup: true
@@ -91,6 +89,8 @@ engine:
         GH_AW_ATOMIC_STORE_DIR: /tmp/gh-aw/agent/atomic-store
         GH_AW_ATOMIC_STORAGE_STAGING: /tmp/gh-aw/atomic-storage-staging.json
     durable:
+      durable-packages:
+        - "@bastani/atomic-storage-libsql"
       files:
         - /tmp/gh-aw/agent/atomic-store
       execution:
