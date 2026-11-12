@@ -623,15 +623,15 @@ func renderConsoleGatewaySteeringEvents(events []GatewaySteeringEvent) {
 	}
 	fmt.Fprintln(os.Stderr, "  gateway_steering_events:")
 	for _, event := range events {
-		line := fmt.Sprintf("    %s: %s", event.Type, event.Message)
+		line := fmt.Sprintf("    %s: %s", sanitizeControlChars(event.Type), sanitizeControlChars(event.Message))
 		if event.Trigger == steeringTriggerLittleLeft {
 			line += " [little left]"
 		}
 		if event.Conversation != "" {
-			line += " conversation=" + event.Conversation
+			line += " conversation=" + sanitizeControlChars(event.Conversation)
 		}
 		if event.Timestamp != "" {
-			line += " (" + event.Timestamp + ")"
+			line += " (" + sanitizeControlChars(event.Timestamp) + ")"
 		}
 		fmt.Fprintln(os.Stderr, line)
 	}

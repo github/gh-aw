@@ -187,6 +187,22 @@ func TestRenderConsoleGatewaySteeringEvents(t *testing.T) {
 	assert.Contains(t, output, "2026-09-23T12:00:00Z")
 }
 
+func TestRenderConsoleGatewaySteeringEventsEscapesControlChars(t *testing.T) {
+	output := testutil.CaptureStderr(t, func() {
+		renderConsoleGatewaySteeringEvents([]GatewaySteeringEvent{{
+			Type:         tokenSteeringEventName + "\x1b[2J",
+			Message:      "budget \x1b]52;c;aGk=\a low \x1b[31mred\x1b[0m",
+			Conversation: "conv-\x1b[1m",
+			Timestamp:    "2026-09-23T12:00:00Z\x1b[K",
+		}})
+	})
+
+	assert.NotContains(t, output, "\x1b")
+	assert.NotContains(t, output, "\a")
+	assert.Contains(t, output, `low '\x1b'[31mred'\x1b'[0m`)
+	assert.Contains(t, output, `conversation=conv-'\x1b'[1m`)
+}
+
 func TestRenderAuditCompletion(t *testing.T) {
 	outputDir := t.TempDir()
 

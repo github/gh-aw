@@ -1097,6 +1097,42 @@ describe("smoke_model_routing_assertions", () => {
       expect(lineFor(passes, "T2")).toBe("PASS T2 no threshold notices: the main agent was steered by an ai_credit little_left delivery before 80% of 7");
     });
 
+    it("ignores a final 2xx /responses/compact request that started at or above 80% in the zero-notice T2 check", () => {
+      // AWF never places a budget notice on a compaction request
+      // (isSteeringExcluded), so the 80% notice stays pending.
+      steeringFixture({ credits: LITTLE_LEFT_CREDITS });
+      const requests = [...LITTLE_LEFT_CREDITS, [1.35, 5.7], [0.3, 6.0]].map(tokenRecord);
+      requests[7] = { ...requests[7], path: "/responses/compact" };
+      requests[8] = { ...requests[8], path: "/responses/compact" };
+      write(TOKEN_USAGE, requests);
+      const { passes, failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
+      expect(failures).toEqual([]);
+      expect(lineFor(passes, "T2")).toBe("PASS T2 no threshold notices: the main agent was steered by an ai_credit little_left delivery before 80% of 7");
+    });
+
+    it.each(["/v1/messages/count_tokens", "/v1/responses/input_tokens", "/v1beta/models/gemini:countTokens", "/model/anthropic.claude/count-tokens", "/v1/models/count-tokens:rawPredict", "/v1/decisions/"])(
+      "ignores a 2xx %s request without accounting in the zero-notice T2 check",
+      excludedPath => {
+        steeringFixture({ credits: LITTLE_LEFT_CREDITS });
+        const requests = [...LITTLE_LEFT_CREDITS, [undefined, undefined]].map(tokenRecord);
+        requests[7] = { ...requests[7], path: excludedPath };
+        write(TOKEN_USAGE, requests);
+        const { passes, failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
+        expect(failures.filter(line => line.startsWith("FAIL T2"))).toEqual([]);
+        expect(lineFor(passes, "T2")).toBe("PASS T2 no threshold notices: the main agent was steered by an ai_credit little_left delivery before 80% of 7");
+      }
+    );
+
+    it("still fails T2 when a 2xx /responses request started at or above 80% after a compaction request", () => {
+      steeringFixture({ credits: LITTLE_LEFT_CREDITS });
+      const requests = [...LITTLE_LEFT_CREDITS, [1.35, 5.7], [0.3, 6.0]].map(tokenRecord);
+      requests[7] = { ...requests[7], path: "/responses/compact" };
+      write(TOKEN_USAGE, requests);
+      expect(lineFor(steeringCheck({ steering: { maxAiCredits: 7 } }).failures, "T2")).toBe(
+        "FAIL T2 no ai_credit@80 notice, but 1 2xx main-agent request(s) started at or above 80% of 7 (5.6): request=run-38174216426-req-9 status=200 total_before=5.7 total_after=6; observed notices: none"
+      );
+    });
+
     it("fails T1 when the little_left delivery was only on a non-2xx response", () => {
       steeringFixture({ credits: LITTLE_LEFT_CREDITS });
       const requests = LITTLE_LEFT_CREDITS.map(tokenRecord);

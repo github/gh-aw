@@ -70,6 +70,11 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  *   the highest threshold already crossed and still sends the 80% notice on
  *   the next request (a non-2xx request never delivers it, AWF keeps it
  *   pending, so a later 2xx request also started past 80% and is caught);
+ *   both zero-notice checks ignore requests AWF never steers (AWF
+ *   `isSteeringExcluded`: paths ending in `/decisions`, token-counting routes
+ *   `/count_tokens`, `/count-tokens`, `/input_tokens` and `:countTokens`,
+ *   optionally followed by `:rawPredict` or `:streamRawPredict`, and
+ *   `/responses/compact`);
  *   T3 the final `ai_credits_total` is below the budget, no
  *   `ai_credits_limit_exceeded` routing failure, and agent execution
  *   succeeded; T4 every other check passed
@@ -733,6 +738,23 @@ function creditsBefore(request) {
   return total !== undefined && thisResponse !== undefined ? Number((total - thisResponse).toFixed(6)) : undefined;
 }
 
+/**
+ * Whether AWF never places a budget notice on a request to this path (AWF
+ * `isSteeringExcluded`): evaluation evidence (`/decisions`), token-counting
+ * routes and Responses compaction.
+ * @param {unknown} requestPath @returns {boolean}
+ */
+function isSteeringExcludedPath(requestPath) {
+  if (typeof requestPath !== "string") return false;
+  let pathname;
+  try {
+    pathname = new URL(requestPath, "https://localhost").pathname.replace(/\/+$/, "");
+  } catch {
+    return true;
+  }
+  return pathname.endsWith("/decisions") || /(?:\/(?:count[_-]tokens|input_tokens)|:countTokens)(?::(?:rawPredict|streamRawPredict))?$/i.test(pathname) || pathname.endsWith("/responses/compact");
+}
+
 /** @param {unknown} status @returns {boolean} */
 function isSuccessStatus(status) {
   const code = Number(status);
@@ -842,6 +864,8 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
   // 2xx main-agent request started at or above 80%: AWF ranks little_left just
   // above the highest threshold already crossed, so it still sends the 80%
   // notice on the next 2xx request. Every 2xx request must carry accounting.
+  // Requests AWF never steers (/decisions, token counting, /responses/compact)
+  // cannot carry the notice, so they are ignored here.
   const t2Problems = [];
   if (!notices.length && !t1PassedOnLittleLeft) t2Problems.push("no steering notices to check");
   else if (!notices.length) {
@@ -850,7 +874,8 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
       const required = (STEERING_THRESHOLDS[0] / 100) * budget;
       // A 2xx request without accounting may have started past 80%, so the
       // exception cannot be verified; non-2xx requests never reached the model.
-      const unaccounted = agentTraffic.filter(request => isSuccessStatus(request?.status) && creditsBefore(request) === undefined);
+      const steerable = agentTraffic.filter(request => isSuccessStatus(request?.status) && !isSteeringExcludedPath(request?.path));
+      const unaccounted = steerable.filter(request => creditsBefore(request) === undefined);
       if (unaccounted.length) {
         t2Problems.push(
           `no ai_credit@${STEERING_THRESHOLDS[0]} notice, but ${unaccounted.length} 2xx main-agent request(s) lack numeric ai_credits_total/ai_credits_this_response, so they cannot be shown to have started below ${STEERING_THRESHOLDS[0]}% of ${budget}: ${unaccounted
@@ -861,8 +886,7 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
       }
       // A non-2xx request never delivers its notice (AWF keeps it pending for
       // the next request), so only 2xx requests can have missed the notice.
-      const missed = agentTraffic.filter(request => {
-        if (!isSuccessStatus(request?.status)) return false;
+      const missed = steerable.filter(request => {
         const before = creditsBefore(request);
         return before !== undefined && before + CREDIT_EPSILON >= required;
       });
