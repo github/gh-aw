@@ -1806,7 +1806,7 @@ Authorization for one attempt at a Work item in a native [work queue](#work-queu
 
 ### Delivery Evidence (Work Queue)
 
-A ledger record of observed delivery for a [Claim](#claim-work-queue)'s effects, persisted in the `work-queue.jsonl` transaction log so verification survives restarts and checkpoints. Pending Delivery Evidence keeps the delivery barrier in place until bounded verification records a Result or a `DeliveryFailure`; uncertain delivery is never retried by rerunning effects. See [Work Queues](/gh-aw/reference/work-queue/).
+A ledger record of delivery observations for a [Claim](#claim-work-queue)'s effects, persisted in the `work-queue.jsonl` transaction log so verification survives restarts and checkpoints. Delivery Evidence alone does not establish a Result: maintenance must perform fresh, independent native readback, and changed or unavailable resources remain unverified. Pending Delivery Evidence keeps the delivery barrier in place until bounded verification records a Result or a `DeliveryFailure`; uncertain delivery is never retried by rerunning effects. See [Work Queues](/gh-aw/reference/work-queue/).
 
 ## Operational Patterns
 
