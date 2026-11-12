@@ -15,6 +15,8 @@ features:
 model: copilot/gpt-5.3-codex
 engine:
   id: atomic
+  # Validate a newly pinned Atomic release the day after it ships; strict mode allows at least one day.
+  cooldown: 1
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-atomic
 tools:

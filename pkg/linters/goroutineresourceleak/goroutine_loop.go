@@ -6,6 +6,8 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 )
 
 func buildParentMap(files []*ast.File) map[ast.Node]ast.Node {
@@ -131,7 +133,7 @@ func hasWaitGroupMethod(pass *analysis.Pass, node ast.Node, method string, key r
 		if !ok {
 			return true
 		}
-		selector, ok := call.Fun.(*ast.SelectorExpr)
+		selector, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 		if !ok || selector.Sel.Name != method {
 			return true
 		}
@@ -155,7 +157,7 @@ func waitGroupMethodKeys(pass *analysis.Pass, node ast.Node, method string, befo
 		if !ok {
 			return true
 		}
-		selector, ok := call.Fun.(*ast.SelectorExpr)
+		selector, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 		if !ok || selector.Sel.Name != method || (before.IsValid() && call.Pos() >= before) {
 			return true
 		}
