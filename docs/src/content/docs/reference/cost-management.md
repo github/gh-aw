@@ -215,13 +215,13 @@ GitHub Agentic Workflows includes default guardrails: a 20-minute timeout on the
 
 ### Cap AI Credits per Run
 
-Use the top-level `max-ai-credits` frontmatter field to cap the AI Credits (AIC) budget for a single workflow run. It provides a hard stop for unusually expensive runs and a consistent guardrail across all supported engines. The field accepts plain integers or `K`/`M` suffixes such as `100M`.
+Use the top-level `max-ai-credits` frontmatter field to cap the AI Credits (AIC) budget for a single workflow run. It provides a hard stop for unusually expensive runs and a consistent guardrail across all supported engines. The field accepts plain integers or `K`/`M` suffixes such as `5K`. AWF clamps any budget above its hard cap, 10,000 AI credits by default.
 
 ```aw wrap
 max-ai-credits: 500
 ```
 
-When the budget is approached, gh-aw emits steering warnings before the run reaches the limit. Set a negative value only to disable budget enforcement explicitly.
+As the budget is approached, AWF sends the agent budget notices before the run reaches the limit. A negative value disables only budget enforcement; with AWF releases after v0.29.11, notices continue unless [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering) is set.
 
 > [!NOTE]
 > Threat-detection runs have their own AI Credits cap, separate
