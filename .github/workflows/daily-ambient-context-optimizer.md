@@ -40,10 +40,6 @@ safe-outputs:
     max: 3
 timeout-minutes: 45
 steps:
-  - name: Setup Python
-    uses: actions/setup-python@v7.1.0
-    with:
-      python-version: "3.12"
   - name: Prepare analysis workspace
     run: |
       mkdir -p /tmp/gh-aw/ambient-context
@@ -159,6 +155,10 @@ steps:
         core.info(`PR close-rate (7d): ${rateStr} (${closed7d.length} closed, ${merged7d.length} merged)${autoPause ? ' — AUTO-PAUSE ACTIVE' : ''}`);
 
 imports:
+  - uses: shared/python-setup.md
+    with:
+      job-id: agent
+      python-version: "3.12"
   - shared/mcp-pagination.md
   - shared/otlp.md
 features:

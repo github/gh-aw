@@ -12,6 +12,10 @@ on:
 
 imports:
   - shared/graders.md
+  - uses: shared/python-setup.md
+    with:
+      job-id: agent
+      python-version: "3.12"
 permissions:
   contents: read
   actions: read
@@ -38,10 +42,6 @@ tools:
 features:
   gh-aw-detection: true
 steps:
-  - name: Setup Python
-    uses: actions/setup-python@v7.1.0
-    with:
-      python-version: "3.12"
   - name: Setup local chart workspace
     run: |
       mkdir -p /tmp/gh-aw/token-audit/charts /tmp/gh-aw/token-audit/site-packages
