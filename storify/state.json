@@ -1,28 +1,27 @@
 {
-  "last_run_date": "2026-11-11",
+  "last_run_date": "2026-11-12",
   "last_window": {
-    "start": "2026-11-10T07:52:48Z",
-    "end": "2026-11-11T07:52:48Z"
+    "start": "2026-11-11T07:56:07Z",
+    "end": "2026-11-12T07:56:07Z"
   },
   "observed_window": {
-    "coverage": "Partial: 285 cached records with timestamps 2026-11-10T22:19:58Z through 2026-11-11T07:52:48Z; earlier requested period not represented following count limit; collector continuation starts at 07:55:52Z, ends 22:19:04Z",
+    "coverage": "Partial: 263 cached runs created 2026-11-11T21:40:33Z through 2026-11-12T07:53:07Z; count-limit continuation identifies uncollected period 2026-11-11T07:56:07Z through 2026-11-11T21:37:29Z. No fleet refetch.",
     "representative_audits": [
-      42979709763,
-      42959490175,
-      42959539382,
-      42965914786,
-      42958805017
+      43175451229,
+      43155049221,
+      43161542498,
+      43117054112,
+      43123725900,
+      43147956335
     ]
   },
   "key_themes": [
-    "Human-triggered review loop improved PR #76719 before merge",
-    "Ten cached Auditor evidence-collection failures; optimizer raised issue #76773, failures continued",
-    "Simulator repo-memory publication succeeded after #76401 but overall run failed in conclusion"
+    "Auditor collection failed in 10 cached runs; optimizer replaced issue #76773 with #77084, subsequent failures persisted",
+    "PR #76980 review fan-out and Sous Chef follow-up met failed checks; maintainer merged with no demonstrated reviewer recovery"
   ],
   "carry_forward_questions": [
-    "What exact guard or error causes Auditor collection to fail, and did issue #76773 lead to a validated repair?",
-    "What caused simulator run 42958805017 to fail in conclusion despite successful agent and publication jobs?",
-    "Do review fixes in #76719 hold in later validation?",
-    "What occurred in the uncollected first part of the window?"
+    "Did Auditor partial time-budget handling change and do subsequent scheduled runs reach agent and safe outputs?",
+    "Did the failed reviewer and detection checks on PR #76980 recover in subsequent runs?",
+    "What happened in the uncollected earlier part of the window?"
   ]
 }
