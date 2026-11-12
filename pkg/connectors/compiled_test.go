@@ -36,6 +36,42 @@ func TestConnectorPhaseSnapshots(t *testing.T) {
 	}
 }
 
+func TestConnectorReadableSnapshot(t *testing.T) {
+	t.Parallel()
+	plan := fixturePlan(t, "https://api.example.com")
+	op := plan.spec.SafeOutputs["add-comment"]
+	literal := "literal $team ${team} ${{ secrets.DO_NOT_EVALUATE }} ${notJavaScript} `backticks` \\ \"quoted\""
+	op.Request.Body = map[string]Value{"text": {Literal: literal}}
+	plan.spec.SafeOutputs["add-comment"] = op
+	plan, err := freezePlan(plan.spec, plan.connection, plan.binding)
+	require.NoError(t, err)
+	snapshot, err := plan.EncodeJSON()
+	require.NoError(t, err)
+	require.True(t, json.Valid([]byte(snapshot)))
+	require.Contains(t, snapshot, "\n  \"spec\": {")
+	require.Contains(t, snapshot, `"api": "https://api.example.com"`)
+	require.NotContains(t, snapshot, "$")
+	require.NotContains(t, snapshot, "`")
+	restored, err := DecodePlan(snapshot)
+	require.NoError(t, err)
+	require.Equal(t, plan.Digest, restored.Digest)
+	require.Equal(t, literal, restored.spec.SafeOutputs["add-comment"].Request.Body["text"].Literal)
+}
+
+func TestConnectorReadableSnapshotByteBound(t *testing.T) {
+	t.Parallel()
+	plan := fixturePlan(t, "https://api.example.com")
+	snapshot, err := plan.EncodeJSON()
+	require.NoError(t, err)
+	plan.binding.Definition += strings.Repeat("x", MaxEncodedPlanBytes-len(snapshot))
+	snapshot, err = plan.EncodeJSON()
+	require.NoError(t, err)
+	require.Len(t, snapshot, MaxEncodedPlanBytes)
+	plan.binding.Definition += "x"
+	_, err = plan.EncodeJSON()
+	require.ErrorContains(t, err, "65536")
+}
+
 func TestConnectorFrozenSnapshotRejectsTamper(t *testing.T) {
 	t.Parallel()
 	plan := fixturePlan(t, "https://api.example.com")

@@ -598,12 +598,16 @@ function validatePlan(plan) {
   assert(selected > 0);
 }
 function decodePlan(encoded) {
-  assert(typeof encoded === "string" && encoded.length <= 65536, "Compiled connector plan exceeds its byte bound");
-  const { document, raw } = parseJSON(decodeBase64(encoded).toString("utf8"), MAX_DOCUMENT, true);
+  assert(typeof encoded === "string" && Buffer.byteLength(encoded) <= 65536, "Compiled connector plan exceeds its byte bound");
+  const text = encoded.trimStart().startsWith("{") ? encoded : decodeBase64(encoded).toString("utf8");
+  const { document, raw } = parseJSON(text, 65536, true);
   fields(document, ["digest", "spec", "connection", "binding"], ["digest", "spec", "connection", "binding"]);
   assert(fixedPattern(/^[a-f0-9]{64}$/, document.digest), "Invalid connector plan digest");
+  // Preserve Go field order and numeric tokens while normalizing reviewable
+  // whitespace and escaped expression/template delimiters.
+  const canonical = value => value.replace(/"(?:\\.|[^"\\])*"|[ \r\n\t]+/gu, token => (token.startsWith('"') ? goJSON(wellFormed(JSON.parse(token))) : ""));
   const hash = createHash("sha256")
-    .update('{"Spec":' + raw.spec + ',"Connection":' + raw.connection + ',"Binding":' + raw.binding + "}")
+    .update('{"Spec":' + canonical(raw.spec) + ',"Connection":' + canonical(raw.connection) + ',"Binding":' + canonical(raw.binding) + "}")
     .digest("hex");
   assert(hash === document.digest, "Compiled connector plan digest mismatch");
   validatePlan(document);

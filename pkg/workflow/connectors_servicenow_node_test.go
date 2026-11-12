@@ -53,7 +53,7 @@ func TestServiceNowBundledNodeRuntime(t *testing.T) {
 	}
 	input, err := json.Marshal(map[string]any{
 		"agent": agent, "effects": effects, "setup": setup, "runner": runner,
-		"scripts": scripts, "expected": expected,
+		"scripts": scripts, "expected": expected, "plan": config.SafeOutputPlan,
 	})
 	require.NoError(t, err)
 	command := exec.CommandContext(t.Context(), node, "-e", serviceNowNodeDriver, filepath.Join(assets, "connector_runtime.cjs"))
@@ -177,8 +177,8 @@ async function main() {
     process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
     const stagedProcess = {
       execPath: process.execPath,
-      env: new Proxy({ RUNNER_TEMP: input.runner }, {
-        get(env, key) { assert.equal(key, "RUNNER_TEMP", "staged host must not read writer credentials"); return env[key]; }
+      env: new Proxy({ RUNNER_TEMP: input.runner, GH_AW_CONNECTOR_10_SERVICENOW_PLAN:input.plan }, {
+        get(env, key) { assert.ok(Object.hasOwn(env, key), "staged host must not read writer credentials"); return env[key]; }
       })
     };
     const generated = new Function("item", "require", "process", "temporaryIdMap", input.scripts[operation]);
