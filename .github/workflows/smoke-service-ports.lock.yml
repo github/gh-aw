@@ -1178,7 +1178,7 @@ jobs:
             fi
           fi
           if [[ -z "$GH_AW_AIC_LIMIT" ]]; then
-            echo "::warning::Ignoring invalid vars.GH_AW_DEFAULT_MAX_AI_CREDITS (value withheld); expected a positive whole number, a K/M suffix value such as 100M, or -1. Using the default budget of 1000 AI credits."
+            echo "::warning::Ignoring invalid vars.GH_AW_DEFAULT_MAX_AI_CREDITS (value withheld); expected a positive whole number, a K/M suffix value such as 5K, or -1. Using the default budget of 1000 AI credits."
             GH_AW_AIC_LIMIT="1000"
           fi
           GH_AW_MAX_AI_CREDITS="$GH_AW_AIC_LIMIT"
@@ -2299,7 +2299,7 @@ jobs:
             fi
           fi
           if [[ -z "$GH_AW_AIC_LIMIT" ]]; then
-            echo "::warning::Ignoring invalid vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS (value withheld); expected a positive whole number, a K/M suffix value such as 100M, or -1. Using the default budget of 400 AI credits."
+            echo "::warning::Ignoring invalid vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS (value withheld); expected a positive whole number, a K/M suffix value such as 5K, or -1. Using the default budget of 400 AI credits."
             GH_AW_AIC_LIMIT="400"
           fi
           GH_AW_MAX_AI_CREDITS="$GH_AW_AIC_LIMIT"

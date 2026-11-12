@@ -467,7 +467,7 @@ if [[ "$GH_AW_MAX_AI_CREDITS" =~ ^[[:space:]]*(-1|[+]?0*([1-9][0-9]{0,18})([kKmM
   fi
 fi
 if [[ -z "$GH_AW_AIC_LIMIT" ]]; then
-  echo "::warning::Ignoring invalid __SOURCE__ (value withheld); expected a positive whole number, a K/M suffix value such as 100M, or -1. Using the default budget of __DEFAULT__ AI credits."
+  echo "::warning::Ignoring invalid __SOURCE__ (value withheld); expected a positive whole number, a K/M suffix value such as 5K, or -1. Using the default budget of __DEFAULT__ AI credits."
   GH_AW_AIC_LIMIT="__DEFAULT__"
 fi
 GH_AW_MAX_AI_CREDITS="$GH_AW_AIC_LIMIT"
