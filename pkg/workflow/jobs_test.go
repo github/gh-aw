@@ -40,6 +40,24 @@ func TestJobManager_AddJob(t *testing.T) {
 			errMsg:  "job name cannot be empty",
 		},
 		{
+			name: "expression in job ID",
+			job: &Job{
+				Name:   "build-${{ github.actor }}",
+				RunsOn: "ubuntu-latest",
+			},
+			wantErr: true,
+			errMsg:  "cannot contain expressions",
+		},
+		{
+			name: "incomplete expression in job ID",
+			job: &Job{
+				Name:   "${{ github.actor",
+				RunsOn: "ubuntu-latest",
+			},
+			wantErr: true,
+			errMsg:  "cannot contain expressions",
+		},
+		{
 			name: "duplicate job name",
 			job: &Job{
 				Name:   "test-job", // Same name as first test

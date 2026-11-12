@@ -29,6 +29,10 @@ func validateJobDefinition(job *Job) error {
 		return errors.New("job definition cannot be nil")
 	}
 
+	if strings.Contains(job.Name, "${{") {
+		return fmt.Errorf("job ID %q cannot contain expressions; use a literal job ID and put expressions in the job's name field instead", job.Name)
+	}
+
 	switch job.CacheMode {
 	case "", "read", "write", "write-only", "none":
 	default:

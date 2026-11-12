@@ -235,7 +235,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 
 	// Add display name if present
 	if job.DisplayName != "" {
-		fmt.Fprintf(b, "    name: %s\n", job.DisplayName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		fmt.Fprintf(b, "    name: %q\n", job.DisplayName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add needs clause if there are dependencies
