@@ -1381,7 +1381,7 @@ function convertXmlTags(s) {
       if (malformed) return `(${escapeAngleBrackets(tagContent)})`;
 
       const tagNameMatch = tagContent.match(/^\/?\s*([A-Za-z][A-Za-z0-9]*)/);
-      const tagNameDelimiter = tagNameMatch && tagContent[tagNameMatch[0].length];
+      const tagNameDelimiter = tagNameMatch ? tagContent[tagNameMatch[0].length] : undefined;
       if (tagNameMatch && (tagNameDelimiter === undefined || /[\s/]/.test(tagNameDelimiter)) && allowedTags.includes(tagNameMatch[1].toLowerCase())) {
         return `<${stripDangerousAttributes(tagContent)}>`;
       }
