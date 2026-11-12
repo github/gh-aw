@@ -4553,7 +4553,9 @@ async function main() {
           core.info(`Agent emitted ${reportIncompleteItems.length} report_incomplete signal(s) - activating failure handling`);
           // Continue after marking the step failed so optional issue reporting can still run.
           // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
-          core.setFailed("Agent reported that it could not complete the task");
+          core.setFailed(
+            "Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. See the conclusion job summary for the reported reason and runtime evidence; inspect agent_output.json in the agent artifact for the original report."
+          );
         }
       }
     }
