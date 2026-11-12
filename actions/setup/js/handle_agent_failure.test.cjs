@@ -1004,13 +1004,13 @@ describe("handle_agent_failure", () => {
       );
     });
 
-    it("keeps the incompletion notice concise without repeating diagnostic policy", () => {
-      const context = buildReportIncompleteContext([{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }]);
-      expect(context).toContain("completion could not be confirmed");
-      expect(context).toContain("A comment or other safe output does not confirm that the requested task was completed.");
-      expect(context).not.toContain("See the reported reason");
-      expect(context).not.toContain("agent-generated");
-      expect(context).toContain("infrastructure_error");
+    it("explains the incomplete handoff without exposing agent diagnostic details", () => {
+      const rendered = buildReportIncompleteContext([{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }]);
+      expect(rendered).toContain("completion could not be confirmed");
+      expect(rendered).toContain("Treat the agent-declared reason as a lead, not a confirmed root cause");
+      expect(rendered).toContain("agent diagnostic details are excluded");
+      expect(rendered).not.toContain("agent-generated");
+      expect(rendered).toContain("infrastructure_error");
     });
   });
 
@@ -2303,6 +2303,7 @@ describe("handle_agent_failure", () => {
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
       vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
       vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      global.context.runId = 123456;
       global.github = {
         rest: {
           search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
@@ -2318,7 +2319,8 @@ describe("handle_agent_failure", () => {
         expect(diagnostic).toContain("report_incomplete");
         expect(diagnostic).toContain("A successful agent job does not confirm task completion");
         expect(diagnostic).toContain("conclusion job summary");
-        expect(diagnostic).toContain("agent_output.json in the agent artifact");
+        expect(diagnostic).toContain("gh aw audit 123456");
+        expect(diagnostic).not.toContain("agent_output.json");
         const logs = JSON.stringify([...global.core.info.mock.calls, ...global.core.warning.mock.calls, ...global.core.setFailed.mock.calls]);
         expect(logs).not.toContain("build-resource permissions");
         expect(logs).not.toContain("private-build-diagnostics");
@@ -3622,7 +3624,7 @@ describe("handle_agent_failure", () => {
 
     it("renders report_incomplete context in both comment and issue templates", () => {
       const reportIncompleteItems = [{ type: "report_incomplete", reason: "infrastructure_error", details: reportIncompleteMarker }];
-      const reportIncompleteContext = buildReportIncompleteContext(reportIncompleteItems);
+      const reportIncompleteContext = buildReportIncompleteContext(reportIncompleteItems, { runId: 123456 });
       const failureDiagnosticsContext = buildFailureDiagnosticsContext({
         failureCategories: ["report_incomplete"],
         failingStep: "Run agent",
@@ -3675,6 +3677,9 @@ describe("handle_agent_failure", () => {
         expect(rendered).not.toContain(reportIncompleteMarker);
         expect(rendered).toContain("The workflow recorded a `report_incomplete` signal");
         expect(rendered).toContain("completion could not be confirmed");
+        expect(rendered).toContain("This run needs a follow-up");
+        expect(rendered).toContain("A successful agent job only confirms a clean process exit");
+        expect(rendered).toContain("gh aw audit 123456");
         expect(rendered).not.toContain("due to an infrastructure or tool failure");
       }
       expect(reportIncompleteContext).toContain("infrastructure_error");

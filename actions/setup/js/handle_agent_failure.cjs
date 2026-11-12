@@ -1902,14 +1902,14 @@ function loadReportIncompleteMessages(items) {
 }
 
 /**
- * Build report_incomplete context string for display in failure issues/comments.
+ * Build report_incomplete context for display in failure issues/comments.
  * This surfaces the agent's structured incompletion signal so maintainers can
  * distinguish an incomplete task from a confirmed task outcome.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
- * @param {{collectorEmptyOutputCause?: string, rootDir?: string}} [options]
+ * @param {{collectorEmptyOutputCause?: string, rootDir?: string, runId?: number}} [options]
  * @returns {ReportBlock[]}
  */
-function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDir } = {}) {
+function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDir, runId } = {}) {
   const trustedCollectorCause = typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause) ? collectorEmptyOutputCause : undefined;
   const messages = loadReportIncompleteMessages(items).filter(message => message.reason !== trustedCollectorCause);
 
@@ -1939,9 +1939,14 @@ function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDi
   }
   context.push(
     nodes.paragraph([
-      nodes.text("A comment or other safe output does not confirm that the requested task was completed. Reported reasons are not verified causes; runtime evidence is shown separately and agent diagnostic details are excluded."),
+      nodes.text(
+        "This run needs a follow-up: the agent reported that it could not finish. A successful agent job only confirms a clean process exit, not that the requested work was completed. Treat the agent-declared reason as a lead, not a confirmed root cause; agent diagnostic details are excluded, so compare the note with the runtime evidence below."
+      ),
     ])
   );
+  if (typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0) {
+    context.push(nodes.paragraph([nodes.text("For a runtime-focused investigation, run "), nodes.code(`gh aw audit ${runId}`), nodes.text(".")]));
+  }
 
   return context;
 }
@@ -4553,8 +4558,9 @@ async function main() {
           core.info(`Agent emitted ${reportIncompleteItems.length} report_incomplete signal(s) - activating failure handling`);
           // Continue after marking the step failed so optional issue reporting can still run.
           // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
+          const auditCommand = Number.isSafeInteger(context.runId) && context.runId > 0 ? `gh aw audit ${context.runId}` : "gh aw audit <run-id>";
           core.setFailed(
-            "Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. See the conclusion job summary for the reported reason and runtime evidence; inspect agent_output.json in the agent artifact for the original report."
+            `Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. See the conclusion job summary for the reported reason; run ${auditCommand} for runtime evidence.`
           );
         }
       }
@@ -4703,7 +4709,7 @@ async function main() {
         !(isCancelledEmptyOutput && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause)
     );
     const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
-    const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()) });
+    const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()), runId: context.runId });
     if (hasReportedIncomplete && reportIncompleteContext.length > 0 && !failureDiagnostics.secretRedactionFailed) {
       try {
         const summary = renderSizedReport({ type: "report", title: "Incomplete result", children: reportIncompleteContext, agentTainted: false }).body;
