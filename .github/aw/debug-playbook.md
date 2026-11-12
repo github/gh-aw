@@ -44,6 +44,7 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 | `blocked_network_requests` | Destination, caller, denial, necessity. | Fix URL/tool or authorize narrow destination; retain firewall. |
 | `threat_detection_job_failed`, `engine_step_failed` | Detector/evals error/execution state. | Fix engine/proxy startup; failed/green job != clean verdict/evals. |
 | `threat_detected` | Private structured verdict/artifact. | Stop unsafe effects; follow [security guidance](debug-security-review.md). Never publish payloads. |
+| `safeoutputs_command_blocked` | Claude permission denial correlated to a Bash call of `safeoutputs`. | Add the narrow `safeoutputs *` entry to `tools.bash`; recompile. |
 | `high_token_usage`, `many_iterations` | Tokens/cache/turns, repeated calls. | [Optimize](optimize-agentic-workflow.md) scope/context/loops before raising caps. |
 | `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic` | Assessment, deterministic alternatives. | Script mechanical work; retain necessary judgment. |
 | `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work; preserve outcomes. |
