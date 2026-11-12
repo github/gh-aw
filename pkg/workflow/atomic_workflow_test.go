@@ -34,7 +34,7 @@ func TestAtomicSampleExecution(t *testing.T) {
 	engine, err := NewBehaviorDefinedEngine(def)
 	require.NoError(t, err)
 	assert.Equal(t, "atomic", engine.GetID())
-	assert.Equal(t, "0.9.71", def.Version)
+	assert.Equal(t, "0.9.79", def.Version)
 	assert.True(t, def.Experimental)
 	assert.True(t, engine.GetCapabilities().MCP)
 	assert.False(t, engine.GetCapabilities().ToolsAllowlist)
