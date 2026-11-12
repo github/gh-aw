@@ -41,6 +41,8 @@ func TestAtomicSampleExecution(t *testing.T) {
 	assert.False(t, engine.GetCapabilities().MaxTurns)
 	assert.Empty(t, def.Auth)
 	assert.Equal(t, "universal-llm-consumer", def.Behaviors.SecretStrategy)
+	expectedArgs := []string{"--print", "--mode", "text", "--no-session", "--no-themes", "--approve", "--exclude-tools", "ask_user_question"}
+	assert.Equal(t, expectedArgs, def.Behaviors.Execution.Args)
 	assert.Empty(t, engine.GetLogParserScriptId())
 	assert.False(t, def.Behaviors.Installation.PostInstallScripts)
 	data := &WorkflowData{
@@ -58,6 +60,7 @@ func TestAtomicSampleExecution(t *testing.T) {
 		execution.WriteString(strings.Join(step, "\n"))
 	}
 	assert.Contains(t, execution.String(), "atomic_harness.cjs")
+	assert.Contains(t, execution.String(), "--exclude-tools ask_user_question")
 	assert.Contains(t, execution.String(), "ATOMIC_MODEL: copilot/gpt-5.3-codex")
 	assert.Contains(t, execution.String(), "GH_AW_ENGINE_VERSION: "+def.Version)
 	assert.Contains(t, execution.String(), "AWF_REFLECT_ENABLED: 1")
@@ -394,7 +397,6 @@ func TestAtomicSmokeContract(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/smoke-atomic.md")
 	require.NoError(t, err)
 	assert.Contains(t, string(source), "shared/atomic.md")
-	assert.Contains(t, string(source), "on:\n  schedule: every 2 days\n  workflow_dispatch:\n")
 	taskStart := strings.Index(string(source), "1. Use native GitHub MCP tools")
 	require.NotEqual(t, -1, taskStart)
 	taskEnd := strings.Index(string(source)[taskStart:], "\n2. ")
@@ -424,9 +426,13 @@ func TestAtomicSmokeContract(t *testing.T) {
 	assert.Contains(t, string(source), "The evals assess report completeness, not independent verification of execution.")
 	lock, err := os.ReadFile("../../.github/workflows/smoke-atomic.lock.yml")
 	require.NoError(t, err)
+	assert.Contains(t, string(lock), `- cron: "0 0 */2 * *"`)
+	assert.NotContains(t, string(lock), "--cooldown-days 1")
 	for _, expected := range []string{
 		"npm install -g @bastani/atomic@" + loadAtomicSample(t).Version,
 		"NPM_CONFIG_IGNORE_SCRIPTS: 'true'",
+		"NPM_CONFIG_MIN_RELEASE_AGE: '1'",
+		"--cooldown-days 3",
 		"GH_AW_ENGINE_VERSION: " + loadAtomicSample(t).Version,
 		"ATOMIC_MODEL: copilot/gpt-5.3-codex",
 		"atomic_mcp_config_adapter.cjs", "--exclude-env OPENAI_API_KEY",
