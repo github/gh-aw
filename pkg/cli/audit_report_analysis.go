@@ -33,6 +33,7 @@ func generateFindings(processedRun ProcessedRun, metrics MetricsData, errors []V
 	detectionFindings := generateThreatDetectionFindings(processedRun)
 	findings = append(findings, detectionFindings...)
 	findings = append(findings, generateEngineStepFailureFindings(processedRun)...)
+	findings = append(findings, generateSafeOutputsBlockedFindings(processedRun)...)
 	findings = append(findings, generatePerformanceFindings(metrics)...)
 	findings = append(findings, generateErrorVolumeFindings(errors)...)
 	findings = append(findings, generateToolingFindings(processedRun)...)
@@ -79,6 +80,7 @@ func generateRecommendations(processedRun ProcessedRun, metrics MetricsData, fin
 	recommendations = appendCostRecommendations(recommendations, hasHighCostFindings)
 	recommendations = appendIterationRecommendations(recommendations, hasManyTurns)
 	recommendations = appendToolingRecommendations(recommendations, processedRun)
+	recommendations = appendSafeOutputsBlockedRecommendations(recommendations, findings)
 	if metrics.SubagentFailureCount > 0 {
 		recommendations = append(recommendations, Recommendation{
 			Priority: "high",
