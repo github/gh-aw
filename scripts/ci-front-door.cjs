@@ -130,7 +130,11 @@ async function frontDoor({ catalog, diff, prompt, endpoint, fullRun = false, dec
     try {
       response = await decide(
         endpoint,
-        { diff_summary: diff,         suite_catalog: validCatalog || { version: 1, suites: SUITE_IDS.map(id => ({ id, description: "Catalog unavailable; run all suites.", historical_duration_seconds: null, mandatory: MANDATORY.includes(id) })) }, prompt },
+        {
+          diff_summary: diff,
+          suite_catalog: validCatalog || { version: 1, suites: SUITE_IDS.map(id => ({ id, description: "Catalog unavailable; run all suites.", historical_duration_seconds: null, mandatory: MANDATORY.includes(id) })) },
+          prompt,
+        },
         {
           onRequest: () => {
             decisionCalls++;
