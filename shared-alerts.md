@@ -349,3 +349,8 @@
 - Still live: metrics-collector.md lacks `model-provider` under `engine:` (line 14). Its daily failures were also attributed to a separate AWF redaction crash, so the config fix alone may not clear them.
 - Ranking now uses the complete 2026-11-08 snapshot; `metrics/latest.json` is partial and is not a scoring source.
 - ai-moderator (1/16 on 11-08; 3/17 → 12/24 → 1/16 trend) and auditor (1/11) are the critical failure clusters; logs unverified.
+
+## Update — 2026-11-12 (Workflow Health Manager)
+- Auditor (`auditor.md`) hourly `Collect failure evidence` failing 5/5 recent main runs. Health discovery hits `time_budget` and the checkpoint never advances. Was untracked before this run; new P1 tracker filed.
+- CI spec-pin/release-alignment (#76787) and CGO govulncheck (#76789) remain open. No new tracker.
+- CodeQL - Code Quality recovered (successes since 04:28Z).
