@@ -188,7 +188,7 @@ describe("single-step durable restoration", () => {
     expect(record).toMatchObject({ type: "durable.restore", data: { status: "fresh", runId: "200" } });
   });
 
-  it.each(["copilot", "claude", "codex", "gemini", "agy", "pi", "imported-engine"])("downloads and validates %s state before enabling continuation", async engine => {
+  it.each(["copilot", "claude", "codex", "gemini", "agy", "pi", "atomic", "imported-engine"])("downloads and validates %s state before enabling continuation", async engine => {
     const options = restoreFixture(engine);
     await restoreCheckpoint(options);
     expect(options.artifactClient.downloadArtifact).toHaveBeenCalledWith(999, {
@@ -206,6 +206,7 @@ describe("single-step durable restoration", () => {
     else {
       expect(prompt).toContain("untrusted historical data");
       expect(prompt.endsWith("Current task")).toBe(true);
+      if (engine === "atomic") expect(prompt).toContain("The harness resumes your exact Atomic root session ID");
     }
     if (engine === "pi") {
       expect(fs.readFileSync(options.promptFile, "utf8")).toBe("Current task");

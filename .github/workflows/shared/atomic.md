@@ -18,7 +18,7 @@ pre-agent-steps:
       ATOMIC_STORAGE_URL: ${{ secrets.ATOMIC_STORAGE_URL }}
       ATOMIC_STORAGE_TOKEN: ${{ secrets.ATOMIC_STORAGE_TOKEN }}
       NPM_CONFIG_IGNORE_SCRIPTS: "true"
-      NPM_CONFIG_MIN_RELEASE_AGE: "0"
+      NPM_CONFIG_MIN_RELEASE_AGE: "1"
     run: |
       set -euo pipefail
       node <<'JS'
@@ -28,6 +28,10 @@ pre-agent-steps:
       rmSync(stagingPath, { force: true });
       const url = (process.env.ATOMIC_STORAGE_URL || "").trim();
       if (!url) process.exit(0);
+      const version = process.env.GH_AW_ENGINE_VERSION || "";
+      if (!/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+        throw new Error("GH_AW_ENGINE_VERSION must be a pinned semantic version");
+      }
       const token = (process.env.ATOMIC_STORAGE_TOKEN || "").trim();
       for (const secret of [url, token]) {
         if (!secret) continue;
@@ -38,7 +42,7 @@ pre-agent-steps:
       mkdirSync("/tmp/gh-aw/atomic-storage", { recursive: true, mode: 0o700 });
       const install = spawnSync(
         "npm",
-        ["install", "--prefix", "/tmp/gh-aw/atomic-storage", "--ignore-scripts", "--no-audit", "--no-fund", "@bastani/atomic-storage-libsql@0.9.79"],
+        ["install", "--prefix", "/tmp/gh-aw/atomic-storage", "--ignore-scripts", "--no-audit", "--no-fund", `@bastani/atomic-storage-libsql@${version}`],
         { stdio: "inherit" }
       );
       if (install.error) throw install.error;
@@ -125,14 +129,27 @@ engine:
           GH_AW_ATOMIC_STORAGE_ADAPTER: /tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js
           GH_AW_ATOMIC_STORAGE_STAGING: /tmp/gh-aw/atomic-storage-staging.json
       harness-script: |-
-        const { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
+        const { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
         const { isAbsolute, join } = require("path");
         const { spawnSync } = require("child_process");
+        const { createHash, randomUUID } = require("node:crypto");
         const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
         const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
         const [command, ...args] = process.argv.slice(2);
         const sensitiveValues = new Set();
+        const sessionIdPattern = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/;
+        const writeSessionId = (sessionIdPath, sessionId) => {
+          if (!sessionIdPattern.test(sessionId)) throw new Error("Atomic session ID is invalid");
+          writeFileSync(sessionIdPath, `${sessionId}\n`, { mode: 0o600 });
+          chmodSync(sessionIdPath, 0o600);
+        };
+        const storagePrefix = repository => {
+          const identity = repository.toLowerCase();
+          const sanitized = identity.replace(/[^a-z0-9_]/g, "_");
+          const suffix = createHash("sha256").update(identity).digest("hex").slice(0, 32);
+          return `gh_aw_${sanitized}_${suffix}`;
+        };
         const addSecret = value => {
           if (typeof value !== "string" || !value) return;
           sensitiveValues.add(value);
@@ -166,8 +183,8 @@ engine:
             const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_sessions'").get();
             if (!table) return;
             const row = db.prepare("SELECT id FROM session_sessions WHERE internal = 0 ORDER BY modified_at DESC, rowid DESC LIMIT 1").get();
-            if (typeof row?.id === "string" && /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(row.id)) {
-              writeFileSync(sessionIdPath, `${row.id}\n`, { mode: 0o600 });
+            if (typeof row?.id === "string" && sessionIdPattern.test(row.id)) {
+              writeSessionId(sessionIdPath, row.id);
             }
           } finally {
             db.close();
@@ -266,7 +283,7 @@ engine:
               url: rawUrl,
               token: rawToken,
               namespace,
-              prefix: `gh_aw_${repository.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`,
+              prefix: storagePrefix(repository),
             };
           }
           const selectedModel = process.env.ATOMIC_MODEL;
@@ -361,13 +378,17 @@ engine:
             const resumed = process.env.GH_AW_DURABLE_RESUMED === "true";
             const forwardedArgs = (externalStorage || resumed) ? args.filter(arg => arg !== "--no-session") : [...args];
             const sessionArgs = [];
-            if (resumed && !forwardedArgs.some(arg => ["--session", "--session-id", "--continue", "-c", "--no-session"].includes(arg))) {
+            const hasExplicitSession = forwardedArgs.some(arg => ["--session", "--session-id", "--continue", "-c", "--no-session"].includes(arg));
+            if (resumed && !hasExplicitSession) {
               const recordedSessionId = existsSync(sessionIdPath) ? readFileSync(sessionIdPath, "utf8").trim() : "";
-              if (/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(recordedSessionId)) {
-                sessionArgs.push("--session", recordedSessionId);
-              } else {
-                sessionArgs.push("--continue");
+              if (!sessionIdPattern.test(recordedSessionId)) {
+                throw new Error("Restored Atomic session ID is missing or invalid; refusing to continue an unrelated session");
               }
+              sessionArgs.push("--session", recordedSessionId);
+            } else if (externalStorage && !resumed && !hasExplicitSession) {
+              const sessionId = randomUUID();
+              writeSessionId(sessionIdPath, sessionId);
+              sessionArgs.push("--session-id", sessionId);
             }
             // Inherit runtime bindings, never arbitrary workflow secrets or execution hooks.
             const env = {
@@ -462,14 +483,27 @@ engine:
         });
         writeSecureOutput("/tmp/gh-aw/atomic-mcp.json", JSON.stringify({ autoEnableCodemode: false, mcpServers: servers }, null, 2));
     harness-script: |-
-      const { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
+      const { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
       const { isAbsolute, join } = require("path");
       const { spawnSync } = require("child_process");
+      const { createHash, randomUUID } = require("node:crypto");
       const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
       const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...args] = process.argv.slice(2);
       const sensitiveValues = new Set();
+      const sessionIdPattern = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/;
+      const writeSessionId = (sessionIdPath, sessionId) => {
+        if (!sessionIdPattern.test(sessionId)) throw new Error("Atomic session ID is invalid");
+        writeFileSync(sessionIdPath, `${sessionId}\n`, { mode: 0o600 });
+        chmodSync(sessionIdPath, 0o600);
+      };
+      const storagePrefix = repository => {
+        const identity = repository.toLowerCase();
+        const sanitized = identity.replace(/[^a-z0-9_]/g, "_");
+        const suffix = createHash("sha256").update(identity).digest("hex").slice(0, 32);
+        return `gh_aw_${sanitized}_${suffix}`;
+      };
       const addSecret = value => {
         if (typeof value !== "string" || !value) return;
         sensitiveValues.add(value);
@@ -503,8 +537,8 @@ engine:
           const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_sessions'").get();
           if (!table) return;
           const row = db.prepare("SELECT id FROM session_sessions WHERE internal = 0 ORDER BY modified_at DESC, rowid DESC LIMIT 1").get();
-          if (typeof row?.id === "string" && /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(row.id)) {
-            writeFileSync(sessionIdPath, `${row.id}\n`, { mode: 0o600 });
+          if (typeof row?.id === "string" && sessionIdPattern.test(row.id)) {
+            writeSessionId(sessionIdPath, row.id);
           }
         } finally {
           db.close();
@@ -603,7 +637,7 @@ engine:
             url: rawUrl,
             token: rawToken,
             namespace,
-            prefix: `gh_aw_${repository.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`,
+            prefix: storagePrefix(repository),
           };
         }
         const selectedModel = process.env.ATOMIC_MODEL;
@@ -698,13 +732,17 @@ engine:
           const resumed = process.env.GH_AW_DURABLE_RESUMED === "true";
           const forwardedArgs = (externalStorage || resumed) ? args.filter(arg => arg !== "--no-session") : [...args];
           const sessionArgs = [];
-          if (resumed && !forwardedArgs.some(arg => ["--session", "--session-id", "--continue", "-c", "--no-session"].includes(arg))) {
+          const hasExplicitSession = forwardedArgs.some(arg => ["--session", "--session-id", "--continue", "-c", "--no-session"].includes(arg));
+          if (resumed && !hasExplicitSession) {
             const recordedSessionId = existsSync(sessionIdPath) ? readFileSync(sessionIdPath, "utf8").trim() : "";
-            if (/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(recordedSessionId)) {
-              sessionArgs.push("--session", recordedSessionId);
-            } else {
-              sessionArgs.push("--continue");
+            if (!sessionIdPattern.test(recordedSessionId)) {
+              throw new Error("Restored Atomic session ID is missing or invalid; refusing to continue an unrelated session");
             }
+            sessionArgs.push("--session", recordedSessionId);
+          } else if (externalStorage && !resumed && !hasExplicitSession) {
+            const sessionId = randomUUID();
+            writeSessionId(sessionIdPath, sessionId);
+            sessionArgs.push("--session-id", sessionId);
           }
           // Inherit runtime bindings, never arbitrary workflow secrets or execution hooks.
           const env = {

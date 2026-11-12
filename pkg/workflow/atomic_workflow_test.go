@@ -484,9 +484,9 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 	assert.Equal(t, "${{ secrets.ATOMIC_STORAGE_URL }}", step.Env["ATOMIC_STORAGE_URL"])
 	assert.Equal(t, "${{ secrets.ATOMIC_STORAGE_TOKEN }}", step.Env["ATOMIC_STORAGE_TOKEN"])
 	assert.Equal(t, "true", step.Env["NPM_CONFIG_IGNORE_SCRIPTS"])
-	assert.Equal(t, "0", step.Env["NPM_CONFIG_MIN_RELEASE_AGE"])
+	assert.Equal(t, "1", step.Env["NPM_CONFIG_MIN_RELEASE_AGE"])
 	expectedAdapterPkg := "@bastani/atomic-storage-libsql@" + def.Version
-	assert.Contains(t, step.Run, expectedAdapterPkg, "adapter package version must match engine.version")
+	assert.Contains(t, step.Run, "@bastani/atomic-storage-libsql@${version}", "adapter package version must match the effective engine version")
 
 	dir := t.TempDir()
 	binDir := filepath.Join(dir, "bin")
@@ -499,14 +499,15 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 	script := strings.ReplaceAll(step.Run, "/tmp/gh-aw/atomic-storage-staging.json", staging)
 	script = strings.ReplaceAll(script, "/tmp/gh-aw/atomic-storage", prefix)
 
-	runStep := func(url, token string) string {
+	runStep := func(url, token, version string) string {
 		cmd := exec.CommandContext(t.Context(), "bash", "-c", script)
 		cmd.Env = []string{
 			"PATH=" + binDir + ":" + os.Getenv("PATH"),
 			"ATOMIC_STORAGE_URL=" + url,
 			"ATOMIC_STORAGE_TOKEN=" + token,
+			"GH_AW_ENGINE_VERSION=" + version,
 			"NPM_CONFIG_IGNORE_SCRIPTS=true",
-			"NPM_CONFIG_MIN_RELEASE_AGE=0",
+			"NPM_CONFIG_MIN_RELEASE_AGE=1",
 		}
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "%s", out)
@@ -514,14 +515,14 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 	}
 
 	require.NoError(t, os.WriteFile(staging, []byte("stale"), 0o600))
-	outEmpty := runStep("   ", "unused-token")
+	outEmpty := runStep("   ", "unused-token", def.Version)
 	assert.Empty(t, outEmpty)
 	_, err := os.Stat(staging)
 	assert.True(t, os.IsNotExist(err), "empty URL must remove stale staging file and write nothing")
 	_, err = os.Stat(npmCalls)
 	assert.True(t, os.IsNotExist(err), "empty URL must skip npm install")
 
-	outStaged := runStep("  libsql://example-org.turso.io  ", "  turso-secret-token  ")
+	outStaged := runStep("  libsql://example-org.turso.io  ", "  turso-secret-token  ", def.Version)
 	assert.Contains(t, outStaged, "::add-mask::libsql://example-org.turso.io")
 	assert.Contains(t, outStaged, "::add-mask::turso-secret-token")
 	calls, err := os.ReadFile(npmCalls)
@@ -538,6 +539,25 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 		"url":   "libsql://example-org.turso.io",
 		"token": "turso-secret-token",
 	}, parsedStaging)
+
+	outOverride := runStep("  libsql://example-org.turso.io  ", "  turso-secret-token  ", "0.9.80")
+	assert.Contains(t, outOverride, "::add-mask::libsql://example-org.turso.io")
+	calls, err = os.ReadFile(npmCalls)
+	require.NoError(t, err)
+	assert.Contains(t, string(calls), "@bastani/atomic-storage-libsql@0.9.80")
+
+	invalidVersion := exec.CommandContext(t.Context(), "bash", "-c", script)
+	invalidVersion.Env = []string{
+		"PATH=" + binDir + ":" + os.Getenv("PATH"),
+		"ATOMIC_STORAGE_URL=libsql://example-org.turso.io",
+		"ATOMIC_STORAGE_TOKEN=turso-secret-token",
+		"GH_AW_ENGINE_VERSION=latest",
+		"NPM_CONFIG_IGNORE_SCRIPTS=true",
+		"NPM_CONFIG_MIN_RELEASE_AGE=1",
+	}
+	outInvalidVersion, err := invalidVersion.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(outInvalidVersion), "GH_AW_ENGINE_VERSION must be a pinned semantic version")
 }
 
 func TestAtomicDurableCompilation(t *testing.T) {
@@ -706,10 +726,9 @@ db.close();
 		require.NoError(t, os.Remove(filepath.Join(storeDir, "session-id")))
 		cmd3 := atomicHarnessCommand(t, dir, "node", probe)
 		cmd3.Env = append(cmd3.Env, "HOSTALIASES="+writeHostAliases(t, dir), "GH_AW_DURABLE_RESUMED=true")
-		out3, err := cmd3.Output()
-		require.NoError(t, err)
-		require.NoError(t, json.Unmarshal(out3, &captured))
-		assert.Equal(t, []string{"--continue", "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+		out3, err := cmd3.CombinedOutput()
+		require.Error(t, err)
+		assert.Contains(t, string(out3), "Restored Atomic session ID is missing or invalid")
 	})
 
 	for _, delivery := range []string{"staging", "env"} {
@@ -754,7 +773,14 @@ db.close();
 			require.NoError(t, err)
 			var captured probeCapture
 			require.NoError(t, json.Unmarshal(capturedBytes, &captured))
-			assert.Equal(t, []string{"--print", "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+			sessionID, err := os.ReadFile(filepath.Join(dir, "atomic-store", "session-id"))
+			require.NoError(t, err)
+			recordedID := strings.TrimSpace(string(sessionID))
+			assert.Regexp(t, `^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, recordedID)
+			assert.Equal(t, []string{"--print", "--session-id", recordedID, "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+			info, err := os.Stat(filepath.Join(dir, "atomic-store", "session-id"))
+			require.NoError(t, err)
+			assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 			assert.True(t, captured.HasTokenFile)
 			require.NotNil(t, captured.TokenMode)
 			assert.Equal(t, 0o600, *captured.TokenMode)
@@ -764,12 +790,12 @@ db.close();
 			assert.False(t, *captured.StagingExistsDuringRun)
 			assert.Nil(t, captured.Settings["sessions"])
 			assert.Nil(t, captured.Settings["workflows"])
-			assert.Equal(t, map[string]any{
-				"adapter": adapter,
-				"options": map[string]any{"url": "libsql://gh-aw-org.turso.io"},
-				"secrets": map[string]any{"authToken": map[string]any{"file": filepath.Join(captured.Home, "storage-token")}},
-				"prefix":  "gh_aw_owner_my_repo_name",
-			}, captured.Settings["storage"])
+			storage := captured.Settings["storage"].(map[string]any)
+			assert.Equal(t, adapter, storage["adapter"])
+			assert.Equal(t, map[string]any{"url": "libsql://gh-aw-org.turso.io"}, storage["options"])
+			assert.Equal(t, map[string]any{"authToken": map[string]any{"file": filepath.Join(captured.Home, "storage-token")}}, storage["secrets"])
+			prefix := storage["prefix"].(string)
+			assert.Regexp(t, `^gh_aw_owner_my_repo_name_[0-9a-f]{32}$`, prefix)
 			for _, forbidden := range []string{"ATOMIC_STORAGE", "ATOMIC_STORAGE_URL", "ATOMIC_STORAGE_TOKEN", "ATOMIC_STORAGE_NAMESPACE"} {
 				assert.NotContains(t, captured.EnvKeys, forbidden)
 			}
@@ -796,11 +822,77 @@ db.close();
 		var captured probeCapture
 		require.NoError(t, json.Unmarshal(out, &captured))
 		assert.False(t, captured.HasTokenFile)
-		assert.Equal(t, map[string]any{
-			"adapter": adapter,
-			"options": map[string]any{"url": "http://sqld.internal:8080", "namespace": "team-ci_1"},
-			"prefix":  "gh_aw_acme_worker_1",
-		}, captured.Settings["storage"])
+		storage := captured.Settings["storage"].(map[string]any)
+		assert.Equal(t, adapter, storage["adapter"])
+		assert.Equal(t, map[string]any{"url": "http://sqld.internal:8080", "namespace": "team-ci_1"}, storage["options"])
+		prefix := storage["prefix"].(string)
+		assert.Regexp(t, `^gh_aw_acme_worker_1_[0-9a-f]{32}$`, prefix)
+	})
+
+	t.Run("external durable resume uses the recorded exact session ID", func(t *testing.T) {
+		dir := t.TempDir()
+		probe := filepath.Join(dir, "probe.cjs")
+		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
+		adapter := filepath.Join(dir, "libsql.js")
+		require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+		storeDir := filepath.Join(dir, "atomic-store")
+		require.NoError(t, os.MkdirAll(storeDir, 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(storeDir, "session-id"), []byte("repo-root-session-123\n"), 0o600))
+
+		cmd := atomicHarnessCommand(t, dir, "node", probe)
+		cmd.Env = append(cmd.Env,
+			"HOSTALIASES="+writeHostAliases(t, dir),
+			"GITHUB_REPOSITORY=Owner/Repo",
+			"ATOMIC_STORAGE_URL=http://sqld.internal:8080",
+			"GH_AW_DURABLE_RESUMED=true",
+		)
+		out, err := cmd.Output()
+		require.NoError(t, err)
+		var captured probeCapture
+		require.NoError(t, json.Unmarshal(out, &captured))
+		assert.Equal(t, []string{"--session", "repo-root-session-123", "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+	})
+
+	t.Run("external durable resume refuses a missing exact session ID", func(t *testing.T) {
+		dir := t.TempDir()
+		probe := filepath.Join(dir, "probe.cjs")
+		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
+		adapter := filepath.Join(dir, "libsql.js")
+		require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+		cmd := atomicHarnessCommand(t, dir, "node", probe)
+		cmd.Env = append(cmd.Env,
+			"HOSTALIASES="+writeHostAliases(t, dir),
+			"GITHUB_REPOSITORY=Owner/Repo",
+			"ATOMIC_STORAGE_URL=http://sqld.internal:8080",
+			"GH_AW_DURABLE_RESUMED=true",
+		)
+		out, err := cmd.CombinedOutput()
+		require.Error(t, err)
+		assert.Contains(t, string(out), "Restored Atomic session ID is missing or invalid")
+		assert.NotContains(t, string(out), `"args"`)
+	})
+
+	t.Run("storage prefixes distinguish colliding repository slugs", func(t *testing.T) {
+		prefixFor := func(repository string) string {
+			dir := t.TempDir()
+			probe := filepath.Join(dir, "probe.cjs")
+			require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
+			adapter := filepath.Join(dir, "libsql.js")
+			require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+			cmd := atomicHarnessCommand(t, dir, "node", probe)
+			cmd.Env = append(cmd.Env,
+				"HOSTALIASES="+writeHostAliases(t, dir),
+				"GITHUB_REPOSITORY="+repository,
+				"ATOMIC_STORAGE_URL=http://sqld.internal:8080",
+			)
+			out, err := cmd.Output()
+			require.NoError(t, err)
+			var captured probeCapture
+			require.NoError(t, json.Unmarshal(out, &captured))
+			return captured.Settings["storage"].(map[string]any)["prefix"].(string)
+		}
+
+		assert.NotEqual(t, prefixFor("acme/payments-prod"), prefixFor("acme/payments_prod"))
 	})
 
 	for _, tc := range []struct {

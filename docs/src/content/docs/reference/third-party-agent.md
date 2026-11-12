@@ -124,11 +124,16 @@ Workflows in the same repository that omit `ATOMIC_STORAGE: "on"` delete the sta
 
 ##### Read CI runs from your machine
 
-The harness stores each repository's data under the prefix `gh_aw_<owner>_<repo>`, lowercased, with every character other than a letter, digit, or underscore replaced by `_`. Join the database with the same prefix:
+The harness stores each repository's data under a prefix made from the lowercased, sanitized owner/repository name and the first 32 hexadecimal characters of its SHA-256 hash. The hash is computed from the full lowercased `owner/repo` identity so names that sanitize to the same text remain separate. Join the database with the same prefix:
 
 ```bash
+GITHUB_REPOSITORY="owner/repo"
+repository="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+sanitized_repository="$(printf '%s' "$repository" | sed 's/[^a-z0-9_]/_/g')"
+repository_hash="$(printf '%s' "$repository" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -c1-32)"
+repository_prefix="gh_aw_${sanitized_repository}_${repository_hash}"
 atomic install npm:@bastani/atomic-storage-libsql
-atomic storage join "$(turso db show gh-aw-atomic --url)" --token-file turso-token --prefix gh_aw_<owner>_<repo>
+atomic storage join "$(turso db show gh-aw-atomic --url)" --token-file turso-token --prefix "$repository_prefix"
 ```
 
 This points your global Atomic settings at the shared database. To go back to your local store, remove the `storage` setting from `~/.atomic/agent/settings.json`.

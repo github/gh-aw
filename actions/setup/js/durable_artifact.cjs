@@ -43,7 +43,7 @@ async function restoreCheckpoint({ github, context, core, token, artifactClient 
       findBy: { token, repositoryOwner: context.repo.owner, repositoryName: context.repo.repo },
     });
     restoreFiles({ core: { ...core, setOutput() {} }, root });
-    if (["copilot", "claude", "codex", "gemini", "agy", "pi"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
+    if (["copilot", "claude", "codex", "gemini", "agy", "pi", "atomic"].includes(process.env.GH_AW_DURABLE_ENGINE || "")) {
       const currentPrompt = process.env.GH_AW_DURABLE_ENGINE === "pi" ? process.env.GH_AW_PI_USER_PROMPT || path.join(path.dirname(promptFile), "user.txt") : promptFile;
       preparePrompt({ env: { ...process.env, GH_AW_DURABLE_RESUMED: "true" }, promptFile: currentPrompt });
     }
