@@ -110,7 +110,7 @@ func matchBufBytesArg(pass *analysis.Pass, call *ast.CallExpr) (*ast.CallExpr, *
 	if !ok {
 		return nil, nil, false
 	}
-	sel, ok := inner.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(inner.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Bytes" {
 		return nil, nil, false
 	}
