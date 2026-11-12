@@ -49,12 +49,10 @@ engine:
         - --mode
         - text
         - --no-session
-        - --no-skills
-        - --no-prompt-templates
         - --no-themes
-        - --no-approve
-        - --tools
-        - read,bash,edit,write,find,search,kill,todo,workflow,subagent,intercom,web_search,code_search,fetch_content,get_search_content,mcp__*
+        - --approve
+        - --exclude-tools
+        - ask_user_question
       step-name: Execute Atomic CLI
       model-env-var: ATOMIC_MODEL
       mcp-config-env-var: GH_AW_MCP_CONFIG
@@ -278,22 +276,23 @@ incomplete output. Logs appear after the process exits rather than streaming.
 This known-value masking does not contain the agent or cover arbitrary encodings,
 partial credentials, other secrets, or files the agent writes.
 
-Startup network checks, telemetry, saved sessions, skills,
-prompt templates, and themes are disabled. `--no-approve` ignores project-local
-Atomic/Pi configuration; repository settings and workflow definitions are not
-overwritten. The fresh agent directory excludes user-installed extensions;
-bundled extensions remain loaded. An explicit allowlist enables Atomic's default
-and bundled-extension tools inside the gh-aw sandbox: read, bash, edit, write,
-find, search, kill, todo, workflow, subagent, intercom, web_search, code_search,
-fetch_content, get_search_content, and native MCP. The interactive
-`ask_user_question` is not listed because no person answers in a workflow run,
-and tools added by later Atomic releases stay off until a reviewed bump lists them. Headless runs return a workflow's run ID at launch,
-and a durable approval gate stays pending rather than proceeding. Workflows and
-extensions defined in the repository's `.atomic/` are not loaded, because
-`--no-approve` ignores project-local configuration. Web tools reach only domains
-the workflow allows. This sample does not advertise
-gh-aw tool allowlists, native iteration limits, Agent Plugins, custom Atomic
-process workflows, or structured session/token parsing. Plain-text output does
+Startup network checks, telemetry, saved sessions, and themes are disabled.
+Everything else in Atomic is on, minus its one interactive tool. `--approve`
+loads the repository's `.atomic/` extensions, workflows, skills, prompt
+templates, and settings, so a repository can add custom tools, workflows, and
+skills by committing them there; skills gh-aw installs into `.atomic/skills`
+are loaded too. gh-aw restores `.atomic/` from the
+base branch before the agent starts, so a pull request cannot supply its own.
+The fresh agent directory excludes user-installed extensions; bundled
+extensions remain loaded. Every Atomic tool is enabled inside the gh-aw sandbox,
+including workflows, subagents, Intercom, web access, native MCP, and tools
+registered by the repository's extensions; only the interactive
+`ask_user_question` is excluded, because no person answers in a workflow run.
+Headless runs return a workflow's run ID at launch, and a durable approval gate
+stays pending rather than proceeding. Web tools reach only domains the workflow
+allows. This sample does not advertise
+gh-aw tool allowlists, native iteration limits, Agent Plugins, or structured
+session/token parsing. Plain-text output does
 not establish tool, usage, or MCP-failure telemetry. The smoke workflow runs
 every two days and on manual dispatch, and checks native MCP, file readback, build
 status, and credentials.
