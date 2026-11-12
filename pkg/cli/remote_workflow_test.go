@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -872,6 +873,156 @@ imports:
 		"transitive dep must be written to shared/control-aux.md")
 	assert.NoFileExists(t, filepath.Join(tmpDir, "control-aux.md"),
 		"transitive dep must not be written at the root level")
+}
+
+func TestFetchFrontmatterImportsRecursive_PreservesRelativeLayout(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseDir string
+		imports string
+		files   map[string]string
+	}{
+		{
+			name:    "shared imports",
+			baseDir: ".github/workflows",
+			imports: "shared/review.md",
+			files:   map[string]string{".github/workflows/shared/review.md": "# Shared review\n"},
+		},
+		{
+			name:    "external prompt",
+			baseDir: ".github/workflows",
+			imports: "../prompts/review.md",
+			files:   map[string]string{".github/prompts/review.md": "# External review\n"},
+		},
+		{
+			name:    "nested and transitive imports",
+			baseDir: ".github/workflows",
+			imports: "shared/review.md",
+			files: map[string]string{
+				".github/workflows/shared/review.md": "---\nimports:\n  - ./../../prompts/review.md\n---\n# Shared review\n",
+				".github/prompts/review.md":          "---\nimports:\n  - ./nested/context.md\n---\n# External review\n",
+				".github/prompts/nested/context.md":  "# Nested context\n",
+			},
+		},
+		{
+			name:    "source workflow in custom directory",
+			baseDir: "library/workflows",
+			imports: "../prompts/review.md",
+			files:   map[string]string{"library/prompts/review.md": "# External review\n"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoRoot := t.TempDir()
+			t.Chdir(repoRoot)
+			targetDir := filepath.Join(repoRoot, ".github", "workflows")
+			require.NoError(t, os.MkdirAll(targetDir, 0755))
+			content := fmt.Sprintf("---\non: workflow_dispatch\nengine: copilot\nnetwork: defaults\nimports:\n  - %s\ninlined-imports: true\n---\n# Review workflow\n", tt.imports)
+			workflowPath := filepath.Join(targetDir, "review.md")
+			require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0600))
+			var downloaded []string
+			opts := frontmatterImportsOpts{
+				originalBaseDir: tt.baseDir,
+				targetDir:       targetDir,
+				strict:          true,
+				seen:            make(map[string]struct{}),
+				downloadFn: func(_ context.Context, _, _, remotePath, _ string) ([]byte, error) {
+					downloaded = append(downloaded, remotePath)
+					body, ok := tt.files[remotePath]
+					if !ok {
+						return nil, fmt.Errorf("unexpected download: %s", remotePath)
+					}
+					return []byte(body), nil
+				},
+			}
+			require.NoError(t, fetchFrontmatterImportsRecursive(t.Context(), content, tt.baseDir, opts))
+			require.Len(t, downloaded, len(tt.files))
+			for remotePath, body := range tt.files {
+				rel, err := filepath.Rel(filepath.FromSlash(tt.baseDir), filepath.FromSlash(remotePath))
+				require.NoError(t, err)
+				localContent, err := os.ReadFile(filepath.Join(targetDir, rel))
+				require.NoError(t, err)
+				assert.Equal(t, body, string(localContent))
+			}
+			assert.NoDirExists(t, filepath.Join(targetDir, ".github"))
+
+			compiler := workflow.NewCompiler()
+			compiler.SetQuiet(true)
+			compiler.SetStrictMode(true)
+			require.NoError(t, compiler.CompileWorkflow(workflowPath))
+			assert.FileExists(t, filepath.Join(targetDir, "review.lock.yml"))
+
+			// Existing imports must still be traversed to restore missing dependencies.
+			clear(opts.seen)
+			downloaded = nil
+			require.NoError(t, fetchFrontmatterImportsRecursive(t.Context(), content, tt.baseDir, opts))
+			assert.Empty(t, downloaded)
+			if tt.name == "nested and transitive imports" {
+				require.NoError(t, os.Remove(filepath.Join(repoRoot, ".github", "prompts", "nested", "context.md")))
+				clear(opts.seen)
+				require.NoError(t, fetchFrontmatterImportsRecursive(t.Context(), content, tt.baseDir, opts))
+				assert.Equal(t, []string{".github/prompts/nested/context.md"}, downloaded)
+			}
+		})
+	}
+}
+
+func TestFetchFrontmatterImportsRecursive_RejectsUnsafeDestinations(t *testing.T) {
+	for _, strict := range []bool{false, true} {
+		for _, tt := range []struct {
+			baseDir    string
+			importPath string
+		}{
+			{".github/workflows", "../../../outside.md"},
+			{".github/workflows", "/../outside.md"},
+			{".github/workflows", "/"},
+			{".github/workflows/nested", "../../../outside.md"},
+		} {
+			t.Run(fmt.Sprintf("strict=%t/%s/%s", strict, tt.baseDir, tt.importPath), func(t *testing.T) {
+				repoRoot := t.TempDir()
+				opts := frontmatterImportsOpts{
+					originalBaseDir: tt.baseDir,
+					targetDir:       filepath.Join(repoRoot, ".github", "workflows"),
+					strict:          strict,
+					seen:            make(map[string]struct{}),
+					downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
+						t.Fatal("unsafe imports must be rejected before downloading")
+						return nil, nil
+					},
+				}
+				content := fmt.Sprintf("---\nimports:\n  - %q\n---\n", tt.importPath)
+				err := fetchFrontmatterImportsRecursive(t.Context(), content, tt.baseDir, opts)
+				if strict {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+				}
+				entries, err := os.ReadDir(repoRoot)
+				require.NoError(t, err)
+				assert.Empty(t, entries)
+			})
+		}
+	}
+}
+
+func TestFetchFrontmatterImportsRecursive_RejectsSymlinkEscape(t *testing.T) {
+	repoRoot := t.TempDir()
+	outside := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(repoRoot, ".github"), 0755))
+	require.NoError(t, os.Symlink(outside, filepath.Join(repoRoot, ".github", "prompts")))
+	opts := frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       filepath.Join(repoRoot, ".github", "workflows"),
+		strict:          true,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
+			t.Fatal("symlink escapes must be rejected before downloading")
+			return nil, nil
+		},
+	}
+	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - ../prompts/new/review.md\n---\n", ".github/workflows", opts)
+	require.Error(t, err)
+	assert.NoFileExists(t, filepath.Join(outside, "new", "review.md"))
 }
 
 func TestFetchAndSaveRemoteRuntimeImports_EmptyRepoSlug(t *testing.T) {

@@ -276,7 +276,7 @@ func fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx context.Context, conten
 
 	// workflowBaseDir is the directory of the top-level workflow in the source repo
 	// (e.g. ".github/workflows"). It serves as both the starting point for resolving
-	// relative imports and as the prefix to strip when computing local target paths.
+	// relative imports and as the base when computing local target paths.
 	workflowBaseDir := getParentDir(spec.WorkflowPath)
 
 	// seen is keyed by fully-resolved remote file path. It is shared across all recursion
@@ -369,7 +369,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 
 	remoteWorkflowLog.Printf("Processing %d frontmatter imports recursively: owner=%s, repo=%s, ref=%s", len(importPaths), opts.owner, opts.repo, opts.ref)
 
-	// Pre-compute the absolute target directory once for path-traversal boundary checks.
+	// Imports may leave the workflows directory, but must stay inside the repository.
 	absTargetDir, err := filepath.Abs(opts.targetDir)
 	if err != nil {
 		if opts.strict {
@@ -377,6 +377,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		return nil
 	}
+	repoRoot := filepath.Dir(filepath.Dir(absTargetDir))
 
 	for _, importPath := range importPaths {
 		// Skip workflowspec-format imports (already pinned to a remote ref)
@@ -455,28 +456,20 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		opts.seen[remoteFilePath] = struct{}{}
 
-		// Derive the local path relative to targetDir by stripping the original base-dir
-		// prefix from the remote path. This ensures that imports in nested files resolve
-		// to the correct location regardless of how many levels deep the recursion goes.
+		// Preserve the path relative to the original workflow directory, including
+		// parent components for imports outside that directory.
 		//
 		// Example: originalBaseDir=".github/workflows"
 		//   remoteFilePath=".github/workflows/shared/analysis.md" → localRelPath="shared/analysis.md"
-		//   (nested) remoteFilePath=".github/workflows/other.md"  → localRelPath="other.md"
-		var localRelPath string
-		if opts.originalBaseDir != "" && strings.HasPrefix(remoteFilePath, opts.originalBaseDir+"/") {
-			localRelPath = remoteFilePath[len(opts.originalBaseDir)+1:]
-		} else {
-			// Workflow at repo root, or import outside the original base dir:
-			// use the full remote path relative to targetDir.
-			localRelPath = remoteFilePath
+		//   remoteFilePath=".github/prompts/review.md" → localRelPath="../prompts/review.md"
+		localRelPath, err := filepath.Rel(filepath.FromSlash(opts.originalBaseDir), filepath.FromSlash(remoteFilePath))
+		if err != nil {
+			if opts.strict {
+				return fmt.Errorf("failed to resolve import path %q: %w", importPath, err)
+			}
+			continue
 		}
-		localRelPath = filepath.Clean(filepath.FromSlash(localRelPath))
-		// Strip any leading separator produced by Clean on root-relative paths.
-		localRelPath = strings.TrimLeft(localRelPath, string(filepath.Separator))
-		// Reject empty or "." paths (would point to targetDir itself) as a safety guard.
-		// ".." cannot appear here because remoteFilePath was already rejected above if it
-		// started with "..", and path.Clean cannot introduce new ".." components.
-		if localRelPath == "" || localRelPath == "." {
+		if remoteFilePath == "." || localRelPath == "." {
 			if opts.strict {
 				return fmt.Errorf("invalid import path %q", importPath)
 			}
@@ -484,20 +477,12 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		targetPath := filepath.Join(opts.targetDir, localRelPath)
 
-		// Belt-and-suspenders: verify the resolved path is inside targetDir
-		absTargetPath, absErr := filepath.Abs(targetPath)
-		if absErr != nil {
+		if err := fileutil.ValidatePathWithinBase(repoRoot, targetPath); err != nil {
 			if opts.strict {
-				return fmt.Errorf("failed to resolve import target path %q: %w", importPath, absErr)
-			}
-			continue
-		}
-		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
-			if opts.strict {
-				return fmt.Errorf("refusing to write import outside target directory: %q", importPath)
+				return fmt.Errorf("refusing to write import outside repository root: %q: %w", importPath, err)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside target directory: %q", importPath)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside repository root: %q", importPath)))
 			}
 			continue
 		}
