@@ -414,7 +414,7 @@ func (c *Compiler) generateAgentStepSummaryAppend(yaml *strings.Builder, data *W
 	compilerYamlLog.Print("Generating agent step summary append step")
 
 	yaml.WriteString("      - name: Append agent step summary\n")
-	yaml.WriteString("        if: always()\n")
+	yaml.WriteString("        if: always() && " + secretMaskingSuccessCondition(data) + "\n")
 	if isArcDindTopology(data) {
 		yaml.WriteString("        env:\n")
 		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
@@ -866,7 +866,7 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// Append the agent step summary to the real $GITHUB_STEP_SUMMARY after secrets are redacted.
 	// The agent writes its GITHUB_STEP_SUMMARY content to AgentStepSummaryPath (a file inside
 	// /tmp/gh-aw/ that is reachable in both AWF sandbox and non-sandbox modes).
-	// secret redaction already scanned this file, so it is safe to append.
+	// Publication requires successful redaction and a symlink-safe regular-file read.
 	c.generateAgentStepSummaryAppend(yaml, data)
 
 	// Add output collection step only if safe-outputs feature is used (GH_AW_SAFE_OUTPUTS functionality)

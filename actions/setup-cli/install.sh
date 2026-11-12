@@ -435,9 +435,6 @@ if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
         fi
     else
         print_warning "gh extension install failed, falling back to manual installation..."
-        if [ -f "$GH_INSTALL_LOG" ]; then
-            cat "$GH_INSTALL_LOG"
-        fi
     fi
 elif [ "$TRY_GH_INSTALL" = true ]; then
     print_info "gh CLI not available, proceeding with manual installation..."

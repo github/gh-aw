@@ -277,6 +277,28 @@ function receiptMatchesClaim(receipt, claim) {
   );
 }
 
+/**
+ * In-process: the private WeakMap receipt. Durable (maintenance re-verification):
+ * the serialized receipt carried by the DeliveryEvidence entry, rebound to the
+ * active Claim identity. `receipts` is a WeakMap or a `(result) => receipt` function.
+ */
+function claimDeliveryReceipt(options, verifier, receipts) {
+  if (options.durable !== true) {
+    if (!options.result) return undefined;
+    return typeof receipts === "function" ? receipts(options.result) : receipts.get(options.result);
+  }
+  const entry = options.result?.entry;
+  if (!entry || entry.verifier !== verifier || !object(entry.receipt)) return undefined;
+  return { ...entry.receipt, ...claimIdentity(options.claim.handle) };
+}
+
+/** Serializable copy of a private receipt without the four Claim identity fields (plus `omit`). */
+function durableReceipt(receipt, omit = []) {
+  const copy = structuredClone(receipt);
+  for (const field of ["dispatch_id", "claim_id", "work_id", "claim_handle", ...omit]) delete copy[field];
+  return copy;
+}
+
 function claimArtifactPath(base, handle, assignment) {
   const identity = claimIdentity(handle, assignment);
   return path.join(base, "claims", crypto.createHash("sha256").update(canonical(identity)).digest("hex"));
@@ -436,6 +458,8 @@ module.exports = {
   claimIdentity,
   assertClaimIdentity,
   receiptMatchesClaim,
+  claimDeliveryReceipt,
+  durableReceipt,
   assertClaimArtifactDirectory,
   assertClaimArtifactFile,
   currentClaimHandle,

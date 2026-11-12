@@ -6,7 +6,7 @@ const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const { resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 
 const { canonical, canonicalBytes, closed } = require("./work_queue_codec.cjs");
-const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, receiptMatchesClaim, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
+const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, receiptMatchesClaim, claimDeliveryReceipt, durableReceipt, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
@@ -116,12 +116,30 @@ function createRestEffectHandler(adapter, github) {
   };
 }
 
+function durableRestReceipt(result, claim) {
+  const receipt = result && privateReceipts.get(result);
+  if (!receiptMatchesClaim(receipt, claim) || canonicalBytes(receipt.fields) > 8192) return null;
+  return durableReceipt(receipt, ["adapter"]);
+}
+
 async function verifyRestAdapterDelivery(options) {
-  const { adapter, result, claim, github } = options;
+  const receipt = claimDeliveryReceipt(options, "rest_adapter", privateReceipts);
+  return verifyRestReceipt(options, receipt);
+}
+
+async function verifyRestReceipt(options, receipt) {
+  const { adapter, claim, github } = options;
   const unverified = field_index => ({ verified: false, diagnostics: { event: "rest.readback.mismatch", field_index } });
   validateRestAdapter(adapter);
-  const receipt = result && privateReceipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return unverified(-1);
+  if (!receiptMatchesClaim(receipt, claim) || (options.durable === true ? options.result?.entry?.adapter : receipt.adapter) !== canonical(adapter)) return unverified(-1);
+  try {
+    if (typeof receipt.id !== "string") return unverified(-1);
+    nativeIdentity(receipt.id);
+    closed(receipt.fields, [...new Set([...Object.keys(adapter.expected || {}), ...Object.keys(adapter["field-map"] || {})])], [], "REST receipt fields");
+    canonical(receipt.fields);
+  } catch {
+    return unverified(-1);
+  }
   if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return unverified(-1);
   const [owner, repo] = adapter["target-repo"].split("/");
   const route = concreteRoute(adapter.verifier.route, { ...receipt.fields, owner, repo, receipt_id: receipt.id });
@@ -145,4 +163,4 @@ async function verifyRestAdapterDelivery(options) {
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
-module.exports = { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery };
+module.exports = { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery, durableRestReceipt };

@@ -121,10 +121,6 @@ function findFiles(dir, extensions) {
             core.warning(`Skipping directory that disappeared during secret redaction: ${currentDir}`);
             continue;
           }
-          if (isErrnoCode(error, "EACCES", "EPERM")) {
-            core.warning(`Skipping inaccessible directory during secret redaction: ${currentDir}`);
-            continue;
-          }
           throw error;
         }
         for (const entry of entries) {

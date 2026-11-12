@@ -33,6 +33,8 @@ func TestPermitted(t *testing.T) {
 		{name: "claim producer rejected", role: "producer", kind: "Claim"},
 		{name: "completion worker", role: "worker", kind: "Completion", want: true},
 		{name: "completion administrator rejected", role: "administrator", kind: "Completion"},
+		{name: "delivery evidence worker", role: "worker", kind: "DeliveryEvidence", want: true},
+		{name: "delivery evidence reconciler rejected", role: "reconciler", kind: "DeliveryEvidence"},
 		{name: "result reconciler", role: "reconciler", kind: "Result", want: true},
 		{name: "delivery failure reconciler", role: "reconciler", kind: "DeliveryFailure", want: true},
 		{name: "release reconciler", role: "reconciler", kind: "Release", want: true},

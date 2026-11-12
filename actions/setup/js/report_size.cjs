@@ -10,11 +10,16 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 
 const MAX_BODY_LENGTH = 65536;
 const SIZE_NOTICE = "Content redacted to fit size limit.";
-const PROTECTED_TYPES = new Set(["xml_marker", "json_marker", "review_marker", "marker", "expiration", "closing_reference"]);
+const PROTECTED_TYPES = new Set(["xml_marker", "json_marker", "review_marker", "reference_definition", "marker", "expiration", "closing_reference"]);
+
+/** @param {ReportBlock | ReportInline} node */
+function isProtectedType(node) {
+  return PROTECTED_TYPES.has(node.type) && (node.type !== "reference_definition" || node.agentTainted === false);
+}
 
 /** @param {ReportBlock | ReportInline} node */
 function isSizeRedactable(node) {
-  if (node.agentTainted === false || node.sizeProtected || PROTECTED_TYPES.has(node.type)) return false;
+  if (node.agentTainted === false || node.sizeProtected || isProtectedType(node)) return false;
   if (node.type === "details" && Array.isArray(node.summary) && !node.summary.every(isSizeRedactable)) return false;
   if ("children" in node) return node.children.every(isSizeRedactable);
   if (node.type === "list") return node.items.every(item => item.every(isSizeRedactable));
@@ -60,7 +65,7 @@ function replaceSelected(report, selected) {
           notices.add(notice);
           return notice;
         }
-        if (node.sizeProtected || PROTECTED_TYPES.has(node.type)) return node;
+        if (node.sizeProtected || isProtectedType(node)) return node;
         switch (node.type) {
           case "paragraph":
           case "heading":
@@ -85,8 +90,8 @@ function replaceSelected(report, selected) {
 }
 
 /**
- * Trim trailing whitespace before measuring publication output, replacing only agent-owned subtrees. Metadata
- * and footers are reserved in full; structured data is replaced only as a unit.
+ * Trim trailing whitespace before measuring publication output, replacing only agent-owned subtrees. Trusted
+ * metadata and footers are reserved in full; structured data is replaced only as a unit.
  * @param {Report} report
  * @param {number} [maxLength]
  * @returns {{title: string, body: string}}
@@ -107,7 +112,7 @@ function renderSizedReport(report, maxLength = MAX_BODY_LENGTH) {
   /** @param {Array<ReportBlock | ReportInline>} nodes */
   function collect(nodes) {
     for (const node of nodes) {
-      if (node.sizeProtected || PROTECTED_TYPES.has(node.type)) continue;
+      if (node.sizeProtected || isProtectedType(node)) continue;
       if (isSizeRedactable(node)) {
         candidates.push({ node, size: textSize(node) });
         continue;

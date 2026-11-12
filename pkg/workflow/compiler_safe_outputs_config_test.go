@@ -982,6 +982,68 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			checkJSON:    true,
 			expectedKeys: []string{"create_issue"},
 		},
+		{
+			name: "create security advisory config",
+			safeOutputs: &SafeOutputsConfig{
+				CreateSecurityAdvisory: &CreateSecurityAdvisoryConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"create_security_advisory"},
+		},
+		{
+			name: "add security advisory comment config",
+			safeOutputs: &SafeOutputsConfig{
+				AddSecurityAdvisoryComment: &AddSecurityAdvisoryCommentConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("3"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"add_security_advisory_comment"},
+		},
+		{
+			name: "create agent session config",
+			safeOutputs: &SafeOutputsConfig{
+				CreateAgentSessions: &CreateAgentSessionConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					Base: "main",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"create_agent_session"},
+		},
+		{
+			name: "set issue field config",
+			safeOutputs: &SafeOutputsConfig{
+				SetIssueField: &SetIssueFieldConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("5"),
+					},
+					AllowedFields: []string{"Priority"},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"set_issue_field"},
+		},
 	}
 
 	for _, tt := range tests {

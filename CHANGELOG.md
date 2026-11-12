@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+Require Go 1.27.4 for repository builds, tooling, and owned workflow runtimes to
+fix [GO-2026-6859 (CVE-2026-97054)](https://pkg.go.dev/vuln/GO-2026-6859), an
+HTTP/1 server crash caused by a `net/http` header race. Release builds reject
+older toolchains. Rebuild binaries and devcontainers with Go 1.27.4 or newer.
+
 Allow explicitly `on.bots`-listed Apps to check out same-repository PRs on
 `edited` events only when the webhook reports a non-null object-valued `body`
 change and no other changed fields. Missing change metadata, title/base changes,
@@ -86,7 +91,7 @@ manifest digests through an independently trusted channel and update/recompile
 workflows to consume the new setup action. Explicit Copilot pins bypass
 toolcache selection; without a supplied pin, trusted toolcache behavior is
 unchanged. Repository Go tooling, module requirements and generated runtime
-defaults now use Go 1.27.3; release builds reject older toolchains. Go root
+defaults now use Go 1.27.4; release builds reject older toolchains. Go root
 capture and Serena setup clear stale GOROOT values before discovering the
 selected toolchain, preventing mixed-version compiler/standard-library failures.
 

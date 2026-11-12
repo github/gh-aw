@@ -5,6 +5,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -160,9 +161,15 @@ func containsMergeConflictMarkers(content string) bool {
 }
 
 func findWorkflowWithMergeConflictMarkers(workflowsDir string) (string, error) {
+	if workflowsDir == "" {
+		workflowsDir = getWorkflowsDir()
+	}
 	var conflictedWorkflow string
 	err := filepath.WalkDir(workflowsDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
+			if path == workflowsDir && errors.Is(walkErr, os.ErrNotExist) {
+				return nil
+			}
 			return walkErr
 		}
 		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
@@ -171,7 +178,7 @@ func findWorkflowWithMergeConflictMarkers(workflowsDir string) (string, error) {
 
 		content, err := os.ReadFile(path)
 		if err != nil {
-			return nil
+			return err
 		}
 		if containsMergeConflictMarkers(string(content)) && conflictedWorkflow == "" {
 			conflictedWorkflow = path

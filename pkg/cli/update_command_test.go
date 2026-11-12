@@ -4,6 +4,8 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1307,6 +1309,160 @@ Updated content referencing a workflow that doesn't exist locally.
 	restoredContent, readErr := os.ReadFile(workflowFile)
 	require.NoError(t, readErr, "failed to read workflow file after failed update")
 	assert.Equal(t, originalContent, string(restoredContent), "workflow file should be restored to its original content after a compile failure")
+}
+
+func TestUpdateWorkflows_MergeConflictsFail(t *testing.T) {
+	originalResolve, originalDownload := resolveLatestRefFn, downloadWorkflowContentFn
+	t.Cleanup(func() {
+		resolveLatestRefFn, downloadWorkflowContentFn = originalResolve, originalDownload
+	})
+	resolveLatestRefFn = func(context.Context, string, string, bool, bool, time.Duration) (latestRefResolution, error) {
+		return latestRefResolution{Ref: "v2.0.0"}, nil
+	}
+	const base = "---\non: workflow_dispatch\ntools:\n  bash: [\"echo base\"]\n---\n\n# Workflow\n"
+	downloadWorkflowContentFn = func(_ context.Context, _, _, ref string, _ bool) ([]byte, error) {
+		if ref == "v2.0.0" {
+			return []byte(strings.Replace(base, "echo base", "echo upstream", 1)), nil
+		}
+		return []byte(base), nil
+	}
+
+	for _, noCompile := range []bool{false, true} {
+		name := "preserves workflow when compiling"
+		if noCompile {
+			name = "reports partial failure without compilation"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "conflict.md")
+			local := strings.Replace(base, "echo base", "echo local", 1)
+			local = strings.Replace(local, "on: workflow_dispatch", "on: workflow_dispatch\nsource: owner/repo/workflows/conflict.md@v1.0.0", 1)
+			require.NoError(t, os.WriteFile(path, []byte(local), 0o600))
+			lockPath := filepath.Join(dir, "conflict.lock.yml")
+			require.NoError(t, os.WriteFile(lockPath, []byte("existing lock"), 0o600))
+
+			// A successful update must not hide another workflow's merge failure.
+			if noCompile {
+				healthy := strings.Replace(base, "on: workflow_dispatch", "on: workflow_dispatch\nsource: owner/repo/workflows/healthy.md@v1.0.0", 1)
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "healthy.md"), []byte(healthy), 0o600))
+			}
+			err := UpdateWorkflows(context.Background(), UpdateWorkflowsOptions{
+				WorkflowsDir: dir,
+				NoCompile:    noCompile,
+			})
+			require.ErrorContains(t, err, "1 workflow(s) failed to update")
+			updated, err := os.ReadFile(path)
+			require.NoError(t, err)
+			if noCompile {
+				assert.Contains(t, string(updated), "<<<<<<< current (local changes)")
+				healthy, err := os.ReadFile(filepath.Join(dir, "healthy.md"))
+				require.NoError(t, err)
+				assert.Contains(t, string(healthy), "echo upstream")
+			} else {
+				assert.Equal(t, local, string(updated))
+			}
+			lock, err := os.ReadFile(lockPath)
+			require.NoError(t, err)
+			assert.Equal(t, "existing lock", string(lock))
+		})
+	}
+}
+
+func TestRunUpdateWorkflows_MergeConflictStopsLaterPhases(t *testing.T) {
+	originalResolve, originalDownload := resolveLatestRefFn, downloadWorkflowContentFn
+	t.Cleanup(func() {
+		resolveLatestRefFn, downloadWorkflowContentFn = originalResolve, originalDownload
+	})
+	resolveLatestRefFn = func(context.Context, string, string, bool, bool, time.Duration) (latestRefResolution, error) {
+		return latestRefResolution{Ref: "v2.0.0"}, nil
+	}
+	const base = "---\non: workflow_dispatch\nsteps:\n  - uses: actions/checkout@v1\ntools:\n  bash: [\"echo base\"]\n---\n\n# Workflow\n"
+	downloadWorkflowContentFn = func(_ context.Context, _, _, ref string, _ bool) ([]byte, error) {
+		if ref == "v2.0.0" {
+			return []byte(strings.Replace(base, "echo base", "echo upstream", 1)), nil
+		}
+		return []byte(base), nil
+	}
+	dir := t.TempDir()
+	t.Chdir(dir)
+	path := filepath.Join(dir, "conflict.md")
+	local := strings.Replace(base, "echo base", "echo local", 1)
+	local = strings.Replace(local, "on: workflow_dispatch", "on: workflow_dispatch\nsource: owner/repo/workflows/conflict.md@v1.0.0", 1)
+	require.NoError(t, os.WriteFile(path, []byte(local), 0o600))
+	lockPath := filepath.Join(dir, "conflict.lock.yml")
+	require.NoError(t, os.WriteFile(lockPath, []byte("existing lock"), 0o600))
+	requests := 0
+	_, ctx := newUpdateGitHubTestClient(t, func(req *http.Request) (*http.Response, error) {
+		requests++
+		if strings.Contains(req.URL.Path, "/releases") {
+			return updateGitHubTestResponse(req, http.StatusOK, `[{"tag_name":"v6.0.0"}]`, nil), nil
+		}
+		return updateGitHubTestResponse(req, http.StatusOK, strings.Repeat("a", 40), nil), nil
+	})
+
+	err := RunUpdateWorkflows(ctx, UpdateWorkflowsOptions{WorkflowsDir: dir})
+	require.ErrorContains(t, err, "1 workflow(s) failed to update")
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, local, string(content), "action updates must not rewrite a preserved source")
+	lock, err := os.ReadFile(lockPath)
+	require.NoError(t, err)
+	assert.Equal(t, "existing lock", string(lock))
+	assert.Zero(t, requests, "dependency update phases must stop after source update failures")
+}
+
+func TestUpdateWorkflows_PartialFailureContract(t *testing.T) {
+	originalResolve, originalDownload := resolveLatestRefFn, downloadWorkflowContentFn
+	t.Cleanup(func() {
+		resolveLatestRefFn, downloadWorkflowContentFn = originalResolve, originalDownload
+	})
+	downloadWorkflowContentFn = func(context.Context, string, string, string, bool) ([]byte, error) {
+		return []byte("---\non: workflow_dispatch\n---\n\n# Updated\n"), nil
+	}
+	for _, tt := range []struct {
+		name        string
+		failures    []string
+		withSuccess bool
+		wantError   bool
+	}{
+		{name: "partial ordinary failure", failures: []string{"upstream unavailable"}, withSuccess: true, wantError: true},
+		{name: "partial rate limit", failures: []string{"API rate limit exceeded"}, withSuccess: true},
+		{name: "only rate limits", failures: []string{"API rate limit exceeded"}},
+		{name: "mixed failure types", failures: []string{"API rate limit exceeded", "upstream unavailable"}, withSuccess: true, wantError: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			for i := range tt.failures {
+				name := fmt.Sprintf("failure%d", i)
+				content := "---\nsource: owner/" + name + "/workflows/test.md@v1.0.0\n---\n\n# Original\n"
+				require.NoError(t, os.WriteFile(filepath.Join(dir, name+".md"), []byte(content), 0o600))
+			}
+			if tt.withSuccess {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "healthy.md"), []byte("---\nsource: owner/healthy/workflows/test.md@v1.0.0\n---\n\n# Original\n"), 0o600))
+			}
+			resolveLatestRefFn = func(_ context.Context, repo, _ string, _, _ bool, _ time.Duration) (latestRefResolution, error) {
+				for i, message := range tt.failures {
+					if repo == fmt.Sprintf("owner/failure%d", i) {
+						return latestRefResolution{}, fmt.Errorf("%s", message)
+					}
+				}
+				return latestRefResolution{Ref: "v2.0.0"}, nil
+			}
+
+			err := UpdateWorkflows(context.Background(), UpdateWorkflowsOptions{WorkflowsDir: dir, NoCompile: true, NoMerge: true})
+			if tt.wantError {
+				require.ErrorContains(t, err, "workflow(s) failed to update")
+			} else {
+				require.NoError(t, err)
+			}
+			if tt.withSuccess {
+				content, readErr := os.ReadFile(filepath.Join(dir, "healthy.md"))
+				require.NoError(t, readErr)
+				assert.Contains(t, string(content), "@v2.0.0")
+			}
+		})
+	}
 }
 
 func TestUpdateWorkflow_BackupReadFailureStopsUpdate(t *testing.T) {

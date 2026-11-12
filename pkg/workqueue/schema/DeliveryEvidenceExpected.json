@@ -1,0 +1,19 @@
+{
+  "$defs": {
+    "DeliveryEvidenceExpected": {
+      "additionalProperties": false,
+      "properties": {
+        "assignees": {},
+        "labels": {},
+        "ref": {},
+        "sha": {}
+      },
+      "required": [],
+      "type": "object"
+    }
+  },
+  "$id": "DeliveryEvidenceExpected.json",
+  "$ref": "#/$defs/DeliveryEvidenceExpected",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliveryEvidenceExpected"
+}

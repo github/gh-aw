@@ -321,9 +321,9 @@ async function reconcileQueueImpl(options) {
       continue;
     }
     let delivery;
-    if (dispatch.state !== "reserved" && dispatch.run && (typeof options.verifyEffects === "function" || options.expireUnverified === true)) {
+    if (dispatch.state !== "reserved" && dispatch.run && (typeof options.verifyEffects === "function" || typeof options.verifyEffectsFor === "function" || options.expireUnverified === true)) {
       try {
-        delivery = await require("./finish_work_queue_claim.cjs").finalizeWorkerResults({ ...options, assignment });
+        delivery = await require("./finish_work_queue_claim.cjs").finalizeWorkerResults({ ...options, assignment, verifyEffects: options.verifyEffects ?? options.verifyEffectsFor?.(assignment) });
       } catch (error) {
         log.failure("queue.reconcile.delivery_failed", error);
         let projection = latest.projection;

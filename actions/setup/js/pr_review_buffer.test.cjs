@@ -712,6 +712,27 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(callArgs.comments).toBeUndefined();
     });
 
+    it("should preserve hidden reference definitions in the submitted review body", async () => {
+      buffer.setReviewMetadata("Body text.\n\n[my-marker]: #score=85,run_id=1,run_attempt=1\n[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi", "COMMENT");
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      mockGithub.rest.pulls.createReview.mockResolvedValue({ data: { id: 601, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-601" } });
+
+      const result = await buffer.submitReview();
+      const body = mockGithub.rest.pulls.createReview.mock.calls[0][0].body;
+
+      expect(result.success).toBe(true);
+      expect(body).toBe("Body text.\n\n[my-marker]: #score=85,run_id=1,run_attempt=1\n\n[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi");
+      expect(body).toContain("[my-marker]: #score=85,run_id=1,run_attempt=1");
+      expect(body).toContain("[my-data]: #v=1,data=H4sIAAAA-abc_def_ghi");
+      expect(body).not.toContain("\\[my-marker\\]");
+      expect(body).not.toContain("abc\\_def\\_ghi");
+    });
+
     it("should use GH_AW_HEAD_SHA from env instead of live PR head SHA", async () => {
       const previousHeadSHA = process.env.GH_AW_HEAD_SHA;
       process.env.GH_AW_HEAD_SHA = "original-reviewed-sha";

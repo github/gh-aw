@@ -791,25 +791,32 @@ else
     echo "Skipping Bash behavioral installer tests outside Linux."
 fi
 
-test_private_gh_install_log() (
+test_gh_install_diagnostics() (
     local scenario=$1
-    local case_root fixture_bin tmp_dir output result=0
+    local version=$2
+    local private_checks=$3
+    local case_root fixture_bin tmp_dir output result=0 installer_path
     case_root=$(mktemp -d)
     trap 'rm -rf -- "$case_root"' EXIT
     fixture_bin="$case_root/bin"
     tmp_dir="$case_root/tmp"
     output="$case_root/output"
+    installer_path=$INSTALLER_PATH
     mkdir -p "$fixture_bin" "$tmp_dir" "$case_root/home"
-    printf 'sentinel\n' > "$case_root/sentinel"
-    ln -s "$case_root/sentinel" "$tmp_dir/gh-install.log"
-    [ -L "$tmp_dir/gh-install.log" ] || fail "fixture did not create the planted legacy symlink"
-    # Keep even a regression to the legacy fixed path inside this test's namespace.
-    sed "s|/tmp/gh-install.log|$tmp_dir/gh-install.log|g" "$INSTALLER_PATH" > "$case_root/install.sh"
+    if [ "$private_checks" = true ]; then
+        printf 'sentinel\n' > "$case_root/sentinel"
+        ln -s "$case_root/sentinel" "$tmp_dir/gh-install.log"
+        [ -L "$tmp_dir/gh-install.log" ] || fail "fixture did not create the planted legacy symlink"
+        # Keep even a regression to the legacy fixed path inside this test's namespace.
+        installer_path="$case_root/install.sh"
+        sed "s|/tmp/gh-install.log|$tmp_dir/gh-install.log|g" "$INSTALLER_PATH" > "$installer_path"
+    fi
     cat > "$fixture_bin/gh" <<'EOF'
 #!/bin/sh
 case "$*" in
     "extension install "*)
-        echo "fixture install diagnostic"
+        echo "fixture install stdout"
+        echo "fixture install stderr" >&2
         case "$FIXTURE_SCENARIO" in
             error) exit 42 ;;
             timeout) exit 124 ;;
@@ -830,25 +837,33 @@ EOF
 #!/bin/sh
 exit 0
 EOF
-    cat > "$fixture_bin/tee" <<'EOF'
+    if [ "$private_checks" = true ]; then
+        cat > "$fixture_bin/tee" <<'EOF'
 #!/bin/bash
 set -e
 [ "$(dirname "$1")" != "$FIXTURE_TMPDIR" ] || { echo "unsafe log parent" >&2; exit 1; }
 [ "$(find "$(dirname "$1")" -maxdepth 0 -type d -perm 0700)" ] || exit 1
 exec "$FIXTURE_REAL_TEE" "$@"
 EOF
+    fi
     chmod +x "$fixture_bin/"*
     if [ "$scenario" = allocation-failure ]; then
         tmp_dir="$case_root/missing"
     fi
     env -u GITHUB_OUTPUT \
-        INPUT_VERSION=v1.2.3 HOME="$case_root/home" TMPDIR="$tmp_dir" \
+        INPUT_VERSION="$version" HOME="$case_root/home" TMPDIR="$tmp_dir" \
         PATH="$fixture_bin:$PATH" FIXTURE_SCENARIO="$scenario" \
         FIXTURE_REAL_TEE="$(command -v tee)" FIXTURE_TMPDIR="$tmp_dir" \
-        bash "$case_root/install.sh" > "$output" 2>&1 || result=$?
-    [ "$(cat "$case_root/sentinel")" = sentinel ] || fail "$scenario changed the external sentinel"
-    [ -L "$case_root/tmp/gh-install.log" ] || fail "$scenario removed the planted legacy link"
-    [ -z "$(find "$case_root/tmp" -name 'gh-aw-install-log.*' -print)" ] || fail "$scenario left a private log directory"
+        bash "$installer_path" > "$output" 2>&1 || result=$?
+    if [ "$private_checks" = true ]; then
+        [ "$(cat "$case_root/sentinel")" = sentinel ] || fail "$scenario changed the external sentinel"
+        [ -L "$case_root/tmp/gh-install.log" ] || fail "$scenario removed the planted legacy link"
+        [ -z "$(find "$case_root/tmp" -name 'gh-aw-install-log.*' -print)" ] || fail "$scenario left a private log directory"
+    fi
+    if [ "$scenario" != allocation-failure ]; then
+        [ "$(grep -c '^fixture install stdout$' "$output")" -eq 1 ] || fail "$scenario lost or repeated gh stdout"
+        [ "$(grep -c '^fixture install stderr$' "$output")" -eq 1 ] || fail "$scenario lost or repeated gh stderr"
+    fi
     [ -z "$(find "$case_root/home" -name '.gh-aw-install.*' -print)" ] || fail "$scenario left a staging directory"
     if [ "$scenario" = success ]; then
         [ "$result" -eq 0 ] || { cat "$output" >&2; fail "gh install failed"; }
@@ -865,13 +880,18 @@ EOF
                 ;;
             error)
                 grep -q "gh extension install failed" "$output" || fail "missing gh failure diagnostic"
-                grep -q "fixture install diagnostic" "$output" || fail "gh stderr/stdout lost"
                 grep -q "fixture download failure" "$output" || fail "gh failure did not fall back"
                 ;;
         esac
     fi
-    echo "Test: private gh install log ($scenario) PASS"
+    echo "Test: gh install diagnostics ($version, $scenario, private=$private_checks) PASS"
 )
+
+for version in v1.2.3 latest; do
+    for scenario in success error timeout; do
+        test_gh_install_diagnostics "$scenario" "$version" false
+    done
+done
 
 case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)
@@ -879,7 +899,7 @@ case "$(uname -s)" in
         ;;
     *)
         for scenario in success error timeout allocation-failure; do
-            test_private_gh_install_log "$scenario"
+            test_gh_install_diagnostics "$scenario" v1.2.3 true
         done
         ;;
 esac

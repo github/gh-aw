@@ -276,6 +276,8 @@ function extractImportsFromText(frontmatterText) {
 
   let inImports = false;
   let baseIndent = 0;
+  /** @type {number|null} */
+  let importItemIndent = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -301,6 +303,12 @@ function extractImportsFromText(frontmatterText) {
 
       // Extract array item
       if (trimmed.startsWith("-")) {
+        if (importItemIndent === null) {
+          importItemIndent = lineIndent;
+        } else if (lineIndent !== importItemIndent) {
+          continue;
+        }
+
         let item = trimmed.substring(1).trim();
         // Extract path from object-form imports (uses: <path> / path: <path>).
         // These are valid import forms that the compiler accepts; extract the path

@@ -28,6 +28,7 @@ const { TEMPORARY_ID_PATTERN } = require("./temporary_id.cjs");
  *   {type: "structured_data", data: ReportData} |
  *   ReportXMLMarker | ReportJSONMarker |
  *   {type: "review_marker", workflowCallId: string} |
+ *   {type: "reference_definition", value: string} |
  *   {type: "expiration", expiresAt: string} |
  *   {type: "marker", name: "gh-aw-threat-detected" | "gh-aw-threat-engine-error"})} ReportBlock
  * @typedef {ReportXMLMarker & {name: "gh-aw-agentic-workflow" | "gh-aw-failure-issue", value: string, fields: ReportMarkerField[]}} ReportMarker
@@ -36,6 +37,7 @@ const { TEMPORARY_ID_PATTERN } = require("./temporary_id.cjs");
  */
 
 const ALERT_KINDS = new Set(["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"]);
+const REPORT_REFERENCE_DEFINITION = /^ {0,3}\[[A-Za-z0-9_.:-]+(?:[ \t]+[A-Za-z0-9_.:-]+)*\]:[ \t]+#[A-Za-z0-9._~!$&'*+,;=:@/?%-]*[ \t]*$/;
 const MAX_DEPTH = 16;
 /** @type {WeakSet<Report>} */
 const redactedReports = new WeakSet();
@@ -154,6 +156,17 @@ function normalizeReportText(value, { redact = true, preserveImageAttributes = f
     current = redacted;
   }
   throw new TypeError("Report text contains excessively nested encodings");
+}
+
+/** @param {string} value */
+function isReportReferenceDefinition(value) {
+  return REPORT_REFERENCE_DEFINITION.test(value);
+}
+
+/** @param {string} value @returns {string | undefined} */
+function normalizeReportReferenceDefinition(value) {
+  if (!isReportReferenceDefinition(value)) throw new TypeError("Invalid report reference definition");
+  return normalizeReportText(value, { redact: false }) === normalizeReportText(value) ? value : undefined;
 }
 
 /** @param {string} value */
@@ -435,6 +448,17 @@ function normalizeBlocks(nodes, depth) {
         if (!node.workflowCallId) throw new TypeError("Review metadata requires a workflow call ID");
         result.push({ type: "review_marker", workflowCallId: normalizeReportText(node.workflowCallId) });
         break;
+      case "reference_definition":
+        {
+          const value = normalizeReportReferenceDefinition(node.value);
+          if (value === undefined) {
+            result.push({
+              type: "paragraph",
+              children: [{ type: "text", value: normalizeReportText(node.value), ...provenance }],
+            });
+          } else result.push({ type: "reference_definition", value });
+        }
+        break;
       case "structured_data": {
         result.push({ type: "structured_data", data: normalizeReportData(node.data, depth + 1) });
         break;
@@ -648,6 +672,8 @@ function renderBlocks(nodes, compactExpiration = false) {
           return `<!-- ${node.name}: ${JSON.stringify(node.data).replace(/[<>&]/g, character => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`)} -->`;
         case "review_marker":
           return `[gh-aw-workflow-call-id]: # "${encodeURIComponent(node.workflowCallId)}"`;
+        case "reference_definition":
+          return node.value;
         case "structured_data": {
           const value = JSON.stringify(node.data, null, 2);
           const fence = codeFence(value);
@@ -830,4 +856,4 @@ function renderReport(report) {
   return result;
 }
 
-module.exports = { normalizeReport, normalizeReportText, normalizeReportTitle, normalizeReportURL, normalizeReportAllowedURL, normalizeReportImage, redactReportForRendering, assertRedactedReport, renderReport };
+module.exports = { normalizeReport, normalizeReportText, normalizeReportTitle, normalizeReportURL, normalizeReportAllowedURL, normalizeReportImage, isReportReferenceDefinition, redactReportForRendering, assertRedactedReport, renderReport };
