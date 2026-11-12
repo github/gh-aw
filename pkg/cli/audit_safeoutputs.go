@@ -20,7 +20,6 @@ func countBlockedSafeOutputsCommands(logsPath string) int {
 	if err != nil {
 		return 0
 	}
-	defer file.Close()
 
 	type toolUse struct {
 		Type  string `json:"type"`
@@ -70,6 +69,11 @@ func countBlockedSafeOutputsCommands(logsPath string) int {
 			}
 		}
 	}
+	scanErr := scanner.Err()
+	closeErr := file.Close()
+	if scanErr != nil || closeErr != nil {
+		return len(blockedCalls)
+	}
 	return len(blockedCalls)
 }
 
@@ -78,8 +82,8 @@ func isSafeOutputsCommand(command string) bool {
 	if !strings.HasPrefix(command, "safeoutputs") {
 		return false
 	}
-	if len(command) == len("safeoutputs") {
-		return true
+	if len(command) <= len("safeoutputs") {
+		return len(command) == len("safeoutputs")
 	}
 	switch command[len("safeoutputs")] {
 	case ' ', '\t', '\n', '\r', ';', '&', '|':
