@@ -296,7 +296,7 @@ func parseDerivedModelRoutingFixture(t *testing.T, replacements ...string) *Mode
 func assertNeutralModelDowngrade(t *testing.T, assessment AgenticAssessment) {
 	t.Helper()
 	assert.Equal(t, "low", assessment.Severity)
-	assertEconomyRoutingChange(t, assessment)
+	assertPerTaskRoutingChange(t, assessment)
 	assert.Contains(t, assessment.Recommendation, "https://github.github.com/gh-aw/reference/model-routing/")
 	assert.Contains(t, assessment.Recommendation, "eligible for default routing", "omission alternative must be eligibility-qualified")
 	assertNoModelPinAdvice(t, assessment)
@@ -308,10 +308,11 @@ func assertNeutralModelDowngrade(t *testing.T, assessment AgenticAssessment) {
 	}
 }
 
-func assertEconomyRoutingChange(t *testing.T, assessment AgenticAssessment) {
+func assertPerTaskRoutingChange(t *testing.T, assessment AgenticAssessment) {
 	t.Helper()
-	assert.Contains(t, assessment.Recommendation, "change engine.model (if set) or the top-level model to router/economy", "should replace the existing model setting, which takes precedence")
-	assert.Contains(t, assessment.Recommendation, "engine.model-routing block, set its mode: economy", "router values are rejected alongside a model-routing block")
+	assert.Contains(t, assessment.Recommendation, "change engine.model (if set) or the top-level model to router;", "should replace the existing model setting, which takes precedence")
+	assert.Contains(t, assessment.Recommendation, "engine.model-routing block, set its mode: auto", "router values are rejected alongside a model-routing block")
+	assert.Contains(t, assessment.Recommendation, "cap routing at the lowest level, use router/economy", "router/economy should be offered only as an explicit cap")
 }
 
 func assertNoModelPinAdvice(t *testing.T, assessment AgenticAssessment) {
@@ -327,7 +328,7 @@ func TestBuildAgenticAssessmentsFlagsModelDowngrade(t *testing.T) {
 	t.Parallel()
 	downgrades := modelDowngradeAssessments(t, nil)
 	require.Len(t, downgrades, 1, "model_downgrade_available assessment should be present for moderate triage run")
-	assertEconomyRoutingChange(t, downgrades[0])
+	assertPerTaskRoutingChange(t, downgrades[0])
 	assertNoModelPinAdvice(t, downgrades[0])
 }
 
@@ -348,21 +349,27 @@ func TestModelDowngradeAssessmentIsRoutingAware(t *testing.T) {
 		{name: "A unrouted classification only", routing: func(t *testing.T) *ModelRoutingSummary {
 			return parseDerivedModelRoutingFixture(t, `"stage":"selection"`, `"stage":"ignored"`)
 		}, expect: "neutral"},
-		{name: "B routed balanced from auto objective", routing: func(t *testing.T) *ModelRoutingSummary {
-			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"balanced"`)
-		}, expect: "routed", level: "balanced"},
-		{name: "B routed robust from auto objective", routing: func(t *testing.T) *ModelRoutingSummary {
-			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"robust"`)
-		}, expect: "routed", level: "robust"},
-		{name: "B routed balanced explicit objective", routing: func(t *testing.T) *ModelRoutingSummary {
+		{name: "B routed fixed balanced objective", routing: func(t *testing.T) *ModelRoutingSummary {
 			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"balanced"`, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost","mode":"balanced"}`)
 		}, expect: "routed", level: "balanced"},
+		{name: "B routed fixed robust objective", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"robust"`, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost","mode":"robust"}`)
+		}, expect: "routed", level: "robust"},
+		{name: "B2 auto objective resolved balanced", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"balanced"`)
+		}, expect: "none"},
+		{name: "B2 auto objective resolved robust", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"robust"`)
+		}, expect: "none"},
 		{name: "C fixture auto objective resolved economy", routing: func(t *testing.T) *ModelRoutingSummary {
 			return analyzeModelRouting(filepath.Join("testdata", "model_routing_golden", "copilot-routed-gpt-responses"))
 		}, expect: "none"},
 		{name: "C explicit economy objective", routing: func(t *testing.T) *ModelRoutingSummary {
 			return parseDerivedModelRoutingFixture(t, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost","mode":"economy"}`)
 		}, expect: "none"},
+		{name: "D selected level without objective mode", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"balanced"`, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost"}`)
+		}, expect: "neutral"},
 		{name: "D missing evidence", routing: func(t *testing.T) *ModelRoutingSummary { return analyzeModelRouting(t.TempDir()) }, expect: "neutral"},
 		{name: "D unreadable evidence", routing: func(t *testing.T) *ModelRoutingSummary {
 			return parseModelRoutingFile(filepath.Join(t.TempDir(), "missing.jsonl"), nil)
@@ -403,7 +410,7 @@ func TestModelDowngradeAssessmentIsRoutingAware(t *testing.T) {
 			downgrades := modelDowngradeAssessments(t, tt.routing(t))
 			switch tt.expect {
 			case "none":
-				assert.Empty(t, downgrades, "already-economy route must not emit model_downgrade_available")
+				assert.Empty(t, downgrades, "economy or classifier-chosen route must not emit model_downgrade_available")
 			case "neutral":
 				require.Len(t, downgrades, 1)
 				assertNeutralModelDowngrade(t, downgrades[0])
@@ -412,9 +419,10 @@ func TestModelDowngradeAssessmentIsRoutingAware(t *testing.T) {
 			case "routed":
 				require.Len(t, downgrades, 1)
 				assert.Equal(t, "low", downgrades[0].Severity)
-				assert.Contains(t, downgrades[0].Summary, "already routed")
-				assert.Contains(t, downgrades[0].Summary, tt.level)
-				assertEconomyRoutingChange(t, downgrades[0])
+				assert.Contains(t, downgrades[0].Summary, "fixed "+tt.level+" level")
+				assert.Contains(t, downgrades[0].Evidence, "routing_objective_mode="+tt.level)
+				assert.Contains(t, downgrades[0].Recommendation, "Let the router pick the level for each task")
+				assertPerTaskRoutingChange(t, downgrades[0])
 				assertNoModelPinAdvice(t, downgrades[0])
 			}
 		})

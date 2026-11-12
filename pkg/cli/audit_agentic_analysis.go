@@ -413,38 +413,45 @@ func appendPartiallyReducibleAssessment(assessments []AgenticAssessment, metrics
 
 const modelRoutingDocsURL = "https://github.github.com/gh-aw/reference/model-routing/"
 
-// economyRoutingChange covers each way a workflow can set its model because
+// perTaskRoutingChange covers each way a workflow can set its model because
 // audit cannot tell which form the workflow uses.
-const economyRoutingChange = "change engine.model (if set) or the top-level model to router/economy; with an engine.model-routing block, set its mode: economy instead."
+const perTaskRoutingChange = "change engine.model (if set) or the top-level model to router; with an engine.model-routing block, set its mode: auto instead. To cap routing at the lowest level, use router/economy (mode: economy) instead."
 
 func appendModelDowngradeAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, routing *ModelRoutingSummary) []AgenticAssessment {
-	// Economy routing suggestion: the run uses a non-lean resource profile but
-	// the task domain is routine enough that economy-level routing would likely suffice.
+	// Per-task routing suggestion: the run uses a non-lean resource profile but
+	// the task domain is routine enough that the router's classifier would
+	// likely pick the economy level for it.
 	if fingerprint.ResourceProfile == "lean" ||
 		(domain.Name != "triage" && domain.Name != "repo_maintenance" && domain.Name != "issue_response") ||
 		fingerprint.ActuationStyle == "write_heavy" {
 		return assessments
 	}
 	evidence := fmt.Sprintf("domain=%s resource_profile=%s actuation=%s", domain.Name, fingerprint.ResourceProfile, fingerprint.ActuationStyle)
-	switch level := confirmedModelRoutingLevel(routing); level {
-	case "economy":
+	level := confirmedModelRoutingLevel(routing)
+	switch {
+	case level == "economy":
 		auditAgenticLog.Print("Skipping model downgrade assessment: run was already routed at economy")
 		return assessments
-	case "balanced", "robust":
+	case level != "" && routing.ObjectiveMode == "auto":
+		// The classifier chose this level for the task; the domain heuristic
+		// is weaker evidence and must not overrule it.
+		auditAgenticLog.Printf("Skipping model downgrade assessment: auto routing selected %s for this task", level)
+		return assessments
+	case level != "" && (routing.ObjectiveMode == "balanced" || routing.ObjectiveMode == "robust"):
 		return append(assessments, AgenticAssessment{
 			Kind:           "model_downgrade_available",
 			Severity:       "low",
-			Summary:        fmt.Sprintf("This %s run was already routed per task at the %s level; routine work like this may be handled at the economy level for lower cost.", domain.Label, level),
-			Evidence:       fmt.Sprintf("%s routing_mode=%s", evidence, level),
-			Recommendation: "Keep per-task routing at the economy level: " + economyRoutingChange + " See " + modelRoutingDocsURL,
+			Summary:        fmt.Sprintf("This %s run was routed at a fixed %s level; when the router's classifier picks the level per task, routine work like this usually runs at the economy level for lower cost.", domain.Label, routing.ObjectiveMode),
+			Evidence:       fmt.Sprintf("%s routing_objective_mode=%s routing_mode=%s", evidence, routing.ObjectiveMode, level),
+			Recommendation: "Let the router pick the level for each task: " + perTaskRoutingChange + " See " + modelRoutingDocsURL,
 		})
 	default:
 		return append(assessments, AgenticAssessment{
 			Kind:           "model_downgrade_available",
 			Severity:       "low",
-			Summary:        fmt.Sprintf("This %s run may not need a high-capability model. Per-task model routing at the economy level could handle routine work at lower cost.", domain.Label),
+			Summary:        fmt.Sprintf("This %s run may not need a high-capability model. Per-task model routing lets the router's classifier pick the level for each task, usually economy for routine work like this, at lower cost.", domain.Label),
 			Evidence:       evidence,
-			Recommendation: "Route each task at the economy level: " + economyRoutingChange + " Workflows eligible for default routing can instead omit the model. See " + modelRoutingDocsURL,
+			Recommendation: "Route each task with model: router: " + perTaskRoutingChange + " Workflows eligible for default routing can instead omit the model. See " + modelRoutingDocsURL,
 		})
 	}
 }
@@ -507,7 +514,7 @@ func generateAgenticAssessmentFindings(assessments []AgenticAssessment) []AuditF
 		case "model_downgrade_available":
 			code = AuditFindingAgenticModelDowngrade
 			category = "optimization"
-			impact = "Economy-level model routing could reduce per-run cost for this task domain"
+			impact = "Per-task model routing could reduce per-run cost for this task domain"
 		case "delegated_context_present":
 			code = AuditFindingAgenticDelegatedContext
 			category = "coordination"
