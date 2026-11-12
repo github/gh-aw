@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-12",
+  "headline": "Security hardening and Atomic engine work landed before 05:00 UTC; v1.2.2 remains current.",
+  "highlights": [
+    "Atomic built-in tools and smoke test enabled (#77020)",
+    "Temporary-file hardening for cache commits, MCP shell outputs, and installer logs (#76954)",
+    "Connector safe-output metadata fix (#76981)",
+    "13 Dependabot PRs still open",
+    "Community reports on lock-file scalars, Copilot auto reasoning, and API-proxy tool images"
+  ],
+  "open_prs": 27,
+  "commits_30d": 1302,
+  "human_commits_30d": 502
+}
