@@ -110,7 +110,10 @@ test("compiled workflow lock YAML is ignored during manifest eligibility checks"
   const result = await select([pull(1, [".github/workflows/package.json", ".github/workflows/dependabot-burner.lock.yml"])]);
   assert.deepEqual(result.selected_batch_pr_numbers, [1]);
   assert.deepEqual(result.selected_batch_dependencies[0].manifest_files, [".github/workflows/package.json"]);
-  assert.match(workflow, /create-pull-request:\n\s+exclude-lock-yml: true/);
+  assert.match(
+    workflow,
+    /create-pull-request:\n\s+title-prefix: "\[dependabot-burner\] "\n\s+expires: "3d"\n\s+labels: \[automation, dependencies, dependabot\]\n\s+reviewers: \[copilot\]\n\s+protected-files: request_review\n\s+exclude-lock-yml: true/
+  );
 });
 
 test("slash-command grouping still uses only shared generated manifests", async () => {
@@ -142,6 +145,7 @@ test("slash-command fallback ignores compiled workflow lock YAML", async () => {
   const result = await select([], 1, pull(1, [".github/workflows/package.json", ".github/workflows/dependabot-burner.lock.yml"]));
   assert.equal(result.trigger_pr.number, 1);
   assert.equal(result.open_dependabot_pr_count, 1);
+  assert.equal(result.open_pr_count, 1);
   assert.deepEqual(result.selected_batch_pr_numbers, [1]);
 });
 

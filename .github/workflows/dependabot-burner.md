@@ -52,6 +52,11 @@ safe-outputs:
   add-comment:
     max: 1
   create-pull-request:
+    title-prefix: "[dependabot-burner] "
+    expires: "3d"
+    labels: [automation, dependencies, dependabot]
+    reviewers: [copilot]
+    protected-files: request_review
     exclude-lock-yml: true
 timeout-minutes: 20
 imports:
@@ -273,6 +278,7 @@ steps:
                   updated_at: pull.data.updated_at,
                   url: pull.data.html_url,
                 };
+                openPRs.push(triggerPR);
               }
             }
           }
