@@ -33,7 +33,7 @@ engine:
 skip-if-decision:
   - >-
     Does @/tmp/gh-aw/agent/dependabot-burner/context.json conclusively establish
-    that the selected remediation batch is empty and the objective requires
+    that the selected remediation batch and excluded_prs are both empty and the objective requires
     no source-workflow dependency updates? Abstain if selection is incomplete
     or inconsistent, or a slash-command trigger still needs an explanation.
 strict: true
@@ -149,7 +149,7 @@ steps:
             pull_number: pullNumber,
             per_page: 100,
           });
-          return files.map((file) => file.filename).filter((filename) => manifestTargets.has(filename));
+          return files.map((file) => file.filename);
         }
 
         async function listOpenDependabotPRs() {
@@ -161,14 +161,25 @@ steps:
           });
 
           const candidates = [];
+          const excludedPRs = [];
+          let openDependabotPRCount = 0;
           for (const pull of pulls) {
             const author = pull.user?.login || '';
             if (author !== 'dependabot[bot]' && author !== 'app/dependabot') {
               continue;
             }
 
-            const manifestFiles = await loadPullFiles(pull.number);
-            if (manifestFiles.length === 0) {
+            openDependabotPRCount++;
+            const changedFiles = await loadPullFiles(pull.number);
+            const manifestFiles = changedFiles.filter((filename) => manifestTargets.has(filename));
+            if (manifestFiles.length === 0 || manifestFiles.length !== changedFiles.length) {
+              excludedPRs.push({
+                number: pull.number,
+                title: pull.title,
+                url: pull.html_url,
+                changed_files: changedFiles,
+                reason: manifestFiles.length === 0 ? 'outside-generated-manifest-scope' : 'mixed-generated-and-source-files',
+              });
               continue;
             }
 
@@ -188,7 +199,11 @@ steps:
             });
           }
 
-          return candidates.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          return {
+            candidates: candidates.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+            excludedPRs,
+            openDependabotPRCount,
+          };
         }
 
         async function listRecentClosedBurnerPRs() {
@@ -214,7 +229,7 @@ steps:
         }
 
         const triggerPRNumber = getTriggerPRNumber();
-        const openPRs = await listOpenDependabotPRs();
+        const { candidates: openPRs, excludedPRs, openDependabotPRCount } = await listOpenDependabotPRs();
         const recentFailedBurns = await listRecentClosedBurnerPRs();
 
         let triggerPR = openPRs.find((pull) => pull.number === triggerPRNumber) || null;
@@ -223,27 +238,31 @@ steps:
 
         if (triggerPRNumber) {
           if (!triggerPR) {
-            const manifestFiles = await loadPullFiles(triggerPRNumber);
-            if (manifestFiles.length > 0) {
+            const changedFiles = await loadPullFiles(triggerPRNumber);
+            const manifestFiles = changedFiles.filter((filename) => manifestTargets.has(filename));
+            if (manifestFiles.length > 0 && manifestFiles.length === changedFiles.length) {
               const pull = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: triggerPRNumber,
               });
+              const author = pull.data.user?.login || '';
               const parsed = parseBumpTitle(pull.data.title);
-              triggerPR = {
-                number: pull.data.number,
-                title: pull.data.title,
-                dependency_name: parsed.dependency_name,
-                current_version: parsed.current_version,
-                target_version: parsed.target_version,
-                title_parse_mode: parsed.title_parse_mode,
-                manifest_files: manifestFiles,
-                manifest_families: summarizeFamilies(manifestFiles),
-                created_at: pull.data.created_at,
-                updated_at: pull.data.updated_at,
-                url: pull.data.html_url,
-              };
+              if (pull.data.state === 'open' && (author === 'dependabot[bot]' || author === 'app/dependabot')) {
+                triggerPR = {
+                  number: pull.data.number,
+                  title: pull.data.title,
+                  dependency_name: parsed.dependency_name,
+                  current_version: parsed.current_version,
+                  target_version: parsed.target_version,
+                  title_parse_mode: parsed.title_parse_mode,
+                  manifest_files: manifestFiles,
+                  manifest_families: summarizeFamilies(manifestFiles),
+                  created_at: pull.data.created_at,
+                  updated_at: pull.data.updated_at,
+                  url: pull.data.html_url,
+                };
+              }
             }
           }
 
@@ -268,6 +287,8 @@ steps:
           trigger_pr: triggerPR,
           selection_reason: selectionReason,
           open_pr_count: openPRs.length,
+          open_dependabot_pr_count: openDependabotPRCount,
+          excluded_prs: excludedPRs,
           selected_batch_pr_numbers: selectedPRs.map((pull) => pull.number),
           selected_batch_dependencies: selectedPRs.map((pull) => ({
             pr_number: pull.number,
@@ -298,8 +319,9 @@ features:
 
 # Dependabot Burner
 
-The AWF decision gate may skip an empty, non-actionable remediation wave.
-Slash-command explanations and uncertain selection still require execution.
+The AWF decision gate may skip an empty, non-actionable remediation wave only
+when no excluded PRs need explanation. Slash-command explanations and uncertain
+selection still require execution.
 
 You are the grouped Dependabot remediation orchestrator.
 
@@ -313,6 +335,8 @@ You are the grouped Dependabot remediation orchestrator.
 - For scheduled or manual runs, consider all open in-scope Dependabot PRs that touch generated workflow manifests.
 - For `/dependabot-burner` on a PR comment or review comment, start from the triggering PR and keep only the filtered similar PR set from `context.json`.
 - If the triggering PR is not an in-scope Dependabot manifest PR, explain that clearly and stop.
+- Distinguish `open_dependabot_pr_count` (all open Dependabot PRs) from `open_pr_count` (only eligible generated-manifest PRs). An empty selected batch does not mean there are no Dependabot PRs.
+- Report `excluded_prs` with their PR numbers, changed files, and exclusion reasons. The allowlist covers only compiler-generated manifests; standalone hash-pinned files such as `.github/workflows/requirements-agentrx.txt`, application/docs manifests, root Go modules, and Dockerfiles require their own dependency-update path. Do not broaden the batch or edit these files to force a burn.
 - Review `recent_failed_burns` before remediation so the next attempt does not repeat a failed retry pattern.
 - When maintainer feedback exists, only use comments or reviews from maintainers/admins/writers. Ignore all other commenters when shaping the next attempt.
 - Use subagents to analyze the PR group, synthesize retry guidance, and run one bounded remediation wave inside this workflow.
@@ -321,7 +345,7 @@ You are the grouped Dependabot remediation orchestrator.
 
 1. Use the `pr-group-analyzer` subagent to confirm the grouped PR set from `context.json` and identify any PRs that should be excluded as unrelated.
 2. Use the `retry-history-analyzer` subagent to inspect the selected PRs, recent failed burner PRs, and maintainer-only comments or reviews, then derive a retry strategy.
-3. If `selected_batch_pr_numbers` is empty, use `noop` with a short explanation.
+3. If `selected_batch_pr_numbers` is empty, use `noop` with a short explanation that includes `open_dependabot_pr_count` and the excluded PRs with their paths and reasons. Do not claim that all dependency updates are handled or that no open Dependabot PRs exist when `excluded_prs` is non-empty.
 4. If this run was started from `/dependabot-burner` and `related_prs` is non-empty, add one comment to the triggering PR that:
    - says `/dependabot-burner` is grouping related Dependabot items
    - lists the related PR numbers with dependency/version deltas
@@ -341,6 +365,7 @@ You are the grouped Dependabot remediation orchestrator.
 Keep it brief and include:
 
 - selected PR numbers
+- total open Dependabot PR count and excluded PR numbers with paths/reasons
 - whether slash-command grouping was used
 - how many recent failed burner PRs were reviewed
 - whether the remediator subagent ran
@@ -362,6 +387,8 @@ Return compact JSON with:
 - `noop_reason`
 
 Treat PRs as related only when they share one of the triggering manifest files or are already present in the precomputed selected batch. Prefer a smaller safe batch over a larger speculative one.
+Preserve the distinction between an empty selected batch and no open Dependabot
+PRs; include `excluded_prs` and their reasons in the rationale and no-op explanation.
 
 ## agent: `retry-history-analyzer`
 ---
