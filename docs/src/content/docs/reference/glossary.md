@@ -1696,7 +1696,7 @@ services:
 
 ### Token Steering (`sandbox.agent.token-steering`)
 
-A `sandbox.agent` boolean field, enabled by default, that controls whether AWF's API proxy actively steers Copilot requests through dynamic token/provider routing. Set `token-steering: false` to preserve the explicitly configured provider and model without proxy interception. See [Sandbox Configuration](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering).
+A `sandbox.agent` boolean field that controls AWF's budget notices, which warn the agent when the run's AI credits or time are nearly spent. Notices are on by default; set `token-steering: false` to turn them off. Steering never changes the provider or model. See [Sandbox Configuration](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering).
 
 ```yaml wrap
 sandbox:

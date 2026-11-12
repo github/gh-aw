@@ -560,14 +560,14 @@ max-turn-cache-misses: 5
 
 ### AI Credits Guardrail (`max-ai-credits:`)
 
-Sets the AWF AI Credits budget used for cost enforcement. It is enabled by default and defaults to `1000` (`1k`) when omitted. Steering (budget-warning messages at 80%, 90%, 95%, and 99% of the budget) is enabled by default. Use plain integers or `K`/`M` suffixes such as `100000K` or `100M`. Set to a negative value to disable both budget enforcement and steering.
+Sets the AWF AI Credits budget used for cost enforcement. It is enabled by default and defaults to `1000` (`1k`) when omitted. Budget notices are on by default: AWF warns the agent at 80%, 90%, 95%, and 99% of the budget. With AWF releases after v0.29.11, each conversation in the run, sub-agents included, gets each notice once; the notice states how much budget or time is left, then says what to do, and a further notice comes when about five requests' worth of credits, or about five minutes, remain. Use plain integers or `K`/`M` suffixes such as `100000K` or `100M`. Set to a negative value to disable budget enforcement. With AWF releases after v0.29.11, notices continue against the agent deadline and AWF's hard cap; set [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering) to turn them off.
 
 ```yaml wrap
 max-ai-credits: 500
 ```
 
 ```yaml wrap
-# Disable budget enforcement and steering
+# Disable budget enforcement (notices continue unless token-steering is false)
 max-ai-credits: -1
 ```
 

@@ -249,7 +249,7 @@ This is required for providers whose model identifiers are not in the built-in c
 
 #### Token steering (`sandbox.agent.token-steering`)
 
-AWF enables API proxy token steering by default. To keep the explicitly configured provider and model, disable it for a workflow:
+This setting controls AWF's budget notices, which warn the agent when the run's AI credits or time are nearly spent. Notices are on by default; steering never changes the provider or model. To turn the notices off for a workflow:
 
 ```yaml wrap
 sandbox:
@@ -257,7 +257,9 @@ sandbox:
     token-steering: false
 ```
 
-With steering enabled, AWF adds a notice to the next eligible model request after the run crosses 80, 90, 95 or 99% of its AI-credit budget, its effective-token budget or its runtime deadline. Runtime notices need an agent deadline, which gh-aw sends with AWF v0.28.51 or newer on runtimes other than Cloud Hypervisor and NVX:
+With notices on, AWF adds a notice to the next eligible model request after the run crosses 80, 90, 95 or 99% of its AI-credit budget, its effective-token budget or its runtime deadline. With AWF releases after v0.29.11, each conversation in the run, sub-agents included, gets each notice once. The notice states how much budget or time is left, then says what to do, and a further notice comes when about five requests' worth of credits, or about five minutes, remain. Notices stay on when [`max-ai-credits: -1`](/gh-aw/reference/frontmatter/#ai-credits-guardrail-max-ai-credits) removes the budget: time notices use the agent deadline and credit notices use AWF's hard cap. Up to AWF v0.29.11, notices are on only when gh-aw enables them in the AWF config, which it does for every workflow with a credit budget.
+
+Runtime notices need an agent deadline, which gh-aw sends with AWF v0.28.51 or newer on runtimes other than Cloud Hypervisor and NVX:
 
 - **Literal `timeout-minutes`** (for example `timeout-minutes: 30`): the AWF config gets `container.agentTimeout` set to that value.
 - **Expression timeout**, including the default that workflows without `timeout-minutes` compile to (`${{ fromJSON(vars.GH_AW_DEFAULT_TIMEOUT_MINUTES || '20') }}`): the agent step gets the step timeout in `GH_AW_ENGINE_STEP_TIMEOUT_MINUTES`, and `awf` receives it at run time as `--agent-timeout`. The AWF config has no `agentTimeout`.

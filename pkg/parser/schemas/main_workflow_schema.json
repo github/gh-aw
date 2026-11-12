@@ -4437,7 +4437,7 @@
                     },
                     "token-steering": {
                       "type": "boolean",
-                      "description": "Enable or disable API proxy token steering. Set to false to preserve the explicitly configured provider and model.",
+                      "description": "Enable or disable AWF budget notices, which warn the agent when the run's AI credits or time are nearly spent. Notices are on by default; set to false to turn them off. Steering never changes the provider or model.",
                       "examples": [false]
                     },
                     "ca-cert": {
@@ -5016,7 +5016,7 @@
     "max-ai-credits": {
       "$ref": "#/$defs/max_ai_credits_limit",
       "default": 1000,
-      "description": "Per-run AI Credits budget control for firewall cost enforcement. Enabled by default at 1000 (1k) when omitted. Set to -1 to disable both budget enforcement and token steering. Supports GitHub Actions expressions."
+      "description": "Per-run AI Credits budget control for firewall cost enforcement. Enabled by default at 1000 (1k) when omitted. Set to -1 to disable budget enforcement; with AWF releases after v0.29.11, budget notices continue unless sandbox.agent.token-steering is false. Supports GitHub Actions expressions."
     },
     "max-turn-cache-misses": {
       "type": "integer",
@@ -15397,7 +15397,7 @@
       ]
     },
     "max_ai_credits_limit": {
-      "description": "Maximum AI Credits budget for AWF API proxy enforcement. Accepts positive integers (including K/M suffix strings and expressions). Set to -1 to disable both budget enforcement and token steering.",
+      "description": "Maximum AI Credits budget for AWF API proxy enforcement. Accepts positive integers (including K/M suffix strings and expressions). Set to -1 to disable budget enforcement; with AWF releases after v0.29.11, budget notices continue unless sandbox.agent.token-steering is false.",
       "oneOf": [
         {
           "$ref": "#/$defs/positive_ai_credits_limit"
