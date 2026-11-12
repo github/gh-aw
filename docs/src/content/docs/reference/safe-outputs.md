@@ -94,6 +94,8 @@ Do not make a review depend on its own inline comments: they are included
 automatically. If such a dependency is supplied, the review and its comments
 are submitted together; other dependents still wait for publication. If the
 review cannot run, its buffered batch is not submitted without the review.
+If a required inline comment cannot be anchored, the batch fails instead of
+falling back to a review without that comment.
 
 Dependencies apply within a single safe-output processing pass (and within the
 same Claim in queue workflows). Custom safe jobs, `call_workflow`,

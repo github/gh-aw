@@ -290,9 +290,10 @@ function createReviewBuffer() {
    * Supports body-only reviews (no inline comments) when metadata is set.
    * If no submit_pull_request_review message was provided, defaults to event: "COMMENT".
    *
+   * @param {Array<any>} [requiredComments] Inline prerequisites that must be published with this review
    * @returns {Promise<Object>} Result with success status and review details
    */
-  async function submitReview() {
+  async function submitReview(requiredComments = []) {
     if (bufferedComments.length === 0 && !reviewMetadata) {
       core.info("No buffered review comments or review metadata to submit");
       return { success: true, skipped: true };
@@ -468,6 +469,10 @@ function createReviewBuffer() {
       } catch (pathValidationError) {
         core.warning(`Failed to validate comment paths against PR diff: ${getErrorMessage(pathValidationError)}. Proceeding without path validation.`);
       }
+    }
+
+    if (requiredComments.some(required => !required || !comments.some(comment => ["path", "line", "start_line", "side"].every(key => comment[key] === required[key])))) {
+      return { success: false, error: "A required review comment cannot be included in the PR review" };
     }
 
     // Sub-pattern A: Guard against empty review submission (no body and no inline comments).
@@ -720,7 +725,7 @@ function createReviewBuffer() {
         } catch (retryError) {
           const retryErrorMsg = getErrorMessage(retryError);
           // If the COMMENT retry still fails due to unresolvable line(s), fall back to body-only COMMENT.
-          if (retryErrorMsg.includes("Line could not be resolved") || retryErrorMsg.includes("Path could not be resolved")) {
+          if (requiredComments.length === 0 && (retryErrorMsg.includes("Line could not be resolved") || retryErrorMsg.includes("Path could not be resolved"))) {
             core.warning(`COMMENT retry on own PR failed with unresolvable line(s): ${retryErrorMsg}. Falling back to body-only COMMENT.`);
             try {
               const ownPrBodyOnlyParams = { ...requestParams };
@@ -780,7 +785,7 @@ function createReviewBuffer() {
       // When the API cannot resolve a line or path reference in an inline comment, retry as a
       // body-only review so that the overall review (and its footer body) is still submitted
       // successfully. Matches both "Line could not be resolved" and "Path could not be resolved".
-      if ((errorMessage.includes("Line could not be resolved") || errorMessage.includes("Path could not be resolved")) && comments.length > 0) {
+      if (requiredComments.length === 0 && (errorMessage.includes("Line could not be resolved") || errorMessage.includes("Path could not be resolved")) && comments.length > 0) {
         const unresolvableCommentIndices = extractUnresolvableCommentIndices(error, comments.length);
         if (unresolvableCommentIndices.length > 0 && unresolvableCommentIndices.length < comments.length) {
           const unresolvableCommentIndexSet = new Set(unresolvableCommentIndices);

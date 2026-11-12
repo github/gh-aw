@@ -1000,7 +1000,7 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  * @param {Map<string, Function>} messageHandlers - Map of message handler functions
  * @param {Array<Object>} messages - Array of safe output messages
  * @param {((item: {type: string, url?: string, number?: number, repo?: string, temporaryId?: string}) => void)|null} [onItemCreated] - Optional callback invoked after each successful create operation (for manifest logging)
- * @param {((results: Array<any>, protectedTargets: Set<string>) => Promise<void>)|null} [finalizeBufferedOutputs] - Finalize buffered effects before resolving waiting dependencies
+ * @param {((results: Array<any>, protectedTargets: Set<string>, requiredComments: Map<string, any[]>) => Promise<void>)|null} [finalizeBufferedOutputs] - Finalize buffered effects before resolving waiting dependencies
  * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
  */
 async function processMessages(messageHandlers, messages, onItemCreated = null, finalizeBufferedOutputs = null) {
@@ -1030,7 +1030,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     return new Set(
       [...dependencyPlan.prerequisites[i]].filter(prerequisite => {
         const record = results.find(result => result.messageIndex === prerequisite);
-        return record?.type === "create_pull_request_review_comment" && reviewKey(record.result) === target;
+        return record?.type === "create_pull_request_review_comment" && record.result?.buffered && record.result?.deferred_manifest && reviewKey(record.result) === target;
       })
     );
   }
@@ -1048,9 +1048,23 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
             return commentKey && !published.has(commentKey) ? [commentKey] : [];
           });
         }
-        return key && !published.has(key) && (!result || !result.success || result.skipped) ? [key] : [];
+        const dependsOnOwnComment = reviewCommentPrerequisites(i).size > 0;
+        const failedDependency = result && (!result.success || result.skipped) && dependencyPlan.prerequisites[i].size > 0;
+        return key && !published.has(key) && (dependsOnOwnComment || failedDependency) ? [key] : [];
       })
     );
+  }
+
+  function requiredReviewComments() {
+    const required = new Map();
+    for (let i = 0; i < messages.length; i++) {
+      const target = reviewKey(reviewTargets[i]);
+      const review = results.find(record => record.messageIndex === i);
+      if (!target || !review?.success || !review.result?.deferred_manifest) continue;
+      const comments = [...reviewCommentPrerequisites(i)].map(index => results.find(record => record.messageIndex === index)?.result?.metadata);
+      if (comments.length) required.set(target, comments);
+    }
+    return required;
   }
   const detectionConclusion = getEffectiveDetectionConclusion(process.env.GH_AW_DETECTION_CONCLUSION, process.env.GH_AW_DETECTION_REASON);
   const detectionConclusionMissing = String(process.env.GH_AW_RUN_DETECTION || "").trim() === "true" && detectionConclusion === "";
@@ -1719,7 +1733,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       const pendingResults = new Set(pendingPublications.map(record => record.result));
       const temporaryIdCount = temporaryIdMap.size;
       const deferredCount = deferredMessages.length;
-      await finalizeBufferedOutputs(results, protectedReviews());
+      await finalizeBufferedOutputs(results, protectedReviews(), requiredReviewComments());
       const publicationProgress = pendingPublications.some(record => classifySafeOutputResult(record) !== "deferred");
       await drainWaitingMessages();
       if (publicationProgress || temporaryIdMap.size !== temporaryIdCount || deferredMessages.length !== deferredCount) {
@@ -2405,8 +2419,8 @@ async function main(options = {}) {
 
     // Finalize buffered PR reviews before releasing their dependent outputs.
     const finalizedReviewResults = new Set();
-    /** @param {Array<any>} results @param {Set<string>} protectedTargets */
-    async function finalizeBufferedReviews(results, protectedTargets) {
+    /** @param {Array<any>} results @param {Set<string>} protectedTargets @param {Map<string, any[]>} requiredComments */
+    async function finalizeBufferedReviews(results, protectedTargets, requiredComments) {
       const registryEntries = prReviewBufferRegistry.drainEntries(protectedTargets);
       for (const { repo: reviewRepo, prNumber: reviewPrNum, buffer: reviewBuffer } of registryEntries) {
         const reviewResults = results.filter(record => record.result?.deferred_manifest && !finalizedReviewResults.has(record) && record.result.repo === reviewRepo && record.result.pull_request_number === reviewPrNum);
@@ -2429,7 +2443,7 @@ async function main(options = {}) {
               skipReviewResultsForPR(reviewResults, reviewRepo, reviewPrNum, stalePRReason);
               continue;
             }
-            const reviewResult = await reviewBuffer.submitReview();
+            const reviewResult = await reviewBuffer.submitReview(requiredComments.get(`${reviewRepo}#${reviewPrNum}`));
             if (reviewResult.success && !reviewResult.skipped) {
               finalizeBufferedReviewOutcomes(reviewResults, reviewRepo, reviewPrNum, reviewResult);
               logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
