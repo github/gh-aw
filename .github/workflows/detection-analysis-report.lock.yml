@@ -71,7 +71,7 @@
 name: "Detection Analysis Report"
 on:
   schedule:
-    - cron: "05 23 * * *"  # Friendly format: daily on weekdays (scattered)
+    - cron: "05 23 * * *"
   workflow_dispatch:
     inputs:
       aw_context:
