@@ -348,10 +348,14 @@ if [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)$ ]]; then
 fi
 
 cleanup_install() {
+    if [ -n "${GH_INSTALL_LOG_DIR:-}" ]; then
+        rm -rf -- "$GH_INSTALL_LOG_DIR"
+    fi
     if [ -n "${STAGING_DIR:-}" ]; then
         rm -rf -- "$STAGING_DIR"
     fi
 }
+GH_INSTALL_LOG_DIR=""
 STAGING_DIR=""
 trap cleanup_install EXIT
 trap 'exit 130' INT
@@ -359,6 +363,11 @@ trap 'exit 143' TERM
 
 # Try gh extension install if requested (and gh is available)
 if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
+    if ! GH_INSTALL_LOG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/gh-aw-install-log.XXXXXX"); then
+        print_error "Failed to create temporary gh extension install log directory."
+        exit 1
+    fi
+    GH_INSTALL_LOG="$GH_INSTALL_LOG_DIR/gh-install.log"
     print_info "Attempting to install gh-aw using 'gh extension install'..."
 
     # On Windows, `gh extension install` has been observed to hang for the full
@@ -377,10 +386,12 @@ if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
     install_result=0
     if [ -n "$VERSION" ] && [ "$VERSION" != "latest" ]; then
         # shellcheck disable=SC2086  # GH_INSTALL_CMD_TIMEOUT is intentionally unquoted
-        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force --pin "$VERSION" || install_result=$?
+        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force --pin "$VERSION" 2>&1 | tee "$GH_INSTALL_LOG"
+        install_result=${PIPESTATUS[0]}
     else
         # shellcheck disable=SC2086  # GH_INSTALL_CMD_TIMEOUT is intentionally unquoted
-        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force || install_result=$?
+        $GH_INSTALL_CMD_TIMEOUT gh extension install "$REPO" --force 2>&1 | tee "$GH_INSTALL_LOG"
+        install_result=${PIPESTATUS[0]}
     fi
 
     # Exit code 124 means the timeout command fired; treat it the same as a
