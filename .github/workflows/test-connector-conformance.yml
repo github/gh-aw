@@ -31,31 +31,35 @@ jobs:
       - name: Validate provider selection
         shell: bash
         run: |
-          case "$PROVIDER" in
-            asana|azure-devops|confluence|datadog|gitlab|jira|linear|notion|pagerduty|sentry|servicenow|slack|teams|zendesk) ;;
-            *) echo "::error::Unknown connector provider"; exit 1 ;;
-          esac
+          [[ "$PROVIDER" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]] || { echo "::error::Invalid connector provider name"; exit 1; }
           test -f ".github/workflows/connectors/$PROVIDER.md"
           echo "PROVIDER_TEST_PATTERN=${PROVIDER//-/}" >> "$GITHUB_ENV"
       # Fixtures check registration contracts, not receiver enrollment or live ingress.
       # Providers without triggers still validate their declaration and daily workflow.
       - name: Check declarations and declared trigger registrations
         shell: bash
-        run: >-
-          go test ./pkg/workflow
-          -run "^(TestBundledConnectorImportMetadata|TestConnectorGatewayImportedProviderSubscriptions|TestConnectorConformanceWorkflows)$/${PROVIDER}(\\.md)?$"
-          -v -count=1 -timeout=5m
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/connector-registration-tests.log"
+          go test ./pkg/workflow \
+            -run "^(TestBundledConnectorImportMetadata|TestConnectorGatewayImportedProviderSubscriptions|TestConnectorConformanceWorkflows)$/${PROVIDER}(\\.md)?$" \
+            -v -count=1 -timeout=5m | tee "$log"
+          grep -q '^=== RUN' "$log" || { echo "No declaration or trigger tests ran for $PROVIDER"; exit 1; }
       - name: Check selected MCP tools and staged workflow compilation
         shell: bash
-        run: >-
-          go test ./pkg/workflow
-          -run "^(TestConnectorGoldenWorkflows|TestConnectorScenarioImports|TestConnectorScenarioImportDoesNotSelectCapabilities|TestConnectorScenarioIndependentPhases|TestConnectorScenarioRejectsInvalidConfiguration)$/${PROVIDER}$"
-          -v -count=1 -timeout=5m
-      # Existing provider suites use synthetic credentials and mocked transports.
-      # They exercise MCP where declared, safe-output staging/execution, and rejection
-      # boundaries without contacting providers, resolving secrets, or making live writes.
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/connector-compilation-tests.log"
+          go test ./pkg/workflow \
+            -run "^(TestConnectorGoldenWorkflows|TestConnectorScenarioImports|TestConnectorScenarioImportDoesNotSelectCapabilities|TestConnectorScenarioIndependentPhases|TestConnectorScenarioRejectsInvalidConfiguration)$/${PROVIDER}$" \
+            -v -count=1 -timeout=5m | tee "$log"
+          grep -q '^=== RUN' "$log" || { echo "No compilation or MCP selection tests ran for $PROVIDER"; exit 1; }
+      # Provider runtime tests live in pkg/workflow; pkg/connectors is covered by
+      # the aggregate offline job. These fixtures use synthetic credentials/mocks.
       - name: Check provider MCP and safe-output runtimes
         shell: bash
         run: |
-          go test -race ./pkg/connectors -run "(?i)${PROVIDER_TEST_PATTERN}" -v -count=1 -timeout=5m
-          go test ./pkg/workflow -run "(?i)${PROVIDER_TEST_PATTERN}" -v -count=1 -timeout=5m
+          set -euo pipefail
+          log="$RUNNER_TEMP/connector-runtime-tests.log"
+          go test ./pkg/workflow -run "(?i)${PROVIDER_TEST_PATTERN}" -v -count=1 -timeout=5m | tee "$log"
+          grep -q '^=== RUN' "$log" || { echo "No provider runtime tests ran for $PROVIDER"; exit 1; }

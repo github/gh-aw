@@ -1,6 +1,8 @@
 name: Test Connectors
 
 on:
+  schedule:
+    - cron: '11 2 * * *'
   pull_request:
     paths:
       - '.github/workflows/connectors/**'
@@ -10,6 +12,7 @@ on:
       - 'actions/setup/setup.sh'
       - 'actions/setup/js/connector*'
       - 'actions/setup/js/setup_sh_file_lists.test.cjs'
+      - 'pkg/cli/workflows/*-golden.md'
       - 'pkg/connectors/**'
       - 'pkg/cli/*connector*'
       - 'pkg/workflow/*connector*'
@@ -28,6 +31,7 @@ on:
       - 'actions/setup/setup.sh'
       - 'actions/setup/js/connector*'
       - 'actions/setup/js/setup_sh_file_lists.test.cjs'
+      - 'pkg/cli/workflows/*-golden.md'
       - 'pkg/connectors/**'
       - 'pkg/cli/*connector*'
       - 'pkg/workflow/*connector*'
@@ -58,6 +62,51 @@ permissions:
   contents: read
 
 jobs:
+  discover:
+    name: Discover connector declarations
+    runs-on: ubuntu-latest
+    outputs:
+      providers: ${{ steps.providers.outputs.providers }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: providers
+        name: Build provider matrix from declarations
+        shell: bash
+        run: |
+          set -euo pipefail
+          providers=()
+          while IFS= read -r -d '' declaration; do
+            provider=${declaration##*/}
+            provider=${provider%.md}
+            if [[ ! "$provider" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]]; then
+              echo "::error::Invalid connector declaration name"
+              exit 1
+            fi
+            providers+=("$provider")
+          done < <(find .github/workflows/connectors -maxdepth 1 -type f -name '*.md' -print0 | sort -z)
+          if ((${#providers[@]} == 0)); then
+            echo "::error::No connector declarations found"
+            exit 1
+          fi
+          providers_json=""
+          for provider in "${providers[@]}"; do
+            providers_json+="${providers_json:+,}\"${provider}\""
+          done
+          printf 'providers=[%s]\n' "$providers_json" >> "$GITHUB_OUTPUT"
+
+  conformance:
+    name: Conformance (${{ matrix.provider }})
+    needs: discover
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ${{ fromJSON(needs.discover.outputs.providers) }}
+    uses: ./.github/workflows/test-connector-conformance.yml
+    with:
+      provider: ${{ matrix.provider }}
+
   offline:
     name: Offline connector conformance
     runs-on: ubuntu-latest
@@ -114,3 +163,34 @@ jobs:
           JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || 'KAN' }}
           AZURE_DEVOPS_MCP_ENTRA_TOKEN: ${{ matrix.provider == 'azure-devops' && secrets.AZURE_DEVOPS_MCP_ENTRA_TOKEN || '' }}
         run: go test ./pkg/workflow -run '^TestConnectorLiveProvider$' -v -count=1 -timeout=90s
+
+  report-failure:
+    name: Report scheduled conformance failure
+    if: >-
+      always() &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+      (needs.discover.result == 'failure' || needs.conformance.result == 'failure' ||
+       needs.offline.result == 'failure' || needs.live.result == 'failure')
+    needs: [discover, conformance, offline, live]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing_issue=$(gh issue list --state open --limit 1 \
+            --search 'in:title "[Connector Conformance] daily checks failed"' \
+            --json number --jq '.[0].number // empty')
+          body=$(printf 'Connector conformance failed. Review the [workflow run](%s/%s/actions/runs/%s) for details.\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          if [[ -n "$existing_issue" ]]; then
+            gh issue comment "$existing_issue" --body "$body"
+          else
+            gh issue create \
+              --title '[Connector Conformance] daily checks failed' \
+              --body "$body"
+          fi
