@@ -44,7 +44,9 @@ console.log(JSON.stringify({
   readback: fs.readFileSync(file, "utf8"), build: shell.stdout,
   mcp: JSON.parse(fs.readFileSync(path.join(process.env.ATOMIC_CODING_AGENT_DIR, "mcp.json"), "utf8"))
 }));`), 0o600))
-	cmd.Args = append(cmd.Args, probe, "--print", "--tools", "read,bash,edit,write,mcp__*")
+	executionArgs := loadAtomicSample(t).Behaviors.Execution.Args
+	cmd.Args = append(cmd.Args, probe)
+	cmd.Args = append(cmd.Args, executionArgs...)
 	retained := map[string]string{
 		"PATH": os.Getenv("PATH"), "HOME": dir, "TMPDIR": dir, "TMP": dir, "TEMP": dir,
 		"LANG": "C", "LC_ALL": "C", "LC_CTYPE": "C", "TZ": "UTC", "TERM": "dumb",
@@ -107,7 +109,8 @@ console.log(JSON.stringify({
 	}
 	assert.NotContains(t, string(output), "sentinel-not-for-agent")
 	assert.Equal(t, "--help $(not-a-command)\nAtomic fixture prompt", captured.Prompt)
-	assert.Equal(t, []string{"--print", "--tools", "read,bash,edit,write,mcp__*", "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+	expectedArgs := append(append([]string{}, executionArgs...), "--provider", "awf-proxy", "--model", "fixture-model")
+	assert.Equal(t, expectedArgs, captured.Args)
 	assert.Equal(t, "readback verified", captured.Readback)
 	assert.Equal(t, "build verified", captured.Build)
 	assert.Equal(t, "http", captured.MCP.Servers["fixture"].Type)

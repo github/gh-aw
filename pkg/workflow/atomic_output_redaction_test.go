@@ -55,6 +55,9 @@ func TestAtomicHarnessOutputRedaction(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), encoded, 0o600))
 			probe := filepath.Join(dir, "probe.cjs")
+			executionArgs := loadAtomicSample(t).Behaviors.Execution.Args
+			expectedArgs, err := json.Marshal(append(append([]string{}, executionArgs...), "--provider", "awf-proxy", "--model", "fixture-model"))
+			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(probe, []byte(fmt.Sprintf(`
 const fs = require("fs"), path = require("path"), assert = require("assert/strict");
 (async () => {
@@ -69,7 +72,7 @@ const fs = require("fs"), path = require("path"), assert = require("assert/stric
   const response = await fetch(mcp.mcpServers.fixture.url, { headers });
   assert.equal(await response.text(), "MCP authenticated");
   assert.equal(fs.readFileSync(0, "utf8"), "--help $(not-a-command)\nAtomic fixture prompt");
-  assert.deepEqual(process.argv.slice(2), ["--print", "--tools", "read,bash,edit,write,mcp__*", "--provider", "awf-proxy", "--model", "fixture-model"]);
+  assert.deepEqual(process.argv.slice(2), %s);
   const payload = [
     "private MCP and stdin/args verified", privateConfig,
     ...Object.values(headers), "gateway-test-token", "qz",
@@ -82,8 +85,9 @@ const fs = require("fs"), path = require("path"), assert = require("assert/stric
   process.stderr.write("stderr\n" + payload);
   process.exitCode = %d;
 })().catch(error => { console.error(error); process.exitCode = 99; });
-`, exitCode)), 0o600))
-			cmd.Args = append(cmd.Args, probe, "--print", "--tools", "read,bash,edit,write,mcp__*")
+`, string(expectedArgs), exitCode)), 0o600))
+			cmd.Args = append(cmd.Args, probe)
+			cmd.Args = append(cmd.Args, executionArgs...)
 			var stderr strings.Builder
 			cmd.Stderr = &stderr
 			stdout, err := cmd.Output()
