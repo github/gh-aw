@@ -1158,7 +1158,7 @@
             },
             "token-steering": {
               "type": "boolean",
-              "desc": "Enable or disable API proxy token steering.",
+              "desc": "Enable or disable AWF budget notices, which warn the agent when the run's AI credits or time are nearly spent.",
               "enum": [true, false],
               "leaf": true
             },
