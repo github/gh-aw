@@ -32,7 +32,8 @@ network:
 imports:
   - shared/otlp.md
   - shared/reporting.md
-  - path: shared/ci-toolchain-setup.md
+  - shared/ci-go-setup.md
+  - path: shared/ci-node-setup.md
     inputs:
       node-cache: npm
       node-cache-dependency-path: actions/setup/js/package-lock.json

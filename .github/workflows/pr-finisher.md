@@ -34,7 +34,8 @@ network:
   allowed: [defaults, go, node]
 imports:
   - shared/otlp.md
-  - shared/ci-toolchain-setup.md
+  - shared/ci-go-setup.md
+  - shared/ci-node-setup.md
 checkout:
   ref: ${{ needs.preflight.outputs.head_sha }}
   fetch-depth: 0

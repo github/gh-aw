@@ -129,6 +129,7 @@ safe-outputs:
                   return;
                 }
               }
+# The following build steps require Go to build the local gh-aw MCP server.
 imports:
   - shared/ci-go-setup.md
 steps:

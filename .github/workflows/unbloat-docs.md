@@ -49,11 +49,6 @@ imports:
       expires: "2d"
       labels: [documentation, automation, doc-unbloat]
       reviewers: [copilot]
-  - path: shared/ci-node-setup.md
-    inputs:
-      node-cache: npm
-      node-cache-dependency-path: docs/package-lock.json
-
 # Network access for documentation best practices research
   - shared/otlp.md
   - shared/reporting.md
@@ -178,6 +173,13 @@ steps:
     uses: actions/checkout@v7.0.1
     with:
       persist-credentials: false
+
+  - name: Setup Node.js
+    uses: actions/setup-node@v7.1.0
+    with:
+      node-version: "24"
+      cache: npm
+      cache-dependency-path: docs/package-lock.json
 
   - name: Checkout agentics workflows
     uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -30,9 +30,11 @@ timeout-minutes: 40
 network:
   allowed: [defaults, go, node]
 imports:
-  - path: shared/ci-toolchain-setup.md
+  - path: shared/ci-go-setup.md
     inputs:
       go-step-name: Setup Go for focused regression tests
+  - path: shared/ci-node-setup.md
+    inputs:
       node-step-name: Setup Node.js for focused regression tests
 tools:
   bash: ["*"]
