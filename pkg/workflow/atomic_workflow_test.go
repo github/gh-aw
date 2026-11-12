@@ -41,9 +41,10 @@ func TestAtomicSampleExecution(t *testing.T) {
 	assert.False(t, engine.GetCapabilities().MaxTurns)
 	assert.Empty(t, def.Auth)
 	assert.Equal(t, "universal-llm-consumer", def.Behaviors.SecretStrategy)
-	expectedArgs := []string{"--print", "--mode", "text", "--no-session", "--no-themes", "--approve", "--exclude-tools", "ask_user_question"}
+	expectedArgs := []string{"--print", "--mode", "json", "--no-session", "--no-themes", "--approve", "--exclude-tools", "ask_user_question"}
 	assert.Equal(t, expectedArgs, def.Behaviors.Execution.Args)
-	assert.Empty(t, engine.GetLogParserScriptId())
+	assert.Equal(t, "atomic_log_parser", engine.GetLogParserScriptId())
+	assert.Contains(t, engine.GetLogParserScriptSource(), `require("./parse_pi_log.cjs").parseAtomicLog`)
 	assert.False(t, def.Behaviors.Installation.PostInstallScripts)
 	data := &WorkflowData{
 		Name: "atomic-test", Model: "copilot/gpt-5.3-codex",
@@ -61,6 +62,7 @@ func TestAtomicSampleExecution(t *testing.T) {
 	}
 	assert.Contains(t, execution.String(), "atomic_harness.cjs")
 	assert.Contains(t, execution.String(), "--exclude-tools ask_user_question")
+	assert.Contains(t, execution.String(), "--mode json")
 	assert.Contains(t, execution.String(), "ATOMIC_MODEL: copilot/gpt-5.3-codex")
 	assert.Contains(t, execution.String(), "GH_AW_ENGINE_VERSION: "+def.Version)
 	assert.Contains(t, execution.String(), "AWF_REFLECT_ENABLED: 1")
@@ -349,6 +351,22 @@ func TestAtomicHarnessPublishedCLI(t *testing.T) {
 		require.NoError(t, err, "%s", output)
 		assert.Contains(t, string(output), "Atomic integration verified")
 		assert.NotContains(t, string(output), "fixture-gateway")
+		parseVerify := exec.CommandContext(t.Context(), "node", "-e", `
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const { parseAtomicLog } = require("../../actions/setup/js/parse_pi_log.cjs");
+const { mergeSessionSources } = require("../../actions/setup/js/unified_session.cjs");
+const parsed = parseAtomicLog(fs.readFileSync(process.argv[1], "utf8"));
+const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: parsed.logEntries }]);
+assert.equal(unified.find(e => e.type === "session.init")?.data?.sourceEngine, "atomic");
+assert.equal(unified.find(e => e.type === "session.result")?.data?.sourceEngine, "atomic");
+assert.equal(unified.find(e => e.type === "session.result")?.data?.numTurns, 2);
+assert.deepEqual(unified.filter(e => e.type === "assistant.message").map(e => e.data.content), ["Atomic integration verified"]);
+assert.equal(unified.filter(e => e.type === "tool.execution_complete" && e.data.success === true).length, 1);
+`, filepath.Join(dir, "captured.jsonl"))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "captured.jsonl"), output, 0o600))
+		verifyOut, verifyErr := parseVerify.CombinedOutput()
+		require.NoError(t, verifyErr, "%s", verifyOut)
 		require.NotEmpty(t, requests)
 		var transcript strings.Builder
 		for len(requests) > 0 {
@@ -435,7 +453,7 @@ func TestAtomicSmokeContract(t *testing.T) {
 		"--cooldown-days 3",
 		"GH_AW_ENGINE_VERSION: " + loadAtomicSample(t).Version,
 		"ATOMIC_MODEL: copilot/gpt-5.3-codex",
-		"atomic_mcp_config_adapter.cjs", "--exclude-env OPENAI_API_KEY",
+		"atomic_mcp_config_adapter.cjs", "atomic_log_parser.cjs", "--mode json", "--exclude-env OPENAI_API_KEY",
 		"proxy.golang.org", `"GITHUB_READ_ONLY": "1"`,
 		smoke.Evals[0].Question, smoke.Evals[1].Question,
 	} {

@@ -9,6 +9,7 @@ const { ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 
 const sessionParsers = {
   agy: ["parse_agy_log.cjs", "parseAgyLog"],
+  atomic: ["parse_pi_log.cjs", "parseAtomicLog"],
   claude: ["parse_claude_log.cjs", "parseClaudeLog"],
   copilot: ["parse_copilot_log.cjs", "parseCopilotLog"],
   codex: ["parse_codex_log.cjs", "parseCodexLog"],
@@ -147,6 +148,7 @@ function normalizeEngineLogEntries(entries, engine) {
 /** @type {Map<string, (entries: any[]) => boolean>} */
 const declaredFirstParserPolicies = new Map([
   ["aider", () => true],
+  ["atomic", entries => entries.every(isSessionEvent)],
   // Older plaintext definitions relied on terminal extraction; canonical producers own framing.
   ["crush", entries => entries.every(isSessionEvent)],
   ["cursor", entries => entries.every(isSessionEvent)],

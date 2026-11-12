@@ -175,6 +175,7 @@ func TestSessionParserEngines(t *testing.T) {
 		{"gemini", "agent-stdio.log", `{"type":"message","role":"assistant","content":"Engine session text"}`},
 		{"pi", "pi-streaming.jsonl", `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Engine session text"}]}}`},
 		{"pi", "sandbox/agent/logs/pi-streaming.jsonl", `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Engine session text"}]}}`},
+		{"atomic", "agent-stdio.log", "{\"type\":\"session\",\"version\":4,\"id\":\"atomic-session\",\"createdAt\":\"2026-11-12T02:45:30.124Z\",\"cwd\":\"/workspace\"}\n{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Engine session text\"}]}}"},
 		{"opencode", "agent-stdio.log", `{"type":"text","sessionID":"ses_fixture","timestamp":1790899201000,"part":{"id":"prt_fixture","type":"text","text":"Engine session text"}}`},
 		{"goose", "agent-stdio.log", `{"type":"message","message":{"id":"goose-native","role":"assistant","created":1790899201,"content":[{"type":"text","text":"Engine session text"}]}}`},
 		{"custom", "agent-stdio.log", `{"type":"assistant.message","data":{"content":"Engine session text"}}`},
@@ -193,6 +194,9 @@ func TestSessionParserEngines(t *testing.T) {
 				expectedEventType = "claude.assistant.message"
 			}
 			require.Contains(t, string(session), `"type":"`+expectedEventType+`"`)
+			if test.engine == "atomic" {
+				require.Contains(t, string(session), `"sourceEngine":"atomic"`)
+			}
 		})
 	}
 }
