@@ -19,3 +19,16 @@ Rules inspect parsed workflow ASTs and return structured diagnostics. The runner
 | `Runner.Run` | Runs applicable rules against an input and returns diagnostics. |
 
 Rule constructors in this package provide built-in checks for expression, permission, checkout, network, artifact, grader, and other workflow policies. Diagnostics are intended to identify source locations without including secret values.
+
+### Built-in Rules
+
+`Default()` returns the built-in runner. The following exported constructors
+cover high-impact policy areas:
+
+| Policy area | Rule constructors |
+|-------------|-------------------|
+| Expressions and secrets | `TemplateInjectionRule`, `PromptExpressionRule`, `SecretLeakRule`, `OTLPSecretLeakRule` |
+| Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule` |
+| Permissions and execution | `PermissionScopeRule`, `ExcessivePermissionsRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule` |
+| Network and outputs | `NetworkScopeRule`, `SafeOutputShellExpansionRule`, `PushTargetRule`, `AllowedLabelsRule`, `ArtifactExecutionRule` |
+| Graders and custom jobs | `GraderFileIORule`, `GraderShellFileWriteRule`, `CustomJobDetectionRule` |

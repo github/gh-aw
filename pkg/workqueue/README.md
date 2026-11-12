@@ -31,11 +31,22 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `Selection` | struct | Scheduler selection or the reason no Work was selected. |
 | `Decision` | struct | Planned transaction operations, assignments, and next selection. |
 | `Settings` | struct | Parsed repository scheduling preferences; it does not grant authorization or routes. |
+| `SettingsRetry` | struct | Retry limits and backoff preferences for settings and pools. |
+| `PoolSettings` | struct | Per-pool concurrency, account limit, and retry preferences. |
 | `Branch` | struct | Git-backed queue ledger transport. |
 | `NativeDeliveryHost` | struct | Native host for verifying and publishing queue delivery outputs. |
 | `LedgerSession` | struct | Scoped set of ledger operations sharing one isolated Git object store. |
 
 Other exported types represent typed operation parameters, dependencies and external resources, policies and worker profiles, queue limits, explanations, statistics, delivery verification, and settings overrides.
+
+### Inspection and Delivery Types
+
+| Type | Description |
+|------|-------------|
+| `TraceOptions`, `TraceEvent`, `TraceEvidence`, `TracePage` | Bounded ledger provenance, including lifecycle events and evidence metadata without work payloads or request parameters. |
+| `NativeDeliveryScope` | Binds approved host callbacks to an immutable assignment and authenticated Actions attempt. |
+| `NativeDeliveryOutput`, `NativeDeliveryInventory` | Closed effect-channel records supplied by an approved process callback; neither caller data nor receipts can create verifier authority. |
+| `NativeOutputVerifier` | Host-registered callback for independent readback of a native delivery output. |
 
 ### Functions
 
