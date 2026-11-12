@@ -12,7 +12,7 @@ import { parseEngineSession, writeUnifiedSession } from "./unified_session.cjs";
 import { validateSession } from "./scripts/validate_session.cjs";
 
 const req = createRequire(import.meta.url);
-const addMaskRedaction = req("./add_mask_redaction.cjs");
+const atomicOutputRedaction = req("./atomic_output_redaction.cjs");
 const awfReflect = req("./awf_reflect.cjs");
 function extractAtomicHarnessScript() {
   const currentSource = fs.readFileSync(new URL("../../../.github/workflows/shared/atomic.md", import.meta.url), "utf8");
@@ -230,7 +230,7 @@ describe("Atomic native-to-unified session pipeline", () => {
             spawnSync: () => ({ status: 0, signal: null, stdout: childStdout, stderr: Buffer.alloc(0) }),
           };
         }
-        if (specifier === "./add_mask_redaction.cjs") return addMaskRedaction;
+        if (specifier === "./atomic_output_redaction.cjs") return atomicOutputRedaction;
         if (specifier === "./awf_reflect.cjs") {
           return {
             ...awfReflect,

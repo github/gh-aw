@@ -83,17 +83,12 @@ engine:
       const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
       const { join } = require("path");
       const { spawnSync } = require("child_process");
-      const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
+      const { createAtomicOutputSanitizers } = require("./atomic_output_redaction.cjs");
       const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...args] = process.argv.slice(2);
       const sensitiveValues = new Set();
-      const sanitizeText = output => redactArtifactMaskedValues(
-        output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
-      );
-      const sanitizeStdout = output => sanitizeText(redactArtifactMaskedValues(
-        output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]"
-      ));
+      const { sanitizeText, sanitizeStdout } = createAtomicOutputSanitizers(() => [...sensitiveValues]);
       const log = message => process.stderr.write(sanitizeText(`[atomic-harness] ${message}\n`));
       const main = async () => {
         if (!command) throw new Error("Atomic command is required");

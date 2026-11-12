@@ -86,6 +86,11 @@ fetchAWFReflect: async () => JSON.parse(process.env.ATOMIC_TEST_REFLECT) };`), 0
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "add_mask_redaction.cjs"), []byte(
 		"module.exports = require("+string(encodedRedactionPath)+");"), 0o600))
+	outputRedactionPath, err := filepath.Abs("../../actions/setup/js/atomic_output_redaction.cjs")
+	require.NoError(t, err)
+	outputRedaction, err := os.ReadFile(outputRedactionPath)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "atomic_output_redaction.cjs"), outputRedaction, 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("--help $(not-a-command)\nAtomic fixture prompt"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), []byte(`{"autoEnableCodemode":false,"mcpServers":{}}`), 0o600))
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
