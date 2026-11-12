@@ -535,6 +535,14 @@ func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
 
 // buildRunData converts a processed run into RunData while accumulating rollup totals.
 // localRepo guards against cross-repo misclassification of intentional-failure workflows.
+// applyRunDataSteering copies the AWF steering notices and notice deliveries read
+// from the unified session onto a run's JSON record.
+func applyRunDataSteering(runData *RunData, summary *TokenUsageSummary) {
+	runData.SteeringNotices = tokenUsageSteeringNotices(summary)
+	runData.SteeringDeliveries = tokenUsageSteeringDeliveries(summary)
+	runData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(summary)
+}
+
 func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo string, agg *logsAggregate, classifyLocal bool) RunData {
 	if pr.cachedData != nil {
 		agg.accumulateCachedRunTotals(*pr.cachedData)
@@ -566,9 +574,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	runData := newRunData(pr, engineInfo, chainMetrics, comparison, failureKind, gitHubAPICalls)
 	runData.EpisodeHops = collectRunEpisodeHops(pr, engineInfo.awContext)
 	runData.ModelRouting = pr.ModelRouting
-	runData.SteeringNotices = tokenUsageSteeringNotices(pr.TokenUsage)
-	runData.SteeringDeliveries = tokenUsageSteeringDeliveries(pr.TokenUsage)
-	runData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(pr.TokenUsage)
+	applyRunDataSteering(&runData, pr.TokenUsage)
 	runData.Ledger = pr.Ledger
 	runData.awInfo = engineInfo.awInfo
 	if engineInfo.awInfo != nil {

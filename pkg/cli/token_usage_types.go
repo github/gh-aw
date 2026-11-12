@@ -156,10 +156,10 @@ func (d *TokenUsageSteeringDelivery) UnmarshalJSON(data []byte) error {
 	}
 	trigger := optionalJSONString(raw.Trigger)
 	var threshold steeringThreshold
-	isNull := string(bytes.TrimSpace(raw.Threshold)) == "null"
-	if len(raw.Threshold) > 0 && !isNull {
-		_ = threshold.UnmarshalJSON(raw.Threshold)
+	if len(raw.Threshold) == 0 || json.Unmarshal(raw.Threshold, &threshold) != nil {
+		return nil
 	}
+	isNull := string(bytes.TrimSpace(raw.Threshold)) == "null"
 	switch {
 	case trigger == steeringTriggerThreshold && threshold != 0:
 	case trigger == steeringTriggerLittleLeft && isNull:

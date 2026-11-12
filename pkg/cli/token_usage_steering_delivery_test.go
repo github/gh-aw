@@ -5,6 +5,7 @@ package cli
 import (
 	"encoding/json"
 	"io"
+	"maps"
 	"os"
 	"testing"
 
@@ -23,9 +24,6 @@ func steeringDeliverySessionEvent(t *testing.T, phase, requestID string, steerin
 	require.NoError(t, err)
 	return string(encoded)
 }
-
-func steeringIntPtr(value int) *int          { return &value }
-func steeringStringPtr(value string) *string { return &value }
 
 func TestAnalyzeTokenUsageSteeringDeliveries(t *testing.T) {
 	t.Run("lists every delivery with its conversation", func(t *testing.T) {
@@ -47,10 +45,10 @@ func TestAnalyzeTokenUsageSteeringDeliveries(t *testing.T) {
 		assert.Equal(t, []SteeringNotice{{Type: "ai_credit", Threshold: 80, RequestID: "req-2", Phase: "agent"}}, summary.SteeringNotices,
 			"legacy notices stay at most once per threshold")
 		assert.Equal(t, []SteeringDelivery{
-			{Type: "ai_credit", Trigger: "threshold", Threshold: steeringIntPtr(80), Conversation: steeringStringPtr("0123456789ab"), First: true, RequestID: "req-2", Phase: "agent"},
-			{Type: "ai_credit", Trigger: "threshold", Threshold: steeringIntPtr(80), Conversation: steeringStringPtr("ba9876543210"), RequestID: "req-3", Phase: "agent"},
+			{Type: "ai_credit", Trigger: "threshold", Threshold: new(80), Conversation: new("0123456789ab"), First: true, RequestID: "req-2", Phase: "agent"},
+			{Type: "ai_credit", Trigger: "threshold", Threshold: new(80), Conversation: new("ba9876543210"), RequestID: "req-3", Phase: "agent"},
 			{Type: "timeout", Trigger: "little_left", First: true, RequestID: "req-4", Phase: "agent"},
-			{Type: "ai_credit", Trigger: "little_left", Conversation: steeringStringPtr("fedcba987654"), First: true, RequestID: "det-1", Phase: "detection"},
+			{Type: "ai_credit", Trigger: "little_left", Conversation: new("fedcba987654"), First: true, RequestID: "det-1", Phase: "detection"},
 		}, summary.SteeringDeliveries)
 
 		audit, _ := buildLocalAuditData(ProcessedRun{
@@ -82,10 +80,7 @@ func TestAnalyzeTokenUsageSteeringDeliveries(t *testing.T) {
 	t.Run("drops malformed deliveries without failing the usage record", func(t *testing.T) {
 		valid := map[string]any{"type": "ai_credit", "trigger": "threshold", "threshold": 90, "conversation": "0123456789ab", "first": true}
 		with := func(key string, value any) map[string]any {
-			delivery := map[string]any{}
-			for k, v := range valid {
-				delivery[k] = v
-			}
+			delivery := maps.Clone(valid)
 			if value == nil {
 				delete(delivery, key)
 			} else {
@@ -164,7 +159,7 @@ func TestGatewaySteeringEventsLittleLeft(t *testing.T) {
 func TestRenderConsoleSteeringDeliveries(t *testing.T) {
 	output := captureStderrForSteeringDeliveries(t, func() {
 		renderConsoleSteeringDeliveries([]SteeringDelivery{
-			{Type: "ai_credit", Trigger: "threshold", Threshold: steeringIntPtr(80), Conversation: steeringStringPtr("0123456789ab"), First: true, RequestID: "req-2", Phase: "agent"},
+			{Type: "ai_credit", Trigger: "threshold", Threshold: new(80), Conversation: new("0123456789ab"), First: true, RequestID: "req-2", Phase: "agent"},
 			{Type: "timeout", Trigger: "little_left", RequestID: "det-1", Phase: "detection"},
 		})
 	})
