@@ -131,6 +131,7 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 					assert.False(t, present, "-1 must omit maxAiCredits from the AWF config")
 					assert.Contains(t, result.output, "budget disabled at runtime")
 				} else {
+					assert.NotContains(t, result.output, "budget disabled at runtime")
 					require.True(t, present, "maxAiCredits must be present")
 					assert.Equal(t, json.Number(want), credits)
 				}
@@ -158,6 +159,7 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 		result := runRuntimeMaxAICreditsScript(t, runtimeMaxAICreditsConfigScript(t, data),
 			awfMaxAICreditsVarName+"=-1", "GH_AW_ADMISSION_RESULT=admitted", "GH_AW_ADMISSION_MAX_AI_CREDITS=111")
 		assert.Equal(t, json.Number("111"), result.apiProxy["maxAiCredits"])
+		assert.NotContains(t, result.output, "budget disabled at runtime", "the omit message must not appear when an admission allowance replaces -1")
 	})
 
 	t.Run("frontmatter -1 keeps the compiled literal", func(t *testing.T) {

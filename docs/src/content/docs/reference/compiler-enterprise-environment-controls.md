@@ -257,7 +257,7 @@ For max AI credits, precedence is:
 3. `vars.GH_AW_DEFAULT_MAX_AI_CREDITS` GitHub Actions variable (action runtime)
 4. Built-in constant default: `1000` AIC
 
-The compiler emits `${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}` in a runtime patch script when no frontmatter or imported value is set, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` removes the per-run budget at runtime and omits `maxAiCredits` from the firewall configuration. Positive values accept `K`/`M` suffixes such as `100M`. Any other value falls back to the `1000` AIC default, and the agent step log shows a warning that names the variable without printing its value.
+The compiler emits `${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}` in a runtime patch script when no frontmatter or imported value is set, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` removes the per-run budget and omits `maxAiCredits` from the firewall configuration. Positive whole numbers such as `1500` and `K`/`M` suffixes such as `5K` are accepted. Any other value, including `0`, falls back to the built-in default of `1000`, and the agent step log shows a warning that names the variable without printing its value. You can also remove the budget by setting `max-ai-credits: -1` in frontmatter.
 
 For max turn cache misses, precedence is:
 
@@ -273,7 +273,7 @@ For threat-detection max AI credits, precedence is:
 2. `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS` GitHub Actions variable (action runtime)
 3. Built-in constant default: `400` AIC
 
-The compiler emits `${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}` for threat-detection runs when `safe-outputs.threat-detection.max-ai-credits` is unset, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` removes the detection budget at runtime and omits `maxAiCredits` from the firewall configuration. Positive values accept `K`/`M` suffixes such as `100M`. Any other value falls back to the `400` AIC default, and the detection step log shows a warning that names the variable without printing its value.
+The compiler emits `${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}` for threat-detection runs when `safe-outputs.threat-detection.max-ai-credits` is unset, so the organization variable is resolved at workflow run time by the GitHub Actions runner — not at compile time. A value of `-1` removes the detection budget and omits `maxAiCredits` from the firewall configuration. Positive whole numbers such as `750` and `K`/`M` suffixes such as `5K` are accepted. Any other value, including `0`, falls back to the built-in default of `400`, and the detection step log shows a warning that names the variable without printing its value. You can also remove the detection budget by setting `safe-outputs.threat-detection.max-ai-credits: -1` in frontmatter.
 
 For daily AI credits workflow guardrails, precedence is:
 
@@ -340,11 +340,7 @@ gh variable set GH_AW_DEFAULT_MODEL_CODEX --org my-org --body "gpt-5.5"
 Set an org-wide default max-ai-credits guardrail:
 
 ```bash
-gh variable set GH_AW_DEFAULT_MAX_AI_CREDITS --org my-org --body "15M"
-```
-
-```bash
-gh variable set GH_AW_DEFAULT_MAX_AI_CREDITS --org my-org --body "100M"
+gh variable set GH_AW_DEFAULT_MAX_AI_CREDITS --org my-org --body "1500"
 ```
 
 Set an org-wide default detection max-ai-credits guardrail:

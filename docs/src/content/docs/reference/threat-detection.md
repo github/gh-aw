@@ -239,7 +239,7 @@ When unset, the compiler emits a runtime resolution that falls back to the built
 ${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}
 ```
 
-Set the org-wide default with the [`GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`](/gh-aw/reference/compiler-enterprise-environment-controls/) GitHub Actions variable. A value of `-1` removes the detection budget and `K`/`M` suffixes such as `100M` are expanded; any other value falls back to `400` with a warning in the detection step log.
+Set the org-wide default with the [`GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`](/gh-aw/reference/compiler-enterprise-environment-controls/) GitHub Actions variable. A value of `-1` removes the detection budget, and `K`/`M` suffixes such as `5K` are accepted. Any other value, including `0`, falls back to the built-in default of `400` with a warning in the detection step log. You can also remove the detection budget by setting `max-ai-credits: -1` under `safe-outputs.threat-detection` in frontmatter.
 
 ## AI-Based Detection (Default)
 

@@ -1004,7 +1004,6 @@ jobs:
             case "${BASH_REMATCH[3]}" in [kK]) GH_AW_AIC_SCALE=1000 ;; [mM]) GH_AW_AIC_SCALE=1000000 ;; *) GH_AW_AIC_SCALE=1 ;; esac
             if [[ "${BASH_REMATCH[1]}" == "-1" ]]; then
               GH_AW_AIC_LIMIT="-1"
-              echo "Per-run AI credits budget disabled at runtime; maxAiCredits omitted from the AWF config."
             elif [[ "${#BASH_REMATCH[2]}" -lt 19 || "${BASH_REMATCH[2]}" < "9223372036854775808" ]] && (( BASH_REMATCH[2] <= 9223372036854775807 / GH_AW_AIC_SCALE )); then
               GH_AW_AIC_LIMIT="$(( BASH_REMATCH[2] * GH_AW_AIC_SCALE ))"
             fi
@@ -1038,10 +1037,13 @@ jobs:
           fi
           if [[ "$GH_AW_MAX_AI_CREDITS" == "-1" ]]; then
             GH_AW_AWF_CONFIG_JSON="$(<"${RUNNER_TEMP}/gh-aw/awf-config.json")"
-            GH_AW_AWF_CONFIG_JSON="${GH_AW_AWF_CONFIG_JSON/,\"maxAiCredits\":-1/}"
-            GH_AW_AWF_CONFIG_JSON="${GH_AW_AWF_CONFIG_JSON/\"maxAiCredits\":-1,/}"
-            printf '%s\n' "$GH_AW_AWF_CONFIG_JSON" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
-            unset GH_AW_AWF_CONFIG_JSON
+            GH_AW_AWF_CONFIG_JSON_OMITTED="${GH_AW_AWF_CONFIG_JSON/,\"maxAiCredits\":-1/}"
+            GH_AW_AWF_CONFIG_JSON_OMITTED="${GH_AW_AWF_CONFIG_JSON_OMITTED/\"maxAiCredits\":-1,/}"
+            if [[ "$GH_AW_AWF_CONFIG_JSON_OMITTED" != "$GH_AW_AWF_CONFIG_JSON" ]]; then
+              printf '%s\n' "$GH_AW_AWF_CONFIG_JSON_OMITTED" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
+              echo "Per-run AI credits budget disabled at runtime; maxAiCredits omitted from the AWF config."
+            fi
+            unset GH_AW_AWF_CONFIG_JSON GH_AW_AWF_CONFIG_JSON_OMITTED
           fi
           cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json
           export GH_AW_MODELS_JSON_PATH="/tmp/gh-aw/models.json"

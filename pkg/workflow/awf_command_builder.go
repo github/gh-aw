@@ -461,7 +461,6 @@ if [[ "$GH_AW_MAX_AI_CREDITS" =~ ^[[:space:]]*(-1|[+]?0*([1-9][0-9]{0,18})([kKmM
   case "${BASH_REMATCH[3]}" in [kK]) GH_AW_AIC_SCALE=1000 ;; [mM]) GH_AW_AIC_SCALE=1000000 ;; *) GH_AW_AIC_SCALE=1 ;; esac
   if [[ "${BASH_REMATCH[1]}" == "-1" ]]; then
     GH_AW_AIC_LIMIT="-1"
-    echo "Per-run AI credits budget disabled at runtime; maxAiCredits omitted from the AWF config."
   elif [[ "${#BASH_REMATCH[2]}" -lt 19 || "${BASH_REMATCH[2]}" < "9223372036854775808" ]] && (( BASH_REMATCH[2] <= 9223372036854775807 / GH_AW_AIC_SCALE )); then
     GH_AW_AIC_LIMIT="$(( BASH_REMATCH[2] * GH_AW_AIC_SCALE ))"
   fi
@@ -481,7 +480,8 @@ func buildRuntimeMaxAICreditsNormalization(data *WorkflowData, defaultMaxAICredi
 }
 
 // buildRuntimeMaxAICreditsOmitScript removes maxAiCredits from the written AWF config
-// when the runtime value is the -1 disable sentinel (AI credits specification §10.5).
+// when the runtime value is the -1 disable sentinel (AI credits specification §10.5),
+// and reports the removal only when the key was actually present.
 // Compile-time max-ai-credits values keep their existing handling.
 func buildRuntimeMaxAICreditsOmitScript(data *WorkflowData) string {
 	if hasCompileTimeMaxAICredits(data) {
@@ -489,10 +489,13 @@ func buildRuntimeMaxAICreditsOmitScript(data *WorkflowData) string {
 	}
 	return fmt.Sprintf(`if [[ "$GH_AW_MAX_AI_CREDITS" == "-1" ]]; then
   GH_AW_AWF_CONFIG_JSON="$(<%[1]q)"
-  GH_AW_AWF_CONFIG_JSON="${GH_AW_AWF_CONFIG_JSON/,\"maxAiCredits\":-1/}"
-  GH_AW_AWF_CONFIG_JSON="${GH_AW_AWF_CONFIG_JSON/\"maxAiCredits\":-1,/}"
-  printf '%%s\n' "$GH_AW_AWF_CONFIG_JSON" > %[1]q
-  unset GH_AW_AWF_CONFIG_JSON
+  GH_AW_AWF_CONFIG_JSON_OMITTED="${GH_AW_AWF_CONFIG_JSON/,\"maxAiCredits\":-1/}"
+  GH_AW_AWF_CONFIG_JSON_OMITTED="${GH_AW_AWF_CONFIG_JSON_OMITTED/\"maxAiCredits\":-1,/}"
+  if [[ "$GH_AW_AWF_CONFIG_JSON_OMITTED" != "$GH_AW_AWF_CONFIG_JSON" ]]; then
+    printf '%%s\n' "$GH_AW_AWF_CONFIG_JSON_OMITTED" > %[1]q
+    echo "Per-run AI credits budget disabled at runtime; maxAiCredits omitted from the AWF config."
+  fi
+  unset GH_AW_AWF_CONFIG_JSON GH_AW_AWF_CONFIG_JSON_OMITTED
 fi`, awfConfigRuntimePathExpr)
 }
 
