@@ -399,6 +399,67 @@ describe("safe-output application outcomes", () => {
     expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
   });
 
+  it.each(["success", "configured-target", "failed-prerequisite", "invalid-review", "missing-target", "different-pr", "publication-fails"])("handles a review depending on a buffered comment: %s", async scenario => {
+    const pullRequest = { number: 1, state: "open", head: { sha: "abc123" }, user: { login: "review-author" } };
+    const summary = { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn(), summary });
+    vi.stubGlobal("context", { eventName: "pull_request", repo: { owner: "org", repo: "repo" }, payload: { pull_request: pullRequest } });
+    const createReview = vi.fn(async ({ pull_number }) => {
+      if (scenario === "publication-fails") throw Object.assign(new Error("Review rejected"), { status: 422 });
+      return { data: { id: pull_number + 4, html_url: `https://github.com/org/repo/pull/${pull_number}#pullrequestreview-${pull_number + 4}` } };
+    });
+    vi.stubGlobal("github", {
+      rest: {
+        rateLimit: { get: vi.fn().mockResolvedValue({ data: { resources: { core: { remaining: 5000, limit: 5000, reset: 0 } } } }) },
+        pulls: {
+          get: vi.fn(async ({ pull_number }) => ({ data: { ...pullRequest, number: pull_number } })),
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+          listFiles: vi.fn().mockResolvedValue({ data: [{ filename: "file.js" }] }),
+          createReview,
+          listCommentsForReview: vi.fn().mockResolvedValue({ data: [{ id: 20, path: "file.js", line: 1, side: "RIGHT", html_url: "https://github.com/org/repo/pull/1#discussion_r20" }] }),
+        },
+      },
+    });
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify({ submit_pull_request_review: { max: 2, target: scenario === "configured-target" ? "1" : "*" }, create_pull_request_review_comment: {} }));
+    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    await handlerManagerMain({
+      messages: [
+        { type: "create_pull_request_review_comment", output_id: "so_000000000001", path: "file.js", line: 1, body: "Inline finding" },
+        {
+          type: "submit_pull_request_review",
+          output_id: "so_000000000002",
+          "depends-on": scenario === "failed-prerequisite" ? ["so_000000000001", "so_000000000099"] : "so_000000000001",
+          ...(scenario === "missing-target" ? {} : { pull_request_number: scenario === "different-pr" || scenario === "configured-target" ? 2 : 1 }),
+          body: "Review summary",
+          event: scenario === "invalid-review" ? "INVALID" : "COMMENT",
+        },
+      ],
+    });
+    const outcomeCall = append.mock.calls.find(([file]) => String(file).endsWith("safe-output-outcomes.jsonl"));
+    const outcomes = String(outcomeCall[1])
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    if (scenario === "success" || scenario === "configured-target") {
+      expect(createReview).toHaveBeenCalledOnce();
+      expect(createReview.mock.calls[0][0]).toMatchObject({ pull_number: 1, body: expect.stringContaining("Review summary"), comments: [expect.objectContaining({ path: "file.js", line: 1, body: "Inline finding" })] });
+      expect(outcomes.every(outcome => outcome.status === "success")).toBe(true);
+    } else if (scenario === "different-pr") {
+      expect(createReview.mock.calls.map(([args]) => args.pull_number)).toEqual([1, 2]);
+      expect(createReview.mock.calls[1][0].body).toContain("Review summary");
+    } else if (scenario === "publication-fails") {
+      expect(createReview).toHaveBeenCalledOnce();
+      expect(createReview.mock.calls[0][0].body).toContain("Review summary");
+      expect(outcomes.every(outcome => outcome.status === "failed")).toBe(true);
+    } else {
+      expect(createReview).not.toHaveBeenCalled();
+      expect(outcomes.every(outcome => outcome.status === "failed")).toBe(true);
+    }
+  });
+
   it("persists real processing results and collects root and Claim outcomes into the unified session", async () => {
     const root = fs.mkdtempSync(path.join(process.cwd(), ".safe-output-outcomes-test-"));
     vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() });

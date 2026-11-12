@@ -1000,7 +1000,7 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  * @param {Map<string, Function>} messageHandlers - Map of message handler functions
  * @param {Array<Object>} messages - Array of safe output messages
  * @param {((item: {type: string, url?: string, number?: number, repo?: string, temporaryId?: string}) => void)|null} [onItemCreated] - Optional callback invoked after each successful create operation (for manifest logging)
- * @param {((results: Array<any>) => Promise<void>)|null} [finalizeBufferedOutputs] - Finalize buffered effects before resolving waiting dependencies
+ * @param {((results: Array<any>, protectedTargets: Set<string>) => Promise<void>)|null} [finalizeBufferedOutputs] - Finalize buffered effects before resolving waiting dependencies
  * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
  */
 async function processMessages(messageHandlers, messages, onItemCreated = null, finalizeBufferedOutputs = null) {
@@ -1019,6 +1019,39 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   const processingOrder = dependencyPlan.order;
   const waitingMessages = [];
   const results = [];
+  /** @type {any} */
+  const reviewHandler = messageHandlers.get("submit_pull_request_review");
+  const reviewTargets = messages.map(message => (message.type === "submit_pull_request_review" && typeof reviewHandler?.getReviewTarget === "function" ? reviewHandler.getReviewTarget(message) : null));
+  const reviewKey = target => (target?.repo && target?.pull_request_number ? `${target.repo}#${target.pull_request_number}` : null);
+
+  function reviewCommentPrerequisites(i) {
+    const target = reviewKey(reviewTargets[i]);
+    if (!target) return new Set();
+    return new Set(
+      [...dependencyPlan.prerequisites[i]].filter(prerequisite => {
+        const record = results.find(result => result.messageIndex === prerequisite);
+        return record?.type === "create_pull_request_review_comment" && reviewKey(record.result) === target;
+      })
+    );
+  }
+
+  function protectedReviews() {
+    const published = new Set(results.filter(record => record.type === "submit_pull_request_review" && record.success && !record.skipped && record.result?.deferred_manifest).map(record => reviewKey(record.result)));
+    return new Set(
+      reviewTargets.flatMap((target, i) => {
+        const key = reviewKey(target);
+        const result = results.find(record => record.messageIndex === i);
+        if (!key && messages[i].type === "submit_pull_request_review" && typeof reviewHandler?.getReviewTarget === "function" && (!result || !result.success || result.skipped)) {
+          return [...dependencyPlan.prerequisites[i]].flatMap(prerequisite => {
+            const record = results.find(item => item.messageIndex === prerequisite && item.type === "create_pull_request_review_comment");
+            const commentKey = reviewKey(record?.result);
+            return commentKey && !published.has(commentKey) ? [commentKey] : [];
+          });
+        }
+        return key && !published.has(key) && (!result || !result.success || result.skipped) ? [key] : [];
+      })
+    );
+  }
   const detectionConclusion = getEffectiveDetectionConclusion(process.env.GH_AW_DETECTION_CONCLUSION, process.env.GH_AW_DETECTION_REASON);
   const detectionConclusionMissing = String(process.env.GH_AW_RUN_DETECTION || "").trim() === "true" && detectionConclusion === "";
 
@@ -1073,7 +1106,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   async function processMessage(i, allowWaiting) {
     let message = messages[i];
     const messageType = message.type;
-    const dependency = checkSafeOutputDependencies(dependencyPlan, i, results, allowWaiting);
+    const dependency = checkSafeOutputDependencies(dependencyPlan, i, results, allowWaiting, reviewCommentPrerequisites(i));
     if (dependency.state === "waiting") {
       waitingMessages.push(i);
       return;
@@ -1521,7 +1554,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   async function drainWaitingMessages() {
     for (let position = 0; position < waitingMessages.length;) {
       const i = waitingMessages[position];
-      if (checkSafeOutputDependencies(dependencyPlan, i, results, true).state === "waiting") {
+      if (checkSafeOutputDependencies(dependencyPlan, i, results, true, reviewCommentPrerequisites(i)).state === "waiting") {
         position++;
         continue;
       }
@@ -1686,17 +1719,26 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       const pendingResults = new Set(pendingPublications.map(record => record.result));
       const temporaryIdCount = temporaryIdMap.size;
       const deferredCount = deferredMessages.length;
-      await finalizeBufferedOutputs(results);
+      await finalizeBufferedOutputs(results, protectedReviews());
       const publicationProgress = pendingPublications.some(record => classifySafeOutputResult(record) !== "deferred");
       await drainWaitingMessages();
       if (publicationProgress || temporaryIdMap.size !== temporaryIdCount || deferredMessages.length !== deferredCount) {
         await retryDeferredMessages();
       }
-      if (!results.some(record => record.success && !record.skipped && record.result?.deferred_manifest && !pendingResults.has(record.result))) break;
+      if (!(publicationProgress && protectedReviews().size > 0) && !results.some(record => record.success && !record.skipped && record.result?.deferred_manifest && !pendingResults.has(record.result))) break;
     }
   }
   for (const i of waitingMessages) {
     await processMessage(i, false);
+  }
+
+  const protectedTargets = protectedReviews();
+  for (const record of results) {
+    const key = reviewKey(record.result);
+    if (key && record.success && record.result?.deferred_manifest && protectedTargets.has(key)) {
+      record.success = false;
+      record.error = "Review was not submitted because its submit_pull_request_review output did not succeed";
+    }
   }
 
   for (const result of results) {
@@ -2363,12 +2405,12 @@ async function main(options = {}) {
 
     // Finalize buffered PR reviews before releasing their dependent outputs.
     const finalizedReviewResults = new Set();
-    /** @param {Array<any>} results */
-    async function finalizeBufferedReviews(results) {
-      const reviewResults = results.filter(record => record.result?.deferred_manifest && !finalizedReviewResults.has(record));
-      for (const record of reviewResults) finalizedReviewResults.add(record);
-      const registryEntries = prReviewBufferRegistry.drainEntries();
+    /** @param {Array<any>} results @param {Set<string>} protectedTargets */
+    async function finalizeBufferedReviews(results, protectedTargets) {
+      const registryEntries = prReviewBufferRegistry.drainEntries(protectedTargets);
       for (const { repo: reviewRepo, prNumber: reviewPrNum, buffer: reviewBuffer } of registryEntries) {
+        const reviewResults = results.filter(record => record.result?.deferred_manifest && !finalizedReviewResults.has(record) && record.result.repo === reviewRepo && record.result.pull_request_number === reviewPrNum);
+        for (const record of reviewResults) finalizedReviewResults.add(record);
         if (reviewBuffer.hasBufferedComments() || reviewBuffer.hasReviewMetadata()) {
           core.info(`\n=== Finalizing PR Review for ${reviewRepo}#${reviewPrNum} ===`);
           const bufferedCount = reviewBuffer.getBufferedCount();

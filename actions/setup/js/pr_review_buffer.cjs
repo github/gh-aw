@@ -952,11 +952,22 @@ function createPrReviewBufferRegistry() {
 
   /**
    * Consume the current batch so dependent outputs can buffer a fresh review.
+   * @param {Set<string>} [excluded] Review targets that must remain buffered
    * @returns {{repo: string, prNumber: number, buffer: Object}[]}
    */
-  function drainEntries() {
-    bufferMap.clear();
-    return insertionOrder.splice(0);
+  function drainEntries(excluded = new Set()) {
+    const drained = [];
+    for (let i = 0; i < insertionOrder.length;) {
+      const entry = insertionOrder[i];
+      const key = `${entry.repo}#${entry.prNumber}`;
+      if (excluded.has(key)) {
+        i++;
+      } else {
+        bufferMap.delete(key);
+        drained.push(...insertionOrder.splice(i, 1));
+      }
+    }
+    return drained;
   }
 
   /**
