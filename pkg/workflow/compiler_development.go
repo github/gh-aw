@@ -148,6 +148,10 @@ func prepareDryRunCreditLimits(result, original *WorkflowData) {
 	result.MaxDailyAICBackend = ""
 	result.MaxDailyAICreditsGitHubApp = nil
 	result.MaxDailyAICContinueOnError = false
+	result.DryRunMaxAICreditsSource = ""
+	if value, ok := original.RawFrontmatter["max-ai-credits"].(string); ok && isExpression(value) {
+		result.DryRunMaxAICreditsSource = "max-ai-credits"
+	}
 	if original.MaxDailyAICredits == nil {
 		return
 	}
@@ -173,6 +177,9 @@ func prepareDryRunCreditLimits(result, original *WorkflowData) {
 	if !original.MaxDailyAICreditsExplicit {
 		engine.MaxAICredits = constants.DefaultMaxAICredits
 		budget = strconv.FormatInt(engine.MaxAICredits, 10)
+	}
+	if isExpression(budget) {
+		result.DryRunMaxAICreditsSource = maxDailyAICreditsField
 	}
 	result.EngineConfig = &engine
 	if result.RawFrontmatter == nil {

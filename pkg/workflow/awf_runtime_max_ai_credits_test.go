@@ -184,3 +184,36 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 		assert.Equal(t, json.Number("-1"), result.apiProxy["maxAiCredits"])
 	})
 }
+
+// TestRuntimeMaxAICreditsDryRunSourceLabel verifies the dry-run fallback warning names
+// the frontmatter field the user configured, even when dry-run preparation promotes an
+// expression-valued max-daily-ai-credits into the per-run budget.
+func TestRuntimeMaxAICreditsDryRunSourceLabel(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash is required")
+	}
+	daily := "${{ vars.DAILY_BUDGET }}"
+	for _, tc := range []struct {
+		name, source string
+		raw          map[string]any
+	}{
+		{"max-daily-ai-credits", maxDailyAICreditsField, map[string]any{maxDailyAICreditsField: daily}},
+		{"max-ai-credits", "max-ai-credits", map[string]any{maxDailyAICreditsField: daily, "max-ai-credits": "${{ vars.RUN_BUDGET }}"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.SetDryRun(true)
+			data := compiler.dryRunWorkflowData(&WorkflowData{
+				MaxDailyAICredits:         &daily,
+				MaxDailyAICreditsExplicit: true,
+				EngineConfig:              &EngineConfig{ID: "copilot"},
+				NetworkPermissions:        &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+				RawFrontmatter:            tc.raw,
+			})
+			assert.Equal(t, tc.source, data.DryRunMaxAICreditsSource)
+			result := runRuntimeMaxAICreditsScript(t, runtimeMaxAICreditsConfigScript(t, data), awfMaxAICreditsVarName+"=unlimited")
+			assert.Contains(t, result.output, "::warning::Ignoring invalid "+tc.source+" (value withheld)")
+			assert.Equal(t, json.Number("1000"), result.apiProxy["maxAiCredits"])
+		})
+	}
+}

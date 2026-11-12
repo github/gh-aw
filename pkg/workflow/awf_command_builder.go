@@ -436,10 +436,8 @@ func hasCompileTimeMaxAICredits(data *WorkflowData) bool {
 // runtimeMaxAICreditsSourceName names the setting that supplies GH_AW_MAX_AI_CREDITS
 // at run time, mirroring applyDefaultMaxAICreditsEnvToMap.
 func runtimeMaxAICreditsSourceName(data *WorkflowData) string {
-	if data != nil && data.DryRun {
-		if value, ok := data.RawFrontmatter["max-ai-credits"].(string); ok && isExpression(value) {
-			return "max-ai-credits"
-		}
+	if data != nil && data.DryRun && data.DryRunMaxAICreditsSource != "" {
+		return data.DryRunMaxAICreditsSource
 	}
 	switch {
 	case data != nil && data.IsEvalsRun:
