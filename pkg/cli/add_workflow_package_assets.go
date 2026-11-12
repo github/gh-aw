@@ -9,7 +9,10 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var addWorkflowPackageAssetsLog = logger.New("cli:add_workflow_package_assets")
 
 // packageInstallableWorkflowName returns the workflow name used when installing a package
 // entry. The name is derived from the install destination so that source-to-destination
@@ -20,6 +23,7 @@ func packageInstallableWorkflowName(installable resolvedPackageInstallable) stri
 }
 
 func resolveLocalPackageSkillFiles(packageDir, packageRoot string, explicitSkillDirs []string) ([]resolvedPackageSkillFile, []string, error) {
+	addWorkflowPackageAssetsLog.Printf("Resolving package skill files: dir=%s, explicit_dirs=%d", packageDir, len(explicitSkillDirs))
 	seenSkillDirs := make(map[string]struct{})
 	var warnings []string
 
@@ -100,6 +104,7 @@ func collectLocalPackageSkillDirFiles(skillDir string) ([]resolvedPackageSkillFi
 
 func resolveLocalPackageAgentFiles(packageDir, packageRoot string, explicitAgentFiles []string) ([]string, []string, error) {
 	if len(explicitAgentFiles) > 0 {
+		addWorkflowPackageAssetsLog.Printf("Using %d explicit package agent files", len(explicitAgentFiles))
 		agentFiles := make([]string, 0, len(explicitAgentFiles))
 		for _, sourcePath := range explicitAgentFiles {
 			baseDir := packageDir
@@ -111,6 +116,7 @@ func resolveLocalPackageAgentFiles(packageDir, packageRoot string, explicitAgent
 		return agentFiles, nil, nil
 	}
 
+	addWorkflowPackageAssetsLog.Printf("No explicit agent files; auto-scanning agents directories in %s", packageDir)
 	var agentFiles []string
 	for _, root := range []string{packageAgentsDirectory, constants.GithubDir + packageAgentsDirectory} {
 		agentsDir := filepath.Join(packageDir, filepath.FromSlash(root))
