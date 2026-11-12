@@ -267,7 +267,7 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 		npmSteps = append(npmSteps, GenerateNpmInstallSteps(
 			packageName,
 			version,
-			fmt.Sprintf("Install %s", packageName),
+			"Install "+packageName,
 			"",
 			NPMInstallOptions{
 				RunInstallScripts: install.PostInstallScripts,

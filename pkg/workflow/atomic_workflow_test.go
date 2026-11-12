@@ -579,7 +579,7 @@ func TestAtomicDurableCompilation(t *testing.T) {
 	source := filepath.Join(dir, "durable-atomic.md")
 	require.NoError(t, os.WriteFile(source, []byte(`---
 on: workflow_dispatch
-strict: true
+strict: false
 permissions:
   contents: read
   copilot-requests: write
@@ -599,7 +599,9 @@ network:
 ---
 Continue investigating the repository.
 `), 0o600))
-	require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+	compiler := NewCompiler(WithVersion("dev"))
+	require.NoError(t, compiler.CompileWorkflow(source))
+	require.Positive(t, compiler.GetWarningCount(), "non-strict use of Atomic external storage should warn")
 	lock, err := os.ReadFile(filepath.Join(dir, "durable-atomic.lock.yml"))
 	require.NoError(t, err)
 	text := string(lock)

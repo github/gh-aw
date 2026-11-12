@@ -219,6 +219,9 @@ func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdow
 	if err := c.validatePrivateToPublicFlowsPolicy(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := c.validateAtomicExternalStoragePolicy(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	if err := validateSteeringIssuePermissions(workflowData, workflowPermissions); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}

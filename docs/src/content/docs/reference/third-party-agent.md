@@ -101,7 +101,7 @@ gh secret set ATOMIC_STORAGE_URL --body "$(turso db show gh-aw-atomic --url)"
 turso db tokens create gh-aw-atomic | gh secret set ATOMIC_STORAGE_TOKEN
 ```
 
-The Atomic engine definition installs `@bastani/atomic-storage-libsql` declaratively alongside the CLI, using the same effective pinned engine version and npm release cooldown. When `ATOMIC_STORAGE_URL` is configured, a pre-agent step only masks and stages the credentials in a private file; it does not install packages. Enable external storage on a workflow with `ATOMIC_STORAGE: "on"` in `engine.env` and allow the database host through the firewall:
+The Atomic engine definition installs `@bastani/atomic-storage-libsql` declaratively alongside the CLI, using the same effective pinned engine version and npm release cooldown. When `ATOMIC_STORAGE_URL` is configured, a pre-agent step only masks and stages the credentials in a private file; it does not install packages. Enable external storage on a workflow with `ATOMIC_STORAGE: "on"` in `engine.env` and allow the database host through the firewall. The compiler rejects this setting in strict mode and warns otherwise because agent-controlled session and workflow data reaches the external database before post-run threat detection:
 
 ```yaml wrap
 engine:
