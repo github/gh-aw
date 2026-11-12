@@ -61,7 +61,6 @@ The package is intentionally large (~520 source files) because it encodes all Gi
 | `ModelEnvVarProvider` | interface | Model environment variable mapping |
 | `AgentFileProvider` | interface | Custom agent file support |
 | `ConfigRenderer` | interface | Configuration file rendering |
-| `DriverProvider` | interface | Driver-level execution configuration |
 | `HarnessProvider` | interface | Harness script configuration — returns the Node.js harness filename or empty string |
 | `CodingAgentEngine` | interface | Composite interface combining all engine capabilities |
 | `BaseEngine` | struct | Base implementation shared by all engines |
@@ -198,7 +197,6 @@ The `checkout:` frontmatter key is parsed by `ParseCheckoutConfigs` into one or 
 | `Tools` | type alias | Alias for `ToolsConfig` |
 | `GitHubToolConfig` | struct | GitHub MCP tool configuration (toolsets, allowed tools, integrity) |
 | `PlaywrightToolConfig` | struct | Playwright browser automation tool config |
-| `PlaywrightDockerArgs` | struct | Docker image version and MCP package version for Playwright container configuration |
 | `BashToolConfig` | struct | Bash execution tool config |
 | `WebFetchToolConfig` | struct | Web fetch tool config |
 | `WebSearchToolConfig` | struct | Web search tool config |
@@ -222,9 +220,19 @@ The `checkout:` frontmatter key is parsed by `ParseCheckoutConfigs` into one or 
 | `NewTools` | `func(map[string]any) *Tools` | Creates a `Tools` from a raw map |
 | `ParseToolsConfig` | `func(map[string]any) (*ToolsConfig, error)` | Parses the `tools:` frontmatter section |
 | `ValidateGitHubToolsAgainstToolsets` | `func([]string, []string) error` | Validates tool names against enabled toolsets |
-| `GetPlaywrightTools` | `func() []any` | Returns the standard Playwright tool definitions |
 | `GetSafeOutputToolOptions` | `func() []SafeOutputToolOption` | Returns valid safe-output tool option definitions |
 | `GetValidationConfigJSON` | `func(enabledTypes []string) (string, error)` | Returns JSON validation config for given safe-output types |
+
+### Connector Declarations
+
+The workflow compiler accepts declarative connectors under `connectors.<alias>`
+and lowers selected capabilities into the runtime plan described in the
+[`connectors` package specification](../connectors/README.md).
+
+| Type | Description |
+|------|-------------|
+| `ConnectorDeclaration` | Typed AW frontmatter declaration for connector endpoints, credentials, resources, triggers, tools, MCP servers, and safe outputs. |
+| `ConnectorCredential` | Credential configuration selecting a secret token, GitHub App, or GitHub OIDC route. |
 
 ### Safe Outputs
 
@@ -479,13 +487,11 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `GetActionPin` | `func(actionRepo string) string` | Returns the pinned SHA for an action |
 | `DetectActionMode` | `func(version string) ActionMode` | Detects the action reference mode |
 | `ParseTagRefTSV` | `func(line string) (sha, objType string, err error)` | Parses tab-separated tag ref output into SHA and object type |
 | `ResolveGhAwRef` | `func(ctx context.Context, ref string) (string, error)` | Resolves a branch, tag, or SHA ref in `github/gh-aw` to its full 40-character commit SHA; passes full SHAs through unchanged |
 | `ExtractActionsFromLockFile` | `func(lockFilePath string) ([]ActionUsage, error)` | Extracts action usages from a lock file |
 | `CheckActionSHAUpdates` | `func(actions []ActionUsage, resolver *ActionResolver) []ActionUpdateCheck` | Checks whether action SHAs need updates |
-| `ApplyActionPinsToTypedSteps` | `func([]*WorkflowStep, *WorkflowData) []*WorkflowStep` | Applies pins to all steps |
 | `ValidateActionSHAsInLockFile` | `func(string, *ActionCache, bool) error` | Validates action SHAs in a lock file |
 
 ### String Utilities (Workflow-Specific)
@@ -508,7 +514,6 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 |----------|-----------|-------------|
 | `ExtractSecretName` | `func(string) string` | Extracts the secret name from a `${{ secrets.NAME }}` expression |
 | `ExtractSecretsFromValue` | `func(string) map[string]string` | Extracts all secrets from a template value |
-| `ReplaceSecretsWithEnvVars` | `func(string, map[string]string) string` | Replaces secret references with env var references |
 | `ExtractGitHubContextExpressionsFromValue` | `func(string) map[string]string` | Extracts GitHub context expressions |
 | `CollectSecretReferences` | `func(string) []string` | Collects all secret references from YAML content |
 | `CollectActionReferences` | `func(string) []string` | Collects all action references from YAML content |
@@ -794,8 +799,8 @@ This appendix is generated from the current non-test Go source files in this pac
 | `awf_config.go` | `AWFPlatformConfig` | `type AWFPlatformConfig struct { // Type is the GitHub deployment type consumed by AWF for auth behavior. Type string `json:"type,omitempty"` }` | AWFPlatformConfig is the "platform" section of the AWF config file. |
 | `awf_config.go` | `AWFRunnerConfig` | `type AWFRunnerConfig struct { // Topology identifies the runner execution topology. // Currently supported values: "arc-dind" (ARC with Docker-in-Docker sidecar). // When set to "arc-dind", AWF activates split-filesystem handling, network // isolation, sysroot image staging, and DinD pre-staging automatically. Topology string `json:"topology,omitempty"` }` | AWFRunnerConfig is the "runner" section of the AWF config file. |
 | `behavior_defined_engine.go` | `BehaviorDefinedEngine` | `type BehaviorDefinedEngine struct { UniversalLLMConsumerEngine definition *EngineDefinition }` | BehaviorDefinedEngine is a declarative CodingAgentEngine built from an engine definition's behaviors block. |
-| `cache.go` | `CacheMemoryConfig` | `type CacheMemoryConfig struct { Caches []CacheMemoryEntry `yaml:"caches,omitempty"` // cache configurations }` | CacheMemoryConfig holds configuration for cache-memory functionality |
-| `cache.go` | `CacheMemoryEntry` | `type CacheMemoryEntry struct { ID string `yaml:"id"` // cache identifier (required for array notation) Key string `yaml:"key,omitempty"` // custom cache key Description string `yaml:"description,omitempty"` // optional description for this cache RetentionDays *int `yaml:"retention-days,omitempty"` // retention days for upload-artifact action RestoreOnly bool `yaml:"restore-only,omitempty"` // if true, only restore cache without saving Scope string `yaml:"scope,omitempty"` // scope for restore keys: "workflow" (default) or "repo" AllowedExtensions []string `yaml:"allowed-extensions,omitempty"` // allowed file extensions (default: [".json", ".jsonl", ".txt", ".md", ".csv"]) }` | CacheMemoryEntry represents a single cache-memory configuration |
+| `cache_config.go` | `CacheMemoryConfig` | `type CacheMemoryConfig struct { Caches []CacheMemoryEntry `yaml:"caches,omitempty"` // cache configurations }` | CacheMemoryConfig holds configuration for cache-memory functionality |
+| `cache_config.go` | `CacheMemoryEntry` | `type CacheMemoryEntry struct { ID string `yaml:"id"` // cache identifier (required for array notation) Key string `yaml:"key,omitempty"` // custom cache key Description string `yaml:"description,omitempty"` // optional description for this cache RetentionDays *int `yaml:"retention-days,omitempty"` // retention days for upload-artifact action RestoreOnly bool `yaml:"restore-only,omitempty"` // if true, only restore cache without saving Scope string `yaml:"scope,omitempty"` // scope for restore keys: "workflow" (default) or "repo" AllowedExtensions []string `yaml:"allowed-extensions,omitempty"` // allowed file extensions (default: [".json", ".jsonl", ".txt", ".md", ".csv"]) }` | CacheMemoryEntry represents a single cache-memory configuration |
 | `call_workflow.go` | `CallWorkflowConfig` | `type CallWorkflowConfig struct { BaseSafeOutputConfig `yaml:",inline"` Workflows []string `yaml:"workflows,omitempty"` // List of workflow names (without .md extension) to allow calling WorkflowFiles map[string]string `yaml:"workflow_files,omitempty"` // Map of workflow name to file path (relative, e.g. ./.github/workflows/x.lock.yml) - populated at compile time }` | CallWorkflowConfig holds configuration for calling workflows via workflow_call chaining. |
 | `compiler_experiments.go` | `ExperimentStorageMode` | `type ExperimentStorageMode string` | ExperimentStorageMode controls how experiment state is persisted across runs. |
 | `copilot_logs.go` | `SessionContent` | `type SessionContent struct { Type string `json:"type"` Text string `json:"text,omitempty"` ID string `json:"id,omitempty"` Name string `json:"name,omitempty"` Input map[string]any `json:"input,omitempty"` ToolUseID string `json:"tool_use_id,omitempty"` Content string `json:"content,omitempty"` }` | SessionContent represents content items in messages |
@@ -1078,12 +1083,9 @@ This appendix is generated from the current non-test Go source files in this pac
 | `domains.go` | `var` | `ClaudeDefaultDomains` | `var ClaudeDefaultDomains = []string{ "*.githubusercontent.com", "anthropic.com", "api.anthropic.com", "api…` | ClaudeDefaultDomains are the default domains required for Claude Code CLI authentication and operation |
 | `domains.go` | `var` | `CodexDefaultDomains` | `var CodexDefaultDomains = []string{ "172.30.0.1", "api.github.com", "api.openai.com", "chatgpt.com", "git…` | CodexDefaultDomains are the minimal default domains required for Codex CLI operation |
 | `domains.go` | `var` | `CopilotDefaultDomains` | `var CopilotDefaultDomains = []string{ "api.business.githubcopilot.com", "api.enterprise.githubcopilot.com",…` | CopilotDefaultDomains are the default domains required for GitHub Copilot CLI authentication and operation |
-| `domains.go` | `var` | `CrushBaseDefaultDomains` | `var CrushBaseDefaultDomains = []string{ "host.docker.internal", "charm.land", "github.com", "raw.githubuserco…` | CrushBaseDefaultDomains are the default domains required for Crush CLI operation. |
-| `domains.go` | `var` | `CrushDefaultDomains` | `var CrushDefaultDomains = []string{ "api.githubcopilot.com", "api.openai.com", "generativelanguage.google…` | CrushDefaultDomains are the static default domains for backward compatibility. |
 | `domains.go` | `var` | `GeminiDefaultDomains` | `var GeminiDefaultDomains = []string{ "*.googleapis.com", "generativelanguage.googleapis.com", "github.com"…` | GeminiDefaultDomains are the default domains required for Google Gemini CLI authentication and operation. |
 | `domains.go` | `var` | `PiBaseDefaultDomains` | `var PiBaseDefaultDomains = []string{ "host.docker.internal", "github.com", "raw.githubusercon…` | PiBaseDefaultDomains are the base domains required for the Pi CLI to operate, independent of the chosen LLM provider. |
 | `domains.go` | `var` | `PiDefaultDomains` | `var PiDefaultDomains = []string{ "api.githubcopilot.com", "host.docker.internal", "github…` | PiDefaultDomains are the static default domains for backward compatibility when no model provider prefix is given. |
-| `domains.go` | `var` | `PlaywrightDomains` | `var PlaywrightDomains = []string{ "cdn.playwright.dev", "playwright.download.prss.microsoft.com", }` | PlaywrightDomains are the domains required for Playwright browser downloads These domains are needed when Playwright MCP server initializes in the Docker container |
 | `expression_patterns.go` | `var` | `AWImportInputsExpressionPattern` | `var AWImportInputsExpressionPattern = regexp.MustCompile(`\$\{\{\s*github\.aw\.import-inputs\.([a-zA-Z0-9_-]+(?:\.[a-…` | AWImportInputsExpressionPattern matches full ${{ github. |
 | `expression_patterns.go` | `var` | `AWImportInputsPattern` | `var AWImportInputsPattern = regexp.MustCompile(`^github\.aw\.import-inputs\.[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-…` | AWImportInputsPattern matches github. |
 | `expression_patterns.go` | `var` | `AWInputsExpressionPattern` | `var AWInputsExpressionPattern = regexp.MustCompile(`\$\{\{\s*github\.aw\.inputs\.([a-zA-Z0-9_-]+)\s*\}\}`)` | AWInputsExpressionPattern matches full ${{ github. |
@@ -1123,7 +1125,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | File | Symbol | Declaration | Description |
 |------|--------|-------------|-------------|
 | `engine_helpers.go` | `BuildEngineSecretValidationStep` | `func BuildEngineSecretValidationStep(workflowData *WorkflowData, config EngineSecretValidationConfig) GitHubActionStep` | BuildEngineSecretValidationStep builds the reusable secret-validation step for engine credentials. |
-| `engine_registry.go` | `(*EngineRegistry).EnginesWithCapability` | `func (r *EngineRegistry) EnginesWithCapability(predicate func(EngineCapabilities) bool) []string` | EnginesWithCapability returns sorted engine IDs that satisfy a capability predicate. |
+| `agentic_engine.go` | `(*EngineRegistry).EnginesWithCapability` | `func (r *EngineRegistry) EnginesWithCapability(predicate func(EngineCapabilities) bool) []string` | EnginesWithCapability returns sorted engine IDs that satisfy a capability predicate. |
 | `agent_validation.go` | `HasBashExplicitRestriction` | `func HasBashExplicitRestriction(tools map[string]any) bool` | HasBashExplicitRestriction reports whether `tools.bash` has an explicit restriction value. |
 | `repo_config.go` | `(*RepoConfig).IsActionFailureIssueExpiresExplicit` | `func (r *RepoConfig) IsActionFailureIssueExpiresExplicit() bool` | IsActionFailureIssueExpiresExplicit reports whether maintenance expiry was explicitly set in repo config. |
 | `action_cache.go` | `(*ActionCache).Delete` | `func (*ActionCache).Delete(repo, version string)` | Delete removes the cache entry for the given repo and version. |
@@ -1308,7 +1310,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `copilot_engine.go` | `(*CopilotEngine).GetSupportedEnvVarKeys` | `func (*CopilotEngine).GetSupportedEnvVarKeys() []string` | GetSupportedEnvVarKeys returns the engine. |
 | `copilot_engine.go` | `(*CopilotEngine).ResolveLLMProvider` | `func (*CopilotEngine).ResolveLLMProvider(workflowData *WorkflowData) string` | ResolveLLMProvider returns the effective provider for Copilot inference. |
 | `copilot_engine_installation.go` | `(*CopilotEngine).GetSecretValidationStep` | `func (*CopilotEngine).GetSecretValidationStep(workflowData *WorkflowData) GitHubActionStep` | GetSecretValidationStep returns the secret validation step for the Copilot engine. |
-| `copilot_installer.go` | `GenerateCopilotInstallerSteps` | `func GenerateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion string) []GitHubActionStep` | GenerateCopilotInstallerSteps creates GitHub Actions steps to install the Copilot CLI using the official installer. |
 | `copilot_logs.go` | `(*CopilotEngine).GetErrorDetectionScriptId` | `func (*CopilotEngine).GetErrorDetectionScriptId() string` | GetErrorDetectionScriptId returns the JavaScript script name for detecting agent errors from the agent stdio log. |
 | `copilot_logs.go` | `(*CopilotEngine).GetLogFileForParsing` | `func (*CopilotEngine).GetLogFileForParsing() string` | GetLogFileForParsing returns the log directory for Copilot CLI logs Copilot writes detailed debug logs to /tmp/gh-aw/sandbox/agent/logs/ |
 | `copilot_logs.go` | `(*CopilotEngine).GetLogParserScriptId` | `func (*CopilotEngine).GetLogParserScriptId() string` | GetLogParserScriptId returns the JavaScript script name for parsing Copilot logs |
@@ -1381,7 +1382,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `expression_parser.go` | `BreakAtParentheses` | `func BreakAtParentheses(expression string) []string` | BreakAtParentheses attempts to break long lines at parentheses for function calls |
 | `expression_parser.go` | `BreakLongExpression` | `func BreakLongExpression(expression string) []string` | BreakLongExpression breaks a long expression into multiple lines at logical points such as after \|\| and && operators for better readability |
 | `expression_parser.go` | `ParseExpression` | `func ParseExpression(expression string) (ConditionNode, error)` | ParseExpression parses a string expression into a ConditionNode tree Supports && (AND), \|\| (OR), ! |
-| `expression_parser.go` | `VisitExpressionTree` | `func VisitExpressionTree(node ConditionNode, visitor func(expr *ExpressionNode) error) error` | VisitExpressionTree walks through an expression tree and calls the visitor function for each ExpressionNode (literal expression) found in the tree |
 | `firewall_validation.go` | `ValidateLogLevel` | `func ValidateLogLevel(level string) error` | ValidateLogLevel validates that a firewall log-level value is one of the allowed enum values. |
 | `frontmatter_parsing.go` | `ParseFrontmatterConfig` | `func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, error)` | ParseFrontmatterConfig creates a FrontmatterConfig from a raw frontmatter map This provides a single entry point for converting untyped frontmatter into a structured configuration with better error handling. |
 | `frontmatter_serialization.go` | `(*FrontmatterConfig).ToMap` | `func (*FrontmatterConfig).ToMap() map[string]any` | ToMap converts FrontmatterConfig back to map[string]any for backward compatibility This allows gradual migration from map[string]any to strongly-typed config |
@@ -1406,7 +1406,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `github_cli.go` | `RunGHContext` | `func RunGHContext(ctx context.Context, spinnerMessage string, args ...string) ([]byte, error)` | RunGHContext executes a gh CLI command with context support (for cancellation/timeout), a spinner, and returns the stdout output. |
 | `github_cli.go` | `RunGHContextWithHost` | `func RunGHContextWithHost(ctx context.Context, spinnerMessage string, host string, args ...string) ([]byte, error)` | RunGHContextWithHost executes a gh CLI command with context support, a spinner, and an explicit GitHub host. |
 | `github_cli.go` | `RunGHInputContext` | `func RunGHInputContext(ctx context.Context, spinnerMessage string, input io.Reader, args ...string) ([]byte, error)` | RunGHInputContext executes a gh CLI command with context, a spinner, and an io. |
-| `github_cli.go` | `RunGHWithHost` | `func RunGHWithHost(spinnerMessage string, host string, args ...string) ([]byte, error)` | RunGHWithHost executes a gh CLI command with a spinner, targeting a specific GitHub host. |
 | `github_cli.go` | `SetDefaultGHHost` | `func SetDefaultGHHost(host string)` | SetDefaultGHHost sets the default host used by gh CLI helper commands when GH_HOST is not set in the process environment. |
 | `github_cli.go` | `SetGHHostEnv` | `func SetGHHostEnv(cmd *exec.Cmd, host string)` | SetGHHostEnv sets the GH_HOST environment variable on the command for non-github. |
 | `github_cli_wasm.go` | `ExecGHWithOutput` | `func ExecGHWithOutput(args ...string) (stdout, stderr bytes.Buffer, err error)` | Exported function or method declared in `github_cli_wasm.go`. |
@@ -1428,7 +1427,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `jobs_validation.go` | `(*JobManager).ValidateDuplicateSteps` | `func (*JobManager).ValidateDuplicateSteps() error` | ValidateDuplicateSteps checks that no job has duplicate steps. |
 | `js.go` | `FormatJavaScriptForYAML` | `func FormatJavaScriptForYAML(script string) []string` | FormatJavaScriptForYAML formats a JavaScript script with proper indentation for embedding in YAML |
 | `js.go` | `GetJavaScriptSources` | `func GetJavaScriptSources() map[string]string` | Exported function or method declared in `js.go`. |
-| `js.go` | `GetLogParserBootstrap` | `func GetLogParserBootstrap() string` | Exported function or method declared in `js.go`. |
 | `js.go` | `GetLogParserScript` | `func GetLogParserScript(name string) string` | Exported function or method declared in `js.go`. |
 | `js.go` | `GetMCPHTTPTransportScript` | `func GetMCPHTTPTransportScript() string` | Exported function or method declared in `js.go`. |
 | `js.go` | `GetMCPHandlerPythonScript` | `func GetMCPHandlerPythonScript() string` | Exported function or method declared in `js.go`. |
@@ -1505,7 +1503,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `permissions_factory.go` | `NewPermissionsContentsReadCodeQualityWritePRRead` | `func NewPermissionsContentsReadCodeQualityWritePRRead() *Permissions` | NewPermissionsContentsReadCodeQualityWritePRRead creates permissions with contents: read, code-quality: write, pull-requests: read (required by actions/upload-code-coverage) |
 | `permissions_factory.go` | `NewPermissionsContentsReadDiscussionsWrite` | `func NewPermissionsContentsReadDiscussionsWrite() *Permissions` | NewPermissionsContentsReadDiscussionsWrite creates permissions with contents: read and discussions: write |
 | `permissions_factory.go` | `NewPermissionsContentsReadIssuesWrite` | `func NewPermissionsContentsReadIssuesWrite() *Permissions` | NewPermissionsContentsReadIssuesWrite creates permissions with contents: read and issues: write |
-| `permissions_factory.go` | `NewPermissionsContentsReadIssuesWritePRWrite` | `func NewPermissionsContentsReadIssuesWritePRWrite() *Permissions` | NewPermissionsContentsReadIssuesWritePRWrite creates permissions with contents: read, issues: write, pull-requests: write |
 | `permissions_factory.go` | `NewPermissionsContentsReadPRWrite` | `func NewPermissionsContentsReadPRWrite() *Permissions` | NewPermissionsContentsReadPRWrite creates permissions with contents: read and pull-requests: write |
 | `permissions_factory.go` | `NewPermissionsContentsReadSecurityEventsWrite` | `func NewPermissionsContentsReadSecurityEventsWrite() *Permissions` | NewPermissionsContentsReadSecurityEventsWrite creates permissions with contents: read and security-events: write |
 | `permissions_factory.go` | `NewPermissionsContentsReadSecurityEventsWriteActionsRead` | `func NewPermissionsContentsReadSecurityEventsWriteActionsRead() *Permissions` | NewPermissionsContentsReadSecurityEventsWriteActionsRead creates permissions with contents: read, security-events: write, actions: read |
@@ -1617,15 +1614,12 @@ This appendix is generated from the current non-test Go source files in this pac
 | `github_app_requirements.go` | `ComputeGitHubAppManifestPermissions` | `func ComputeGitHubAppManifestPermissions(frontmatterPermissions any, safeOutputs *SafeOutputsConfig) map[string]string` | Derives the GitHub App manifest `default_permissions` map required to operate a workflow, given its top-level frontmatter `permissions` value and its parsed safe-outputs configuration. Scopes with no manifest equivalent, and scopes at `none`, are omitted. |
 | `github_app_requirements.go` | `NormalizeGitHubAppWebhookEvents` | `func NormalizeGitHubAppWebhookEvents(onValue any) []string` | Extracts the set of GitHub App webhook events required by a workflow's `on:` frontmatter, expanding gh-aw's command-trigger shorthands and mapping `pull_request_target` to `pull_request`, while excluding non-webhook Actions triggers and gh-aw's `on:`-section extension keys. |
 | `maintenance_workflow_expiry.go` | `DisableDefaultActionFailureExpiryMarkersIfUnenforced` | `func DisableDefaultActionFailureExpiryMarkersIfUnenforced(lockFiles []string, workflowDir string, repoConfig *RepoConfig)` | Disables default action-failure-issue expiry markers in the given lock files unless maintenance workflow enforcement is active; leaves markers untouched when `maintenance.action_failure_issue_expires` is explicitly set in `aw.json`. `repoConfig` may be nil. |
-| `domains.go` | `GetEngineDefaultDomainSets` | `func GetEngineDefaultDomainSets() map[string][]string` | Returns copies of the named engine default domain sets for analysis, reporting, and `network.allowed` expansion. |
 | `tools_validation.go` | `IsGitHubCLIProxyMode` | `func IsGitHubCLIProxyMode(tools map[string]any) (string, bool)` | Reports whether `tools.github.mode` is a shell-backed GitHub CLI proxy mode. |
-| `graders_config.go` | `IsValidOperationalValueEvaluatorRunPath` | `func IsValidOperationalValueEvaluatorRunPath(evaluatorPath string) bool` | Reports whether `evaluatorPath` is a safe shell script path. Paths may be repository-root-relative or local to the workflow file (prefixed with `./`). Empty components, `.`, and `..` are rejected to avoid traversal. |
 | `graders_config.go` | `ParseGradersFromFrontmatter` | `func ParseGradersFromFrontmatter(frontmatter map[string]any) (*GradersConfig, error)` | Public standalone convenience wrapper for parsing the `graders` section of workflow frontmatter into a `GradersConfig`. |
 | `compiler_experiments.go` | `ParseExperimentMetricGraderReference` | `func ParseExperimentMetricGraderReference(metric string) (string, bool)` | Returns the referenced grader ID when `metric` declares a grader-backed metric. Supports the forms `grader:<id>`, `graders.<id>`, and `graders.<id>.<suffix>`. |
 | `compiler_experiments.go` | `RewriteExperimentsReferenceForDownstreamJobs` | `func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[string][]string) string` | Rewrites `experiments.<name>` references in `s` (for names declared in `experiments`) to `needs.activation.outputs.<name>`, for use in jobs other than activation where the experiment variant is exposed via the activation job's outputs. |
 | `compiler_experiments.go` | `RewriteActivationOutputsToLocalStepOutputs` | `func RewriteActivationOutputsToLocalStepOutputs(s string, experiments map[string][]string) string` | Converts `needs.activation.outputs.<name>` references (as produced by `RewriteExperimentsReferenceForDownstreamJobs`) back into `steps.pick-experiment.outputs.<name>`, for evaluating such expressions inside the activation job itself. |
 | `secret_extraction.go` | `ReplaceSecretsWithShellEnvVars` | `func ReplaceSecretsWithShellEnvVars(value string, secrets map[string]string) string` | Replaces secret expressions in a value with plain shell environment variable references (e.g. `${{ secrets.DD_API_KEY }}` → `${DD_API_KEY}`), without the backslash escape used for JSON configs. Used for TOML configs written through an expanding heredoc. |
-| `graders_operational_value.go` | `ResolveOperationalValueEvaluatorPath` | `func ResolveOperationalValueEvaluatorPath(repoRoot, markdownPath, runPath string) string` | Resolves a validated operational-value evaluator run path. Paths starting with `./` are local to the workflow file's directory; all other paths are relative to the repository root. |
 | `engine_helpers.go` | `GenerateMultiSecretValidationStepWithID` | `func GenerateMultiSecretValidationStepWithID(secretNames []string, requirementName, docsURL string, envOverrides map[string]string, stepID string) GitHubActionStep` | Creates a secret validation step with a caller-provided step ID; used by `GenerateMultiSecretValidationStep` with the default ID `"validate-secret"`. |
 
 <!-- END SOURCE-VERIFIED EXPORT COVERAGE -->
