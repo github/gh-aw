@@ -41,7 +41,7 @@ func TestAtomicSampleExecution(t *testing.T) {
 	assert.False(t, engine.GetCapabilities().MaxTurns)
 	assert.Empty(t, def.Auth)
 	assert.Equal(t, "universal-llm-consumer", def.Behaviors.SecretStrategy)
-	expectedArgs := []string{"--print", "--mode", "text", "--no-session", "--no-themes", "--approve", "--exclude-tools", "ask_user_question"}
+	expectedArgs := []string{"--print", "--mode", "text", "--no-themes", "--approve", "--exclude-tools", "ask_user_question"}
 	assert.Equal(t, expectedArgs, def.Behaviors.Execution.Args)
 	assert.Empty(t, engine.GetLogParserScriptId())
 	assert.False(t, def.Behaviors.Installation.PostInstallScripts)
@@ -93,6 +93,9 @@ fetchAWFReflect: async () => JSON.parse(process.env.ATOMIC_TEST_REFLECT) };`), 0
 		"PATH=" + os.Getenv("PATH"), "GITHUB_WORKSPACE=" + dir, "GH_AW_PROMPT=" + filepath.Join(dir, "prompt.txt"),
 		"GH_AW_MCP_CONFIG=" + filepath.Join(dir, "mcp.json"), "AWF_REFLECT_ENABLED=1",
 		"ATOMIC_MODEL=copilot/fixture-model", "GH_AW_LLM_PROVIDER=github",
+		"GH_AW_ATOMIC_STORE_DIR=" + filepath.Join(dir, "atomic-store"),
+		"GH_AW_ATOMIC_STORAGE_STAGING=" + filepath.Join(dir, "atomic-storage-staging.json"),
+		"GH_AW_ATOMIC_STORAGE_ADAPTER=" + filepath.Join(dir, "libsql.js"),
 		`ATOMIC_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"copilot","configured":true,"models_url":"http://api-proxy:10001/prefix/v1/models"}]}}`,
 	}
 	return cmd
@@ -397,6 +400,7 @@ func TestAtomicSmokeContract(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/smoke-atomic.md")
 	require.NoError(t, err)
 	assert.Contains(t, string(source), "shared/atomic.md")
+	assert.Contains(t, string(source), "durable:\n    retention-days: 7")
 	taskStart := strings.Index(string(source), "1. Use native GitHub MCP tools")
 	require.NotEqual(t, -1, taskStart)
 	taskEnd := strings.Index(string(source)[taskStart:], "\n2. ")
@@ -436,11 +440,471 @@ func TestAtomicSmokeContract(t *testing.T) {
 		"GH_AW_ENGINE_VERSION: " + loadAtomicSample(t).Version,
 		"ATOMIC_MODEL: copilot/gpt-5.3-codex",
 		"atomic_mcp_config_adapter.cjs", "--exclude-env OPENAI_API_KEY",
+		"--exclude-env ATOMIC_STORAGE_TOKEN", "--exclude-env ATOMIC_STORAGE_URL",
+		"Restore durable workflow state", "Stage durable session files", "/tmp/gh-aw/agent/atomic-store",
 		"proxy.golang.org", `"GITHUB_READ_ONLY": "1"`,
 		smoke.Evals[0].Question, smoke.Evals[1].Question,
 	} {
 		assert.Contains(t, string(lock), expected)
 	}
+}
+
+func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
+	var frontmatter struct {
+		ExcludedEnv   []string         `yaml:"excluded-env"`
+		Engine        EngineDefinition `yaml:"engine"`
+		PreAgentSteps []struct {
+			Name string            `yaml:"name"`
+			Env  map[string]string `yaml:"env"`
+			Run  string            `yaml:"run"`
+		} `yaml:"pre-agent-steps"`
+	}
+	readConformanceFrontmatter(t, "../../.github/workflows/shared/atomic.md", &frontmatter)
+	def := &frontmatter.Engine
+	require.NotNil(t, def.Behaviors)
+	require.NotNil(t, def.Behaviors.Execution)
+	assert.NotContains(t, def.Behaviors.Execution.Args, "--no-session")
+	assert.Equal(t, []string{
+		"--print", "--mode", "text", "--no-themes", "--approve", "--exclude-tools", "ask_user_question",
+	}, def.Behaviors.Execution.Args)
+	assert.Contains(t, frontmatter.ExcludedEnv, "ATOMIC_STORAGE_URL")
+	assert.Contains(t, frontmatter.ExcludedEnv, "ATOMIC_STORAGE_TOKEN")
+	assert.Equal(t, "/tmp/gh-aw/agent/atomic-store", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORE_DIR"])
+	assert.Equal(t, "/tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORAGE_ADAPTER"])
+	assert.Equal(t, "/tmp/gh-aw/atomic-storage-staging.json", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORAGE_STAGING"])
+
+	require.NotNil(t, def.Behaviors.Durable)
+	assert.Equal(t, []string{"/tmp/gh-aw/agent/atomic-store"}, def.Behaviors.Durable.Files)
+	assert.Equal(t, def.Behaviors.Execution, def.Behaviors.Durable.Execution)
+	assert.Equal(t, def.Behaviors.HarnessScript, def.Behaviors.Durable.HarnessScript)
+
+	require.Len(t, frontmatter.PreAgentSteps, 1)
+	step := frontmatter.PreAgentSteps[0]
+	assert.Equal(t, "Stage Atomic external storage", step.Name)
+	assert.Equal(t, "${{ secrets.ATOMIC_STORAGE_URL }}", step.Env["ATOMIC_STORAGE_URL"])
+	assert.Equal(t, "${{ secrets.ATOMIC_STORAGE_TOKEN }}", step.Env["ATOMIC_STORAGE_TOKEN"])
+	assert.Equal(t, "true", step.Env["NPM_CONFIG_IGNORE_SCRIPTS"])
+	assert.Equal(t, "0", step.Env["NPM_CONFIG_MIN_RELEASE_AGE"])
+	expectedAdapterPkg := "@bastani/atomic-storage-libsql@" + def.Version
+	assert.Contains(t, step.Run, expectedAdapterPkg, "adapter package version must match engine.version")
+
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o700))
+	npmCalls := filepath.Join(dir, "npm-calls.txt")
+	fakeNpm := filepath.Join(binDir, "npm")
+	require.NoError(t, os.WriteFile(fakeNpm, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \""+npmCalls+"\"\n"), 0o700))
+	staging := filepath.Join(dir, "staging.json")
+	prefix := filepath.Join(dir, "prefix")
+	script := strings.ReplaceAll(step.Run, "/tmp/gh-aw/atomic-storage-staging.json", staging)
+	script = strings.ReplaceAll(script, "/tmp/gh-aw/atomic-storage", prefix)
+
+	runStep := func(url, token string) string {
+		cmd := exec.CommandContext(t.Context(), "bash", "-c", script)
+		cmd.Env = []string{
+			"PATH=" + binDir + ":" + os.Getenv("PATH"),
+			"ATOMIC_STORAGE_URL=" + url,
+			"ATOMIC_STORAGE_TOKEN=" + token,
+			"NPM_CONFIG_IGNORE_SCRIPTS=true",
+			"NPM_CONFIG_MIN_RELEASE_AGE=0",
+		}
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", out)
+		return string(out)
+	}
+
+	require.NoError(t, os.WriteFile(staging, []byte("stale"), 0o600))
+	outEmpty := runStep("   ", "unused-token")
+	assert.Empty(t, outEmpty)
+	_, err := os.Stat(staging)
+	assert.True(t, os.IsNotExist(err), "empty URL must remove stale staging file and write nothing")
+	_, err = os.Stat(npmCalls)
+	assert.True(t, os.IsNotExist(err), "empty URL must skip npm install")
+
+	outStaged := runStep("  libsql://example-org.turso.io  ", "  turso-secret-token  ")
+	assert.Contains(t, outStaged, "::add-mask::libsql://example-org.turso.io")
+	assert.Contains(t, outStaged, "::add-mask::turso-secret-token")
+	calls, err := os.ReadFile(npmCalls)
+	require.NoError(t, err)
+	assert.Contains(t, string(calls), "install --prefix "+prefix+" --ignore-scripts --no-audit --no-fund "+expectedAdapterPkg)
+	info, err := os.Stat(staging)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	rawStaging, err := os.ReadFile(staging)
+	require.NoError(t, err)
+	var parsedStaging map[string]string
+	require.NoError(t, json.Unmarshal(rawStaging, &parsedStaging))
+	assert.Equal(t, map[string]string{
+		"url":   "libsql://example-org.turso.io",
+		"token": "turso-secret-token",
+	}, parsedStaging)
+}
+
+func TestAtomicDurableCompilation(t *testing.T) {
+	dir := t.TempDir()
+	engineSource, err := os.ReadFile("../../.github/workflows/shared/atomic.md")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "atomic-engine.md"), engineSource, 0o600))
+	source := filepath.Join(dir, "durable-atomic.md")
+	require.NoError(t, os.WriteFile(source, []byte(`---
+on: workflow_dispatch
+strict: true
+permissions:
+  contents: read
+  copilot-requests: write
+imports: [atomic-engine.md]
+model: copilot/gpt-5.3-codex
+engine:
+  id: atomic
+  durable:
+    retention-days: 7
+  env:
+    ATOMIC_STORAGE: "on"
+    ATOMIC_STORAGE_NAMESPACE: team_alpha
+network:
+  allowed:
+    - defaults
+    - db-org.turso.io
+---
+Continue investigating the repository.
+`), 0o600))
+	require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+	lock, err := os.ReadFile(filepath.Join(dir, "durable-atomic.lock.yml"))
+	require.NoError(t, err)
+	text := string(lock)
+	for _, expected := range []string{
+		"name: Stage Atomic external storage\n",
+		"- name: " + DurableRestoreStepName + "\n",
+		"Stage durable session files",
+		"Upload durable checkpoint artifact",
+		"/tmp/gh-aw/agent/atomic-store",
+		"GH_AW_DURABLE_RESUMED",
+		`ATOMIC_STORAGE: "on"`,
+		"ATOMIC_STORAGE_NAMESPACE: team_alpha",
+		"db-org.turso.io",
+	} {
+		assert.Contains(t, text, expected)
+	}
+}
+
+func TestAtomicHarnessStorageAndDurableResume(t *testing.T) {
+	probeSource := `
+const fs = require("node:fs"), path = require("node:path");
+const cfgPath = path.join(__dirname, "probe-config.json");
+const cfg = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, "utf8")) : {};
+const home = process.env.ATOMIC_CODING_AGENT_DIR;
+const tokenPath = path.join(home, "storage-token");
+const hasTokenFile = fs.existsSync(tokenPath);
+if (cfg.emitStdout) process.stdout.write(cfg.emitStdout);
+if (cfg.emitStderr) process.stderr.write(cfg.emitStderr);
+const out = {
+  home,
+  args: process.argv.slice(2),
+  settings: JSON.parse(fs.readFileSync(path.join(home, "settings.json"), "utf8")),
+  hasTokenFile,
+  tokenMode: hasTokenFile ? (fs.statSync(tokenPath).mode & 0o777) : null,
+  tokenContent: hasTokenFile ? fs.readFileSync(tokenPath, "utf8") : null,
+  stagingExistsDuringRun: cfg.stagingPath ? fs.existsSync(cfg.stagingPath) : null,
+  envKeys: Object.keys(process.env).sort(),
+  workflowArtifactDir: process.env.ATOMIC_WORKFLOW_ARTIFACT_DIR || null,
+};
+if (cfg.outFile) fs.writeFileSync(cfg.outFile, JSON.stringify(out));
+else console.log(JSON.stringify(out));
+`
+	type probeCapture struct {
+		Home                   string         `json:"home"`
+		Args                   []string       `json:"args"`
+		Settings               map[string]any `json:"settings"`
+		HasTokenFile           bool           `json:"hasTokenFile"`
+		TokenMode              *int           `json:"tokenMode"`
+		TokenContent           *string        `json:"tokenContent"`
+		StagingExistsDuringRun *bool          `json:"stagingExistsDuringRun"`
+		EnvKeys                []string       `json:"envKeys"`
+		WorkflowArtifactDir    *string        `json:"workflowArtifactDir"`
+	}
+
+	t.Run("default local store and unlinks unused staging file", func(t *testing.T) {
+		dir := t.TempDir()
+		probe := filepath.Join(dir, "probe.cjs")
+		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
+		staging := filepath.Join(dir, "atomic-storage-staging.json")
+		require.NoError(t, os.WriteFile(staging, []byte(`{"url":"libsql://unused.turso.io","token":"unused-staging-secret"}`), 0o600))
+		outFile := filepath.Join(dir, "captured.json")
+		cfgBytes, err := json.Marshal(map[string]string{
+			"stagingPath": staging,
+			"outFile":     outFile,
+			"emitStderr":  "leak check unused-staging-secret\n",
+		})
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "probe-config.json"), cfgBytes, 0o600))
+		cmd := atomicHarnessCommand(t, dir, "node", append([]string{probe}, loadAtomicSample(t).Behaviors.Execution.Args...)...)
+		cmd.Env = append(cmd.Env, "HOSTALIASES="+writeHostAliases(t, dir))
+		rawOut, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", rawOut)
+		assert.NotContains(t, string(rawOut), "unused-staging-secret")
+		assert.Contains(t, string(rawOut), "[REDACTED]")
+		_, err = os.Stat(staging)
+		assert.True(t, os.IsNotExist(err), "staging file must be unlinked even when external storage is off")
+
+		capturedBytes, err := os.ReadFile(outFile)
+		require.NoError(t, err)
+		var captured probeCapture
+		require.NoError(t, json.Unmarshal(capturedBytes, &captured))
+		assert.NotContains(t, captured.Args, "--no-session")
+		assert.NotContains(t, captured.Args, "--continue")
+		assert.NotContains(t, captured.Args, "--session")
+		assert.False(t, captured.HasTokenFile)
+		require.NotNil(t, captured.StagingExistsDuringRun)
+		assert.False(t, *captured.StagingExistsDuringRun, "staging file must be unlinked before spawning atomic")
+		assert.Nil(t, captured.Settings["storage"])
+		storeDir := filepath.Join(dir, "atomic-store")
+		assert.Equal(t, map[string]any{"storage": map[string]any{"path": filepath.Join(storeDir, "sessions.sqlite")}}, captured.Settings["sessions"])
+		assert.Equal(t, map[string]any{"journal": map[string]any{"path": filepath.Join(storeDir, "journal.sqlite")}}, captured.Settings["workflows"])
+		require.NotNil(t, captured.WorkflowArtifactDir)
+		assert.Equal(t, filepath.Join(storeDir, "runs"), *captured.WorkflowArtifactDir)
+		assert.NotContains(t, captured.EnvKeys, "ATOMIC_STORAGE")
+		assert.NotContains(t, captured.EnvKeys, "ATOMIC_STORAGE_URL")
+		assert.NotContains(t, captured.EnvKeys, "ATOMIC_STORAGE_TOKEN")
+	})
+
+	t.Run("durable resume records and continues exact root session id", func(t *testing.T) {
+		dir := t.TempDir()
+		storeDir := filepath.Join(dir, "atomic-store")
+		require.NoError(t, os.MkdirAll(storeDir, 0o700))
+		writer := filepath.Join(dir, "write-session.cjs")
+		require.NoError(t, os.WriteFile(writer, []byte(`
+const { DatabaseSync } = require("node:sqlite");
+const path = require("node:path");
+const settings = JSON.parse(require("node:fs").readFileSync(path.join(process.env.ATOMIC_CODING_AGENT_DIR, "settings.json"), "utf8"));
+const db = new DatabaseSync(settings.sessions.storage.path);
+db.exec("CREATE TABLE session_sessions (id TEXT PRIMARY KEY, internal INTEGER NOT NULL, modified_at TEXT NOT NULL)");
+db.prepare("INSERT INTO session_sessions VALUES (?, ?, ?)").run("root-session-111", 0, "2026-11-12T01:00:00.000Z");
+db.prepare("INSERT INTO session_sessions VALUES (?, ?, ?)").run("subagent-session-222", 1, "2026-11-12T02:00:00.000Z");
+db.close();
+`), 0o600))
+		cmd1 := atomicHarnessCommand(t, dir, "node", writer)
+		cmd1.Env = append(cmd1.Env, "HOSTALIASES="+writeHostAliases(t, dir))
+		out1, err := cmd1.CombinedOutput()
+		require.NoError(t, err, "%s", out1)
+		recordedID, err := os.ReadFile(filepath.Join(storeDir, "session-id"))
+		require.NoError(t, err)
+		assert.Equal(t, "root-session-111", strings.TrimSpace(string(recordedID)))
+		info, err := os.Stat(filepath.Join(storeDir, "session-id"))
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+
+		probe := filepath.Join(dir, "probe.cjs")
+		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
+		cmd2 := atomicHarnessCommand(t, dir, "node", probe)
+		cmd2.Env = append(cmd2.Env, "HOSTALIASES="+writeHostAliases(t, dir), "GH_AW_DURABLE_RESUMED=true")
+		out2, err := cmd2.Output()
+		require.NoError(t, err)
+		var captured probeCapture
+		require.NoError(t, json.Unmarshal(out2, &captured))
+		assert.Equal(t, []string{"--session", "root-session-111", "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+
+		require.NoError(t, os.Remove(filepath.Join(storeDir, "session-id")))
+		cmd3 := atomicHarnessCommand(t, dir, "node", probe)
+		cmd3.Env = append(cmd3.Env, "HOSTALIASES="+writeHostAliases(t, dir), "GH_AW_DURABLE_RESUMED=true")
+		out3, err := cmd3.Output()
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(out3, &captured))
+		assert.Equal(t, []string{"--continue", "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+	})
+
+	for _, delivery := range []string{"staging", "env"} {
+		t.Run("Turso URL and token via "+delivery, func(t *testing.T) {
+			dir := t.TempDir()
+			probe := filepath.Join(dir, "probe.cjs")
+			require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
+			adapter := filepath.Join(dir, "libsql.js")
+			require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+			staging := filepath.Join(dir, "atomic-storage-staging.json")
+			outFile := filepath.Join(dir, "captured.json")
+			cfgBytes, err := json.Marshal(map[string]string{
+				"stagingPath": staging,
+				"outFile":     outFile,
+				"emitStdout":  "stdout secret check turso-jwt-secret-99\n",
+				"emitStderr":  "stderr secret check turso-jwt-secret-99\n",
+			})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "probe-config.json"), cfgBytes, 0o600))
+			cmd := atomicHarnessCommand(t, dir, "node", probe, "--print", "--no-session")
+			cmd.Env = append(cmd.Env,
+				"HOSTALIASES="+writeHostAliases(t, dir),
+				"GITHUB_REPOSITORY=Owner/My-Repo.name",
+			)
+			if delivery == "staging" {
+				require.NoError(t, os.WriteFile(staging, []byte(`{"url":"  libsql://gh-aw-org.turso.io  ","token":"  turso-jwt-secret-99  "}`), 0o600))
+				cmd.Env = append(cmd.Env, "ATOMIC_STORAGE=on")
+			} else {
+				cmd.Env = append(cmd.Env,
+					"ATOMIC_STORAGE_URL=  libsql://gh-aw-org.turso.io  ",
+					"ATOMIC_STORAGE_TOKEN=  turso-jwt-secret-99  ",
+				)
+			}
+			rawOut, err := cmd.CombinedOutput()
+			require.NoError(t, err, "%s", rawOut)
+			assert.NotContains(t, string(rawOut), "turso-jwt-secret-99")
+			assert.Contains(t, string(rawOut), "[REDACTED]")
+			_, err = os.Stat(staging)
+			assert.True(t, os.IsNotExist(err), "staging file must be unlinked")
+
+			capturedBytes, err := os.ReadFile(outFile)
+			require.NoError(t, err)
+			var captured probeCapture
+			require.NoError(t, json.Unmarshal(capturedBytes, &captured))
+			assert.Equal(t, []string{"--print", "--provider", "awf-proxy", "--model", "fixture-model"}, captured.Args)
+			assert.True(t, captured.HasTokenFile)
+			require.NotNil(t, captured.TokenMode)
+			assert.Equal(t, 0o600, *captured.TokenMode)
+			require.NotNil(t, captured.TokenContent)
+			assert.Equal(t, "turso-jwt-secret-99", *captured.TokenContent)
+			require.NotNil(t, captured.StagingExistsDuringRun)
+			assert.False(t, *captured.StagingExistsDuringRun)
+			assert.Nil(t, captured.Settings["sessions"])
+			assert.Nil(t, captured.Settings["workflows"])
+			assert.Equal(t, map[string]any{
+				"adapter": adapter,
+				"options": map[string]any{"url": "libsql://gh-aw-org.turso.io"},
+				"secrets": map[string]any{"authToken": map[string]any{"file": filepath.Join(captured.Home, "storage-token")}},
+				"prefix":  "gh_aw_owner_my_repo_name",
+			}, captured.Settings["storage"])
+			for _, forbidden := range []string{"ATOMIC_STORAGE", "ATOMIC_STORAGE_URL", "ATOMIC_STORAGE_TOKEN", "ATOMIC_STORAGE_NAMESPACE"} {
+				assert.NotContains(t, captured.EnvKeys, forbidden)
+			}
+			_, err = os.Stat(captured.Home)
+			assert.True(t, os.IsNotExist(err))
+		})
+	}
+
+	t.Run("self-hosted http URL without token and with namespace", func(t *testing.T) {
+		dir := t.TempDir()
+		probe := filepath.Join(dir, "probe.cjs")
+		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
+		adapter := filepath.Join(dir, "libsql.js")
+		require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+		cmd := atomicHarnessCommand(t, dir, "node", probe)
+		cmd.Env = append(cmd.Env,
+			"HOSTALIASES="+writeHostAliases(t, dir),
+			"GITHUB_REPOSITORY=Acme/Worker_1",
+			"ATOMIC_STORAGE_URL=http://sqld.internal:8080",
+			"ATOMIC_STORAGE_NAMESPACE=team-ci_1",
+		)
+		out, err := cmd.Output()
+		require.NoError(t, err)
+		var captured probeCapture
+		require.NoError(t, json.Unmarshal(out, &captured))
+		assert.False(t, captured.HasTokenFile)
+		assert.Equal(t, map[string]any{
+			"adapter": adapter,
+			"options": map[string]any{"url": "http://sqld.internal:8080", "namespace": "team-ci_1"},
+			"prefix":  "gh_aw_acme_worker_1",
+		}, captured.Settings["storage"])
+	})
+
+	for _, tc := range []struct {
+		name          string
+		env           []string
+		createAdapter bool
+		staging       string
+		wantMessage   string
+		forbidInOut   string
+	}{
+		{
+			name:        "invalid ATOMIC_STORAGE toggle",
+			env:         []string{"ATOMIC_STORAGE=maybe"},
+			wantMessage: `ATOMIC_STORAGE must be "on" or "off"`,
+		},
+		{
+			name:          "toggle on without staging or URL",
+			env:           []string{"ATOMIC_STORAGE=on", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: true,
+			wantMessage:   "ATOMIC_STORAGE_URL",
+		},
+		{
+			name:          "bad scheme file:",
+			env:           []string{"ATOMIC_STORAGE_URL=file:/tmp/local.db", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: true,
+			wantMessage:   "libsql:, https:, wss:, or http:",
+		},
+		{
+			name:          "credentials in URL",
+			env:           []string{"ATOMIC_STORAGE_URL=libsql://admin:url-pass-secret@db.turso.io", "ATOMIC_STORAGE_TOKEN=tok-123", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: true,
+			wantMessage:   "pass the token in ATOMIC_STORAGE_TOKEN",
+			forbidInOut:   "url-pass-secret",
+		},
+		{
+			name:          "authToken query param in URL",
+			env:           []string{"ATOMIC_STORAGE_URL=libsql://db.turso.io?authToken=query-jwt-secret", "ATOMIC_STORAGE_TOKEN=tok-123", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: true,
+			wantMessage:   "pass the token in ATOMIC_STORAGE_TOKEN",
+			forbidInOut:   "query-jwt-secret",
+		},
+		{
+			name:          "missing token for libsql:",
+			env:           []string{"ATOMIC_STORAGE_URL=libsql://db.turso.io", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: true,
+			wantMessage:   "ATOMIC_STORAGE_TOKEN is required",
+		},
+		{
+			name:          "missing adapter file",
+			env:           []string{"ATOMIC_STORAGE_URL=libsql://db.turso.io", "ATOMIC_STORAGE_TOKEN=missing-adapter-secret", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: false,
+			wantMessage:   "Stage Atomic external storage",
+			forbidInOut:   "missing-adapter-secret",
+		},
+		{
+			name:          "missing GITHUB_REPOSITORY",
+			env:           []string{"ATOMIC_STORAGE_URL=http://sqld.internal:8080"},
+			createAdapter: true,
+			wantMessage:   "GITHUB_REPOSITORY",
+		},
+		{
+			name:          "bad namespace characters",
+			env:           []string{"ATOMIC_STORAGE_URL=http://sqld.internal:8080", "ATOMIC_STORAGE_NAMESPACE=bad/ns", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: true,
+			wantMessage:   "ATOMIC_STORAGE_NAMESPACE",
+		},
+		{
+			name:          "namespace with wss URL",
+			env:           []string{"ATOMIC_STORAGE_URL=wss://db.turso.io", "ATOMIC_STORAGE_TOKEN=wss-secret", "ATOMIC_STORAGE_NAMESPACE=team1", "GITHUB_REPOSITORY=org/repo"},
+			createAdapter: true,
+			wantMessage:   "ATOMIC_STORAGE_NAMESPACE requires a libsql:, https:, or http: URL",
+			forbidInOut:   "wss-secret",
+		},
+	} {
+		t.Run("rejects "+tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.createAdapter {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "libsql.js"), []byte("export default {};\n"), 0o600))
+			}
+			staging := filepath.Join(dir, "atomic-storage-staging.json")
+			require.NoError(t, os.WriteFile(staging, []byte(tc.staging), 0o600))
+			if tc.staging == "" {
+				require.NoError(t, os.Remove(staging))
+			}
+			cmd := atomicHarnessCommand(t, dir, "node", "-e", "process.exit(0)")
+			cmd.Env = append(cmd.Env, "HOSTALIASES="+writeHostAliases(t, dir))
+			cmd.Env = append(cmd.Env, tc.env...)
+			out, err := cmd.CombinedOutput()
+			require.Error(t, err, "%s", out)
+			assert.Contains(t, string(out), tc.wantMessage)
+			if tc.forbidInOut != "" {
+				assert.NotContains(t, string(out), tc.forbidInOut)
+			}
+			_, statErr := os.Stat(staging)
+			assert.True(t, os.IsNotExist(statErr), "staging file must always be unlinked on failure")
+		})
+	}
+}
+
+func writeHostAliases(t *testing.T, dir string) string {
+	t.Helper()
+	hostAliases := filepath.Join(dir, "host-aliases")
+	require.NoError(t, os.WriteFile(hostAliases, []byte("api-proxy localhost\n"), 0o600))
+	return hostAliases
 }
 
 func TestAtomicHarnessPublishedProviders(t *testing.T) {

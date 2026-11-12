@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"150112023409ac96169751c32a0245c9e0487c274395349f768762f77c1b71c3","body_hash":"2e7f995fcbbadf68268550a78ae5031e9ffbc9147c7de2d12a418fd5e481481e","strict":true,"agent_id":"atomic","agent_model":"copilot/gpt-5.3-codex","engine_versions":{"atomic":"0.9.79"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11","digest":"sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11@sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11","digest":"sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11@sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11","digest":"sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11@sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.6","digest":"sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.6@sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"}],"mcp_servers":[{"name":"mcpscripts","tools":["conformance-challenge"]},{"name":"safeoutputs","tools":["create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_explain","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"disabled"},"admission":true,"work_queue":{"worker":true,"logical_contract":"c6d9cd40ef0ee6217906e1b7f6d3286efef1ee0f8ac81d0a21ac0ebe014cb937"},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"9aad20395adc32784baa744fe8f803ddf7f5a97b67ea0968e5e1b605c8223bd0","body_hash":"5f6a9e63cac2df2a92df2f3df597d072cb3c2485f2600528ea508a31ab77b015","strict":true,"agent_id":"atomic","agent_model":"copilot/gpt-5.3-codex","engine_versions":{"atomic":"0.9.79"}}
+# gh-aw-manifest: {"version":1,"secrets":["ATOMIC_STORAGE_TOKEN","ATOMIC_STORAGE_URL","GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11","digest":"sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.11@sha256:8774a73c351395b41d2ad0af4ddb4689007c67de3cd08bd9f43bb8a0e300690e"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11","digest":"sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.11@sha256:88d2d0e315a504d93fd4fb8847fd0f6b7f4469f41a6fc6047b3dc9654c56ab2c"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11","digest":"sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.11@sha256:861739ecf924dd2db5e5fb652db2ad82aaafd1615623297ddabc8f41a36b2847"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.6","digest":"sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.6@sha256:342cd624e1f179d91be2de7a146fc4f387092e62e6c8a47506d7932e113d2311"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"}],"mcp_servers":[{"name":"mcpscripts","tools":["conformance-challenge"]},{"name":"safeoutputs","tools":["create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_explain","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"disabled"},"admission":true,"work_queue":{"worker":true,"logical_contract":"c6d9cd40ef0ee6217906e1b7f6d3286efef1ee0f8ac81d0a21ac0ebe014cb937"},"agent_metadata":{"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad","tools":["*"]},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -34,6 +34,8 @@
 # inlined-imports: true
 #
 # Secrets used:
+#   - ATOMIC_STORAGE_TOKEN
+#   - ATOMIC_STORAGE_URL
 #   - GH_AW_DEFAULT_OTLP_ENDPOINT
 #   - GH_AW_DEFAULT_OTLP_HEADERS
 #   - GH_AW_GITHUB_MCP_SERVER_TOKEN
@@ -576,7 +578,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "150112023409ac96169751c32a0245c9e0487c274395349f768762f77c1b71c3:2e7f995fcbbadf68268550a78ae5031e9ffbc9147c7de2d12a418fd5e481481e"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "9aad20395adc32784baa744fe8f803ddf7f5a97b67ea0968e5e1b605c8223bd0:5f6a9e63cac2df2a92df2f3df597d072cb3c2485f2600528ea508a31ab77b015"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -768,6 +770,13 @@ jobs:
         env:
           GH_AW_SKILL_DIR: ".atomic/skills"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_inline_skills.sh"
+      - env:
+          ATOMIC_STORAGE_TOKEN: ${{ secrets.ATOMIC_STORAGE_TOKEN }}
+          ATOMIC_STORAGE_URL: ${{ secrets.ATOMIC_STORAGE_URL }}
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
+          NPM_CONFIG_MIN_RELEASE_AGE: "0"
+        name: Stage Atomic external storage
+        run: "set -euo pipefail\nnode <<'JS'\nconst { mkdirSync, rmSync, writeFileSync } = require(\"node:fs\");\nconst { spawnSync } = require(\"node:child_process\");\nconst stagingPath = \"/tmp/gh-aw/atomic-storage-staging.json\";\nrmSync(stagingPath, { force: true });\nconst url = (process.env.ATOMIC_STORAGE_URL || \"\").trim();\nif (!url) process.exit(0);\nconst token = (process.env.ATOMIC_STORAGE_TOKEN || \"\").trim();\nfor (const secret of [url, token]) {\n  if (!secret) continue;\n  for (const line of secret.split(/\\r?\\n/)) {\n    if (line) process.stdout.write(`::add-mask::${line}\\n`);\n  }\n}\nmkdirSync(\"/tmp/gh-aw/atomic-storage\", { recursive: true, mode: 0o700 });\nconst install = spawnSync(\n  \"npm\",\n  [\"install\", \"--prefix\", \"/tmp/gh-aw/atomic-storage\", \"--ignore-scripts\", \"--no-audit\", \"--no-fund\", \"@bastani/atomic-storage-libsql@0.9.79\"],\n  { stdio: \"inherit\" }\n);\nif (install.error) throw install.error;\nif (install.status !== 0) process.exit(install.status ?? 1);\nwriteFileSync(stagingPath, JSON.stringify({ url, token }), { mode: 0o600 });\nJS\n"
       - env:
           CONFORMANCE_ENGINE: atomic
           CONFORMANCE_ROOT: /tmp/gh-aw/agent/engine-conformance
@@ -1217,22 +1226,149 @@ jobs:
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/actions"
           cat <<'GHAW_HARNESS_SCRIPT_3c7b9f1a_EOF' > "${RUNNER_TEMP}/gh-aw/actions/atomic_harness.cjs"
-          const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
-          const { join } = require("path");
+          const { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
+          const { isAbsolute, join } = require("path");
           const { spawnSync } = require("child_process");
           const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
           const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
           const [command, ...args] = process.argv.slice(2);
           const sensitiveValues = new Set();
+          const addSecret = value => {
+            if (typeof value !== "string" || !value) return;
+            sensitiveValues.add(value);
+            if (value.trim()) sensitiveValues.add(value.trim());
+          };
+          const addUrlCredentials = raw => {
+            if (typeof raw !== "string" || !raw) return;
+            const userinfo = /\/\/([^/?#]*)@/.exec(raw)?.[1];
+            if (userinfo) {
+              for (const part of userinfo.split(":")) {
+                try { addSecret(decodeURIComponent(part)); } catch {}
+                addSecret(part);
+              }
+            }
+            for (const match of raw.matchAll(/[?&]([^=&#]+)=([^&#]*)/g)) {
+              if (match[1].toLowerCase() === "authtoken") {
+                try { addSecret(decodeURIComponent(match[2])); } catch {}
+                addSecret(match[2]);
+              }
+            }
+          };
           const sanitize = output => redactArtifactMaskedValues(
             output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
           );
           const log = message => process.stderr.write(sanitize(`[atomic-harness] ${message}\n`));
+          const recordLocalSessionId = (sessionsDbPath, sessionIdPath) => {
+            if (!existsSync(sessionsDbPath)) return;
+            const { DatabaseSync } = require("node:sqlite");
+            const db = new DatabaseSync(sessionsDbPath, { readOnly: true });
+            try {
+              const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_sessions'").get();
+              if (!table) return;
+              const row = db.prepare("SELECT id FROM session_sessions WHERE internal = 0 ORDER BY modified_at DESC, rowid DESC LIMIT 1").get();
+              if (typeof row?.id === "string" && /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(row.id)) {
+                writeFileSync(sessionIdPath, `${row.id}\n`, { mode: 0o600 });
+              }
+            } finally {
+              db.close();
+            }
+          };
           const main = async () => {
+            const stagingPath = process.env.GH_AW_ATOMIC_STORAGE_STAGING || "/tmp/gh-aw/atomic-storage-staging.json";
+            let stagedStorage;
+            let stagingReadError;
+            try {
+              const rawStaging = readFileSync(stagingPath, "utf8");
+              addSecret(rawStaging);
+              try {
+                stagedStorage = JSON.parse(rawStaging);
+              } catch {
+                stagingReadError = new Error("Staged Atomic storage configuration is invalid JSON");
+              }
+            } catch (error) {
+              if (error?.code !== "ENOENT") stagingReadError = error;
+            } finally {
+              try {
+                unlinkSync(stagingPath);
+              } catch (error) {
+                if (error?.code !== "ENOENT") stagingReadError ??= error;
+              }
+            }
+            addSecret(stagedStorage?.token);
+            addUrlCredentials(stagedStorage?.url);
+            addSecret(process.env.ATOMIC_STORAGE_TOKEN);
+            addUrlCredentials(process.env.ATOMIC_STORAGE_URL);
+
             if (!command) throw new Error("Atomic command is required");
             if (process.env.AWF_REFLECT_ENABLED !== "1") {
               throw new Error("Atomic requires the AWF API proxy; direct credential authentication is not supported");
+            }
+            const storageToggle = (process.env.ATOMIC_STORAGE || "").trim().toLowerCase();
+            if (storageToggle !== "" && storageToggle !== "on" && storageToggle !== "off") {
+              throw new Error('ATOMIC_STORAGE must be "on" or "off" when set');
+            }
+            const envStorageUrl = (process.env.ATOMIC_STORAGE_URL || "").trim();
+            const useExternalStorage = storageToggle === "on" || (storageToggle === "" && envStorageUrl !== "");
+            let externalStorage;
+            if (useExternalStorage) {
+              if (stagingReadError) throw stagingReadError;
+              const rawUrl = (typeof stagedStorage?.url === "string" && storageToggle === "on" ? stagedStorage.url : envStorageUrl).trim();
+              const rawToken = (typeof stagedStorage?.token === "string" && storageToggle === "on" ? stagedStorage.token : process.env.ATOMIC_STORAGE_TOKEN || "").trim();
+              addSecret(rawToken);
+              addUrlCredentials(rawUrl);
+              if (!rawUrl) {
+                throw new Error("ATOMIC_STORAGE_URL is required when ATOMIC_STORAGE is on; configure the ATOMIC_STORAGE_URL Actions secret");
+              }
+              let parsedUrl;
+              try {
+                parsedUrl = new URL(rawUrl);
+              } catch {
+                throw new Error("ATOMIC_STORAGE_URL must use the libsql:, https:, wss:, or http: scheme");
+              }
+              if (!["libsql:", "https:", "wss:", "http:"].includes(parsedUrl.protocol) || !parsedUrl.hostname) {
+                throw new Error("ATOMIC_STORAGE_URL must use the libsql:, https:, wss:, or http: scheme");
+              }
+              if (parsedUrl.username || parsedUrl.password) {
+                throw new Error("ATOMIC_STORAGE_URL must not contain credentials; pass the token in ATOMIC_STORAGE_TOKEN");
+              }
+              for (const key of parsedUrl.searchParams.keys()) {
+                if (key.toLowerCase() === "authtoken") {
+                  throw new Error("ATOMIC_STORAGE_URL must not include authToken; pass the token in ATOMIC_STORAGE_TOKEN");
+                }
+              }
+              if (/[\r\n\0]/.test(rawToken)) {
+                throw new Error("ATOMIC_STORAGE_TOKEN must be a single-line token");
+              }
+              if (parsedUrl.protocol !== "http:" && !rawToken) {
+                throw new Error(`ATOMIC_STORAGE_TOKEN is required for ${parsedUrl.protocol} storage URLs`);
+              }
+              const rawNamespace = process.env.ATOMIC_STORAGE_NAMESPACE;
+              let namespace = "";
+              if (rawNamespace !== undefined && rawNamespace !== "") {
+                namespace = rawNamespace.trim();
+                if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(namespace)) {
+                  throw new Error("ATOMIC_STORAGE_NAMESPACE must be a non-empty simple name (letters, digits, underscores, and hyphens)");
+                }
+                if (parsedUrl.protocol === "wss:") {
+                  throw new Error("ATOMIC_STORAGE_NAMESPACE requires a libsql:, https:, or http: URL");
+                }
+              }
+              const adapterPath = process.env.GH_AW_ATOMIC_STORAGE_ADAPTER || "/tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js";
+              if (!isAbsolute(adapterPath) || !existsSync(adapterPath)) {
+                throw new Error(`Atomic libSQL storage adapter was not found at ${adapterPath}; check the "Stage Atomic external storage" pre-agent step`);
+              }
+              const repository = (process.env.GITHUB_REPOSITORY || "").trim();
+              if (!/^[^/]+\/[^/]+$/.test(repository)) {
+                throw new Error("GITHUB_REPOSITORY is required in owner/repo format when Atomic external storage is enabled");
+              }
+              externalStorage = {
+                adapterPath,
+                url: rawUrl,
+                token: rawToken,
+                namespace,
+                prefix: `gh_aw_${repository.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`,
+              };
             }
             const selectedModel = process.env.ATOMIC_MODEL;
             const separator = selectedModel?.indexOf("/") ?? -1;
@@ -1286,20 +1422,61 @@ jobs:
             mkdirSync("/tmp/gh-aw/agent", { recursive: true });
             const agentDir = mkdtempSync("/tmp/gh-aw/agent/atomic-");
             try {
+              const storeDir = process.env.GH_AW_ATOMIC_STORE_DIR || "/tmp/gh-aw/agent/atomic-store";
+              const sessionsDbPath = join(storeDir, "sessions.sqlite");
+              const sessionIdPath = join(storeDir, "session-id");
+              mkdirSync(storeDir, { recursive: true, mode: 0o700 });
               const writeConfig = (name, value) => writeFileSync(join(agentDir, name), JSON.stringify(value), { mode: 0o600 });
               writeConfig("models.json", {
                 providers: {
                   "awf-proxy": { baseUrl, api, apiKey: "awf-proxy", models: [{ id: model }] },
                 },
               });
-              writeConfig("settings.json", { quietStartup: true, enableAnalytics: false, enableInstallTelemetry: false });
+              if (externalStorage) {
+                const tokenPath = join(agentDir, "storage-token");
+                if (externalStorage.token) writeFileSync(tokenPath, externalStorage.token, { mode: 0o600 });
+                writeConfig("settings.json", {
+                  quietStartup: true,
+                  enableAnalytics: false,
+                  enableInstallTelemetry: false,
+                  storage: {
+                    adapter: externalStorage.adapterPath,
+                    options: {
+                      url: externalStorage.url,
+                      ...(externalStorage.namespace ? { namespace: externalStorage.namespace } : {}),
+                    },
+                    ...(externalStorage.token ? { secrets: { authToken: { file: tokenPath } } } : {}),
+                    prefix: externalStorage.prefix,
+                  },
+                });
+              } else {
+                writeConfig("settings.json", {
+                  quietStartup: true,
+                  enableAnalytics: false,
+                  enableInstallTelemetry: false,
+                  sessions: { storage: { path: sessionsDbPath } },
+                  workflows: { journal: { path: join(storeDir, "journal.sqlite") } },
+                });
+              }
               writeConfig("mcp.json", mcp);
+              const resumed = process.env.GH_AW_DURABLE_RESUMED === "true";
+              const forwardedArgs = (externalStorage || resumed) ? args.filter(arg => arg !== "--no-session") : [...args];
+              const sessionArgs = [];
+              if (resumed && !forwardedArgs.some(arg => ["--session", "--session-id", "--continue", "-c", "--no-session"].includes(arg))) {
+                const recordedSessionId = existsSync(sessionIdPath) ? readFileSync(sessionIdPath, "utf8").trim() : "";
+                if (/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(recordedSessionId)) {
+                  sessionArgs.push("--session", recordedSessionId);
+                } else {
+                  sessionArgs.push("--continue");
+                }
+              }
               // Inherit runtime bindings, never arbitrary workflow secrets or execution hooks.
               const env = {
                 ATOMIC_CODING_AGENT_DIR: agentDir,
                 PI_CODING_AGENT_DIR: agentDir,
                 ATOMIC_OFFLINE: "1",
                 ATOMIC_TELEMETRY: "0",
+                ATOMIC_WORKFLOW_ARTIFACT_DIR: join(storeDir, "runs"),
               };
               const conformanceSentinel = process.env.ENGINE_CONFORMANCE_SENTINEL;
               if (conformanceSentinel) {
@@ -1329,13 +1506,16 @@ jobs:
                 }
                 env[name] = value;
               }
-              const result = spawnSync(command, [...args, "--provider", "awf-proxy", "--model", model], {
+              const result = spawnSync(command, [...forwardedArgs, ...sessionArgs, "--provider", "awf-proxy", "--model", model], {
                 cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
                 env,
                 input: prompt,
                 stdio: ["pipe", "pipe", "pipe"],
                 maxBuffer: 64 * 1024 * 1024,
               });
+              if (!externalStorage) {
+                try { recordLocalSessionId(sessionsDbPath, sessionIdPath); } catch {}
+              }
               // A bounded capture failure may leave a credential split at the buffer boundary.
               if (result.error?.code === "ENOBUFS") {
                 throw new Error("Atomic output exceeded the 64 MiB capture limit; incomplete output withheld");
@@ -1350,6 +1530,10 @@ jobs:
                 process.exitCode = result.status || 1;
               }
             } finally {
+              try {
+                const brokerPid = Number(readFileSync(join(agentDir, "intercom", "broker.pid"), "utf8").trim());
+                if (Number.isInteger(brokerPid) && brokerPid > 0) process.kill(brokerPid, "SIGTERM");
+              } catch {}
               rmSync(agentDir, { recursive: true, force: true });
             }
           };
@@ -1361,7 +1545,6 @@ jobs:
             }
             process.exitCode = 1;
           });
-
           GHAW_HARNESS_SCRIPT_3c7b9f1a_EOF
           chmod 755 "${RUNNER_TEMP}/gh-aw/actions/atomic_harness.cjs"
       - name: Execute Atomic CLI
@@ -1417,8 +1600,8 @@ jobs:
             fi
           fi
           # shellcheck disable=SC1003,SC2016,SC2086
-          awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env ANTHROPIC_API_KEY --exclude-env CODEX_API_KEY --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_AGENT_TOKEN --exclude-env GH_AW_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GH_ENTERPRISE_TOKEN --exclude-env GH_TOKEN --exclude-env GITHUB_ENTERPRISE_TOKEN --exclude-env GITHUB_TOKEN --exclude-env MCP_GATEWAY_AGENT_ID --exclude-env OPENAI_API_KEY --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --mount /tmp/gh-aw:/tmp/gh-aw:rw --log-level info --skip-pull \
-            -- /bin/bash -c 'set +o histexpand; export PATH="${RUNNER_TEMP}/gh-aw/mcp-cli/bin:$PATH" && export OPENAI_API_KEY="$COPILOT_DUMMY_BYOK" && export no_proxy="${NO_PROXY:-}" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" ${RUNNER_TEMP}/gh-aw/actions/atomic_harness.cjs atomic --print --mode text --no-session --no-themes --approve --exclude-tools ask_user_question' 2>&1 | tee -a /tmp/gh-aw/agent-stdio.log
+          awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env ANTHROPIC_API_KEY --exclude-env ATOMIC_STORAGE_TOKEN --exclude-env ATOMIC_STORAGE_URL --exclude-env CODEX_API_KEY --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_AGENT_TOKEN --exclude-env GH_AW_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GH_ENTERPRISE_TOKEN --exclude-env GH_TOKEN --exclude-env GITHUB_ENTERPRISE_TOKEN --exclude-env GITHUB_TOKEN --exclude-env MCP_GATEWAY_AGENT_ID --exclude-env OPENAI_API_KEY --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --mount /tmp/gh-aw:/tmp/gh-aw:rw --log-level info --skip-pull \
+            -- /bin/bash -c 'set +o histexpand; export PATH="${RUNNER_TEMP}/gh-aw/mcp-cli/bin:$PATH" && export OPENAI_API_KEY="$COPILOT_DUMMY_BYOK" && export no_proxy="${NO_PROXY:-}" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" ${RUNNER_TEMP}/gh-aw/actions/atomic_harness.cjs atomic --print --mode text --no-themes --approve --exclude-tools ask_user_question' 2>&1 | tee -a /tmp/gh-aw/agent-stdio.log
         env:
           ATOMIC_MODEL: copilot/gpt-5.3-codex
           ATOMIC_OFFLINE: 1
@@ -1429,6 +1612,9 @@ jobs:
           ENGINE_CONFORMANCE_SENTINEL: conformance-atomic
           GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
           GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
+          GH_AW_ATOMIC_STORAGE_ADAPTER: /tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js
+          GH_AW_ATOMIC_STORAGE_STAGING: /tmp/gh-aw/atomic-storage-staging.json
+          GH_AW_ATOMIC_STORE_DIR: /tmp/gh-aw/agent/atomic-store
           GH_AW_ENGINE_VERSION: 0.9.79
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
@@ -1479,7 +1665,9 @@ jobs:
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
         env:
-          GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
+          GH_AW_SECRET_NAMES: 'ATOMIC_STORAGE_TOKEN,ATOMIC_STORAGE_URL,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
+          SECRET_ATOMIC_STORAGE_TOKEN: ${{ secrets.ATOMIC_STORAGE_TOKEN }}
+          SECRET_ATOMIC_STORAGE_URL: ${{ secrets.ATOMIC_STORAGE_URL }}
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1977,7 +2165,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "150112023409ac96169751c32a0245c9e0487c274395349f768762f77c1b71c3:2e7f995fcbbadf68268550a78ae5031e9ffbc9147c7de2d12a418fd5e481481e"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "9aad20395adc32784baa744fe8f803ddf7f5a97b67ea0968e5e1b605c8223bd0:5f6a9e63cac2df2a92df2f3df597d072cb3c2485f2600528ea508a31ab77b015"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}

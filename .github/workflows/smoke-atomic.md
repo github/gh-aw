@@ -14,6 +14,8 @@ engine:
   id: atomic
   # Validate a newly pinned Atomic release the day after it ships; strict mode allows at least one day.
   cooldown: 1
+  durable:
+    retention-days: 7
 model: copilot/gpt-5.3-codex
 strict: true
 imports:

@@ -10,6 +10,41 @@ excluded-env:
   - GH_ENTERPRISE_TOKEN
   - GH_AW_GITHUB_TOKEN
   - GH_AW_AGENT_TOKEN
+  - ATOMIC_STORAGE_URL
+  - ATOMIC_STORAGE_TOKEN
+pre-agent-steps:
+  - name: Stage Atomic external storage
+    env:
+      ATOMIC_STORAGE_URL: ${{ secrets.ATOMIC_STORAGE_URL }}
+      ATOMIC_STORAGE_TOKEN: ${{ secrets.ATOMIC_STORAGE_TOKEN }}
+      NPM_CONFIG_IGNORE_SCRIPTS: "true"
+      NPM_CONFIG_MIN_RELEASE_AGE: "0"
+    run: |
+      set -euo pipefail
+      node <<'JS'
+      const { mkdirSync, rmSync, writeFileSync } = require("node:fs");
+      const { spawnSync } = require("node:child_process");
+      const stagingPath = "/tmp/gh-aw/atomic-storage-staging.json";
+      rmSync(stagingPath, { force: true });
+      const url = (process.env.ATOMIC_STORAGE_URL || "").trim();
+      if (!url) process.exit(0);
+      const token = (process.env.ATOMIC_STORAGE_TOKEN || "").trim();
+      for (const secret of [url, token]) {
+        if (!secret) continue;
+        for (const line of secret.split(/\r?\n/)) {
+          if (line) process.stdout.write(`::add-mask::${line}\n`);
+        }
+      }
+      mkdirSync("/tmp/gh-aw/atomic-storage", { recursive: true, mode: 0o700 });
+      const install = spawnSync(
+        "npm",
+        ["install", "--prefix", "/tmp/gh-aw/atomic-storage", "--ignore-scripts", "--no-audit", "--no-fund", "@bastani/atomic-storage-libsql@0.9.79"],
+        { stdio: "inherit" }
+      );
+      if (install.error) throw install.error;
+      if (install.status !== 0) process.exit(install.status ?? 1);
+      writeFileSync(stagingPath, JSON.stringify({ url, token }), { mode: 0o600 });
+      JS
 engine:
   id: atomic
   detection-engine: copilot
@@ -48,7 +83,6 @@ engine:
         - --print
         - --mode
         - text
-        - --no-session
         - --no-themes
         - --approve
         - --exclude-tools
@@ -62,6 +96,354 @@ engine:
         ATOMIC_OFFLINE: "1"
         ATOMIC_TELEMETRY: "0"
         NO_COLOR: "1"
+        GH_AW_ATOMIC_STORE_DIR: /tmp/gh-aw/agent/atomic-store
+        GH_AW_ATOMIC_STORAGE_ADAPTER: /tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js
+        GH_AW_ATOMIC_STORAGE_STAGING: /tmp/gh-aw/atomic-storage-staging.json
+    durable:
+      files:
+        - /tmp/gh-aw/agent/atomic-store
+      execution:
+        command-name: atomic
+        args:
+          - --print
+          - --mode
+          - text
+          - --no-themes
+          - --approve
+          - --exclude-tools
+          - ask_user_question
+        step-name: Execute Atomic CLI
+        model-env-var: ATOMIC_MODEL
+        mcp-config-env-var: GH_AW_MCP_CONFIG
+        provider-env-mode: universal-llm-consumer
+        write-timestamp: true
+        env:
+          ATOMIC_OFFLINE: "1"
+          ATOMIC_TELEMETRY: "0"
+          NO_COLOR: "1"
+          GH_AW_ATOMIC_STORE_DIR: /tmp/gh-aw/agent/atomic-store
+          GH_AW_ATOMIC_STORAGE_ADAPTER: /tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js
+          GH_AW_ATOMIC_STORAGE_STAGING: /tmp/gh-aw/atomic-storage-staging.json
+      harness-script: |-
+        const { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
+        const { isAbsolute, join } = require("path");
+        const { spawnSync } = require("child_process");
+        const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
+        const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
+
+        const [command, ...args] = process.argv.slice(2);
+        const sensitiveValues = new Set();
+        const addSecret = value => {
+          if (typeof value !== "string" || !value) return;
+          sensitiveValues.add(value);
+          if (value.trim()) sensitiveValues.add(value.trim());
+        };
+        const addUrlCredentials = raw => {
+          if (typeof raw !== "string" || !raw) return;
+          const userinfo = /\/\/([^/?#]*)@/.exec(raw)?.[1];
+          if (userinfo) {
+            for (const part of userinfo.split(":")) {
+              try { addSecret(decodeURIComponent(part)); } catch {}
+              addSecret(part);
+            }
+          }
+          for (const match of raw.matchAll(/[?&]([^=&#]+)=([^&#]*)/g)) {
+            if (match[1].toLowerCase() === "authtoken") {
+              try { addSecret(decodeURIComponent(match[2])); } catch {}
+              addSecret(match[2]);
+            }
+          }
+        };
+        const sanitize = output => redactArtifactMaskedValues(
+          output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
+        );
+        const log = message => process.stderr.write(sanitize(`[atomic-harness] ${message}\n`));
+        const recordLocalSessionId = (sessionsDbPath, sessionIdPath) => {
+          if (!existsSync(sessionsDbPath)) return;
+          const { DatabaseSync } = require("node:sqlite");
+          const db = new DatabaseSync(sessionsDbPath, { readOnly: true });
+          try {
+            const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_sessions'").get();
+            if (!table) return;
+            const row = db.prepare("SELECT id FROM session_sessions WHERE internal = 0 ORDER BY modified_at DESC, rowid DESC LIMIT 1").get();
+            if (typeof row?.id === "string" && /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(row.id)) {
+              writeFileSync(sessionIdPath, `${row.id}\n`, { mode: 0o600 });
+            }
+          } finally {
+            db.close();
+          }
+        };
+        const main = async () => {
+          const stagingPath = process.env.GH_AW_ATOMIC_STORAGE_STAGING || "/tmp/gh-aw/atomic-storage-staging.json";
+          let stagedStorage;
+          let stagingReadError;
+          try {
+            const rawStaging = readFileSync(stagingPath, "utf8");
+            addSecret(rawStaging);
+            try {
+              stagedStorage = JSON.parse(rawStaging);
+            } catch {
+              stagingReadError = new Error("Staged Atomic storage configuration is invalid JSON");
+            }
+          } catch (error) {
+            if (error?.code !== "ENOENT") stagingReadError = error;
+          } finally {
+            try {
+              unlinkSync(stagingPath);
+            } catch (error) {
+              if (error?.code !== "ENOENT") stagingReadError ??= error;
+            }
+          }
+          addSecret(stagedStorage?.token);
+          addUrlCredentials(stagedStorage?.url);
+          addSecret(process.env.ATOMIC_STORAGE_TOKEN);
+          addUrlCredentials(process.env.ATOMIC_STORAGE_URL);
+
+          if (!command) throw new Error("Atomic command is required");
+          if (process.env.AWF_REFLECT_ENABLED !== "1") {
+            throw new Error("Atomic requires the AWF API proxy; direct credential authentication is not supported");
+          }
+          const storageToggle = (process.env.ATOMIC_STORAGE || "").trim().toLowerCase();
+          if (storageToggle !== "" && storageToggle !== "on" && storageToggle !== "off") {
+            throw new Error('ATOMIC_STORAGE must be "on" or "off" when set');
+          }
+          const envStorageUrl = (process.env.ATOMIC_STORAGE_URL || "").trim();
+          const useExternalStorage = storageToggle === "on" || (storageToggle === "" && envStorageUrl !== "");
+          let externalStorage;
+          if (useExternalStorage) {
+            if (stagingReadError) throw stagingReadError;
+            const rawUrl = (typeof stagedStorage?.url === "string" && storageToggle === "on" ? stagedStorage.url : envStorageUrl).trim();
+            const rawToken = (typeof stagedStorage?.token === "string" && storageToggle === "on" ? stagedStorage.token : process.env.ATOMIC_STORAGE_TOKEN || "").trim();
+            addSecret(rawToken);
+            addUrlCredentials(rawUrl);
+            if (!rawUrl) {
+              throw new Error("ATOMIC_STORAGE_URL is required when ATOMIC_STORAGE is on; configure the ATOMIC_STORAGE_URL Actions secret");
+            }
+            let parsedUrl;
+            try {
+              parsedUrl = new URL(rawUrl);
+            } catch {
+              throw new Error("ATOMIC_STORAGE_URL must use the libsql:, https:, wss:, or http: scheme");
+            }
+            if (!["libsql:", "https:", "wss:", "http:"].includes(parsedUrl.protocol) || !parsedUrl.hostname) {
+              throw new Error("ATOMIC_STORAGE_URL must use the libsql:, https:, wss:, or http: scheme");
+            }
+            if (parsedUrl.username || parsedUrl.password) {
+              throw new Error("ATOMIC_STORAGE_URL must not contain credentials; pass the token in ATOMIC_STORAGE_TOKEN");
+            }
+            for (const key of parsedUrl.searchParams.keys()) {
+              if (key.toLowerCase() === "authtoken") {
+                throw new Error("ATOMIC_STORAGE_URL must not include authToken; pass the token in ATOMIC_STORAGE_TOKEN");
+              }
+            }
+            if (/[\r\n\0]/.test(rawToken)) {
+              throw new Error("ATOMIC_STORAGE_TOKEN must be a single-line token");
+            }
+            if (parsedUrl.protocol !== "http:" && !rawToken) {
+              throw new Error(`ATOMIC_STORAGE_TOKEN is required for ${parsedUrl.protocol} storage URLs`);
+            }
+            const rawNamespace = process.env.ATOMIC_STORAGE_NAMESPACE;
+            let namespace = "";
+            if (rawNamespace !== undefined && rawNamespace !== "") {
+              namespace = rawNamespace.trim();
+              if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(namespace)) {
+                throw new Error("ATOMIC_STORAGE_NAMESPACE must be a non-empty simple name (letters, digits, underscores, and hyphens)");
+              }
+              if (parsedUrl.protocol === "wss:") {
+                throw new Error("ATOMIC_STORAGE_NAMESPACE requires a libsql:, https:, or http: URL");
+              }
+            }
+            const adapterPath = process.env.GH_AW_ATOMIC_STORAGE_ADAPTER || "/tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js";
+            if (!isAbsolute(adapterPath) || !existsSync(adapterPath)) {
+              throw new Error(`Atomic libSQL storage adapter was not found at ${adapterPath}; check the "Stage Atomic external storage" pre-agent step`);
+            }
+            const repository = (process.env.GITHUB_REPOSITORY || "").trim();
+            if (!/^[^/]+\/[^/]+$/.test(repository)) {
+              throw new Error("GITHUB_REPOSITORY is required in owner/repo format when Atomic external storage is enabled");
+            }
+            externalStorage = {
+              adapterPath,
+              url: rawUrl,
+              token: rawToken,
+              namespace,
+              prefix: `gh_aw_${repository.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`,
+            };
+          }
+          const selectedModel = process.env.ATOMIC_MODEL;
+          const separator = selectedModel?.indexOf("/") ?? -1;
+          if (separator <= 0 || !selectedModel.slice(separator + 1).trim()) {
+            throw new Error("ATOMIC_MODEL must use provider/model format");
+          }
+          const model = selectedModel.slice(separator + 1).trim();
+          const provider = process.env.GH_AW_LLM_PROVIDER;
+          if (!["github", "anthropic", "openai"].includes(provider)) {
+            throw new Error("GH_AW_LLM_PROVIDER must be github, anthropic, or openai");
+          }
+          const promptPath = process.env.GH_AW_PROMPT;
+          if (!promptPath) throw new Error("GH_AW_PROMPT is required");
+          const prompt = readFileSync(promptPath, "utf8");
+          if (!prompt.trim()) throw new Error("GH_AW_PROMPT must contain a non-empty instruction");
+          const reflected = await fetchAWFReflect({ logger: log });
+          if (!reflected.ok || !reflected.reflectData) throw new Error("Unable to discover the Atomic LLM endpoint from /reflect");
+          const endpoint = resolveProviderEndpointFromReflect({ provider, reflectData: reflected.reflectData, logger: log });
+          if (!endpoint || !REFLECT_PROVIDER_ALIASES[provider].has(normalizeReflectProviderName(endpoint.endpointProvider))) {
+            throw new Error(`No configured /reflect endpoint found for provider ${provider}`);
+          }
+          const reflectedEndpoint = reflected.reflectData.endpoints?.find(
+            entry => entry?.configured === true &&
+              normalizeReflectProviderName(entry.provider) === normalizeReflectProviderName(endpoint.endpointProvider)
+          );
+          if (typeof reflectedEndpoint?.models_url !== "string") {
+            throw new Error(`No configured /reflect models endpoint found for provider ${provider}`);
+          }
+          let baseUrl = deriveBaseUrlFromModelsURL(reflectedEndpoint.models_url);
+          const api = provider === "anthropic"
+            ? "anthropic-messages"
+            : inferWireApiForModel("openai", model) === "responses" ? "openai-responses" : "openai-completions";
+          // The Anthropic SDK appends /v1/messages itself.
+          if (provider === "anthropic") baseUrl = baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "");
+          const mcpPath = process.env.GH_AW_MCP_CONFIG;
+          const mcp = mcpPath ? JSON.parse(readFileSync(mcpPath, "utf8")) : { mcpServers: {} };
+          if (!mcp || !mcp.mcpServers || typeof mcp.mcpServers !== "object" || Array.isArray(mcp.mcpServers)) {
+            throw new Error("Atomic MCP configuration must contain an mcpServers object");
+          }
+          for (const server of Object.values(mcp.mcpServers)) {
+            for (const [name, value] of Object.entries(server?.headers || {})) {
+              if (typeof value !== "string" || !value.trim()) continue;
+              sensitiveValues.add(value);
+              sensitiveValues.add(value.trim());
+              if (name.toLowerCase() === "authorization") {
+                const bearer = /^Bearer\s+(.+)$/i.exec(value.trim());
+                if (bearer) sensitiveValues.add(bearer[1].trim());
+              }
+            }
+          }
+          mkdirSync("/tmp/gh-aw/agent", { recursive: true });
+          const agentDir = mkdtempSync("/tmp/gh-aw/agent/atomic-");
+          try {
+            const storeDir = process.env.GH_AW_ATOMIC_STORE_DIR || "/tmp/gh-aw/agent/atomic-store";
+            const sessionsDbPath = join(storeDir, "sessions.sqlite");
+            const sessionIdPath = join(storeDir, "session-id");
+            mkdirSync(storeDir, { recursive: true, mode: 0o700 });
+            const writeConfig = (name, value) => writeFileSync(join(agentDir, name), JSON.stringify(value), { mode: 0o600 });
+            writeConfig("models.json", {
+              providers: {
+                "awf-proxy": { baseUrl, api, apiKey: "awf-proxy", models: [{ id: model }] },
+              },
+            });
+            if (externalStorage) {
+              const tokenPath = join(agentDir, "storage-token");
+              if (externalStorage.token) writeFileSync(tokenPath, externalStorage.token, { mode: 0o600 });
+              writeConfig("settings.json", {
+                quietStartup: true,
+                enableAnalytics: false,
+                enableInstallTelemetry: false,
+                storage: {
+                  adapter: externalStorage.adapterPath,
+                  options: {
+                    url: externalStorage.url,
+                    ...(externalStorage.namespace ? { namespace: externalStorage.namespace } : {}),
+                  },
+                  ...(externalStorage.token ? { secrets: { authToken: { file: tokenPath } } } : {}),
+                  prefix: externalStorage.prefix,
+                },
+              });
+            } else {
+              writeConfig("settings.json", {
+                quietStartup: true,
+                enableAnalytics: false,
+                enableInstallTelemetry: false,
+                sessions: { storage: { path: sessionsDbPath } },
+                workflows: { journal: { path: join(storeDir, "journal.sqlite") } },
+              });
+            }
+            writeConfig("mcp.json", mcp);
+            const resumed = process.env.GH_AW_DURABLE_RESUMED === "true";
+            const forwardedArgs = (externalStorage || resumed) ? args.filter(arg => arg !== "--no-session") : [...args];
+            const sessionArgs = [];
+            if (resumed && !forwardedArgs.some(arg => ["--session", "--session-id", "--continue", "-c", "--no-session"].includes(arg))) {
+              const recordedSessionId = existsSync(sessionIdPath) ? readFileSync(sessionIdPath, "utf8").trim() : "";
+              if (/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(recordedSessionId)) {
+                sessionArgs.push("--session", recordedSessionId);
+              } else {
+                sessionArgs.push("--continue");
+              }
+            }
+            // Inherit runtime bindings, never arbitrary workflow secrets or execution hooks.
+            const env = {
+              ATOMIC_CODING_AGENT_DIR: agentDir,
+              PI_CODING_AGENT_DIR: agentDir,
+              ATOMIC_OFFLINE: "1",
+              ATOMIC_TELEMETRY: "0",
+              ATOMIC_WORKFLOW_ARTIFACT_DIR: join(storeDir, "runs"),
+            };
+            const conformanceSentinel = process.env.ENGINE_CONFORMANCE_SENTINEL;
+            if (conformanceSentinel) {
+              if (conformanceSentinel !== "conformance-atomic") {
+                throw new Error("ENGINE_CONFORMANCE_SENTINEL must be conformance-atomic when set");
+              }
+              env.ENGINE_CONFORMANCE_SENTINEL = "conformance-atomic";
+            }
+            for (const name of [
+              "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE",
+              "TZ", "TERM", "NO_COLOR", "CI", "HOSTALIASES",
+              "GITHUB_WORKSPACE", "GH_AW_ENGINE_CWD", "GH_AW_ENGINE_VERSION",
+              "GH_AW_MCP_CONFIG", "GH_AW_TOOL_TIMEOUT", "GH_AW_SAFE_OUTPUTS",
+              "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
+              "NO_PROXY", "no_proxy",
+            ]) {
+              if (process.env[name] !== undefined) env[name] = process.env[name];
+            }
+            for (const name of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
+              const value = process.env[name];
+              if (!value) continue;
+              let proxy;
+              try { proxy = new URL(value); } catch { throw new Error(`${name} must be a credential-free HTTP proxy URL`); }
+              if (!["http:", "https:"].includes(proxy.protocol) || proxy.username || proxy.password ||
+                  proxy.pathname !== "/" || proxy.search || proxy.hash) {
+                throw new Error(`${name} must be a credential-free HTTP proxy URL`);
+              }
+              env[name] = value;
+            }
+            const result = spawnSync(command, [...forwardedArgs, ...sessionArgs, "--provider", "awf-proxy", "--model", model], {
+              cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
+              env,
+              input: prompt,
+              stdio: ["pipe", "pipe", "pipe"],
+              maxBuffer: 64 * 1024 * 1024,
+            });
+            if (!externalStorage) {
+              try { recordLocalSessionId(sessionsDbPath, sessionIdPath); } catch {}
+            }
+            // A bounded capture failure may leave a credential split at the buffer boundary.
+            if (result.error?.code === "ENOBUFS") {
+              throw new Error("Atomic output exceeded the 64 MiB capture limit; incomplete output withheld");
+            }
+            const stdout = sanitize(result.stdout);
+            const stderr = sanitize(result.stderr);
+            process.stdout.write(stdout);
+            process.stderr.write(stderr);
+            if (result.error) throw result.error;
+            if (result.status !== 0) {
+              log(result.signal ? `Atomic terminated by signal ${result.signal}` : `Atomic exited with code ${result.status ?? "unknown"}`);
+              process.exitCode = result.status || 1;
+            }
+          } finally {
+            try {
+              const brokerPid = Number(readFileSync(join(agentDir, "intercom", "broker.pid"), "utf8").trim());
+              if (Number.isInteger(brokerPid) && brokerPid > 0) process.kill(brokerPid, "SIGTERM");
+            } catch {}
+            rmSync(agentDir, { recursive: true, force: true });
+          }
+        };
+        main().catch(error => {
+          try {
+            log(error instanceof Error ? error.message : String(error));
+          } catch {
+            process.stderr.write("[atomic-harness] Atomic output redaction failed; output withheld\n");
+          }
+          process.exitCode = 1;
+        });
     mcp:
       config-path: /tmp/gh-aw/atomic-mcp.json
       config-adapter: |
@@ -79,23 +461,150 @@ engine:
           };
         });
         writeSecureOutput("/tmp/gh-aw/atomic-mcp.json", JSON.stringify({ autoEnableCodemode: false, mcpServers: servers }, null, 2));
-    harness-script: |
-      const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
-      const { join } = require("path");
+    harness-script: |-
+      const { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
+      const { isAbsolute, join } = require("path");
       const { spawnSync } = require("child_process");
       const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
       const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...args] = process.argv.slice(2);
       const sensitiveValues = new Set();
+      const addSecret = value => {
+        if (typeof value !== "string" || !value) return;
+        sensitiveValues.add(value);
+        if (value.trim()) sensitiveValues.add(value.trim());
+      };
+      const addUrlCredentials = raw => {
+        if (typeof raw !== "string" || !raw) return;
+        const userinfo = /\/\/([^/?#]*)@/.exec(raw)?.[1];
+        if (userinfo) {
+          for (const part of userinfo.split(":")) {
+            try { addSecret(decodeURIComponent(part)); } catch {}
+            addSecret(part);
+          }
+        }
+        for (const match of raw.matchAll(/[?&]([^=&#]+)=([^&#]*)/g)) {
+          if (match[1].toLowerCase() === "authtoken") {
+            try { addSecret(decodeURIComponent(match[2])); } catch {}
+            addSecret(match[2]);
+          }
+        }
+      };
       const sanitize = output => redactArtifactMaskedValues(
         output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
       );
       const log = message => process.stderr.write(sanitize(`[atomic-harness] ${message}\n`));
+      const recordLocalSessionId = (sessionsDbPath, sessionIdPath) => {
+        if (!existsSync(sessionsDbPath)) return;
+        const { DatabaseSync } = require("node:sqlite");
+        const db = new DatabaseSync(sessionsDbPath, { readOnly: true });
+        try {
+          const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_sessions'").get();
+          if (!table) return;
+          const row = db.prepare("SELECT id FROM session_sessions WHERE internal = 0 ORDER BY modified_at DESC, rowid DESC LIMIT 1").get();
+          if (typeof row?.id === "string" && /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(row.id)) {
+            writeFileSync(sessionIdPath, `${row.id}\n`, { mode: 0o600 });
+          }
+        } finally {
+          db.close();
+        }
+      };
       const main = async () => {
+        const stagingPath = process.env.GH_AW_ATOMIC_STORAGE_STAGING || "/tmp/gh-aw/atomic-storage-staging.json";
+        let stagedStorage;
+        let stagingReadError;
+        try {
+          const rawStaging = readFileSync(stagingPath, "utf8");
+          addSecret(rawStaging);
+          try {
+            stagedStorage = JSON.parse(rawStaging);
+          } catch {
+            stagingReadError = new Error("Staged Atomic storage configuration is invalid JSON");
+          }
+        } catch (error) {
+          if (error?.code !== "ENOENT") stagingReadError = error;
+        } finally {
+          try {
+            unlinkSync(stagingPath);
+          } catch (error) {
+            if (error?.code !== "ENOENT") stagingReadError ??= error;
+          }
+        }
+        addSecret(stagedStorage?.token);
+        addUrlCredentials(stagedStorage?.url);
+        addSecret(process.env.ATOMIC_STORAGE_TOKEN);
+        addUrlCredentials(process.env.ATOMIC_STORAGE_URL);
+
         if (!command) throw new Error("Atomic command is required");
         if (process.env.AWF_REFLECT_ENABLED !== "1") {
           throw new Error("Atomic requires the AWF API proxy; direct credential authentication is not supported");
+        }
+        const storageToggle = (process.env.ATOMIC_STORAGE || "").trim().toLowerCase();
+        if (storageToggle !== "" && storageToggle !== "on" && storageToggle !== "off") {
+          throw new Error('ATOMIC_STORAGE must be "on" or "off" when set');
+        }
+        const envStorageUrl = (process.env.ATOMIC_STORAGE_URL || "").trim();
+        const useExternalStorage = storageToggle === "on" || (storageToggle === "" && envStorageUrl !== "");
+        let externalStorage;
+        if (useExternalStorage) {
+          if (stagingReadError) throw stagingReadError;
+          const rawUrl = (typeof stagedStorage?.url === "string" && storageToggle === "on" ? stagedStorage.url : envStorageUrl).trim();
+          const rawToken = (typeof stagedStorage?.token === "string" && storageToggle === "on" ? stagedStorage.token : process.env.ATOMIC_STORAGE_TOKEN || "").trim();
+          addSecret(rawToken);
+          addUrlCredentials(rawUrl);
+          if (!rawUrl) {
+            throw new Error("ATOMIC_STORAGE_URL is required when ATOMIC_STORAGE is on; configure the ATOMIC_STORAGE_URL Actions secret");
+          }
+          let parsedUrl;
+          try {
+            parsedUrl = new URL(rawUrl);
+          } catch {
+            throw new Error("ATOMIC_STORAGE_URL must use the libsql:, https:, wss:, or http: scheme");
+          }
+          if (!["libsql:", "https:", "wss:", "http:"].includes(parsedUrl.protocol) || !parsedUrl.hostname) {
+            throw new Error("ATOMIC_STORAGE_URL must use the libsql:, https:, wss:, or http: scheme");
+          }
+          if (parsedUrl.username || parsedUrl.password) {
+            throw new Error("ATOMIC_STORAGE_URL must not contain credentials; pass the token in ATOMIC_STORAGE_TOKEN");
+          }
+          for (const key of parsedUrl.searchParams.keys()) {
+            if (key.toLowerCase() === "authtoken") {
+              throw new Error("ATOMIC_STORAGE_URL must not include authToken; pass the token in ATOMIC_STORAGE_TOKEN");
+            }
+          }
+          if (/[\r\n\0]/.test(rawToken)) {
+            throw new Error("ATOMIC_STORAGE_TOKEN must be a single-line token");
+          }
+          if (parsedUrl.protocol !== "http:" && !rawToken) {
+            throw new Error(`ATOMIC_STORAGE_TOKEN is required for ${parsedUrl.protocol} storage URLs`);
+          }
+          const rawNamespace = process.env.ATOMIC_STORAGE_NAMESPACE;
+          let namespace = "";
+          if (rawNamespace !== undefined && rawNamespace !== "") {
+            namespace = rawNamespace.trim();
+            if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(namespace)) {
+              throw new Error("ATOMIC_STORAGE_NAMESPACE must be a non-empty simple name (letters, digits, underscores, and hyphens)");
+            }
+            if (parsedUrl.protocol === "wss:") {
+              throw new Error("ATOMIC_STORAGE_NAMESPACE requires a libsql:, https:, or http: URL");
+            }
+          }
+          const adapterPath = process.env.GH_AW_ATOMIC_STORAGE_ADAPTER || "/tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js";
+          if (!isAbsolute(adapterPath) || !existsSync(adapterPath)) {
+            throw new Error(`Atomic libSQL storage adapter was not found at ${adapterPath}; check the "Stage Atomic external storage" pre-agent step`);
+          }
+          const repository = (process.env.GITHUB_REPOSITORY || "").trim();
+          if (!/^[^/]+\/[^/]+$/.test(repository)) {
+            throw new Error("GITHUB_REPOSITORY is required in owner/repo format when Atomic external storage is enabled");
+          }
+          externalStorage = {
+            adapterPath,
+            url: rawUrl,
+            token: rawToken,
+            namespace,
+            prefix: `gh_aw_${repository.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`,
+          };
         }
         const selectedModel = process.env.ATOMIC_MODEL;
         const separator = selectedModel?.indexOf("/") ?? -1;
@@ -149,20 +658,61 @@ engine:
         mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         const agentDir = mkdtempSync("/tmp/gh-aw/agent/atomic-");
         try {
+          const storeDir = process.env.GH_AW_ATOMIC_STORE_DIR || "/tmp/gh-aw/agent/atomic-store";
+          const sessionsDbPath = join(storeDir, "sessions.sqlite");
+          const sessionIdPath = join(storeDir, "session-id");
+          mkdirSync(storeDir, { recursive: true, mode: 0o700 });
           const writeConfig = (name, value) => writeFileSync(join(agentDir, name), JSON.stringify(value), { mode: 0o600 });
           writeConfig("models.json", {
             providers: {
               "awf-proxy": { baseUrl, api, apiKey: "awf-proxy", models: [{ id: model }] },
             },
           });
-          writeConfig("settings.json", { quietStartup: true, enableAnalytics: false, enableInstallTelemetry: false });
+          if (externalStorage) {
+            const tokenPath = join(agentDir, "storage-token");
+            if (externalStorage.token) writeFileSync(tokenPath, externalStorage.token, { mode: 0o600 });
+            writeConfig("settings.json", {
+              quietStartup: true,
+              enableAnalytics: false,
+              enableInstallTelemetry: false,
+              storage: {
+                adapter: externalStorage.adapterPath,
+                options: {
+                  url: externalStorage.url,
+                  ...(externalStorage.namespace ? { namespace: externalStorage.namespace } : {}),
+                },
+                ...(externalStorage.token ? { secrets: { authToken: { file: tokenPath } } } : {}),
+                prefix: externalStorage.prefix,
+              },
+            });
+          } else {
+            writeConfig("settings.json", {
+              quietStartup: true,
+              enableAnalytics: false,
+              enableInstallTelemetry: false,
+              sessions: { storage: { path: sessionsDbPath } },
+              workflows: { journal: { path: join(storeDir, "journal.sqlite") } },
+            });
+          }
           writeConfig("mcp.json", mcp);
+          const resumed = process.env.GH_AW_DURABLE_RESUMED === "true";
+          const forwardedArgs = (externalStorage || resumed) ? args.filter(arg => arg !== "--no-session") : [...args];
+          const sessionArgs = [];
+          if (resumed && !forwardedArgs.some(arg => ["--session", "--session-id", "--continue", "-c", "--no-session"].includes(arg))) {
+            const recordedSessionId = existsSync(sessionIdPath) ? readFileSync(sessionIdPath, "utf8").trim() : "";
+            if (/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(recordedSessionId)) {
+              sessionArgs.push("--session", recordedSessionId);
+            } else {
+              sessionArgs.push("--continue");
+            }
+          }
           // Inherit runtime bindings, never arbitrary workflow secrets or execution hooks.
           const env = {
             ATOMIC_CODING_AGENT_DIR: agentDir,
             PI_CODING_AGENT_DIR: agentDir,
             ATOMIC_OFFLINE: "1",
             ATOMIC_TELEMETRY: "0",
+            ATOMIC_WORKFLOW_ARTIFACT_DIR: join(storeDir, "runs"),
           };
           const conformanceSentinel = process.env.ENGINE_CONFORMANCE_SENTINEL;
           if (conformanceSentinel) {
@@ -192,13 +742,16 @@ engine:
             }
             env[name] = value;
           }
-          const result = spawnSync(command, [...args, "--provider", "awf-proxy", "--model", model], {
+          const result = spawnSync(command, [...forwardedArgs, ...sessionArgs, "--provider", "awf-proxy", "--model", model], {
             cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
             env,
             input: prompt,
             stdio: ["pipe", "pipe", "pipe"],
             maxBuffer: 64 * 1024 * 1024,
           });
+          if (!externalStorage) {
+            try { recordLocalSessionId(sessionsDbPath, sessionIdPath); } catch {}
+          }
           // A bounded capture failure may leave a credential split at the buffer boundary.
           if (result.error?.code === "ENOBUFS") {
             throw new Error("Atomic output exceeded the 64 MiB capture limit; incomplete output withheld");
@@ -213,6 +766,10 @@ engine:
             process.exitCode = result.status || 1;
           }
         } finally {
+          try {
+            const brokerPid = Number(readFileSync(join(agentDir, "intercom", "broker.pid"), "utf8").trim());
+            if (Number.isInteger(brokerPid) && brokerPid > 0) process.kill(brokerPid, "SIGTERM");
+          } catch {}
           rmSync(agentDir, { recursive: true, force: true });
         }
       };
@@ -235,6 +792,8 @@ Import this definition and select a concrete provider/model ID:
 ```yaml
 engine:
   id: atomic
+  durable:
+    retention-days: 7
 model: copilot/gpt-5.3-codex
 imports:
   - shared/atomic.md
@@ -276,7 +835,16 @@ incomplete output. Logs appear after the process exits rather than streaming.
 This known-value masking does not contain the agent or cover arbitrary encodings,
 partial credentials, other secrets, or files the agent writes.
 
-Startup network checks, telemetry, saved sessions, and themes are disabled.
+Every run saves Atomic sessions and workflow runs under `/tmp/gh-aw/agent/atomic-store`.
+Enable `engine.durable` so gh-aw snapshots that folder into a checkpoint artifact,
+restores it on the next run, and tells the harness to continue the saved root session.
+To keep sessions and workflow runs past artifact expiry, inspect them from your own
+machine, or route Intercom messages across runners, set `ATOMIC_STORAGE: "on"` in
+`engine.env` with `ATOMIC_STORAGE_URL` and `ATOMIC_STORAGE_TOKEN` secrets for Turso or
+a self-hosted `sqld` server; see
+[Atomic sessions and workflow runs](/gh-aw/reference/third-party-agent/#atomic-sessions-and-workflow-runs).
+
+Startup network checks, telemetry, and themes are disabled.
 Everything else in Atomic is on, minus its one interactive tool. `--approve`
 loads the repository's `.atomic/` extensions, workflows, skills, prompt
 templates, and settings, so a repository can add custom tools, workflows, and

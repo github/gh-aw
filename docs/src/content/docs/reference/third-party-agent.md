@@ -54,7 +54,7 @@ These definitions are examples for integration authors, **not supported gh-aw en
 
 | Sample | Runtime and limitations |
 | --- | --- |
-| Atomic | Pins `@bastani/atomic` 0.9.79 with npm lifecycle scripts disabled. Uses AWF-only Copilot, Anthropic, or OpenAI/Codex inference, stdin prompts, private temporary configuration, and native authenticated HTTP MCP with direct tool exposure. The child environment allowlists runtime bindings and credential-free proxy addresses; arbitrary workflow secrets and execution hooks are not inherited. Startup network checks, telemetry, saved sessions, and project-local configuration are disabled; the isolated agent directory excludes user-installed extensions. Gateway MCP policies, including GitHub integrity and repository restrictions, remain enforced. Native bash restrictions and `edit: false` fail compilation. No native gh-aw tool allowlists, iteration limits, Agent Plugins, custom Atomic process workflows, or structured session parsing. |
+| Atomic | Pins `@bastani/atomic` 0.9.79 with npm lifecycle scripts disabled. Uses AWF-only Copilot, Anthropic, or OpenAI/Codex inference, stdin prompts, private temporary configuration, and native authenticated HTTP MCP with direct tool exposure. The child environment allowlists runtime bindings and credential-free proxy addresses; arbitrary workflow secrets and execution hooks are not inherited. Startup network checks, telemetry, and themes are disabled; `--approve` loads base-restored `.atomic/` extensions, workflows, skills, prompt templates, and settings while the isolated agent directory excludes user-installed extensions. Saves sessions and workflow runs under `/tmp/gh-aw/agent/atomic-store` with `engine.durable` checkpoint continuation and optional libSQL (`@bastani/atomic-storage-libsql@0.9.79`) storage. Gateway MCP policies, including GitHub integrity and repository restrictions, remain enforced. Native bash restrictions and `edit: false` fail compilation. No native gh-aw tool allowlists, iteration limits, Agent Plugins, or structured session parsing. |
 | OpenCode | Installs OpenCode 2 from `@opencode/cli`, uses `--standalone`, native MCP with Code Mode disabled, and JSONL events. Copilot requires AWF; direct Anthropic/OpenAI BYOK is supported without it. Repository JSON/JSONC settings are overlaid; updates/sharing are disabled. V2 has no language servers, and V1 plugins require porting. Native npm plugins are not gh-aw Agent Plugins. |
 | DeepSeek Harness | Pins `dsh` v0.2.0-rc.2. Uses headless stdin prompts, a private per-run configuration patch, and CLI-proxy tools rather than native MCP. Copilot requires AWF; direct Anthropic/OpenAI credentials apply only without AWF. Per-command native bash restrictions are rejected. No native reasoning, tool, refusal, or token-accounting observations are inferred from stdout. |
 | Factory Droid | Pins `@factory/cli` 0.248.0 with lifecycle scripts disabled. Uses custom models through the AWF API proxy with placeholder credentials; real provider and Factory keys are excluded from the agent. Supports Copilot, Anthropic, and OpenAI inference, file-based prompts, high autonomy inside the sandbox, and native HTTP MCP. Native MCP retains the gateway session authorization in agent-readable `.factory/mcp.json`; this is not an upstream provider credential or a security boundary against the agent (see [gateway authentication](/gh-aw/reference/mcp-gateway/#71-authorization-header-format)). Removing it prevents authenticated MCP calls. No Factory API key is required. Factory-managed inference, direct-key execution, structured session parsing, gh-aw tool allowlists, max-turn enforcement, and Agent Plugins are unsupported. |
@@ -63,6 +63,83 @@ These definitions are examples for integration authors, **not supported gh-aw en
 | mini-SWE-agent | Pins PyPI 2.4.6 on Python 3.12. Uses the non-interactive Python API, text-based shell actions, file-based prompts, and AWF-only Copilot, OpenAI/Codex, or Anthropic inference. Native task submission is required for success; `max-turns` limits model calls. Tools use CLI proxies, not native MCP. The untrusted native trajectory is retained in the unified agent artifact only after secret redaction and recovery-envelope validation, including failed executions. No native shell allowlists, edit disabling, Agent Plugins, repository mini configuration, or structured session parser. |
 
 Read the pinned definition for its exact install and provider contract. Native events and accounting are retained only when observed; process exit zero alone does not prove task completion.
+
+### Atomic sessions and workflow runs
+
+Every Atomic run saves its sessions, workflow journal, and workflow run artifacts in `/tmp/gh-aw/agent/atomic-store`. Subagents, workflow stages, and `history://` share that store during the job. On a run without `engine.durable` (such as a `workflow_call` or `work-queue` worker), that folder is deleted with the runner when the job ends, and only the redacted plain-text output log stays in the `agent` artifact.
+
+Every standalone Atomic workflow should turn on `engine.durable` so sessions and workflow runs carry across runs:
+
+```yaml wrap
+engine:
+  id: atomic
+  durable:
+    retention-days: 7
+```
+
+With `engine.durable` set:
+
+- After the agent exits, gh-aw checks `/tmp/gh-aw/agent/atomic-store` for credentials and uploads it as a checkpoint artifact kept for `retention-days` (1 to 90, default 7, capped by repository and organization retention settings).
+- On the next run on the same branch, or from an explicit `aw_context` parent run, gh-aw restores `/tmp/gh-aw/agent/atomic-store` before Atomic starts. The harness reads the saved root session ID and passes `--session <id>` so Atomic continues that conversation (`--continue` if no session ID file is present).
+- Interrupted Atomic workflow runs stay in the restored journal. The harness does not resume workflow runs on its own, so the agent can inspect and resume them with the `workflow` tool.
+
+Durable checkpoint artifacts hold restorable session history, including prompts, tool output, and file contents the agent read. Anyone who can download workflow artifacts in the repository can read them, and secret redaction is heuristic. Turn on `engine.durable` only where that fits your repository's artifact access and retention rules. Because `--approve` loads `.atomic/settings.json`, leave `storage`, `sessions.storage`, and `workflows.journal` out of `.atomic/settings.json` so repository settings do not redirect sessions and workflow runs away from `/tmp/gh-aw/agent/atomic-store`.
+
+#### Use Turso or your own sqld server (optional)
+
+Point Atomic at a libSQL database (Turso or a self-hosted `sqld` server) when artifact checkpoints are not enough:
+
+- Every session and workflow run stays past GitHub Actions artifact expiry, even if a job is cancelled or a runner is lost before artifact upload. Join the same database from your machine to search history with `history://`, inspect runs with `/workflow status`, or resume a session with `/resume`.
+- A workflow run cut off by a timeout or a cancelled job can be resumed from your machine or from a later run. Atomic gives each run one executor at a time. Once the owner has stopped renewing its lease for about two minutes, any machine can take the run over, and two machines resuming at once cannot both win.
+- Concurrent runs can message each other with Intercom, and so can your own Atomic sessions. Brokers exchange messages through the database, so runners need no network path to each other or to you. Sessions of the same repository share the group `project:<owner>/<repo>`; other repositories in the same database cannot list or message them.
+
+##### Set up Turso
+
+```bash
+turso db create gh-aw-atomic
+gh secret set ATOMIC_STORAGE_URL --body "$(turso db show gh-aw-atomic --url)"
+turso db tokens create gh-aw-atomic | gh secret set ATOMIC_STORAGE_TOKEN
+```
+
+When the `ATOMIC_STORAGE_URL` secret is present, a pre-agent step installs `@bastani/atomic-storage-libsql@0.9.79` before AWF starts and stages the credentials in a private file. Enable external storage on a workflow with `ATOMIC_STORAGE: "on"` in `engine.env` and allow the database host through the firewall:
+
+```yaml wrap
+engine:
+  id: atomic
+  durable:
+    retention-days: 7
+  env:
+    ATOMIC_STORAGE: "on"
+network:
+  allowed:
+    - defaults
+    - gh-aw-atomic-<org>.turso.io
+```
+
+Workflows in the same repository that omit `ATOMIC_STORAGE: "on"` delete the staging file before Atomic starts and keep using `/tmp/gh-aw/agent/atomic-store`.
+
+##### Use your own sqld server
+
+`sqld` is the libSQL server, a SQLite-compatible database you can host yourself. Save its address (`libsql://`, `https://`, or `wss://`) in the `ATOMIC_STORAGE_URL` secret and a token it accepts in `ATOMIC_STORAGE_TOKEN`, then set `ATOMIC_STORAGE: "on"` in `engine.env`. If the server runs with `--enable-namespaces`, also set `ATOMIC_STORAGE_NAMESPACE` in `engine.env` (supported with `libsql://`, `https://`, and `http://` URLs); each namespace is a separate database with its own token. A plain `http://` URL without a token works for a server without authentication on a private network, for example from self-hosted runners, but the traffic is not encrypted. Add the server's host to `network.allowed`.
+
+##### Read CI runs from your machine
+
+The harness stores each repository's data under the prefix `gh_aw_<owner>_<repo>`, lowercased, with every character other than a letter, digit, or underscore replaced by `_`. Join the database with the same prefix:
+
+```bash
+atomic install npm:@bastani/atomic-storage-libsql
+atomic storage join "$(turso db show gh-aw-atomic --url)" --token-file turso-token --prefix gh_aw_<owner>_<repo>
+```
+
+This points your global Atomic settings at the shared database. To go back to your local store, remove the `storage` setting from `~/.atomic/agent/settings.json`.
+
+##### Before you turn it on
+
+- The agent can read files in its own agent directory, including the token. Create a token for this one database and rotate it on a schedule.
+- Anyone with the token can read every saved session: prompts, tool output, and the file contents the agent read. Protect the database as you would the repository's logs.
+- Intercom message bodies stay in the database until shortly after delivery.
+- Because `--approve` loads `.atomic/settings.json`, a `storage`, `sessions.storage`, or `workflows.journal` setting in `.atomic/settings.json` overrides the harness's database for sessions and workflow runs while Intercom keeps using the shared database. Leave those keys out of `.atomic/settings.json`.
+- If the database is unreachable, the run fails. Atomic never falls back to a temporary store.
 
 ### mini-SWE-agent package access
 
