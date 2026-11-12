@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parsePiLog } from "./parse_pi_log.cjs";
 import { transformPiV3Entries, computePiV3Stats } from "./pi_session.cjs";
+import { atomicWorkflowStream } from "./fixtures/atomic_ci_stream.cjs";
 import { success, failure, childObservations } from "./fixtures/pi_ci_stream.cjs";
 import { normalizeAgentSession, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
 import { mergeSessionSources } from "./unified_session.cjs";
@@ -883,51 +884,7 @@ describe("Pi CI stream regressions", () => {
   });
 
   it("keeps multi-turn assistant messages and accounting separate when a proxy reuses responseId across turns", () => {
-    const call = { type: "toolCall", id: "call_1", name: "workflow", arguments: { action: "list" } };
-    const firstTurn = {
-      role: "assistant",
-      content: [call],
-      model: "mock-model",
-      timestamp: 100,
-      responseId: "1",
-      stopReason: "toolUse",
-      usage: { input: 5, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 7, cost: { total: 0 } },
-    };
-    const toolResult = { role: "toolResult", toolCallId: "call_1", toolName: "workflow", content: [{ type: "text", text: '{"action":"list","items":[]}' }], isError: false, timestamp: 150 };
-    const secondTurn = {
-      role: "assistant",
-      content: [{ type: "text", text: "listed" }],
-      model: "mock-model",
-      timestamp: 200,
-      responseId: "1",
-      stopReason: "stop",
-      usage: { input: 5, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 7, cost: { total: 0 } },
-    };
-    const records = [
-      { type: "session", version: 4, id: "reused-response-id", createdAt: "2026-11-12T02:45:30.124Z", cwd: "/workspace/repo" },
-      { type: "agent_start" },
-      { type: "turn_start" },
-      { type: "message_start", message: { ...firstTurn, usage: { input: 0, output: 0, totalTokens: 0 } } },
-      { type: "message_update", assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, id: "call_1", toolName: "workflow" } },
-      { type: "message_update", assistantMessageEvent: { type: "toolcall_delta", contentIndex: 0, delta: '{"action":"list"}' } },
-      { type: "message_update", assistantMessageEvent: { type: "toolcall_end", contentIndex: 0, toolCall: call } },
-      { type: "message_end", message: firstTurn },
-      { type: "tool_execution_start", toolCallId: "call_1", toolName: "workflow", args: call.arguments },
-      { type: "tool_execution_end", toolCallId: "call_1", toolName: "workflow", result: { content: toolResult.content }, isError: false, durationMs: 63 },
-      { type: "message_start", message: toolResult },
-      { type: "message_end", message: toolResult },
-      { type: "turn_end", message: firstTurn, toolResults: [toolResult] },
-      { type: "turn_start" },
-      { type: "message_start", message: { ...secondTurn, usage: { input: 0, output: 0, totalTokens: 0 } } },
-      { type: "message_update", assistantMessageEvent: { type: "text_start", contentIndex: 0 } },
-      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "listed" } },
-      { type: "message_update", assistantMessageEvent: { type: "text_end", contentIndex: 0, content: "listed" } },
-      { type: "message_end", message: secondTurn },
-      { type: "turn_end", message: secondTurn, toolResults: [] },
-      { type: "agent_end", messages: [firstTurn, toolResult, secondTurn] },
-      { type: "agent_settled", aborted: false },
-    ];
-    const { logEntries, markdown } = parse(records);
+    const { logEntries, markdown } = parse(atomicWorkflowStream);
     expect(byType(logEntries, "assistant.message").map(event => event.data.content)).toEqual(["listed"]);
     expect(byType(logEntries, "assistant.message")[0].data).not.toHaveProperty("nativeSnapshots");
     expect(byType(logEntries, "tool.execution_start")[0].data).not.toHaveProperty("nativeSnapshots");
@@ -936,6 +893,67 @@ describe("Pi CI stream regressions", () => {
       sourceEngine: "pi",
       numTurns: 2,
       usage: { input_tokens: 10, output_tokens: 4, total_tokens: 14 },
+    });
+  });
+
+  it("projects session header createdAt onto session.init.timestamp only when no primary clock is present", () => {
+    const [fromTimestamp] = transformPiV3Entries([{ type: "session", version: 3, id: "v3-timed", timestamp: "2026-07-14T08:25:33.707Z", createdAt: "2026-07-14T09:00:00.000Z", cwd: "/repo" }]);
+    expect(fromTimestamp).toMatchObject({
+      type: "session.init",
+      timestamp: "2026-07-14T08:25:33.707Z",
+      data: { sourceEngine: "pi", sessionId: "v3-timed", cwd: "/repo" },
+    });
+
+    const [untimed] = transformPiV3Entries([{ type: "session", version: 3, id: "v3-untimed", cwd: "/repo" }]);
+    expect(untimed).toMatchObject({
+      type: "session.init",
+      data: { sourceEngine: "pi", sessionId: "v3-untimed", cwd: "/repo" },
+    });
+    expect(untimed).not.toHaveProperty("timestamp");
+
+    const [fromCreatedAt] = transformPiV3Entries([{ type: "session", version: 4, id: "v4-created-at", createdAt: "2026-11-12T02:45:30.124Z", cwd: "/repo" }]);
+    expect(fromCreatedAt).toMatchObject({
+      type: "session.init",
+      timestamp: "2026-11-12T02:45:30.124Z",
+      data: { sourceEngine: "pi", sessionId: "v4-created-at", cwd: "/repo" },
+    });
+  });
+
+  it("falls back to the open assistantState at agent_end when the trailing partial message has no responseId", () => {
+    const firstTurn = {
+      role: "assistant",
+      responseId: "turn-1",
+      model: "mock-model",
+      content: [{ type: "text", text: "first turn" }],
+      usage: { input: 3, output: 2 },
+    };
+    const followUp = { role: "user", content: [{ type: "text", text: "follow up" }] };
+    const trailingSnapshotWithoutId = {
+      role: "assistant",
+      model: "mock-model",
+      content: [{ type: "text", text: "partial second turn completed" }],
+      usage: { input: 4, output: 5 },
+    };
+    const records = [
+      { type: "turn_start" },
+      { type: "message_start", message: { ...firstTurn, usage: { input: 0, output: 0 } } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "first turn" } },
+      { type: "message_end", message: firstTurn },
+      { type: "turn_end", message: firstTurn, toolResults: [] },
+      { type: "turn_start" },
+      { type: "message_end", message: followUp },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "partial second turn" } },
+      {
+        type: "agent_end",
+        messages: [{ ...firstTurn, stopReason: "stop" }, followUp, trailingSnapshotWithoutId],
+      },
+    ];
+    const { logEntries } = parse(records);
+    expect(byType(logEntries, "assistant.message").map(event => event.data.content)).toEqual(["first turn", "partial second turn completed"]);
+    expect(selectSessionResult(logEntries)).toMatchObject({
+      sourceEngine: "pi",
+      numTurns: 2,
+      usage: { input_tokens: 7, output_tokens: 7 },
     });
   });
 });

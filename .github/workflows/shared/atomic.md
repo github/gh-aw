@@ -88,12 +88,12 @@ engine:
 
       const [command, ...args] = process.argv.slice(2);
       const sensitiveValues = new Set();
-      const sanitizeStdout = output => redactArtifactMaskedValues(
-        output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]"
-      );
       const sanitizeText = output => redactArtifactMaskedValues(
         output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
       );
+      const sanitizeStdout = output => sanitizeText(redactArtifactMaskedValues(
+        output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]"
+      ));
       const log = message => process.stderr.write(sanitizeText(`[atomic-harness] ${message}\n`));
       const main = async () => {
         if (!command) throw new Error("Atomic command is required");

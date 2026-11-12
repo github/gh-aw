@@ -546,6 +546,7 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event, { source
     } else if (raw.type === "agent_end") {
       const consumed = new Set();
       const consumedStates = new Set();
+      const openAssistantState = assistantState;
       const messages = raw.messages ?? [];
       const lastAssistant = messages.findLastIndex(message => message?.role === "assistant");
       for (const [position, message] of messages.entries()) {
@@ -556,9 +557,12 @@ function transformPiV3Entries(records, mapLegacyEvent = event => event, { source
           emitMessage(raw, message, snapshots[index].state);
           continue;
         }
+        // Prefer matching by message identity in turn order so modified snapshots from earlier
+        // turns reconcile against their own turn state even after assistantState advances;
+        // fall back to the open assistantState only for an unidentifiable trailing partial turn.
         const messageID = messageIdentity(message);
         const byIdentity = messageID !== undefined ? identityStates.get(messageID)?.find(candidate => !consumedStates.has(candidate)) : undefined;
-        const selectedState = byIdentity ?? (partialAssistant && position === lastAssistant ? assistantState : newMessageState());
+        const selectedState = byIdentity ?? (partialAssistant && position === lastAssistant && !consumedStates.has(openAssistantState) ? openAssistantState : newMessageState());
         consumedStates.add(selectedState);
         emitMessage(raw, message, selectedState);
       }
