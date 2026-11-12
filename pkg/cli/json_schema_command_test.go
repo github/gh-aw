@@ -5,6 +5,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -335,6 +336,7 @@ func TestGeneratedOutputSchemasPairSteeringTriggerAndThreshold(t *testing.T) {
 		name      string
 		trigger   string
 		threshold any
+		fields    map[string]any
 		valid     bool
 	}{
 		{name: "threshold with percentage", trigger: "threshold", threshold: 95, valid: true},
@@ -342,6 +344,9 @@ func TestGeneratedOutputSchemasPairSteeringTriggerAndThreshold(t *testing.T) {
 		{name: "threshold with null", trigger: "threshold", threshold: nil},
 		{name: "threshold with unknown percentage", trigger: "threshold", threshold: 85},
 		{name: "little_left with percentage", trigger: "little_left", threshold: 80},
+		{name: "unknown type", trigger: "threshold", threshold: 95, fields: map[string]any{"type": "token"}},
+		{name: "malformed conversation", trigger: "threshold", threshold: 95, fields: map[string]any{"conversation": "NOT-A-KEY"}},
+		{name: "null conversation", trigger: "threshold", threshold: 95, fields: map[string]any{"conversation": nil}, valid: true},
 	}
 
 	for schemaName, output := range outputs {
@@ -368,6 +373,7 @@ func TestGeneratedOutputSchemasPairSteeringTriggerAndThreshold(t *testing.T) {
 					t.Fatalf("unmarshal %s output: %v", schemaName, err)
 				}
 				candidate := map[string]any{"type": "ai_credit", "trigger": delivery.trigger, "threshold": delivery.threshold, "conversation": "0123456789ab", "first": true}
+				maps.Copy(candidate, delivery.fields)
 				if replaced := replaceSteeringDeliveries(value, candidate); replaced == 0 {
 					t.Fatalf("%s output has no steering_deliveries", schemaName)
 				}

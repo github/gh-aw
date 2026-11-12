@@ -533,8 +533,6 @@ func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
 	}
 }
 
-// buildRunData converts a processed run into RunData while accumulating rollup totals.
-// localRepo guards against cross-repo misclassification of intentional-failure workflows.
 // applyRunDataSteering copies the AWF steering notices and notice deliveries read
 // from the unified session onto a run's JSON record.
 func applyRunDataSteering(runData *RunData, summary *TokenUsageSummary) {
@@ -543,6 +541,8 @@ func applyRunDataSteering(runData *RunData, summary *TokenUsageSummary) {
 	runData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(summary)
 }
 
+// buildRunData converts a processed run into RunData while accumulating rollup totals.
+// localRepo guards against cross-repo misclassification of intentional-failure workflows.
 func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo string, agg *logsAggregate, classifyLocal bool) RunData {
 	if pr.cachedData != nil {
 		agg.accumulateCachedRunTotals(*pr.cachedData)

@@ -750,7 +750,7 @@ function isSteeringExcludedPath(requestPath) {
   try {
     pathname = new URL(requestPath, "https://localhost").pathname.replace(/\/+$/, "");
   } catch {
-    return true;
+    return false;
   }
   return pathname.endsWith("/decisions") || /(?:\/(?:count[_-]tokens|input_tokens)|:countTokens)(?::(?:rawPredict|streamRawPredict))?$/i.test(pathname) || pathname.endsWith("/responses/compact");
 }

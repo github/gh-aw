@@ -174,22 +174,8 @@ func (d *TokenUsageSteeringDelivery) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON writes the delivery in AWF's token-usage.jsonl form, with a null
-// threshold for little_left notices and a null conversation when it is unknown.
-func (d TokenUsageSteeringDelivery) MarshalJSON() ([]byte, error) {
-	out := struct {
-		Type         string  `json:"type"`
-		Trigger      string  `json:"trigger"`
-		Threshold    *int    `json:"threshold"`
-		Conversation *string `json:"conversation"`
-		First        bool    `json:"first"`
-	}{Type: d.Type, Trigger: d.Trigger, First: d.First}
-	out.Threshold, out.Conversation = d.thresholdAndConversation()
-	return json.Marshal(out)
-}
-
-// thresholdAndConversation returns the delivery threshold and conversation as
-// optional values: nil for a little_left threshold or an unkeyed conversation.
+// thresholdAndConversation returns report values: nil for a little_left
+// threshold or an unkeyed conversation.
 func (d TokenUsageSteeringDelivery) thresholdAndConversation() (*int, *string) {
 	var threshold *int
 	if d.Trigger != steeringTriggerLittleLeft {

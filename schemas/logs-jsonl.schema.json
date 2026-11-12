@@ -3192,7 +3192,11 @@
                     "type": "object",
                     "properties": {
                       "type": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                          "ai_credit",
+                          "timeout"
+                        ]
                       },
                       "trigger": {
                         "type": "string"
@@ -3207,7 +3211,8 @@
                         "type": [
                           "null",
                           "string"
-                        ]
+                        ],
+                        "pattern": "^[0-9a-f]{12}$"
                       },
                       "first": {
                         "type": "boolean"
@@ -3331,7 +3336,11 @@
                 "type": "object",
                 "properties": {
                   "type": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                      "ai_credit",
+                      "timeout"
+                    ]
                   },
                   "trigger": {
                     "type": "string"
@@ -3346,7 +3355,8 @@
                     "type": [
                       "null",
                       "string"
-                    ]
+                    ],
+                    "pattern": "^[0-9a-f]{12}$"
                   },
                   "first": {
                     "type": "boolean"
@@ -6047,7 +6057,11 @@
                     "type": "object",
                     "properties": {
                       "type": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                          "ai_credit",
+                          "timeout"
+                        ]
                       },
                       "trigger": {
                         "type": "string"
@@ -6062,7 +6076,8 @@
                         "type": [
                           "null",
                           "string"
-                        ]
+                        ],
+                        "pattern": "^[0-9a-f]{12}$"
                       },
                       "first": {
                         "type": "boolean"
@@ -6612,7 +6627,11 @@
                         "type": "object",
                         "properties": {
                           "type": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "ai_credit",
+                              "timeout"
+                            ]
                           },
                           "trigger": {
                             "type": "string"
@@ -6627,7 +6646,8 @@
                             "type": [
                               "null",
                               "string"
-                            ]
+                            ],
+                            "pattern": "^[0-9a-f]{12}$"
                           },
                           "first": {
                             "type": "boolean"

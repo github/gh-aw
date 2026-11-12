@@ -4,11 +4,10 @@ package cli
 
 import (
 	"encoding/json"
-	"io"
 	"maps"
-	"os"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -117,17 +116,24 @@ func TestAnalyzeTokenUsageSteeringDeliveries(t *testing.T) {
 	})
 }
 
-func TestTokenUsageSteeringDeliveryJSONRoundTrip(t *testing.T) {
-	for _, raw := range []string{
-		`{"type":"ai_credit","trigger":"threshold","threshold":95,"conversation":"0123456789ab","first":false}`,
-		`{"type":"timeout","trigger":"little_left","threshold":null,"conversation":null,"first":true}`,
+func TestTokenUsageSteeringDeliveryJSONDecode(t *testing.T) {
+	for _, tt := range []struct {
+		raw  string
+		want TokenUsageSteeringDelivery
+	}{
+		{
+			raw:  `{"type":"ai_credit","trigger":"threshold","threshold":95,"conversation":"0123456789ab","first":false}`,
+			want: TokenUsageSteeringDelivery{Type: "ai_credit", Trigger: steeringTriggerThreshold, Threshold: 95, Conversation: "0123456789ab"},
+		},
+		{
+			raw:  `{"type":"timeout","trigger":"little_left","threshold":null,"conversation":null,"first":true}`,
+			want: TokenUsageSteeringDelivery{Type: "timeout", Trigger: steeringTriggerLittleLeft, First: true},
+		},
 	} {
 		var entry TokenUsageEntry
-		require.NoError(t, json.Unmarshal([]byte(`{"event":"token_usage","steering_delivery":`+raw+`}`), &entry))
-		require.True(t, entry.SteeringDelivery.valid(), raw)
-		encoded, err := json.Marshal(entry.SteeringDelivery)
-		require.NoError(t, err)
-		assert.JSONEq(t, raw, string(encoded))
+		require.NoError(t, json.Unmarshal([]byte(`{"event":"token_usage","steering_delivery":`+tt.raw+`}`), &entry))
+		require.True(t, entry.SteeringDelivery.valid(), tt.raw)
+		assert.Equal(t, &tt.want, entry.SteeringDelivery)
 	}
 	var entry TokenUsageEntry
 	require.NoError(t, json.Unmarshal([]byte(`{"event":"token_usage","request_id":"old","input_tokens":3}`), &entry), "records without steering_delivery decode")
@@ -158,7 +164,7 @@ func TestGatewaySteeringEventsLittleLeft(t *testing.T) {
 }
 
 func TestRenderConsoleSteeringDeliveries(t *testing.T) {
-	output := captureStderrForSteeringDeliveries(t, func() {
+	output := testutil.CaptureStderr(t, func() {
 		renderConsoleSteeringDeliveries([]SteeringDelivery{
 			{Type: "ai_credit", Trigger: "threshold", Threshold: new(80), Conversation: new("0123456789ab"), First: true, RequestID: "req-2", Phase: "agent"},
 			{Type: "timeout", Trigger: "little_left", RequestID: "det-1", Phase: "detection"},
@@ -171,7 +177,7 @@ func TestRenderConsoleSteeringDeliveries(t *testing.T) {
 }
 
 func TestRenderConsoleSteeringOutputEscapesControlCharacters(t *testing.T) {
-	output := captureStderrForSteeringDeliveries(t, func() {
+	output := testutil.CaptureStderr(t, func() {
 		renderConsoleSteeringDeliveries([]SteeringDelivery{
 			{Type: "ai_credit\x1b[2J", Trigger: "threshold", Threshold: new(80), Conversation: new("\x1b]52;c;aGk=\a"), RequestID: "req-\x1b[31mred\x1b[0m", Phase: "det\x1bection"},
 		})
@@ -182,18 +188,4 @@ func TestRenderConsoleSteeringOutputEscapesControlCharacters(t *testing.T) {
 	assert.NotContains(t, output, "\x1b")
 	assert.NotContains(t, output, "\a")
 	assert.Contains(t, output, `request_id=req-'\x1b'[31mred'\x1b'[0m`)
-}
-
-func captureStderrForSteeringDeliveries(t *testing.T, render func()) string {
-	t.Helper()
-	original := os.Stderr
-	reader, writer, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stderr = writer
-	defer func() { os.Stderr = original }()
-	render()
-	require.NoError(t, writer.Close())
-	output, err := io.ReadAll(reader)
-	require.NoError(t, err)
-	return string(output)
 }

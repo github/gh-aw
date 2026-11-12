@@ -165,6 +165,12 @@ func constrainSteeringDeliverySchema(schema *jsonschema.Schema) {
 	}
 	if deliveries, ok := schema.Properties["steering_deliveries"]; ok && deliveries.Items != nil {
 		item := deliveries.Items
+		if steeringType, hasType := item.Properties["type"]; hasType {
+			steeringType.Enum = []any{"ai_credit", "timeout"}
+		}
+		if conversation, hasConversation := item.Properties["conversation"]; hasConversation {
+			conversation.Pattern = "^[0-9a-f]{12}$"
+		}
 		if _, hasTrigger := item.Properties["trigger"]; hasTrigger {
 			if _, hasThreshold := item.Properties["threshold"]; hasThreshold {
 				item.OneOf = []*jsonschema.Schema{
