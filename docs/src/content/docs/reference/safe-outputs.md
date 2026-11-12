@@ -96,6 +96,8 @@ are submitted together; other dependents still wait for publication. If the
 review cannot run, its buffered batch is not submitted without the review.
 If a required inline comment cannot be anchored, the batch fails instead of
 falling back to a review without that comment.
+Avoid indirect cycles too: a review cannot wait for an output that itself
+requires publication of a comment in that same review.
 
 Dependencies apply within a single safe-output processing pass (and within the
 same Claim in queue workflows). Custom safe jobs, `call_workflow`,
