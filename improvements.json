@@ -1,6 +1,18 @@
 {
-  "last_updated": "2026-11-11",
+  "last_updated": "2026-11-12",
   "pending_tasks": [
+    {
+      "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
+      "created": "2026-11-12",
+      "status": "pending",
+      "issue": "newInvalidDependencyNameError (line 154) hardcodes 'Example: dependencies: [requests]' for all package managers; pass manager and example per call site"
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "created": "2026-11-12",
+      "status": "pending",
+      "issue": "Compile help line 265 'Unlike gh aw upgrade...' sentence sits inside the action-mode section; move it next to the --fix flag description"
+    },
     {
       "file": "cmd/gh-aw/main.go",
       "created": "2026-11-11",

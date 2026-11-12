@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-12",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/arc-dind-copilot-agent.md",
+      "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-creative-culture.md"
+    ],
+    "cli": [
+      "gh aw (root help, cmd/gh-aw/main.go)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/draft-pr-cleanup.md",
+      ".github/workflows/issue-monster.md"
+    ],
+    "validation": [
+      "pkg/workflow/mcp_scripts_dependencies_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "arc-dind-copilot-agent.md: prerequisites, required vs optional table, and 'What is NOT required' section are explicit and scoped",
+    "blog creative-culture: each workflow has a copy-paste gh aw add-wizard command",
+    "draft-pr-cleanup and issue-monster messages: started/success/failure states outcome and next step",
+    "run help: realistic Examples block"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
+      "priority": "high",
+      "issue": "newInvalidDependencyNameError (line 154) always suggests 'Example: dependencies: [requests]' (a pip package) for npm, go, and shell tools; also uses internal term 'inferred package manager'. Pass manager and example per call site, matching newUnpinnedDependencyError."
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "high",
+      "issue": "Root 'Common Tasks' rows (lines 94-102) still pad with tab characters; '#' lands at column 40 for init and 48 for doctor. Carried over from 2026-11-11, still present."
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "medium",
+      "issue": "Compile help line 265 ('Unlike gh aw upgrade, gh aw compile only applies codemods when you opt in with --fix.') sits inside the action-mode section, between the intro and the --action-mode list. Move it next to the --fix description."
+    }
+  ]
+}
