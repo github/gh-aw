@@ -223,9 +223,9 @@ as successful mutations.
 `Plan.ForPhase` prunes unselected capabilities, endpoints, credentials and grants
 before distribution. `Plan.EncodeJSON` emits indented, human-reviewable JSON for
 `GH_AW_CONNECTOR_PLAN`, limited to 65,536 UTF-8 bytes per phase. JSON Unicode
-escapes protect expression openers and JavaScript template delimiters from
-evaluation. `DecodePlan` accepts these snapshots and the legacy base64 format
-emitted by `Plan.Encode`. Digest verification preserves field order and numeric
+escapes protect all dollar signs and JavaScript template delimiters from
+evaluation or MCP environment substitution. `DecodePlan` accepts these snapshots
+and the legacy base64 format emitted by `Plan.Encode`. Digest verification preserves field order and numeric
 tokens while normalizing JSON formatting and string escapes. A digest is not a
 signature: only the trusted compiler/lock file may supply runtime plans.
 The compiler stores each safe-output snapshot as compact JSON in a

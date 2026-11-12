@@ -40,7 +40,7 @@ func TestConnectorReadableSnapshot(t *testing.T) {
 	t.Parallel()
 	plan := fixturePlan(t, "https://api.example.com")
 	op := plan.spec.SafeOutputs["add-comment"]
-	literal := "literal ${{ secrets.DO_NOT_EVALUATE }} ${notJavaScript} `backticks` \\ \"quoted\""
+	literal := "literal $team ${team} ${{ secrets.DO_NOT_EVALUATE }} ${notJavaScript} `backticks` \\ \"quoted\""
 	op.Request.Body = map[string]Value{"text": {Literal: literal}}
 	plan.spec.SafeOutputs["add-comment"] = op
 	plan, err := freezePlan(plan.spec, plan.connection, plan.binding)
@@ -50,7 +50,7 @@ func TestConnectorReadableSnapshot(t *testing.T) {
 	require.True(t, json.Valid([]byte(snapshot)))
 	require.Contains(t, snapshot, "\n  \"spec\": {")
 	require.Contains(t, snapshot, `"api": "https://api.example.com"`)
-	require.NotContains(t, snapshot, "${")
+	require.NotContains(t, snapshot, "$")
 	require.NotContains(t, snapshot, "`")
 	restored, err := DecodePlan(snapshot)
 	require.NoError(t, err)

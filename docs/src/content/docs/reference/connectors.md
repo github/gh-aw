@@ -1204,9 +1204,10 @@ Compile a consuming workflow with `gh aw compile my-workflow --strict --no-emit`
 Compilation makes no provider requests. It freezes selected definitions,
 resource grants, and phase-specific secret references into content-addressed
 plans; runtime hosts do not reload mutable configuration. `GH_AW_CONNECTOR_PLAN`
-contains human-reviewable JSON, not base64. Expression openers and
+contains human-reviewable JSON, not base64. Dollar signs and
 JavaScript template delimiters are escaped as JSON Unicode sequences so plan
-data cannot be evaluated as code. Each phase plan is limited to 65,536 UTF-8 bytes.
+data cannot be evaluated as code or rewritten by MCP environment substitution.
+Each phase plan is limited to 65,536 UTF-8 bytes.
 Runtime readers retain support for legacy base64 snapshots in older locks.
 
 Safe-output plans are stored once per connector in the job's YAML `env` mapping,

@@ -270,7 +270,7 @@ MUST NOT be automatic; a declaration needing complete evidence MUST explicitly
 reject incomplete pages.
 
 New `GH_AW_CONNECTOR_PLAN` values MUST use human-reviewable JSON, not
-base64. Expression openers and JavaScript template delimiters MUST be escaped
+base64. Dollar signs and JavaScript template delimiters MUST be escaped
 as JSON Unicode sequences without changing the decoded data. Readers MAY retain
 legacy base64 snapshot support.
 Generated safe-output hosts MUST load plans from compiler-owned workflow

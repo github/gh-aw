@@ -93,6 +93,45 @@ new Function("require", "module", "process", options.source)(adaptedRequire, mod
 	require.NoError(t, err, "%s", output)
 }
 
+func TestConnectorPlanRenderedMCPPreservesGraphQLVariables(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	require.NoError(t, err)
+	_, data, _, err := parseLinearConnectorWorkflow(t, linearConnectorImport, "tools:\n  linear: [list-issues]\n")
+	require.NoError(t, err)
+	plan := data.Connectors["linear"].Agent
+	snapshot, err := plan.EncodeJSON()
+	require.NoError(t, err)
+	tool, ok := data.Tools["linear"].(map[string]any)
+	require.True(t, ok)
+	var rendered strings.Builder
+	require.NoError(t, renderCustomMCPConfigWrapperWithContext(&rendered, "linear", tool, true, data))
+	command := exec.CommandContext(t.Context(), "bash", "-e", "-c", "cat <<EOF\n{\"mcpServers\": {\n"+rendered.String()+"}}\nEOF")
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	require.True(t, json.Valid(output), "%s", output)
+	input, err := json.Marshal(map[string]any{
+		"config": json.RawMessage(output), "snapshot": snapshot, "digest": plan.Digest,
+	})
+	require.NoError(t, err)
+	command = exec.CommandContext(t.Context(), node, "-e", `
+const assert = require("node:assert/strict");
+const {resolveMCPConfigExpressions} = require("../../actions/setup/js/start_mcp_gateway.cjs");
+const {decodePlan} = require("../../actions/setup/js/connector_runtime.cjs");
+const input = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const config = resolveMCPConfigExpressions(input.config, new Proxy({}, {get: () => "must-not-replace-frozen-plan"}));
+const snapshot = config.mcpServers.linear.env.GH_AW_CONNECTOR_PLAN;
+assert.equal(snapshot, input.snapshot);
+const plan = decodePlan(snapshot);
+assert.equal(plan.digest, input.digest);
+assert.match(plan.spec.mcp["list-issues"].request.graphql, /\$team: String!/);
+assert.match(plan.spec.mcp["list-issues"].request.graphql, /team\(id: \$team\)/);
+`)
+	command.Stdin = strings.NewReader(string(input))
+	output, err = command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
+
 func TestConnectorContentCompilerDefaults(t *testing.T) {
 	t.Parallel()
 	compiler, root := connectorCompiler(t)

@@ -38,14 +38,14 @@ func (p *Plan) Encode() (string, error) {
 }
 
 // EncodeJSON freezes a readable snapshot containing secret names, never values.
-// Escape expression openers and template delimiters so it remains data in both
-// Actions YAML and the generated JavaScript raw template literal.
+// Escape dollar signs and backticks so Actions and MCP shell/environment
+// transport preserve the snapshot as data rather than interpreting it.
 func (p *Plan) EncodeJSON() (string, error) {
 	data, err := json.MarshalIndent(compiledPlan{p.Digest, p.spec, p.connection, p.binding}, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("encode connector plan JSON: %w", err)
 	}
-	snapshot := strings.NewReplacer("${", `\u0024{`, "`", `\u0060`).Replace(string(data))
+	snapshot := strings.NewReplacer("$", `\u0024`, "`", `\u0060`).Replace(string(data))
 	if len(snapshot) > MaxEncodedPlanBytes {
 		return "", errors.New("compiled connector plan exceeds 65536 JSON bytes; select fewer capabilities")
 	}
