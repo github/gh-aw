@@ -28,6 +28,7 @@ var loadCacheModeSchema = sync.OnceValues(func() (map[string]definition, error) 
 	schema := maps.Clone(upstream)
 	schema["cache-mode"] = definition{AllowedValues: []string{"read", "write", "write-only", "none"}}
 	issuesActivityType := schema["issues-activity-type"]
+	// Copy the slice before appending so the cached upstream schema remains unchanged.
 	issuesActivityType.AllowedValues = append(append([]string(nil), issuesActivityType.AllowedValues...), "status_changed")
 	schema["issues-activity-type"] = issuesActivityType
 	for _, name := range []string{"workflow-root", "workflow-root-strict", "job-factory", "workflow-job"} {

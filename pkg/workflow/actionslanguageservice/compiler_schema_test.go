@@ -42,6 +42,7 @@ func TestCompilerIssuesStatusChangedSchema(t *testing.T) {
 	statusChanged := "on:\n  issues:\n    types: [status_changed]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: [{run: echo hi}]\n"
 	require.NoError(t, ValidateWorkflowWithCacheMode("issues.yml", statusChanged))
 
+	// The pinned upstream schema must still reject status_changed until it includes the value.
 	_, err := ParseWorkflow("upstream.yml", statusChanged)
 	require.ErrorContains(t, err, "status_changed")
 

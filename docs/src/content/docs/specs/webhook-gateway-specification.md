@@ -185,7 +185,7 @@ The shared compiler/runtime catalog is `actions/setup/js/github_notification_web
 
 | Nested trigger | Semantic `event` / native event | Exact supported actions | Canonical HTML path and original URL field |
 | --- | --- | --- | --- |
-| `issue` | `issues` / `issues` | `opened`, `edited`, `deleted`, `transferred`, `pinned`, `unpinned`, `closed`, `reopened`, `assigned`, `unassigned`, `labeled`, `unlabeled`, `locked`, `unlocked`, `milestoned`, `demilestoned`, `typed`, `untyped`, `field_added`, `field_removed` | `/OWNER/REPO/issues/N`, `issue.html_url` |
+| `issue` | `issues` / `issues` | `opened`, `edited`, `deleted`, `transferred`, `pinned`, `unpinned`, `closed`, `reopened`, `assigned`, `unassigned`, `labeled`, `unlabeled`, `locked`, `unlocked`, `milestoned`, `demilestoned`, `typed`, `untyped`, `field_added`, `field_removed`, `status_changed` | `/OWNER/REPO/issues/N`, `issue.html_url` |
 | `pull-request` | `pull_request` / `pull_request` | `assigned`, `unassigned`, `labeled`, `unlabeled`, `opened`, `edited`, `closed`, `reopened`, `synchronize`, `converted_to_draft`, `locked`, `unlocked`, `enqueued`, `dequeued`, `milestoned`, `demilestoned`, `ready_for_review`, `review_requested`, `review_request_removed`, `auto_merge_enabled`, `auto_merge_disabled` | `/OWNER/REPO/pull/N`, `pull_request.html_url` |
 | `discussion` | `discussion` / `discussion` | `created`, `edited`, `deleted`, `transferred`, `pinned`, `unpinned`, `labeled`, `unlabeled`, `locked`, `unlocked`, `category_changed`, `answered`, `unanswered` | `/OWNER/REPO/discussions/N`, `discussion.html_url` |
 | `issue-comment` | `issue_comment` / `issue_comment` | `created`, `edited`, `deleted` | `/OWNER/REPO/issues/N#issuecomment-C`, `comment.html_url` |
@@ -832,7 +832,7 @@ The receiver checks the original `projects_v2_item.project_node_id` and delivere
 These complete examples use the exact family/URL/anchor forms from the notification catalog. Each GitHub notification carries exactly one original action. Only the last example includes a declared matching selector.
 
 ```json title="issues.payload.json"
-{"url":"https://github.com/owner/repo/issues/42","type":["opened"]}
+{"url":"https://github.com/owner/repo/issues/42","type":["status_changed"]}
 ```
 
 ```json title="pull_request.payload.json"
