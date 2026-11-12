@@ -2319,8 +2319,8 @@ describe("handle_agent_failure", () => {
         expect(diagnostic).toContain("report_incomplete");
         expect(diagnostic).toContain("A successful agent job does not confirm task completion");
         expect(diagnostic).toContain("conclusion job summary");
+        expect(diagnostic).toContain("agent_output.json in the agent artifact");
         expect(diagnostic).toContain("gh aw audit 123456");
-        expect(diagnostic).not.toContain("agent_output.json");
         const logs = JSON.stringify([...global.core.info.mock.calls, ...global.core.warning.mock.calls, ...global.core.setFailed.mock.calls]);
         expect(logs).not.toContain("build-resource permissions");
         expect(logs).not.toContain("private-build-diagnostics");
@@ -2334,11 +2334,58 @@ describe("handle_agent_failure", () => {
       }
     });
 
+    it("points to the agent artifact when secret redaction suppresses the summary", async () => {
+      const outputPath = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason: "safe but unverified reason", details: "private-redaction-details" }] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      global.context.runId = 123456;
+      global.github = {
+        rest: {
+          actions: {
+            listJobsForWorkflowRun: vi.fn(),
+            downloadJobLogsForWorkflowRun: vi.fn().mockResolvedValue({ data: "" }),
+          },
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: vi.fn(), createComment: vi.fn() },
+        },
+        paginate: vi.fn(async () => [
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Run agent", conclusion: "success" },
+              { name: "Redact secrets in logs", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:04Z" },
+            ],
+          },
+        ]),
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        const diagnostic = global.core.setFailed.mock.calls[0][0];
+        expect(diagnostic).toContain("summary was suppressed because secret redaction failed");
+        expect(diagnostic).toContain("agent_output.json in the agent artifact");
+        expect(diagnostic).not.toContain("check the conclusion job summary");
+        expect(diagnostic).not.toContain("safe but unverified reason");
+        expect(diagnostic).not.toContain("private-redaction-details");
+        expect(global.core.summary.addRaw).not.toHaveBeenCalled();
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it.each([{}, " "])("does not write an empty incomplete-result summary for invalid reason %s", async reason => {
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason }] }));
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
       vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      global.context.runId = 123456;
       global.github = {
         rest: {
           search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
@@ -2351,6 +2398,12 @@ describe("handle_agent_failure", () => {
         await main();
         expect(global.core.summary.addRaw).not.toHaveBeenCalled();
         expect(global.core.summary.write).not.toHaveBeenCalled();
+        expect(global.core.setFailed).toHaveBeenCalledOnce();
+        const diagnostic = global.core.setFailed.mock.calls[0][0];
+        expect(diagnostic).toContain("report_incomplete signal had no usable reason");
+        expect(diagnostic).toContain("agent_output.json in the agent artifact");
+        expect(diagnostic).toContain("gh aw audit 123456");
+        expect(diagnostic).not.toContain("conclusion job summary");
       } finally {
         vi.unstubAllEnvs();
       }

@@ -1952,6 +1952,24 @@ function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDi
 }
 
 /**
+ * Build safe next-step guidance for an agent-reported incomplete task.
+ * @param {Array<any>} items
+ * @param {{runId?: number, secretRedactionFailed?: boolean}} [options]
+ * @returns {string}
+ */
+function buildReportIncompleteFailureMessage(items, { runId, secretRedactionFailed = false } = {}) {
+  const hasUsableReason = loadReportIncompleteMessages(items).length > 0;
+  const diagnosticNextStep = !hasUsableReason
+    ? "The report_incomplete signal had no usable reason; inspect agent_output.json in the agent artifact."
+    : secretRedactionFailed
+      ? "The conclusion job summary was suppressed because secret redaction failed; inspect agent_output.json in the agent artifact."
+      : "If available, check the conclusion job summary for the reported reason and inspect agent_output.json in the agent artifact.";
+  const auditCommand = typeof runId === "number" && Number.isSafeInteger(runId) && runId > 0 ? `gh aw audit ${runId}` : "gh aw audit <run-id>";
+
+  return `Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. ${diagnosticNextStep} Run ${auditCommand} for runtime evidence.`;
+}
+
+/**
  * Only fixed redactor diagnostics from the failed step's time window may be
  * published. Agent logs and arbitrary exception payloads are never excerpts.
  * @param {number} jobId
@@ -4478,6 +4496,7 @@ async function main() {
     let hasMissingSafeOutputs = false;
     let hasOnlyNoopOutputs = false;
     let hasReportIncomplete = false;
+    let reportIncompleteItems = [];
     // Tracks the case where agentConclusion is "failure" but the agent completed its work
     // successfully (terminal_reason: completed) and produced valid non-noop safe outputs.
     // This is a false-positive failure caused by a transient error after the agent's task
@@ -4549,19 +4568,13 @@ async function main() {
     // classified as a successful review or other completed task.
     if (agentOutputResult.success && agentOutputResult.items && agentOutputResult.items.length > 0) {
       // Cancellation can interrupt the agent before it starts or emits a terminal safe output.
-      const reportIncompleteItems = agentOutputResult.items.filter(item => item.type === "report_incomplete" && !(isCancelledEmptyOutput && item.reason === collectorEmptyOutputCause));
+      reportIncompleteItems = agentOutputResult.items.filter(item => item.type === "report_incomplete" && !(isCancelledEmptyOutput && item.reason === collectorEmptyOutputCause));
       if (reportIncompleteItems.length > 0) {
         if (taskCompleteRegistrationIssueOnlyReportIncomplete) {
           core.info("Ignoring report_incomplete signal(s) caused only by task_complete registration trouble after successful task-level outputs");
         } else {
           hasReportIncomplete = true;
           core.info(`Agent emitted ${reportIncompleteItems.length} report_incomplete signal(s) - activating failure handling`);
-          // Continue after marking the step failed so optional issue reporting can still run.
-          // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
-          const auditCommand = Number.isSafeInteger(context.runId) && context.runId > 0 ? `gh aw audit ${context.runId}` : "gh aw audit <run-id>";
-          core.setFailed(
-            `Agent reported that it could not complete the task (report_incomplete). A successful agent job does not confirm task completion. See the conclusion job summary for the reported reason; run ${auditCommand} for runtime evidence.`
-          );
         }
       }
     }
@@ -4661,6 +4674,11 @@ async function main() {
     }
 
     failureDiagnostics ??= await getFailedAgentDiagnostics({ startupFailure: collectorEmptyOutputCause === "agent_startup_failure" });
+    if (hasReportIncomplete) {
+      // Continue after marking the step failed so optional issue reporting can still run.
+      // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
+      core.setFailed(buildReportIncompleteFailureMessage(reportIncompleteItems, { runId: context.runId, secretRedactionFailed: failureDiagnostics.secretRedactionFailed }));
+    }
     if (failureDiagnostics.hasNoJobs && !hasCheckoutFailure) {
       core.info("Skipping failure reporting: no workflow jobs started; the run may not have been approved.");
       return;
