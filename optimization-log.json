@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-09-28",
-    "workflow_name": "Daily File Diet",
-    "workflow_file": "daily-file-diet",
-    "total_aic_analyzed": 126.05393,
-    "runs_audited": 1,
-    "recommendations_count": 3,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 20
-  },
-  {
     "date": "2026-09-29",
     "workflow_name": "[aw] Failure Investigator (6h)",
     "workflow_file": "aw-failure-investigator",
@@ -298,5 +288,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 20
+  },
+  {
+    "date": "2026-11-12",
+    "workflow_name": "CI Optimization Coach",
+    "workflow_file": "ci-coach",
+    "total_aic_analyzed": 17.14054,
+    "runs_audited": 1,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 6
   }
 ]
