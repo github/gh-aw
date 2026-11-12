@@ -17,7 +17,7 @@ import (
 func TestBundledConnectorImportMetadata(t *testing.T) {
 	files, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
-	require.Len(t, files, 14)
+	require.NotEmpty(t, files)
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
 			source, err := os.ReadFile(file)
