@@ -5,7 +5,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var auditThreatDetectionLogsLog = logger.New("cli:audit_threat_detection_logs")
 
 // Matches only the validated quota details recorded by release_integrity.sh.
 var detectionQuotaDetailsPattern = regexp.MustCompile(`resource=[a-z_]{1,64}; limit=(?:[0-9]{1,16}|unknown); remaining=(?:[0-9]{1,16}|unknown); used=(?:[0-9]{1,16}|unknown); reset=(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z|[0-9]{1,12}|unknown); reason=(?:reset_exceeds_budget|unknown_reset|renewed_exhaustion)`)
@@ -22,6 +26,7 @@ func readDetectionQuotaDetails(runDir string) string {
 			continue
 		}
 		if details := detectionQuotaDetailsPattern.FindString(line); details != "" {
+			auditThreatDetectionLogsLog.Printf("Found detection quota details in %s", runDir)
 			return details
 		}
 	}
@@ -40,6 +45,7 @@ func readConclusionDetectionUsageResult(runDir string) (detectionUsageResult, bo
 	if location.file == "" && location.dir == "" {
 		name, ok := uniqueQualifiedConclusionLog(workflowLogsDir)
 		if !ok {
+			auditThreatDetectionLogsLog.Printf("No unique qualified conclusion log found in %s", workflowLogsDir)
 			return detectionUsageResult{}, false
 		}
 		job.Name = name
@@ -65,6 +71,7 @@ func readConclusionDetectionUsageResult(runDir string) (detectionUsageResult, bo
 		case line == "##[endgroup]":
 			if inEnv && validDetectionJobResult(block.JobResult) && validDetectionConclusion(block.Conclusion) {
 				if found && block != result {
+					auditThreatDetectionLogsLog.Print("Conflicting detection outcomes in conclusion log; ignoring")
 					return detectionUsageResult{}, false
 				}
 				result, found = block, true

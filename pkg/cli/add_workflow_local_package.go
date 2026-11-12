@@ -9,24 +9,31 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var addWorkflowLocalPackageLog = logger.New("cli:add_workflow_local_package")
 
 func resolveLocalRepositoryPackage(source string) (*resolvedRepositoryPackage, error) {
 	if !isLocalWorkflowPath(source) {
 		return nil, nil
 	}
 
+	addWorkflowLocalPackageLog.Printf("Resolving local repository package: source=%s", source)
 	manifestPath, packageDir, err := localRepositoryPackageManifest(source)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			addWorkflowLocalPackageLog.Printf("Package manifest not found for source=%s", source)
 			return nil, nil
 		}
 		return nil, err
 	}
 	if manifestPath == "" {
+		addWorkflowLocalPackageLog.Printf("No package manifest located for source=%s", source)
 		return nil, nil
 	}
+	addWorkflowLocalPackageLog.Printf("Found package manifest: manifest=%s, dir=%s", manifestPath, packageDir)
 
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -71,6 +78,8 @@ func resolveLocalRepositoryPackage(source string) (*resolvedRepositoryPackage, e
 	if err := validateUniqueManifestWorkflowFilenames(assets.installationSources, manifestPath); err != nil {
 		return nil, err
 	}
+	addWorkflowLocalPackageLog.Printf("Resolved local package: workflows=%d, resources=%d, skills=%d, agents=%d, warnings=%d",
+		len(assets.installationSources), len(assets.resourceFiles), len(assets.extensionFiles.skillFiles), len(assets.extensionFiles.agentFiles), len(warnings))
 	return newResolvedLocalRepositoryPackage(manifestPath, packageDir, manifest, assets, projectFile, warnings), nil
 }
 
