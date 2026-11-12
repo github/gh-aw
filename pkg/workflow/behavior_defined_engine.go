@@ -263,6 +263,18 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 			CooldownDays:      &cooldownDays,
 		},
 	)
+	for _, packageName := range install.AdditionalPackageNames {
+		npmSteps = append(npmSteps, GenerateNpmInstallSteps(
+			packageName,
+			version,
+			fmt.Sprintf("Install %s", packageName),
+			"",
+			NPMInstallOptions{
+				RunInstallScripts: install.PostInstallScripts,
+				CooldownDays:      &cooldownDays,
+			},
+		)...)
+	}
 	// MicroVMs cannot rely on the global npm installation. Stage the CLI in
 	// the runtime tree mounted by Cloud Hypervisor or exported through NVX.
 	binaryName := install.BinaryName

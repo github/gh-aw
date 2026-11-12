@@ -195,13 +195,16 @@ type EngineNetworkDefinition struct {
 
 // EngineInstallationDefinition describes how an engine CLI is installed.
 type EngineInstallationDefinition struct {
-	PackageManager     string `yaml:"package-manager,omitempty"`
-	PackageName        string `yaml:"package-name,omitempty"`
-	Version            string `yaml:"version,omitempty"`
-	StepName           string `yaml:"step-name,omitempty"`
-	BinaryName         string `yaml:"binary-name,omitempty"`
-	IncludeNodeSetup   bool   `yaml:"include-node-setup,omitempty"`
-	PostInstallScripts bool   `yaml:"post-install-scripts,omitempty"`
+	PackageManager string `yaml:"package-manager,omitempty"`
+	PackageName    string `yaml:"package-name,omitempty"`
+	// AdditionalPackageNames are installed globally with the same version,
+	// script policy, and release cooldown as PackageName.
+	AdditionalPackageNames []string `yaml:"additional-package-names,omitempty"`
+	Version                string   `yaml:"version,omitempty"`
+	StepName               string   `yaml:"step-name,omitempty"`
+	BinaryName             string   `yaml:"binary-name,omitempty"`
+	IncludeNodeSetup       bool     `yaml:"include-node-setup,omitempty"`
+	PostInstallScripts     bool     `yaml:"post-install-scripts,omitempty"`
 	// Deprecated: workflow engine.cooldown replaces this compiler-ignored metadata.
 	Cooldown         *bool  `yaml:"cooldown,omitempty"`
 	VerifyCommand    string `yaml:"verify-command,omitempty"`

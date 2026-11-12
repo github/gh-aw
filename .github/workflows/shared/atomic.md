@@ -17,21 +17,14 @@ pre-agent-steps:
     env:
       ATOMIC_STORAGE_URL: ${{ secrets.ATOMIC_STORAGE_URL }}
       ATOMIC_STORAGE_TOKEN: ${{ secrets.ATOMIC_STORAGE_TOKEN }}
-      NPM_CONFIG_IGNORE_SCRIPTS: "true"
-      NPM_CONFIG_MIN_RELEASE_AGE: "1"
     run: |
       set -euo pipefail
       node <<'JS'
       const { mkdirSync, rmSync, writeFileSync } = require("node:fs");
-      const { spawnSync } = require("node:child_process");
       const stagingPath = "/tmp/gh-aw/atomic-storage-staging.json";
       rmSync(stagingPath, { force: true });
       const url = (process.env.ATOMIC_STORAGE_URL || "").trim();
       if (!url) process.exit(0);
-      const version = process.env.GH_AW_ENGINE_VERSION || "";
-      if (!/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-        throw new Error("GH_AW_ENGINE_VERSION must be a pinned semantic version");
-      }
       const token = (process.env.ATOMIC_STORAGE_TOKEN || "").trim();
       for (const secret of [url, token]) {
         if (!secret) continue;
@@ -39,14 +32,7 @@ pre-agent-steps:
           if (line) process.stdout.write(`::add-mask::${line}\n`);
         }
       }
-      mkdirSync("/tmp/gh-aw/atomic-storage", { recursive: true, mode: 0o700 });
-      const install = spawnSync(
-        "npm",
-        ["install", "--prefix", "/tmp/gh-aw/atomic-storage", "--ignore-scripts", "--no-audit", "--no-fund", `@bastani/atomic-storage-libsql@${version}`],
-        { stdio: "inherit" }
-      );
-      if (install.error) throw install.error;
-      if (install.status !== 0) process.exit(install.status ?? 1);
+      mkdirSync("/tmp/gh-aw", { recursive: true, mode: 0o700 });
       writeFileSync(stagingPath, JSON.stringify({ url, token }), { mode: 0o600 });
       JS
 engine:
@@ -75,6 +61,8 @@ engine:
     installation:
       package-manager: npm
       package-name: "@bastani/atomic"
+      additional-package-names:
+        - "@bastani/atomic-storage-libsql"
       binary-name: atomic
       step-name: Install Atomic CLI
       include-node-setup: true
@@ -101,7 +89,6 @@ engine:
         ATOMIC_TELEMETRY: "0"
         NO_COLOR: "1"
         GH_AW_ATOMIC_STORE_DIR: /tmp/gh-aw/agent/atomic-store
-        GH_AW_ATOMIC_STORAGE_ADAPTER: /tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js
         GH_AW_ATOMIC_STORAGE_STAGING: /tmp/gh-aw/atomic-storage-staging.json
     durable:
       files:
@@ -126,7 +113,6 @@ engine:
           ATOMIC_TELEMETRY: "0"
           NO_COLOR: "1"
           GH_AW_ATOMIC_STORE_DIR: /tmp/gh-aw/agent/atomic-store
-          GH_AW_ATOMIC_STORAGE_ADAPTER: /tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js
           GH_AW_ATOMIC_STORAGE_STAGING: /tmp/gh-aw/atomic-storage-staging.json
       harness-script: |-
         const { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, unlinkSync, rmSync } = require("fs");
@@ -270,9 +256,13 @@ engine:
                 throw new Error("ATOMIC_STORAGE_NAMESPACE requires a libsql:, https:, or http: URL");
               }
             }
-            const adapterPath = process.env.GH_AW_ATOMIC_STORAGE_ADAPTER || "/tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js";
+            const npmRoot = spawnSync("npm", ["root", "-g"], { encoding: "utf8" });
+            if (npmRoot.error || npmRoot.status !== 0 || !isAbsolute(npmRoot.stdout.trim())) {
+              throw new Error("Unable to resolve the globally installed Atomic libSQL adapter; check the declarative Atomic installation");
+            }
+            const adapterPath = join(npmRoot.stdout.trim(), "@bastani", "atomic-storage-libsql", "libsql.js");
             if (!isAbsolute(adapterPath) || !existsSync(adapterPath)) {
-              throw new Error(`Atomic libSQL storage adapter was not found at ${adapterPath}; check the "Stage Atomic external storage" pre-agent step`);
+              throw new Error(`Atomic libSQL storage adapter was not found at ${adapterPath}; check the declarative Atomic installation`);
             }
             const repository = (process.env.GITHUB_REPOSITORY || "").trim();
             if (!/^[^/]+\/[^/]+$/.test(repository)) {
@@ -624,9 +614,13 @@ engine:
               throw new Error("ATOMIC_STORAGE_NAMESPACE requires a libsql:, https:, or http: URL");
             }
           }
-          const adapterPath = process.env.GH_AW_ATOMIC_STORAGE_ADAPTER || "/tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js";
+          const npmRoot = spawnSync("npm", ["root", "-g"], { encoding: "utf8" });
+          if (npmRoot.error || npmRoot.status !== 0 || !isAbsolute(npmRoot.stdout.trim())) {
+            throw new Error("Unable to resolve the globally installed Atomic libSQL adapter; check the declarative Atomic installation");
+          }
+          const adapterPath = join(npmRoot.stdout.trim(), "@bastani", "atomic-storage-libsql", "libsql.js");
           if (!isAbsolute(adapterPath) || !existsSync(adapterPath)) {
-            throw new Error(`Atomic libSQL storage adapter was not found at ${adapterPath}; check the "Stage Atomic external storage" pre-agent step`);
+            throw new Error(`Atomic libSQL storage adapter was not found at ${adapterPath}; check the declarative Atomic installation`);
           }
           const repository = (process.env.GITHUB_REPOSITORY || "").trim();
           if (!/^[^/]+\/[^/]+$/.test(repository)) {

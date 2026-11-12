@@ -41,6 +41,7 @@ func TestAtomicSampleExecution(t *testing.T) {
 	assert.False(t, engine.GetCapabilities().MaxTurns)
 	assert.Empty(t, def.Auth)
 	assert.Equal(t, "universal-llm-consumer", def.Behaviors.SecretStrategy)
+	assert.Equal(t, []string{"@bastani/atomic-storage-libsql"}, def.Behaviors.Installation.AdditionalPackageNames)
 	expectedArgs := []string{"--print", "--mode", "text", "--no-themes", "--approve", "--exclude-tools", "ask_user_question"}
 	assert.Equal(t, expectedArgs, def.Behaviors.Execution.Args)
 	assert.Empty(t, engine.GetLogParserScriptId())
@@ -54,8 +55,18 @@ func TestAtomicSampleExecution(t *testing.T) {
 		installation.WriteString(strings.Join(step, "\n"))
 	}
 	assert.Contains(t, installation.String(), "@bastani/atomic@"+def.Version)
+	assert.Contains(t, installation.String(), "@bastani/atomic-storage-libsql@"+def.Version)
 	assert.Contains(t, installation.String(), "NPM_CONFIG_IGNORE_SCRIPTS: 'true'")
 	assert.Contains(t, installation.String(), "atomic --version")
+	overrideData := &WorkflowData{
+		EngineConfig: &EngineConfig{ID: "atomic", Version: "0.9.80"},
+	}
+	var overrideInstallation strings.Builder
+	for _, step := range engine.GetInstallationSteps(overrideData) {
+		overrideInstallation.WriteString(strings.Join(step, "\n"))
+	}
+	assert.Contains(t, overrideInstallation.String(), "@bastani/atomic@0.9.80")
+	assert.Contains(t, overrideInstallation.String(), "@bastani/atomic-storage-libsql@0.9.80")
 	for _, step := range engine.GetExecutionSteps(data, "/tmp/atomic.log") {
 		execution.WriteString(strings.Join(step, "\n"))
 	}
@@ -89,16 +100,32 @@ fetchAWFReflect: async () => JSON.parse(process.env.ATOMIC_TEST_REFLECT) };`), 0
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 	t.Cleanup(cancel)
 	cmd := exec.CommandContext(ctx, "node", append([]string{harness, command}, args...)...)
+	binDir := filepath.Join(dir, "bin")
+	globalModules := filepath.Join(dir, "global-node-modules")
+	require.NoError(t, os.MkdirAll(binDir, 0o700))
+	npmPath := filepath.Join(binDir, "npm")
+	require.NoError(t, os.WriteFile(npmPath, []byte("#!/bin/sh\nprintf '%s\\n' '"+globalModules+"'\n"), 0o700))
 	cmd.Env = []string{
-		"PATH=" + os.Getenv("PATH"), "GITHUB_WORKSPACE=" + dir, "GH_AW_PROMPT=" + filepath.Join(dir, "prompt.txt"),
+		"PATH=" + binDir + ":" + os.Getenv("PATH"), "GITHUB_WORKSPACE=" + dir, "GH_AW_PROMPT=" + filepath.Join(dir, "prompt.txt"),
 		"GH_AW_MCP_CONFIG=" + filepath.Join(dir, "mcp.json"), "AWF_REFLECT_ENABLED=1",
 		"ATOMIC_MODEL=copilot/fixture-model", "GH_AW_LLM_PROVIDER=github",
 		"GH_AW_ATOMIC_STORE_DIR=" + filepath.Join(dir, "atomic-store"),
 		"GH_AW_ATOMIC_STORAGE_STAGING=" + filepath.Join(dir, "atomic-storage-staging.json"),
-		"GH_AW_ATOMIC_STORAGE_ADAPTER=" + filepath.Join(dir, "libsql.js"),
 		`ATOMIC_TEST_REFLECT={"ok":true,"reflectData":{"endpoints":[{"provider":"copilot","configured":true,"models_url":"http://api-proxy:10001/prefix/v1/models"}]}}`,
 	}
 	return cmd
+}
+
+func atomicStorageAdapterPath(dir string) string {
+	return filepath.Join(dir, "global-node-modules", "@bastani", "atomic-storage-libsql", "libsql.js")
+}
+
+func writeAtomicStorageAdapter(t *testing.T, dir string) string {
+	t.Helper()
+	adapterPath := atomicStorageAdapterPath(dir)
+	require.NoError(t, os.MkdirAll(filepath.Dir(adapterPath), 0o700))
+	require.NoError(t, os.WriteFile(adapterPath, []byte("export default {};\n"), 0o600))
+	return adapterPath
 }
 
 func TestAtomicHarnessProviders(t *testing.T) {
@@ -470,8 +497,9 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 	assert.Contains(t, frontmatter.ExcludedEnv, "ATOMIC_STORAGE_URL")
 	assert.Contains(t, frontmatter.ExcludedEnv, "ATOMIC_STORAGE_TOKEN")
 	assert.Equal(t, "/tmp/gh-aw/agent/atomic-store", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORE_DIR"])
-	assert.Equal(t, "/tmp/gh-aw/atomic-storage/node_modules/@bastani/atomic-storage-libsql/libsql.js", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORAGE_ADAPTER"])
+	assert.NotContains(t, def.Behaviors.Execution.Env, "GH_AW_ATOMIC_STORAGE_ADAPTER")
 	assert.Equal(t, "/tmp/gh-aw/atomic-storage-staging.json", def.Behaviors.Execution.Env["GH_AW_ATOMIC_STORAGE_STAGING"])
+	assert.Equal(t, []string{"@bastani/atomic-storage-libsql"}, def.Behaviors.Installation.AdditionalPackageNames)
 
 	require.NotNil(t, def.Behaviors.Durable)
 	assert.Equal(t, []string{"/tmp/gh-aw/agent/atomic-store"}, def.Behaviors.Durable.Files)
@@ -483,31 +511,21 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 	assert.Equal(t, "Stage Atomic external storage", step.Name)
 	assert.Equal(t, "${{ secrets.ATOMIC_STORAGE_URL }}", step.Env["ATOMIC_STORAGE_URL"])
 	assert.Equal(t, "${{ secrets.ATOMIC_STORAGE_TOKEN }}", step.Env["ATOMIC_STORAGE_TOKEN"])
-	assert.Equal(t, "true", step.Env["NPM_CONFIG_IGNORE_SCRIPTS"])
-	assert.Equal(t, "1", step.Env["NPM_CONFIG_MIN_RELEASE_AGE"])
-	expectedAdapterPkg := "@bastani/atomic-storage-libsql@" + def.Version
-	assert.Contains(t, step.Run, "@bastani/atomic-storage-libsql@${version}", "adapter package version must match the effective engine version")
+	assert.Len(t, step.Env, 2)
+	assert.NotContains(t, step.Run, "npm")
+	assert.NotContains(t, step.Run, "spawnSync")
+	assert.NotContains(t, step.Run, "GH_AW_ENGINE_VERSION")
 
 	dir := t.TempDir()
-	binDir := filepath.Join(dir, "bin")
-	require.NoError(t, os.MkdirAll(binDir, 0o700))
-	npmCalls := filepath.Join(dir, "npm-calls.txt")
-	fakeNpm := filepath.Join(binDir, "npm")
-	require.NoError(t, os.WriteFile(fakeNpm, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \""+npmCalls+"\"\n"), 0o700))
 	staging := filepath.Join(dir, "staging.json")
-	prefix := filepath.Join(dir, "prefix")
 	script := strings.ReplaceAll(step.Run, "/tmp/gh-aw/atomic-storage-staging.json", staging)
-	script = strings.ReplaceAll(script, "/tmp/gh-aw/atomic-storage", prefix)
 
-	runStep := func(url, token, version string) string {
+	runStep := func(url, token string) string {
 		cmd := exec.CommandContext(t.Context(), "bash", "-c", script)
 		cmd.Env = []string{
-			"PATH=" + binDir + ":" + os.Getenv("PATH"),
+			"PATH=" + os.Getenv("PATH"),
 			"ATOMIC_STORAGE_URL=" + url,
 			"ATOMIC_STORAGE_TOKEN=" + token,
-			"GH_AW_ENGINE_VERSION=" + version,
-			"NPM_CONFIG_IGNORE_SCRIPTS=true",
-			"NPM_CONFIG_MIN_RELEASE_AGE=1",
 		}
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "%s", out)
@@ -515,19 +533,14 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 	}
 
 	require.NoError(t, os.WriteFile(staging, []byte("stale"), 0o600))
-	outEmpty := runStep("   ", "unused-token", def.Version)
+	outEmpty := runStep("   ", "unused-token")
 	assert.Empty(t, outEmpty)
 	_, err := os.Stat(staging)
 	assert.True(t, os.IsNotExist(err), "empty URL must remove stale staging file and write nothing")
-	_, err = os.Stat(npmCalls)
-	assert.True(t, os.IsNotExist(err), "empty URL must skip npm install")
 
-	outStaged := runStep("  libsql://example-org.turso.io  ", "  turso-secret-token  ", def.Version)
+	outStaged := runStep("  libsql://example-org.turso.io  ", "  turso-secret-token  ")
 	assert.Contains(t, outStaged, "::add-mask::libsql://example-org.turso.io")
 	assert.Contains(t, outStaged, "::add-mask::turso-secret-token")
-	calls, err := os.ReadFile(npmCalls)
-	require.NoError(t, err)
-	assert.Contains(t, string(calls), "install --prefix "+prefix+" --ignore-scripts --no-audit --no-fund "+expectedAdapterPkg)
 	info, err := os.Stat(staging)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
@@ -540,24 +553,22 @@ func TestAtomicStorageDefinitionAndAdapterVersion(t *testing.T) {
 		"token": "turso-secret-token",
 	}, parsedStaging)
 
-	outOverride := runStep("  libsql://example-org.turso.io  ", "  turso-secret-token  ", "0.9.80")
-	assert.Contains(t, outOverride, "::add-mask::libsql://example-org.turso.io")
-	calls, err = os.ReadFile(npmCalls)
+	engine, err := NewBehaviorDefinedEngine(def)
 	require.NoError(t, err)
-	assert.Contains(t, string(calls), "@bastani/atomic-storage-libsql@0.9.80")
-
-	invalidVersion := exec.CommandContext(t.Context(), "bash", "-c", script)
-	invalidVersion.Env = []string{
-		"PATH=" + binDir + ":" + os.Getenv("PATH"),
-		"ATOMIC_STORAGE_URL=libsql://example-org.turso.io",
-		"ATOMIC_STORAGE_TOKEN=turso-secret-token",
-		"GH_AW_ENGINE_VERSION=latest",
-		"NPM_CONFIG_IGNORE_SCRIPTS=true",
-		"NPM_CONFIG_MIN_RELEASE_AGE=1",
+	for _, test := range []struct {
+		version string
+	}{
+		{def.Version},
+		{"0.9.80"},
+	} {
+		data := &WorkflowData{EngineConfig: &EngineConfig{ID: "atomic", Version: test.version}}
+		var installation strings.Builder
+		for _, installStep := range engine.GetInstallationSteps(data) {
+			installation.WriteString(strings.Join(installStep, "\n"))
+		}
+		assert.Contains(t, installation.String(), "@bastani/atomic@"+test.version)
+		assert.Contains(t, installation.String(), "@bastani/atomic-storage-libsql@"+test.version)
 	}
-	outInvalidVersion, err := invalidVersion.CombinedOutput()
-	require.Error(t, err)
-	assert.Contains(t, string(outInvalidVersion), "GH_AW_ENGINE_VERSION must be a pinned semantic version")
 }
 
 func TestAtomicDurableCompilation(t *testing.T) {
@@ -736,8 +747,7 @@ db.close();
 			dir := t.TempDir()
 			probe := filepath.Join(dir, "probe.cjs")
 			require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
-			adapter := filepath.Join(dir, "libsql.js")
-			require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+			adapter := writeAtomicStorageAdapter(t, dir)
 			staging := filepath.Join(dir, "atomic-storage-staging.json")
 			outFile := filepath.Join(dir, "captured.json")
 			cfgBytes, err := json.Marshal(map[string]string{
@@ -808,8 +818,7 @@ db.close();
 		dir := t.TempDir()
 		probe := filepath.Join(dir, "probe.cjs")
 		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
-		adapter := filepath.Join(dir, "libsql.js")
-		require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+		adapter := writeAtomicStorageAdapter(t, dir)
 		cmd := atomicHarnessCommand(t, dir, "node", probe)
 		cmd.Env = append(cmd.Env,
 			"HOSTALIASES="+writeHostAliases(t, dir),
@@ -833,8 +842,7 @@ db.close();
 		dir := t.TempDir()
 		probe := filepath.Join(dir, "probe.cjs")
 		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
-		adapter := filepath.Join(dir, "libsql.js")
-		require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+		writeAtomicStorageAdapter(t, dir)
 		storeDir := filepath.Join(dir, "atomic-store")
 		require.NoError(t, os.MkdirAll(storeDir, 0o700))
 		require.NoError(t, os.WriteFile(filepath.Join(storeDir, "session-id"), []byte("repo-root-session-123\n"), 0o600))
@@ -857,8 +865,7 @@ db.close();
 		dir := t.TempDir()
 		probe := filepath.Join(dir, "probe.cjs")
 		require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
-		adapter := filepath.Join(dir, "libsql.js")
-		require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+		writeAtomicStorageAdapter(t, dir)
 		cmd := atomicHarnessCommand(t, dir, "node", probe)
 		cmd.Env = append(cmd.Env,
 			"HOSTALIASES="+writeHostAliases(t, dir),
@@ -877,8 +884,7 @@ db.close();
 			dir := t.TempDir()
 			probe := filepath.Join(dir, "probe.cjs")
 			require.NoError(t, os.WriteFile(probe, []byte(probeSource), 0o600))
-			adapter := filepath.Join(dir, "libsql.js")
-			require.NoError(t, os.WriteFile(adapter, []byte("export default {};\n"), 0o600))
+			writeAtomicStorageAdapter(t, dir)
 			cmd := atomicHarnessCommand(t, dir, "node", probe)
 			cmd.Env = append(cmd.Env,
 				"HOSTALIASES="+writeHostAliases(t, dir),
@@ -944,7 +950,7 @@ db.close();
 			name:          "missing adapter file",
 			env:           []string{"ATOMIC_STORAGE_URL=libsql://db.turso.io", "ATOMIC_STORAGE_TOKEN=missing-adapter-secret", "GITHUB_REPOSITORY=org/repo"},
 			createAdapter: false,
-			wantMessage:   "Stage Atomic external storage",
+			wantMessage:   "declarative Atomic installation",
 			forbidInOut:   "missing-adapter-secret",
 		},
 		{
@@ -970,7 +976,7 @@ db.close();
 		t.Run("rejects "+tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			if tc.createAdapter {
-				require.NoError(t, os.WriteFile(filepath.Join(dir, "libsql.js"), []byte("export default {};\n"), 0o600))
+				writeAtomicStorageAdapter(t, dir)
 			}
 			staging := filepath.Join(dir, "atomic-storage-staging.json")
 			require.NoError(t, os.WriteFile(staging, []byte(tc.staging), 0o600))

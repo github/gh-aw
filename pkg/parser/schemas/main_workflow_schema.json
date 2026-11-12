@@ -16407,6 +16407,14 @@
                     "package-name": {
                       "type": "string"
                     },
+                    "additional-package-names": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Additional npm packages installed globally with the same version, script policy, and release cooldown as package-name."
+                    },
                     "version": {
                       "type": "string"
                     },
