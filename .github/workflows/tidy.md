@@ -32,6 +32,12 @@ network:
 imports:
   - shared/otlp.md
   - shared/reporting.md
+  - path: shared/ci-toolchain-setup.md
+    inputs:
+      setup-go: true
+      setup-node: true
+      node-cache: npm
+      node-cache-dependency-path: actions/setup/js/package-lock.json
 tools:
   cli-proxy: true
   github:
@@ -51,17 +57,6 @@ safe-outputs:
   push-to-pull-request-branch:
   missing-tool:
 steps:
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
-      cache: npm
-      cache-dependency-path: actions/setup/js/package-lock.json
-  - name: Setup Go
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
   - name: Install development dependencies
     run: make deps-dev
 strict: true
