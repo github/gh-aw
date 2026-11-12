@@ -3,6 +3,7 @@ private: true
 description: Smoke test for Atomic headless execution and native MCP
 name: Smoke Atomic
 on:
+  schedule: every 2 days
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,6 +12,8 @@ permissions:
   copilot-requests: write
 engine:
   id: atomic
+  # Validate a newly pinned Atomic release the day after it ships; strict mode allows at least one day.
+  cooldown: 1
 model: copilot/gpt-5.3-codex
 strict: true
 imports:

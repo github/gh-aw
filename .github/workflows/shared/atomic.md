@@ -53,8 +53,8 @@ engine:
         - --no-prompt-templates
         - --no-themes
         - --no-approve
-        - --tools
-        - read,bash,edit,write,mcp__*
+        - --exclude-tools
+        - ask_user_question
       step-name: Execute Atomic CLI
       model-env-var: ATOMIC_MODEL
       mcp-config-env-var: GH_AW_MCP_CONFIG
@@ -282,11 +282,17 @@ Startup network checks, telemetry, saved sessions, skills,
 prompt templates, and themes are disabled. `--no-approve` ignores project-local
 Atomic/Pi configuration; repository settings and workflow definitions are not
 overwritten. The fresh agent directory excludes user-installed extensions;
-bundled extensions remain loaded so native MCP works. The explicit tool
-selection excludes Intercom and unrelated bundled tools. Native read, bash, edit, write, and MCP
-tools are enabled inside the gh-aw sandbox. This sample does not advertise
+bundled extensions remain loaded. Atomic's default and bundled-extension tools
+are enabled inside the gh-aw sandbox, including workflows, subagents, Intercom,
+web access, and native MCP; `ask_user_question` is excluded because no person
+answers in a workflow run. Headless runs return a workflow's run ID at launch,
+and a durable approval gate stays pending rather than proceeding. Workflows and
+extensions defined in the repository's `.atomic/` are not loaded, because
+`--no-approve` ignores project-local configuration. Web tools reach only domains
+the workflow allows. This sample does not advertise
 gh-aw tool allowlists, native iteration limits, Agent Plugins, custom Atomic
 process workflows, or structured session/token parsing. Plain-text output does
-not establish tool, usage, or MCP-failure telemetry. The manually dispatched
-smoke workflow checks native MCP, file readback, build status, and credentials.
+not establish tool, usage, or MCP-failure telemetry. The smoke workflow runs
+every two days and on manual dispatch, and checks native MCP, file readback, build
+status, and credentials.
 -->

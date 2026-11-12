@@ -394,7 +394,7 @@ func TestAtomicSmokeContract(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/smoke-atomic.md")
 	require.NoError(t, err)
 	assert.Contains(t, string(source), "shared/atomic.md")
-	assert.NotContains(t, string(source), "schedule:")
+	assert.Contains(t, string(source), "on:\n  schedule: every 2 days\n  workflow_dispatch:\n")
 	taskStart := strings.Index(string(source), "1. Use native GitHub MCP tools")
 	require.NotEqual(t, -1, taskStart)
 	taskEnd := strings.Index(string(source)[taskStart:], "\n2. ")
