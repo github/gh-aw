@@ -464,7 +464,7 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 	if !versionAtLeast(version, string(constants.DefaultFirewallVersion), string(constants.AWFModelRoutingMinVersion)) {
 		return NewValidationError("engine.model-routing", version, fmt.Sprintf("task-level model routing requires AWF %s or newer", constants.AWFModelRoutingMinVersion), fmt.Sprintf("The effective AWF version is %s. Set sandbox.agent.version or firewall.version to %s or newer.", version, constants.AWFModelRoutingMinVersion))
 	}
-	return nil
+	return validateModelRoutingRuntimeCompatibility(workflowData)
 }
 
 func generateModelRoutingConversationStep(yaml *strings.Builder, data *WorkflowData) {

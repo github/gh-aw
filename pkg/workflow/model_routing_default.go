@@ -328,8 +328,11 @@ func defaultModelRoutingIneligibility(data *WorkflowData) string {
 	if data.TokenBrokerCopilotRequest || data.TokenBrokerEnabled || enclavesEnabled(data) {
 		return "custom inference credentials or enclaves"
 	}
-	if isArcDindTopology(data) || isCloudHypervisorRuntime(data) || isNVXRuntime(data) || isLegacySecurityRuntime(data) {
-		return "non-default sandbox runtime"
+	if conflict := modelRoutingRuntimeCompatibility(data); conflict != nil {
+		return conflict.Reason
+	}
+	if isLegacySecurityRuntime(data) {
+		return "legacy-security sandbox runtime"
 	}
 	agentConfig := getAgentConfig(data)
 	if agentConfig != nil && envMayChooseModel(agentConfig.Env) {

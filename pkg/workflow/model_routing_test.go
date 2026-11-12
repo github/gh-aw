@@ -637,18 +637,16 @@ network:
 			dir := t.TempDir()
 			workflowPath := filepath.Join(dir, "routed.md")
 			require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0o600))
+			if tc.topology == RunnerTopologyArcDind {
+				// AWF refuses primary-agent routing with Docker-in-Docker.
+				err := NewCompiler().CompileWorkflow(workflowPath)
+				require.ErrorContains(t, err, "Validation failed for field 'runner.topology'")
+				return
+			}
 			require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
 			compiled, err := os.ReadFile(filepath.Join(dir, "routed.lock.yml"))
 			require.NoError(t, err)
-			compiledYAML := string(compiled)
-			require.Contains(t, compiledYAML, output.String())
-			if tc.topology == RunnerTopologyArcDind {
-				routingStepIndex := strings.Index(compiledYAML, "- name: Prepare model-routing conversation")
-				promptStagingIndex := strings.Index(compiledYAML, "cp -a /tmp/gh-aw/aw-prompts")
-				require.NotEqual(t, -1, routingStepIndex)
-				require.NotEqual(t, -1, promptStagingIndex)
-				require.Greater(t, promptStagingIndex, routingStepIndex)
-			}
+			require.Contains(t, string(compiled), output.String())
 		})
 	}
 }
@@ -1431,4 +1429,132 @@ func TestCompileDefaultModelRouting_ReviewIneligibleUnchanged(t *testing.T) {
 		require.NoError(t, compiled.err)
 		require.True(t, isModelRoutingImplicit(compiled.data), "the same environment resolves model variables consistently")
 	})
+}
+
+// routingRuntimeFixture builds a small Copilot workflow whose model choice is
+// selected by routing ("router", "engine", "none", or "off") with extra
+// frontmatter appended.
+func routingRuntimeFixture(routing, extra string) string {
+	choice := map[string]string{
+		"router": "model: router\nengine: copilot\n",
+		"engine": "engine:\n  id: copilot\n  model-routing:\n    goal: cost\n    mode: auto\n",
+		"none":   "engine: copilot\n",
+		"off":    "engine:\n  id: copilot\n  model-routing: false\n",
+	}[routing]
+	return "---\non: workflow_dispatch\npermissions:\n  contents: read\n" + choice + extra + "---\nReport a finding.\n"
+}
+
+const routingNVXSandbox = "sandbox:\n  agent:\n    runtime: nvx\n    nvx:\n      preview: true\n      network-isolation: true\n      api-proxy: true\n" +
+	"      layer-path: /tmp/nvx/guest-layer\n      openvmm-path: /tmp/nvx/openvmm\n      kernel-path: /tmp/nvx/vmlinux\n      initramfs-path: /tmp/nvx/initramfs.cpio.gz\n" +
+	"      artifact-manifest-path: /tmp/nvx/manifest.json\n      artifact-manifest-bundle-path: /tmp/nvx/manifest.sigstore.jsonl\n      mount-policy: workspace-only\n"
+
+// requireExplicitRouting asserts a compiled workflow routes every run through
+// explicit (not implicit) routing with a digest-pinned router image.
+func requireExplicitRouting(t *testing.T, compiled defaultRoutingCompilation) {
+	t.Helper()
+	require.NoError(t, compiled.err)
+	require.True(t, isModelRoutingEnabled(compiled.data))
+	require.False(t, isModelRoutingImplicit(compiled.data))
+	require.NotContains(t, compiled.stderr, defaultRoutingNoticeMarker)
+	require.Contains(t, compiled.lock, "GH_AW_MODEL_ROUTING: 1")
+	if strings.Contains(compiled.lock, "Initialize WSL runtime") {
+		// The WSL adapter encodes the AWF execution script, so its config is not inspected here.
+		return
+	}
+	configs := compiled.awfConfigs(t)
+	require.Len(t, configs, 1)
+	require.Equal(t, true, configs[0]["experimental"].(map[string]any)["modelRouting"])
+	require.Contains(t, configs[0]["apiProxy"].(map[string]any), "routing")
+	routerImage, ok := configs[0]["container"].(map[string]any)["images"].(map[string]any)[awfImageRoleRouter].(string)
+	require.True(t, ok, "routed config must pin the router image")
+	require.Contains(t, routerImage, "@sha256:")
+}
+
+// TestCompileModelRoutingRuntimeCompatibility covers explicit routing, through
+// both model: router and engine.model-routing, on supported and unsupported
+// runtimes, AWF versions, topologies, mounts, and hosts.
+func TestCompileModelRoutingRuntimeCompatibility(t *testing.T) {
+	const cloudHypervisor = "sandbox:\n  agent:\n    runtime: cloud-hypervisor\n"
+	for _, tc := range []struct {
+		name   string
+		extra  string
+		field  string
+		value  string
+		reason string
+		check  func(t *testing.T, compiled defaultRoutingCompilation)
+	}{
+		{name: "default docker", extra: ""},
+		{name: "explicit docker runtime", extra: "sandbox:\n  agent:\n    runtime: docker\n"},
+		{name: "B1 cloud-hypervisor default AWF", extra: cloudHypervisor, check: func(t *testing.T, compiled defaultRoutingCompilation) {
+			require.Contains(t, compiled.lock, "--container-runtime cloud-hypervisor")
+		}},
+		{name: "cloud-hypervisor v0.29.12 boundary", extra: cloudHypervisor + "    version: v0.29.12\n"},
+		{name: "B2 cloud-hypervisor v0.29.11", extra: cloudHypervisor + "    version: v0.29.11\n",
+			field: "sandbox.agent.version", value: "v0.29.11", reason: "requires AWF v0.29.12 or newer"},
+		{name: "C1 nvx", extra: routingNVXSandbox, field: "sandbox.agent.runtime", value: "nvx", reason: `"nvx" sandbox runtime`},
+		{name: "C1 arc-dind", extra: "runner:\n  topology: arc-dind\n", field: "runner.topology", value: "arc-dind", reason: "Docker-in-Docker"},
+		{name: "C1 unmasked socket bind", extra: "sandbox:\n  agent:\n    mounts: [\"/var/run/docker.sock:/docker.sock:rw\"]\n",
+			field: "sandbox.agent.mounts", value: "/var/run/docker.sock:/docker.sock:rw", reason: "Docker socket"},
+		{name: "C2 parent directory bind", extra: "sandbox:\n  agent:\n    mounts: [\"/var/run:/docker-run:ro\"]\n",
+			field: "sandbox.agent.mounts", value: "/var/run:/docker-run:ro", reason: "Docker socket"},
+		{name: "C2 /run parent directory bind", extra: "sandbox:\n  agent:\n    mounts: [\"/run:/host-run:ro\"]\n",
+			field: "sandbox.agent.mounts", value: "/run:/host-run:ro", reason: "Docker socket"},
+		{name: "C2 masked socket and safe mounts", extra: "sandbox:\n  agent:\n    mounts: [\"/var/run/docker.sock:/var/run/docker.sock:rw\", \"/var/run:/var/run:ro\", \"/opt/tools:/opt/tools:ro\"]\n"},
+		{name: "C3a windows-latest WSL adapter", extra: "runs-on: windows-latest\n", check: func(t *testing.T, compiled defaultRoutingCompilation) {
+			require.Contains(t, compiled.lock, "Initialize WSL runtime")
+			require.Contains(t, compiled.lock, "Prepare model-routing conversation")
+		}},
+		{name: "C3b native self-hosted windows", extra: "runs-on: [self-hosted, windows, x64]\n",
+			field: "runs-on", value: "self-hosted, windows, x64", reason: "Linux AWF execution host"},
+		{name: "native hosted windows label", extra: "runs-on: windows-2022\n", field: "runs-on", value: "windows-2022", reason: "Linux AWF execution host"},
+		{name: "self-hosted linux", extra: "runs-on: [self-hosted, linux, x64]\n"},
+		{name: "arbitrary self-hosted label", extra: "runs-on: [self-hosted, windows-builders]\n"},
+		{name: "runner group", extra: "runs-on:\n  group: windows-runners\n"},
+		{name: "expression", extra: "runs-on: ${{ vars.RUNNER }}\n"},
+	} {
+		for _, routing := range []string{"router", "engine"} {
+			t.Run(tc.name+"/"+routing, func(t *testing.T) {
+				compiled := compileDefaultRoutingSource(t, routingRuntimeFixture(routing, tc.extra))
+				if tc.field == "" {
+					requireExplicitRouting(t, compiled)
+					if tc.check != nil {
+						tc.check(t, compiled)
+					}
+					return
+				}
+				require.Error(t, compiled.err)
+				message := compiled.err.Error()
+				require.Contains(t, message, fmt.Sprintf("Validation failed for field '%s'", tc.field))
+				require.Contains(t, message, "Value: "+tc.value)
+				require.Contains(t, message, tc.reason)
+				require.Contains(t, message, "default Docker (runc) runtime and cloud-hypervisor with AWF v0.29.12 or newer")
+				require.Contains(t, message, "https://github.com/github/gh-aw-firewall/issues/10335")
+			})
+		}
+	}
+}
+
+// TestModelRoutingRuntimeCompatibilityVersionPrecedence checks that the
+// cloud-hypervisor gate uses the effective AWF version: sandbox.agent.version,
+// then the configured firewall version, then the compiler default.
+func TestModelRoutingRuntimeCompatibilityVersionPrecedence(t *testing.T) {
+	data := func(agentVersion, firewallVersion string) *WorkflowData {
+		return &WorkflowData{
+			SandboxConfig:      &SandboxConfig{Agent: &AgentSandboxConfig{Runtime: AgentRuntimeCloudHypervisor, Version: agentVersion}},
+			NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true, Version: firewallVersion}},
+		}
+	}
+	require.Nil(t, modelRoutingRuntimeCompatibility(data("", "")), "the compiler default supports cloud-hypervisor routing")
+	require.Nil(t, modelRoutingRuntimeCompatibility(data("v0.29.12", "v0.29.11")), "sandbox.agent.version wins")
+	require.Nil(t, modelRoutingRuntimeCompatibility(data("", "v0.29.12")))
+
+	conflict := modelRoutingRuntimeCompatibility(data("v0.29.11", "v0.29.12"))
+	require.NotNil(t, conflict)
+	require.Equal(t, "sandbox.agent.version", conflict.Field)
+	require.Equal(t, "v0.29.11", conflict.Value)
+
+	conflict = modelRoutingRuntimeCompatibility(data("", "v0.29.11"))
+	require.NotNil(t, conflict)
+	require.Equal(t, "firewall.version", conflict.Field)
+	require.Equal(t, "v0.29.11", conflict.Value)
 }

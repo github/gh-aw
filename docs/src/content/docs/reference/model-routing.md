@@ -36,6 +36,8 @@ Find the likely cause of issue #${{ github.event.issue.number }} and comment wit
 
 The router classifies each task as economy, balanced, or robust, then chooses the cheapest model and effort likely to succeed at that level. If classification is unavailable or unknown, it uses balanced. The example uses GitHub Copilot inference and needs [Copilot authentication](/gh-aw/reference/auth/#copilot-requests-write-permission). Routing also needs the AWF firewall, enabled by default.
 
+Routing runs on the default Docker sandbox runtime, or on `sandbox.agent.runtime: cloud-hypervisor` with AWF v0.29.12 or later, on a Linux AWF host. Compilation fails for explicit routing with another runtime such as `nvx`, `runner.topology: arc-dind`, a `sandbox.agent.mounts` entry that exposes the Docker socket to the agent, or a native Windows or macOS runner; `runs-on: windows-latest` runs AWF in WSL and is supported. Support for other runtimes is tracked in [gh-aw-firewall#10335](https://github.com/github/gh-aw-firewall/issues/10335).
+
 > [!NOTE]
 > `model: auto` uses the engine or provider's own model selection, not gh-aw's per-task router. Use `model: router` for gh-aw routing.
 
@@ -62,6 +64,7 @@ Eligible workflows without a model already behave like `model: router`. For Copi
 
 - The engine is `copilot`, `claude`, `codex`, or `pi`, using GitHub Copilot inference. Claude and Codex require `model-provider: github`; `copilot-requests: write` alone doesn't switch providers.
 - Neither the workflow nor its imports set a top-level `model`, `engine.model` (including aliases, `auto`, and expressions), explicit routing settings, `engine.fallback-models`, or an `engine.env` model variable such as `COPILOT_MODEL` or `GH_AW_DEFAULT_MODEL_COPILOT`.
+- The workflow's sandbox runtime, topology, mounts, and runner support routing, and the workflow doesn't use the `docker-sudo-iptables` runtime.
 - The workflow uses a routing-capable AWF version and images and doesn't otherwise customize model selection or inference, for example through a custom engine command, model or effort arguments in `engine.args`, a custom agent, sub-agent models, a custom API target, or custom sandbox images.
 
 The default applies only to the main agent, not threat detection, evals, or sub-agents. If eligibility isn't met or is uncertain, compilation preserves the previous behavior. When it applies, compilation prints an informational notice. Explicit router values aren't bypassed by model variables.
