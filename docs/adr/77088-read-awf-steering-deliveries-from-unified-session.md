@@ -1,8 +1,8 @@
 # ADR-77088: Read AWF Per-Conversation Steering Deliveries from the Unified Session Only
 
-**Date**: 2026-05-20
-**Status**: Draft
-**Deciders**: Unknown (drafted by the Design Decision Gate from PR #77088)
+**Date**: 2026-11-12
+**Status**: Proposed
+**Deciders**: rabeckett; pending maintainer review (pelikhan)
 
 ---
 
@@ -38,7 +38,7 @@ Forward `steering_delivery` unvalidated. Simpler, but would let malformed record
 #### Negative
 - Two overlapping steering views now exist (`steering_notices` and `steering_deliveries`) with different sources and semantics, increasing documentation and maintenance burden.
 - `steering_deliveries` is empty when the session file is not retained, with no raw-log fallback.
-- Strictly dropping non-conforming records can silently hide deliveries if AWF's contract evolves; gh-aw must be updated in step.
+- Strictly dropping non-conforming records can silently hide deliveries if AWF's contract evolves; gh-aw must be updated in step. This matters most when AWF adds another kind of steering, such as a progress judge, or new triggers. Those are off by default and need a gh-aw opt-in, so the reader can be updated alongside them. A follow-up will make the reader report the deliveries it drops instead of discarding them silently, and the record is expected to grow a shared envelope (`type`, `trigger`, `conversation`, `first`) with kind-specific fields such as `threshold` becoming optional.
 - Bumping `auditSchemaVersion` (14) and `cachedLogsJSONLSchemaVersion` (6) forces cache rebuilds.
 
 #### Neutral
@@ -47,4 +47,4 @@ Forward `steering_delivery` unvalidated. Simpler, but would let malformed record
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*ADR drafted by [adr-writer agent] and reviewed by the PR author. Change the status to Accepted once a maintainer approves.*
