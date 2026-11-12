@@ -780,16 +780,83 @@ if command -v pwsh >/dev/null 2>&1; then
     pwsh -NoProfile -File "$SCRIPT_DIR/test-install-script.ps1" -InstallerPath "$POWERSHELL_INSTALLER_PATH"
 fi
 
-if [ "$(uname -s)" != Linux ]; then
+if [ "$(uname -s)" = Linux ]; then
+    for case_name in dangling-symlink live-symlink partial-download checksum-mismatch invalid-binary directory-conflict; do
+        test_manual_binary_replacement "$case_name"
+    done
+    for case_name in channel-page-and-semver channel-no-v1-release exact-tag auth-pinned no-auth-pinned auth-401-fallback auth-latest gh-install-metadata-tag; do
+        test_version_resolution "$case_name"
+    done
+else
     echo "Skipping Bash behavioral installer tests outside Linux."
-    exit 0
 fi
 
-for case_name in dangling-symlink live-symlink partial-download checksum-mismatch invalid-binary directory-conflict; do
-    test_manual_binary_replacement "$case_name"
-done
-for case_name in channel-page-and-semver channel-no-v1-release exact-tag auth-pinned no-auth-pinned auth-401-fallback auth-latest gh-install-metadata-tag; do
-    test_version_resolution "$case_name"
+test_gh_install_diagnostics() (
+    local scenario=$1
+    local version=$2
+    local case_root fixture_bin output result=0
+    case_root=$(mktemp -d)
+    trap 'rm -rf -- "$case_root"' EXIT
+    fixture_bin="$case_root/bin"
+    output="$case_root/output"
+    mkdir -p "$fixture_bin" "$case_root/home"
+    cat > "$fixture_bin/gh" <<'EOF'
+#!/bin/sh
+case "$*" in
+    "extension install "*)
+        echo "fixture install stdout"
+        echo "fixture install stderr" >&2
+        case "$FIXTURE_SCENARIO" in
+            error) exit 42 ;;
+            timeout) exit 124 ;;
+        esac
+        ;;
+    "aw version")
+        echo "gh aw version v1.2.3"
+        ;;
+    *) exit 1 ;;
+esac
+EOF
+    cat > "$fixture_bin/curl" <<'EOF'
+#!/bin/sh
+echo "fixture download failure" >&2
+exit 22
+EOF
+    cat > "$fixture_bin/sleep" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+    chmod +x "$fixture_bin/"*
+    env -u GITHUB_OUTPUT \
+        INPUT_VERSION="$version" HOME="$case_root/home" \
+        PATH="$fixture_bin:$PATH" FIXTURE_SCENARIO="$scenario" \
+        bash "$INSTALLER_PATH" > "$output" 2>&1 || result=$?
+    [ "$(grep -c '^fixture install stdout$' "$output")" -eq 1 ] || fail "$scenario lost or repeated gh stdout"
+    [ "$(grep -c '^fixture install stderr$' "$output")" -eq 1 ] || fail "$scenario lost or repeated gh stderr"
+    [ -z "$(find "$case_root/home" -name '.gh-aw-install.*' -print)" ] || fail "$scenario left a staging directory"
+    if [ "$scenario" = success ]; then
+        [ "$result" -eq 0 ] || { cat "$output" >&2; fail "gh install failed"; }
+        grep -q "Successfully installed" "$output" || fail "gh install did not verify success"
+    else
+        [ "$result" -ne 0 ] || fail "$scenario did not propagate failure"
+        case "$scenario" in
+            timeout)
+                grep -q "gh extension install timed out" "$output" || fail "missing timeout diagnostic"
+                grep -q "fixture download failure" "$output" || fail "timeout did not fall back"
+                ;;
+            error)
+                grep -q "gh extension install failed" "$output" || fail "missing gh failure diagnostic"
+                grep -q "fixture download failure" "$output" || fail "gh failure did not fall back"
+                ;;
+        esac
+    fi
+    echo "Test: gh install diagnostics ($version, $scenario) PASS"
+)
+
+for version in v1.2.3 latest; do
+    for scenario in success error timeout; do
+        test_gh_install_diagnostics "$scenario" "$version"
+    done
 done
 
 echo "All installer behavior tests passed."

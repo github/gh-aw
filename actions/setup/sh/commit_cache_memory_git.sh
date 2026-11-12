@@ -87,15 +87,20 @@ git add -A
 
 # Commit on the current integrity branch; allow empty commits in case
 # the agent made no changes (idempotent).
-if git -c commit.gpgSign=false commit --no-verify --allow-empty -m "run-${RUN_ID}" -q 2>/tmp/gh-aw-commit-err; then
+COMMIT_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/gh-aw-commit.XXXXXX")
+COMMIT_ERROR_FILE="$COMMIT_TEMP_DIR/stderr"
+trap 'rm -f -- "$COMMIT_ERROR_FILE"; rmdir -- "$COMMIT_TEMP_DIR"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+if git -c commit.gpgSign=false commit --no-verify --allow-empty -m "run-${RUN_ID}" -q 2>"$COMMIT_ERROR_FILE"; then
   echo "Cache memory git commit complete (run: $RUN_ID)"
 else
   # Distinguish "nothing to commit" (benign) from real errors
-  if grep -qiE "nothing to commit|nothing added" /tmp/gh-aw-commit-err 2>/dev/null; then
+  if grep -qiE "nothing to commit|nothing added" "$COMMIT_ERROR_FILE" 2>/dev/null; then
     echo "Cache memory git: nothing to commit (run: $RUN_ID)"
   else
     echo "Warning: git commit encountered an issue:" >&2
-    cat /tmp/gh-aw-commit-err >&2
+    cat "$COMMIT_ERROR_FILE" >&2
   fi
 fi
 

@@ -269,8 +269,15 @@ contract permits them, not discovered authority. Pagination and cursor traversal
 MUST NOT be automatic; a declaration needing complete evidence MUST explicitly
 reject incomplete pages.
 
-The encoded selected plan MUST NOT exceed 65536 bytes. Oversized plans MUST
-fail with a request to select fewer capabilities, not silently omit controls.
+New `GH_AW_CONNECTOR_PLAN` values MUST use human-reviewable JSON, not
+base64. Dollar signs and JavaScript template delimiters MUST be escaped
+as JSON Unicode sequences without changing the decoded data. Readers MAY retain
+legacy base64 snapshot support.
+Generated safe-output hosts MUST load plans from compiler-owned workflow
+environment variables, not embed plan data in executable JavaScript.
+
+The serialized selected plan MUST NOT exceed 65536 UTF-8 bytes. Oversized plans
+MUST fail with a request to select fewer capabilities, not silently omit controls.
 Declaration/development documents have a separate 256 KiB limit. Response bytes,
 argument documents, and string code points are different bounds.
 

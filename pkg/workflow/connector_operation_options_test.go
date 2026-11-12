@@ -390,7 +390,7 @@ func TestConnectorOperationOptionsAgentCannotOverrideStaging(t *testing.T) {
 	helpers, err := filepath.Abs("../../actions/setup/js/safe_output_helpers.cjs")
 	require.NoError(t, err)
 	source := generateSafeOutputScriptContent("tracker-add-comment", &SafeScriptConfig{
-		Script: connectorSafeOutputScript("frozen", "add-comment", "PREFIX_", []string{"WRITER"}, false, false),
+		Script: connectorSafeOutputScript("PLAN", "add-comment", "PREFIX_", []string{"WRITER"}, false, false),
 	})
 	for _, global := range []bool{false, true} {
 		t.Run(fmt.Sprintf("global-%t", global), func(t *testing.T) {
@@ -400,7 +400,7 @@ func TestConnectorOperationOptionsAgentCannotOverrideStaging(t *testing.T) {
 const assert = require("node:assert/strict");
 const options = %s;
 process.env = {GH_AW_SAFE_OUTPUTS_STAGED: String(options.global)};
-const env = {RUNNER_TEMP: "runner"};
+const env = {RUNNER_TEMP: "runner", PLAN:"frozen"};
 Object.defineProperty(env, "PREFIX_WRITER", {get() { throw new Error("staging resolved writer credentials"); }});
 let invoked = 0;
 const adaptedRequire = name => {

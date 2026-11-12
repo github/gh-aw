@@ -48,12 +48,12 @@ func resolveRefToSHAViaGit(ctx context.Context, owner, repo, ref, host string) (
 	// Try to resolve the ref using git ls-remote.
 	// ValidateGitRef above guarantees ref does not begin with '-' before it is passed
 	// as a separate argument, so no extra separator is needed here.
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", repoURL, ref)
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", repoURL, ref, ref+"^{}")
 	output, err := cmd.Output()
 	if err != nil {
 		// If exact ref doesn't work, try with refs/heads/ and refs/tags/ prefixes
 		for _, prefix := range []string{"refs/heads/", "refs/tags/"} {
-			cmd = exec.CommandContext(ctx, "git", "ls-remote", repoURL, prefix+ref)
+			cmd = exec.CommandContext(ctx, "git", "ls-remote", repoURL, prefix+ref, prefix+ref+"^{}")
 			output, err = cmd.Output()
 			if err == nil && len(output) > 0 {
 				break
@@ -65,16 +65,32 @@ func resolveRefToSHAViaGit(ctx context.Context, owner, repo, ref, host string) (
 		}
 	}
 
-	// Parse the output: "<sha> <ref>"
-	firstLine, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n")
+	sha, err := parseGitRemoteRefSHA(string(output))
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve ref %s: %w", ref, err)
+	}
+	remoteLog.Printf("Successfully resolved ref via git ls-remote: %s/%s@%s -> %s", owner, repo, ref, sha)
+	return sha, nil
+}
+
+func parseGitRemoteRefSHA(output string) (string, error) {
+	firstLine, _, _ := strings.Cut(strings.TrimSpace(output), "\n")
 	if firstLine == "" {
-		return "", fmt.Errorf("no matching ref found for %s", ref)
+		return "", errors.New("no matching ref found")
 	}
 
-	// Extract SHA from the first line
-	var sha string
-	if _, err := fmt.Sscan(firstLine, &sha); err != nil {
+	var sha, matchedRef string
+	if _, err := fmt.Sscan(firstLine, &sha, &matchedRef); err != nil {
 		return "", errors.New("invalid git ls-remote output format")
+	}
+	matchedRef = strings.TrimSuffix(matchedRef, "^{}")
+	// Annotated tags name tag objects; the peeled ref names the commit.
+	for line := range strings.SplitSeq(output, "\n") {
+		var candidateSHA, candidateRef string
+		if _, err := fmt.Sscan(line, &candidateSHA, &candidateRef); err == nil && candidateRef == matchedRef+"^{}" {
+			sha = candidateSHA
+			break
+		}
 	}
 
 	// Validate it's a valid SHA
@@ -82,7 +98,6 @@ func resolveRefToSHAViaGit(ctx context.Context, owner, repo, ref, host string) (
 		return "", fmt.Errorf("invalid SHA format from git ls-remote: %s", sha)
 	}
 
-	remoteLog.Printf("Successfully resolved ref via git ls-remote: %s/%s@%s -> %s", owner, repo, ref, sha)
 	return sha, nil
 }
 

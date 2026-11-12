@@ -192,7 +192,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        pinned="e5113cd9c697c9443ed269ba3b83e457765da1df"
+        pinned="20236db49103c7e5551a61ed0b8f430eb9d509a7"
         current="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
         if [ -z "$current" ]; then
           echo "No commit found for scratchpad/github-mcp-access-control-specification.md"
@@ -379,6 +379,7 @@ jobs:
         - name: "Workflow Actions & Containers"
           packages: "./pkg/workflow"
           pattern: "^TestAction[^P]|Container"
+          github_token: true
         - name: "CMD Tests"    # All cmd/gh-aw integration tests
           packages: "./cmd/gh-aw"
           pattern: ""
@@ -490,6 +491,12 @@ jobs:
 
     - name: Build gh-aw binary for integration tests
       run: make build
+
+    - name: Install actions-lock for compiler parity integration test
+      if: ${{ matrix.test-group.name == 'Workflow Actions & Containers' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh extension install github/gh-actions-lock --pin v0.2.0
 
     - name: Test model-routing golden capture tooling
       if: ${{ matrix.test-group.name == 'CLI Audit Logs & Firewall' }}

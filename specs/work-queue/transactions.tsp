@@ -316,6 +316,70 @@ model ResultOperation {
   evidence: Evidence;
 }
 @jsonSchema
+model DeliveryEvidenceExpected {
+  ref?: unknown;
+  sha?: unknown;
+  labels?: unknown;
+  assignees?: unknown;
+}
+@jsonSchema
+model DeliveryEvidenceEffect {
+  kind: Identity;
+  repository: Identity;
+  outcome: "succeeded" | "unknown";
+  id?: Identity;
+  @minValue(1)
+  @maxValue(9007199254740991)
+  number?: safeint;
+  commit?: Revision;
+  expected?: DeliveryEvidenceExpected;
+}
+@jsonSchema
+model DeliveryEvidenceNoWriteOutput {
+  @minValue(0)
+  @maxValue(127)
+  index: safeint;
+  @maxLength(128)
+  @extension("x-utf8-max-bytes", 128)
+  type: Identity;
+  verifier: "none";
+  @maxLength(8192)
+  adapter?: string;
+}
+@jsonSchema
+model DeliveryEvidenceWriteOutput {
+  @minValue(0)
+  @maxValue(127)
+  index: safeint;
+  @maxLength(128)
+  @extension("x-utf8-max-bytes", 128)
+  type: Identity;
+  verifier: "builtin" | "native_creation" | "asset" | "code_scanning" | "code_coverage" | "artifact" | "rest_adapter" | "graphql_adapter" | "git_tree_adapter" | "prepared_builtin" | "declared_builtin" | "queue_control";
+  receipt: Record<unknown>;
+  @maxLength(8192)
+  adapter?: string;
+}
+@jsonSchema
+union DeliveryEvidenceOutput {
+  DeliveryEvidenceNoWriteOutput, DeliveryEvidenceWriteOutput
+}
+@jsonSchema
+model DeliveryEvidenceOperation {
+  kind: "DeliveryEvidence";
+  work_id: Identity;
+  claim_id: Identity;
+  dispatch_id: Identity;
+  claim_handle: Identity;
+  completion_id: Identity;
+  run_id: Decimal;
+  run_attempt: 1;
+  @maxItems(128)
+  outputs: DeliveryEvidenceOutput[];
+  @maxItems(256)
+  effects: DeliveryEvidenceEffect[];
+  controls_digest?: Digest;
+}
+@jsonSchema
 model DeliveryFailureOperation {
   kind: "DeliveryFailure";
   work_id: Identity;
@@ -402,7 +466,7 @@ model IssueCommentOperation {
 @jsonSchema
 union QueueOperation {
   PolicyOperation, PoolInstallOperation, DeploymentOperation, ControlOperation, WorkOperation, ClaimOperation,
-  CompletionOperation, ResultOperation, DeliveryFailureOperation,
+  CompletionOperation, DeliveryEvidenceOperation, ResultOperation, DeliveryFailureOperation,
   ObservationOperation, ClaimCancellationOperation, WorkCancellationOperation,
   DispatchOperation, ReleaseOperation, WorkPriorityOperation, CheckpointOperation,
   IssueLinkOperation, IssueCommentOperation
@@ -451,7 +515,7 @@ union RequestParameters {
 @jsonSchema
 model QueueRequest {
   id: Identity;
-  kind: "policy" | "pool_install" | "deployment" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim" | "checkpoint" | "issue_link";
+  kind: "policy" | "pool_install" | "deployment" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "delivery_evidence" | "cancel_work" | "cancel_claim" | "checkpoint" | "issue_link";
   parameters: RequestParameters;
   fingerprint: Digest;
 }

@@ -29,17 +29,21 @@ func TestConnectorNodeDecodesGoPhaseSnapshots(t *testing.T) {
 		t.Run(phase, func(t *testing.T) {
 			plan, err := full.ForPhase(phase)
 			require.NoError(t, err)
-			encoded, err := plan.Encode()
-			require.NoError(t, err)
-			command := exec.CommandContext(t.Context(), node, "-e", `
+			for format, encode := range map[string]func() (string, error){"legacy": plan.Encode, "json": plan.EncodeJSON} {
+				t.Run(format, func(t *testing.T) {
+					encoded, err := encode()
+					require.NoError(t, err)
+					command := exec.CommandContext(t.Context(), node, "-e", `
 const { decodePlan } = require(process.argv[1]);
 const plan = decodePlan(require("node:fs").readFileSync(0, "utf8"));
 process.stdout.write(plan.digest);
 `, runtime)
-			command.Stdin = strings.NewReader(encoded)
-			output, err := command.CombinedOutput()
-			require.NoError(t, err, "%s", output)
-			require.Equal(t, plan.Digest, string(output))
+					command.Stdin = strings.NewReader(encoded)
+					output, err := command.CombinedOutput()
+					require.NoError(t, err, "%s", output)
+					require.Equal(t, plan.Digest, string(output))
+				})
+			}
 		})
 	}
 }
@@ -54,7 +58,7 @@ func TestConnectorNodeStagesGoSafeOutputSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	expected, err := json.Marshal(map[string]any{"staged": true, "request": request})
 	require.NoError(t, err)
-	encoded, err := plan.Encode()
+	encoded, err := plan.EncodeJSON()
 	require.NoError(t, err)
 	input, err := json.Marshal(args)
 	require.NoError(t, err)

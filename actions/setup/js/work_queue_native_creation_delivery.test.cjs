@@ -10,7 +10,7 @@ const { queueFixture, REPOSITORY, WORKFLOW, REF } = require("./work_queue_lifecy
 const { withClaimExecution, closeClaimEffectChannel, recordClaimEffect } = require("./work_queue_claim_scope.cjs");
 const { authorizeWorkerClaim, finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
 const { readDeliveryControlInventory, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
-const { captureDiscussionDelivery, preparePullRequestDelivery, capturePullRequestDelivery } = require("./work_queue_native_creation_delivery.cjs");
+const { captureDiscussionDelivery, preparePullRequestDelivery, capturePullRequestDelivery, durableNativeCreationReceipt, verifyNativeCreationDelivery } = require("./work_queue_native_creation_delivery.cjs");
 const { settleClaimDelivery } = require("./safe_output_handler_manager.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { addDiscussionComment, closeDiscussionAsOutdated } = require("./close_older_discussions.cjs");
@@ -153,6 +153,75 @@ function fixture(type) {
 }
 
 describe("native creation Claim delivery", () => {
+  it.each(["create_discussion", "create_pull_request"])("rechecks serialized %s receipts without the original result or message", async type => {
+    const f = fixture(type);
+    let receipt;
+    if (type === "create_pull_request") Object.assign(f.message, { head_repo: REPOSITORY, base_branch: "main", base_commit: BASE });
+    await f.execute(async () => {
+      await f.capture();
+      receipt = JSON.parse(JSON.stringify(durableNativeCreationReceipt(f.result, f.message, f.member)));
+    });
+    expect(receipt).not.toBeNull();
+    for (const key of ["message", "title", "body", "dispatch_id", "claim_id", "work_id", "claim_handle"]) expect(receipt).not.toHaveProperty(key);
+    expect(JSON.stringify(receipt)).not.toContain("Requested title");
+    expect(JSON.stringify(receipt)).not.toContain("Final body");
+    if (type === "create_pull_request") expect(receipt.transport).toEqual({ head_repo: REPOSITORY, base_branch: "main", base_commit: BASE });
+    const options = { claim: f.member, message: { type, claim_handle: f.member.handle }, result: { entry: { verifier: "native_creation", receipt } }, github: f.client, effects: f.effects, durable: true };
+    await f.execute(async () => {
+      expect((await verifyNativeCreationDelivery(options)).verified).toBe(true);
+      expect((await verifyNativeCreationDelivery({ ...options, durable: false })).verified).toBe(false);
+      const observed = type === "create_discussion" ? f.discussion : f.pull;
+      observed.body = "Changed after creation";
+      expect((await verifyNativeCreationDelivery(options)).verified).toBe(false);
+      observed.body = "Final body";
+      for (const key of ["title_digest", "body_digest", "number", ...(type === "create_pull_request" ? ["commit", "transport", "draft"] : ["category", "repositoryNodeId", "effectIds"])]) {
+        const incomplete = { ...receipt };
+        delete incomplete[key];
+        expect((await verifyNativeCreationDelivery({ ...options, result: { entry: { verifier: "native_creation", receipt: incomplete } } })).verified).toBe(false);
+      }
+      if (type === "create_pull_request") {
+        f.client.rest.git.getRef.mockResolvedValue({ data: { ref: "refs/heads/approved", object: { type: "commit", sha: "a".repeat(40) } } });
+        expect((await verifyNativeCreationDelivery(options)).verified).toBe(false);
+      }
+    });
+  });
+
+  it("keeps native durable export bound to the original message and result", async () => {
+    const f = fixture("create_discussion");
+    await f.execute(async () => {
+      await f.capture();
+      expect(durableNativeCreationReceipt({ ...f.result }, f.message, f.member)).toBeNull();
+      expect(durableNativeCreationReceipt(f.result, { ...f.message, title: "Changed" }, f.member)).toBeNull();
+      f.result.staged = true;
+      expect(durableNativeCreationReceipt(f.result, f.message, f.member)).toBeNull();
+      delete f.result.staged;
+      f.result.fallback_used = true;
+      expect(durableNativeCreationReceipt(f.result, f.message, f.member)).toBeNull();
+    });
+  });
+
+  it("rechecks serialized discussion cleanup body digests", async () => {
+    const f = fixture("create_discussion");
+    const discussion = { id: "D_old", number: 18, repository: f.discussion.repository };
+    const comment = { __typename: "DiscussionComment", id: "DC_old", body: "Cleanup content", discussion };
+    f.client.graphql.mockImplementation(async (_query, variables) => ({ node: variables.id === comment.id ? comment : f.discussion }));
+    let receipt;
+    await f.execute(async () => {
+      await f.capture({ cleanup: [{ type: "comment", id: comment.id, discussionId: discussion.id, effectId: "a".repeat(64), body: comment.body }] });
+      receipt = JSON.parse(JSON.stringify(durableNativeCreationReceipt(f.result, f.message, f.member)));
+    });
+    expect(receipt.cleanup[0]).not.toHaveProperty("body");
+    expect(receipt.cleanup[0].body_digest).toMatch(/^[a-f0-9]{64}$/);
+    const options = { claim: f.member, message: { type: "create_discussion" }, result: { entry: { verifier: "native_creation", receipt } }, github: f.client, effects: f.effects, durable: true };
+    await f.execute(async () => {
+      expect((await verifyNativeCreationDelivery(options)).verified).toBe(true);
+      comment.body = "Changed cleanup";
+      expect((await verifyNativeCreationDelivery(options)).verified).toBe(false);
+      delete receipt.cleanup[0].body_digest;
+      expect((await verifyNativeCreationDelivery(options)).verified).toBe(false);
+    });
+  });
+
   it.each([2 * MAX_CLOSE_COUNT, 2 * MAX_CLOSE_COUNT + 1])("bounds cleanup readbacks for %i receipts from older discussions", async receiptCount => {
     const f = fixture("create_discussion");
     const count = Math.ceil(receiptCount / 2);

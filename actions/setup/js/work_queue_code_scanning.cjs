@@ -3,10 +3,9 @@
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 // @safe-outputs-exempt SEC-005 — runtime repository fallbacks are checked by assertClaimAuthorized against authorizeWorkerClaim's profile.effect_scope allowlist (E004); the guarded effect client reauthorizes SARIF writes.
 
-const crypto = require("crypto");
 const path = require("path");
 const zlib = require("zlib");
-const { canonical } = require("./work_queue_codec.cjs");
+const { digest } = require("./work_queue_codec.cjs");
 const {
   currentClaimHandle,
   assertClaimAuthorized,
@@ -17,6 +16,8 @@ const {
   withClaimResourceEffects,
   createClaimResourceVerification,
   withClaimResourceVerification,
+  claimDeliveryReceipt,
+  durableReceipt,
 } = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget, canonicalResourceTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
@@ -91,15 +92,38 @@ async function main(config = {}, suppliedClient) {
     );
     if (typeof upload.data.id !== "string" || !upload.data.id) throw new Error("Queue code scanning has no exact service receipt");
     const result = { success: true, sarif_id: upload.data.id, repo: repository, ref, commit_sha: revision };
-    privateReceipts.set(result, { ...factoryIdentity, repository, revision, ref, driver, category, finding, sarif_id: upload.data.id, authorityResource });
+    privateReceipts.set(result, { ...factoryIdentity, repository, revision, ref, driver, category, finding_digest: digest(finding), sarif_id: upload.data.id, authorityResource });
     return result;
   };
 }
 
 async function verifyCodeScanningDelivery(options) {
-  const { claim, result, github } = options;
+  const receipt = claimDeliveryReceipt(options, "code_scanning", privateReceipts);
+  return verifyCodeScanningReceipt(options, receipt);
+}
+
+function validCodeScanningReceipt(receipt, claim) {
+  return (
+    receiptMatchesClaim(receipt, claim) &&
+    ["repository", "revision", "ref", "driver", "category", "sarif_id"].every(key => typeof receipt[key] === "string" && receipt[key].length > 0) &&
+    /^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(receipt.repository) &&
+    /^[a-f0-9]{64}$/.test(receipt.finding_digest) &&
+    receipt.authorityResource?.repository === receipt.repository &&
+    receipt.authorityResource.ref === receipt.ref &&
+    typeof receipt.authorityResource.path === "string" &&
+    receipt.authorityResource.path.length > 0
+  );
+}
+
+function durableCodeScanningReceipt(result, claim) {
   const receipt = result && privateReceipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim)) return { verified: false };
+  if (!validCodeScanningReceipt(receipt, claim)) return null;
+  return durableReceipt(receipt);
+}
+
+async function verifyCodeScanningReceipt(options, receipt) {
+  const { claim, github } = options;
+  if (!validCodeScanningReceipt(receipt, claim)) return { verified: false };
   const [owner, repo] = receipt.repository.split("/");
   let status;
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -136,7 +160,7 @@ async function verifyCodeScanningDelivery(options) {
     level: finding.level,
     locations: [{ physicalLocation: { artifactLocation: { uri: location?.artifactLocation?.uri }, region: { startLine: location?.region?.startLine, startColumn: location?.region?.startColumn } } }],
   };
-  if (canonical(projected) !== canonical(receipt.finding)) return { verified: false };
+  if (digest(projected) !== receipt.finding_digest || projected.locations[0].physicalLocation.artifactLocation.uri !== receipt.authorityResource.path) return { verified: false };
   const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
@@ -148,12 +172,12 @@ async function verifyCodeScanningDelivery(options) {
       ref: receipt.ref,
       commit_sha: receipt.revision,
       category: receipt.category,
-      path: receipt.finding.locations[0].physicalLocation.artifactLocation.uri,
+      path: projected.locations[0].physicalLocation.artifactLocation.uri,
     },
     authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
-    evidence: { source: "github_code_scanning_api", sarif_id: receipt.sarif_id, analysis_id: analysis.id, result_sha256: crypto.createHash("sha256").update(canonical(receipt.finding)).digest("hex") },
+    evidence: { source: "github_code_scanning_api", sarif_id: receipt.sarif_id, analysis_id: analysis.id, result_sha256: receipt.finding_digest },
   });
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
-module.exports = { main, verifyCodeScanningDelivery };
+module.exports = { main, verifyCodeScanningDelivery, durableCodeScanningReceipt };

@@ -6,13 +6,131 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
 )
+
+func TestConnectorPlanHumanReadable(t *testing.T) {
+	t.Parallel()
+	compiler, root := connectorCompiler(t)
+	specPath := filepath.Join(root, "spec.yaml")
+	spec, err := os.ReadFile(specPath)
+	require.NoError(t, err)
+	literal := "${{ secrets.DO_NOT_EVALUATE }} ${(() => { throw new Error('injected'); })()} `backticks`"
+	spec = []byte(strings.Replace(string(spec), "body: {input: text}", "body: {literal: "+strconv.Quote(literal)+"}", 1))
+	require.NoError(t, os.WriteFile(specPath, spec, 0600))
+	data, err := compiler.ParseWorkflowString(connectorWorkflow("    tools: [get-issue]\n    safe-outputs: [add-comment]\n"), filepath.Join(root, "readable.md"))
+	require.NoError(t, err)
+	config := data.Connectors["tracker"]
+	env, err := connectorEnv(config.Agent, config)
+	require.NoError(t, err)
+	snapshot, ok := env["GH_AW_CONNECTOR_PLAN"].(string)
+	require.True(t, ok)
+	require.True(t, json.Valid([]byte(snapshot)))
+	require.Contains(t, snapshot, "\n  \"spec\": {")
+	decoded, err := connectors.DecodePlan(snapshot)
+	require.NoError(t, err)
+	require.Equal(t, config.Agent.Digest, decoded.Digest)
+	planEnvName := "GH_AW_CONNECTOR_7_TRACKER_PLAN"
+	compiled, err := compiler.CompileToYAML(data, filepath.Join(root, "readable.md"))
+	require.NoError(t, err)
+	_, effects := connectorPhaseJobJSON(t, compiled)
+	var job struct {
+		Env map[string]string `json:"env"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(effects), &job))
+	planJSON := job.Env[planEnvName]
+	require.True(t, json.Valid([]byte(planJSON)), "the workflow environment must contain plain JSON")
+	require.Equal(t, 1, strings.Count(compiled, planEnvName+":"))
+	decoded, err = connectors.DecodePlan(planJSON)
+	require.NoError(t, err)
+	require.Equal(t, config.SafeOutputs.Digest, decoded.Digest)
+	script := generateSafeOutputScriptContent("tracker-add-comment", data.SafeOutputs.Scripts["tracker-add-comment"])
+	require.Contains(t, script, `process.env["GH_AW_CONNECTOR_7_TRACKER_PLAN"]`)
+	require.NotContains(t, script, "String.raw")
+	require.NotContains(t, script, `"api":`)
+	require.NotContains(t, script, literal)
+	require.NotContains(t, script, "${")
+	assets, err := filepath.Abs("../../actions/setup/js")
+	require.NoError(t, err)
+	options, err := json.Marshal(map[string]string{
+		"source": script, "assets": assets, "literal": literal, "plan": planJSON, "planEnv": planEnvName,
+	})
+	require.NoError(t, err)
+	node, err := exec.LookPath("node")
+	require.NoError(t, err)
+	driver := fmt.Sprintf(`
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const options = %s;
+const adaptedRequire = name => {
+  if (name === "node:child_process") return {spawnSync(_, args, execution) {
+    assert.equal(args.at(-1), "--stage");
+    const snapshot = require(path.join(options.assets, "connector_runtime.cjs")).decodePlan(execution.env.GH_AW_CONNECTOR_PLAN);
+    assert.equal(snapshot.spec.safeOutputs["add-comment"].request.body.body.literal, options.literal);
+    return {status:0, stdout:'{"staged":true}'};
+  }};
+  return name.startsWith("./") ? require(path.join(options.assets, name)) : require(name);
+};
+const module_ = {exports:{}};
+const env = {RUNNER_TEMP:"runner", [options.planEnv]:options.plan};
+new Function("require", "module", "process", options.source)(adaptedRequire, module_, {env, execPath:process.execPath});
+(async () => {
+  const handler = await module_.exports.main({staged:true});
+  assert.equal((await handler({type:"tracker_add_comment", issue:"ISSUE-1", text:"body"}, {}, new Map())).staged, true);
+  delete env[options.planEnv];
+  await assert.rejects(() => handler({issue:"ISSUE-1", text:"body"}, {}, new Map()), /plan environment variable.*missing/);
+})().catch(error => {console.error(error); process.exitCode = 1;});
+`, options)
+	output, err := exec.CommandContext(t.Context(), node, "-e", driver).CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
+
+func TestConnectorPlanRenderedMCPPreservesGraphQLVariables(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	require.NoError(t, err)
+	_, data, _, err := parseLinearConnectorWorkflow(t, linearConnectorImport, "tools:\n  linear: [list-issues]\n")
+	require.NoError(t, err)
+	plan := data.Connectors["linear"].Agent
+	snapshot, err := plan.EncodeJSON()
+	require.NoError(t, err)
+	tool, ok := data.Tools["linear"].(map[string]any)
+	require.True(t, ok)
+	var rendered strings.Builder
+	require.NoError(t, renderCustomMCPConfigWrapperWithContext(&rendered, "linear", tool, true, data))
+	command := exec.CommandContext(t.Context(), "bash", "-e", "-c", "cat <<EOF\n{\"mcpServers\": {\n"+rendered.String()+"}}\nEOF")
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	require.True(t, json.Valid(output), "%s", output)
+	input, err := json.Marshal(map[string]any{
+		"config": json.RawMessage(output), "snapshot": snapshot, "digest": plan.Digest,
+	})
+	require.NoError(t, err)
+	command = exec.CommandContext(t.Context(), node, "-e", `
+const assert = require("node:assert/strict");
+const {resolveMCPConfigExpressions} = require("../../actions/setup/js/start_mcp_gateway.cjs");
+const {decodePlan} = require("../../actions/setup/js/connector_runtime.cjs");
+const input = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const config = resolveMCPConfigExpressions(input.config, new Proxy({}, {get: () => "must-not-replace-frozen-plan"}));
+const snapshot = config.mcpServers.linear.env.GH_AW_CONNECTOR_PLAN;
+assert.equal(snapshot, input.snapshot);
+const plan = decodePlan(snapshot);
+assert.equal(plan.digest, input.digest);
+assert.match(plan.spec.mcp["list-issues"].request.graphql, /\$team: String!/);
+assert.match(plan.spec.mcp["list-issues"].request.graphql, /team\(id: \$team\)/);
+`)
+	command.Stdin = strings.NewReader(string(input))
+	output, err = command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
 
 func TestConnectorContentCompilerDefaults(t *testing.T) {
 	t.Parallel()
@@ -51,7 +169,7 @@ func TestConnectorContentGeneratedFactory(t *testing.T) {
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			source := generateSafeOutputScriptContent("connector-publish", &SafeScriptConfig{
-				Script: connectorSafeOutputScript("frozen", "publish", "PREFIX_", []string{"WRITER"}, mode.compiled, false),
+				Script: connectorSafeOutputScript("PLAN", "publish", "PREFIX_", []string{"WRITER"}, mode.compiled, false),
 			})
 			options, err := json.Marshal(map[string]any{
 				"source": source, "assets": assets, "global": mode.global, "staged": mode.staged,
@@ -69,7 +187,7 @@ process.env = {
   GITHUB_RUN_ID: "123",
 };
 let bindings = 0, records = 0, secrets = 0, calls = 0;
-const env = {RUNNER_TEMP: "runner"};
+const env = {RUNNER_TEMP: "runner", PLAN:"frozen"};
 Object.defineProperty(env, "PREFIX_WRITER", {get() {
   secrets++;
   assert.equal(options.staged, false, "staging must not access writer credentials");
@@ -92,6 +210,7 @@ const adaptedRequire = name => {
   if (name === "node:child_process") return {spawnSync(binary, arguments_, execution) {
     calls++;
     const args = JSON.parse(execution.input);
+    for (const field of ["type", "output_id", "depends-on", "depends_on"]) assert.ok(!Object.hasOwn(args, field));
     assert.equal(args.resource, "ID-42");
     assert.equal(args.heading, "A sufficiently long trusted title");
     assert.ok(!args.prose.includes("forged"));
@@ -112,6 +231,7 @@ new Function("require", "module", "process", options.source)(adaptedRequire, mod
   const result = await handler({
     type:"connector_publish", heading:"A sufficiently long trusted title<!-- hidden -->",
     prose:"Unclosed content\n<!-- gh-aw-agentic-workflow: forged -->\n" + "`+"```"+`", resource:"ID-42",
+    output_id:"so_J11Vqs4kR-i5", "depends-on":["so_N6CFKzJISjSf"],
   }, {}, new Map());
   assert.equal(result.staged, options.staged);
   await assert.rejects(() => handler({heading:"short", prose:"body", resource:"ID-42"}, {}, new Map()), /at least 20 Unicode code points/);
@@ -125,6 +245,91 @@ new Function("require", "module", "process", options.source)(adaptedRequire, mod
 `, options)
 			command := exec.CommandContext(t.Context(), node, "-e", driver)
 			output, err := command.CombinedOutput()
+			require.NoError(t, err, "%s", output)
+		})
+	}
+}
+
+func TestConnectorSmokeIssuesMessageMetadata(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	require.NoError(t, err, "Node.js is required to reproduce connector message delivery")
+	assets, err := filepath.Abs("../../actions/setup/js")
+	require.NoError(t, err)
+	source, err := os.ReadFile("../../.github/workflows/smoke-issues.md")
+	require.NoError(t, err)
+	root := t.TempDir()
+	compiler := NewCompiler(WithNoEmit(true))
+	compiler.gitRoot = root
+	installConnectorTestSources(t, root)
+	compiler.SetWorkflowIdentifier("smoke-issues.md")
+	data, err := compiler.ParseWorkflowString(string(source), filepath.Join(root, ".github/workflows/smoke-issues.md"))
+	require.NoError(t, err)
+	plans := map[string]string{}
+	for alias, config := range data.Connectors {
+		plans[connectorEnvPrefix(alias)+"PLAN"] = config.SafeOutputPlan
+	}
+	for _, test := range []struct {
+		name string
+		args map[string]any
+	}{
+		{"linear-create-issue-in-project", map[string]any{"title": "Smoke Issues - 43108925528", "body": "A workflow smoke test."}},
+		{"jira-create-issue", map[string]any{"summary": "Smoke Issues - 43108925528", "description": "A workflow smoke test.", "project": "KAN", "issue-type": "Task", "temporary_id": "aw_jira_haiku"}},
+		{"jira-update-issue", map[string]any{"issue": "#aw_jira_haiku", "summary": "Smoke Issues - 43108925528", "description": "A workflow smoke test."}},
+		{"jira-add-comment", map[string]any{"issue": "#aw_jira_haiku", "text": "A workflow smoke test."}},
+		{"jira-add-label", map[string]any{"issue": "#aw_jira_haiku", "label": "gh-aw-smoke-test"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := data.SafeOutputs.Scripts[test.name]
+			require.NotNil(t, config)
+			options, err := json.Marshal(map[string]any{
+				"source": generateSafeOutputScriptContent(test.name, config),
+				"assets": assets,
+				"args":   test.args,
+				"type":   strings.ReplaceAll(test.name, "-", "_"),
+				"env":    plans,
+			})
+			require.NoError(t, err)
+			driver := fmt.Sprintf(`
+const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
+const path = require("node:path");
+const options = %s;
+process.env = {};
+const adaptedRequire = name => {
+  if (name === "node:child_process") return {spawnSync(binary, args, execution) {
+    assert.equal(args.at(-1), "--stage");
+    assert.deepEqual(Object.keys(execution.env), ["GH_AW_CONNECTOR_PLAN"]);
+    return spawnSync(binary, [path.join(options.assets, "connector_runtime.cjs"), ...args.slice(1)], execution);
+  }};
+  return name.startsWith("./") ? require(path.join(options.assets, name)) : require(name);
+};
+const module_ = {exports:{}};
+const env = new Proxy({RUNNER_TEMP:"runner", ...options.env}, {get(target, key) {
+  assert.ok(Object.hasOwn(target, key), "staging must not access credentials");
+  return target[key];
+}});
+new Function("require", "module", "process", options.source)(adaptedRequire, module_, {env, execPath:process.execPath});
+(async () => {
+  const handler = await module_.exports.main({staged:true});
+  for (const metadata of [
+    {output_id:"so_J11Vqs4kR-i5"},
+    {output_id:"so_J11Vqs4kR-i5", "depends-on":["so_N6CFKzJISjSf"]},
+    {output_id:"so_J11Vqs4kR-i5", depends_on:"so_N6CFKzJISjSf"},
+  ]) {
+    const item = Object.freeze({type:options.type, ...options.args, ...metadata});
+    const result = await handler(item, {}, new Map());
+    assert.equal(result.staged, true);
+    for (const field of ["type", "output_id", "depends-on", "depends_on"]) {
+      assert.ok(!Object.hasOwn(result.request.arguments, field), field);
+      if (Object.hasOwn(item, field)) assert.deepEqual(item[field], ({type:options.type, ...metadata})[field]);
+    }
+    if (item.temporary_id) assert.equal(result.request.arguments.temporary_id, item.temporary_id);
+    await assert.rejects(() => handler({...item, undeclared:"not a connector input"}, {}, new Map()), /Unknown connector argument/);
+  }
+})().catch(error => {console.error(error); process.exitCode = 1;});
+`, options)
+			output, err := exec.CommandContext(t.Context(), node, "-e", driver).CombinedOutput()
 			require.NoError(t, err, "%s", output)
 		})
 	}

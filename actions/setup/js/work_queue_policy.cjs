@@ -11,7 +11,7 @@ const ROLE_KINDS = {
   administrator: ["policy", "pool_install", "deployment", "control", "submit", "dispatch_next", "observe", "cancel_work", "checkpoint"],
   producer: ["pool_install", "deployment", "submit", "cancel_work"],
   dispatcher: ["pool_install", "deployment", "submit", "dispatch_next", "observe", "dispatch"],
-  worker: ["submit", "dispatch_next", "observe", "finish", "dispatch"],
+  worker: ["submit", "dispatch_next", "observe", "finish", "dispatch", "delivery_evidence"],
   reconciler: ["observe", "dispatch", "release", "result", "delivery_failure", "cancel_claim", "cancel_work"],
   projector: ["issue_link"],
 };

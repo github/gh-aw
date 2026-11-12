@@ -35,7 +35,7 @@ Local runtime imports have the same author expression capabilities as the main w
 
 ### Prompt Execution and Credentials
 
-Activation-job prompt creation, interpolation, and substitution use pinned `actions/github-script` actions. Their default GitHub token is replaced with the non-secret `no-authentication` placeholder because the action requires a nonempty token. Before loading prompt modules, the compiler-owned script removes environment variables outside its explicit bindings and non-secret runner/context allowlist, including inherited tokens and Node startup options. Prompt modules receive `core` and `context`, not an authenticated API client. Existing shell validation and printing steps remain shell steps.
+Activation-job prompt creation, interpolation, and substitution use pinned `actions/github-script` actions. Their default GitHub token is replaced with the non-secret `no-authentication` placeholder because the action requires a nonempty token. Before loading prompt modules, the shared `setup_prompt_globals.cjs` helper removes environment variables outside its explicit bindings and non-secret runner/context allowlist, including inherited tokens and Node startup options. The compiler passes selected binding names through `GH_AW_PROMPT_ENV`, keeping environment filtering and global setup out of generated lock-file scripts. Prompt modules receive `core` and `context`, not an authenticated API client. Existing shell validation and printing steps remain shell steps.
 
 Environment cleanup occurs after the action starts, not before Node startup. It is not process-startup, filesystem, or runner isolation; authors must not place credentials in prompt files, inputs, or custom job outputs.
 

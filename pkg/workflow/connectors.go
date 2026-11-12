@@ -39,6 +39,7 @@ type WorkflowConnector struct {
 	Agent             *connectors.Plan
 	Context           *connectors.Plan
 	SafeOutputs       *connectors.Plan
+	SafeOutputPlan    string
 	SafeOutputOptions map[string]ConnectorOperationOptions
 	ContextArgs       map[string]map[string]any
 	Alias             string

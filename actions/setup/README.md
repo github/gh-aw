@@ -137,6 +137,18 @@ This action copies files from `actions/setup/`, including:
 
 All files are copied from the committed `js/` and `sh/` directories which contain the source of truth for all JavaScript and shell scripts.
 
+### Agent step summary publication
+
+The compiler publishes the agent's step summary only after every built-in and
+custom secret-masking step succeeds. Unreadable directories fail redaction rather
+than silently bypassing its coverage. `append_agent_step_summary.sh` delegates to
+the Node.js publisher, which reuses the shared guarded-file reader's Linux
+directory-relative descriptors and no-follow opens for every path component.
+Only isolated regular files up to 10 MiB are accepted; source and ancestor
+symlinks cannot redirect publication. Missing or empty summaries remain a no-op;
+unsafe inputs fail with a diagnostic without publishing their content. As with
+other guarded asset readers, unsupported platforms fail closed.
+
 ## AWF release downloads
 
 The AWF installer retries release downloads up to eight times with exponential

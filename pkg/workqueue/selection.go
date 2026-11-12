@@ -4,7 +4,6 @@ import (
 	"maps"
 	"math/big"
 	"slices"
-	"sort"
 	"strconv"
 )
 
@@ -215,7 +214,7 @@ func selectBucket(state Projection, poolName string, at int64, buckets map[int]m
 	}
 	var selectedClass string
 	if state.Policy.Mode == "strict-priority" {
-		sort.Strings(classes)
+		slices.Sort(classes)
 		for _, class := range classes {
 			selectedClass = class
 			break
@@ -274,6 +273,7 @@ func cloneProjection(state Projection) Projection {
 	maps.Copy(copy.ObservationWrites, state.ObservationWrites)
 	copy.ObservationIDs = maps.Clone(state.ObservationIDs)
 	copy.TerminalBarriers = maps.Clone(state.TerminalBarriers)
+	copy.DeliveryEvidence = maps.Clone(state.DeliveryEvidence)
 	copy.Cancellations = maps.Clone(state.Cancellations)
 	copy.WorkCreators = maps.Clone(state.WorkCreators)
 	copy.ClaimExplanations = maps.Clone(state.ClaimExplanations)

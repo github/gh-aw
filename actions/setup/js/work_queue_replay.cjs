@@ -44,6 +44,8 @@ const {
   validateDispatchParameters,
 } = require("./work_queue_scheduler.cjs");
 
+const DELIVERY_EVIDENCE_MAX_BYTES = 32 * 1024;
+
 const OP_FIELDS = {
   Policy: [["kind", "epoch", "policy"], []],
   PoolInstall: [["kind", "pool", "config"], ["config_ref"]],
@@ -55,6 +57,7 @@ const OP_FIELDS = {
   ],
   Claim: [["kind", "work_id", "claim_id", "dispatch_id", "handle", "observations"], []],
   Completion: [["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "run_id", "run_attempt"], ["keep_open"]],
+  DeliveryEvidence: [["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "completion_id", "run_id", "run_attempt", "outputs", "effects"], ["controls_digest"]],
   Result: [["kind", "work_id", "claim_id", "completion_id", "descriptor", "evidence"], []],
   DeliveryFailure: [["kind", "work_id", "claim_id", "completion_id", "reason", "disposition", "evidence"], []],
   Observation: [
@@ -128,6 +131,7 @@ const REQUEST_KINDS = {
   release: ["ClaimCancellation", "WorkCancellation", "Release"],
   result: ["Result"],
   delivery_failure: ["DeliveryFailure"],
+  delivery_evidence: ["DeliveryEvidence"],
   cancel_work: ["WorkCancellation"],
   cancel_claim: ["ClaimCancellation", "WorkCancellation"],
   checkpoint: ["Checkpoint"],
@@ -142,6 +146,7 @@ const OP_ROLES = {
   Work: ["producer", "dispatcher", "worker", "administrator"],
   Claim: ["dispatcher", "administrator", "worker"],
   Completion: ["worker"],
+  DeliveryEvidence: ["worker"],
   Result: ["reconciler"],
   DeliveryFailure: ["reconciler"],
   Observation: ["reconciler", "dispatcher", "administrator", "worker"],
@@ -184,6 +189,42 @@ function validateOperation(operation) {
   closed(operation, OP_FIELDS[operation.kind][0], OP_FIELDS[operation.kind][1], operation.kind, "unsupported_protocol");
   for (const field of ["work_id", "claim_id", "dispatch_id", "handle", "claim_handle", "completion_id", "epoch", "observation_id", "credential_generation", "read_status"])
     if (Object.hasOwn(operation, field)) identity(operation[field], field);
+  if (operation.kind === "DeliveryEvidence") {
+    decimal(operation.run_id, "evidence run ID");
+    if (operation.run_attempt !== 1) throw queueError("evidence_invalid", "DeliveryEvidence requires native attempt 1");
+    if (!Array.isArray(operation.outputs) || operation.outputs.length > 128 || !Array.isArray(operation.effects) || operation.effects.length > 256)
+      throw queueError("evidence_invalid", "DeliveryEvidence requires at most 128 outputs and 256 effects");
+    if (Object.hasOwn(operation, "controls_digest") && (typeof operation.controls_digest !== "string" || !/^[0-9a-f]{64}$/.test(operation.controls_digest)))
+      throw queueError("evidence_invalid", "DeliveryEvidence controls_digest requires a lowercase SHA256 digest");
+    boundedBytes(operation, DELIVERY_EVIDENCE_MAX_BYTES, "DeliveryEvidence");
+    let previousIndex = -1;
+    for (const entry of operation.outputs) {
+      closed(entry, ["index", "type", "verifier"], ["receipt", "adapter"], "delivery evidence output");
+      integer(entry.index, 0, 127, "delivery evidence output index");
+      identity(entry.type, "delivery evidence output type", false, 128);
+      if (entry.index <= previousIndex) throw queueError("evidence_invalid", "DeliveryEvidence output indexes require strictly increasing order");
+      previousIndex = entry.index;
+      if (
+        !["none", "builtin", "native_creation", "asset", "code_scanning", "code_coverage", "artifact", "rest_adapter", "graphql_adapter", "git_tree_adapter", "prepared_builtin", "declared_builtin", "queue_control"].includes(entry.verifier)
+      )
+        throw queueError("evidence_invalid", "DeliveryEvidence requires a supported verifier");
+      if ((entry.verifier === "none") === Object.hasOwn(entry, "receipt")) throw queueError("evidence_invalid", "DeliveryEvidence receipts are required exactly for write verifiers");
+      if (Object.hasOwn(entry, "receipt") && (!entry.receipt || typeof entry.receipt !== "object" || Array.isArray(entry.receipt))) throw queueError("evidence_invalid", "DeliveryEvidence receipt requires an object");
+      if (Object.hasOwn(entry, "adapter")) {
+        if (typeof entry.adapter !== "string" || Buffer.byteLength(entry.adapter, "utf8") > 8192) throw queueError("evidence_invalid", "DeliveryEvidence adapter requires JSON within 8192 bytes");
+        parseStrictJSON(entry.adapter);
+      }
+    }
+    for (const effect of operation.effects) {
+      closed(effect, ["kind", "repository", "outcome"], ["id", "number", "commit", "expected"], "delivery evidence effect");
+      for (const field of ["kind", "repository", "id"]) if (Object.hasOwn(effect, field)) identity(effect[field], `delivery evidence effect ${field}`);
+      if (!["succeeded", "unknown"].includes(effect.outcome)) throw queueError("evidence_invalid", "DeliveryEvidence effect outcome requires succeeded or unknown");
+      if (Object.hasOwn(effect, "number")) integer(effect.number, 1, Number.MAX_SAFE_INTEGER, "delivery evidence effect number");
+      if (Object.hasOwn(effect, "commit") && (typeof effect.commit !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(effect.commit)))
+        throw queueError("evidence_invalid", "DeliveryEvidence effect commit requires an immutable revision");
+      if (Object.hasOwn(effect, "expected")) closed(effect.expected, [], ["ref", "sha", "labels", "assignees"], "delivery evidence effect expectation");
+    }
+  }
   if (Object.hasOwn(operation, "reason")) validateReason(operation.reason);
   if (operation.kind === "WorkCancellation" && Object.hasOwn(operation, "version") && operation.version !== 1) throw queueError("unsupported_protocol", "checked WorkCancellation requires version 1");
   if (Object.hasOwn(operation, "evidence")) validateEvidence(operation.evidence);
@@ -413,6 +454,7 @@ function newState() {
     observation_writes: new Map(),
     lifecycleWrites: new Map(),
     terminalBarriers: new Map(),
+    deliveryEvidence: new Map(),
     cancellations: new Map(),
     ledgerBytes: 0,
     transactions,
@@ -543,6 +585,26 @@ function applyLifecycle(state, operation, commit) {
       }
       break;
     }
+    case "DeliveryEvidence": {
+      const authority = claimAuthority(state, operation.claim_id, commit.actor, true);
+      if (
+        operation.work_id !== authority.work.work_id ||
+        operation.dispatch_id !== authority.dispatch.dispatch_id ||
+        operation.claim_handle !== authority.claim.handle ||
+        operation.run_id !== authority.dispatch.run.run_id ||
+        operation.completion_id !== authority.work.completion_id
+      )
+        throw queueError("claim_scope_invalid", "DeliveryEvidence is outside native Claim scope");
+      const barrier = authority.claim.keep_open ? authority.claim.barrier : authority.work.barrier;
+      if (barrier !== "pending") throw queueError("delivery_conflict", "DeliveryEvidence requires a pending delivery barrier");
+      const previous = state.deliveryEvidence.get(operation.claim_id);
+      if (previous) {
+        if (canonical(previous) !== canonical(operation)) throw queueError("delivery_conflict", "DeliveryEvidence is immutable per Completion");
+        break;
+      }
+      state.deliveryEvidence.set(operation.claim_id, operation);
+      break;
+    }
     case "ClaimCancellation": {
       if (claim?.state === "cancelled") {
         const cancelled = state.cancellations.get(claim.claim_id);
@@ -650,6 +712,7 @@ function applyLifecycle(state, operation, commit) {
         if (claim.keep_open) claim.barrier = "failed";
       }
       state.terminalBarriers.set(operation.work_id, operation);
+      state.deliveryEvidence.delete(operation.claim_id);
       if (claim.keep_open) {
         state.terminalBarriers.set(operation.claim_id, operation);
         if (operation.kind === "Result") {
@@ -864,6 +927,7 @@ function checkpointSnapshot(state, lastAt, retainPolicyHistory = true) {
     seen_generations: object([...state.seen_generations].map(generation => [generation, true])),
     observation_ids: object(state.observationsById),
     terminal_barriers: object(state.terminalBarriers),
+    ...(state.deliveryEvidence.size ? { delivery_evidence: object(state.deliveryEvidence) } : {}),
     cancellations: object(state.cancellations),
     completion_times: completionTimes,
     last_at: lastAt,
@@ -903,7 +967,7 @@ function restoreCheckpointState(checkpoint) {
       "completion_times",
       "last_at",
     ],
-    ["deployments"],
+    ["deployments", "delivery_evidence"],
     "checkpoint state",
     "checkpoint_invalid"
   );
@@ -914,6 +978,7 @@ function restoreCheckpointState(checkpoint) {
   const object = value => value && typeof value === "object" && !Array.isArray(value);
   for (const key of ["works", "claims", "dispatches", "observations", "clocks", "observation_writes", "seen_epochs", "seen_generations", "observation_ids", "terminal_barriers", "cancellations", "completion_times"])
     if (!object(snapshot[key])) throw invalid();
+  if (Object.hasOwn(snapshot, "delivery_evidence") && !object(snapshot.delivery_evidence)) throw invalid();
   if (
     !Array.isArray(snapshot.requests) ||
     snapshot.requests.length !== snapshot.stats?.transactions ||
@@ -952,6 +1017,7 @@ function restoreCheckpointState(checkpoint) {
   state.observationsById = new Map(Object.entries(snapshot.observation_ids));
   state.observation_writes = new Map(Object.entries(snapshot.observation_writes));
   state.terminalBarriers = new Map(Object.entries(snapshot.terminal_barriers));
+  state.deliveryEvidence = new Map(Object.entries(snapshot.delivery_evidence ?? {}));
   state.cancellations = new Map(Object.entries(snapshot.cancellations));
   state.lifecycleWrites = new Map([...state.dispatches].map(([id, dispatch]) => [id, dispatch.lifecycle_writes]));
   state.clocks = new Map(
@@ -1114,6 +1180,27 @@ function restoreCheckpointState(checkpoint) {
       }
     }
   }
+  for (const [id, evidence] of state.deliveryEvidence) {
+    validateOperation(evidence);
+    const claim = state.claims.get(id);
+    const work = state.works.get(evidence.work_id);
+    const dispatch = state.dispatches.get(evidence.dispatch_id);
+    if (
+      evidence.kind !== "DeliveryEvidence" ||
+      evidence.claim_id !== id ||
+      !claim ||
+      claim.state !== "completed" ||
+      claim.work_id !== evidence.work_id ||
+      claim.dispatch_id !== evidence.dispatch_id ||
+      claim.handle !== evidence.claim_handle ||
+      !work ||
+      work.claim_id !== id ||
+      work.completion_id !== evidence.completion_id ||
+      (claim.keep_open ? claim.barrier : work.barrier) !== "pending" ||
+      dispatch?.run?.run_id !== evidence.run_id
+    )
+      throw invalid();
+  }
   const checkpointStarts = new Map();
   for (const receipt of snapshot.requests)
     for (const event of receipt.events)
@@ -1184,7 +1271,7 @@ function expandCheckpointSnapshot(wire) {
       "completion_times",
       "last_at",
     ],
-    ["deployments"],
+    ["deployments", "delivery_evidence"],
     "checkpoint state",
     "checkpoint_invalid"
   );
