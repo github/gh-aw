@@ -20,62 +20,51 @@ var actionPinsLog = logger.New("actionpins:actionpins")
 var actionPinsJSON []byte
 
 // actionPinsCache bundles the parsed/derived action pin data behind a single
-// pointer so the package-level variable holding it is never a bare slice or
-// map that gets reassigned in place; the pointer itself is written exactly
-// once (guarded by actionPinsOnce) and is treated as read-only thereafter.
+// pointer so the package-level value is treated as read-only after lazy
+// initialization.
 type actionPinsCache struct {
 	pins       []ActionPin
 	byRepo     map[string][]ActionPin
 	containers map[string]ContainerPin
 }
 
-var (
-	cachedPins     *actionPinsCache
-	actionPinsOnce sync.Once
-)
+var cachedPins = sync.OnceValue(func() *actionPinsCache {
+	actionPinsLog.Print("Unmarshaling action pins from embedded JSON (first call, will be cached)")
+
+	data := loadActionPinsData(actionPinsJSON)
+
+	pins := slices.Collect(maps.Values(data.Entries))
+
+	slices.SortFunc(pins, func(a, b ActionPin) int {
+		if a.Version != b.Version {
+			return cmp.Compare(b.Version, a.Version) // descending by version
+		}
+		return cmp.Compare(a.Repo, b.Repo)
+	})
+
+	actionPinsLog.Printf("Successfully unmarshaled and sorted %d action pins from JSON", len(pins))
+
+	byRepo := buildByRepoIndex(pins)
+	actionPinsLog.Printf("Built per-repo action pin index for %d repos", len(byRepo))
+
+	containers := data.Containers
+	if containers == nil {
+		containers = make(map[string]ContainerPin)
+	}
+	actionPinsLog.Printf("Loaded %d container pins from JSON", len(containers))
+
+	return &actionPinsCache{
+		pins:       pins,
+		byRepo:     byRepo,
+		containers: containers,
+	}
+})
 
 // getCachedActionPins returns the initialized action pin cache.
 // Panics if cache initialization did not complete, which can only follow
 // invalid embedded action pin data.
 func getCachedActionPins() *actionPinsCache {
-	actionPinsOnce.Do(func() {
-		actionPinsLog.Print("Unmarshaling action pins from embedded JSON (first call, will be cached)")
-
-		data := loadActionPinsData(actionPinsJSON)
-
-		pins := slices.Collect(maps.Values(data.Entries))
-
-		slices.SortFunc(pins, func(a, b ActionPin) int {
-			if a.Version != b.Version {
-				return cmp.Compare(b.Version, a.Version) // descending by version
-			}
-			return cmp.Compare(a.Repo, b.Repo)
-		})
-
-		actionPinsLog.Printf("Successfully unmarshaled and sorted %d action pins from JSON", len(pins))
-
-		byRepo := buildByRepoIndex(pins)
-		actionPinsLog.Printf("Built per-repo action pin index for %d repos", len(byRepo))
-
-		containers := data.Containers
-		if containers == nil {
-			containers = make(map[string]ContainerPin)
-		}
-		actionPinsLog.Printf("Loaded %d container pins from JSON", len(containers))
-
-		cachedPins = &actionPinsCache{
-			pins:       pins,
-			byRepo:     byRepo,
-			containers: containers,
-		}
-	})
-
-	if cachedPins == nil {
-		// Build-time invariant: actionPinsOnce.Do above always assigns cachedPins
-		// unless loadActionPinsData panicked, so this is unreachable in practice.
-		panic("action pins cache was not initialized")
-	}
-	return cachedPins
+	return cachedPins()
 }
 
 // loadActionPinsData unmarshals embedded action pin data.
