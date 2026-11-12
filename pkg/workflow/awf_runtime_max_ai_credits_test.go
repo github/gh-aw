@@ -59,6 +59,19 @@ func runRuntimeMaxAICreditsScript(t *testing.T, script string, env ...string) ru
 	return runtimeMaxAICreditsResult{apiProxy: apiProxy, output: string(out)}
 }
 
+// TestRuntimeMaxAICreditsNormalization_Shellcheck verifies the runtime normalization
+// script passes ShellCheck, which gh aw compile --dry-run runs on generated steps.
+func TestRuntimeMaxAICreditsNormalization_Shellcheck(t *testing.T) {
+	if _, err := exec.LookPath("shellcheck"); err != nil {
+		t.Skip("shellcheck is not installed")
+	}
+	script := buildRuntimeMaxAICreditsNormalization(&WorkflowData{}, "1000")
+	cmd := exec.Command("shellcheck", "-s", "bash", "-")
+	cmd.Stdin = strings.NewReader(script)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "runtime max AI credits normalization must pass ShellCheck:\n%s", output)
+}
+
 // TestRuntimeMaxAICreditsVariableValues runs the compiled AWF step with runtime
 // GH_AW_MAX_AI_CREDITS values (as resolved from vars.GH_AW_DEFAULT_*_MAX_AI_CREDITS)
 // and verifies they are accepted exactly like frontmatter values. Covers T-AIC-PR-003.

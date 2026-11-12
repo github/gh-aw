@@ -1142,6 +1142,7 @@ jobs:
           GH_AW_AIC_LIMIT=""
           if [[ "$GH_AW_MAX_AI_CREDITS" =~ ^[[:space:]]*(-1|[+]?0*([1-9][0-9]{0,18})([kKmM]?))[[:space:]]*$ ]]; then
             case "${BASH_REMATCH[3]}" in [kK]) GH_AW_AIC_SCALE=1000 ;; [mM]) GH_AW_AIC_SCALE=1000000 ;; *) GH_AW_AIC_SCALE=1 ;; esac
+            # shellcheck disable=SC2071 # intentional lexical compare of 19-digit strings avoids 64-bit arithmetic overflow
             if [[ "${BASH_REMATCH[1]}" == "-1" ]]; then
               GH_AW_AIC_LIMIT="-1"
             elif [[ "${#BASH_REMATCH[2]}" -lt 19 || "${BASH_REMATCH[2]}" < "9223372036854775808" ]] && (( BASH_REMATCH[2] <= 9223372036854775807 / GH_AW_AIC_SCALE )); then
@@ -2185,6 +2186,7 @@ jobs:
           GH_AW_AIC_LIMIT=""
           if [[ "$GH_AW_MAX_AI_CREDITS" =~ ^[[:space:]]*(-1|[+]?0*([1-9][0-9]{0,18})([kKmM]?))[[:space:]]*$ ]]; then
             case "${BASH_REMATCH[3]}" in [kK]) GH_AW_AIC_SCALE=1000 ;; [mM]) GH_AW_AIC_SCALE=1000000 ;; *) GH_AW_AIC_SCALE=1 ;; esac
+            # shellcheck disable=SC2071 # intentional lexical compare of 19-digit strings avoids 64-bit arithmetic overflow
             if [[ "${BASH_REMATCH[1]}" == "-1" ]]; then
               GH_AW_AIC_LIMIT="-1"
             elif [[ "${#BASH_REMATCH[2]}" -lt 19 || "${BASH_REMATCH[2]}" < "9223372036854775808" ]] && (( BASH_REMATCH[2] <= 9223372036854775807 / GH_AW_AIC_SCALE )); then
