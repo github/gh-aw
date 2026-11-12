@@ -48,13 +48,18 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  *   the declared model and endpoint; S4 events carry the declared agent name
  *   (when configured)
  * - T1–T4 AWF AI-credit steering (only when `steering` is configured):
- *   T1 an `ai_credit` 80% notice on a 200 response in token-usage.jsonl, the
- *   same `steering` on the session `firewall.token_usage` event with the same
- *   request ID, and no `subagent.started` events (the main agent received it);
- *   T2 each `(type, threshold)` at most once, thresholds in {80, 90, 95, 99},
- *   and each `ai_credit` notice's pre-request total at or above that share of
- *   the budget (order is not checked: AWF sends the highest pending threshold
- *   first); T3 the final `ai_credits_total` is below the budget, no
+ *   T1 the main agent was steered: an `ai_credit` 80% notice on a 200 response
+ *   in token-usage.jsonl, or an `ai_credit` `little_left` `steering_delivery`
+ *   on a 2xx response (AWF can send it before 80% on a small budget, and the
+ *   agent may then stop before 80%); every legacy `steering` record and the
+ *   chosen `little_left` delivery match the session `firewall.token_usage`
+ *   event with the same request ID, and no `subagent.started` events (the main
+ *   agent received it);
+ *   T2 each `(type, threshold)` legacy `steering` record at most once,
+ *   thresholds in {80, 90, 95, 99}, and each `ai_credit` notice's pre-request
+ *   total at or above that share of the budget (order is not checked: AWF
+ *   sends the highest pending threshold first); zero threshold notices are
+ *   allowed only when T1 passed on a `little_left` delivery; T3 the final `ai_credits_total` is below the budget, no
  *   `ai_credits_limit_exceeded` routing failure, and agent execution
  *   succeeded; T4 every other check passed
  *
@@ -687,18 +692,32 @@ function steeringKey(steering) {
   return `${steering?.type ?? "<no type>"}@${steering?.threshold ?? "<no threshold>"}`;
 }
 
-/** @param {any} request @returns {string} */
-function describeNotice(request) {
+/** @param {any} delivery @returns {boolean} */
+function isCreditLittleLeft(delivery) {
+  return delivery?.type === "ai_credit" && delivery?.trigger === "little_left";
+}
+
+/** @param {unknown} status @returns {boolean} */
+function isSuccessStatus(status) {
+  const code = Number(status);
+  return code >= 200 && code < 300;
+}
+
+/** @param {any} request @param {string} [key] @returns {string} */
+function describeNotice(request, key = steeringKey(request?.steering)) {
   const total = finiteNumber(request?.ai_credits_total);
   const thisResponse = finiteNumber(request?.ai_credits_this_response);
   const before = total !== undefined && thisResponse !== undefined ? Number((total - thisResponse).toFixed(6)) : "<unknown>";
-  return `${steeringKey(request?.steering)} request=${requestId(request) || "<none>"} status=${request?.status ?? "<none>"} total_before=${before} total_after=${total ?? "<unknown>"}`;
+  return `${key} request=${requestId(request) || "<none>"} status=${request?.status ?? "<none>"} total_before=${before} total_after=${total ?? "<unknown>"}`;
 }
 
 /** @param {any[]} requests @returns {string} */
 function describeNotices(requests) {
   if (!requests.length) return "none";
-  const shown = requests.slice(0, MAX_OBSERVED).map(describeNotice).join(", ");
+  const shown = requests
+    .slice(0, MAX_OBSERVED)
+    .map(request => describeNotice(request))
+    .join(", ");
   return requests.length > MAX_OBSERVED ? `${shown}, … (${requests.length} total)` : shown;
 }
 
@@ -729,11 +748,27 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
   const sessionNotices = sessionUsage.filter(event => event.data?.steering && typeof event.data.steering === "object");
   const describeSessionNotices = () => (sessionNotices.length ? sessionNotices.map(event => `${steeringKey(event.data.steering)} request=${eventRequestId(event) || "<none>"}`).join(", ") : "none");
 
-  // T1: the 80% notice reached the main agent and both logs agree on it.
+  // T1: the 80% notice, or a little_left delivery, reached the main agent and
+  // both logs agree on it. On a small budget AWF can send little_left before
+  // 80%; the agent then stops and no threshold is ever crossed.
   const t1Problems = [];
   const credit80 = notices.filter(request => request.steering.type === "ai_credit" && Number(request.steering.threshold) === 80);
-  if (!credit80.length) t1Problems.push(`no ai_credit@80 notice in token-usage.jsonl`);
-  else if (!credit80.some(request => Number(request.status) === 200)) t1Problems.push(`ai_credit@80 notice only on non-200 response(s), so it never reached the model`);
+  const credit80Delivered = credit80.find(request => Number(request.status) === 200);
+  const littleLeft = agentTraffic.filter(request => isCreditLittleLeft(request?.steering_delivery));
+  const littleLeftDelivered = littleLeft.filter(request => isSuccessStatus(request.status));
+  const littleLeftMatched = littleLeftDelivered.find(request => {
+    const id = requestId(request);
+    return Boolean(id) && sessionUsage.some(event => eventRequestId(event) === id && isCreditLittleLeft(event.data?.steeringDelivery));
+  });
+  const describeLittleLeft = (/** @type {any[]} */ list) => (list.length ? list.map(request => describeNotice(request, "ai_credit@little_left")).join(", ") : "none");
+  if (!credit80Delivered && !littleLeftMatched) {
+    if (credit80.length) t1Problems.push(`ai_credit@80 notice only on non-200 response(s), so it never reached the model`);
+    else if (!littleLeft.length) t1Problems.push(`no ai_credit@80 notice or ai_credit little_left delivery in token-usage.jsonl`);
+    if (littleLeft.length && !littleLeftDelivered.length) t1Problems.push(`ai_credit little_left delivery only on non-2xx response(s), so it never reached the model`);
+    else if (littleLeftDelivered.length) {
+      t1Problems.push(`no session firewall.token_usage event carries the ai_credit little_left delivery for request(s) ${littleLeftDelivered.map(request => requestId(request) || "<none>").join(", ")}`);
+    }
+  }
   const noticeKey = (id, steering) => JSON.stringify([id, steeringKey(steering)]);
   const tokenNoticeKeys = new Set(notices.map(request => noticeKey(requestId(request), request.steering)));
   for (const request of notices) {
@@ -749,15 +784,19 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
   if (unmatchedSession.length) t1Problems.push(`session notice(s) with no matching token-usage.jsonl record: ${unmatchedSession.map(event => `${steeringKey(event.data.steering)} request=${eventRequestId(event) || "<none>"}`).join(", ")}`);
   const started = events.filter(event => event?.type === "subagent.started");
   if (started.length) t1Problems.push(`${started.length} subagent.started event(s), so a notice may have gone to a sub-agent: ${describeEvents(started)}`);
-  if (t1Problems.length) fail("T1", `${t1Problems.join("; ")}; observed token-usage notices: ${describeNotices(notices)}; observed session notices: ${describeSessionNotices()}`);
-  else pass("T1", `main agent received ${describeNotice(credit80.find(request => Number(request.status) === 200))}; session event matches; no sub-agents`);
+  if (t1Problems.length) {
+    fail("T1", `${t1Problems.join("; ")}; observed token-usage notices: ${describeNotices(notices)}; observed little_left deliveries: ${describeLittleLeft(littleLeft)}; observed session notices: ${describeSessionNotices()}`);
+  } else if (credit80Delivered) pass("T1", `main agent received ${describeNotice(credit80Delivered)}; session event matches; no sub-agents`);
+  else pass("T1", `main agent received ${describeNotice(littleLeftMatched, "ai_credit@little_left")} before any threshold notice; session event matches; no sub-agents`);
+  const t1PassedOnLittleLeft = !t1Problems.length && !credit80Delivered && Boolean(littleLeftMatched);
 
   // T2: each (type, threshold) once, on a known threshold, and never early.
   // Order is not checked: AWF sends the highest pending threshold first.
   // Uses the legacy `steering` records, written at most once per threshold per
-  // run; `steering_delivery` repeats each notice once per conversation.
+  // run; `steering_delivery` repeats each notice once per conversation. A run
+  // steered by little_left before 80% has no threshold notices.
   const t2Problems = [];
-  if (!notices.length) t2Problems.push("no steering notices to check");
+  if (!notices.length && !t1PassedOnLittleLeft) t2Problems.push("no steering notices to check");
   /** @type {Map<string, number>} */
   const counts = new Map();
   for (const request of notices) counts.set(steeringKey(request.steering), (counts.get(steeringKey(request.steering)) ?? 0) + 1);
@@ -781,6 +820,7 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
     }
   }
   if (t2Problems.length) fail("T2", `${t2Problems.join("; ")}; observed notices: ${describeNotices(notices)}`);
+  else if (!notices.length) pass("T2", `no threshold notices: the main agent was steered by an ai_credit little_left delivery before 80% of ${budget}`);
   else pass("T2", `${notices.length} notice(s), each once and at or above its threshold of ${budget}: ${describeNotices(notices)}`);
 
   // T3: the run ended under budget, without a budget rejection, and succeeded.
