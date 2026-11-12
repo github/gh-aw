@@ -554,6 +554,56 @@ Quick reference:
 - `make agent-report-progress` - Final branch-scoped validation before pushing
 - `make agent-finish` - Explicit repository-wide maintenance sweep; not an inner-loop command
 
+### CI Front Door
+
+CGO selects optional PR suites through `scripts/ci-front-door.cjs`. All other
+checks retain their existing conditions, including mandatory security,
+vulnerability, taint-analysis, and safe-output tests. Main-branch pushes,
+manual runs, and the weekly scheduled control run all applicable suites without
+calling the Decision API. CJS and Windows CI are unchanged.
+
+Provision the repository variable `CI_DECISION_URL` with an approved HTTPS
+Decision API endpoint before enabling selection. It receives repository diff
+content; do not point it at an untrusted service. No GitHub token is sent.
+An unset, invalid, or GitHub API endpoint results in zero requests and a full
+fallback. A configured valid endpoint receives exactly one POST, including on
+invalid local input; there are no retries or redirects. The selector makes no
+other HTTP or GitHub API requests. Checkout, existing CI cache/artifact actions,
+and timing collection are outside this selector boundary.
+
+The request contains `diff_summary`, `suite_catalog`, and the versioned `prompt`.
+The summary uses only the local merge commit's first-parent diff, with at most
+200 filenames and 24,000 patch bytes. Missing history, oversized/truncated input,
+or selector-policy changes force all suites. No fetch or API mining repairs a
+missing diff. The response is `{"suite_ids":["build-wasm"],"confidence":0.95}`;
+reasoning is ignored. Confidence below 0.9 or missing confidence, malformed JSON,
+unknown/duplicate IDs, non-200 status, a 10-second deadline, or more than 16 KiB
+of response data forces all suites. Mandatory IDs are always added locally.
+Step failure or missing job outputs also runs all optional suites.
+
+`.github/ci/suite-catalog.json` has schema version 1 and entries with a stable
+`id`, short `description`, `mandatory` flag, and
+`historical_duration_seconds` (nonnegative seconds, or `null` for unknown).
+Adding a suite requires updating both the catalog and the runtime's fixed ID
+list, plus job wiring and tests. Never invent historical durations.
+
+Run `node --test scripts/ci-front-door.test.cjs` for conformance checks.
+Offline evaluation uses
+`node scripts/ci-front-door-evaluate.cjs .github/ci/suite-catalog.json RECORDS.json`.
+The input is an object containing `records`. Each record has a unique `id`,
+`diff_summary`, cached `response`, optional per-suite `durations_seconds`,
+`api_requests: {decision, github}`, and, for full-run controls, `full_run: true`
+with `failed_suite_ids` (an empty array means observed success). Replay never
+calls an API. It reports selected suite count, estimated minutes saved, observed
+misses, API counts, and missing evidence separately. Missing outcomes are not
+zero regressions, and recorded-response replay alone cannot validate a new
+model prompt. Savings are estimates, not measured billing reductions.
+
+The daily `ci-front-door-researcher` consumes restored PR/run evidence, reports
+cache gaps without downloading replacements, and proposes evidence-backed draft
+PRs for catalog or policy changes. Require historical replay and independent
+full-run controls before accepting a more selective policy.
+
 ### Compiling against a different actions repository
 
 When working on changes that span both `github/gh-aw` and `github/gh-aw-actions`, you can compile workflows against a fork or branch of the actions repository:
