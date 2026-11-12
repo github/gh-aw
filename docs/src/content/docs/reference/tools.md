@@ -40,20 +40,11 @@ See **[GitHub Tools Reference](/gh-aw/reference/github-tools/)** for complete co
 
 ### Linear Tools (`linear:`)
 
-Linear is configured through an imported Markdown connector, not a built-in
-toolset. Import `.github/workflows/connectors/linear.md`, configure exact resource grants,
-and select `tools.linear: [get-issue]` or the reviewed hosted MCP registration.
-Personal GraphQL API keys and hosted MCP bearer tokens are separate credentials.
-See [Connectors](/gh-aw/reference/connectors/#linear) for the single configuration
-reference and migration limitations.
+Linear is configured through an imported connector, not a built-in toolset. Import `.github/workflows/connectors/linear.md`, grant exact resources, and select `tools.linear: [get-issue]` or the reviewed hosted MCP registration. See [Connectors](/gh-aw/reference/connectors/#linear).
 
 ### Jira connector
 
-Import `".github/workflows/connectors/jira.md"` and select `tools.jira: [personal]` or
-`[service-account]` with explicit cloud, issue, and query grants. The former
-`auth`/`allowed` built-in configuration is no longer supported. See the
-[Jira connector reference](/gh-aw/reference/connectors/#jira) for inputs,
-credentials, supported methods, and migration limitations.
+Import `.github/workflows/connectors/jira.md` and select `tools.jira: [personal]` or `[service-account]` with explicit grants. The former `auth`/`allowed` built-in configuration is no longer supported. See the [Jira connector reference](/gh-aw/reference/connectors/#jira).
 
 ### Bash Tool (`bash:`)
 
@@ -79,13 +70,14 @@ tools:
   web-search:  # Search the web (engine-dependent)
 ```
 
-**Note:** Some engines require third-party Model Context Protocol (MCP) servers for web search. See [Using Web Search](/gh-aw/reference/web-search/).
+Engine behavior differs:
 
-Web search is disabled by default for **Codex** and **Claude**. Claude enables it only when `web-search:` is declared. Codex enables a shared native search/browsing tool when either `web-search:` or `web-fetch:` is declared; the two capabilities cannot be disabled independently. With neither tool, Codex runs with `-c web_search="disabled"`. Use `network.hosted-web` to restrict Codex's hosted retrieval.
+- **Claude**: Web search is off by default and enabled only when `web-search:` is declared.
+- **Codex**: Enabled when either `web-search:` or `web-fetch:` is declared; the two cannot be disabled independently. With neither, Codex runs with `-c web_search="disabled"`. Use `network.hosted-web` to restrict hosted retrieval.
+- **Copilot**: Runs in offline BYOK mode, so native web tools are disabled. Compilation rejects `web-search:` and, in CLI mode, `web-fetch:`. With `engine.copilot-sdk: true`, `web-fetch:` works through a proxy-aware custom tool that follows `network.allowed`; this does not enable native search.
+- **Gemini** and **Pi**: No built-in web search. `web-search:` has no effect and `gh aw compile` prints a warning.
 
-**Copilot** runs in offline BYOK mode, which disables its native web tools. Compilation rejects `web-search:` and, in CLI mode, `web-fetch:`. Use an MCP server for search or fetch. With `engine.copilot-sdk: true`, `web-fetch:` remains supported by a custom proxy-aware tool that follows `network.allowed`; this does not enable native web search.
-
-The **Gemini** and **Pi** engines have no built-in web search. Declaring `web-search:` with either engine has no effect, and `gh aw compile` prints a warning. To search the web with these engines, configure a third-party MCP server as described in [Using Web Search](/gh-aw/reference/web-search/).
+Copilot, Gemini, and Pi need a third-party MCP server for search (Copilot CLI mode also needs one for fetch). See [Using Web Search](/gh-aw/reference/web-search/).
 
 ### Playwright Tool (`playwright:`)
 
@@ -97,7 +89,7 @@ tools:
     version: "1.56.1"  # Optional: specify version
 ```
 
-See **[Playwright Reference](/gh-aw/reference/playwright/)** for complete configuration options, network access, browser support, and example workflows.
+See the **[Playwright Reference](/gh-aw/reference/playwright/)** for full configuration, network access, and browser support.
 
 ### Cache Memory (`cache-memory:`)
 
@@ -108,33 +100,26 @@ tools:
   cache-memory:
 ```
 
-See **[Cache Memory Reference](/gh-aw/reference/cache-memory/)** for complete configuration options and usage examples.
+See the **[Cache Memory Reference](/gh-aw/reference/cache-memory/)** for full configuration and examples.
 
 ### Drive Memory (`drive-memory:`) — Private Preview
 
-Drive memory is an experimental, feature-gated GitHub Drives integration. Do not
-configure it unless GitHub has explicitly enrolled the repository in the private
-preview.
-
-The [Drive Memory Reference](/gh-aw/experimental/drive-memory/) records the preview
-behavior for enrolled repositories; it is not a recommendation for general use.
+An experimental, feature-gated GitHub Drives integration. Do not configure it unless GitHub has enrolled the repository in the private preview. See the [Drive Memory Reference](/gh-aw/experimental/drive-memory/).
 
 ### Repo Memory (`repo-memory:`)
 
-Repository-specific memory storage for maintaining context across executions.
+Repository memory that persists across executions.
 
 ```yaml wrap
 tools:
   repo-memory:
 ```
 
-See **[Repo Memory Reference](/gh-aw/reference/repo-memory/)** for complete configuration options and usage examples.
+See the **[Repo Memory Reference](/gh-aw/reference/repo-memory/)** for full configuration and examples.
 
 ### QMD Documentation Search — Experimental
 
-Import a shared agentic workflow file to configure [QMD Documentation Search](/gh-aw/experimental/qmd/), including its custom MCP server, indexing job, and cache-memory.
-
-The index/search pattern restores cache-memory in a separate deterministic job, incrementally updates documents and embeddings, and passes the fresh index to the agent through an artifact. The agent searches a working copy without checking out the source, then gh-aw persists the snapshot for subsequent runs. See the [example shared workflow](/gh-aw/experimental/qmd/#example-shared-workflow).
+Import a shared workflow to configure [QMD Documentation Search](/gh-aw/experimental/qmd/), including its MCP server, indexing job, and cache-memory. See the [example shared workflow](/gh-aw/experimental/qmd/#example-shared-workflow).
 
 ### Introspection on Agentic Workflows (`agentic-workflows:`)
 
@@ -149,9 +134,9 @@ tools:
 
 See [GH-AW as an MCP Server](/gh-aw/reference/gh-aw-as-mcp-server/) for available operations.
 
-The built-in container runs with the runner's UID and GID unless a container user is explicitly configured. This keeps downloaded logs runner-owned without widening their owner-only permissions, so the post-agent secret-redaction step can read them. Its default `HOME` is the backend container's ephemeral `/tmp`, not `/root`. Redaction failures still remove unsanitized sources and fail the step.
+The built-in container runs as the runner's UID and GID unless a container user is configured, so downloaded logs stay runner-owned and the post-agent secret-redaction step can read them. Redaction failures still remove unsanitized sources and fail the step.
 
-The `compile` tool uses a dedicated read-only mode with `--no-emit` by default. Remote imports and nested body-level includes must already be cached; container validation does not pull missing Docker images. Ordinary CLI `--no-emit` compilation can still populate import caches. Workflow-writing tools (`add`, `update`, and `fix`), emitted compilation, dry-run compilation, and external scanners require an explicit opt-in at server startup:
+The `compile` tool is read-only (`--no-emit`) by default. Remote imports and nested includes must already be cached; container validation does not pull missing Docker images. Workflow-writing tools (`add`, `update`, `fix`), emitted or dry-run compilation, and external scanners require opt-in at server startup:
 
 ```aw wrap
 tools:
@@ -177,13 +162,11 @@ safeoutputs add_comment '{"item_number":42,"body":"### Result\n\nIt\u0027s ready
 mcpscripts mcpscripts-gh --args "issue list --limit 5"
 ```
 
-For `add_comment`, use `item_number` rather than `issue_number`; schema validation strips the latter. Prefer one single-quoted JSON object argument for safe outputs. Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes as `\\`, and apostrophes as `\u0027`; Unicode can remain literal. Stdin is also supported: `safeoutputs <tool_name> .` reads a complete JSON object from stdin. This does not grant permission for helper commands or redirections. No auxiliary tools, pipelines, temporary files, or shell expansion are needed for inline JSON.
+For `add_comment`, use `item_number`, not `issue_number` (schema validation strips the latter). Pass safe-output arguments as one single-quoted JSON object, encoding newlines as `\n`, double quotes as `\"`, backslashes as `\\`, and apostrophes as `\u0027`. Stdin also works: `safeoutputs <tool_name> .` reads a complete JSON object from stdin.
 
-CLI mounting changes only the agent-facing interface: the MCP gateway still starts normally, but mounted servers are removed from the MCP tool list and accessed via shell. This can reduce token use from large tool schemas and simplify prompts when shell-style invocation is preferred.
+CLI mounting only changes the agent-facing interface: mounted servers leave the MCP tool list, which can reduce token use from large tool schemas. Defaults to `false`.
 
-Defaults to `false`.
-
-CLI mounting requires shell access because the wrappers are ordinary executables invoked from bash. GitHub `gh-proxy` mode is also shell-backed because GitHub reads are performed with the `gh` CLI. When `tools.bash` is disabled (`bash: false` or `bash: []`), `cli-proxy: true` and `tools.github.mode: gh-proxy` are rejected at compile time, and strict mode requires `cli-proxy: false` to be stated explicitly:
+CLI mounting and `gh-proxy` mode both require shell access. If `tools.bash` is disabled (`bash: false` or `bash: []`), `cli-proxy: true` and `tools.github.mode: gh-proxy` are rejected at compile time, and strict mode requires `cli-proxy: false` to be set explicitly:
 
 ```yaml wrap
 tools:
@@ -193,7 +176,7 @@ tools:
     mode: local
 ```
 
-With `cli-proxy: false` and an MCP-backed GitHub mode (`local` or `remote`), MCP servers (including `safeoutputs`) remain available through the MCP protocol, and the CLI-only instructions are omitted from the generated prompt. Run `gh aw fix` to add the explicit setting to existing workflows.
+With `cli-proxy: false` and an MCP-backed GitHub mode (`local` or `remote`), servers such as `safeoutputs` stay on the MCP protocol and CLI instructions are omitted from the prompt. Run `gh aw fix` to add the explicit setting to existing workflows.
 
 ## Tool Timeout Configuration
 
@@ -215,7 +198,7 @@ tools:
   startup-timeout: 60   # seconds
 ```
 
-Both fields accept either an integer or a GitHub Actions expression string, enabling `workflow_call` reusable workflows to parameterize these values:
+Both fields accept integers or GitHub Actions expressions, so `workflow_call` workflows can parameterize them:
 
 ```yaml wrap
 tools:
@@ -224,7 +207,7 @@ tools:
 ```
 
 > [!NOTE]
-> Expression values are passed through environment variables and resolved before execution. Codex's configuration renderer converts the resolved values into numeric TOML settings; expressions do not fall back to defaults. An explicit per-server timeout in `engine.config` takes precedence over `tools.timeout` or `tools.startup-timeout`.
+> Expressions resolve before execution, and Codex converts them to numeric TOML settings without falling back to defaults. An explicit per-server timeout in `engine.config` takes precedence over `tools.timeout` or `tools.startup-timeout`.
 
 ## Custom MCP Servers (`mcp-servers:`)
 
@@ -244,7 +227,7 @@ mcp-servers:
 
 ### Custom CA Certificates
 
-`ca-cert-file` adds PEM CA certificates to system trust for one custom HTTPS MCP server. Other servers, the runner, and model-provider connections keep their existing trust. Certificate and hostname verification remain enabled. Requires MCP Gateway v0.4.35 or later; the default gateway includes support.
+`ca-cert-file` adds PEM CA certificates to system trust for one custom HTTPS MCP server; other servers and model-provider connections keep their trust. Certificate and hostname verification stay enabled. Requires MCP Gateway v0.4.35 or later.
 
 ```yaml wrap
 mcp-servers:
@@ -254,9 +237,9 @@ mcp-servers:
     ca-cert-file: .github/certs/internal-ca.pem
 ```
 
-The path is relative to `GITHUB_WORKSPACE`, or an absolute Linux host path. For a custom checkout path such as `checkout: { path: target }`, include that directory: `ca-cert-file: target/.github/certs/internal-ca.pem`. The exact prefixes `${{ github.workspace }}/` and `${{ runner.temp }}/` are also supported. Paths may contain letters, digits, spaces, `_`, `.`, `/`, and `-`; parent-directory traversal, shell substitutions, and other expressions are rejected. The file must exist and be readable by the runner before the **Start MCP Gateway** step. The launcher resolves symlinks and mounts only that file read-only at a gateway-private path, including when `sandbox.mcp.mounts` overrides the defaults. No extra gateway mount configuration is needed.
+The path is relative to `GITHUB_WORKSPACE` or an absolute Linux host path. For a custom checkout path such as `checkout: { path: target }`, include that directory (`target/.github/certs/internal-ca.pem`). The `${{ github.workspace }}/` and `${{ runner.temp }}/` prefixes are also supported. Paths may contain letters, digits, spaces, `_`, `.`, `/`, and `-`; traversal and other expressions are rejected. The file must exist and be readable before the **Start MCP Gateway** step. The gateway mounts only that file, read-only, even when `sandbox.mcp.mounts` overrides the defaults.
 
-For PEM content stored in a secret, a reviewed setup step can provision the file through an environment variable; the server then uses `ca-cert-file: "${{ runner.temp }}/internal-ca.pem"`:
+To provision PEM content from a secret, write it to a file in a reviewed setup step and reference that path:
 
 ```yaml wrap
 steps:
@@ -268,11 +251,11 @@ steps:
       printf '%s\n' "$MCP_CA_PEM" > "$RUNNER_TEMP/internal-ca.pem"
 ```
 
-Do not put a private key in this file. Missing or unreadable files fail startup; malformed PEM or files without valid CA certificates are rejected by the gateway without printing certificate contents. `ca-cert-file` is not supported for stdio servers or plain HTTP URLs. Local `gh aw mcp inspect` reports this gateway-only setting as unsupported rather than ignoring it. This setting does not replace the separate model-provider `sandbox.agent.ca-cert` configuration.
+Do not put a private key in this file. Missing or unreadable files fail startup; malformed PEM or files without valid CA certificates are rejected without printing certificate contents. `ca-cert-file` is not supported for stdio servers or plain HTTP URLs, and `gh aw mcp inspect` reports it as unsupported. It does not replace the model-provider `sandbox.agent.ca-cert` setting.
 
 ### Required Field
 
-MCP servers must pass a startup connectivity check before the agent starts. By default every server is startup-critical: if it cannot be reached, the workflow fails. Set `required: false` to mark a server as best-effort, so an unreachable server logs a warning and the workflow continues without it:
+By default every MCP server is startup-critical: if it can't be reached, the workflow fails. Set `required: false` to make a server best-effort; an unreachable server then logs a warning and is skipped:
 
 ```yaml wrap
 mcp-servers:
@@ -282,11 +265,11 @@ mcp-servers:
     required: false
 ```
 
-Use this for optional integrations whose transient outages (for example an HTTP 503 from a hosted endpoint) should not take down the other configured servers. At least one server must still connect successfully for startup to proceed.
+Use this for optional integrations so transient outages don't block other servers. At least one server must still connect for startup to proceed.
 
 ### Registry Field
 
-The `registry` field specifies the source URI of an MCP server in a registry. It is informational — useful for documenting server origin and enabling registry-aware tooling — and does not affect execution. gh-aw does not enforce registry usage. Works with both stdio and HTTP servers:
+The `registry` field records a server's source URI in an MCP registry. It is informational only: gh-aw does not enforce registry usage or change execution. It works with stdio and HTTP servers:
 
 ```yaml wrap
 mcp-servers:
@@ -298,4 +281,4 @@ mcp-servers:
 
 ## Learn More
 
-See [GitHub Tools](/gh-aw/reference/github-tools/) for GitHub API operations, toolsets, and modes; [Playwright](/gh-aw/reference/playwright/) for browser automation; [Cache Memory](/gh-aw/reference/cache-memory/) and [Repo Memory](/gh-aw/reference/repo-memory/) for persistent context; [MCP Scripts](/gh-aw/reference/mcp-scripts/) for custom inline tools; and [MCPs](/gh-aw/guides/mcps/) for end-to-end Model Context Protocol setup.
+See [GitHub Tools](/gh-aw/reference/github-tools/), [Playwright](/gh-aw/reference/playwright/), [Cache Memory](/gh-aw/reference/cache-memory/), [Repo Memory](/gh-aw/reference/repo-memory/), [MCP Scripts](/gh-aw/reference/mcp-scripts/), and [MCPs](/gh-aw/guides/mcps/).
