@@ -430,7 +430,7 @@ For advanced controls without native gh-aw settings, use this admission integrat
 
 ### Roll Out Shared Defaults
 
-For large installations, set baseline model and token guardrails once and let individual workflows override them only when needed:
+For large installations, set baseline credit guardrails once and let individual workflows override them only when needed:
 
 1. Export current defaults:
 
@@ -438,23 +438,20 @@ For large installations, set baseline model and token guardrails once and let in
 gh aw env get defaults.yml --scope org --org MY_ORG
 ```
 
-2. Update and apply shared defaults:
+2. Update the exported file, retaining any other defaults you want to keep. For example:
 
 ```yaml
 default_max_ai_credits: "5M"
 default_max_daily_ai_credits: "15M"
-default_model_copilot: "gpt-5-mini"
-default_model_claude: "small"
-default_model_codex: "gpt-5.4-mini"
 ```
 
-`default_model_*` variables are explicit model overrides: when set, they bypass [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model). They cannot enable routing, so do not set them to `router` or `router/*` values; a run whose model resolves to a router value at run time stops before the agent starts. To route workflows, write the router value in the workflow or omit the model.
+`default_model_*` variables are explicit model overrides: when set, they opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model). Leave them unset to preserve default routing for eligible workflows. They cannot enable routing, so do not set them to `router` or `router/*` values; a run whose model resolves to a router value at run time stops before the agent starts. To route workflows explicitly, write the router value in the workflow.
 
 ```bash
 gh aw env update defaults.yml --scope org --org MY_ORG
 ```
 
-`gh aw env update` previews changes before applying them. Use `--yes` to skip confirmation in automation or `--dry-run` to preview only. Set a field to `null` to delete the corresponding variable. Unknown YAML keys are rejected. `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers; `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers. Negative values disable the corresponding guardrail.
+`gh aw env update` previews changes before applying them. Use `--yes` to skip confirmation in automation or `--dry-run` to preview only. Set a field to `null` or omit it to delete the corresponding variable. Unknown YAML keys are rejected. `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers; `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers. Negative values disable the corresponding guardrail.
 
 3. If you compile workflows in CI, pass compiler-read defaults into the compiler process environment, for example via `${{ vars.* }}`: `GH_AW_DEFAULT_MAX_TURNS`, `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES`, and `GH_AW_DEFAULT_DETECTION_MODEL`.
 
@@ -507,8 +504,7 @@ on:
 
 permissions:
   issues: read
-engine:
-  id: copilot
+engine: copilot
 model: router/economy
 tools:
   github:
