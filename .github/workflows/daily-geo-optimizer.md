@@ -53,6 +53,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
 
+      - name: Setup Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.11"
+
       - name: Install geo-optimizer-skill
         run: |
           python -m pip install --require-hashes --only-binary=:all: -r .github/workflows/requirements-geo-optimizer.txt
@@ -216,11 +221,6 @@ safe-outputs:
   noop:
 
 imports:
-  - uses: shared/python-setup.md
-    with:
-      job-id: geo_audit
-      python-version: "3.11"
-
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[geo-optimizer] "
