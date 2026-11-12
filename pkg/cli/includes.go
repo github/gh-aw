@@ -379,9 +379,13 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		return nil
 	}
 	repoRoot, err := gitutil.FindGitRootFrom(absTargetDir)
+	var importRoot string
 	if err != nil {
 		// Without repository context, do not allow imports to leave targetDir.
 		repoRoot = absTargetDir
+		importRoot = repoRoot
+	} else {
+		importRoot = filepath.Join(repoRoot, ".github")
 	}
 	root, err := os.OpenRoot(repoRoot)
 	if err != nil {
@@ -500,6 +504,15 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 			}
 			if opts.verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside repository root: %q", importPath)))
+			}
+			continue
+		}
+		if err := fileutil.ValidatePathWithinBase(importRoot, targetPath); err != nil {
+			if opts.strict {
+				return fmt.Errorf("refusing to write import outside .github: %q: %w", importPath, err)
+			}
+			if opts.verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside .github: %q", importPath)))
 			}
 			continue
 		}
