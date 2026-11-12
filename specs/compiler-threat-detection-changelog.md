@@ -118,8 +118,9 @@ Findings and disposition:
 - Credential-bearing wildcard projections (#76980): already implemented by `isCredentialReference` and `valueUsesCredentialReference` and covered by `TestCompileEnvCredentialReferences`. Added the explicit requirement and test mapping to CTR-010/017 (spec 1.0.101).
 - Temporary-file, symlink, shell-data, and fallback-config log hardening (#76954, #76958, #76951, #76952, #76955, #76956, #76974): runtime and CLI hardening that the compiler does not detect in authored workflows. Existing CTR-017 summary-publication coverage already maps the step-summary change. No new `CTR-*` rule.
 - Label-length compile-time rejection (#76941): input validation without a new threat class; no rule change.
+- Decided that the optimizer MUST resolve false positives affecting non-strict rejection controls within 10 business days, matching T-CTR-026 in the [compliance mapping](compiler-threat-detection-compliance/README.md#section-64-false-positive-handling-norms).
 - Open high-severity code-scanning alerts: none returned (one item was withheld by the secrecy policy). No `threat-detection-suppress` annotations exist in workflow sources, so no suppression SLA action applies.
-- Go tests could not be executed in this environment (the required Go 1.27.4 toolchain could not be downloaded); no implementation changed.
+- Re-ran the audit-named test with Go 1.27.4: `go test ./pkg/workflow -run '^TestCompileEnvCredentialReferences$' -count=1` passed. No implementation changed.
 
 ### Mapping Audit (2026-11-04)
 

@@ -2,6 +2,7 @@
 
 **Document**: Validation of `security-architecture-spec.md` against compiled `.lock.yml` files  
 **Date**: November 9, 2026<br>
+**Validated specification revision**: 1.1.9 / November 5, 2026
 **Last completed full revalidation**: 2026-11-08
 **Last completed targeted formal revalidation**: RS-05a authorization model / 2026-11-09
 **Current compiled-lock structure check**: 2026-11-08

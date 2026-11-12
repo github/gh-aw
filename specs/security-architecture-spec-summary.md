@@ -5,8 +5,8 @@
 **Current specification revision**: 1.1.9 / November 5, 2026
 **Status**: Candidate Recommendation  
 **Date**: November 5, 2026
-**Last full validation**: v1.0.0 / 2026-07-15
-**Current targeted lock check**: 2026-11-03 (partial; see [validation report](security-architecture-spec-validation.md))
+**Last completed full revalidation**: 2026-11-08 (no overall grade; see [validation report](security-architecture-spec-validation.md))
+**Current targeted evidence**: PM-08 / 2026-11-08; RS-05a authorization model / 2026-11-09 (see [validation report](security-architecture-spec-validation.md))
 
 ## Overview
 
@@ -21,11 +21,11 @@ log.
 
 ### Floating-Head Opt-In (v1.1.8 / 2026-10-28)
 
-`checkout.pull-request-floating-head: true` explicitly selects the current API PR head instead of the triggering revision; it is not revision approval. The default remains event revision binding. The opt-in retains SHA fetch and verification, fetch-time head checks, authorization, and checkout-disable policies. Formal revalidation remains pending.
+`checkout.pull-request-floating-head: true` explicitly selects the current API PR head instead of the triggering revision; it is not revision approval. The default remains event revision binding. The opt-in retains SHA fetch and verification, fetch-time head checks, authorization, and checkout-disable policies. Targeted formal proof for this v1.1.8 opt-in remains pending.
 
 ### RS-05a Update (v1.1.7 / 2026-10-27)
 
-This summary retains its historical validation baseline above. Current [RS-05a requirements](security-architecture-spec.md#113-repository-validation) bind PR checkout to a validated immutable SHA from `origin` and verify actual `HEAD` before success or patch-baseline export. Ordinary PR events retain their recorded revision; label/review/revision-bound dispatch paths reject detected head changes. Malformed or cross-repository PR dispatch context fails explicitly. Issue-comment commands and unbound manual dispatch select the current head, not an approved revision; timestamps cannot prove which revision was reviewed. Actor trust, credential constraints, and independent safe-output lifecycle checks remain unchanged. The [validation mapping](security-architecture-spec-validation.md#7b-pr-checkout-authorization-and-revision-isolation-section-113---rs-05a) records runtime evidence, not a new formal freshness proof or live GitHub fetch test; targeted formal revalidation remains pending.
+This summary retains its historical validation baseline above. Current [RS-05a requirements](security-architecture-spec.md#113-repository-validation) bind PR checkout to a validated immutable SHA from `origin` and verify actual `HEAD` before success or patch-baseline export. Ordinary PR events retain their recorded revision; label/review/revision-bound dispatch paths reject detected head changes. Malformed or cross-repository PR dispatch context fails explicitly. Issue-comment commands and unbound manual dispatch select the current head, not an approved revision; timestamps cannot prove which revision was reviewed. Actor trust, credential constraints, and independent safe-output lifecycle checks remain unchanged. The [validation mapping](security-architecture-spec-validation.md#7b-pr-checkout-authorization-and-revision-isolation-section-113---rs-05a) records the bounded authorization-model revalidation passed on 2026-11-09; this is not a formal freshness proof or live GitHub fetch test.
 
 ## Key Highlights
 
@@ -390,7 +390,7 @@ The full specification defines normative MUST/SHOULD requirements. Summary statu
 
 ### Summary
 
-This canvas covers requirements, entities, approach, structure, operations, norms, and safeguards, with evidence, assumptions, and this summary as additional subsections. The latest targeted check leaves PM-08 fork protection UNVERIFIED for the representative lock and does not assign a new overall validation grade.
+This canvas covers requirements, entities, approach, structure, operations, norms, and safeguards, with evidence, assumptions, and this summary as additional subsections. The 2026-11-08 revalidation verified PM-08 default fork denial and explicit allowlisting for the representative lock. The 2026-11-09 RS-05a authorization-model revalidation passed; the overall validation grade remains unassigned because the v1.1.4 TT-01–04 requirement-level mapping is incomplete.
 
 ## Target Audience
 
@@ -443,6 +443,8 @@ Key implementation files referenced in the specification:
 
 The 1.0.0 architecture baseline was last fully validated on **2026-07-15**, matching the historical validation marker in `specs/security-architecture-spec-validation.md`.
 
+The formal-test inventory is separate from this lock evidence: `pkg/workflow/security_architecture_sg_formal_test.go` currently contains 24 test functions. The 15- and 16-test counts in the maintenance history are historical.
+
 The historical validation established the following minimum `.lock.yml` behaviors:
 
 - Activation, agent, detection, and safe output jobs remain separated in compiled workflows
@@ -450,7 +452,7 @@ The historical validation established the following minimum `.lock.yml` behavior
 - Runtime repository/fork validation, timestamp validation, and action pinning remain present in compiled output
 - Concurrency controls and threat-detection job placement are validated against current lock-file generation
 
-The **2026-11-03 targeted check** confirms the ten-job structure in `.github/workflows/security-review.lock.yml`, but also records workflow-specific write permissions and an UNVERIFIED PM-08 claim. It does not update the historical full-validation grade.
+The **2026-11-08 full revalidation** confirms the ten-job structure in `.github/workflows/security-review.lock.yml` and verifies PM-08 default fork denial and explicit allowlisting. Permissions remain workflow-specific; no overall grade is assigned because the v1.1.4 TT-01–04 mapping remains incomplete. The **2026-11-09 targeted RS-05a authorization-model revalidation** passed, within the limitations recorded in the [validation report](security-architecture-spec-validation.md).
 
 ## Next Steps
 
@@ -489,13 +491,28 @@ The **2026-11-03 targeted check** confirms the ten-job structure in `.github/wor
 | Track detection job naming note from validation doc | ✅ Done (2026-07-06) | Appendix D now names the `detection` job explicitly as the runtime threat-detection layer |
 | Track conclusion job note from validation doc | ✅ Done (2026-07-06) | Documented the optional `conclusion` job as non-normative cleanup/reporting guidance |
 | Audit trusted-users runtime enforcement coverage | ✅ Done (2026-07-06) | Sections 8-9 now document runtime `trusted-users` enforcement scope directly in this spec summary (membership checks gate privileged runtime access) |
-| Add formal model and test suite for SG-01 through SG-07 | ✅ Done (2026-07-09) | Added "Formal Model" (TLA+/F*/Z3 invariants), "Behavioral Coverage Map" (15 predicates), and "Generated Test Suite" sections; 15 tests in `pkg/workflow/security_architecture_sg_formal_test.go` |
-| Sync PM-11 formal coverage into behavioral coverage map | ✅ Done (2026-07-15) | Added `TestFormalPM11_PreActivationContainsMembershipStep` to the behavioral coverage map and generated suite notes; formal suite now tracks 16 tests in `pkg/workflow/security_architecture_sg_formal_test.go` |
+| Add formal model and test suite for SG-01 through SG-07 | ✅ Done (2026-07-09) | Historical count: 15 tests at the time; superseded by the current 24-test suite in `pkg/workflow/security_architecture_sg_formal_test.go` |
+| Sync PM-11 formal coverage into behavioral coverage map | ✅ Done (2026-07-15) | Historical count: 16 tests at the time; superseded by the current 24-test suite in `pkg/workflow/security_architecture_sg_formal_test.go` |
 | Sync §12 CS/RS coverage update from daily SPDD queue | ✅ Done (2026-07-28) | Added formal coverage map/test-suite entries for T-CS-001/002 and T-RS-003..008; synced to `specs/security-architecture-spec-validation.md` §12 matrix |
 | Add RS-05a for workflow_dispatch + aw_context PR checkout | ✅ Done (2026-08-01) | Security threat review cleared; added RS-05a to §11.3 (repository scope, actor trust, parse resilience, ref isolation); validation §7a added with 9-test unit evidence; §12 matrix updated; spec bumped to v1.0.1 |
-| Recheck compiled ten-job structure | ✅ Targeted check (2026-11-03) | `.github/workflows/security-review.lock.yml` confirms the ten jobs; full revalidation remains pending and PM-08 is UNVERIFIED in the validation report |
+| Recheck compiled ten-job structure and current requirement status | ✅ Revalidated (2026-11-08; RS-05a targeted revalidation 2026-11-09) | Validation report confirms PM-08 and the bounded RS-05a authorization model; the full specification revision is 1.1.9, with TT-01–04 mapping still incomplete |
+| Reconcile status and formal-test count with validation report | ✅ Done (2026-11-12) | PM-08 and RS-05a statuses synced to dated validation evidence; verified the 24-test count against `pkg/workflow/security_architecture_sg_formal_test.go` |
 
 ## Change Log
+
+### 2026-11-12
+
+- **Status reconciliation**: The former PM-08 UNVERIFIED statements (summary lines 393, 453, and 496) conflicted with validation report lines 18, 24, and 508, which verified default fork denial and allowlisting on 2026-11-08. The former RS-05a pending statement (summary line 28) conflicted with validation report lines 7 and 392, which record a passing bounded authorization-model revalidation on 2026-11-09. The floating-head note (former line 24) remains pending because validation report line 52 marks its version-specific targeted formal proof unverified; it is distinct from the RS-05a authorization-model result.
+- Counted 24 test functions in `pkg/workflow/security_architecture_sg_formal_test.go`; the 15- and 16-test maintenance entries are historical.
+- Synced the current specification revision, validation dates, Change Log, and Spec Maintenance status with the validation report.
+
+### 2026-11-09
+
+- Recorded the passing bounded RS-05a authorization-model revalidation and its limitations from the [validation report](security-architecture-spec-validation.md).
+
+### 2026-11-08
+
+- Recorded the full revalidation and PM-08 default-deny/allowlist verification from the [validation report](security-architecture-spec-validation.md).
 
 ### 2026-11-03
 

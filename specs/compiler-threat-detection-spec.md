@@ -447,7 +447,7 @@ The daily optimizer MUST review recent compiler changes, related validation path
 
 `threat-detection-suppress` entries MUST provide a rule and non-empty reason; `expires` is optional ISO 8601. Active entries MUST retain rule, reason, and expiry in the lock-file manifest. Expired entries do not suppress a rule.
 
-The optimizer SHOULD resolve false positives affecting non-strict rejection controls within 10 business days. It MUST report older suppressions as `SLA_BREACH` with rule, reason, age, owner, and expiry, and MUST create a follow-up action after 20 business days. The mechanically-verified norms for suppression handling are cataloged as `T-CTR-024`–`T-CTR-029` in `specs/compiler-threat-detection-compliance/README.md` (Section 6.4 False-Positive Handling Norms).
+The optimizer MUST resolve false positives affecting non-strict rejection controls within 10 business days. It MUST report older suppressions as `SLA_BREACH` with rule, reason, age, owner, and expiry, and MUST create a follow-up action after 20 business days. The mechanically-verified norms for suppression handling are cataloged as `T-CTR-024`–`T-CTR-029` in `specs/compiler-threat-detection-compliance/README.md` (Section 6.4 False-Positive Handling Norms).
 
 ### 6.2 Failure Safeguards
 

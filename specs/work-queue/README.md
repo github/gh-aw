@@ -95,7 +95,7 @@ Claims, timestamp rollback and checkpoint watermark loss. Two safety-guarded
 witnesses reach a running Claim past its deadline and a checkpoint with expired
 Work.
 
-Official TLC 2.19 (pinned jar SHA below), Java 21, exhausted **34,023 distinct
+Official TLC 2.19 from TLA+ Tools v1.7.4 (pinned jar SHA below), Java 21, exhausted **34,023 distinct
 states at depth 6** for `WorkExpiration.cfg`. All eight configurations produced
 their exact expected verdicts. Reproduce with:
 
@@ -145,7 +145,7 @@ charges, reservations and historical Results; it does not authorize effect repla
 | `BrokenRetirementMaintenance.cfg` | Reject retirement failures that skip core recovery. |
 | `RetirementCheckedWitness.cfg`, `RetirementLegacyWitness.cfg`, `RetirementRecoveryWitness.cfg`, `RetirementExpirationWitness.cfg` | Reach checked retirement, legacy checkpoint preservation, recovery after failure and an elapsed-deadline prefix under `Safety`. |
 
-Official TLC 2.19 (pinned jar SHA below) with Java 21 exhausted **9,411 distinct
+Official TLC 2.19 from TLA+ Tools v1.7.4 (pinned jar SHA below) with Java 21 exhausted **9,411 distinct
 states at depth 11** for `Retirement.cfg` and **9,195 at depth 11** for
 `RetirementSingle.cfg`. All thirteen mutation controls and four safety-guarded
 witnesses produced their exact named counterexamples and expected exit statuses.
@@ -1608,7 +1608,7 @@ delivery, and external condition truth/admission. Positive cases exhaust their b
 space; a trace showing partial completion is reachability evidence, not a proof
 that arbitrary partial completions eventually happen.
 
-Use Java 21 and the official [`tla2tools.jar` v1.7.4](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4), which reports TLC 2.19. Jar SHA-256:
+Use Java 21 and official TLC 2.19 from [TLA+ Tools v1.7.4](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4). Jar SHA-256:
 
 ```text
 936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88

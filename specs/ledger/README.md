@@ -57,7 +57,7 @@ and Git push behavior are tested separately and are not modeled by
 
 ## Reproduce
 
-With Java and a TLA+ Tools `tla2tools.jar` installed outside the repository:
+With Java and a TLA+ Tools `tla2tools.jar` installed outside the repository. In the command below, `/path/to/tla2tools.jar` is a placeholder; replace it with the path to the installed jar.
 
 ```sh
 cd specs/ledger
@@ -73,7 +73,8 @@ durable records. TLC from [TLA+ Tools 1.8.0](https://github.com/tlaplus/tlaplus/
 completed exhaustive exploration without invariant violations (distinct states:
 raw **4,637**, log **4,637**, set
 **19,097**, map **19,241**, table **111,795**, counter **26,009**, notes
-**203,331**). The state counts may change with TLC version or model changes.
+**203,331**). These state counts depend on the TLC version and model; the
+reported counts were generated with TLA+ Tools 1.8.0.
 `actions/setup/js/ledger_protocol_model.test.cjs` exercises hand-selected
 concrete witnesses. The generated vectors in
 `actions/setup/js/ledger_protocol_vectors.json` cover every declared
