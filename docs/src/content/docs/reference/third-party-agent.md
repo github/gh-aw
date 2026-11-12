@@ -144,8 +144,20 @@ recursively snapshots only these paths and restores them before the harness
 runs. A native implementation can declare `$GH_AW_DURABLE_CHECKPOINT` to persist
 the compiler-managed checkpoint file instead.
 
-The `execution` object is required; `installation` and `harness-script` are
-optional. When a native implementation needs extra dependencies, each dependency
+The `execution` object is required; `default-retention-days`, `installation`, and
+`harness-script` are optional. Setting `default-retention-days` (`1` to `90`)
+enables durable mode automatically for workflows using the engine, so workflows
+do not each need `engine.durable`. A workflow can override the retention period
+with `engine.durable: { retention-days: 30 }` or disable durable mode with
+`engine.durable: false`. The experimental-feature warning notes when durability
+came from the engine default. If durability comes only from
+`default-retention-days`, the compiler skips durable mode and emits a warning
+when a workflow uses `workflow_call`, `tools.work-queue`, explicit `concurrency`
+or `engine.concurrency` settings, or a custom `engine.command`, `engine.driver`,
+or `engine.harness-script`. Explicit `engine.durable` settings remain errors in
+those workflows.
+
+When a native implementation needs extra dependencies, each dependency
 uses the existing installation fields: `package-manager: npm`, a valid
 `package-name`, an exact literal `version`, and a `verify-command`. Durable
 dependencies are installed and verified in addition to the ordinary engine

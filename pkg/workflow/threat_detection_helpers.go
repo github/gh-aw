@@ -271,6 +271,8 @@ func cloneThreatDetectionEngineConfig(engineID string, source *EngineConfig) *En
 	cloned.ID = engineID
 	cloned.ModelRouting = nil
 	cloned.Durable = nil
+	cloned.DurableDisabled = false
+	cloned.durableDefaultSkipReason = ""
 	cloned.durableError = nil
 	if source.ID != "" && source.ID != engineID {
 		threatLog.Printf("Resetting runtime settings when normalizing %q to detection engine %q", source.ID, engineID)

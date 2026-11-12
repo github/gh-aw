@@ -543,6 +543,7 @@ func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownP
 	}
 
 	c.emitExperimentalFeatureWarnings(workflowData)
+	c.emitEngineDefaultDurableSkipWarning(workflowData, markdownPath)
 	for _, warning := range repoMemoryLedgerLimitWarnings(workflowData.RepoMemoryConfig) {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warning))
 		c.IncrementWarningCount()
@@ -592,7 +593,7 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: workflowData.RateLimit != nil, message: "Using experimental feature: rate limiting"},
 		{enabled: isSkipIfDecisionEnabled(workflowData), message: "Using experimental feature: skip-if-decision"},
 		{enabled: workflowData.TokenBrokerEnabled, message: "Using experimental feature: token-broker"},
-		{enabled: workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil, message: "Using experimental feature: engine.durable"},
+		{enabled: workflowData.EngineConfig != nil && workflowData.EngineConfig.Durable != nil, message: engineDurableExperimentalWarning(workflowData)},
 		{enabled: len(workflowData.WebhookSubscriptions) > 0, message: "Using experimental feature: on.gateway-dispatch (approved webhook bridge required)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "projects_v2_item" }), message: "Using experimental feature: on.gateway-dispatch.projects-items (hosted CAO triggers)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "code_scanning_alert" }), message: "Using experimental feature: on.gateway-dispatch.code-scanning-alert (hosted CAO triggers)"},

@@ -4,9 +4,35 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+
+	"github.com/github/gh-aw/pkg/jsonutil"
 )
 
 var durableDependencyVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$`)
+
+func validateBehaviorDurableDefinition(def *EngineDefinition) error {
+	if def == nil || def.Behaviors == nil || def.Behaviors.Durable == nil {
+		return nil
+	}
+	if days := def.Behaviors.Durable.DefaultRetentionDays; days != nil && (*days < 1 || *days > 90) {
+		return fmt.Errorf("engine definition %q behaviors.durable.default-retention-days must be an integer from 1 to 90", def.ID)
+	}
+	return nil
+}
+
+func validateEngineDefinitionDurableConsistency(engineJSON string, def *EngineDefinition) error {
+	if def == nil || def.Behaviors == nil || def.Behaviors.Durable == nil || def.Behaviors.Durable.DefaultRetentionDays == nil {
+		return nil
+	}
+	var raw map[string]any
+	if err := jsonutil.UnmarshalString(engineJSON, &raw); err != nil {
+		return nil
+	}
+	if durableBool, ok := raw["durable"].(bool); ok && !durableBool {
+		return fmt.Errorf("engine definition %q cannot set engine.durable: false alongside behaviors.durable.default-retention-days", def.ID)
+	}
+	return nil
+}
 
 func (e *BehaviorDefinedEngine) GetDurableExecutionPlan(data *WorkflowData, logFile string) (*DurableExecutionPlan, error) {
 	behavior := e.behavior()
@@ -20,7 +46,7 @@ func (e *BehaviorDefinedEngine) GetDurableExecutionPlan(data *WorkflowData, logF
 	if durable.Execution.ProtectedSessionCapture != e.protectedSessionCaptureEnabled() {
 		return nil, fmt.Errorf("engine %q behaviors.durable.execution.protected-session-capture must match behaviors.execution.protected-session-capture so capture and publication use the same source", e.GetID())
 	}
-	if data.EngineConfig.Command != "" || data.EngineConfig.Driver != "" || data.EngineConfig.HarnessScript != "" {
+	if data.EngineConfig.Command != "" || data.EngineConfig.Driver != "" || data.EngineConfig.InlineDriver != nil || data.EngineConfig.HarnessScript != "" {
 		return nil, fmt.Errorf("engine %q durable execution cannot be overridden by command, driver or harness", e.GetID())
 	}
 	env, err := durableExecutionEnv(data)

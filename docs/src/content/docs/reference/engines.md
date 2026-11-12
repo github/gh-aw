@@ -70,7 +70,7 @@ engine:
 | `command` | Replacement executable that skips the engine installer, not AWF installation. Provision it in setup steps; Agy checks the verified version, and Copilot checksum pins cannot be combined with it. |
 | `api-target` | Endpoint hostname, where supported; see below. |
 | `harness` | Replacement wrapper or retry settings for Copilot, Claude, and Codex. |
-| `durable` | Artifact-backed session continuation with optional `retention-days` (1–90, default `7`). |
+| `durable` | Artifact-backed session continuation with optional `retention-days` (1 to 90, default `7`), or `false` to opt out of an engine default. |
 
 Engine-specific options such as `agent`, `copilot-sdk`, `driver`, `dynamic-workflows`, `permission-mode`, `config`, and `extensions` are documented in each engine reference. Agy rejects most overrides.
 
@@ -110,6 +110,8 @@ Only session files are restored, not workspace edits, credentials, pending task 
 The unified session records `durable.restore` (`restored`, `fresh`, or `failed`) and, for Copilot, Claude, Codex, and Pi, `durable.session` (`resumed` or `fresh`). These records hold metadata only, and restoration alone does not prove native continuation for Gemini, Agy, or imported engines. Recording is best effort; missing records mean evidence is unavailable, not a fresh start or a failed restore. `gh aw audit RUN --artifacts info,usage --json` and `gh aw health WORKFLOW --json --logs-dir DIRECTORY` report this evidence; see the [audit reference](/gh-aw/reference/audit/). Spans and durable session logs carry the checkpoint parent as `gh-aw.durable.parent_run_id`; fresh runs omit it.
 
 Built-in durable mode rejects replacement commands, custom drivers, and harnesses. Pi's SDK and RPC drivers remain supported. Ordinary CLI arguments work, but session selectors and persistence-disabling flags cannot override compiler-managed continuation. Copilot cannot override `COPILOT_HOME`. Pi has [additional restrictions](/gh-aw/reference/engines/pi/#durable-runs), and [imported engines](/gh-aw/reference/third-party-agent/#durable-execution) must declare their own durable files. Threat detection uses a separate fresh session.
+
+An [imported engine definition](/gh-aw/reference/third-party-agent/#durable-execution) can turn durable mode on by default with `behaviors.durable.default-retention-days`. A workflow using that engine can override the retention window with `engine.durable.retention-days` or disable durable mode with `engine.durable: false`. When durability comes only from the engine default, the compiler skips durable mode and prints a warning if the workflow uses `workflow_call`, `tools.work-queue`, explicit `concurrency` or `engine.concurrency` settings, or a custom `engine.command`, `engine.driver`, or `engine.harness-script`. Explicit `engine.durable` settings still fail compilation in those cases.
 
 Checkpoints are published after secret redaction and integrity validation. Cancellation or hard runner loss can prevent publication. Artifacts contain restorable session content that may expose sensitive history to anyone with artifact access, and redaction is heuristic. Enable durable mode only where that suits the repository's artifact access and retention policies.
 

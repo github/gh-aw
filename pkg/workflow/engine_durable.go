@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"path"
 	"strings"
 
@@ -14,10 +15,20 @@ import (
 
 type DurableConfig struct {
 	RetentionDays int `json:"retention-days"`
+	implicit      bool
 }
 
 const durableStateDirectory = "/tmp/gh-aw/agent/durable"
 const defaultDurableRetentionDays = 7
+const experimentalEngineDurableMessage = "Using experimental feature: engine.durable"
+const experimentalEngineDefaultDurableMessage = "Using experimental feature: engine.durable (from engine default)"
+
+func engineDurableExperimentalWarning(data *WorkflowData) string {
+	if data != nil && data.EngineConfig != nil && data.EngineConfig.Durable != nil && data.EngineConfig.Durable.implicit {
+		return experimentalEngineDefaultDurableMessage
+	}
+	return experimentalEngineDurableMessage
+}
 
 type DurableExecutionPlan struct {
 	Files             []string
@@ -30,9 +41,18 @@ func applyEngineDurableField(config *EngineConfig, options map[string]any) {
 	if !exists {
 		return
 	}
+	if enabled, ok := raw.(bool); ok {
+		if enabled {
+			config.durableError = errors.New("engine.durable must be false or an object with optional retention-days (1-90)")
+			return
+		}
+		config.Durable = nil
+		config.DurableDisabled = true
+		return
+	}
 	object, ok := raw.(map[string]any)
 	if !ok {
-		config.durableError = errors.New("engine.durable must be an object with optional retention-days (1-90)")
+		config.durableError = errors.New("engine.durable must be false or an object with optional retention-days (1-90)")
 		return
 	}
 	for field, value := range object {
@@ -71,6 +91,91 @@ func durableCheckpointName(data *WorkflowData) string {
 	return "pi-durable-" + durableWorkflowID(data) + ".json"
 }
 
+func (c *Compiler) applyEngineDurableDefault(data *WorkflowData) {
+	if data == nil || data.EngineConfig == nil || data.EngineConfig.Durable != nil ||
+		data.EngineConfig.DurableDisabled || data.EngineConfig.durableError != nil {
+		return
+	}
+	def := data.engineDefinition
+	if def == nil && c.engineCatalog != nil {
+		def = c.engineCatalog.Get(data.EngineConfig.ID)
+	}
+	if def == nil || def.Behaviors == nil || def.Behaviors.Durable == nil || def.Behaviors.Durable.DefaultRetentionDays == nil {
+		return
+	}
+	if reason := c.durableWorkflowIncompatibility(data); reason != "" {
+		data.EngineConfig.durableDefaultSkipReason = reason
+		return
+	}
+	data.EngineConfig.Durable = &DurableConfig{
+		RetentionDays: *def.Behaviors.Durable.DefaultRetentionDays,
+		implicit:      true,
+	}
+}
+
+func (c *Compiler) durableWorkflowIncompatibility(data *WorkflowData) string {
+	if c.hasExplicitDurableConcurrencyConflict(data) {
+		return "explicit concurrency settings are configured"
+	}
+	if hasWorkflowCallTrigger(data.On) || frontmatterHasWorkflowCallTrigger(data.RawFrontmatter) {
+		return "workflow_call triggers are not supported"
+	}
+	if data.WorkQueuePolicy != nil || isWorkQueueEnabled(data) {
+		return "work-queue workflows are not supported"
+	}
+	if data.EngineConfig.Command != "" || data.EngineConfig.Driver != "" ||
+		data.EngineConfig.InlineDriver != nil || data.EngineConfig.HarnessScript != "" {
+		return "a custom engine command, driver, or harness is configured"
+	}
+	return ""
+}
+
+func (c *Compiler) hasExplicitDurableConcurrencyConflict(data *WorkflowData) bool {
+	if data.Concurrency != "" || data.EngineConfig.Concurrency != "" {
+		return true
+	}
+	return data.RawFrontmatter != nil && c.extractConcurrencySection(data.RawFrontmatter) != ""
+}
+
+func frontmatterHasWorkflowCallTrigger(frontmatter map[string]any) bool {
+	if frontmatter == nil {
+		return false
+	}
+	switch on := frontmatter["on"].(type) {
+	case string:
+		return strings.TrimSpace(on) == "workflow_call"
+	case []any:
+		for _, item := range on {
+			if name, ok := item.(string); ok && strings.TrimSpace(name) == "workflow_call" {
+				return true
+			}
+		}
+	case []string:
+		for _, item := range on {
+			if strings.TrimSpace(item) == "workflow_call" {
+				return true
+			}
+		}
+	case map[string]any:
+		_, exists := on["workflow_call"]
+		return exists
+	}
+	return false
+}
+
+func (c *Compiler) emitEngineDefaultDurableSkipWarning(workflowData *WorkflowData, markdownPath string) {
+	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.durableDefaultSkipReason == "" {
+		return
+	}
+	message := fmt.Sprintf(
+		"engine %q default durable mode skipped because %s; compiling without durable continuation",
+		workflowData.EngineConfig.ID,
+		workflowData.EngineConfig.durableDefaultSkipReason,
+	)
+	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+	c.IncrementWarningCount()
+}
+
 func (c *Compiler) validateEngineDurable(data *WorkflowData) error {
 	if data.EngineConfig == nil {
 		return nil
@@ -84,10 +189,11 @@ func (c *Compiler) validateEngineDurable(data *WorkflowData) error {
 	if data.EngineConfig.Durable.RetentionDays < 1 || data.EngineConfig.Durable.RetentionDays > 90 {
 		return errors.New("engine.durable.retention-days must be an integer from 1 to 90")
 	}
-	if data.Concurrency != "" || data.EngineConfig.Concurrency != "" {
+	if c.hasExplicitDurableConcurrencyConflict(data) {
 		return errors.New("engine.durable manages workflow concurrency; remove explicit concurrency settings to serialize checkpoint publication")
 	}
-	if hasWorkflowCallTrigger(data.On) || data.WorkQueuePolicy != nil {
+	if hasWorkflowCallTrigger(data.On) || frontmatterHasWorkflowCallTrigger(data.RawFrontmatter) ||
+		data.WorkQueuePolicy != nil || isWorkQueueEnabled(data) {
 		return errors.New("engine.durable does not support workflow_call or work-queue workers; use a single workflow invocation")
 	}
 	engine, err := c.getAgenticEngine(data.AI)

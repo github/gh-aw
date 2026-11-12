@@ -15459,18 +15459,27 @@
       "additionalProperties": false
     },
     "durable_config": {
-      "type": "object",
-      "description": "Experimental. Persist engine-declared session files in GitHub Actions artifacts. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation. Copilot, Claude, Codex, and Pi resume the exact native session with the current workflow prompt; other session-based engines receive a continuation prompt. Starts fresh when no prior history exists. No memory tool is required.",
-      "properties": {
-        "retention-days": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 90,
-          "default": 7,
-          "description": "Number of days to retain durable checkpoint artifacts, subject to repository and organization artifact retention policy."
+      "description": "Experimental. Persist engine-declared session files in GitHub Actions artifacts. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation. Copilot, Claude, Codex, and Pi resume the exact native session with the current workflow prompt; other session-based engines receive a continuation prompt. Starts fresh when no prior history exists. No memory tool is required. Set false to opt out when an engine enables durable mode by default.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "retention-days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 7,
+              "description": "Number of days to retain durable checkpoint artifacts, subject to repository and organization artifact retention policy."
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "boolean",
+          "const": false,
+          "description": "Disable durable mode when the selected engine enables it by default."
         }
-      },
-      "additionalProperties": false
+      ]
     },
     "pi_engine_config": {
       "type": "object",
@@ -16291,6 +16300,12 @@
                   "type": "object",
                   "description": "Experimental native durability or session-file continuation. Declares persisted files and the continuation invocation; pinned dependency installation is optional. Enabling engine.durable emits a compile-time warning. The harness receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.",
                   "properties": {
+                    "default-retention-days": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 90,
+                      "description": "Default checkpoint artifact retention days (1-90) enabling durable mode automatically for workflows using this engine unless opted out with engine.durable: false or skipped for incompatible workflow shapes."
+                    },
                     "files": {
                       "type": "array",
                       "minItems": 1,

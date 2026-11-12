@@ -3251,7 +3251,9 @@ engine:
   # can typically be omitted. Supports full model IDs (e.g.,
   # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
   # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-  # main agent engine.
+  # main agent engine. For the main agent engine, router values ('router',
+  # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+  # are rejected for other engines.
   # (optional)
   model: "example-value"
 
@@ -3613,13 +3615,20 @@ engine:
   # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
   # native session with the current workflow prompt; other session-based engines
   # receive a continuation prompt. Starts fresh when no prior history exists. No
-  # memory tool is required.
+  # memory tool is required. Set false to opt out when an engine enables durable
+  # mode by default.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: object
   durable:
     # Number of days to retain durable checkpoint artifacts, subject to repository and
     # organization artifact retention policy.
     # (optional)
     retention-days: 1
+
+  # Format 2: Disable durable mode when the selected engine enables it by default.
+  durable: true
 
   # Engine-specific plugin names to install before launching the engine. Currently
   # used by the Pi engine: each entry is passed to `pi install <extension>`.
@@ -3764,13 +3773,20 @@ engine:
   # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
   # native session with the current workflow prompt; other session-based engines
   # receive a continuation prompt. Starts fresh when no prior history exists. No
-  # memory tool is required.
+  # memory tool is required. Set false to opt out when an engine enables durable
+  # mode by default.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: object
   durable:
     # Number of days to retain durable checkpoint artifacts, subject to repository and
     # organization artifact retention policy.
     # (optional)
     retention-days: 1
+
+  # Format 2: Disable durable mode when the selected engine enables it by default.
+  durable: true
 
   # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
   # engine registry. Defaults to id when omitted.
@@ -3875,6 +3891,12 @@ engine:
     # receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.
     # (optional)
     durable:
+      # Default checkpoint artifact retention days (1-90) enabling durable mode
+      # automatically for workflows using this engine unless opted out with
+      # engine.durable: false or skipped for incompatible workflow shapes.
+      # (optional)
+      default-retention-days: 1
+
       # Explicit files or directories under /tmp/gh-aw/agent/ to persist.
       # $GH_AW_DURABLE_CHECKPOINT refers to the compiler-managed native checkpoint file.
       # Globs and overlapping paths are unsupported.
@@ -4194,19 +4216,28 @@ engine:
     # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
     # native session with the current workflow prompt; other session-based engines
     # receive a continuation prompt. Starts fresh when no prior history exists. No
-    # memory tool is required.
+    # memory tool is required. Set false to opt out when an engine enables durable
+    # mode by default.
     # (optional)
+    # Accepted formats:
+
+    # Format 1: object
     durable:
       # Number of days to retain durable checkpoint artifacts, subject to repository and
       # organization artifact retention policy.
       # (optional)
       retention-days: 1
 
+    # Format 2: Disable durable mode when the selected engine enables it by default.
+    durable: true
+
     # Model for this engine, overriding the top-level model. Has sensible defaults and
     # can typically be omitted. Supports full model IDs (e.g.,
     # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
     # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-    # main agent engine.
+    # main agent engine. For the main agent engine, router values ('router',
+    # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+    # are rejected for other engines.
     # (optional)
     model: "example-value"
 
@@ -10389,7 +10420,6 @@ safe-outputs:
 
     # Format 1: Array of label names
     labels: []
-      # Array items: string
 
     # Format 2: GitHub Actions expression resolving to a comma-separated list of label
     # names (e.g. '${{ inputs.labels }}')
@@ -22424,7 +22454,9 @@ safe-outputs:
       # can typically be omitted. Supports full model IDs (e.g.,
       # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
       # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-      # main agent engine.
+      # main agent engine. For the main agent engine, router values ('router',
+      # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+      # are rejected for other engines.
       # (optional)
       model: "example-value"
 
@@ -22786,13 +22818,20 @@ safe-outputs:
       # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
       # native session with the current workflow prompt; other session-based engines
       # receive a continuation prompt. Starts fresh when no prior history exists. No
-      # memory tool is required.
+      # memory tool is required. Set false to opt out when an engine enables durable
+      # mode by default.
       # (optional)
+      # Accepted formats:
+
+      # Format 1: object
       durable:
         # Number of days to retain durable checkpoint artifacts, subject to repository and
         # organization artifact retention policy.
         # (optional)
         retention-days: 1
+
+      # Format 2: Disable durable mode when the selected engine enables it by default.
+      durable: true
 
       # Engine-specific plugin names to install before launching the engine. Currently
       # used by the Pi engine: each entry is passed to `pi install <extension>`.
@@ -22937,13 +22976,20 @@ safe-outputs:
       # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
       # native session with the current workflow prompt; other session-based engines
       # receive a continuation prompt. Starts fresh when no prior history exists. No
-      # memory tool is required.
+      # memory tool is required. Set false to opt out when an engine enables durable
+      # mode by default.
       # (optional)
+      # Accepted formats:
+
+      # Format 1: object
       durable:
         # Number of days to retain durable checkpoint artifacts, subject to repository and
         # organization artifact retention policy.
         # (optional)
         retention-days: 1
+
+      # Format 2: Disable durable mode when the selected engine enables it by default.
+      durable: true
 
       # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
       # engine registry. Defaults to id when omitted.
@@ -23048,6 +23094,12 @@ safe-outputs:
         # receives GH_AW_DURABLE_RESUMED and GH_AW_DURABLE_PARENT_RUN_ID.
         # (optional)
         durable:
+          # Default checkpoint artifact retention days (1-90) enabling durable mode
+          # automatically for workflows using this engine unless opted out with
+          # engine.durable: false or skipped for incompatible workflow shapes.
+          # (optional)
+          default-retention-days: 1
+
           # Explicit files or directories under /tmp/gh-aw/agent/ to persist.
           # $GH_AW_DURABLE_CHECKPOINT refers to the compiler-managed native checkpoint file.
           # Globs and overlapping paths are unsupported.
@@ -23367,19 +23419,28 @@ safe-outputs:
         # change without deprecation. Copilot, Claude, Codex, and Pi resume the exact
         # native session with the current workflow prompt; other session-based engines
         # receive a continuation prompt. Starts fresh when no prior history exists. No
-        # memory tool is required.
+        # memory tool is required. Set false to opt out when an engine enables durable
+        # mode by default.
         # (optional)
+        # Accepted formats:
+
+        # Format 1: object
         durable:
           # Number of days to retain durable checkpoint artifacts, subject to repository and
           # organization artifact retention policy.
           # (optional)
           retention-days: 1
 
+        # Format 2: Disable durable mode when the selected engine enables it by default.
+        durable: true
+
         # Model for this engine, overriding the top-level model. Has sensible defaults and
         # can typically be omitted. Supports full model IDs (e.g.,
         # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
         # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-        # main agent engine.
+        # main agent engine. For the main agent engine, router values ('router',
+        # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
+        # are rejected for other engines.
         # (optional)
         model: "example-value"
 
@@ -25938,7 +25999,9 @@ import-schema:
 # safe-outputs.threat-detection.engine.model) takes precedence over this field for
 # that engine instance. Supports full model IDs (e.g.
 # 'claude-3-5-sonnet-20241022', 'gpt-5.4') and model aliases (e.g. 'small',
-# 'large').
+# 'large'). Router values ('router', 'router/economy', 'router/balanced',
+# 'router/robust') choose model routing for the main agent instead of a fixed
+# model.
 # (optional)
 model: "example-value"
 

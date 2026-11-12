@@ -27,10 +27,25 @@ func TestDurableEngineConfiguration(t *testing.T) {
 			require.Equal(t, "pi", config.ID)
 			require.Equal(t, "openai/gpt-5", model)
 			require.Equal(t, &DurableConfig{RetentionDays: 7}, config.Durable)
+			require.False(t, config.DurableDisabled)
 			require.NoError(t, config.durableError)
 		})
 	}
 	for _, source := range []string{
+		`{"id":"pi","durable":false}`,
+		`{"pi":{"durable":false}}`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			config, _, err := NewCompiler().extractEngineConfigFromJSON(source)
+			require.NoError(t, err)
+			require.Nil(t, config.Durable)
+			require.True(t, config.DurableDisabled)
+			require.NoError(t, config.durableError)
+		})
+	}
+	for _, source := range []string{
+		`{"id":"pi","durable":true}`,
+		`{"pi":{"durable":true}}`,
 		`{"id":"pi","durable":"repo"}`,
 		`{"pi":{"durable":{"storage":"disk"}}}`,
 		`{"pi":{"durable":{"retention-days":0}}}`,
@@ -51,8 +66,10 @@ func TestDurableEngineConfiguration(t *testing.T) {
 func TestDurableEngineSchema(t *testing.T) {
 	for _, source := range []string{
 		`{"pi":{"durable":{}}}`,
+		`{"pi":{"durable":false}}`,
 		`{"pi":{"durable":{"retention-days":90},"config":"{}","env":{"FOO":"bar"}}}`,
 		`{"id":"pi","durable":{"retention-days":1}}`,
+		`{"id":"copilot","durable":false}`,
 	} {
 		t.Run(source, func(t *testing.T) {
 			var engine any
@@ -63,6 +80,8 @@ func TestDurableEngineSchema(t *testing.T) {
 		})
 	}
 	for _, source := range []string{
+		`{"id":"pi","durable":true}`,
+		`{"pi":{"durable":true}}`,
 		`{"pi":{"durable":"repo"}}`,
 		`{"pi":{"durable":{"storage":"disk"}}}`,
 		`{"pi":{"durable":{"retention-days":0}}}`,
@@ -350,6 +369,398 @@ func TestCompilePiDurableArtifactLifecycle(t *testing.T) {
 			require.Less(t, strings.Index(text, DurableRestoreStepName), strings.Index(text, "Execute Pi CLI"))
 			require.Less(t, strings.Index(text, "Stage durable session files"), strings.Index(text, "Redact secrets in logs"))
 			require.Less(t, strings.Index(text, "Redact secrets in logs"), strings.Index(text, "Upload durable checkpoint artifact"))
+		})
+	}
+}
+
+func TestCompileBehaviorDefinedEngineDefaultDurable(t *testing.T) {
+	dir := t.TempDir()
+	defaultDurableDef := filepath.Join(dir, "default-durable-engine.md")
+	require.NoError(t, os.WriteFile(defaultDurableDef, []byte(`---
+engine:
+  id: session-agent
+  display-name: Session Agent
+  behaviors:
+    execution:
+      command-name: node
+      step-name: Start session agent
+    durable:
+      default-retention-days: 14
+      files:
+        - /tmp/gh-aw/agent/example/sessions
+      execution:
+        command-name: node
+        step-name: Continue session agent
+      harness-script: |
+        console.log(process.env.GH_AW_DURABLE_RESUMED);
+---
+`), 0o600))
+
+	source := filepath.Join(dir, "continuable.md")
+	require.NoError(t, os.WriteFile(source, []byte(`---
+on: workflow_dispatch
+engine:
+  id: session-agent
+imports:
+  - default-durable-engine.md
+---
+Continue the workflow task.
+`), 0o600))
+
+	compiler := NewCompiler(WithVersion("dev"))
+	stderr := captureStderrOutput(t, func() {
+		require.NoError(t, compiler.CompileWorkflow(source))
+	})
+	require.Contains(t, stderr, "Using experimental feature: engine.durable (from engine default)")
+
+	lock, err := os.ReadFile(filepath.Join(dir, "continuable.lock.yml"))
+	require.NoError(t, err)
+	text := string(lock)
+	require.Contains(t, text, "Continue session agent")
+	require.NotContains(t, text, "Start session agent")
+	require.Contains(t, text, "- name: "+DurableRestoreStepName+"\n")
+	require.Contains(t, text, "Stage durable session files")
+	require.Contains(t, text, "Upload durable checkpoint artifact")
+	require.Contains(t, text, "|| '14'")
+	require.Contains(t, text, `group: "gh-aw-durable-continuable"`)
+	require.Contains(t, text, "actions: read")
+
+	// Batch mode records the distinct engine-default experimental feature key.
+	batchCompiler := NewCompiler(WithVersion("dev"))
+	batchCompiler.SetBatchMode(true)
+	require.NoError(t, batchCompiler.CompileWorkflow(source))
+	require.Equal(t, 1, batchCompiler.GetExperimentalFeatureUsage()["Using experimental feature: engine.durable (from engine default)"])
+
+	// An engine without default-retention-days stays non-durable when the workflow omits engine.durable.
+	optInOnlyDef := filepath.Join(dir, "opt-in-engine.md")
+	require.NoError(t, os.WriteFile(optInOnlyDef, []byte(`---
+engine:
+  id: opt-in-agent
+  display-name: Opt-In Agent
+  behaviors:
+    execution:
+      command-name: node
+      step-name: Start opt-in agent
+    durable:
+      files:
+        - /tmp/gh-aw/agent/example/sessions
+      execution:
+        command-name: node
+        step-name: Continue opt-in agent
+---
+`), 0o600))
+	nonDurableSource := filepath.Join(dir, "ordinary.md")
+	require.NoError(t, os.WriteFile(nonDurableSource, []byte(`---
+on: workflow_dispatch
+engine:
+  id: opt-in-agent
+imports:
+  - opt-in-engine.md
+---
+Run once.
+`), 0o600))
+	require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(nonDurableSource))
+	ordinaryLock, err := os.ReadFile(filepath.Join(dir, "ordinary.lock.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(ordinaryLock), "Start opt-in agent")
+	require.NotContains(t, string(ordinaryLock), DurableRestoreStepName)
+}
+
+func TestEngineDefaultDurableOverridesAndOptOut(t *testing.T) {
+	dir := t.TempDir()
+	defPath := filepath.Join(dir, "default-durable-engine.md")
+	require.NoError(t, os.WriteFile(defPath, []byte(`---
+engine:
+  id: session-agent
+  display-name: Session Agent
+  behaviors:
+    execution:
+      command-name: node
+      step-name: Start session agent
+    durable:
+      default-retention-days: 14
+      files:
+        - /tmp/gh-aw/agent/example/sessions
+      execution:
+        command-name: node
+        step-name: Continue session agent
+---
+`), 0o600))
+
+	t.Run("imported engine without main engine field uses engine default", func(t *testing.T) {
+		source := filepath.Join(dir, "implicit-import.md")
+		require.NoError(t, os.WriteFile(source, []byte("---\non: workflow_dispatch\nimports:\n  - default-durable-engine.md\n---\nTask.\n"), 0o600))
+		require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+		lock, err := os.ReadFile(filepath.Join(dir, "implicit-import.lock.yml"))
+		require.NoError(t, err)
+		require.Contains(t, string(lock), "|| '14'")
+		require.Contains(t, string(lock), "Continue session agent")
+	})
+
+	t.Run("explicit retention-days wins over engine default", func(t *testing.T) {
+		source := filepath.Join(dir, "explicit-30.md")
+		require.NoError(t, os.WriteFile(source, []byte("---\non: workflow_dispatch\nengine:\n  id: session-agent\n  durable:\n    retention-days: 30\nimports:\n  - default-durable-engine.md\n---\nTask.\n"), 0o600))
+		compiler := NewCompiler(WithVersion("dev"))
+		stderr := captureStderrOutput(t, func() {
+			require.NoError(t, compiler.CompileWorkflow(source))
+		})
+		require.Contains(t, stderr, "Using experimental feature: engine.durable")
+		require.NotContains(t, stderr, "(from engine default)")
+		lock, err := os.ReadFile(filepath.Join(dir, "explicit-30.lock.yml"))
+		require.NoError(t, err)
+		require.Contains(t, string(lock), "|| '30'")
+		require.NotContains(t, string(lock), "|| '14'")
+	})
+
+	t.Run("explicit empty durable object uses explicit 7-day default", func(t *testing.T) {
+		source := filepath.Join(dir, "explicit-empty.md")
+		require.NoError(t, os.WriteFile(source, []byte("---\non: workflow_dispatch\nengine:\n  id: session-agent\n  durable: {}\nimports:\n  - default-durable-engine.md\n---\nTask.\n"), 0o600))
+		require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+		lock, err := os.ReadFile(filepath.Join(dir, "explicit-empty.lock.yml"))
+		require.NoError(t, err)
+		require.Contains(t, string(lock), "|| '7'")
+		require.NotContains(t, string(lock), "|| '14'")
+	})
+
+	t.Run("durable false opts out of engine default", func(t *testing.T) {
+		source := filepath.Join(dir, "opt-out.md")
+		markdown := "---\non: workflow_dispatch\nengine:\n  id: session-agent\n  durable: false\nimports:\n  - default-durable-engine.md\n---\nTask.\n"
+		require.NoError(t, os.WriteFile(source, []byte(markdown), 0o600))
+		compiler := NewCompiler(WithVersion("dev"))
+		stderr := captureStderrOutput(t, func() {
+			require.NoError(t, compiler.CompileWorkflow(source))
+		})
+		require.NotContains(t, stderr, "engine.durable")
+		lock, err := os.ReadFile(filepath.Join(dir, "opt-out.lock.yml"))
+		require.NoError(t, err)
+		text := string(lock)
+		require.Contains(t, text, "Start session agent")
+		require.NotContains(t, text, "Continue session agent")
+		require.NotContains(t, text, DurableRestoreStepName)
+		require.NotContains(t, text, "gh-aw-durable-")
+
+		// String API parity for opt-out.
+		strCompiler := NewCompiler(WithVersion("dev"))
+		data, err := strCompiler.ParseWorkflowString(markdown, source)
+		require.NoError(t, err)
+		yamlOut, err := strCompiler.CompileToYAML(data, source)
+		require.NoError(t, err)
+		require.Contains(t, yamlOut, "Start session agent")
+		require.NotContains(t, yamlOut, DurableRestoreStepName)
+	})
+}
+
+func TestBehaviorDefinedEngineDefaultRetentionValidation(t *testing.T) {
+	for _, days := range []int{1, 7, 90} {
+		d := days
+		_, err := NewBehaviorDefinedEngine(&EngineDefinition{
+			ID: "valid-default",
+			Behaviors: &EngineBehaviorDefinition{
+				Execution: &EngineExecutionDefinition{CommandName: "node"},
+				Durable: &EngineDurableDefinition{
+					DefaultRetentionDays: &d,
+					Files:                []string{"/tmp/gh-aw/agent/example/sessions"},
+					Execution:            &EngineExecutionDefinition{CommandName: "node"},
+				},
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	for _, invalid := range []int{0, -1, 91} {
+		d := invalid
+		_, err := NewBehaviorDefinedEngine(&EngineDefinition{
+			ID: "invalid-default",
+			Behaviors: &EngineBehaviorDefinition{
+				Execution: &EngineExecutionDefinition{CommandName: "node"},
+				Durable: &EngineDurableDefinition{
+					DefaultRetentionDays: &d,
+					Files:                []string{"/tmp/gh-aw/agent/example/sessions"},
+					Execution:            &EngineExecutionDefinition{CommandName: "node"},
+				},
+			},
+		})
+		require.ErrorContains(t, err, "default-retention-days must be an integer from 1 to 90")
+	}
+
+	for _, valid := range []any{1, 7, 90} {
+		err := parser.ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{
+			"engine": map[string]any{
+				"id":           "good-schema-engine",
+				"display-name": "Good Schema Engine",
+				"behaviors": map[string]any{
+					"execution": map[string]any{"command-name": "node"},
+					"durable": map[string]any{
+						"default-retention-days": valid,
+						"files":                  []any{"/tmp/gh-aw/agent/example/sessions"},
+						"execution":              map[string]any{"command-name": "node"},
+					},
+				},
+			},
+		}, "engine.md")
+		require.NoError(t, err, "valid=%v", valid)
+	}
+
+	for _, raw := range []any{0, -1, 91, 1.5, "7", true} {
+		err := parser.ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{
+			"engine": map[string]any{
+				"id":           "bad-schema-engine",
+				"display-name": "Bad Schema Engine",
+				"behaviors": map[string]any{
+					"execution": map[string]any{"command-name": "node"},
+					"durable": map[string]any{
+						"default-retention-days": raw,
+						"files":                  []any{"/tmp/gh-aw/agent/example/sessions"},
+						"execution":              map[string]any{"command-name": "node"},
+					},
+				},
+			},
+		}, "engine.md")
+		require.Error(t, err, "raw=%v", raw)
+	}
+
+	// CompileWorkflow fails closed when an imported engine definition has out-of-range default-retention-days
+	// or contradicts itself with engine.durable: false alongside default-retention-days.
+	for _, defBody := range []string{
+		"engine:\n  id: bad-agent\n  display-name: Bad Agent\n  behaviors:\n    execution:\n      command-name: node\n    durable:\n      default-retention-days: 91\n      files:\n        - /tmp/gh-aw/agent/example/sessions\n      execution:\n        command-name: node\n",
+		"engine:\n  id: bad-agent\n  display-name: Bad Agent\n  durable: false\n  behaviors:\n    execution:\n      command-name: node\n    durable:\n      default-retention-days: 7\n      files:\n        - /tmp/gh-aw/agent/example/sessions\n      execution:\n        command-name: node\n",
+	} {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "engine.md"), []byte("---\n"+defBody+"---\n"), 0o600))
+		wf := filepath.Join(dir, "wf.md")
+		require.NoError(t, os.WriteFile(wf, []byte("---\non: workflow_dispatch\nengine:\n  id: bad-agent\nimports:\n  - engine.md\n---\nTask.\n"), 0o600))
+		require.Error(t, NewCompiler(WithVersion("dev")).CompileWorkflow(wf))
+		require.NoFileExists(t, filepath.Join(dir, "wf.lock.yml"))
+	}
+}
+
+func TestEngineDefaultDurableSkipsIncompatibleWorkflowShapes(t *testing.T) {
+	dir := t.TempDir()
+	workflowsDir := filepath.Join(dir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "default-durable-engine.md"), []byte(`---
+engine:
+  id: session-agent
+  display-name: Session Agent
+  behaviors:
+    execution:
+      command-name: node
+      step-name: Start session agent
+    durable:
+      default-retention-days: 7
+      files:
+        - /tmp/gh-aw/agent/example/sessions
+      execution:
+        command-name: node
+        step-name: Continue session agent
+---
+`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "shared-concurrency.md"), []byte(`---
+concurrency:
+  group: shared-imported-group
+---
+`), 0o600))
+
+	cases := []struct {
+		name           string
+		frontmatter    string
+		extraEngine    string
+		wantSkipWarn   string
+		wantLockSubstr string
+		wantExplicitEr string
+	}{
+		{
+			name:           "workflow_call map trigger",
+			frontmatter:    "on:\n  workflow_call:\n",
+			wantSkipWarn:   "workflow_call",
+			wantExplicitEr: "does not support workflow_call",
+		},
+		{
+			name:           "workflow_call string trigger",
+			frontmatter:    "on: workflow_call\n",
+			wantSkipWarn:   "workflow_call",
+			wantExplicitEr: "does not support workflow_call",
+		},
+		{
+			name:           "work-queue worker",
+			frontmatter:    "on:\n  workflow_dispatch:\ntools:\n  work-queue:\n    worker: true\n",
+			wantSkipWarn:   "work-queue",
+			wantExplicitEr: "does not support workflow_call or work-queue",
+		},
+		{
+			name:           "top-level concurrency group",
+			frontmatter:    "on: workflow_dispatch\nconcurrency:\n  group: custom-workflow-group\n",
+			wantSkipWarn:   "concurrency",
+			wantLockSubstr: "custom-workflow-group",
+			wantExplicitEr: "manages workflow concurrency",
+		},
+		{
+			name:           "imported concurrency group",
+			frontmatter:    "on: workflow_dispatch\n",
+			wantSkipWarn:   "concurrency",
+			wantLockSubstr: "shared-imported-group",
+			wantExplicitEr: "manages workflow concurrency",
+		},
+		{
+			name:           "engine concurrency",
+			frontmatter:    "on: workflow_dispatch\n",
+			extraEngine:    "  concurrency: custom-engine-group\n",
+			wantSkipWarn:   "concurrency",
+			wantLockSubstr: "custom-engine-group",
+			wantExplicitEr: "manages workflow concurrency",
+		},
+		{
+			name:           "custom engine command",
+			frontmatter:    "on: workflow_dispatch\n",
+			extraEngine:    "  command: custom-node\n",
+			wantSkipWarn:   "command, driver, or harness",
+			wantExplicitEr: "cannot be overridden by command, driver or harness",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			imports := "imports:\n  - default-durable-engine.md\n"
+			if tc.name == "imported concurrency group" {
+				imports += "  - shared-concurrency.md\n"
+			}
+
+			// 1. Engine default skips durable mode cleanly and emits a warning naming why.
+			defaultWf := filepath.Join(workflowsDir, strings.ReplaceAll(tc.name, " ", "-")+"-default.md")
+			defaultSrc := "---\n" + tc.frontmatter + "engine:\n  id: session-agent\n" + tc.extraEngine + imports + "---\nRun task.\n"
+			require.NoError(t, os.WriteFile(defaultWf, []byte(defaultSrc), 0o600))
+			compiler := NewCompiler(WithVersion("dev"))
+			stderr := captureStderrOutput(t, func() {
+				require.NoError(t, compiler.CompileWorkflow(defaultWf))
+			})
+			require.Contains(t, stderr, tc.wantSkipWarn)
+			require.NotContains(t, stderr, "Using experimental feature: engine.durable")
+			lockBytes, err := os.ReadFile(strings.TrimSuffix(defaultWf, ".md") + ".lock.yml")
+			require.NoError(t, err)
+			lock := string(lockBytes)
+			require.Contains(t, lock, "Start session agent")
+			require.NotContains(t, lock, "Continue session agent")
+			require.NotContains(t, lock, DurableRestoreStepName)
+			require.NotContains(t, lock, "gh-aw-durable-")
+			if tc.wantLockSubstr != "" {
+				require.Contains(t, lock, tc.wantLockSubstr)
+			}
+
+			// 2. Explicit engine.durable: false compiles cleanly without a skip warning.
+			optOutWf := filepath.Join(workflowsDir, strings.ReplaceAll(tc.name, " ", "-")+"-optout.md")
+			optOutSrc := "---\n" + tc.frontmatter + "engine:\n  id: session-agent\n  durable: false\n" + tc.extraEngine + imports + "---\nRun task.\n"
+			require.NoError(t, os.WriteFile(optOutWf, []byte(optOutSrc), 0o600))
+			optOutStderr := captureStderrOutput(t, func() {
+				require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(optOutWf))
+			})
+			require.NotContains(t, optOutStderr, "default durable mode skipped")
+
+			// 3. Explicit engine.durable: {} preserves today's hard error.
+			explicitWf := filepath.Join(workflowsDir, strings.ReplaceAll(tc.name, " ", "-")+"-explicit.md")
+			explicitSrc := "---\n" + tc.frontmatter + "engine:\n  id: session-agent\n  durable: {}\n" + tc.extraEngine + imports + "---\nRun task.\n"
+			require.NoError(t, os.WriteFile(explicitWf, []byte(explicitSrc), 0o600))
+			err = NewCompiler(WithVersion("dev")).CompileWorkflow(explicitWf)
+			require.ErrorContains(t, err, tc.wantExplicitEr)
 		})
 	}
 }

@@ -126,6 +126,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
 	ctx.workflowData.Connectors = connectorConfigs
 	ctx.workflowData.engineDefinition = c.engineCatalog.Get(engineSetup.engineSetting)
+	c.applyEngineDurableDefault(ctx.workflowData)
 	ctx.workflowData.SourceDocument = ctx.document
 	if config := ctx.workflowData.ParsedFrontmatter; config != nil && config.TokenBroker != nil {
 		ctx.workflowData.TokenBrokerCopilotRequest = config.TokenBroker.CopilotRequest

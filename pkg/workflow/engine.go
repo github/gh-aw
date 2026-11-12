@@ -90,9 +90,11 @@ type EngineConfig struct {
 
 	// Extensions is a list of engine-specific plugin names to install before launching the engine.
 	// Currently used by the Pi engine: each entry is passed to `pi install <extension>`.
-	Extensions   []string
-	Durable      *DurableConfig
-	durableError error
+	Extensions               []string
+	Durable                  *DurableConfig
+	DurableDisabled          bool
+	durableDefaultSkipReason string
+	durableError             error
 
 	ModelRouting *CopilotModelRoutingConfig
 	// ModelRoutingDisabled records an explicit `engine.model-routing: false`,

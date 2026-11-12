@@ -47,6 +47,9 @@ func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, er
 	if err := validateBehaviorOutputFiles(def.Behaviors.OutputFiles); err != nil {
 		return nil, fmt.Errorf("engine definition %q behaviors.output-files: %w", def.ID, err)
 	}
+	if err := validateBehaviorDurableDefinition(def); err != nil {
+		return nil, err
+	}
 	if def.Behaviors.Execution != nil && def.Behaviors.Execution.ProtectedSessionCapture && def.Behaviors.LogParser == "" {
 		return nil, fmt.Errorf("engine definition %q enables protected-session-capture without a log-parser", def.ID)
 	}
@@ -1037,6 +1040,10 @@ func deepCopyEngineBehaviorDefinition(src EngineBehaviorDefinition) EngineBehavi
 	dst := src // value copy covers all scalar fields
 	if src.Durable != nil {
 		durable := *src.Durable
+		if src.Durable.DefaultRetentionDays != nil {
+			days := *src.Durable.DefaultRetentionDays
+			durable.DefaultRetentionDays = &days
+		}
 		durable.Installation = append([]EngineInstallationDefinition(nil), src.Durable.Installation...)
 		durable.Files = append([]string(nil), src.Durable.Files...)
 		for i := range durable.Installation {
@@ -1122,6 +1129,9 @@ func deepCopyEngineBehaviorDefinition(src EngineBehaviorDefinition) EngineBehavi
 func (c *Compiler) registerNamedEngineDefinitionFromJSON(engineJSON string) error {
 	def, err := parseEngineDefinitionFromJSON(engineJSON)
 	if err != nil || !isEngineDefinitionForm(def) {
+		return err
+	}
+	if err := validateEngineDefinitionDurableConsistency(engineJSON, def); err != nil {
 		return err
 	}
 	if def.Behaviors != nil {
