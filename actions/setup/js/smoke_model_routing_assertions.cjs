@@ -64,11 +64,13 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  *   allowed only when T1 passed on a `little_left` delivery, every 2xx
  *   main-agent request carries numeric `ai_credits_total` and
  *   `ai_credits_this_response` (otherwise the exception cannot be verified;
- *   non-2xx requests never reached the model and are ignored), and no
+ *   non-2xx requests never reached the model and are ignored), and no 2xx
  *   main-agent request started (`ai_credits_total - ai_credits_this_response`)
  *   at or above 80% of the budget, because AWF ranks `little_left` just above
  *   the highest threshold already crossed and still sends the 80% notice on
- *   the next request; T3 the final `ai_credits_total` is below the budget, no
+ *   the next request (a non-2xx request never delivers it, AWF keeps it
+ *   pending, so a later 2xx request also started past 80% and is caught);
+ *   T3 the final `ai_credits_total` is below the budget, no
  *   `ai_credits_limit_exceeded` routing failure, and agent execution
  *   succeeded; T4 every other check passed
  *
@@ -837,9 +839,9 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
   // Uses the legacy `steering` records, written at most once per threshold per
   // run; `steering_delivery` repeats each notice once per conversation. A run
   // steered by little_left before 80% has no threshold notices, but only if no
-  // main-agent request started at or above 80%: AWF ranks little_left just
+  // 2xx main-agent request started at or above 80%: AWF ranks little_left just
   // above the highest threshold already crossed, so it still sends the 80%
-  // notice on the next request. Every 2xx request must carry accounting.
+  // notice on the next 2xx request. Every 2xx request must carry accounting.
   const t2Problems = [];
   if (!notices.length && !t1PassedOnLittleLeft) t2Problems.push("no steering notices to check");
   else if (!notices.length) {
@@ -857,13 +859,16 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
             .join(", ")}`
         );
       }
+      // A non-2xx request never delivers its notice (AWF keeps it pending for
+      // the next request), so only 2xx requests can have missed the notice.
       const missed = agentTraffic.filter(request => {
+        if (!isSuccessStatus(request?.status)) return false;
         const before = creditsBefore(request);
         return before !== undefined && before + CREDIT_EPSILON >= required;
       });
       if (missed.length) {
         t2Problems.push(
-          `no ai_credit@${STEERING_THRESHOLDS[0]} notice, but ${missed.length} main-agent request(s) started at or above ${STEERING_THRESHOLDS[0]}% of ${budget} (${Number(required.toFixed(6))}): ${missed
+          `no ai_credit@${STEERING_THRESHOLDS[0]} notice, but ${missed.length} 2xx main-agent request(s) started at or above ${STEERING_THRESHOLDS[0]}% of ${budget} (${Number(required.toFixed(6))}): ${missed
             .slice(0, MAX_OBSERVED)
             .map(request => describeNotice(request, ""))
             .join(", ")}`

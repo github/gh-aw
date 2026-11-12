@@ -1057,7 +1057,9 @@ describe("smoke_model_routing_assertions", () => {
       const { passes, failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
       expect(checkIds(failures)).toEqual(["T2"]);
       expect(lineFor(passes, "T1")).toMatch(/^PASS T1 main agent received ai_credit@little_left /);
-      expect(lineFor(failures, "T2")).toBe("FAIL T2 no ai_credit@80 notice, but 1 main-agent request(s) started at or above 80% of 7 (5.6): request=run-38174216426-req-9 status=200 total_before=5.7 total_after=6; observed notices: none");
+      expect(lineFor(failures, "T2")).toBe(
+        "FAIL T2 no ai_credit@80 notice, but 1 2xx main-agent request(s) started at or above 80% of 7 (5.6): request=run-38174216426-req-9 status=200 total_before=5.7 total_after=6; observed notices: none"
+      );
     });
 
     it.each([
@@ -1076,6 +1078,18 @@ describe("smoke_model_routing_assertions", () => {
     it("ignores non-2xx main-agent requests without accounting in the zero-notice T2 check", () => {
       steeringFixture({ credits: LITTLE_LEFT_CREDITS });
       const requests = [...LITTLE_LEFT_CREDITS, [undefined, undefined]].map(tokenRecord);
+      requests[7] = { ...requests[7], status: 502 };
+      write(TOKEN_USAGE, requests);
+      const { passes, failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
+      expect(failures).toEqual([]);
+      expect(lineFor(passes, "T2")).toBe("PASS T2 no threshold notices: the main agent was steered by an ai_credit little_left delivery before 80% of 7");
+    });
+
+    it("ignores a final non-2xx main-agent request that started at or above 80% in the zero-notice T2 check", () => {
+      // A failed request never delivers its notice; AWF keeps it pending for
+      // the next request, and there is none.
+      steeringFixture({ credits: LITTLE_LEFT_CREDITS });
+      const requests = [...LITTLE_LEFT_CREDITS, [0.3, 6.0]].map(tokenRecord);
       requests[7] = { ...requests[7], status: 502 };
       write(TOKEN_USAGE, requests);
       const { passes, failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
