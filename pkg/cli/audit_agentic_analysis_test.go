@@ -296,7 +296,7 @@ func parseDerivedModelRoutingFixture(t *testing.T, replacements ...string) *Mode
 func assertNeutralModelDowngrade(t *testing.T, assessment AgenticAssessment) {
 	t.Helper()
 	assert.Equal(t, "low", assessment.Severity)
-	assert.Contains(t, assessment.Recommendation, "model: router/economy")
+	assertEconomyRoutingChange(t, assessment)
 	assert.Contains(t, assessment.Recommendation, "https://github.github.com/gh-aw/reference/model-routing/")
 	assert.Contains(t, assessment.Recommendation, "eligible for default routing", "omission alternative must be eligibility-qualified")
 	assertNoModelPinAdvice(t, assessment)
@@ -308,10 +308,16 @@ func assertNeutralModelDowngrade(t *testing.T, assessment AgenticAssessment) {
 	}
 }
 
+func assertEconomyRoutingChange(t *testing.T, assessment AgenticAssessment) {
+	t.Helper()
+	assert.Contains(t, assessment.Recommendation, "change engine.model (if set) or the top-level model to router/economy", "should replace the existing model setting, which takes precedence")
+	assert.Contains(t, assessment.Recommendation, "engine.model-routing block, set its mode: economy", "router values are rejected alongside a model-routing block")
+}
+
 func assertNoModelPinAdvice(t *testing.T, assessment AgenticAssessment) {
 	t.Helper()
 	for _, text := range []string{assessment.Summary, assessment.Recommendation} {
-		for _, forbidden := range []string{"engine.model", "gpt-", "claude-", "haiku", "gemini", "pin"} {
+		for _, forbidden := range []string{"gpt-", "claude-", "haiku", "gemini", "pin"} {
 			assert.NotContains(t, text, forbidden)
 		}
 	}
@@ -321,7 +327,7 @@ func TestBuildAgenticAssessmentsFlagsModelDowngrade(t *testing.T) {
 	t.Parallel()
 	downgrades := modelDowngradeAssessments(t, nil)
 	require.Len(t, downgrades, 1, "model_downgrade_available assessment should be present for moderate triage run")
-	assert.Contains(t, downgrades[0].Recommendation, "model: router/economy", "should recommend economy routing")
+	assertEconomyRoutingChange(t, downgrades[0])
 	assertNoModelPinAdvice(t, downgrades[0])
 }
 
@@ -408,7 +414,7 @@ func TestModelDowngradeAssessmentIsRoutingAware(t *testing.T) {
 				assert.Equal(t, "low", downgrades[0].Severity)
 				assert.Contains(t, downgrades[0].Summary, "already routed")
 				assert.Contains(t, downgrades[0].Summary, tt.level)
-				assert.Contains(t, downgrades[0].Recommendation, "model: router/economy")
+				assertEconomyRoutingChange(t, downgrades[0])
 				assertNoModelPinAdvice(t, downgrades[0])
 			}
 		})

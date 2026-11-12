@@ -297,7 +297,7 @@ Parent workflow success does not imply successful delegation. `metrics.error_cou
 | `agentic_overkill_for_agentic` | The task may not require an agentic workflow |
 | `agentic_poor_agentic_control` | Agentic control signals were weak |
 | `agentic_partially_reducible` | Part of the task could use deterministic steps |
-| `agentic_model_downgrade_available` | A routine task may fit economy-level [model routing](/gh-aw/reference/model-routing/) (`model: router/economy`); a run already routed at economy emits no finding |
+| `agentic_model_downgrade_available` | A routine task may fit economy-level [model routing](/gh-aw/reference/model-routing/): change `engine.model` (if set) or the top-level `model` to `router/economy`, or set `mode: economy` in an existing `engine.model-routing` block. A run already routed at economy emits no finding |
 | `agentic_delegated_context_present` | Delegated workflow context was preserved |
 
 The audit inspects the `detection` job result and the downloaded `detection` artifact. A failed job emits `threat_detection_job_failed`. A structured verdict in `detection_result.json`, or a legacy `THREAT_DETECTION_RESULT` verdict in `detection.log`, emits `threat_detected` when `prompt_injection`, `secret_leak`, or `malicious_patch` is true. Threat reasons are not copied into the finding description because they may contain sensitive agent output.

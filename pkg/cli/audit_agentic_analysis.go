@@ -413,6 +413,10 @@ func appendPartiallyReducibleAssessment(assessments []AgenticAssessment, metrics
 
 const modelRoutingDocsURL = "https://github.github.com/gh-aw/reference/model-routing/"
 
+// economyRoutingChange covers each way a workflow can set its model because
+// audit cannot tell which form the workflow uses.
+const economyRoutingChange = "change engine.model (if set) or the top-level model to router/economy; with an engine.model-routing block, set its mode: economy instead."
+
 func appendModelDowngradeAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, routing *ModelRoutingSummary) []AgenticAssessment {
 	// Economy routing suggestion: the run uses a non-lean resource profile but
 	// the task domain is routine enough that economy-level routing would likely suffice.
@@ -432,7 +436,7 @@ func appendModelDowngradeAssessment(assessments []AgenticAssessment, domain *Tas
 			Severity:       "low",
 			Summary:        fmt.Sprintf("This %s run was already routed per task at the %s level; routine work like this may be handled at the economy level for lower cost.", domain.Label, level),
 			Evidence:       fmt.Sprintf("%s routing_mode=%s", evidence, level),
-			Recommendation: "Keep per-task routing and set top-level model: router/economy in the workflow frontmatter to target the economy level. See " + modelRoutingDocsURL,
+			Recommendation: "Keep per-task routing at the economy level: " + economyRoutingChange + " See " + modelRoutingDocsURL,
 		})
 	default:
 		return append(assessments, AgenticAssessment{
@@ -440,7 +444,7 @@ func appendModelDowngradeAssessment(assessments []AgenticAssessment, domain *Tas
 			Severity:       "low",
 			Summary:        fmt.Sprintf("This %s run may not need a high-capability model. Per-task model routing at the economy level could handle routine work at lower cost.", domain.Label),
 			Evidence:       evidence,
-			Recommendation: "Set top-level model: router/economy in the workflow frontmatter to route each task at the economy level. Workflows eligible for default routing can instead omit the model. See " + modelRoutingDocsURL,
+			Recommendation: "Route each task at the economy level: " + economyRoutingChange + " Workflows eligible for default routing can instead omit the model. See " + modelRoutingDocsURL,
 		})
 	}
 }
