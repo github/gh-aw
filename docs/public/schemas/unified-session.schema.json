@@ -676,7 +676,9 @@
         "message": { "$ref": "#/definitions/JsonValue" },
         "reason": { "$ref": "#/definitions/JsonValue" },
         "requestId": { "$ref": "#/definitions/JsonValue" },
-        "threshold": { "$ref": "#/definitions/JsonValue" }
+        "threshold": { "$ref": "#/definitions/JsonValue", "description": "Budget percentage of the notice; null for a `little_left` notice." },
+        "trigger": { "$ref": "#/definitions/JsonValue", "description": "Why AWF sent the notice: `threshold` or `little_left`; absent before per-conversation delivery." },
+        "conversation": { "$ref": "#/definitions/JsonValue", "description": "Opaque 12-character conversation key, comparable only within the run; null when AWF could not key the conversation." }
       },
       "additionalProperties": false,
       "description": "AWF API proxy steering event-log observation."
@@ -1335,6 +1337,19 @@
       },
       "additionalProperties": false
     },
+    "SteeringDelivery": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["ai_credit", "timeout"] },
+        "trigger": { "type": "string", "enum": ["threshold", "little_left"], "description": "`threshold` when a budget percentage was crossed; `little_left` when only a few requests' worth of credits, or a few minutes, remain." },
+        "threshold": { "type": ["number", "null"], "enum": [80, 90, 95, 99, null], "description": "Budget percentage; null exactly when `trigger` is `little_left`." },
+        "conversation": { "type": ["string", "null"], "description": "Opaque per-run conversation key; null when AWF could not key the conversation.", "pattern": "^[0-9a-f]{12}$" },
+        "first": { "type": "boolean", "description": "Whether this was the run's first delivery of the notice." }
+      },
+      "required": ["type", "trigger", "threshold", "conversation", "first"],
+      "additionalProperties": false,
+      "description": "One delivery of an AWF steering notice to a conversation; AWF records one per conversation per notice."
+    },
     "SteeringNotice": {
       "type": "object",
       "properties": { "type": { "type": "string", "enum": ["ai_credit", "timeout", "token"] }, "threshold": { "type": "number", "enum": [80, 90, 95, 99] } },
@@ -1439,6 +1454,7 @@
         "premiumRequests": { "$ref": "#/definitions/JsonValue" },
         "durationMs": { "$ref": "#/definitions/JsonValue" },
         "steering": { "$ref": "#/definitions/SteeringNotice" },
+        "steeringDelivery": { "$ref": "#/definitions/SteeringDelivery" },
         "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
       },
       "additionalProperties": false

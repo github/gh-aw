@@ -79,6 +79,7 @@ func mergeTokenUsageSummary(combined, summary *TokenUsageSummary) {
 		combined.SteeringEventCounts[event] += count
 	}
 	combined.SteeringNotices = append(combined.SteeringNotices, summary.SteeringNotices...)
+	combined.SteeringDeliveries = append(combined.SteeringDeliveries, summary.SteeringDeliveries...)
 	combined.SteeringNoticesUnavailable = combined.SteeringNoticesUnavailable || summary.SteeringNoticesUnavailable
 	combined.SubagentModelRequests = append(combined.SubagentModelRequests, summary.SubagentModelRequests...)
 	combined.DeclaredSubagentModels = append(combined.DeclaredSubagentModels, summary.DeclaredSubagentModels...)

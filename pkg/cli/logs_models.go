@@ -155,6 +155,11 @@ type GatewaySteeringEvent struct {
 	Timestamp string `json:"timestamp,omitempty" console:"header:Timestamp,omitempty"`
 	Threshold int    `json:"threshold,omitempty" console:"header:Threshold,omitempty"`
 	RequestID string `json:"request_id,omitempty" console:"header:Request ID,omitempty"`
+	// Trigger is "threshold" or "little_left" on events from AWF releases after
+	// v0.29.11; a little_left notice has no threshold.
+	Trigger string `json:"trigger,omitempty" console:"header:Trigger,omitempty"`
+	// Conversation is the opaque per-run conversation key the notice went to.
+	Conversation string `json:"conversation,omitempty" console:"header:Conversation,omitempty"`
 }
 
 // ReportProvenance holds the shared provenance fields common to all report record types.

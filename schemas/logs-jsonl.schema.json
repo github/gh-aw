@@ -3183,6 +3183,52 @@
                     "additionalProperties": false
                   }
                 },
+                "steering_deliveries": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "trigger": {
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "conversation": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "first": {
+                        "type": "boolean"
+                      },
+                      "request_id": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "trigger",
+                      "threshold",
+                      "conversation",
+                      "first"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
                 "steering_notices_unavailable": {
                   "type": "boolean"
                 },
@@ -3236,6 +3282,52 @@
                 "required": [
                   "type",
                   "threshold"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "steering_deliveries": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string"
+                  },
+                  "threshold": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "conversation": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "first": {
+                    "type": "boolean"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "phase": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "trigger",
+                  "threshold",
+                  "conversation",
+                  "first"
                 ],
                 "additionalProperties": false
               }
@@ -5831,6 +5923,12 @@
                       },
                       "request_id": {
                         "type": "string"
+                      },
+                      "trigger": {
+                        "type": "string"
+                      },
+                      "conversation": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -5864,6 +5962,52 @@
                     "required": [
                       "type",
                       "threshold"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "steering_deliveries": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "trigger": {
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "conversation": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "first": {
+                        "type": "boolean"
+                      },
+                      "request_id": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "trigger",
+                      "threshold",
+                      "conversation",
+                      "first"
                     ],
                     "additionalProperties": false
                   }
@@ -6347,6 +6491,52 @@
                         "required": [
                           "type",
                           "threshold"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "steering_deliveries": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "trigger": {
+                            "type": "string"
+                          },
+                          "threshold": {
+                            "type": [
+                              "null",
+                              "integer"
+                            ]
+                          },
+                          "conversation": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "first": {
+                            "type": "boolean"
+                          },
+                          "request_id": {
+                            "type": "string"
+                          },
+                          "phase": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "trigger",
+                          "threshold",
+                          "conversation",
+                          "first"
                         ],
                         "additionalProperties": false
                       }

@@ -754,6 +754,8 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
 
   // T2: each (type, threshold) once, on a known threshold, and never early.
   // Order is not checked: AWF sends the highest pending threshold first.
+  // Uses the legacy `steering` records, written at most once per threshold per
+  // run; `steering_delivery` repeats each notice once per conversation.
   const t2Problems = [];
   if (!notices.length) t2Problems.push("no steering notices to check");
   /** @type {Map<string, number>} */

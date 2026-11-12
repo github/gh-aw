@@ -536,6 +536,7 @@ func renderConsoleOperationalSections(data AuditData) {
 	renderConsoleSkillActivations(data.SkillActivations)
 	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)
 	renderConsoleSteeringNotices(data.SteeringNotices, data.SteeringNoticesUnavailable)
+	renderConsoleSteeringDeliveries(data.SteeringDeliveries)
 	renderConsoleMissingTools(data.MissingTools)
 	renderConsoleMCPFailures(data.MCPFailures)
 	renderCompactMCPHealth(data.MCPServerHealth)
@@ -623,6 +624,12 @@ func renderConsoleGatewaySteeringEvents(events []GatewaySteeringEvent) {
 	fmt.Fprintln(os.Stderr, "  gateway_steering_events:")
 	for _, event := range events {
 		line := fmt.Sprintf("    %s: %s", event.Type, event.Message)
+		if event.Trigger == steeringTriggerLittleLeft {
+			line += " [little left]"
+		}
+		if event.Conversation != "" {
+			line += " conversation=" + event.Conversation
+		}
 		if event.Timestamp != "" {
 			line += " (" + event.Timestamp + ")"
 		}
@@ -649,6 +656,43 @@ func renderConsoleSteeringNotices(notices []SteeringNotice, unavailable bool) {
 		}
 		fmt.Fprintln(os.Stderr, line)
 	}
+}
+
+// renderConsoleSteeringDeliveries lists every AWF steering notice delivery with
+// its conversation; a little_left notice is shown as "little left" because it
+// has no threshold.
+func renderConsoleSteeringDeliveries(deliveries []SteeringDelivery) {
+	if len(deliveries) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "  steering_deliveries:")
+	for _, delivery := range deliveries {
+		fmt.Fprintln(os.Stderr, "    "+formatSteeringDelivery(delivery))
+	}
+}
+
+func formatSteeringDelivery(delivery SteeringDelivery) string {
+	line := delivery.Type
+	if delivery.Trigger == steeringTriggerLittleLeft || delivery.Threshold == nil {
+		line += " little left"
+	} else {
+		line += fmt.Sprintf(" %d%%", *delivery.Threshold)
+	}
+	if delivery.Conversation != nil {
+		line += " conversation=" + *delivery.Conversation
+	} else {
+		line += " conversation=unknown"
+	}
+	if delivery.First {
+		line += " first"
+	}
+	if delivery.RequestID != "" {
+		line += " request_id=" + delivery.RequestID
+	}
+	if delivery.Phase != "" && delivery.Phase != "agent" {
+		line += " phase=" + delivery.Phase
+	}
+	return line
 }
 
 func renderConsoleSkillActivations(activations []SkillActivation) {

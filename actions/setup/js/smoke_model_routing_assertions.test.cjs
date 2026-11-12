@@ -1032,6 +1032,20 @@ describe("smoke_model_routing_assertions", () => {
       expect(failures[0]).toMatch(/^FAIL T2 repeated notice\(s\): ai_credit@80 x2; observed notices: /);
     });
 
+    it("keeps T2 on the legacy steering records when AWF re-delivers a notice to other conversations", () => {
+      const requests = steeringFixture();
+      const delivery = (index, extra) => ({ ...requests[index], steering_delivery: { type: "ai_credit", trigger: "threshold", threshold: 80, conversation: `00000000000${index}`, first: false, ...extra } });
+      requests[6] = delivery(6, { first: true });
+      requests[7] = delivery(7);
+      requests[8] = delivery(8, { threshold: 90, first: true });
+      requests[9] = delivery(9);
+      requests[10] = delivery(10, { trigger: "little_left", threshold: null, conversation: null, first: true });
+      write(TOKEN_USAGE, requests);
+      const { passes, failures } = steeringCheck();
+      expect(failures).toEqual([]);
+      expect(lineFor(passes, "T2")).toMatch(/^PASS T2 2 notice\(s\), each once and at or above its threshold of 30: ai_credit@80 request=run-38174216426-req-7 .*, ai_credit@90 request=run-38174216426-req-9 /);
+    });
+
     it("passes T2 when the 90% notice arrives before the 80% notice", () => {
       // One response crossed both 80 and 90: AWF sends the higher threshold first.
       const credits = RUN_CREDITS.slice(0, 11).map(([thisResponse, total]) => [thisResponse, total]);

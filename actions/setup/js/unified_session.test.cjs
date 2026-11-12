@@ -1902,11 +1902,21 @@ describe("Unified conclusion session", () => {
       { timestamp: "2026-10-02T00:00:01Z", event: "token_usage", request_id: "credit", purpose: "agent", model: "claude-sonnet-5", input_tokens: 1, steering: { type: "ai_credit", threshold: 80 } },
       { timestamp: "2026-10-02T00:00:02Z", event: "token_usage", request_id: "plain", purpose: "agent", model: "claude-sonnet-5", input_tokens: 1 },
       { timestamp: "2026-10-02T00:00:03Z", event: "token_usage", request_id: "time", purpose: "agent", model: "claude-sonnet-5", input_tokens: 1, steering: { type: "timeout", threshold: 90 } },
+      {
+        timestamp: "2026-10-02T00:00:05Z",
+        event: "token_usage",
+        request_id: "little",
+        purpose: "agent",
+        model: "claude-sonnet-5",
+        input_tokens: 1,
+        steering_delivery: { type: "ai_credit", trigger: "little_left", threshold: null, conversation: "0123456789ab", first: true },
+      },
     ]);
     write("sandbox/firewall/logs/api-proxy-logs/events.jsonl", [
       { timestamp: "2026-10-02T00:00:01Z", level: "info", event: "ai_credit_steering", request_id: "credit", provider: "copilot", threshold: 80, message: "[AWF AI CREDIT WARNING] budget" },
       { timestamp: "2026-10-02T00:00:03Z", level: "info", event: "timeout_steering", request_id: "time", provider: "copilot", threshold: 90, message: "[AWF TIME WARNING] time" },
       { timestamp: "2026-10-02T00:00:04Z", payload: { event: "TOKEN_STEERING" }, request_id: "tokens", threshold: 95, message: "[AWF TOKEN WARNING] tokens" },
+      { timestamp: "2026-10-02T00:00:05Z", level: "info", event: "ai_credit_steering", request_id: "little", threshold: null, trigger: "little_left", conversation: "0123456789ab", message: "[AWF AI CREDIT WARNING] little" },
     ]);
     const { events } = collectUnifiedSession({ rootDir: root });
     const usage = events.filter(event => event.type === "firewall.token_usage");
@@ -1914,16 +1924,20 @@ describe("Unified conclusion session", () => {
       ["credit", { type: "ai_credit", threshold: 80 }],
       ["plain", undefined],
       ["time", { type: "timeout", threshold: 90 }],
+      ["little", undefined],
     ]);
+    expect(usage[3].data.steeringDelivery).toEqual({ type: "ai_credit", trigger: "little_left", threshold: null, conversation: "0123456789ab", first: true });
     expect(usage[1].data).not.toHaveProperty("steering");
     expect(events.filter(event => event.type === "firewall.steering").map(event => event.data)).toEqual([
       { event: "ai_credit_steering", level: "info", message: "[AWF AI CREDIT WARNING] budget", requestId: "credit", threshold: 80 },
       { event: "timeout_steering", level: "info", message: "[AWF TIME WARNING] time", requestId: "time", threshold: 90 },
       { event: "token_steering", message: "[AWF TOKEN WARNING] tokens", requestId: "tokens", threshold: 95 },
+      { event: "ai_credit_steering", level: "info", message: "[AWF AI CREDIT WARNING] little", requestId: "little", threshold: null, trigger: "little_left", conversation: "0123456789ab" },
     ]);
     const validate = req("./scripts/validate_session.cjs").createSessionValidator("unified").event;
     for (const event of events) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
     expect(validate({ ...usage[0], data: { ...usage[0].data, steering: { type: "ai_credit", threshold: 80, message: "PRIVATE" } } })).toBe(false);
+    expect(validate({ ...usage[3], data: { ...usage[3].data, steeringDelivery: { ...usage[3].data.steeringDelivery, conversation: "PRIVATE" } } })).toBe(false);
   });
 
   it("prefers persisted canonical events over raw logs and avoids replicated firewall accounting", () => {

@@ -891,6 +891,11 @@ describe("essential unified session payloads", () => {
       { event: "ai_credit_steering", request_id: "steered", provider: "copilot", threshold: 80, message: "[AWF AI CREDIT WARNING] budget" },
       { event: "ai_credit_steering", requestId: "steered", threshold: 80, message: "[AWF AI CREDIT WARNING] budget" },
     ],
+    [
+      "firewall.steering",
+      { event: "timeout_steering", request_id: "late", threshold: null, trigger: "little_left", conversation: "0123456789ab", message: "[AWF TIME WARNING] time" },
+      { event: "timeout_steering", requestId: "late", threshold: null, trigger: "little_left", conversation: "0123456789ab", message: "[AWF TIME WARNING] time" },
+    ],
     ["mcp.tool_call", { tool_call_id: "call", tool_name: "lookup", duration: 5, input_size: 0, output_size: 10, status: "error" }, { toolCallId: "call", toolName: "lookup", durationMs: 5, inputSize: 0, outputSize: 10, status: "error" }],
     ["execution.result", { exit_code: 0, duration_ms: 0, outcome: "success", extra: "omit" }, { exitCode: 0, durationMs: 0, outcome: "success" }],
     [
@@ -1183,6 +1188,32 @@ describe("essential unified session payloads", () => {
       expect(normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data: { request_id: "plain", steering } }).data).not.toHaveProperty("steering");
     }
     expect(normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data: { request_id: "plain" } }).data).not.toHaveProperty("steering");
+  });
+
+  it("keeps every AWF steering delivery with its trigger and conversation on token usage events", () => {
+    const threshold = { type: "ai_credit", trigger: "threshold", threshold: 80, conversation: "0123456789ab", first: false, message: "omit" };
+    const delivered = normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data: { request_id: "again", steering_delivery: threshold } });
+    expect(delivered.data).toEqual({ requestId: "again", steeringDelivery: { type: "ai_credit", trigger: "threshold", threshold: 80, conversation: "0123456789ab", first: false } });
+    expect(normalizeUnifiedSessionEvent(delivered)).toEqual(delivered);
+    const littleLeft = { type: "timeout", trigger: "little_left", threshold: null, conversation: null, first: true };
+    const report = normalizeUnifiedSessionEvent({ type: "usage.report", data: { request_id: "late", steering: { type: "timeout", threshold: 95 }, steeringDelivery: littleLeft } });
+    expect(report.data).toEqual({ requestId: "late", steering: { type: "timeout", threshold: 95 }, steeringDelivery: littleLeft });
+    for (const steeringDelivery of [
+      null,
+      [],
+      {},
+      { ...threshold, type: "token" },
+      { ...threshold, trigger: "unknown" },
+      { ...threshold, threshold: null },
+      { ...threshold, threshold: 50 },
+      { ...littleLeft, threshold: 80 },
+      { ...threshold, conversation: "PRIVATE-PROMPT" },
+      { ...threshold, conversation: undefined },
+      { ...threshold, first: "true" },
+    ]) {
+      expect(normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data: { request_id: "plain", steering_delivery: steeringDelivery } }).data).not.toHaveProperty("steeringDelivery");
+    }
+    expect(normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data: { request_id: "plain" } }).data).not.toHaveProperty("steeringDelivery");
   });
 
   it("retains normalized subagent invocation and per-request usage fields", () => {

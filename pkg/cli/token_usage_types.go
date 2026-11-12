@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 
@@ -47,6 +48,10 @@ type TokenUsageEntry struct {
 	// Steering is the AWF steering notice delivered on this request, if any.
 	// Older AWF versions never record it, so nil means "no notice recorded".
 	Steering *TokenUsageSteering `json:"steering,omitempty"`
+	// SteeringDelivery is the AWF steering notice delivery recorded on this
+	// request, written once per conversation per notice. AWF v0.29.11 and older
+	// never record it, so nil means "no delivery recorded".
+	SteeringDelivery *TokenUsageSteeringDelivery `json:"steering_delivery,omitempty"`
 }
 
 // TokenUsageSteering is the steering notice AWF attached to a model request.
@@ -112,6 +117,155 @@ func (t *steeringThreshold) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Steering delivery triggers recorded by AWF.
+const (
+	steeringTriggerThreshold  = "threshold"
+	steeringTriggerLittleLeft = "little_left"
+)
+
+// TokenUsageSteeringDelivery is one delivery of an AWF steering notice to a
+// conversation. A little_left notice has no threshold and decodes with a zero
+// Threshold; an empty Conversation means AWF could not key the conversation.
+type TokenUsageSteeringDelivery struct {
+	Type         string            `json:"type"`    // ai_credit or timeout
+	Trigger      string            `json:"trigger"` // threshold or little_left
+	Threshold    steeringThreshold `json:"threshold"`
+	Conversation string            `json:"conversation"`
+	First        bool              `json:"first"`
+}
+
+// UnmarshalJSON decodes a steering delivery leniently so that an unexpected
+// shape never prevents the surrounding token-usage record from being read.
+// Deliveries that do not match the AWF contract decode as invalid.
+func (d *TokenUsageSteeringDelivery) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Type         json.RawMessage `json:"type"`
+		Trigger      json.RawMessage `json:"trigger"`
+		Threshold    json.RawMessage `json:"threshold"`
+		Conversation json.RawMessage `json:"conversation"`
+		First        json.RawMessage `json:"first"`
+	}
+	*d = TokenUsageSteeringDelivery{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+	first, firstOK := jsonBool(raw.First)
+	conversation, conversationOK := steeringConversation(raw.Conversation)
+	if !firstOK || !conversationOK {
+		return nil
+	}
+	trigger := optionalJSONString(raw.Trigger)
+	var threshold steeringThreshold
+	isNull := string(bytes.TrimSpace(raw.Threshold)) == "null"
+	if len(raw.Threshold) > 0 && !isNull {
+		_ = threshold.UnmarshalJSON(raw.Threshold)
+	}
+	switch {
+	case trigger == steeringTriggerThreshold && threshold != 0:
+	case trigger == steeringTriggerLittleLeft && isNull:
+	default:
+		return nil
+	}
+	d.Type = optionalJSONString(raw.Type)
+	d.Trigger = trigger
+	d.Threshold = threshold
+	d.Conversation = conversation
+	d.First = first
+	return nil
+}
+
+// MarshalJSON writes the delivery in AWF's token-usage.jsonl form, with a null
+// threshold for little_left notices and a null conversation when it is unknown.
+func (d TokenUsageSteeringDelivery) MarshalJSON() ([]byte, error) {
+	out := struct {
+		Type         string  `json:"type"`
+		Trigger      string  `json:"trigger"`
+		Threshold    *int    `json:"threshold"`
+		Conversation *string `json:"conversation"`
+		First        bool    `json:"first"`
+	}{Type: d.Type, Trigger: d.Trigger, First: d.First}
+	out.Threshold, out.Conversation = d.thresholdAndConversation()
+	return json.Marshal(out)
+}
+
+// thresholdAndConversation returns the delivery threshold and conversation as
+// optional values: nil for a little_left threshold or an unkeyed conversation.
+func (d TokenUsageSteeringDelivery) thresholdAndConversation() (*int, *string) {
+	var threshold *int
+	if d.Trigger != steeringTriggerLittleLeft {
+		value := int(d.Threshold)
+		threshold = &value
+	}
+	var conversation *string
+	if d.Conversation != "" {
+		value := d.Conversation
+		conversation = &value
+	}
+	return threshold, conversation
+}
+
+// valid reports whether the delivery carries a known AWF steering type and a
+// trigger with a matching threshold, matching the unified session schema.
+func (d *TokenUsageSteeringDelivery) valid() bool {
+	if d == nil {
+		return false
+	}
+	switch d.Type {
+	case "ai_credit", "timeout":
+	default:
+		return false
+	}
+	switch d.Trigger {
+	case steeringTriggerThreshold:
+		return d.Threshold != 0
+	case steeringTriggerLittleLeft:
+		return d.Threshold == 0
+	default:
+		return false
+	}
+}
+
+// jsonBool decodes a required JSON boolean.
+func jsonBool(raw json.RawMessage) (bool, bool) {
+	var value bool
+	if len(raw) == 0 || json.Unmarshal(raw, &value) != nil {
+		return false, false
+	}
+	return value, true
+}
+
+// steeringConversation decodes an AWF conversation key: twelve lowercase hex
+// characters, or null when AWF could not key the conversation (returned as "").
+func steeringConversation(raw json.RawMessage) (string, bool) {
+	if string(bytes.TrimSpace(raw)) == "null" {
+		return "", true
+	}
+	var value string
+	if len(raw) == 0 || json.Unmarshal(raw, &value) != nil || len(value) != 12 {
+		return "", false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return "", false
+		}
+	}
+	return value, true
+}
+
+// SteeringDelivery is one delivery of an AWF steering notice to a conversation,
+// read from firewall.token_usage events in the unified session. Threshold is
+// nil for a little_left notice and Conversation is nil when AWF could not key
+// the conversation.
+type SteeringDelivery struct {
+	Type         string  `json:"type" console:"header:Type"`
+	Trigger      string  `json:"trigger" console:"header:Trigger"`
+	Threshold    *int    `json:"threshold" console:"header:Threshold"`
+	Conversation *string `json:"conversation" console:"header:Conversation"`
+	First        bool    `json:"first" console:"header:First"`
+	RequestID    string  `json:"request_id,omitempty" console:"header:Request ID,omitempty"`
+	Phase        string  `json:"phase,omitempty" console:"header:Phase,omitempty"`
+}
+
 // SteeringNotice is an AWF steering notice delivered on a model request, read
 // from firewall.token_usage events in the unified session.
 type SteeringNotice struct {
@@ -148,6 +302,9 @@ type TokenUsageSummary struct {
 	SubagentModelActuals   []SubagentModelActual       `json:"subagent_model_actuals,omitempty"`
 	AgentUsage             []AgentUsageBreakdown       `json:"agent_usage,omitempty"`
 	SteeringNotices        []SteeringNotice            `json:"steering_notices,omitempty" console:"-"`
+	// SteeringDeliveries lists every AWF steering notice delivery, one per
+	// conversation per notice, read from the unified session.
+	SteeringDeliveries []SteeringDelivery `json:"steering_deliveries,omitempty" console:"-"`
 	// SteeringNoticesUnavailable is true when the unified session could not be
 	// read, so the absence of steering_notices does not mean "no notices".
 	SteeringNoticesUnavailable bool     `json:"steering_notices_unavailable,omitempty" console:"-"`
@@ -299,6 +456,11 @@ type proxyEventsEntry struct {
 	// that include gh-aw-firewall#9790).
 	RequestID string            `json:"request_id"`
 	Threshold steeringThreshold `json:"threshold"`
+	// Trigger ("threshold" or "little_left") and the opaque per-run conversation
+	// key are present on steering events from AWF releases after v0.29.11. A
+	// little_left notice has a null threshold.
+	Trigger      json.RawMessage `json:"trigger,omitempty"`
+	Conversation json.RawMessage `json:"conversation,omitempty"`
 }
 
 // tokenUsageJSONLPath is the relative path within the firewall logs directory

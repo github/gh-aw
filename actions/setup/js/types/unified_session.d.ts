@@ -137,13 +137,34 @@ export interface DurableStartupData extends DurableSessionMetadata {
 
 /** AWF API proxy steering event-log observation. */
 export interface FirewallSteeringData extends RuntimeObservationData {
+  /** Budget percentage of the notice; null for a `little_left` notice. */
   threshold?: JsonValue;
+  /** Why AWF sent the notice: `threshold` or `little_left`; absent before per-conversation delivery. */
+  trigger?: JsonValue;
+  /** Opaque 12-character conversation key, comparable only within the run; null when AWF could not key the conversation. */
+  conversation?: JsonValue;
 }
 
 /** AWF steering notice delivered on a model request. */
 export interface SteeringNotice {
   type: "ai_credit" | "timeout" | "token";
   threshold: 80 | 90 | 95 | 99;
+}
+
+/** One delivery of an AWF steering notice to a conversation; AWF records one per conversation per notice. */
+export interface SteeringDelivery {
+  type: "ai_credit" | "timeout";
+  /** `threshold` when a budget percentage was crossed; `little_left` when only a few requests' worth of credits, or a few minutes, remain. */
+  trigger: "threshold" | "little_left";
+  /** Budget percentage; null exactly when `trigger` is `little_left`. */
+  threshold: 80 | 90 | 95 | 99 | null;
+  /**
+   * Opaque per-run conversation key; null when AWF could not key the conversation.
+   * @pattern ^[0-9a-f]{12}$
+   */
+  conversation: string | null;
+  /** Whether this was the run's first delivery of the notice. */
+  first: boolean;
 }
 
 export interface ModelRoutingData {
@@ -399,6 +420,7 @@ export interface UsageReportData extends UnifiedSessionContextData {
   premiumRequests?: JsonValue;
   durationMs?: JsonValue;
   steering?: SteeringNotice;
+  steeringDelivery?: SteeringDelivery;
   usage?: UnifiedSessionUsage | null;
 }
 

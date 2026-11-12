@@ -88,7 +88,7 @@ Run `echo 1`, then `echo 2`, then `echo 3`, and so on up to `echo 200`: one `ech
 As soon as any message you receive contains text starting with `[AWF AI CREDIT WARNING]`, stop the task immediately. Do not run any further `echo` commands. Then:
 
 1. Create an issue titled **"Smoke Test: Copilot Routed Steering - ${{ github.run_id }}"** with:
-   - The threshold percentage stated in the warning you saw (for example `80%`)
+   - The amounts stated in the warning you saw (for example `247 of 300 AI credits are used`)
    - The last `N` you echoed
    - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 2. Finish with a one-line reply. Make no other tool calls.
