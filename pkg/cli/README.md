@@ -185,6 +185,8 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `DryRunRequiredBoolFlags` | `func() []string` | Lists development-compile checks that cannot be disabled. |
 | `NewSkillCommand` | `func() *cobra.Command` | Constructs the skill command. |
 | `NewWorkCommandWithNativeDeliveryHost` | `func(host *workqueue.NativeDeliveryHost) *cobra.Command` | Constructs the protected native work command using a host-supplied delivery boundary. |
+| `NewConnectorsCommand` | `func() *cobra.Command` | Constructs commands for validating and inspecting connector definitions and hosting frozen plans. |
+| `NewConnectorCommand` | `func() *cobra.Command` | Constructs the id-first setup and local-test interface for AW Markdown connectors. |
 | `RetrieveEpisodeLogs` | `func(ctx context.Context, opts EpisodeRetrievalOptions) (LogsData, error)` | Collects canonical workflow-run members using compact artifacts and the standard log report builder. |
 | `ValidateDevelopmentCompileFlags` | `func(dev bool, flags map[string]bool) error` | Rejects explicit development-compile opt-outs while allowing omitted defaults. |
 
@@ -199,7 +201,6 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `CheckStateSuccess` | `CheckState` | `"success"` | Normalized CI state indicating all required checks passed. |
 | `CheckAndPrepareDockerImages` | `func(ctx context.Context, opts DockerImagesOptions) error` | Pre-pulls security-scanner Docker images |
 | `UpdateContainerPins` | `func(ctx context.Context, workflowDir string, verbose bool) (bool, error)` | Updates container image SHA pins in workflow files |
-| `CreatePRWithChanges` | `func(ctx context.Context, branchPrefix, commitMessage, prTitle, prBody string, verbose bool) (string, error)` | Creates a GitHub PR from uncommitted changes |
 | `AutoMergePullRequestsCreatedAfter` | `func(repoSlug string, createdAfter time.Time, verbose bool) error` | Auto-merges eligible PRs created after a given time |
 | `PreflightCheckForCreatePR` | `func(bool) error` | Validates prerequisites before creating a PR |
 | `DisableAllWorkflowsExcept` | `func(repoSlug string, exceptWorkflows []string, verbose bool) error` | Disables all workflows in a repo except the named ones |
@@ -398,7 +399,6 @@ The `cli` package exports many types used across its command implementations. Th
 | `WorkflowSpec` | struct | A fully resolved workflow specification with source metadata |
 | `WorkflowStats` | struct | Aggregate statistics for a workflow |
 | `LogMetrics` | type alias | Alias for `workflow.LogMetrics` — log parsing metrics |
-| `PostTransformFunc` | func type | A post-compilation transformation function |
 | `LogParser[T]` | generic func type | Generic log-parser function type parameterized on analysis result |
 | `ExperimentState` | struct | State stored in `experiments/*` git branches (counts and run history) |
 | `ExperimentRunRecord` | struct | A single workflow run record in experiment state history |
