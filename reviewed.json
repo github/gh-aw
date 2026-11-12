@@ -87,7 +87,7 @@
   "summary": "Claude Code plugin to discover/install gh-aw workflows from agentics catalog plus agent-team pattern; stale since June 2026.",
   "highlights": [
    "Conversational discover/install skills",
-   "catalog/agent-team: spec→plan→impl→review workflows",
+   "catalog/agent-team: spec\u2192plan\u2192impl\u2192review workflows",
    "Starter pitch: zero-risk daily-repo-status"
   ],
   "blogged": false
@@ -696,6 +696,45 @@
    "README \"Is it worth it?\" and \"Not tested\" sections state where PiG is worse and what was untested; explicitly not an official integration",
    "piglet/gh-aw-smoke.yaml: Piglet restricts tools to read and bash; sample of tool-scoping approach"
   ],
+  "blogged": false
+ },
+ "UnclesLibrary/agentic-workflows-library": {
+  "kind": "workflow-collection",
+  "score": 5,
+  "summary": "Attribution-first backup mirror of five upstream gh-aw workflows (githubnext/agentics, github/gh-aw) pinned to commits for workshop availability; no ongoing sync.",
+  "highlights": [
+   "README.md: provenance table with source path and upstream commit per workflow, MIT attribution",
+   "workflows/issue-triage.md: HTML banner comment recording upstream URL and commit",
+   "workflows/plan.md: deliberately pinned to pre-repurpose commit 97143ac; adds explicit tools.bash allowlist for strict mode",
+   "Single commit (ad9914d6, 2026-09-25); point-in-time copies, not maintained"
+  ],
+  "reviewed": "2026-11-12",
+  "blogged": false
+ },
+ "tomsiwik/laboratory": {
+  "kind": "workflow-collection",
+  "score": 4,
+  "summary": "Dexter's Laboratory-themed gh-aw packages (Dexter PR-review bot and siblings); standard review workflow with thin guardrails and draft-level docs.",
+  "highlights": [
+   "packages/dexter/workflow.md: engine claude, cache-memory, bash: true, push-to-pull-request-branch with no max set",
+   "workflows/computress.md, workflows/dad.md: symlinks to packages/*/workflow.md",
+   "packages/dexter/doc.md: install via gh aw add tomsiwik/laboratory/dexter; CLI wrapper dex",
+   "7 commits, last 2026-03-09"
+  ],
+  "reviewed": "2026-11-12",
+  "blogged": false
+ },
+ "jcampb/mm-bmad": {
+  "kind": "workflow-collection",
+  "score": 6,
+  "summary": "BMAD Method compiled into 18 gh-aw workflows with a label state machine, needs-human-intervention circuit breaker and 3-strike review cap; dormant since 2026-02-24.",
+  "highlights": [
+   "workflows/bmad-dev-story.md: 'Count review cycles' step halts at 3 cycles and applies needs-human-intervention",
+   "if: circuit breaker on needs-human-intervention label across code-review, dev-story and resume workflows",
+   ".github/aw/actions-lock.json: actions/github-script and github/gh-aw setup pinned by SHA",
+   "source: frontmatter uses floating @main refs (weak upgrade pinning); builder skill .claude/skills/bmad-build-workflows.md"
+  ],
+  "reviewed": "2026-11-12",
   "blogged": false
  }
 }

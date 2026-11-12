@@ -1,23 +1,5 @@
 [
  {
-  "id": "UnclesLibrary/agentic-workflows-library",
-  "kind": "workflow-collection",
-  "source": "search: gh aw add/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
-  "id": "tomsiwik/laboratory",
-  "kind": "workflow-collection",
-  "source": "search: gh aw add/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
-  "id": "jcampb/mm-bmad",
-  "kind": "workflow-collection",
-  "source": "search: gh aw add/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
   "id": "notglossy/agentic-workflows",
   "kind": "workflow-collection",
   "source": "search: gh aw add/agentic repo search",
@@ -52,5 +34,71 @@
   "kind": "other",
   "source": "search: gh-aw safe-outputs/agentic repo search",
   "discovered": "2026-11-11"
+ },
+ {
+  "id": "githubnext/evergreen",
+  "kind": "other",
+  "source": "repo search 2026-11-12: gh-aw policy-aware PR workflow",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "githubnext/repo-mind-light-aw",
+  "kind": "shared-component",
+  "source": "repo search 2026-11-12: companion gh-aw shared workflow repo",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "githubnext/gh-aw-dashboard",
+  "kind": "tool",
+  "source": "repo search 2026-11-12: dashboard for gh-aw central agentic ops",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "elbruno/weekly-ai-news-digest",
+  "kind": "other",
+  "source": "repo search 2026-11-12: daily gh-aw news digest",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "srdjan/aw-pack",
+  "kind": "workflow-collection",
+  "source": "repo search 2026-11-12: installable gh-aw pack (triage, PR review, doc sync)",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "cajetzer/agentic-skills-runtime-consumer",
+  "kind": "other",
+  "source": "repo search 2026-11-12: reference issue-to-draft-PR loop on gh-aw",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "brainupgrade-in/global-bank-platform",
+  "kind": "other",
+  "source": "repo search 2026-11-12: central gh-aw orchestration repo for a fleet",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "githubnext/autoloop",
+  "kind": "other",
+  "source": "linked from githubnext/agentics README 2026-11-12",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "githubnext/crane",
+  "kind": "other",
+  "source": "linked from githubnext/agentics README 2026-11-12",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "githubnext/goal",
+  "kind": "other",
+  "source": "linked from githubnext/agentics README 2026-11-12",
+  "discovered": "2026-11-12"
+ },
+ {
+  "id": "hivecommons/hive",
+  "kind": "other",
+  "source": "linked from githubnext/agentics README 2026-11-12",
+  "discovered": "2026-11-12"
  }
 ]

@@ -199,6 +199,18 @@
   {
    "q": "gh-aw fork:false archived:false pushed:>2026-11-09",
    "last_run": "2026-11-11"
+  },
+  {
+   "q": "github-agentic-workflows in:readme fork:false archived:false pushed:>2026-10-20",
+   "last_run": "2026-11-12"
+  },
+  {
+   "q": "agentic-ops gh-aw in:readme fork:false archived:false",
+   "last_run": "2026-11-12"
+  },
+  {
+   "q": "gh-aw shared workflows .github/workflows/shared in:readme fork:false archived:false",
+   "last_run": "2026-11-12"
   }
  ]
 }
