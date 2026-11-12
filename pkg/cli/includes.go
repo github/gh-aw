@@ -390,7 +390,11 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		return nil
 	}
-	defer root.Close()
+	defer func() {
+		if err := root.Close(); err != nil {
+			remoteWorkflowLog.Printf("Failed to close import destination root: %v", err)
+		}
+	}()
 
 	for _, importPath := range importPaths {
 		// Skip workflowspec-format imports (already pinned to a remote ref)
