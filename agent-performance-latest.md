@@ -1,111 +1,29 @@
-# Agent Performance Analyzer — Latest Run (2026-09-30T13:00Z)
+# Agent Performance Analyzer - Latest Run (2026-11-12T12:45Z)
 
-Ranking deferred (18th consecutive run): metrics/latest.json still dated 2026-09-01.
-Re-verified on current main: avenger.md:42 still bind-mounts /usr/local/bin/npm; metrics-collector.md
-still lacks model-provider: github; gpclean.md:61 still uses retired openai/gpt-5-codex.
-No new discussion/issue filed (weekly report already posted 2026-09-28; no new evidence). See shared-alerts.md.
+Data basis: complete 24h snapshot `metrics/daily/2026-11-08.json` (362 workflows, 511 executed, 444 ok = 86.9%; 354 safe outputs, 430 accepted / 0 rejected).
+`metrics/latest.json` is partial (4.7h, null run/quality fields) and was not used for scoring.
+Quality scores are null in every snapshot: success rate and safe-output acceptance are proxies. Output sampling was not performed this run.
 
-## Run 2026-10-01T12:57Z
-metrics/latest.json still dated 2026-09-01 (19th consecutive deferred run). No new evidence; no discussion/issue filed.
+## Bottom tier (executed >= 3, success < 100%)
+- ai-moderator 1/16 (6.3%), avg 6513s, declared timeout 5 min. Cached logs show successes at 6.4-7.8 min (suspect: duration may include queue time).
+- auditor 1/11 (9.1%), 0 tokens. Hourly `Collect failure evidence` failing (WHM P1 tracker). Logs blocked (403).
+- code-scanning-fixer 2/3 (n too small).
+- pr-specification-reviewer 31/41 (75.6%), avg 2642s vs 20 min timeout (suspect metric). No investigation budget or self-check found.
+- design-decision-gate 31/35 (88.6%), 2.25M tokens. Trend 54% (10-25) -> 100% (11-03) -> 89% (11-08).
+- mattpocock-skills-reviewer 29/31 (93.5%), 2.78M tokens, 60 comments. Inline comments 13 (10-25) -> 1 (11-03) -> 60 (11-08).
+- pr-code-quality-reviewer 33/35 (94.3%). ponytail-reviewer 35/36 (97.2%), 24.4M tokens. test-quality-sentinel 40/41 (97.6%), 5.8M tokens.
 
-## Run 2026-10-02T12:57Z
-metrics/latest.json still dated 2026-09-01 (20th consecutive deferred run). No new evidence; no discussion/issue filed.
+## Verdicts
+- Matt Pocock Skills Reviewer: REDESIGN (cost and output-volume swings). Not deprecate.
+- Design Decision Gate: KEEP; trim token spend (64k/run).
+- Impeccable Skills Reviewer: KEEP; path-gated to docs/** so 0-1 runs/day. Insufficient data.
 
-## Run 2026-10-03T14:21Z
-metrics/latest.json still dated 2026-09-01 (21st consecutive deferred run). No new evidence; no discussion/issue filed.
+## Other
+- daily-go-test-parallelizer: 82.3M tokens over 9 runs (~9.1M/run). Largest resource outlier.
+- metrics-collector.md:14-15 still `engine: id: codex` with no `model-provider` (re-verified).
+- Open trackers reported by search for ai-moderator and metrics-collector failures (#77094, #77023). Integrity-filtered, so content/state unverified. No duplicate filed.
 
-## Run 2026-10-04T14:29Z
-metrics/latest.json still dated 2026-09-01 (22nd consecutive deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-05T12:59Z
-metrics/latest.json still dated 2026-09-01 (23rd consecutive deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-06T12:56Z
-metrics/latest.json still dated 2026-09-01 (24th consecutive deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-07T12:58Z
-metrics/latest.json still dated 2026-09-01 (25th consecutive deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-08T12:58Z
-metrics/latest.json still dated 2026-09-01 (26th consecutive deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-09T12:57Z
-metrics/latest.json still dated 2026-09-01 (27th consecutive deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-10T12:55Z
-metrics/latest.json still dated 2026-09-01 (~39 days stale; deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-11T13:00Z
-metrics/latest.json still dated 2026-09-01 (~40 days stale; deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-12T13:17Z
-metrics/latest.json still dated 2026-09-01 (~41 days stale; deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-13T13:01Z
-metrics/daily/2026-10-13.json is partial with 0 workflows (collector could not access tools); latest.json still 2026-09-01. Ranking deferred again; no discussion/issue filed.
-
-## Run 2026-10-14T12:55Z
-metrics/latest.json still dated 2026-09-01 (~43 days stale; deferred run). No new evidence; no discussion/issue filed.
-
-## Run 2026-10-16T12:55Z
-metrics/latest.json now dated 2026-10-16 but collection_status=partial (0.81h coverage, null outputs/scores). Ranking still not possible; no discussion/issue filed.
-
-## Run 2026-10-17T12:50Z
-metrics/latest.json now fresh (2026-10-17) but partial: 6.97h coverage, quality/effectiveness/safe-output outcomes null (logs gateway deadline). Ranking still deferred (no scoreable data); no discussion/issue filed.
-
-## Run 2026-10-18T12:50Z
-metrics/latest.json now fresh (2026-10-18) but partial: 0 workflows with executed-run counts, safe-output values null. Ranking deferred; no discussion/issue filed.
-
-## Run 2026-10-19T12:57Z
-metrics/latest.json (2026-10-19) is a partial snapshot (4.12h coverage, all per-workflow values null). Ranking deferred; no discussion/issue filed.
-
-## Run 2026-10-20T12:56Z
-metrics/latest.json (2026-10-20) partial: 8.06h coverage, 0/344 workflows with executed-run counts. Ranking deferred; no discussion/issue filed.
-
-## Run 2026-10-21T12:57Z
-metrics/latest.json refreshed (2026-10-21T03:05Z, partial: per-workflow safe-output/quality null). First ranking in weeks, run-based only: 538 executed, 75.8% success. Lowest: ai-moderator 10% (9/10 failed, avg 83min), smoke-copilot 22%, test-quality-sentinel 56%, pr-code-quality-reviewer 54%, mattpocock-skills-reviewer 58%, design-decision-gate 60%, ponytail-reviewer 62%. Discussion posted. Prior root causes in shared-alerts (EACCES/#61952, model_not_supported) not re-verified this run; treat as stale until re-checked.
-
-## Run 2026-10-22T13:00Z
-metrics/latest.json (2026-10-22T03:01Z) complete 24h: 500 executed runs across 152 workflows, 81.6% success, 420 safe outputs accepted/0 rejected. Weakest PR reviewers: pr-code-quality-reviewer 72%, mattpocock-skills-reviewer 76%, design-decision-gate 76%, ponytail-reviewer 78%; all share max duration 9720s (common event, not prompt). Discussion posted; root causes from older shared-alerts still unverified.
-
-## Run 2026-10-23T12:55Z
-metrics/latest.json now dated 2026-10-23 but partial (4.56h of logs, null quality/outcome values). Ranking deferred; no discussion/issue filed.
-
-## Run 2026-10-25T12:55Z
-metrics/latest.json (2026-10-25T03:02Z) complete 24h: 440 executed / 112 failed (74.5%), 309 safe outputs accepted/0 rejected. Weakest multi-run: ai-moderator 2/31 ok, design-decision-gate 54%, test-quality-sentinel 58%, pr-code-quality-reviewer 59%, ponytail-reviewer 62%, mattpocock-skills-reviewer 59%. Discussion posted. Older shared-alerts root causes (EACCES #61952, model_not_supported) remain unverified/stale.
-
-## Run 2026-10-26T14:21Z
-metrics/latest.json (2026-10-26) partial but usable: 443 runs/123 workflows, 85.6% overall success, 236 safe outputs. Report discussion filed. Flagged: ai-moderator 25% success (18/24 failed, max 24120s vs 5min timeout), Matt Pocock reviewer 0 outputs/31 runs, Design Decision Gate 15 comments/32 runs, 23 workflows with 1/1 failed runs.
-
-## Run 2026-10-27T13:00Z
-latest.json (2026-10-27, partial): 405 runs, 84.4% success. ai-moderator 3/22 ok; smoke-gemini/pi 0/2; DDG 87%; Pocock 94% (718k tokens, redesign candidate); impeccable 0 runs. Discussion posted; no issues.
-
-## Run 2026-10-29T12:47Z
-metrics/latest.json now dated 2026-10-29 but collection_status=partial; workflow_runs data unavailable (zero placeholders), 1.5h coverage. Ranking deferred; no discussion/issue filed.
-
-## Run 2026-10-31T12:42Z
-metrics/latest.json now dated 2026-10-31 but collection_status=partial: run counters are zero placeholders, safe-output/engagement null (coverage 2.1h). Ranking still not possible; no discussion/issue filed.
-
-## Run 2026-11-03T12:45Z
-latest.json (2026-11-03, complete 24h): 593 executed / 438 ok (73.9%), 465 safe-output items, PR merge 88.9% (16/18). Weakest: pr-sous-chef 39% (60/98 failed), ai-moderator 12/24 failed (avg 4812s), smoke-copilot-aoai-apikey 0/3, 44 workflows with a single failed run. Pocock reviewer 20/24 ok but 1.96M tokens. Discussion posted.
-
-## Run 2026-11-06T12:43Z
-No new discussion/issue: weekly report already posted 2026-11-03; no new evidence gathered this run.
-
-## Run 2026-11-07T12:42Z
-metrics/latest.json is fresh (2026-11-07) but partial: 100 runs over 2.83h, no safe-output/engagement data. Ranking deferred; no discussion/issue filed.
-
-## Run 2026-11-08T12:42Z
-No new evidence; weekly report already posted 2026-11-03. No discussion/issue filed.
-
-## Run 2026-11-10T12:45Z
-metrics/latest.json (2026-11-09) partial: 2.93h coverage, 120 runs, safe-output outcomes/quality null. Live logs retry hit 60s context deadline. Ranking deferred; weekly report already posted 2026-11-03; no discussion/issue filed.
-
-## Run 2026-11-11 (scored from complete 24h snapshot 2026-11-08)
-- Ranking unblocked: `metrics/latest.json` is partial (2.25h, null run/quality fields) and was NOT used. Scored from `metrics/daily/2026-11-08.json` (complete, 362 workflows, 511 executed, 444 ok = 86.9%, 354 safe outputs, 430 accepted / 0 rejected).
-- Quality and engagement fields are null across all snapshots: quality scores not computable; success rate and safe-output acceptance used as proxies (stated in report).
-- Bottom (executed >= 3): ai-moderator 1/16 (6%; declares timeout-minutes 5 but avg 6513s, suspect), auditor 1/11 (9%, 0 tokens), code-scanning-fixer 2/3, pr-specification-reviewer 31/41 (76%, avg 2642s), design-decision-gate 31/35 (89%, 2.25M tokens), mattpocock-skills-reviewer 29/31 (94%, 2.78M tokens, 60 comments).
-- Top: pr-sous-chef 112/112 (63 issues created), avenger, issue-monster, pr-triage-agent, smoke-claude-dynamic, daily-go-test-parallelizer (1.0 each).
-- Log-fetch (`agenticworkflows logs`) timed out at 60s; ai-moderator and auditor root causes unverified.
-- Stale claims corrected in shared-alerts.md (avenger npm mount gone; gpclean model-provider fixed; #63656/#63657 closed not_planned).
-- Open config defect still live: metrics-collector.md lacks `model-provider` under `engine:`.
+## Run log (condensed)
+- 2026-09-30 to 2026-11-10: ranking deferred repeatedly (partial metrics snapshots).
+- 2026-11-11: ranking from 11-08 complete snapshot.
+- 2026-11-12: full ranking, bottom-tier audit, Pocock/Impeccable/DDG verdicts; weekly discussion created.

@@ -354,3 +354,10 @@
 - Auditor (`auditor.md`) hourly `Collect failure evidence` failing 5/5 recent main runs. Health discovery hits `time_budget` and the checkpoint never advances. Was untracked before this run; new P1 tracker filed.
 - CI spec-pin/release-alignment (#76787) and CGO govulncheck (#76789) remain open. No new tracker.
 - CodeQL - Code Quality recovered (successes since 04:28Z).
+
+## Update — 2026-11-12 (Agent Performance Analyzer)
+- ai-moderator: cached logs show successful runs at 6.4-7.8 min against a declared `timeout-minutes: 5` (5-run sample). Duration may include queue time, so the timeout mismatch is suspect, not confirmed. Check open tracker #77094 (integrity-filtered; not read).
+- metrics-collector.md:14-15 still lacks `model-provider` under `engine:` (re-verified). Open tracker #77023 (integrity-filtered; not read).
+- Matt Pocock Skills Reviewer: cost and volume swings (60 comments on 11-08 vs 1 on 11-03). Verdict: redesign, not deprecate.
+- Design Decision Gate: keep, trim tokens. Impeccable: keep; path-gated, insufficient data.
+- daily-go-test-parallelizer: 82.3M tokens over 9 runs (resource outlier).
