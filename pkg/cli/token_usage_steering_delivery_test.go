@@ -83,7 +83,7 @@ func TestAnalyzeTokenUsageSteeringDeliveries(t *testing.T) {
 			if value == nil {
 				delete(delivery, key)
 			} else {
-				delivery[key] = value
+				maps.Copy(delivery, map[string]any{key: value})
 			}
 			return delivery
 		}
