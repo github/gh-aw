@@ -189,21 +189,25 @@ steps:
 Use `skip-if-match` / `skip-if-no-match` whenever possible because they also avoid scheduling the agent job. Use `noop` when you need arbitrary shell logic. See [Triggers](/gh-aw/reference/triggers/) for the full syntax.
 ### Choose a Cheaper Model
 
-The `engine.model` field selects the AI model. Smaller or faster models cost significantly less per token while still handling many routine tasks:
+Unless a task needs a particular model, let [model routing](/gh-aw/reference/model-routing/) right-size the model and reasoning effort for each run instead of pinning one. An [eligible workflow](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) that omits `model` already behaves like `model: router`. For routine, low-risk work such as triage, labeling, and summaries, set `router/economy` explicitly:
 
 ```aw wrap
-engine:
-  id: copilot
-  model: gpt-4.1-mini
+engine: copilot
+model: router/economy
 ```
+
+`router/economy` sets the lowest success target, so the router prefers the cheapest model and effort likely to meet it. It is not a guaranteed spending cap, and it doesn't make any particular model available; combine it with [`max-ai-credits`](#cap-ai-credits-per-run) for a hard stop.
+
+When a task requires a particular model or its capabilities, select one explicitly. An alias such as `small` skips per-task routing, but it resolves against the models available at run time and can map to a different model over time:
 
 ```aw wrap
-engine:
-  id: claude
-  model: claude-haiku-4-5
+engine: copilot
+model: small
 ```
 
-Reserve frontier models (GPT-5, Claude Sonnet, etc.) for complex tasks. Use lighter models for triage, labeling, summarization, and other structured outputs.
+Use an exact model ID instead when the workflow must run on one concrete model.
+
+Reserve frontier models for complex tasks, and prefer lighter models or `router/economy` for triage, labeling, summarization, and other structured outputs.
 
 ### Limit Context Size
 
@@ -215,13 +219,13 @@ GitHub Agentic Workflows includes default guardrails: a 20-minute timeout on the
 
 ### Cap AI Credits per Run
 
-Use the top-level `max-ai-credits` frontmatter field to cap the AI Credits (AIC) budget for a single workflow run. It provides a hard stop for unusually expensive runs and a consistent guardrail across all supported engines. The field accepts plain integers or `K`/`M` suffixes such as `100M`.
+Use the top-level `max-ai-credits` frontmatter field to cap the AI Credits (AIC) budget for a single workflow run. It provides a hard stop for unusually expensive runs and a consistent guardrail across all supported engines. The field accepts plain integers or `K`/`M` suffixes such as `5K`. AWF clamps any budget above its hard cap, 10,000 AI credits by default.
 
 ```aw wrap
 max-ai-credits: 500
 ```
 
-When the budget is approached, gh-aw emits steering warnings before the run reaches the limit. Set a negative value only to disable budget enforcement explicitly.
+As the budget is approached, AWF sends the agent budget notices before the run reaches the limit. A negative value disables only budget enforcement; with AWF releases after v0.29.11, notices continue unless [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering) is set.
 
 > [!NOTE]
 > Threat-detection runs have their own AI Credits cap, separate
@@ -239,6 +243,8 @@ engine: copilot
 model: auto
 max-ai-credits: 500
 ```
+
+Here `auto` is the engine or provider's own selector (Copilot's server-side selector in this example), not gh-aw's per-task router; to route each task with gh-aw, use `model: router` instead (see [Model Routing](/gh-aw/reference/model-routing/)).
 
 gh-aw does not compile a synthetic price for the selector itself. Requests are accounted against the concrete model reported by the response, so each model is charged at its own catalog rate. When a response omits model metadata, the proxy falls back to its conservative rate rather than undercounting.
 
@@ -424,7 +430,7 @@ For advanced controls without native gh-aw settings, use this admission integrat
 
 ### Roll Out Shared Defaults
 
-For large installations, set baseline model and token guardrails once and let individual workflows override them only when needed:
+For large installations, set baseline credit guardrails once and let individual workflows override them only when needed:
 
 1. Export current defaults:
 
@@ -432,21 +438,20 @@ For large installations, set baseline model and token guardrails once and let in
 gh aw env get defaults.yml --scope org --org MY_ORG
 ```
 
-2. Update and apply shared defaults:
+2. Update the exported file, retaining any other defaults you want to keep. For example:
 
 ```yaml
 default_max_ai_credits: "5M"
 default_max_daily_ai_credits: "15M"
-default_model_copilot: "gpt-5-mini"
-default_model_claude: "claude-haiku-4-5"
-default_model_codex: "gpt-5.4-mini"
 ```
+
+`default_model_*` variables are explicit model overrides: when set, they opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model). Leave them unset to preserve default routing for eligible workflows. They cannot enable routing, so do not set them to `router` or `router/*` values; a run whose model resolves to a router value at run time stops before the agent starts. To route workflows explicitly, write the router value in the workflow.
 
 ```bash
 gh aw env update defaults.yml --scope org --org MY_ORG
 ```
 
-`gh aw env update` previews changes before applying them. Use `--yes` to skip confirmation in automation or `--dry-run` to preview only. Set a field to `null` to delete the corresponding variable. Unknown YAML keys are rejected. `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers; `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers. Negative values disable the corresponding guardrail.
+`gh aw env update` previews changes before applying them. Use `--yes` to skip confirmation in automation or `--dry-run` to preview only. Set a field to `null` or omit it to delete the corresponding variable. Unknown YAML keys are rejected. `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers; `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers. Negative values disable the corresponding guardrail.
 
 3. If you compile workflows in CI, pass compiler-read defaults into the compiler process environment, for example via `${{ vars.* }}`: `GH_AW_DEFAULT_MAX_TURNS`, `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES`, and `GH_AW_DEFAULT_DETECTION_MODEL`.
 
@@ -499,9 +504,8 @@ on:
 
 permissions:
   issues: read
-engine:
-  id: copilot
-  model: gpt-4.1-mini
+engine: copilot
+model: router/economy
 tools:
   github:
     toolsets: [issues]

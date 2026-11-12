@@ -256,7 +256,7 @@ A compiler-enforced dependency and success guard on custom jobs that run after t
 
 ### Threat Detection Max AI Credits (`safe-outputs.threat-detection.max-ai-credits`)
 
-A `safe-outputs.threat-detection` field that caps the total AI Credits (AIC) the AWF proxy will spend for a single threat-detection run. Defaults to `400` AIC when omitted. Accepts an integer, a `K`/`M` suffix string (e.g., `750`), or `-1` to disable budget steering for detection runs. The organization-wide default can be overridden at runtime via `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS` without recompiling. Precedence: frontmatter literal → `GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS` variable → built-in default of `400`. See [Compiler Enterprise Environment Controls](/gh-aw/reference/compiler-enterprise-environment-controls/).
+A `safe-outputs.threat-detection` field that caps the total AI Credits (AIC) the AWF proxy will spend for a single threat-detection run. Defaults to `400` AIC when omitted. Accepts an integer, a `K`/`M` suffix string (e.g., `750`), or `-1` to disable the budget for detection runs (with AWF releases after v0.29.11, budget notices continue against AWF's hard cap, 10,000 AI credits by default). The organization-wide default can be overridden at runtime via `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS` without recompiling. Precedence: frontmatter literal → `GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS` variable → built-in default of `400`. See [Compiler Enterprise Environment Controls](/gh-aw/reference/compiler-enterprise-environment-controls/).
 
 ```aw wrap
 safe-outputs:
@@ -1037,7 +1037,7 @@ A specialized failure category reported when a model has no entry in the AWF bui
 
 ### Max AI Credits (`max-ai-credits`)
 
-A top-level frontmatter field that caps the total AI Credits (AIC) the AWF proxy will spend within a single workflow run. Applies to all engines and maps to `apiProxy.maxAiCredits` in the compiled lock file. Defaults to `1000` when omitted. Accepts an integer, an optional `K`/`M` suffix string (for example, `100M`), or a GitHub Actions expression that resolves to an integer at runtime. Example:
+A top-level frontmatter field that caps the total AI Credits (AIC) the AWF proxy will spend within a single workflow run. Applies to all engines and maps to `apiProxy.maxAiCredits` in the compiled lock file. Defaults to `1000` when omitted. Accepts an integer, an optional `K`/`M` suffix string (for example, `5K`), or a GitHub Actions expression that resolves to an integer at runtime. AWF clamps any budget above its hard cap, 10,000 AI credits by default. Example:
 
 ```aw wrap
 max-ai-credits: 500
@@ -1696,7 +1696,7 @@ services:
 
 ### Token Steering (`sandbox.agent.token-steering`)
 
-A `sandbox.agent` boolean field, enabled by default, that controls whether AWF's API proxy actively steers Copilot requests through dynamic token/provider routing. Set `token-steering: false` to preserve the explicitly configured provider and model without proxy interception. See [Sandbox Configuration](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering).
+A `sandbox.agent` boolean field that controls AWF's budget notices, which warn the agent when the run's AI credits or time are nearly spent. Notices are on by default; set `token-steering: false` to turn them off. Steering never changes the provider or model. See [Sandbox Configuration](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering).
 
 ```yaml wrap
 sandbox:
