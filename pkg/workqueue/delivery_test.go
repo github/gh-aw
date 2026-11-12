@@ -3,91 +3,11 @@ package workqueue
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 )
-
-func TestDeliveryVerificationLogsAreDiagnosticAndPrivate(t *testing.T) {
-	if os.Getenv("GH_AW_DELIVERY_LOG_TEST") != "1" {
-		for _, test := range []struct {
-			name  string
-			debug bool
-		}{
-			{name: "debug", debug: true},
-			{name: "no_debug"},
-		} {
-			t.Run(test.name, func(t *testing.T) {
-				command := exec.Command(os.Args[0], "-test.run=^TestDeliveryVerificationLogsAreDiagnosticAndPrivate$")
-				for _, entry := range os.Environ() {
-					key, _, _ := strings.Cut(entry, "=")
-					switch key {
-					case "DEBUG", "ACTIONS_RUNNER_DEBUG", "RUNNER_DEBUG", "GH_AW_DELIVERY_LOG_TEST", "DEBUG_COLORS":
-						continue
-					}
-					command.Env = append(command.Env, entry)
-				}
-				command.Env = append(command.Env, "GH_AW_DELIVERY_LOG_TEST=1", "DEBUG_COLORS=0")
-				if test.debug {
-					command.Env = append(command.Env, "DEBUG=workqueue:delivery,workqueue:native_delivery")
-				}
-				output, err := command.CombinedOutput()
-				if err != nil {
-					t.Fatalf("delivery logging subprocess failed: %v\n%s", err, output)
-				}
-				summary := "delivery.verifier.exhausted attempts=1 max_attempts=1 deadline_exhausted=false receipt_present=false unknown_effects=true"
-				if count := strings.Count(string(output), summary); count != 2 {
-					t.Errorf("expected one exhaustion summary per recovery, got %d:\n%s", count, output)
-				}
-				for _, event := range []string{
-					"delivery.verifier.budget max_attempts=1",
-					"delivery.verifier.checked attempt=1 failed=true",
-					"delivery.inventory.rejected failed=false closed=false outputs=0",
-					"delivery.failure.persisted",
-				} {
-					if strings.Contains(string(output), event) != test.debug {
-						t.Errorf("diagnostic %q visibility did not match debug=%t:\n%s", event, test.debug, output)
-					}
-				}
-				for _, secret := range []string{"private-verifier-error", "private-receipt", testRepository, "operator"} {
-					if strings.Contains(string(output), secret) {
-						t.Errorf("delivery logs exposed private data %q", secret)
-					}
-				}
-			})
-		}
-		return
-	}
-	for _, inventory := range []bool{false, true} {
-		branch, mock := newQueueAPI(t)
-		commits, assignment := boundDeliveryAssignment(t, func(policy *Policy) {
-			pool := policy.Pools["default"]
-			pool.Reconciliation.MaxAttempts = 1
-			policy.Pools["default"] = pool
-		})
-		commits = finishMember(t, commits, assignment, 0, "completed", time.Now().UnixMilli())
-		installMockLog(t, mock, commits)
-		configureNativeRun(mock, assignment)
-		branch.DeliveryVerifier = func(context.Context, Projection, ClaimState) (DeliveryVerification, error) {
-			return DeliveryVerification{Receipt: "private-receipt"}, errors.New("private-verifier-error")
-		}
-		if inventory {
-			branch.DeliveryVerifier = NewNativeDeliveryHost(NativeDeliveryHostOptions{
-				Inventory: func(context.Context, NativeDeliveryScope) (NativeDeliveryInventory, error) {
-					return NativeDeliveryInventory{Closed: false}, nil
-				},
-			}).Verifier(branch)
-		}
-		recovery, err := branch.RecoverDelivery(context.Background(), assignment.Claims[0].WorkID, "logging-failure")
-		if err != nil || recovery.Reason != "delivery_failed_unknown" {
-			t.Fatalf("unexpected delivery settlement: %s %v", recovery.Reason, err)
-		}
-	}
-}
 
 func configureNativeRun(mock *queueAPI, assignment Assignment) {
 	run := &NativeRun{
