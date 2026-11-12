@@ -293,8 +293,8 @@ Test content`
 	yamlStr := string(content)
 
 	// Verify display name
-	if !strings.Contains(yamlStr, "name: My Display Name") {
-		t.Errorf("Expected 'name: My Display Name' in output, got:\n%s", yamlStr)
+	if !strings.Contains(yamlStr, `name: "My Display Name"`) {
+		t.Errorf("Expected quoted display name in output, got:\n%s", yamlStr)
 	}
 
 	// Verify timeout-minutes
@@ -598,7 +598,7 @@ func TestBuildCustomJobsAllNewFieldsViaWorkflowData(t *testing.T) {
 	rendered := renderedBuf.String()
 
 	renderedChecks := []string{
-		"name: My Display Name",
+		`name: "My Display Name"`,
 		"timeout-minutes: 30",
 		"continue-on-error: true",
 		"concurrency: ci-group",

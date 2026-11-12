@@ -90,7 +90,7 @@ env:
 
 jobs:
   activation:
-    name: activation
+    name: "activation"
     needs:
       - admission
       - pre_activation
@@ -581,7 +581,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   admission:
-    name: admission
+    name: "admission"
     needs: pre_activation
     if: (needs.pre_activation.outputs.activated == 'true') && (vars.GH_AW_DEFAULT_ADMISSION_URL != '')
     runs-on: ubuntu-slim
@@ -633,7 +633,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
 
   agent:
-    name: agent
+    name: "agent"
     needs: activation
     if: >
       ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
@@ -1517,7 +1517,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   check_token_telemetry:
-    name: check_token_telemetry
+    name: "check_token_telemetry"
     needs:
       - activation
       - agent
@@ -1591,7 +1591,7 @@ jobs:
         run: echo "::notice::This engine does not provide proxy token counts; token telemetry assertions are not applicable."
 
   conclusion:
-    name: conclusion
+    name: "conclusion"
     needs:
       - activation
       - admission
@@ -2027,7 +2027,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion_admission:
-    name: conclusion_admission
+    name: "conclusion_admission"
     needs: conclusion
     if: always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
     runs-on: ubuntu-slim
@@ -2078,7 +2078,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   detection:
-    name: detection
+    name: "detection"
     needs:
       - activation
       - agent
@@ -2485,7 +2485,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   evals:
-    name: evals
+    name: "evals"
     needs:
       - activation
       - agent
@@ -2661,7 +2661,7 @@ jobs:
           persist-credentials: false
 
   pre_activation:
-    name: pre_activation
+    name: "pre_activation"
     runs-on: ubuntu-slim
     # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:
@@ -2728,7 +2728,7 @@ jobs:
             await main();
 
   push_evals_state:
-    name: push_evals_state
+    name: "push_evals_state"
     needs:
       - activation
       - evals
@@ -2815,7 +2815,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: safe_outputs
+    name: "safe_outputs"
     needs:
       - activation
       - agent

@@ -101,7 +101,7 @@ env:
 
 jobs:
   activation:
-    name: activation
+    name: "activation"
     needs:
       - admission
       - check_ci_status
@@ -596,7 +596,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   admission:
-    name: admission
+    name: "admission"
     needs: check_ci_status
     if: (needs.check_ci_status.outputs.ci_needs_fix == 'true') && (vars.GH_AW_DEFAULT_ADMISSION_URL != '')
     runs-on: ubuntu-slim
@@ -646,7 +646,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
 
   agent:
-    name: agent
+    name: "agent"
     needs:
       - activation
       - check_ci_status
@@ -1596,7 +1596,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   check_ci_status:
-    name: check_ci_status
+    name: "check_ci_status"
     runs-on: ubuntu-latest
     # Permissions for the check_ci_status job (workflow permissions default to none).
     permissions:
@@ -1652,7 +1652,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   conclusion:
-    name: conclusion
+    name: "conclusion"
     needs:
       - activation
       - admission
@@ -2112,7 +2112,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion_admission:
-    name: conclusion_admission
+    name: "conclusion_admission"
     needs: conclusion
     if: always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
     runs-on: ubuntu-slim
@@ -2163,7 +2163,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   detection:
-    name: detection
+    name: "detection"
     needs:
       - activation
       - agent
@@ -2539,7 +2539,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   evals:
-    name: evals
+    name: "evals"
     needs:
       - activation
       - agent
@@ -2714,7 +2714,7 @@ jobs:
           persist-credentials: false
 
   push_evals_state:
-    name: push_evals_state
+    name: "push_evals_state"
     needs:
       - activation
       - evals
@@ -2801,7 +2801,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: safe_outputs
+    name: "safe_outputs"
     needs:
       - activation
       - agent

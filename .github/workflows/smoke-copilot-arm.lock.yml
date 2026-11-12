@@ -108,7 +108,7 @@ env:
 
 jobs:
   activation:
-    name: activation
+    name: "activation"
     needs:
       - admission
       - pre_activation
@@ -650,7 +650,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   admission:
-    name: admission
+    name: "admission"
     needs: pre_activation
     if: >
       (needs.pre_activation.outputs.activated == 'true' && (((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
@@ -706,7 +706,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
 
   agent:
-    name: agent
+    name: "agent"
     needs: activation
     if: >
       ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
@@ -2777,7 +2777,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   check_token_telemetry:
-    name: check_token_telemetry
+    name: "check_token_telemetry"
     needs:
       - activation
       - agent
@@ -2851,7 +2851,7 @@ jobs:
         run: echo "::notice::This engine does not provide proxy token counts; token telemetry assertions are not applicable."
 
   conclusion:
-    name: conclusion
+    name: "conclusion"
     needs:
       - activation
       - admission
@@ -3292,7 +3292,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion_admission:
-    name: conclusion_admission
+    name: "conclusion_admission"
     needs: conclusion
     if: always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
     runs-on: ubuntu-slim
@@ -3343,7 +3343,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   detection:
-    name: detection
+    name: "detection"
     needs:
       - activation
       - agent
@@ -3751,7 +3751,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   pre_activation:
-    name: pre_activation
+    name: "pre_activation"
     if: >
       ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
       ((github.event_name != 'pull_request' && github.event_name != 'pull_request_review') || github.event.pull_request.stack == null ||
@@ -3823,7 +3823,7 @@ jobs:
             await main();
 
   safe_outputs:
-    name: safe_outputs
+    name: "safe_outputs"
     needs:
       - activation
       - agent
@@ -3970,7 +3970,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   send_slack_message:
-    name: send_slack_message
+    name: "send_slack_message"
     needs:
       - agent
       - detection
@@ -4034,7 +4034,7 @@ jobs:
           GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
 
   update_cache_memory:
-    name: update_cache_memory
+    name: "update_cache_memory"
     needs:
       - activation
       - agent

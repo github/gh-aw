@@ -83,7 +83,7 @@ env:
 
 jobs:
   activation:
-    name: activation
+    name: "activation"
     needs:
       - admission
       - gateway_admission
@@ -549,7 +549,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   admission:
-    name: admission
+    name: "admission"
     needs:
       - gateway_admission
       - gateway_provenance
@@ -604,7 +604,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
 
   agent:
-    name: agent
+    name: "agent"
     needs:
       - activation
       - gateway_admission
@@ -1433,7 +1433,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: conclusion
+    name: "conclusion"
     needs:
       - activation
       - admission
@@ -1851,7 +1851,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion_admission:
-    name: conclusion_admission
+    name: "conclusion_admission"
     needs:
       - conclusion
       - gateway_admission
@@ -1905,7 +1905,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   detection:
-    name: detection
+    name: "detection"
     needs:
       - activation
       - agent
@@ -2278,7 +2278,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   evals:
-    name: evals
+    name: "evals"
     needs:
       - activation
       - agent
@@ -2455,7 +2455,7 @@ jobs:
           persist-credentials: false
 
   gateway_admission:
-    name: Verify gateway workflow version
+    name: "Verify gateway workflow version"
     needs: gateway_provenance
     if: "${{ needs.gateway_provenance.result == 'success' && needs.gateway_provenance.outputs.verified == 'true' }}"
     runs-on: ubuntu-slim
@@ -2518,7 +2518,7 @@ jobs:
             await main();
 
   gateway_provenance:
-    name: Verify CAO App provenance
+    name: "Verify CAO App provenance"
     runs-on: ubuntu-slim
     # Permissions for the gateway_provenance job (workflow permissions default to none).
     permissions:
@@ -2571,7 +2571,7 @@ jobs:
             await main();
 
   pre_activation:
-    name: pre_activation
+    name: "pre_activation"
     needs:
       - gateway_admission
       - gateway_provenance
@@ -2612,7 +2612,7 @@ jobs:
           GH_AW_INFO_ENGINE_ID: "copilot"
 
   push_evals_state:
-    name: push_evals_state
+    name: "push_evals_state"
     needs:
       - activation
       - evals
@@ -2700,7 +2700,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: safe_outputs
+    name: "safe_outputs"
     needs:
       - activation
       - agent

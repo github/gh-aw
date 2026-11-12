@@ -108,7 +108,7 @@ env:
 
 jobs:
   activation:
-    name: activation
+    name: "activation"
     needs: admission
     if: (!cancelled()) && (needs.admission.result == 'success' || needs.admission.result == 'skipped')
     runs-on: ubuntu-slim
@@ -582,7 +582,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   admission:
-    name: admission
+    name: "admission"
     if: vars.GH_AW_DEFAULT_ADMISSION_URL != ''
     runs-on: ubuntu-slim
     # Permissions for the admission job (workflow permissions default to none).
@@ -631,7 +631,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
 
   agent:
-    name: agent
+    name: "agent"
     needs: activation
     if: >
       ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
@@ -1723,7 +1723,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: conclusion
+    name: "conclusion"
     needs:
       - activation
       - admission
@@ -2162,7 +2162,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion_admission:
-    name: conclusion_admission
+    name: "conclusion_admission"
     needs: conclusion
     if: always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
     runs-on: ubuntu-slim
@@ -2213,7 +2213,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   detection:
-    name: detection
+    name: "detection"
     needs:
       - activation
       - agent
@@ -2589,7 +2589,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   evals:
-    name: evals
+    name: "evals"
     needs:
       - activation
       - agent
@@ -2764,7 +2764,7 @@ jobs:
           persist-credentials: false
 
   push_evals_state:
-    name: push_evals_state
+    name: "push_evals_state"
     needs:
       - activation
       - evals
@@ -2851,7 +2851,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: safe_outputs
+    name: "safe_outputs"
     needs:
       - activation
       - agent
@@ -2991,7 +2991,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   update_cache_memory:
-    name: update_cache_memory
+    name: "update_cache_memory"
     needs:
       - activation
       - agent
@@ -3059,7 +3059,7 @@ jobs:
           path: /tmp/gh-aw/cache-memory
 
   upload_assets:
-    name: upload_assets
+    name: "upload_assets"
     needs:
       - activation
       - agent

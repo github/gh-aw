@@ -96,7 +96,7 @@ env:
 
 jobs:
   activation:
-    name: activation
+    name: "activation"
     needs:
       - admission
       - precompute
@@ -555,7 +555,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   admission:
-    name: admission
+    name: "admission"
     needs: precompute
     if: (needs.precompute.outputs.action != 'none') && (vars.GH_AW_DEFAULT_ADMISSION_URL != '')
     runs-on: ubuntu-slim
@@ -605,7 +605,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
 
   agent:
-    name: agent
+    name: "agent"
     needs:
       - activation
       - precompute
@@ -1540,7 +1540,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: conclusion
+    name: "conclusion"
     needs:
       - activation
       - admission
@@ -1905,7 +1905,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion_admission:
-    name: conclusion_admission
+    name: "conclusion_admission"
     needs: conclusion
     if: always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
     runs-on: ubuntu-slim
@@ -1956,7 +1956,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   evals:
-    name: evals
+    name: "evals"
     needs:
       - activation
       - agent
@@ -2130,7 +2130,7 @@ jobs:
           persist-credentials: false
 
   precompute:
-    name: precompute
+    name: "precompute"
     runs-on: ubuntu-latest
     # Permissions for the precompute job (workflow permissions default to none).
     permissions:
@@ -2938,7 +2938,7 @@ jobs:
             core.setOutput("issue_body", issueBody);
 
   push_evals_state:
-    name: push_evals_state
+    name: "push_evals_state"
     needs:
       - activation
       - evals
@@ -3025,7 +3025,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: safe_outputs
+    name: "safe_outputs"
     needs:
       - activation
       - agent

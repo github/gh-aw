@@ -106,7 +106,7 @@ env:
 
 jobs:
   activation:
-    name: activation
+    name: "activation"
     needs:
       - admission
       - pre_activation
@@ -655,7 +655,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   admission:
-    name: admission
+    name: "admission"
     needs: pre_activation
     if: "(needs.pre_activation.outputs.activated == 'true' && ((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment') && (github.event_name == 'issues' && (startsWith(github.event.issue.body, '/q ') || startsWith(github.event.issue.body, '/q\n') || startsWith(github.event.issue.body, '/q\r') || github.event.issue.body == '/q') || github.event_name == 'issue_comment' && (startsWith(github.event.comment.body, '/q ') || startsWith(github.event.comment.body, '/q\n') || startsWith(github.event.comment.body, '/q\r') || github.event.comment.body == '/q') && github.event.issue.pull_request == null || github.event_name == 'issue_comment' && (startsWith(github.event.comment.body, '/q ') || startsWith(github.event.comment.body, '/q\n') || startsWith(github.event.comment.body, '/q\r') || github.event.comment.body == '/q') && github.event.issue.pull_request != null || github.event_name == 'discussion' && (startsWith(github.event.discussion.body, '/q ') || startsWith(github.event.discussion.body, '/q\n') || startsWith(github.event.discussion.body, '/q\r') || github.event.discussion.body == '/q') || github.event_name == 'discussion_comment' && (startsWith(github.event.comment.body, '/q ') || startsWith(github.event.comment.body, '/q\n') || startsWith(github.event.comment.body, '/q\r') || github.event.comment.body == '/q')) || !(github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment'))) && (vars.GH_AW_DEFAULT_ADMISSION_URL != '')"
     runs-on: ubuntu-slim
@@ -707,7 +707,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'activation_admission.cjs')).main(core, github, context, exec, io, getOctokit);
 
   agent:
-    name: agent
+    name: "agent"
     needs: activation
     if: >
       ((!cancelled()) && needs.activation.result == 'success') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true' &&
@@ -1731,7 +1731,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: conclusion
+    name: "conclusion"
     needs:
       - activation
       - admission
@@ -2187,7 +2187,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion_admission:
-    name: conclusion_admission
+    name: "conclusion_admission"
     needs: conclusion
     if: always() && needs.conclusion.result != 'skipped' && vars.GH_AW_DEFAULT_ADMISSION_URL != ''
     runs-on: ubuntu-slim
@@ -2238,7 +2238,7 @@ jobs:
             await require(require('node:path').join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'conclusion_admission.cjs')).main(core);
 
   detection:
-    name: detection
+    name: "detection"
     needs:
       - activation
       - agent
@@ -2613,7 +2613,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   pre_activation:
-    name: pre_activation
+    name: "pre_activation"
     if: "(github.event_name != 'issue_comment' || contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'), github.event.comment.author_association)) && ((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment') && (github.event_name == 'issues' && (startsWith(github.event.issue.body, '/q ') || startsWith(github.event.issue.body, '/q\n') || startsWith(github.event.issue.body, '/q\r') || github.event.issue.body == '/q') || github.event_name == 'issue_comment' && (startsWith(github.event.comment.body, '/q ') || startsWith(github.event.comment.body, '/q\n') || startsWith(github.event.comment.body, '/q\r') || github.event.comment.body == '/q') && github.event.issue.pull_request == null || github.event_name == 'issue_comment' && (startsWith(github.event.comment.body, '/q ') || startsWith(github.event.comment.body, '/q\n') || startsWith(github.event.comment.body, '/q\r') || github.event.comment.body == '/q') && github.event.issue.pull_request != null || github.event_name == 'discussion' && (startsWith(github.event.discussion.body, '/q ') || startsWith(github.event.discussion.body, '/q\n') || startsWith(github.event.discussion.body, '/q\r') || github.event.discussion.body == '/q') || github.event_name == 'discussion_comment' && (startsWith(github.event.comment.body, '/q ') || startsWith(github.event.comment.body, '/q\n') || startsWith(github.event.comment.body, '/q\r') || github.event.comment.body == '/q')) || !(github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment'))"
     runs-on: ubuntu-slim
     # Permissions for the pre_activation job (workflow permissions default to none).
@@ -2679,7 +2679,7 @@ jobs:
             await main();
 
   safe_outputs:
-    name: safe_outputs
+    name: "safe_outputs"
     needs:
       - activation
       - agent
