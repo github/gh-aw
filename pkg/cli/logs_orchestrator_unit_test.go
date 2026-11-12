@@ -390,6 +390,12 @@ func TestHandleEmptyWorkflowRunBatch(t *testing.T) {
 // processed run was discarded and `gh aw logs` reported "No workflow runs with artifacts
 // found matching the specified criteria" even though artifacts had been downloaded.
 func TestCollectProcessedWorkflowRunsAccumulatesBatches(t *testing.T) {
+	oldFetchRateLimitFunc := fetchRateLimitFunc
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		return rateLimitResource{Limit: 5000, Remaining: 5000, Reset: time.Now().Add(time.Hour).Unix()}, nil
+	}
+	t.Cleanup(func() { fetchRateLimitFunc = oldFetchRateLimitFunc })
+
 	batches := [][]WorkflowRun{
 		{{DatabaseID: 1}, {DatabaseID: 2}},
 		{{DatabaseID: 3}},
