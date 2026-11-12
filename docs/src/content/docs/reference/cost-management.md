@@ -198,12 +198,14 @@ model: router/economy
 
 `router/economy` sets the lowest success target, so the router prefers the cheapest model and effort likely to meet it. It is not a guaranteed spending cap, and it doesn't make any particular model available; combine it with [`max-ai-credits`](#cap-ai-credits-per-run) for a hard stop.
 
-When a task requires a particular model or its capabilities, select one explicitly. An alias such as `small` skips per-task routing, but it resolves against the models available at run time and can map to a different model over time. Use an exact model ID when the workflow must run on one concrete model:
+When a task requires a particular model or its capabilities, select one explicitly. An alias such as `small` skips per-task routing, but it resolves against the models available at run time and can map to a different model over time:
 
 ```aw wrap
 engine: copilot
 model: small
 ```
+
+Use an exact model ID instead when the workflow must run on one concrete model.
 
 Reserve frontier models for complex tasks, and prefer lighter models or `router/economy` for triage, labeling, summarization, and other structured outputs.
 
