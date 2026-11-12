@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,27 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 )
+
+func TestDefaultFirewallReleaseHasReviewedPin(t *testing.T) {
+	t.Parallel()
+
+	script := filepath.Join("..", "..", "actions", "setup", "sh", "release_integrity.sh")
+	for _, version := range []string{string(constants.DefaultFirewallVersion), strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v")} {
+		t.Run(version, func(t *testing.T) {
+			t.Parallel()
+			cmd := exec.Command("bash", "-c", `source "$1"; release_artifact_sha256 github/gh-aw-firewall "$2" checksums.txt`, "--", script, version)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("default firewall %s has no reviewed manifest pin: %v: %s", version, err, output)
+			}
+			digest := strings.TrimSpace(string(output))
+			decoded, err := hex.DecodeString(digest)
+			if err != nil || len(decoded) != sha256.Size || digest != strings.ToLower(digest) {
+				t.Fatalf("default firewall %s has an invalid SHA256 pin: %q", version, digest)
+			}
+		})
+	}
+}
 
 func TestAWFInstallerAuthenticationIsStepLocal(t *testing.T) {
 	t.Parallel()
