@@ -1,47 +1,41 @@
-### PR triage report
+### Executive totals
+- Open Copilot PRs: 8
+- Eligible after 1h cooldown: 1
+- Skipped by cooldown: 7
+- Distribution by category: refactor=1
+- Distribution by risk: medium=1
+- Distribution by priority: medium=1
+- Distribution by action: batch_review=1, auto_merge=0, fast_track=0, defer=0, close=0
 
-#### Executive summary
-- Eligible Copilot PRs: 4
-- Skipped by cooldown: 2
-- Category mix: 3 bug, 1 feature
-- Risk mix: 3 medium, 1 high
-- Priority mix: 3 medium, 1 high
-- Recommended actions: 3 batch_review, 1 fast_track
+### Top-priority PRs
+- #77049 — [WIP] Refactor to extract shared Go and Node CI toolchain setup | risk=medium | priority=medium | score=49 | action=batch_review
 
-#### Top-priority PRs
-1. #76753 — Raise the Go toolchain baseline to 1.27.4
-   - Category: bug | Risk: high | Score: 82/100
-   - Impact 42 + urgency 25 + quality 15
-   - Reason: security-aligned toolchain fix with passing CI; highest business value in the set.
-2. #76617 — Choose model routing with `model: router` and `router/economy|balanced|robust`
-   - Category: feature | Risk: medium | Score: 62/100
-   - Impact 35 + urgency 13 + quality 14
-   - Reason: biggest scope item and likely value driver, but still a single coherent feature slice.
-3. #76731 — Harden Windows WSL runtime setup
-   - Category: bug | Risk: medium | Score: 58/100
-   - Impact 31 + urgency 14 + quality 13
-   - Reason: targeted platform hardening with a narrow attack surface.
+### Auto-merge candidates
+- None. Only one eligible PR is a medium-risk refactor; it is not auto-merge ready due to draft status and CodeQL timeout.
 
-#### Batch opportunities
-- pr-batch:copilot-ops: #76617, #76731, #76754
-  - These PRs share workflow/automation changes and are comparable in risk and review load.
+### Fast-track items
+- None.
 
-#### Auto-merge candidates
-- None. All eligible PRs need human attention given the mix of feature work and platform/toolchain adjustments.
+### Batch opportunities
+- None. Current eligible pool size is too small to justify a multi-PR batch.
 
-#### Fast-track items
-- #76753 (Go toolchain baseline uplift)
+### Close candidates
+- None in the eligible set. All other open Copilot PRs are temporarily excluded by the 1-hour cooldown.
 
-#### Close candidates
-- None among the eligible set.
+### Key trends and next actions
+- The current eligible backlog is small and dominated by one shared CI refactor.
+- Continue to re-run triage after the 1h cooldown expires for the other open Copilot PRs.
+- Prioritize validation/CodeQL closure before expanding any batch or auto-merge actions.
 
-#### Key trends and next actions
-- Most open Copilot work is corrective or platform hardening rather than broad product rewrites.
-- The only high-priority item is the Go baseline increase, which should be reviewed first.
-- The medium-risk batch should be reviewed together to keep automation and routing changes consistent.
+<details>
+<summary>Skipped by cooldown</summary>
 
-**References:**
-- [PR #76617](https://github.com/github/gh-aw/pull/76617)
-- [PR #76731](https://github.com/github/gh-aw/pull/76731)
-- [PR #76753](https://github.com/github/gh-aw/pull/76753)
-- [PR #76754](https://github.com/github/gh-aw/pull/76754)
+- #77088 — [WIP] Update handling for AWF's new per-conversation budget-notice records (updated within 1 hour of current run; skipped by cooldown)
+- #77087 — [WIP] Update token-steering and max-ai-credits docs for budget notices (updated within 1 hour of current run; skipped by cooldown)
+- #77082 — [WIP] Update firewall to v0.29.12 and MCP gateway to v0.5.8 (updated within 1 hour of current run; skipped by cooldown)
+- #77050 — Extract shared PR safe-output defaults (updated within 1 hour of current run; skipped by cooldown)
+- #77048 — Extract shared Python setup for analysis workflows (updated within 1 hour of current run; skipped by cooldown)
+- #77010 — Add daily conformance workflows for all 14 connectors (updated within 1 hour of current run; skipped by cooldown)
+- #76985 — docs: lead model-choice guidance with default routing and `model: router` (updated within 1 hour of current run; skipped by cooldown)
+
+</details>

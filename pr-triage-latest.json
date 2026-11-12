@@ -1,45 +1,77 @@
 {
-  "run_date": "2026-11-12T00:42:11.951799Z",
-  "run_id": "20261112T004211Z",
-  "open_copilot_prs": 2,
+  "run_date": "2026-11-12T06:26:41Z",
+  "run_id": "pr-triage-20261112T062641Z",
+  "open_copilot_prs": 8,
   "eligible_total": 1,
-  "cooldown_skipped": 1,
+  "cooldown_skipped": 7,
   "category_counts": {
-    "docs": 1
+    "refactor": 1
   },
   "risk_counts": {
-    "low": 1
+    "medium": 1
   },
   "priority_counts": {
-    "low": 1
+    "medium": 1
   },
   "action_counts": {
-    "auto_merge": 1,
-    "batch_review": 0,
+    "batch_review": 1,
+    "auto_merge": 0,
+    "fast_track": 0,
     "defer": 0,
-    "fast_track": 0
+    "close": 0
   },
   "selected_candidates": [
     {
-      "number": 76985,
-      "title": "docs: lead model-choice guidance with default routing and `model: router`",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 29,
+      "number": 77049,
+      "title": "[WIP] Refactor to extract shared Go and Node CI toolchain setup",
+      "category": "refactor",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 49,
       "score_breakdown": {
-        "impact": 8,
-        "urgency": 7,
+        "impact": 26,
+        "urgency": 9,
         "quality": 14
-      }
+      },
+      "reason": "Shared CI toolchain refactor; successful make recompile and no impacted Go tests, but CodeQL timeout and draft status keep it out of auto-merge."
     }
   ],
   "batches": [],
   "skipped": [
     {
-      "number": 76980,
-      "title": "Classify GitHub context wildcard projections as credential-bearing",
+      "number": 77088,
+      "title": "[WIP] Update handling for AWF's new per-conversation budget-notice records",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 77087,
+      "title": "[WIP] Update token-steering and max-ai-credits docs for budget notices",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 77082,
+      "title": "[WIP] Update firewall to v0.29.12 and MCP gateway to v0.5.8",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 77050,
+      "title": "Extract shared PR safe-output defaults",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 77048,
+      "title": "Extract shared Python setup for analysis workflows",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 77010,
+      "title": "Add daily conformance workflows for all 14 connectors",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 76985,
+      "title": "docs: lead model-choice guidance with default routing and `model: router`",
       "reason": "updated within 1 hour of current run; skipped by cooldown"
     }
   ]
