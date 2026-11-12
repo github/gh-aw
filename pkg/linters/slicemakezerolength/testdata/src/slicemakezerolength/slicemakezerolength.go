@@ -99,6 +99,26 @@ func badParenMakeCallee(items []string) {
 	_ = s
 }
 
+func badLabeledRange(items []string) {
+	s := make([]string, 0) // want `make\(\[\]string, 0\) before this range loop can use capacity len\(items\)`
+outer:
+	for _, item := range items {
+		s = append(s, item)
+	}
+	if len(s) > len(items) {
+		goto outer // keeps the label used so the fixture compiles
+	}
+	_ = s
+}
+
+func badParenAppendCallee(items []string) {
+	s := make([]string, 0) // want `make\(\[\]string, 0\) before this range loop can use capacity len\(items\)`
+	for _, item := range items {
+		s = (append)(s, item)
+	}
+	_ = s
+}
+
 func suppressed(items []string) {
 	//nolint:slicemakezerolength
 	s := make([]string, 0)

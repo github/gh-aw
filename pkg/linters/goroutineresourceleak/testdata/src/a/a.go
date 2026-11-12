@@ -308,6 +308,17 @@ func goroutineInLoopWithWaitGroup() {
 	wg.Wait()
 }
 
+func goroutineInLoopWithParenWaitGroup() {
+	var wg sync.WaitGroup
+	for i := 0; i < 1; i++ {
+		(wg.Add)(1)
+		go func() {
+			defer wg.Done()
+		}()
+	}
+	(wg.Wait)()
+}
+
 func goroutineInLoopWithImmediateExit() {
 	for range []int{1} {
 		go doSomeWorkWithID(1)
