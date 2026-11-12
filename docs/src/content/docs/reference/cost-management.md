@@ -189,7 +189,7 @@ steps:
 Use `skip-if-match` / `skip-if-no-match` whenever possible because they also avoid scheduling the agent job. Use `noop` when you need arbitrary shell logic. See [Triggers](/gh-aw/reference/triggers/) for the full syntax.
 ### Choose a Cheaper Model
 
-Unless a task needs a particular model, let [model routing](/gh-aw/reference/model-routing/) right-size the model and reasoning effort for each run instead of pinning one. An [eligible workflow](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) that omits `model` is already routed with `goal: cost` and `mode: auto`. For routine, low-risk work such as triage, labeling, and summaries, set `router/economy` explicitly:
+Unless a task needs a particular model, let [model routing](/gh-aw/reference/model-routing/) right-size the model and reasoning effort for each run instead of pinning one. An [eligible workflow](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) that omits `model` already behaves like `model: router`. For routine, low-risk work such as triage, labeling, and summaries, set `router/economy` explicitly:
 
 ```aw wrap
 engine: copilot
