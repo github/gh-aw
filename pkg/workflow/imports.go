@@ -321,8 +321,8 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 			if _, exists := config[key]; exists {
 				if setutil.Contains(topDefinedTypes, key) {
 					if key == "create-pull-request" {
-						localConfig, _ := topRawSafeOutputs[key].(map[string]any)
-						if localConfig == nil {
+						localConfig, ok := topRawSafeOutputs[key].(map[string]any)
+						if !ok || localConfig == nil {
 							localConfig = map[string]any{}
 						}
 						if importedConfig, ok := config[key].(map[string]any); ok {
@@ -397,8 +397,8 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 			},
 		})
 		if importedConfig != nil && importedConfig.CreatePullRequests != nil {
-			localConfig, _ := topRawSafeOutputs["create-pull-request"].(map[string]any)
-			if localConfig == nil {
+			localConfig, ok := topRawSafeOutputs["create-pull-request"].(map[string]any)
+			if !ok || localConfig == nil {
 				localConfig = map[string]any{}
 			}
 			if _, defined := localConfig["expires"]; !defined {
