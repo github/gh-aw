@@ -285,7 +285,7 @@ Set `model` (or `engine.model`) to a router value to route the main agent: `rout
 model: router/economy
 ```
 
-`engine.model-routing` still works and enables experimental per-run model and reasoning-effort selection for the Copilot, Claude, Codex, and pi engines when they use GitHub Copilot inference, with the AWF firewall. Requires `goal` (`cost` or `cost-speed`) and `mode` (`economy`, `balanced`, `robust`, or `auto`). The optional `allowed-models` list takes exact model names and limits the router's candidates for the main agent; it is not a request policy. Put patterns such as `gpt-*` in [`models.allowed` or `models.blocked`](/gh-aw/reference/glossary/#model-policy-modelsallowed-modelsblocked) instead. Overrides the fixed `engine.model` and effort settings. See [Model Routing](/gh-aw/reference/model-routing/) for value meanings, requirements, sub-agent constraints, known limitations, and logs.
+For shortlists and other settings, see [advanced model routing](/gh-aw/reference/model-routing/#advanced-engine-model-routing).
 
 ### Engine Driver (`engine.driver:`)
 
@@ -560,14 +560,14 @@ max-turn-cache-misses: 5
 
 ### AI Credits Guardrail (`max-ai-credits:`)
 
-Sets the AWF AI Credits budget used for cost enforcement. It is enabled by default and defaults to `1000` (`1k`) when omitted. Steering (budget-warning messages at 80%, 90%, 95%, and 99% of the budget) is enabled by default. Use plain integers or `K`/`M` suffixes such as `100000K` or `100M`. Set to a negative value to disable both budget enforcement and steering.
+Sets the AWF AI Credits budget used for cost enforcement. It is enabled by default and defaults to `1000` (`1k`) when omitted. Budget notices are on by default: AWF warns the agent at 80%, 90%, 95%, and 99% of the budget. With AWF releases after v0.29.11, each conversation in the run, sub-agents included, gets the latest notice once rather than every notice; the notice states how much budget or time is left, then says what to do, and a further notice comes when about five requests' worth of credits, or about five minutes, remain. Use plain integers or `K`/`M` suffixes such as `5K`. AWF clamps any budget above its hard cap, which is 10,000 AI credits by default (the runner operator can change it with `AWF_AI_CREDITS_HARD_CAP`; gh-aw does not set it). Set to a negative value to disable budget enforcement. With AWF releases after v0.29.11, notices continue against the agent deadline and AWF's hard cap; set [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering) to turn them off.
 
 ```yaml wrap
 max-ai-credits: 500
 ```
 
 ```yaml wrap
-# Disable budget enforcement and steering
+# Disable budget enforcement (with AWF releases after v0.29.11, notices continue unless token-steering is false)
 max-ai-credits: -1
 ```
 

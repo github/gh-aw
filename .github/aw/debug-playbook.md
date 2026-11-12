@@ -44,6 +44,7 @@ Keep codes/severity; advisory/pending/skipped/policy-denied may be intentional.
 | `blocked_network_requests` | Destination, caller, denial, necessity. | Fix URL/tool or authorize narrow destination; retain firewall. |
 | `threat_detection_job_failed`, `engine_step_failed` | Detector/evals error/execution state. | Fix engine/proxy startup; failed/green job != clean verdict/evals. |
 | `threat_detected` | Private structured verdict/artifact. | Stop unsafe effects; follow [security guidance](debug-security-review.md). Never publish payloads. |
+| `safeoutputs_command_blocked` | Claude denied Bash `safeoutputs`. | Add `safeoutputs *` to `tools.bash`; recompile. |
 | `high_token_usage`, `many_iterations` | Tokens/cache/turns, repeated calls. | [Optimize](optimize-agentic-workflow.md) scope/context/loops before raising caps. |
 | `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic` | Assessment, deterministic alternatives. | Script mechanical work; retain necessary judgment. |
 | `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work; preserve outcomes. |
@@ -228,9 +229,9 @@ or bypass profiles/effect-scopes.
 | `ledger_invalid`, `ledger_foreign`, `ledger_nonextending` | Queue identity, DAG, ancestry. | Stop publication; recover trusted queue/tip via protocol. |
 | `queue_missing`, `policy_missing`, `work_queue_pool_not_installed` | Queue/pool; compiled/installed policy. | Bootstrap queue/policy; absent pool: quiesce, admin-authorized Policy addition. |
 | `repository_unavailable`, `repository_scope_invalid`, `branch_invalid`, `git_transport_failed` | Repo/branch, credentials, Git failure. | Restore authorized transport; reread uncertain tip. |
-| `actor_unauthorized`, `admission_unauthorized`, `unauthorized_operation`, `ownership_unauthorized`, `work_unauthorized`, `dependency_unauthorized`, `projection_unauthorized`, `resource_unauthorized` | Principal/role/profile/effect scope. | Authorized actor/path only; no impersonation/expansion. |
-| `policy_invalid`, `policy_epoch_invalid`, `policy_proposal_mismatch`, `work_queue_policy_proposal_mismatch`, `profile_invalid`, `pool_invalid`, `dispatcher_invalid` | Schema/revision/epoch/pools/dispatcher. | Correct trusted config via supported deployment/update. |
-| `work_queue_profile_not_approved`, `work_queue_worker_not_compiler_approved`, `work_queue_dispatch_credential_identity_unavailable` | Installed profiles/compiled dispatch allowlist. | Quiesce; update Policy/allowlist/credentials; reject unverified identity. |
+| `actor_unauthorized`, `admission_unauthorized`, `unauthorized_operation`, `ownership_unauthorized`, `work_unauthorized`, `dependency_unauthorized`, `projection_unauthorized`, `resource_unauthorized` | Principal/role/profile/effect scope. | Authorized actor/path only; no impersonation. |
+| `policy_invalid`, `policy_epoch_invalid`, `policy_proposal_mismatch`, `work_queue_policy_proposal_mismatch`, `profile_invalid`, `pool_invalid`, `dispatcher_invalid` | Schema/revision/epoch/pools/dispatcher. | Fix trusted config via supported update. |
+| `work_queue_profile_not_approved`, `work_queue_worker_not_compiler_approved`, `work_queue_dispatch_credential_identity_unavailable` | Installed profiles/dispatch allowlist. | Quiesce; update Policy/allowlist/credentials; reject unverified. |
 | `deployment_invalid`, `deployment_conflict` | Schema, revision, expected tip. | Fix trusted deployment; reconcile before CAS retry. |
 | `policy_not_quiescent`, `admission_paused`, `grants_paused` | Claims/dispatches; pause controls. | Respect pause; reconcile before authorized Policy change. |
 | `work_expired` | Deadline/queue time. | Refresh fair prefix; never revive expired Work. |
@@ -238,9 +239,9 @@ or bypass profiles/effect-scopes.
 | `hard_clear_not_paused` | Admission/grant controls. | Pause both before authorized hard clear. |
 | `hard_clear_unresolved`, `hard_clear_uncertain` | Reservations/Claims/barriers/effects/receipt. | Reconcile trusted evidence before retry; preserve unresolved effects. |
 | `graph_invalid`, `graph_pool_conflict`, `node_conflict`, `replacement_invalid`, `work_conflict`, `work_identity_invalid`, `work_invalid`, `identity_invalid` | Graph/node/pool/payload/fingerprint/replacement. | Fix submission; retain accepted identity. |
-| `dependency_cycle`, `dependency_duplicate`, `dependency_invalid`, `dependency_missing`, `dependency_result_unavailable`, `dependency_credentials_missing` | DAG, dependency, receipt, scoped credentials. | Fix graph/legitimate result/access; never fabricate completion. |
+| `dependency_cycle`, `dependency_duplicate`, `dependency_invalid`, `dependency_missing`, `dependency_result_unavailable`, `dependency_credentials_missing` | DAG, dependency, receipt, scoped credentials. | Fix graph/result/access; never fabricate completion. |
 | `dependency_verifier_required`, `delivery_verifier_required`, `nonlaunch_verifier_required`, `remediation_verifier_required` | Verifier/evidence type. | Approved verifier required; otherwise block effects. Never disable verification. |
-| `ERR_WORK_QUEUE_CLAIM_SCOPE`, `assignment_invalid`, `assignment_immutable`, `claim_invalid`, `claim_missing`, `claim_conflict`, `claim_ineffective` | Immutable 1-16 Claims; owner/epoch/deadline. | Fix producer/reconcile; preserve effective Claim identities/scopes. |
+| `ERR_WORK_QUEUE_CLAIM_SCOPE`, `assignment_invalid`, `assignment_immutable`, `claim_invalid`, `claim_missing`, `claim_conflict`, `claim_ineffective` | Immutable 1-16 Claims; owner/epoch/deadline. | Fix producer/reconcile; keep effective Claim identities/scopes. |
 | `claim_scope_invalid`, `claim_scope_required`, `claim_effects_unauthorized`, `claim_control_delivery_invalid` | Claim handle/factory, scope, control delivery. | Retain original write scope and validated control intent. |
 | `child_entitlement`, `run_binding_conflict`, `run_invalid` | Parent/child entitlement; workflow/run/attempt identity. | Correct authorized binding; reject reused/mismatched authority. |
 | `condition_invalid`, `control_invalid`, `packing_invalid`, `selection_invalid`, `priority_conflict` | Policy/control/scheduler inputs. | Recompute authoritative state; allowed transitions only. |
@@ -252,7 +253,7 @@ or bypass profiles/effect-scopes.
 | `result_invalid`, `completion_conflict`, `cancellation_conflict`, `ownership_terminal`, `work_terminal`, `work_missing` | Work/ownership; finish/result intent. | Respect terminal transitions; reconcile duplicate/conflicting completion/cancellation. |
 | `retry_invalid`, `retry_exhausted`, `release_invalid`, `release_open_claims`, `remediation_invalid` | Retry/release policy, attempts, open claims. | Stop exhausted retries; reconcile claims; authorized recovery only. |
 | `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason/binding/provenance/freshness. | Bounded trusted reconciliation; unverified stays blocked; no forced release. |
-| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit`, `obsolete_limit` | Named limit; count. | Bound/batch/compact via supported paths; keep limits. |
+| `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit`, `obsolete_limit` | Named limit; count. | Bound/batch/compact; keep limits. |
 | `issue_binding_invalid`, `issue_binding_conflict` | Queue-issue binding/ownership. | Correct authorized binding; never adopt another Work's issue. |
 | `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal/acknowledgement/target/CAS. | Reconcile receipts; preserve uncertain writes/locks/history; no duplicates. |
 | `projection_target_unavailable`, `projection_unavailable` | Failure; safe status/request ID. | Diagnose; preserve mirrors and locks. |

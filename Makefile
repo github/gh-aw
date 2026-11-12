@@ -537,7 +537,7 @@ bundle-js:
 # Run workflow contracts in CJS CI even when impacted runtime tests are skipped.
 .PHONY: test-workflow-tool-contracts
 test-workflow-tool-contracts:
-	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs scripts/cache-strategy-workflows.test.cjs
+	node --test scripts/workflow-tool-contracts.test.cjs scripts/code-scanning-fixer-selection.test.cjs scripts/cache-strategy-workflows.test.cjs scripts/dependabot-burner-selection.test.cjs
 
 # Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
 .PHONY: test-pageindex-workflow
@@ -939,7 +939,7 @@ download-github-actions-schema:
 patch-github-actions-schema:
 	@echo "Patching GitHub Actions schema with custom permissions..."
 	@tmpfile=$$(mktemp) && \
-		jq 'def append_missing($$items): reduce $$items[] as $$item (. ; if index($$item) then . else . + [$$item] end); .definitions["permissions-event"].properties += {"copilot-requests": {"type": "string", "enum": ["write", "none"]}, "drives": {"$$ref": "#/definitions/permissions-level"}, "vulnerability-alerts": {"type": "string", "enum": ["read", "none"]}} | (.properties.on.oneOf[] | select(.properties? and .properties.issues? and .properties.issues.properties? and .properties.issues.properties.types?).properties.issues.properties.types.items.enum) |= append_missing(["typed", "untyped", "field_added", "field_removed"]) | (.properties.on.oneOf[] | select(.properties? and .properties.issues? and .properties.issues.properties? and .properties.issues.properties.types?).properties.issues.properties.types.default) |= append_missing(["typed", "untyped", "field_added", "field_removed"])' \
+		jq 'def append_missing($$items): reduce $$items[] as $$item (. ; if index($$item) then . else . + [$$item] end); def issue_types: [.properties.on.oneOf[] | select(.properties?.issues?.oneOf?) | .properties.issues.oneOf[] | select(.properties?.types?.items?.enum? and .properties?.types?.default?)]; if (issue_types | length) == 0 then error("issues types selector matched nothing") else . end | .definitions["permissions-event"].properties += {"copilot-requests": {"type": "string", "enum": ["write", "none"]}, "drives": {"$$ref": "#/definitions/permissions-level"}, "vulnerability-alerts": {"type": "string", "enum": ["read", "none"]}} | (.properties.on.oneOf[] | select(.properties?.issues?.oneOf?) | .properties.issues.oneOf[] | select(.properties?.types?).properties.types.items.enum) |= append_missing(["typed", "untyped", "field_added", "field_removed", "status_changed"]) | (.properties.on.oneOf[] | select(.properties?.issues?.oneOf?) | .properties.issues.oneOf[] | select(.properties?.types?).properties.types.default) |= append_missing(["typed", "untyped", "field_added", "field_removed", "status_changed"]) | if ([issue_types[] | select((.properties.types.items.enum | index("status_changed")) != null and (.properties.types.default | index("status_changed")) != null)] | length) != (issue_types | length) then error("issues types patch did not add status_changed") else . end' \
 			pkg/workflow/schemas/github-workflow.json > "$$tmpfile" && \
 		mv "$$tmpfile" pkg/workflow/schemas/github-workflow.json
 	@cd actions/setup/js && npm run format:schema >/dev/null 2>&1

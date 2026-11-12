@@ -1004,13 +1004,13 @@ describe("handle_agent_failure", () => {
       );
     });
 
-    it("keeps the incompletion notice concise without repeating diagnostic policy", () => {
-      const context = buildReportIncompleteContext([{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }]);
-      expect(context).toContain("completion could not be confirmed");
-      expect(context).toContain("A comment or other safe output does not confirm that the requested task was completed.");
-      expect(context).not.toContain("See the reported reason");
-      expect(context).not.toContain("agent-generated");
-      expect(context).toContain("infrastructure_error");
+    it("explains the incomplete handoff without exposing agent diagnostic details", () => {
+      const rendered = buildReportIncompleteContext([{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }]);
+      expect(rendered).toContain("completion could not be confirmed");
+      expect(rendered).toContain("Treat the agent-declared reason as a lead, not a confirmed root cause");
+      expect(rendered).toContain("agent diagnostic details are excluded");
+      expect(rendered).not.toContain("agent-generated");
+      expect(rendered).toContain("infrastructure_error");
     });
   });
 
@@ -1674,7 +1674,7 @@ describe("handle_agent_failure", () => {
       const write = vi.spyOn(fs, "writeFileSync");
       try {
         await main();
-        expect(global.core.setFailed.mock.calls).toEqual(startup || crashed ? [["Agent reported that it could not complete the task"]] : []);
+        expect(global.core.setFailed.mock.calls).toEqual(startup || crashed ? [[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]] : []);
         expect(create).toHaveBeenCalledOnce();
         const issue = create.mock.calls[0][0];
         expect(issue.title).toBe(startup ? "[aw] Test Workflow: failed before agent execution started" : "[aw] Test Workflow: failed to redact secrets in logs");
@@ -1803,7 +1803,7 @@ describe("handle_agent_failure", () => {
         };
         try {
           await main();
-          expect(global.core.setFailed.mock.calls).toEqual([["Agent reported that it could not complete the task"]]);
+          expect(global.core.setFailed.mock.calls).toEqual([[expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)")]]);
           expect(create).toHaveBeenCalledOnce();
           const { title, body } = create.mock.calls[0][0];
           expect(title).toBe("[aw] Test Workflow: engine driver crashed");
@@ -2292,11 +2292,100 @@ describe("handle_agent_failure", () => {
       }
     });
 
+    it("explains clean-exit incompletion and points to diagnostics without logging the agent payload", async () => {
+      const outputPath = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(
+        outputPath,
+        JSON.stringify({
+          items: [{ type: "report_incomplete", reason: "Required compilation and validation cannot run within the configured build-resource permissions.", details: "private-build-diagnostics" }],
+        })
+      );
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      global.context.runId = 123456;
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: vi.fn(), createComment: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        expect(global.core.setFailed).toHaveBeenCalledOnce();
+        const diagnostic = global.core.setFailed.mock.calls[0][0];
+        expect(diagnostic).toContain("report_incomplete");
+        expect(diagnostic).toContain("A successful agent job does not confirm task completion");
+        expect(diagnostic).toContain("conclusion job summary");
+        expect(diagnostic).toContain("agent_output.json in the agent artifact");
+        expect(diagnostic).toContain("gh aw audit 123456");
+        const logs = JSON.stringify([...global.core.info.mock.calls, ...global.core.warning.mock.calls, ...global.core.setFailed.mock.calls]);
+        expect(logs).not.toContain("build-resource permissions");
+        expect(logs).not.toContain("private-build-diagnostics");
+        const summary = JSON.stringify(global.core.summary.addRaw.mock.calls);
+        expect(summary).toContain("build-resource permissions");
+        expect(summary).not.toContain("private-build-diagnostics");
+        expect(global.core.summary.write).toHaveBeenCalled();
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("points to the agent artifact when secret redaction suppresses the summary", async () => {
+      const outputPath = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason: "safe but unverified reason", details: "private-redaction-details" }] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      global.context.runId = 123456;
+      global.github = {
+        rest: {
+          actions: {
+            listJobsForWorkflowRun: vi.fn(),
+            downloadJobLogsForWorkflowRun: vi.fn().mockResolvedValue({ data: "" }),
+          },
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: vi.fn(), createComment: vi.fn() },
+        },
+        paginate: vi.fn(async () => [
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Run agent", conclusion: "success" },
+              { name: "Redact secrets in logs", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:04Z" },
+            ],
+          },
+        ]),
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        const diagnostic = global.core.setFailed.mock.calls[0][0];
+        expect(diagnostic).toContain("summary was suppressed because secret redaction failed");
+        expect(diagnostic).toContain("agent_output.json in the agent artifact");
+        expect(diagnostic).not.toContain("check the conclusion job summary");
+        expect(diagnostic).not.toContain("safe but unverified reason");
+        expect(diagnostic).not.toContain("private-redaction-details");
+        expect(global.core.summary.addRaw).not.toHaveBeenCalled();
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it.each([{}, " "])("does not write an empty incomplete-result summary for invalid reason %s", async reason => {
       const outputPath = path.join(tmpDir, "agent_output.json");
       fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason }] }));
       vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "success");
       vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      global.context.runId = 123456;
       global.github = {
         rest: {
           search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
@@ -2309,6 +2398,12 @@ describe("handle_agent_failure", () => {
         await main();
         expect(global.core.summary.addRaw).not.toHaveBeenCalled();
         expect(global.core.summary.write).not.toHaveBeenCalled();
+        expect(global.core.setFailed).toHaveBeenCalledOnce();
+        const diagnostic = global.core.setFailed.mock.calls[0][0];
+        expect(diagnostic).toContain("report_incomplete signal had no usable reason");
+        expect(diagnostic).toContain("agent_output.json in the agent artifact");
+        expect(diagnostic).toContain("gh aw audit 123456");
+        expect(diagnostic).not.toContain("conclusion job summary");
       } finally {
         vi.unstubAllEnvs();
       }
@@ -3582,7 +3677,7 @@ describe("handle_agent_failure", () => {
 
     it("renders report_incomplete context in both comment and issue templates", () => {
       const reportIncompleteItems = [{ type: "report_incomplete", reason: "infrastructure_error", details: reportIncompleteMarker }];
-      const reportIncompleteContext = buildReportIncompleteContext(reportIncompleteItems);
+      const reportIncompleteContext = buildReportIncompleteContext(reportIncompleteItems, { runId: 123456 });
       const failureDiagnosticsContext = buildFailureDiagnosticsContext({
         failureCategories: ["report_incomplete"],
         failingStep: "Run agent",
@@ -3635,6 +3730,9 @@ describe("handle_agent_failure", () => {
         expect(rendered).not.toContain(reportIncompleteMarker);
         expect(rendered).toContain("The workflow recorded a `report_incomplete` signal");
         expect(rendered).toContain("completion could not be confirmed");
+        expect(rendered).toContain("This run needs a follow-up");
+        expect(rendered).toContain("A successful agent job only confirms a clean process exit");
+        expect(rendered).toContain("gh aw audit 123456");
         expect(rendered).not.toContain("due to an infrastructure or tool failure");
       }
       expect(reportIncompleteContext).toContain("infrastructure_error");
@@ -7674,7 +7772,7 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
 
-      expect(global.core.setFailed).toHaveBeenCalledWith("Agent reported that it could not complete the task");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
       expect(createIssueMock).toHaveBeenCalled();
     });
 
@@ -7754,7 +7852,7 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
 
-      expect(global.core.setFailed).toHaveBeenCalledWith("Agent reported that it could not complete the task");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
       expect(createIssueMock).toHaveBeenCalled();
     });
 
@@ -7965,7 +8063,7 @@ describe("handle_agent_failure", () => {
 
       // report_incomplete overrides the hasCompletedDespiteJobFailure exemption
       expect(createIssueMock).toHaveBeenCalled();
-      expect(global.core.setFailed).toHaveBeenCalledWith("Agent reported that it could not complete the task");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
       expect(global.core.warning).toHaveBeenCalledWith("Failed to create or update failure tracking issue: issue creation failed");
     });
 
@@ -7993,7 +8091,7 @@ describe("handle_agent_failure", () => {
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
 
-      expect(global.core.setFailed).toHaveBeenCalledWith("Agent reported that it could not complete the task");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Agent reported that it could not complete the task (report_incomplete)"));
       expect(createIssueMock).not.toHaveBeenCalled();
     });
 
