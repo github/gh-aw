@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-12",
+  "prs": 204,
+  "messages": 204,
+  "avg": 0.02,
+  "median": 0.0,
+  "pos_pct": 36.8,
+  "neu_pct": 35.3,
+  "neg_pct": 27.9,
+  "top_topic": "workflow / test / coverage",
+  "comment_data": false,
+  "window_start": "2026-11-05T10:19:25Z",
+  "run_id": "43198527769"
+}
