@@ -3,12 +3,18 @@ package cli
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var addWorkflowPackageSpecsLog = logger.New("cli:add_workflow_package_specs")
 
 func appendLocalRepositoryPackageWorkflowSpecs(parsedSpecs []*WorkflowSpec, pkg *resolvedRepositoryPackage) []*WorkflowSpec {
 	if pkg == nil {
 		return parsedSpecs
 	}
+	addWorkflowPackageSpecsLog.Printf("Appending local package specs: workflows=%d, resources=%d, skills=%d, agents=%d",
+		len(pkg.InstallationSource), len(pkg.ResourceFiles), len(pkg.SkillFiles), len(pkg.AgentFiles))
 	for _, installable := range pkg.InstallationSource {
 		parsedSpecs = append(parsedSpecs, &WorkflowSpec{
 			WorkflowPath:           installable.SourcePath,
@@ -61,6 +67,7 @@ func appendRepositoryPackageWorkflowSpecs(parsedSpecs []*WorkflowSpec, repoSpec 
 	if pkg == nil {
 		return parsedSpecs
 	}
+	addWorkflowPackageSpecsLog.Printf("Appending remote package specs: repo=%s, workflows=%d", repoSpec.RepoSlug, len(pkg.InstallationSource))
 	firstPackageSpec := len(parsedSpecs)
 	host := explicitHostForRepo(repoSpec.RepoSlug)
 	effectiveVersion := repositoryPackageEffectiveRef(repoSpec, pkg)
