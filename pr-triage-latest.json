@@ -1,26 +1,61 @@
 {
-  "run_date": "2026-11-12T06:26:41Z",
-  "run_id": "pr-triage-20261112T062641Z",
-  "open_copilot_prs": 8,
-  "eligible_total": 1,
-  "cooldown_skipped": 7,
+  "run_date": "2026-11-12T12:32:04Z",
+  "run_id": "pr-triage-20261112T123204Z",
+  "open_copilot_prs": 30,
+  "eligible_total": 6,
+  "cooldown_skipped": 24,
   "category_counts": {
-    "refactor": 1
+    "bug": 1,
+    "refactor": 3,
+    "feature": 1,
+    "docs": 1
   },
   "risk_counts": {
-    "medium": 1
+    "low": 1,
+    "medium": 5
   },
   "priority_counts": {
-    "medium": 1
+    "low": 1,
+    "medium": 5
   },
   "action_counts": {
-    "batch_review": 1,
+    "batch_review": 5,
+    "defer": 1,
     "auto_merge": 0,
     "fast_track": 0,
-    "defer": 0,
     "close": 0
   },
   "selected_candidates": [
+    {
+      "number": 77082,
+      "title": "Bump firewall to v0.29.12 and MCP gateway to v0.5.8",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 58,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 16,
+        "quality": 12
+      },
+      "reason": "Dependency and schema bump for security-critical networking components; draft status keeps it out of auto-merge, but the change is coherent and reviewable as a batch."
+    },
+    {
+      "number": 77050,
+      "title": "Extract shared PR safe-output defaults",
+      "category": "refactor",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 51,
+      "score_breakdown": {
+        "impact": 26,
+        "urgency": 11,
+        "quality": 14
+      },
+      "reason": "Shared PR defaults extraction with clear automation benefit; low churn but medium operational risk because it affects multiple workflow outputs."
+    },
     {
       "number": 77049,
       "title": "[WIP] Refactor to extract shared Go and Node CI toolchain setup",
@@ -34,45 +69,105 @@
         "urgency": 9,
         "quality": 14
       },
-      "reason": "Shared CI toolchain refactor; successful make recompile and no impacted Go tests, but CodeQL timeout and draft status keep it out of auto-merge."
-    }
-  ],
-  "batches": [],
-  "skipped": [
-    {
-      "number": 77088,
-      "title": "[WIP] Update handling for AWF's new per-conversation budget-notice records",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    },
-    {
-      "number": 77087,
-      "title": "[WIP] Update token-steering and max-ai-credits docs for budget notices",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    },
-    {
-      "number": 77082,
-      "title": "[WIP] Update firewall to v0.29.12 and MCP gateway to v0.5.8",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    },
-    {
-      "number": 77050,
-      "title": "Extract shared PR safe-output defaults",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
+      "reason": "Shared CI toolchain refactor with moderate blast radius; draft status and CodeQL timeout keep it from auto-merge, but the pattern matches the bundled setup batch."
     },
     {
       "number": 77048,
       "title": "Extract shared Python setup for analysis workflows",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
+      "category": "refactor",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 49,
+      "score_breakdown": {
+        "impact": 25,
+        "urgency": 10,
+        "quality": 14
+      },
+      "reason": "Shared workflow extraction is low-risk in isolation but affects several automation paths, making a grouped review appropriate."
     },
     {
       "number": 77010,
       "title": "Add daily conformance workflows for all 14 connectors",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 56,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 14,
+        "quality": 12
+      },
+      "reason": "Broad workflow addition with operational value but moderate review overhead; best reviewed as a batch with related automation changes."
     },
     {
       "number": 76985,
       "title": "docs: lead model-choice guidance with default routing and `model: router`",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
+      "category": "docs",
+      "risk": "low",
+      "priority": "low",
+      "action": "defer",
+      "score": 32,
+      "score_breakdown": {
+        "impact": 12,
+        "urgency": 6,
+        "quality": 14
+      },
+      "reason": "Documentation-only change with low operational impact; defer while the higher-risk automation PRs are reviewed."
     }
-  ]
+  ],
+  "batches": [
+    {
+      "id": "pr-batch:ci-shared-setup",
+      "prs": [
+        77050,
+        77049,
+        77048
+      ]
+    }
+  ],
+  "skipped": [
+    {
+      "number": 77088,
+      "title": "Read AWF per-conversation steering deliveries from the unified session",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 77087,
+      "title": "docs: describe AWF's on-by-default budget notices for `token-steering` and `max-ai-credits`",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
+    },
+    {
+      "number": 77082,
+      "title": "Bump firewall to v0.29.12 and MCP gateway to v0.5.8",
+      "reason": "included in eligible set; not skipped"
+    },
+    {
+      "number": 77050,
+      "title": "Extract shared PR safe-output defaults",
+      "reason": "included in eligible set; not skipped"
+    },
+    {
+      "number": 77049,
+      "title": "[WIP] Refactor to extract shared Go and Node CI toolchain setup",
+      "reason": "included in eligible set; not skipped"
+    },
+    {
+      "number": 77048,
+      "title": "Extract shared Python setup for analysis workflows",
+      "reason": "included in eligible set; not skipped"
+    },
+    {
+      "number": 77010,
+      "title": "Add daily conformance workflows for all 14 connectors",
+      "reason": "included in eligible set; not skipped"
+    },
+    {
+      "number": 76985,
+      "title": "docs: lead model-choice guidance with default routing and `model: router`",
+      "reason": "included in eligible set; not skipped"
+    }
+  ],
+  "summary": "Six eligible Copilot-authored PRs aged past the one-hour cooldown. Shared CI setup extraction is the dominant batch cluster, with one docs-only deferral and one dependency/budgeting update at medium risk. No PRs are auto-merge or fast-track ready under the current evidence."
 }
