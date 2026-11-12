@@ -13,7 +13,7 @@ excluded-env:
 engine:
   id: atomic
   detection-engine: copilot
-  version: "0.9.71"
+  version: "0.9.79"
   display-name: Atomic
   description: Atomic CLI with sandbox-proxied multi-provider inference and native MCP
   experimental: true
@@ -242,7 +242,7 @@ imports:
   - shared/atomic.md
 ```
 
-The sample pins `@bastani/atomic@0.9.71` (released November 3, 2026), with
+The sample pins `@bastani/atomic@0.9.79` (released November 12, 2026), with
 npm lifecycle scripts disabled and Node.js 24. Copilot uses
 `copilot-requests: write` or `COPILOT_GITHUB_TOKEN`; Anthropic uses
 `ANTHROPIC_API_KEY`; OpenAI and Codex use `OPENAI_API_KEY` or `CODEX_API_KEY`.
