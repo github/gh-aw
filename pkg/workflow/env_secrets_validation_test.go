@@ -162,16 +162,23 @@ Say hello.
 
 func TestCompileEnvCredentialReferences(t *testing.T) {
 	tests := []struct {
-		name        string
-		value       string
-		engineEnv   bool
-		key         string
-		nonStrict   bool
-		awfVersion  string
-		wantSection string
-		wantError   string
+		name         string
+		value        string
+		engineEnv    bool
+		key          string
+		nonStrict    bool
+		awfVersion   string
+		wantSection  string
+		wantError    string
+		preserveLock bool
 	}{
 		{name: "dot token", value: "${{ github.token }}", wantSection: "env"},
+		{name: "github wildcard", value: "${{ github.* }}", wantSection: "env"},
+		{name: "serialized github wildcard", value: "${{ toJSON(github.*) }}", wantSection: "env"},
+		{name: "github wildcard preserves lock", value: "${{ github.* }}", wantSection: "env", preserveLock: true},
+		{name: "serialized github wildcard preserves lock", value: "${{ toJSON(github.*) }}", wantSection: "env", preserveLock: true},
+		{name: "secrets wildcard", value: "${{ secrets.* }}", wantSection: "env"},
+		{name: "secrets wildcard property", value: "${{ secrets.*.value }}", wantSection: "env"},
 		{name: "single quoted token", value: "${{ github['token'] }}", wantSection: "env"},
 		{name: "whole github context", value: "${{ github }}", wantSection: "env"},
 		{name: "computed github access", value: "${{ github[vars.KEY] }}", wantSection: "env"},
@@ -184,13 +191,25 @@ func TestCompileEnvCredentialReferences(t *testing.T) {
 		{name: "embedded token", value: "prefix-${{ github['token'] }}", wantSection: "env"},
 		{name: "secret control", value: "${{ secrets['GITHUB_TOKEN'] }}", wantSection: "env"},
 		{name: "metadata control", value: "${{ github['repository'] }}"},
+		{name: "github event wildcard control", value: "${{ toJSON(github.event.*) }}"},
+		{name: "vars control", value: "${{ vars.VALUE }}"},
+		{name: "vars wildcard control", value: "${{ toJSON(vars.*) }}"},
+		{name: "quoted wildcard control", value: "${{ 'github.*' }}"},
 		{name: "quoted token control", value: "${{ 'github.token' }}"},
 		{name: "quoted bracket token control", value: `${{ 'github["token"]' }}`},
 		{name: "plain token control", value: "github['token']"},
 		{name: "non-strict whole github context", value: "${{ github }}", nonStrict: true, wantSection: "env"},
+		{name: "non-strict github wildcard", value: "${{ github.* }}", nonStrict: true, wantSection: "env"},
+		{name: "non-strict serialized github wildcard", value: "${{ toJSON(github.*) }}", nonStrict: true, wantSection: "env"},
 		{name: "non-strict single quoted token", value: "${{ github['token'] }}", nonStrict: true, wantSection: "env"},
 		{name: "non-strict double quoted token", value: `${{ github["token"] }}`, nonStrict: true, wantError: "invalid expression in 'env' section"},
 		{name: "unsupported engine key", value: "${{ github['token'] }}", engineEnv: true, wantSection: "engine.env"},
+		{name: "engine github wildcard", value: "${{ github.* }}", engineEnv: true, wantSection: "engine.env"},
+		{name: "engine serialized github wildcard", value: "${{ toJSON(github.*) }}", engineEnv: true, wantSection: "engine.env"},
+		{name: "engine github wildcard preserves lock", value: "${{ github.* }}", engineEnv: true, wantSection: "engine.env", preserveLock: true},
+		{name: "engine serialized github wildcard preserves lock", value: "${{ toJSON(github.*) }}", engineEnv: true, wantSection: "engine.env", preserveLock: true},
+		{name: "non-strict engine github wildcard", value: "${{ github.* }}", engineEnv: true, nonStrict: true, wantSection: "engine.env"},
+		{name: "non-strict engine serialized github wildcard", value: "${{ toJSON(github.*) }}", engineEnv: true, nonStrict: true, wantSection: "engine.env"},
 		{name: "unsupported engine double quoted token", value: `${{ github["token"] }}`, engineEnv: true, wantError: "invalid expression in 'engine.env' section"},
 		{name: "supported engine key", value: "${{ github['token'] }}", engineEnv: true, key: "COPILOT_GITHUB_TOKEN"},
 		{name: "non-core Copilot provider key", value: "${{ github['token'] }}", engineEnv: true, key: "COPILOT_PROVIDER_API_KEY"},
@@ -221,6 +240,11 @@ func TestCompileEnvCredentialReferences(t *testing.T) {
 				}
 				content := fmt.Sprintf("---\non: workflow_dispatch\npermissions:\n  contents: read\nstrict: %t\n%s%s%s---\nSay hello.\n", !tt.nonStrict, engine, env, sandbox)
 				require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+				lockPath := filepath.Join(dir, "credentials.lock.yml")
+				const existingLock = "existing lock file\n"
+				if tt.preserveLock {
+					require.NoError(t, os.WriteFile(lockPath, []byte(existingLock), 0600))
+				}
 				var compileErr error
 				var yamlContent string
 				stderr := captureStderr(func() {
@@ -237,7 +261,13 @@ func TestCompileEnvCredentialReferences(t *testing.T) {
 				})
 				if tt.wantSection != "" && !tt.nonStrict {
 					require.ErrorContains(t, compileErr, "strict mode: secrets detected in '"+tt.wantSection+"' section")
-					require.NoFileExists(t, filepath.Join(dir, "credentials.lock.yml"))
+					if tt.preserveLock {
+						lock, err := os.ReadFile(lockPath)
+						require.NoError(t, err)
+						assert.Equal(t, existingLock, string(lock))
+					} else {
+						require.NoFileExists(t, lockPath)
+					}
 					return
 				}
 				if tt.wantError != "" {
