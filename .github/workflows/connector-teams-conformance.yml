@@ -1,0 +1,15 @@
+name: connector-teams-conformance
+
+on:
+  schedule:
+    - cron: '55 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    uses: ./.github/workflows/test-connector-conformance.yml
+    with:
+      provider: teams

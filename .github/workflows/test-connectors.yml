@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/connectors/**'
       - '.github/workflows/test-connectors.yml'
+      - '.github/workflows/connector-*-conformance.yml'
+      - '.github/workflows/test-connector-conformance.yml'
       - 'actions/setup/setup.sh'
       - 'actions/setup/js/connector*'
       - 'actions/setup/js/setup_sh_file_lists.test.cjs'
@@ -21,6 +23,8 @@ on:
     paths:
       - '.github/workflows/connectors/**'
       - '.github/workflows/test-connectors.yml'
+      - '.github/workflows/connector-*-conformance.yml'
+      - '.github/workflows/test-connector-conformance.yml'
       - 'actions/setup/setup.sh'
       - 'actions/setup/js/connector*'
       - 'actions/setup/js/setup_sh_file_lists.test.cjs'

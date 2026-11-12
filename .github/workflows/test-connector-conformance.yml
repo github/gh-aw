@@ -1,0 +1,61 @@
+name: Connector conformance (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      provider:
+        description: Connector declaration ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: ${{ inputs.provider }} offline conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROVIDER: ${{ inputs.provider }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Validate provider selection
+        shell: bash
+        run: |
+          case "$PROVIDER" in
+            asana|azure-devops|confluence|datadog|gitlab|jira|linear|notion|pagerduty|sentry|servicenow|slack|teams|zendesk) ;;
+            *) echo "::error::Unknown connector provider"; exit 1 ;;
+          esac
+          test -f ".github/workflows/connectors/$PROVIDER.md"
+          echo "PROVIDER_TEST_PATTERN=${PROVIDER//-/}" >> "$GITHUB_ENV"
+      # Fixtures check registration contracts, not receiver enrollment or live ingress.
+      # Providers without triggers still validate their declaration and daily workflow.
+      - name: Check declarations and declared trigger registrations
+        shell: bash
+        run: >-
+          go test ./pkg/workflow
+          -run "^(TestBundledConnectorImportMetadata|TestConnectorGatewayImportedProviderSubscriptions|TestConnectorConformanceWorkflows)$/${PROVIDER}(\\.md)?$"
+          -v -count=1 -timeout=5m
+      - name: Check selected MCP tools and staged workflow compilation
+        shell: bash
+        run: >-
+          go test ./pkg/workflow
+          -run "^(TestConnectorGoldenWorkflows|TestConnectorScenarioImports|TestConnectorScenarioImportDoesNotSelectCapabilities|TestConnectorScenarioIndependentPhases|TestConnectorScenarioRejectsInvalidConfiguration)$/${PROVIDER}$"
+          -v -count=1 -timeout=5m
+      # Existing provider suites use synthetic credentials and mocked transports.
+      # They exercise MCP where declared, safe-output staging/execution, and rejection
+      # boundaries without contacting providers, resolving secrets, or making live writes.
+      - name: Check provider MCP and safe-output runtimes
+        shell: bash
+        run: |
+          go test -race ./pkg/connectors -run "(?i)${PROVIDER_TEST_PATTERN}" -v -count=1 -timeout=5m
+          go test ./pkg/workflow -run "(?i)${PROVIDER_TEST_PATTERN}" -v -count=1 -timeout=5m
