@@ -1018,8 +1018,46 @@ describe("smoke_model_routing_assertions", () => {
       steeringFixture({ credits: LITTLE_LEFT_CREDITS, sessionRecords: requests.map(({ steering_delivery: _, ...request }) => request) });
       const { failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
       expect(checkIds(failures)).toEqual(["T1", "T2"]);
-      expect(lineFor(failures, "T1")).toMatch(/^FAIL T1 no session firewall\.token_usage event carries the ai_credit little_left delivery for request\(s\) run-38174216426-req-6; /);
+      expect(lineFor(failures, "T1")).toMatch(/^FAIL T1 no session firewall\.token_usage event carries the ai_credit little_left delivery for request=run-38174216426-req-6; /);
       expect(lineFor(failures, "T2")).toBe("FAIL T2 no steering notices to check; observed notices: none");
+    });
+
+    it.each([
+      ["a different conversation", { conversation: "ba9876543210" }, 'conversation="ba9876543210"'],
+      ["a missing first", { first: undefined }, "first=<missing>"],
+      ["a non-null threshold", { threshold: 80 }, "threshold=80"],
+      ["a different trigger", { trigger: "threshold" }, 'trigger="threshold"'],
+    ])("fails T1 and T2 when the session little_left delivery has %s", (_, change, shown) => {
+      const requests = LITTLE_LEFT_CREDITS.map(tokenRecord);
+      const sessionDelivery = { ...LITTLE_LEFT, ...change };
+      for (const [field, value] of Object.entries(change)) if (value === undefined) delete sessionDelivery[field];
+      requests[5] = { ...requests[5], steering_delivery: sessionDelivery };
+      steeringFixture({ credits: LITTLE_LEFT_CREDITS, sessionRecords: requests });
+      const { failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
+      expect(checkIds(failures)).toEqual(["T1", "T2"]);
+      const t1 = lineFor(failures, "T1");
+      expect(t1).toMatch(/^FAIL T1 session steeringDelivery for request=run-38174216426-req-6 \(/);
+      expect(t1).toContain(shown);
+      expect(t1).toContain('does not match token-usage.jsonl steering_delivery (type="ai_credit" trigger="little_left" threshold=null conversation="0123456789ab" first=true)');
+    });
+
+    it("fails T1 when the token-usage little_left delivery lacks a field the session has", () => {
+      const { first: _, ...partial } = LITTLE_LEFT;
+      const credits = LITTLE_LEFT_CREDITS.map((entry, index) => (index === 5 ? [entry[0], entry[1], undefined, partial] : entry));
+      const requests = LITTLE_LEFT_CREDITS.map(tokenRecord);
+      steeringFixture({ credits, sessionRecords: requests });
+      expect(lineFor(steeringCheck({ steering: { maxAiCredits: 7 } }).failures, "T1")).toMatch(/^FAIL T1 session steeringDelivery for request=run-38174216426-req-6 .* first=<missing>\);/);
+    });
+
+    it("fails T2 when a request after the little_left delivery started at or above 80% without a threshold notice", () => {
+      // AWF ranks little_left just above the highest threshold already
+      // crossed, so crossing 80% after an early little_left still sends the
+      // 80% notice on the next request.
+      steeringFixture({ credits: [...LITTLE_LEFT_CREDITS, [1.35, 5.7], [0.3, 6.0]] });
+      const { passes, failures } = steeringCheck({ steering: { maxAiCredits: 7 } });
+      expect(checkIds(failures)).toEqual(["T2"]);
+      expect(lineFor(passes, "T1")).toMatch(/^PASS T1 main agent received ai_credit@little_left /);
+      expect(lineFor(failures, "T2")).toBe("FAIL T2 no ai_credit@80 notice, but 1 main-agent request(s) started at or above 80% of 7 (5.6): request=run-38174216426-req-9 status=200 total_before=5.7 total_after=6; observed notices: none");
     });
 
     it("fails T1 when the little_left delivery was only on a non-2xx response", () => {
