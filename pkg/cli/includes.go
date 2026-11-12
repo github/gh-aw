@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/fileutil"
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/setutil"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -377,7 +378,19 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		return nil
 	}
-	repoRoot := filepath.Dir(filepath.Dir(absTargetDir))
+	repoRoot, err := gitutil.FindGitRootFrom(absTargetDir)
+	if err != nil {
+		// Without repository context, do not allow imports to leave targetDir.
+		repoRoot = absTargetDir
+	}
+	root, err := os.OpenRoot(repoRoot)
+	if err != nil {
+		if opts.strict {
+			return fmt.Errorf("failed to open import destination root: %w", err)
+		}
+		return nil
+	}
+	defer root.Close()
 
 	for _, importPath := range importPaths {
 		// Skip workflowspec-format imports (already pinned to a remote ref)
@@ -475,7 +488,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 			}
 			continue
 		}
-		targetPath := filepath.Join(opts.targetDir, localRelPath)
+		targetPath := filepath.Join(absTargetDir, localRelPath)
 
 		if err := fileutil.ValidatePathWithinBase(repoRoot, targetPath); err != nil {
 			if opts.strict {
@@ -483,6 +496,13 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 			}
 			if opts.verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside repository root: %q", importPath)))
+			}
+			continue
+		}
+		repoRelPath, err := filepath.Rel(repoRoot, targetPath)
+		if err != nil {
+			if opts.strict {
+				return fmt.Errorf("failed to resolve import destination %q: %w", importPath, err)
 			}
 			continue
 		}
@@ -501,7 +521,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 				// Read the existing file so we can recurse into its own imports.
 				// If the read fails, log it and skip — the compiler will report
 				// any missing transitive dependencies.
-				if existingContent, readErr := os.ReadFile(targetPath); readErr == nil {
+				if existingContent, readErr := root.ReadFile(repoRelPath); readErr == nil {
 					importedBaseDir := path.Dir(remoteFilePath)
 					if err := fetchFrontmatterImportsRecursive(ctx, string(existingContent), importedBaseDir, opts); err != nil && opts.strict {
 						return err
@@ -534,7 +554,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 
 		// Create the parent directory if needed
-		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
+		if err := root.MkdirAll(filepath.Dir(repoRelPath), constants.DirPermPublic); err != nil {
 			if opts.strict {
 				return fmt.Errorf("failed to create directory for import %s: %w", remoteFilePath, err)
 			}
@@ -545,7 +565,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 
 		// Write the file
-		if err := os.WriteFile(targetPath, importContent, constants.FilePermSensitive); err != nil {
+		if err := root.WriteFile(repoRelPath, importContent, constants.FilePermSensitive); err != nil {
 			if opts.strict {
 				return fmt.Errorf("failed to write import %s: %w", remoteFilePath, err)
 			}

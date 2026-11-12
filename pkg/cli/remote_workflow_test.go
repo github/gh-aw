@@ -914,6 +914,7 @@ func TestFetchFrontmatterImportsRecursive_PreservesRelativeLayout(t *testing.T) 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repoRoot := t.TempDir()
+			require.NoError(t, initTestGitRepo(repoRoot))
 			t.Chdir(repoRoot)
 			targetDir := filepath.Join(repoRoot, ".github", "workflows")
 			require.NoError(t, os.MkdirAll(targetDir, 0755))
@@ -980,6 +981,7 @@ func TestFetchFrontmatterImportsRecursive_RejectsUnsafeDestinations(t *testing.T
 		} {
 			t.Run(fmt.Sprintf("strict=%t/%s/%s", strict, tt.baseDir, tt.importPath), func(t *testing.T) {
 				repoRoot := t.TempDir()
+				require.NoError(t, initTestGitRepo(repoRoot))
 				opts := frontmatterImportsOpts{
 					originalBaseDir: tt.baseDir,
 					targetDir:       filepath.Join(repoRoot, ".github", "workflows"),
@@ -999,7 +1001,8 @@ func TestFetchFrontmatterImportsRecursive_RejectsUnsafeDestinations(t *testing.T
 				}
 				entries, err := os.ReadDir(repoRoot)
 				require.NoError(t, err)
-				assert.Empty(t, entries)
+				require.Len(t, entries, 1)
+				assert.Equal(t, ".git", entries[0].Name())
 			})
 		}
 	}
@@ -1007,6 +1010,7 @@ func TestFetchFrontmatterImportsRecursive_RejectsUnsafeDestinations(t *testing.T
 
 func TestFetchFrontmatterImportsRecursive_RejectsSymlinkEscape(t *testing.T) {
 	repoRoot := t.TempDir()
+	require.NoError(t, initTestGitRepo(repoRoot))
 	outside := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(repoRoot, ".github"), 0755))
 	require.NoError(t, os.Symlink(outside, filepath.Join(repoRoot, ".github", "prompts")))
@@ -1023,6 +1027,44 @@ func TestFetchFrontmatterImportsRecursive_RejectsSymlinkEscape(t *testing.T) {
 	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - ../prompts/new/review.md\n---\n", ".github/workflows", opts)
 	require.Error(t, err)
 	assert.NoFileExists(t, filepath.Join(outside, "new", "review.md"))
+}
+
+func TestFetchFrontmatterImportsRecursive_CustomDestinationBoundary(t *testing.T) {
+	repoRoot := t.TempDir()
+	require.NoError(t, initTestGitRepo(repoRoot))
+	opts := frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       filepath.Join(repoRoot, "workflows"),
+		strict:          true,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
+			t.Fatal("imports escaping a custom destination must be rejected before downloading")
+			return nil, nil
+		},
+	}
+	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - ../../outside.md\n---\n", ".github/workflows", opts)
+	require.ErrorContains(t, err, "outside repository root")
+}
+
+func TestFetchFrontmatterImportsRecursive_RejectsDanglingSymlinkEscape(t *testing.T) {
+	repoRoot := t.TempDir()
+	require.NoError(t, initTestGitRepo(repoRoot))
+	outsidePath := filepath.Join(t.TempDir(), "review.md")
+	promptsDir := filepath.Join(repoRoot, ".github", "prompts")
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+	require.NoError(t, os.Symlink(outsidePath, filepath.Join(promptsDir, "review.md")))
+	opts := frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       filepath.Join(repoRoot, ".github", "workflows"),
+		strict:          true,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
+			return []byte("# Review\n"), nil
+		},
+	}
+	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - ../prompts/review.md\n---\n", ".github/workflows", opts)
+	require.Error(t, err)
+	assert.NoFileExists(t, outsidePath)
 }
 
 func TestFetchAndSaveRemoteRuntimeImports_EmptyRepoSlug(t *testing.T) {
