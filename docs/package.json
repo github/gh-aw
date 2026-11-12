@@ -23,7 +23,7 @@
     "test:debug": "playwright test --debug"
   },
   "dependencies": {
-    "@astrojs/markdown-remark": "7.3.5",
+    "@astrojs/markdown-remark": "7.3.6",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.4",
     "@astrojs/starlight": "0.42.8",
@@ -46,7 +46,7 @@
     "starlight-github-alerts": "^0.5.0"
   },
   "overrides": {
-    "@astrojs/markdown-remark": "7.3.5",
+    "@astrojs/markdown-remark": "7.3.6",
     "p-queue": "9.3.3",
     "postcss": "$postcss",
     "qs": "6.16.1",
