@@ -82,7 +82,7 @@ func TestCachedLogsPreserveObservedCopilotModel(t *testing.T) {
 
 func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))
 
 	_, stderr := captureOutput(t, func() error {
 		_, err := loadCachedLogsJSONL(path)
@@ -113,7 +113,7 @@ func TestLoadCachedLogsJSONReportsMissingFile(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{invalid}\n{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{invalid}\n{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -122,7 +122,7 @@ func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidRunAttempt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":42,\"run_attempt\":\"bogus\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":42,\"run_attempt\":\"bogus\"}}\n"), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -395,7 +395,7 @@ func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {
 
 func TestPrepareCachedLogsJSONLLoadsOnceAndOnlyAppends(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	first := []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n")
+	first := []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n")
 	require.NoError(t, os.WriteFile(path, first, 0o600))
 	opts := LogsDownloadOptions{CachedJSONL: path}
 
@@ -418,8 +418,8 @@ func TestPrepareCachedLogsJSONLWildcardLoadsMatchingFilesAndWritesUniqueFile(t *
 	dir := t.TempDir()
 	firstPath := filepath.Join(dir, "logs-1.jsonl")
 	secondPath := filepath.Join(dir, "logs-2.jsonl")
-	require.NoError(t, os.WriteFile(firstPath, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":1}}\n"), 0o600))
-	require.NoError(t, os.WriteFile(secondPath, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":2}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(firstPath, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":1}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(secondPath, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":2}}\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "logs-ignored.json"), []byte("{}\n"), 0o600))
 
 	prepared, err := prepareCachedLogsJSONLPath(filepath.Join(dir, "logs-*"))
@@ -469,16 +469,16 @@ func TestPruneCachedLogsJSONLWildcardSourcesDeletesFilesWithoutInRangeRuns(t *te
 	mixedPath := filepath.Join(dir, "logs-mixed.jsonl")
 	undatedPath := filepath.Join(dir, "logs-undated.jsonl")
 	unrelatedPath := filepath.Join(dir, "other.jsonl")
-	require.NoError(t, os.WriteFile(oldPath, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":1,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(oldPath, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":1,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"), 0o600))
 	require.NoError(t, os.WriteFile(mixedPath, []byte(
-		"{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":2,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"+
-			"{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":3,\"created_at\":\"2026-09-05T00:00:00Z\"}}\n",
+		"{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":2,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"+
+			"{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":3,\"created_at\":\"2026-09-05T00:00:00Z\"}}\n",
 	), 0o600))
 	require.NoError(t, os.WriteFile(undatedPath, []byte(
-		"{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":4}}\n"+
-			"{\"schema_version\":5,\"kind\":\"github_api_rate_limit\",\"rate_limit\":{\"host\":\"github.com\"}}\n",
+		"{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":4}}\n"+
+			"{\"schema_version\":6,\"kind\":\"github_api_rate_limit\",\"rate_limit\":{\"host\":\"github.com\"}}\n",
 	), 0o600))
-	require.NoError(t, os.WriteFile(unrelatedPath, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":5,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(unrelatedPath, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":5,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"), 0o600))
 
 	require.NoError(t, pruneCachedLogsJSONLWildcardSources([]string{oldPath, mixedPath, undatedPath}, true, "2026-09-01", "2026-09-10"))
 
@@ -493,9 +493,9 @@ func TestFinalizeCachedLogsJSONLDeletesExpiredWildcardShards(t *testing.T) {
 	oldPath := filepath.Join(dir, "logs-old.jsonl")
 	currentPath := filepath.Join(dir, "logs-current.jsonl")
 	futurePath := filepath.Join(dir, "logs-future.jsonl")
-	require.NoError(t, os.WriteFile(oldPath, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":1,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"), 0o600))
-	require.NoError(t, os.WriteFile(currentPath, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":2,\"created_at\":\"2026-09-05T00:00:00Z\"}}\n"), 0o600))
-	require.NoError(t, os.WriteFile(futurePath, []byte("{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":3,\"created_at\":\"2026-09-11T00:00:00Z\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(oldPath, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":1,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(currentPath, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":2,\"created_at\":\"2026-09-05T00:00:00Z\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(futurePath, []byte("{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":3,\"created_at\":\"2026-09-11T00:00:00Z\"}}\n"), 0o600))
 
 	prepared, err := prepareCachedLogsJSONLPath(filepath.Join(dir, "logs-*"))
 	require.NoError(t, err)
@@ -514,14 +514,14 @@ func TestFinalizeCachedLogsJSONLDeletesExpiredWildcardShards(t *testing.T) {
 
 func TestCachedLogsJSONLWriterFiltersAppendedContentByDateRange(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	oldRun := `{"schema_version":5,"kind":"run","run":{"run_id":1,"created_at":"2026-08-31T23:59:59Z","future_field":"preserved"}}`
-	firstIncludedRun := `{"schema_version":5,"kind":"run","run":{"run_id":2,"created_at":"2026-09-01T00:00:00Z"}}`
-	lastIncludedRun := `{"schema_version":5,"kind":"run","run":{"run_id":3,"created_at":"2026-09-10T23:59:59Z"}}`
-	futureRun := `{"schema_version":5,"kind":"run","run":{"run_id":4,"created_at":"2026-09-11T00:00:00Z"}}`
-	workflowRuns := `{"schema_version":5,"kind":"workflow_runs","request":{"host":"github.com","repository":"github/gh-aw","args":["run","list"]},"payload":[{"databaseId":1}]}`
-	rateLimit := `{"schema_version":5,"kind":"github_api_rate_limit","rate_limit":{"host":"github.com"}}`
+	oldRun := `{"schema_version":6,"kind":"run","run":{"run_id":1,"created_at":"2026-08-31T23:59:59Z","future_field":"preserved"}}`
+	firstIncludedRun := `{"schema_version":6,"kind":"run","run":{"run_id":2,"created_at":"2026-09-01T00:00:00Z"}}`
+	lastIncludedRun := `{"schema_version":6,"kind":"run","run":{"run_id":3,"created_at":"2026-09-10T23:59:59Z"}}`
+	futureRun := `{"schema_version":6,"kind":"run","run":{"run_id":4,"created_at":"2026-09-11T00:00:00Z"}}`
+	workflowRuns := `{"schema_version":6,"kind":"workflow_runs","request":{"host":"github.com","repository":"github/gh-aw","args":["run","list"]},"payload":[{"databaseId":1}]}`
+	rateLimit := `{"schema_version":6,"kind":"github_api_rate_limit","rate_limit":{"host":"github.com"}}`
 	unknown := `{"schema_version":99,"kind":"future","value":"preserved"}`
-	withoutCreatedAt := `{"schema_version":5,"kind":"run","run":{"run_id":5}}`
+	withoutCreatedAt := `{"schema_version":6,"kind":"run","run":{"run_id":5}}`
 	futureSchemaRun := `{"schema_version":99,"kind":"run","run":{"run_id":7,"created_at":"2026-08-31T00:00:00Z"}}`
 	olderSchemaRun := `{"schema_version":1,"kind":"run","run":{"run_id":8,"created_at":"2026-08-31T00:00:00Z"}}`
 	previous := strings.Join([]string{oldRun, firstIncludedRun, lastIncludedRun, futureRun, workflowRuns, rateLimit, unknown, withoutCreatedAt, futureSchemaRun, olderSchemaRun}, "\n") + "\n"
@@ -582,7 +582,8 @@ func TestLoadCachedLogsJSONLIgnoresIncompatibleSchema(t *testing.T) {
 	data := "{\"schema_version\":0,\"run\":{\"run_id\":41}}\n" +
 		"{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":43}}\n" +
 		"{\"schema_version\":4,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n" +
-		"{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":44}}\n"
+		"{\"schema_version\":5,\"kind\":\"run\",\"run\":{\"run_id\":45}}\n" +
+		"{\"schema_version\":6,\"kind\":\"run\",\"run\":{\"run_id\":44}}\n"
 	require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
 
 	runs, err := loadCachedLogsJSONL(path)

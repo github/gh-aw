@@ -647,12 +647,12 @@ func renderConsoleSteeringNotices(notices []SteeringNotice, unavailable bool) {
 	}
 	fmt.Fprintln(os.Stderr, "  steering_notices:")
 	for _, notice := range notices {
-		line := fmt.Sprintf("    %s %d%%", notice.Type, notice.Threshold)
+		line := fmt.Sprintf("    %s %d%%", sanitizeControlChars(notice.Type), notice.Threshold)
 		if notice.RequestID != "" {
-			line += " request_id=" + notice.RequestID
+			line += " request_id=" + sanitizeControlChars(notice.RequestID)
 		}
 		if notice.Phase != "" && notice.Phase != "agent" {
-			line += " phase=" + notice.Phase
+			line += " phase=" + sanitizeControlChars(notice.Phase)
 		}
 		fmt.Fprintln(os.Stderr, line)
 	}
@@ -672,14 +672,14 @@ func renderConsoleSteeringDeliveries(deliveries []SteeringDelivery) {
 }
 
 func formatSteeringDelivery(delivery SteeringDelivery) string {
-	line := delivery.Type
+	line := sanitizeControlChars(delivery.Type)
 	if delivery.Trigger == steeringTriggerLittleLeft || delivery.Threshold == nil {
 		line += " little left"
 	} else {
 		line += fmt.Sprintf(" %d%%", *delivery.Threshold)
 	}
 	if delivery.Conversation != nil {
-		line += " conversation=" + *delivery.Conversation
+		line += " conversation=" + sanitizeControlChars(*delivery.Conversation)
 	} else {
 		line += " conversation=unknown"
 	}
@@ -687,10 +687,10 @@ func formatSteeringDelivery(delivery SteeringDelivery) string {
 		line += " first"
 	}
 	if delivery.RequestID != "" {
-		line += " request_id=" + delivery.RequestID
+		line += " request_id=" + sanitizeControlChars(delivery.RequestID)
 	}
 	if delivery.Phase != "" && delivery.Phase != "agent" {
-		line += " phase=" + delivery.Phase
+		line += " phase=" + sanitizeControlChars(delivery.Phase)
 	}
 	return line
 }

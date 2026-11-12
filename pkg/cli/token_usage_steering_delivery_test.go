@@ -102,6 +102,7 @@ func TestAnalyzeTokenUsageSteeringDeliveries(t *testing.T) {
 			with("conversation", nil),
 			with("first", "yes"),
 			with("first", nil),
+			map[string]any{"type": "ai_credit", "trigger": "threshold", "threshold": 90, "conversation": "0123456789ab", "first": nil},
 		} {
 			lines = append(lines, steeringDeliverySessionEvent(t, "agent", "req-"+string(rune('a'+i)), nil, delivery))
 		}
@@ -167,6 +168,20 @@ func TestRenderConsoleSteeringDeliveries(t *testing.T) {
 	assert.Contains(t, output, "ai_credit 80% conversation=0123456789ab first request_id=req-2\n")
 	assert.Contains(t, output, "timeout little left conversation=unknown request_id=det-1 phase=detection\n")
 	assert.NotContains(t, output, " 0%")
+}
+
+func TestRenderConsoleSteeringOutputEscapesControlCharacters(t *testing.T) {
+	output := captureStderrForSteeringDeliveries(t, func() {
+		renderConsoleSteeringDeliveries([]SteeringDelivery{
+			{Type: "ai_credit\x1b[2J", Trigger: "threshold", Threshold: new(80), Conversation: new("\x1b]52;c;aGk=\a"), RequestID: "req-\x1b[31mred\x1b[0m", Phase: "det\x1bection"},
+		})
+		renderConsoleSteeringNotices([]SteeringNotice{
+			{Type: "ai_credit\x1b[2J", Threshold: 80, RequestID: "req-\x1b[31mred\x1b[0m", Phase: "det\x1bection"},
+		}, false)
+	})
+	assert.NotContains(t, output, "\x1b")
+	assert.NotContains(t, output, "\a")
+	assert.Contains(t, output, `request_id=req-'\x1b'[31mred'\x1b'[0m`)
 }
 
 func captureStderrForSteeringDeliveries(t *testing.T, render func()) string {

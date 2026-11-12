@@ -225,13 +225,13 @@ func (d *TokenUsageSteeringDelivery) valid() bool {
 	}
 }
 
-// jsonBool decodes a required JSON boolean.
+// jsonBool decodes a required JSON boolean, rejecting a missing value or null.
 func jsonBool(raw json.RawMessage) (bool, bool) {
-	var value bool
-	if len(raw) == 0 || json.Unmarshal(raw, &value) != nil {
+	var value *bool
+	if len(raw) == 0 || json.Unmarshal(raw, &value) != nil || value == nil {
 		return false, false
 	}
-	return value, true
+	return *value, true
 }
 
 // steeringConversation decodes an AWF conversation key: twelve lowercase hex
