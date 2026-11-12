@@ -320,17 +320,19 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 		for _, key := range typeKeys {
 			if _, exists := config[key]; exists {
 				if setutil.Contains(topDefinedTypes, key) {
-					if key == "create-pull-request" && topRawSafeOutputs != nil {
-						if localConfig, ok := topRawSafeOutputs[key].(map[string]any); ok {
-							if importedConfig, ok := config[key].(map[string]any); ok {
-								for _, field := range []string{"expires", "draft"} {
-									if _, defined := localConfig[field]; defined {
-										continue
-									}
-									if value, defined := importedConfig[field]; defined {
-										if _, captured := importedCreatePullRequestDefaults[field]; !captured {
-											importedCreatePullRequestDefaults[field] = value
-										}
+					if key == "create-pull-request" {
+						localConfig, _ := topRawSafeOutputs[key].(map[string]any)
+						if localConfig == nil {
+							localConfig = map[string]any{}
+						}
+						if importedConfig, ok := config[key].(map[string]any); ok {
+							for _, field := range []string{"expires", "draft"} {
+								if _, defined := localConfig[field]; defined {
+									continue
+								}
+								if value, defined := importedConfig[field]; defined {
+									if _, captured := importedCreatePullRequestDefaults[field]; !captured {
+										importedCreatePullRequestDefaults[field] = value
 									}
 								}
 							}
@@ -395,13 +397,15 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 			},
 		})
 		if importedConfig != nil && importedConfig.CreatePullRequests != nil {
-			if localConfig, ok := topRawSafeOutputs["create-pull-request"].(map[string]any); ok {
-				if _, defined := localConfig["expires"]; !defined {
-					result.CreatePullRequests.Expires = importedConfig.CreatePullRequests.Expires
-				}
-				if _, defined := localConfig["draft"]; !defined {
-					result.CreatePullRequests.Draft = importedConfig.CreatePullRequests.Draft
-				}
+			localConfig, _ := topRawSafeOutputs["create-pull-request"].(map[string]any)
+			if localConfig == nil {
+				localConfig = map[string]any{}
+			}
+			if _, defined := localConfig["expires"]; !defined {
+				result.CreatePullRequests.Expires = importedConfig.CreatePullRequests.Expires
+			}
+			if _, defined := localConfig["draft"]; !defined {
+				result.CreatePullRequests.Draft = importedConfig.CreatePullRequests.Draft
 			}
 		}
 	}

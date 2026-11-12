@@ -695,6 +695,22 @@ func TestMergeSafeOutputsCreatePullRequestDefaults(t *testing.T) {
 		assert.Equal(t, "[local] ", result.CreatePullRequests.TitlePrefix)
 	})
 
+	t.Run("shorthand config inherits omitted defaults", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": nil,
+		}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, imported, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Equal(t, 48, result.CreatePullRequests.Expires)
+		assert.Equal(t, strPtr("false"), result.CreatePullRequests.Draft)
+	})
+
 	t.Run("local defaults take precedence", func(t *testing.T) {
 		topConfig := &SafeOutputsConfig{
 			CreatePullRequests: &CreatePullRequestsConfig{
