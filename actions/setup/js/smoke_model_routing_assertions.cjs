@@ -61,11 +61,14 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  *   thresholds in {80, 90, 95, 99}, and each `ai_credit` notice's pre-request
  *   total at or above that share of the budget (order is not checked: AWF
  *   sends the highest pending threshold first); zero threshold notices are
- *   allowed only when T1 passed on a `little_left` delivery and no main-agent
- *   request started (`ai_credits_total - ai_credits_this_response`) at or
- *   above 80% of the budget, because AWF ranks `little_left` just above the
- *   highest threshold already crossed and still sends the 80% notice on the
- *   next request; T3 the final `ai_credits_total` is below the budget, no
+ *   allowed only when T1 passed on a `little_left` delivery, every 2xx
+ *   main-agent request carries numeric `ai_credits_total` and
+ *   `ai_credits_this_response` (otherwise the exception cannot be verified;
+ *   non-2xx requests never reached the model and are ignored), and no
+ *   main-agent request started (`ai_credits_total - ai_credits_this_response`)
+ *   at or above 80% of the budget, because AWF ranks `little_left` just above
+ *   the highest threshold already crossed and still sends the 80% notice on
+ *   the next request; T3 the final `ai_credits_total` is below the budget, no
  *   `ai_credits_limit_exceeded` routing failure, and agent execution
  *   succeeded; T4 every other check passed
  *
@@ -836,13 +839,24 @@ function evaluateSteeringEvidence({ events, requests, routingRecords = [], expec
   // steered by little_left before 80% has no threshold notices, but only if no
   // main-agent request started at or above 80%: AWF ranks little_left just
   // above the highest threshold already crossed, so it still sends the 80%
-  // notice on the next request.
+  // notice on the next request. Every 2xx request must carry accounting.
   const t2Problems = [];
   if (!notices.length && !t1PassedOnLittleLeft) t2Problems.push("no steering notices to check");
   else if (!notices.length) {
     if (!budgetValid) t2Problems.push(budgetProblem);
     else {
       const required = (STEERING_THRESHOLDS[0] / 100) * budget;
+      // A 2xx request without accounting may have started past 80%, so the
+      // exception cannot be verified; non-2xx requests never reached the model.
+      const unaccounted = agentTraffic.filter(request => isSuccessStatus(request?.status) && creditsBefore(request) === undefined);
+      if (unaccounted.length) {
+        t2Problems.push(
+          `no ai_credit@${STEERING_THRESHOLDS[0]} notice, but ${unaccounted.length} 2xx main-agent request(s) lack numeric ai_credits_total/ai_credits_this_response, so they cannot be shown to have started below ${STEERING_THRESHOLDS[0]}% of ${budget}: ${unaccounted
+            .slice(0, MAX_OBSERVED)
+            .map(request => describeNotice(request, ""))
+            .join(", ")}`
+        );
+      }
       const missed = agentTraffic.filter(request => {
         const before = creditsBefore(request);
         return before !== undefined && before + CREDIT_EPSILON >= required;

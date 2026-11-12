@@ -151,13 +151,8 @@ export interface SteeringNotice {
   threshold: 80 | 90 | 95 | 99;
 }
 
-/** One delivery of an AWF steering notice to a conversation; AWF records one per conversation per notice. */
-export interface SteeringDelivery {
+interface SteeringDeliveryBase {
   type: "ai_credit" | "timeout";
-  /** `threshold` when a budget percentage was crossed; `little_left` when only a few requests' worth of credits, or a few minutes, remain. */
-  trigger: "threshold" | "little_left";
-  /** Budget percentage; null exactly when `trigger` is `little_left`. */
-  threshold: 80 | 90 | 95 | 99 | null;
   /**
    * Opaque per-run conversation key; null when AWF could not key the conversation.
    * @pattern ^[0-9a-f]{12}$
@@ -166,6 +161,29 @@ export interface SteeringDelivery {
   /** Whether this was the run's first delivery of the notice. */
   first: boolean;
 }
+
+/** Steering notice delivered because a budget percentage was crossed. */
+export interface SteeringThresholdDelivery extends SteeringDeliveryBase {
+  /** A budget percentage was crossed. */
+  trigger: "threshold";
+  /** Budget percentage that was crossed. */
+  threshold: 80 | 90 | 95 | 99;
+}
+
+/** Steering notice delivered because only a few requests' worth of credits, or a few minutes, remain. */
+export interface SteeringLittleLeftDelivery extends SteeringDeliveryBase {
+  /** Only a few requests' worth of credits, or a few minutes, remain. */
+  trigger: "little_left";
+  /** Always null: no budget percentage applies. */
+  threshold: null;
+}
+
+/**
+ * One delivery of an AWF steering notice to a conversation; AWF records one per conversation per notice.
+ * `threshold` is null exactly when `trigger` is `little_left`.
+ * @discriminator trigger
+ */
+export type SteeringDelivery = SteeringThresholdDelivery | SteeringLittleLeftDelivery;
 
 export interface ModelRoutingData {
   schema?: JsonValue;

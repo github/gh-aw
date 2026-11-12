@@ -112,6 +112,26 @@ describe("Generated session schemas", () => {
     }
   });
 
+  it("pairs AWF steering delivery triggers with their thresholds", () => {
+    const usage = steeringDelivery => unified({ type: "firewall.token_usage", data: { requestId: "req", steeringDelivery } });
+    const delivery = { type: "ai_credit", conversation: "0123456789ab", first: true };
+    for (const valid of [
+      { ...delivery, trigger: "threshold", threshold: 80 },
+      { ...delivery, trigger: "threshold", threshold: 99 },
+      { ...delivery, trigger: "little_left", threshold: null, conversation: null },
+    ]) {
+      expect(validateSession(jsonl([header, usage(valid)]))).toBe(2);
+    }
+    for (const invalid of [
+      { ...delivery, trigger: "threshold", threshold: null },
+      { ...delivery, trigger: "threshold", threshold: 85 },
+      { ...delivery, trigger: "little_left", threshold: 80 },
+      { ...delivery, trigger: "unknown", threshold: null },
+    ]) {
+      expect(() => validateSession(jsonl([header, usage(invalid)]))).toThrow("Invalid session event");
+    }
+  });
+
   it("validates dependency job results with required IDs and native Actions outcomes", () => {
     for (const result of ["success", "failure", "cancelled", "skipped"]) {
       expect(validateSession(jsonl([header, unified({ type: "workflow.job_result", data: { jobId: "custom-job", result, durationMs: 0 } })]))).toBe(2);

@@ -77,6 +77,7 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 	}
 	fixCreatedItemIDSchema(schema)
 	makeOutcomeEvidenceCompletenessOptional(schema)
+	constrainSteeringDeliverySchema(schema)
 	return MarshalOutputSchema(schema)
 }
 
@@ -151,6 +152,59 @@ func fixCreatedItemIDSchema(schema *jsonschema.Schema) {
 	}
 	for _, child := range schema.AllOf {
 		fixCreatedItemIDSchema(child)
+	}
+}
+
+// constrainSteeringDeliverySchema walks the generated schema tree and pairs
+// each steering_deliveries item's trigger with its threshold, matching
+// TokenUsageSteeringDelivery decoding: a threshold trigger carries 80, 90, 95
+// or 99 and a little_left trigger carries a null threshold.
+func constrainSteeringDeliverySchema(schema *jsonschema.Schema) {
+	if schema == nil {
+		return
+	}
+	if deliveries, ok := schema.Properties["steering_deliveries"]; ok && deliveries.Items != nil {
+		item := deliveries.Items
+		if _, hasTrigger := item.Properties["trigger"]; hasTrigger {
+			if _, hasThreshold := item.Properties["threshold"]; hasThreshold {
+				item.OneOf = []*jsonschema.Schema{
+					steeringDeliveryTriggerSchema(steeringTriggerThreshold, &jsonschema.Schema{Type: "integer", Enum: []any{80, 90, 95, 99}}),
+					steeringDeliveryTriggerSchema(steeringTriggerLittleLeft, &jsonschema.Schema{Type: "null"}),
+				}
+			}
+		}
+	}
+	for _, child := range schema.Properties {
+		constrainSteeringDeliverySchema(child)
+	}
+	if schema.Items != nil {
+		constrainSteeringDeliverySchema(schema.Items)
+	}
+	for _, child := range schema.ItemsArray {
+		constrainSteeringDeliverySchema(child)
+	}
+	if schema.AdditionalProperties != nil {
+		constrainSteeringDeliverySchema(schema.AdditionalProperties)
+	}
+	for _, child := range schema.OneOf {
+		constrainSteeringDeliverySchema(child)
+	}
+	for _, child := range schema.AnyOf {
+		constrainSteeringDeliverySchema(child)
+	}
+	for _, child := range schema.AllOf {
+		constrainSteeringDeliverySchema(child)
+	}
+}
+
+func steeringDeliveryTriggerSchema(trigger string, threshold *jsonschema.Schema) *jsonschema.Schema {
+	var value any = trigger
+	return &jsonschema.Schema{
+		Properties: map[string]*jsonschema.Schema{
+			"trigger":   {Const: &value},
+			"threshold": threshold,
+		},
+		Required: []string{"trigger", "threshold"},
 	}
 }
 

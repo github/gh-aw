@@ -314,6 +314,97 @@ func TestGeneratedOutputSchemasAreCurrent(t *testing.T) {
 	}
 }
 
+func TestGeneratedOutputSchemasPairSteeringTriggerAndThreshold(t *testing.T) {
+	t.Parallel()
+
+	threshold := 80
+	placeholder := []SteeringDelivery{{Type: "ai_credit", Trigger: steeringTriggerThreshold, Threshold: &threshold, First: true}}
+	outputs := map[string]any{
+		"audit": AuditData{Overview: OverviewData{}, Metrics: MetricsData{}, DownloadedFiles: []FileInfo{}, SteeringDeliveries: placeholder},
+		"logs":  LogsData{Runs: []RunData{{RunID: 42, SteeringDeliveries: placeholder}}},
+		"logs-jsonl": cachedLogsJSONLRunItemSchema{
+			SchemaVersion: cachedLogsJSONLSchemaVersion,
+			Kind:          cachedLogsJSONLKindRun,
+			Run: cachedLogsJSONLRunData{
+				RunData: RunData{RunID: 42, SteeringDeliveries: placeholder},
+				Audit:   &AuditData{SteeringDeliveries: placeholder},
+			},
+		},
+	}
+	deliveries := []struct {
+		name      string
+		trigger   string
+		threshold any
+		valid     bool
+	}{
+		{name: "threshold with percentage", trigger: "threshold", threshold: 95, valid: true},
+		{name: "little_left with null", trigger: "little_left", threshold: nil, valid: true},
+		{name: "threshold with null", trigger: "threshold", threshold: nil},
+		{name: "threshold with unknown percentage", trigger: "threshold", threshold: 85},
+		{name: "little_left with percentage", trigger: "little_left", threshold: 80},
+	}
+
+	for schemaName, output := range outputs {
+		data, err := GenerateNamedOutputSchema(schemaName)
+		if err != nil {
+			t.Fatalf("generate %s schema: %v", schemaName, err)
+		}
+		var schema jsonschema.Schema
+		if err := json.Unmarshal(data, &schema); err != nil {
+			t.Fatalf("unmarshal %s schema: %v", schemaName, err)
+		}
+		resolved, err := schema.Resolve(&jsonschema.ResolveOptions{})
+		if err != nil {
+			t.Fatalf("resolve %s schema: %v", schemaName, err)
+		}
+		encoded, err := json.Marshal(output)
+		if err != nil {
+			t.Fatalf("marshal %s output: %v", schemaName, err)
+		}
+		for _, delivery := range deliveries {
+			t.Run(schemaName+"/"+delivery.name, func(t *testing.T) {
+				var value any
+				if err := json.Unmarshal(encoded, &value); err != nil {
+					t.Fatalf("unmarshal %s output: %v", schemaName, err)
+				}
+				candidate := map[string]any{"type": "ai_credit", "trigger": delivery.trigger, "threshold": delivery.threshold, "conversation": "0123456789ab", "first": true}
+				if replaced := replaceSteeringDeliveries(value, candidate); replaced == 0 {
+					t.Fatalf("%s output has no steering_deliveries", schemaName)
+				}
+				err := resolved.Validate(value)
+				if delivery.valid && err != nil {
+					t.Errorf("%s schema rejected %s delivery: %v", schemaName, delivery.name, err)
+				}
+				if !delivery.valid && err == nil {
+					t.Errorf("%s schema accepted %s delivery", schemaName, delivery.name)
+				}
+			})
+		}
+	}
+}
+
+// replaceSteeringDeliveries replaces every steering_deliveries array in value
+// with a single candidate delivery and returns the number of arrays replaced.
+func replaceSteeringDeliveries(value any, candidate map[string]any) int {
+	replaced := 0
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if key == "steering_deliveries" {
+				typed[key] = []any{candidate}
+				replaced++
+				continue
+			}
+			replaced += replaceSteeringDeliveries(child, candidate)
+		}
+	case []any:
+		for _, child := range typed {
+			replaced += replaceSteeringDeliveries(child, candidate)
+		}
+	}
+	return replaced
+}
+
 func executeJSONSchemaCommand(args ...string) (stdout string, stderr string, err error) {
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer

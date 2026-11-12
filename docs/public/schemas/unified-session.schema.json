@@ -1339,16 +1339,29 @@
     },
     "SteeringDelivery": {
       "type": "object",
+      "properties": { "trigger": { "enum": ["threshold", "little_left"] } },
+      "required": ["trigger"],
+      "allOf": [
+        { "if": { "properties": { "trigger": { "type": "string", "const": "threshold", "description": "A budget percentage was crossed." } } }, "then": { "$ref": "#/definitions/SteeringThresholdDelivery" } },
+        {
+          "if": { "properties": { "trigger": { "type": "string", "const": "little_left", "description": "Only a few requests' worth of credits, or a few minutes, remain." } } },
+          "then": { "$ref": "#/definitions/SteeringLittleLeftDelivery" }
+        }
+      ],
+      "description": "One delivery of an AWF steering notice to a conversation; AWF records one per conversation per notice. `threshold` is null exactly when `trigger` is `little_left`."
+    },
+    "SteeringLittleLeftDelivery": {
+      "type": "object",
       "properties": {
         "type": { "type": "string", "enum": ["ai_credit", "timeout"] },
-        "trigger": { "type": "string", "enum": ["threshold", "little_left"], "description": "`threshold` when a budget percentage was crossed; `little_left` when only a few requests' worth of credits, or a few minutes, remain." },
-        "threshold": { "type": ["number", "null"], "enum": [80, 90, 95, 99, null], "description": "Budget percentage; null exactly when `trigger` is `little_left`." },
         "conversation": { "type": ["string", "null"], "description": "Opaque per-run conversation key; null when AWF could not key the conversation.", "pattern": "^[0-9a-f]{12}$" },
-        "first": { "type": "boolean", "description": "Whether this was the run's first delivery of the notice." }
+        "first": { "type": "boolean", "description": "Whether this was the run's first delivery of the notice." },
+        "trigger": { "type": "string", "const": "little_left", "description": "Only a few requests' worth of credits, or a few minutes, remain." },
+        "threshold": { "type": "null", "description": "Always null: no budget percentage applies." }
       },
-      "required": ["type", "trigger", "threshold", "conversation", "first"],
+      "required": ["conversation", "first", "threshold", "trigger", "type"],
       "additionalProperties": false,
-      "description": "One delivery of an AWF steering notice to a conversation; AWF records one per conversation per notice."
+      "description": "Steering notice delivered because only a few requests' worth of credits, or a few minutes, remain."
     },
     "SteeringNotice": {
       "type": "object",
@@ -1356,6 +1369,19 @@
       "required": ["type", "threshold"],
       "additionalProperties": false,
       "description": "AWF steering notice delivered on a model request."
+    },
+    "SteeringThresholdDelivery": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["ai_credit", "timeout"] },
+        "conversation": { "type": ["string", "null"], "description": "Opaque per-run conversation key; null when AWF could not key the conversation.", "pattern": "^[0-9a-f]{12}$" },
+        "first": { "type": "boolean", "description": "Whether this was the run's first delivery of the notice." },
+        "trigger": { "type": "string", "const": "threshold", "description": "A budget percentage was crossed." },
+        "threshold": { "type": "number", "enum": [80, 90, 95, 99], "description": "Budget percentage that was crossed." }
+      },
+      "required": ["conversation", "first", "threshold", "trigger", "type"],
+      "additionalProperties": false,
+      "description": "Steering notice delivered because a budget percentage was crossed."
     },
     "UnifiedMessageData": {
       "type": "object",

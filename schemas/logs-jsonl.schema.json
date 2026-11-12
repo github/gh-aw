@@ -3226,7 +3226,43 @@
                       "conversation",
                       "first"
                     ],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "integer",
+                            "enum": [
+                              80,
+                              90,
+                              95,
+                              99
+                            ]
+                          },
+                          "trigger": {
+                            "const": "threshold"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "null"
+                          },
+                          "trigger": {
+                            "const": "little_left"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      }
+                    ]
                   }
                 },
                 "steering_notices_unavailable": {
@@ -3329,7 +3365,43 @@
                   "conversation",
                   "first"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "oneOf": [
+                  {
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "enum": [
+                          80,
+                          90,
+                          95,
+                          99
+                        ]
+                      },
+                      "trigger": {
+                        "const": "threshold"
+                      }
+                    },
+                    "required": [
+                      "trigger",
+                      "threshold"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "threshold": {
+                        "type": "null"
+                      },
+                      "trigger": {
+                        "const": "little_left"
+                      }
+                    },
+                    "required": [
+                      "trigger",
+                      "threshold"
+                    ]
+                  }
+                ]
               }
             },
             "steering_notices_unavailable": {
@@ -6009,7 +6081,43 @@
                       "conversation",
                       "first"
                     ],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "integer",
+                            "enum": [
+                              80,
+                              90,
+                              95,
+                              99
+                            ]
+                          },
+                          "trigger": {
+                            "const": "threshold"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "null"
+                          },
+                          "trigger": {
+                            "const": "little_left"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      }
+                    ]
                   }
                 },
                 "steering_notices_unavailable": {
@@ -6538,7 +6646,43 @@
                           "conversation",
                           "first"
                         ],
-                        "additionalProperties": false
+                        "additionalProperties": false,
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "threshold": {
+                                "type": "integer",
+                                "enum": [
+                                  80,
+                                  90,
+                                  95,
+                                  99
+                                ]
+                              },
+                              "trigger": {
+                                "const": "threshold"
+                              }
+                            },
+                            "required": [
+                              "trigger",
+                              "threshold"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "threshold": {
+                                "type": "null"
+                              },
+                              "trigger": {
+                                "const": "little_left"
+                              }
+                            },
+                            "required": [
+                              "trigger",
+                              "threshold"
+                            ]
+                          }
+                        ]
                       }
                     },
                     "steering_notices_unavailable": {
