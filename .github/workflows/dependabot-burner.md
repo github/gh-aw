@@ -51,6 +51,8 @@ safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:
     max: 1
+  create-pull-request:
+    exclude-lock-yml: true
 timeout-minutes: 20
 imports:
   - shared/mcp-pagination.md
@@ -132,6 +134,10 @@ steps:
           return [...new Set((files || []).map(normalizeManifestFamily))].sort();
         }
 
+        function isCompiledWorkflowLock(filename) {
+          return filename.startsWith('.github/workflows/') && filename.endsWith('.lock.yml');
+        }
+
         function getTriggerPRNumber() {
           if (context.payload.pull_request?.number) {
             return Number(context.payload.pull_request.number);
@@ -171,8 +177,9 @@ steps:
 
             openDependabotPRCount++;
             const changedFiles = await loadPullFiles(pull.number);
-            const manifestFiles = changedFiles.filter((filename) => manifestTargets.has(filename));
-            if (manifestFiles.length === 0 || manifestFiles.length !== changedFiles.length) {
+            const relevantFiles = changedFiles.filter((filename) => !isCompiledWorkflowLock(filename));
+            const manifestFiles = relevantFiles.filter((filename) => manifestTargets.has(filename));
+            if (manifestFiles.length === 0 || manifestFiles.length !== relevantFiles.length) {
               excludedPRs.push({
                 number: pull.number,
                 title: pull.title,
@@ -229,7 +236,7 @@ steps:
         }
 
         const triggerPRNumber = getTriggerPRNumber();
-        const { candidates: openPRs, excludedPRs, openDependabotPRCount } = await listOpenDependabotPRs();
+        let { candidates: openPRs, excludedPRs, openDependabotPRCount } = await listOpenDependabotPRs();
         const recentFailedBurns = await listRecentClosedBurnerPRs();
 
         let triggerPR = openPRs.find((pull) => pull.number === triggerPRNumber) || null;
@@ -239,8 +246,9 @@ steps:
         if (triggerPRNumber) {
           if (!triggerPR) {
             const changedFiles = await loadPullFiles(triggerPRNumber);
-            const manifestFiles = changedFiles.filter((filename) => manifestTargets.has(filename));
-            if (manifestFiles.length > 0 && manifestFiles.length === changedFiles.length) {
+            const relevantFiles = changedFiles.filter((filename) => !isCompiledWorkflowLock(filename));
+            const manifestFiles = relevantFiles.filter((filename) => manifestTargets.has(filename));
+            if (manifestFiles.length > 0 && manifestFiles.length === relevantFiles.length) {
               const pull = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -249,6 +257,9 @@ steps:
               const author = pull.data.user?.login || '';
               const parsed = parseBumpTitle(pull.data.title);
               if (pull.data.state === 'open' && (author === 'dependabot[bot]' || author === 'app/dependabot')) {
+                if (!excludedPRs.some((excluded) => excluded.number === pull.data.number)) {
+                  openDependabotPRCount++;
+                }
                 triggerPR = {
                   number: pull.data.number,
                   title: pull.data.title,
@@ -274,6 +285,9 @@ steps:
               }
               return (pull.manifest_files || []).some((file) => triggerFiles.has(file));
             });
+            if (!selectedPRs.some((pull) => pull.number === triggerPR.number)) {
+              selectedPRs.unshift(triggerPR);
+            }
             selectionReason = 'slash-command-similar-prs';
           } else {
             selectedPRs = [];

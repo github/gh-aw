@@ -106,6 +106,13 @@ test("mixed source and generated manifest PRs are excluded with all paths preser
   assert.deepEqual(result.excluded_prs[0].changed_files, files);
 });
 
+test("compiled workflow lock YAML is ignored during manifest eligibility checks", async () => {
+  const result = await select([pull(1, [".github/workflows/package.json", ".github/workflows/dependabot-burner.lock.yml"])]);
+  assert.deepEqual(result.selected_batch_pr_numbers, [1]);
+  assert.deepEqual(result.selected_batch_dependencies[0].manifest_files, [".github/workflows/package.json"]);
+  assert.match(workflow, /create-pull-request:\n\s+exclude-lock-yml: true/);
+});
+
 test("slash-command grouping still uses only shared generated manifests", async () => {
   const result = await select([pull(1, [".github/workflows/package.json"]), pull(2, [".github/workflows/package.json", ".github/workflows/package-lock.json"]), pull(3, [".github/workflows/requirements.txt"])], 1);
   assert.equal(result.selection_reason, "slash-command-similar-prs");
@@ -129,6 +136,13 @@ test("slash-command fallback cannot admit closed or non-Dependabot PRs", async (
     assert.equal(result.trigger_pr, null);
     assert.deepEqual(result.selected_batch_pr_numbers, []);
   }
+});
+
+test("slash-command fallback ignores compiled workflow lock YAML", async () => {
+  const result = await select([], 1, pull(1, [".github/workflows/package.json", ".github/workflows/dependabot-burner.lock.yml"]));
+  assert.equal(result.trigger_pr.number, 1);
+  assert.equal(result.open_dependabot_pr_count, 1);
+  assert.deepEqual(result.selected_batch_pr_numbers, [1]);
 });
 
 test("truly empty selection stays distinct and exclusion explanations cannot be skipped", async () => {
