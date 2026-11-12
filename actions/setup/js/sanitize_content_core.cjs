@@ -1226,40 +1226,54 @@ function convertXmlTags(s) {
     return /^https:\/\/[\w.-]+(?::\d+)?(\/[^\s<>|]*)?(?:\|[^<>]*)?$/.test(tagContent);
   }
 
-  /**
-   * Finds a tag's closing angle bracket without treating quoted values as boundaries.
-   * An unterminated quote falls back to its first `>` so malformed markup is neutralized.
-   * @param {string} source
-   * @param {number} start
-   * @returns {{end: number, malformed: boolean}}
-   */
-  function findTagEnd(source, start) {
-    let quote = "";
-    let firstQuotedGreaterThan = -1;
-    for (let index = start + 1; index < source.length; index++) {
+  function createTagScanner(source) {
+    const length = source.length;
+    const normal = new Int32Array(length + 1);
+    const expectValue = new Int32Array(length + 1);
+    const unquotedValue = new Int32Array(length + 1);
+    const singleQuotedValue = new Int32Array(length + 1);
+    const doubleQuotedValue = new Int32Array(length + 1);
+    const nextGreaterThan = new Int32Array(length + 1);
+    nextGreaterThan[length] = -1;
+
+    for (let index = length - 1; index >= 0; index--) {
       const character = source[index];
-      if (quote) {
-        if (character === quote) {
-          quote = "";
-        } else if (character === ">" && firstQuotedGreaterThan < 0) {
-          firstQuotedGreaterThan = index;
-        }
-      } else if (character === '"' || character === "'") {
-        quote = character;
+      nextGreaterThan[index] = character === ">" ? index : nextGreaterThan[index + 1];
+
+      normal[index] = character === ">" ? index + 1 : character === "=" ? expectValue[index + 1] : normal[index + 1];
+      if (/\s/.test(character)) {
+        expectValue[index] = expectValue[index + 1];
+        unquotedValue[index] = normal[index + 1];
       } else if (character === ">") {
-        return { end: index, malformed: false };
+        expectValue[index] = index + 1;
+        unquotedValue[index] = index + 1;
+      } else {
+        expectValue[index] = character === "'" ? singleQuotedValue[index + 1] : character === '"' ? doubleQuotedValue[index + 1] : unquotedValue[index + 1];
+        unquotedValue[index] = unquotedValue[index + 1];
       }
+
+      singleQuotedValue[index] = character === "'" ? normal[index + 1] : singleQuotedValue[index + 1] > 0 ? singleQuotedValue[index + 1] : character === ">" ? -(index + 1) : singleQuotedValue[index + 1];
+      doubleQuotedValue[index] = character === '"' ? normal[index + 1] : doubleQuotedValue[index + 1] > 0 ? doubleQuotedValue[index + 1] : character === ">" ? -(index + 1) : doubleQuotedValue[index + 1];
     }
-    return quote && firstQuotedGreaterThan >= 0 ? { end: firstQuotedGreaterThan, malformed: true } : { end: -1, malformed: false };
+
+    return {
+      nextGreaterThan,
+      findTagEnd(start) {
+        const result = normal[start + 1];
+        return result > 0 ? { end: result - 1, malformed: false } : result < 0 ? { end: -result - 1, malformed: true } : { end: -1, malformed: false };
+      },
+    };
   }
 
   /**
    * Applies a transformation to tag-like markup while respecting quoted values.
    * @param {string} source
    * @param {(tagContent: string, match: string, malformed: boolean) => string} transform
+   * @param {boolean} [preserveAutolinks]
    * @returns {string}
    */
-  function replaceTagMarkup(source, transform) {
+  function replaceTagMarkup(source, transform, preserveAutolinks = false) {
+    const scanner = createTagScanner(source);
     let output = "";
     let written = 0;
     for (let index = 0; index < source.length; index++) {
@@ -1267,8 +1281,20 @@ function convertXmlTags(s) {
       const firstCharacter = source[index + 1] === "/" ? source[index + 2] : source[index + 1];
       if (!firstCharacter || !/[A-Za-z!]/.test(firstCharacter)) continue;
 
-      const boundary = findTagEnd(source, index);
-      if (boundary.end < 0) return written ? output + source.slice(written) : source;
+      const firstGreaterThan = scanner.nextGreaterThan[index + 1];
+      if (preserveAutolinks && firstGreaterThan >= 0 && isHttpsAngleBracketAutolink(source.slice(index + 1, firstGreaterThan))) {
+        output += source.slice(written, firstGreaterThan + 1);
+        written = firstGreaterThan + 1;
+        index = firstGreaterThan;
+        continue;
+      }
+
+      const boundary = scanner.findTagEnd(index);
+      if (boundary.end < 0) {
+        output += source.slice(written, index + 1);
+        written = index + 1;
+        continue;
+      }
       const end = boundary.end + 1;
       const match = source.slice(index, end);
       const tagContent = source.slice(index + 1, boundary.end);
@@ -1277,6 +1303,10 @@ function convertXmlTags(s) {
       index = boundary.end;
     }
     return written ? output + source.slice(written) : source;
+  }
+
+  function escapeAngleBrackets(text) {
+    return text.replace(/[<>]/g, character => (character === "<" ? "&lt;" : "&gt;"));
   }
 
   /**
@@ -1322,13 +1352,13 @@ function convertXmlTags(s) {
           attributeEnd = closingQuote < 0 ? tagContent.length : closingQuote + 1;
         } else {
           attributeEnd = valueStart;
-          while (attributeEnd < tagContent.length && !/[\s>"'`<]/.test(tagContent[attributeEnd])) {
+          while (attributeEnd < tagContent.length && !/\s/.test(tagContent[attributeEnd])) {
             attributeEnd++;
           }
         }
       }
 
-      if (/^(?:on\w+|style|title|data-[\w-]+)$/i.test(attributeName)) {
+      if (/^(?:on\w+|style$|title$|data-)/i.test(attributeName)) {
         output += tagContent.slice(written, separatorStart);
         written = attributeEnd;
       }
@@ -1339,22 +1369,26 @@ function convertXmlTags(s) {
 
   // Convert tags inside CDATA sections, then convert the CDATA markers themselves.
   s = s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_match, content) => {
-    const convertedContent = replaceTagMarkup(content, tagContent => `(${tagContent})`);
+    const convertedContent = replaceTagMarkup(content, tagContent => `(${escapeAngleBrackets(tagContent)})`);
     return `(![CDATA[${convertedContent}]])`;
   });
 
   // Convert opening, closing, and self-closing tags while retaining only allowed tags.
   // Malformed quoted markup is always neutralized rather than repaired into an allowed tag.
-  return replaceTagMarkup(s, (tagContent, match, malformed) => {
-    if (malformed) return `(${tagContent})`;
-    if (isHttpsAngleBracketAutolink(tagContent)) return match;
+  return replaceTagMarkup(
+    s,
+    (tagContent, match, malformed) => {
+      if (malformed) return `(${escapeAngleBrackets(tagContent)})`;
 
-    const tagNameMatch = tagContent.match(/^\/?\s*([A-Za-z][A-Za-z0-9]*)/);
-    if (tagNameMatch && allowedTags.includes(tagNameMatch[1].toLowerCase())) {
-      return `<${stripDangerousAttributes(tagContent)}>`;
-    }
-    return `(${tagContent})`;
-  });
+      const tagNameMatch = tagContent.match(/^\/?\s*([A-Za-z][A-Za-z0-9]*)/);
+      const tagNameDelimiter = tagNameMatch && tagContent[tagNameMatch[0].length];
+      if (tagNameMatch && (tagNameDelimiter === undefined || /[\s/]/.test(tagNameDelimiter)) && allowedTags.includes(tagNameMatch[1].toLowerCase())) {
+        return `<${stripDangerousAttributes(tagContent)}>`;
+      }
+      return `(${escapeAngleBrackets(tagContent)})`;
+    },
+    true
+  );
 }
 
 /**
