@@ -634,6 +634,55 @@ func TestBehaviorDefinedEngineDefaultRetentionValidation(t *testing.T) {
 	}
 }
 
+func TestValidateEngineDefinitionDurableConsistencyFailsClosed(t *testing.T) {
+	days := 7
+	def := &EngineDefinition{
+		ID: "invalid-json",
+		Behaviors: &EngineBehaviorDefinition{
+			Durable: &EngineDurableDefinition{DefaultRetentionDays: &days},
+		},
+	}
+
+	err := validateEngineDefinitionDurableConsistency("{", def)
+	require.ErrorContains(t, err, `engine definition "invalid-json": parse engine JSON`)
+}
+
+func TestExplicitDurableKeepsPreviousWorkflowCompatibilityChecks(t *testing.T) {
+	for _, frontmatter := range []map[string]any{
+		{"on": map[string]any{"workflow_call": map[string]any{}}},
+		{"tools": map[string]any{"work-queue": map[string]any{"worker": true}}},
+	} {
+		data := &WorkflowData{
+			EngineConfig: &EngineConfig{
+				Durable: &DurableConfig{RetentionDays: defaultDurableRetentionDays},
+			},
+			RawFrontmatter: frontmatter,
+		}
+		err := NewCompiler().validateEngineDurable(data)
+		if err != nil {
+			require.NotContains(t, err.Error(), "does not support workflow_call or work-queue")
+		}
+	}
+
+	for _, data := range []*WorkflowData{
+		{
+			EngineConfig: &EngineConfig{
+				Durable: &DurableConfig{RetentionDays: defaultDurableRetentionDays},
+			},
+			On: "workflow_call",
+		},
+		{
+			EngineConfig: &EngineConfig{
+				Durable: &DurableConfig{RetentionDays: defaultDurableRetentionDays},
+			},
+			WorkQueuePolicy: &WorkQueuePolicyConfig{},
+		},
+	} {
+		err := NewCompiler().validateEngineDurable(data)
+		require.ErrorContains(t, err, "does not support workflow_call or work-queue")
+	}
+}
+
 func TestEngineDefaultDurableSkipsIncompatibleWorkflowShapes(t *testing.T) {
 	dir := t.TempDir()
 	workflowsDir := filepath.Join(dir, ".github", "workflows")
@@ -670,22 +719,19 @@ concurrency:
 		wantExplicitEr string
 	}{
 		{
-			name:           "workflow_call map trigger",
-			frontmatter:    "on:\n  workflow_call:\n",
-			wantSkipWarn:   "workflow_call",
-			wantExplicitEr: "does not support workflow_call",
+			name:         "workflow_call map trigger",
+			frontmatter:  "on:\n  workflow_call:\n",
+			wantSkipWarn: "workflow_call",
 		},
 		{
-			name:           "workflow_call string trigger",
-			frontmatter:    "on: workflow_call\n",
-			wantSkipWarn:   "workflow_call",
-			wantExplicitEr: "does not support workflow_call",
+			name:         "workflow_call string trigger",
+			frontmatter:  "on: workflow_call\n",
+			wantSkipWarn: "workflow_call",
 		},
 		{
-			name:           "work-queue worker",
-			frontmatter:    "on:\n  workflow_dispatch:\ntools:\n  work-queue:\n    worker: true\n",
-			wantSkipWarn:   "work-queue",
-			wantExplicitEr: "does not support workflow_call or work-queue",
+			name:         "work-queue worker",
+			frontmatter:  "on:\n  workflow_dispatch:\ntools:\n  work-queue:\n    worker: true\n",
+			wantSkipWarn: "work-queue",
 		},
 		{
 			name:           "top-level concurrency group",
@@ -760,7 +806,11 @@ concurrency:
 			explicitSrc := "---\n" + tc.frontmatter + "engine:\n  id: session-agent\n  durable: {}\n" + tc.extraEngine + imports + "---\nRun task.\n"
 			require.NoError(t, os.WriteFile(explicitWf, []byte(explicitSrc), 0o600))
 			err = NewCompiler(WithVersion("dev")).CompileWorkflow(explicitWf)
-			require.ErrorContains(t, err, tc.wantExplicitEr)
+			if tc.wantExplicitEr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantExplicitEr)
+			}
 		})
 	}
 }

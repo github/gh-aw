@@ -873,7 +873,7 @@ on:
     # Accepted formats:
 
     # Format 1: Disable stack protection; run on every pull request in the stack.
-    max-stack: 1
+    max-stack: -1
 
     # Format 2: Run only on the top N pull requests in the stack. Default is 1 (only
     # the latest/top pull request).
@@ -1301,7 +1301,7 @@ on:
 
     # Format 1: Disable stack protection; run on every pull request review in the
     # stack.
-    max-stack: 1
+    max-stack: -1
 
     # Format 2: Run only on pull request reviews for the top N pull requests in the
     # stack. Default is 1 (only the latest/top pull request).
@@ -2751,7 +2751,7 @@ sandbox:
   # Format 2: Set to false to disable the agent sandbox (firewall). Warning: This
   # removes firewall protection but keeps the MCP gateway enabled. Not allowed in
   # strict mode.
-  agent: true
+  agent: false
 
   # Format 3: Sandbox type: 'awf' for Agent Workflow Firewall
   agent: "awf"
@@ -3251,9 +3251,7 @@ engine:
   # can typically be omitted. Supports full model IDs (e.g.,
   # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
   # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-  # main agent engine. For the main agent engine, router values ('router',
-  # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
-  # are rejected for other engines.
+  # main agent engine.
   # (optional)
   model: "example-value"
 
@@ -3301,7 +3299,7 @@ engine:
 
   # Format 2: Disable the implicit cost/auto model-routing default without pinning a
   # model; the existing model variables and fallback model apply.
-  model-routing: true
+  model-routing: false
 
   # Optional model context window metadata for engines that need to register
   # explicit model catalog entries. Supported by the Pi engine when generating its
@@ -3628,7 +3626,7 @@ engine:
     retention-days: 1
 
   # Format 2: Disable durable mode when the selected engine enables it by default.
-  durable: true
+  durable: false
 
   # Engine-specific plugin names to install before launching the engine. Currently
   # used by the Pi engine: each entry is passed to `pi install <extension>`.
@@ -3786,7 +3784,7 @@ engine:
     retention-days: 1
 
   # Format 2: Disable durable mode when the selected engine enables it by default.
-  durable: true
+  durable: false
 
   # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
   # engine registry. Defaults to id when omitted.
@@ -4229,15 +4227,13 @@ engine:
       retention-days: 1
 
     # Format 2: Disable durable mode when the selected engine enables it by default.
-    durable: true
+    durable: false
 
     # Model for this engine, overriding the top-level model. Has sensible defaults and
     # can typically be omitted. Supports full model IDs (e.g.,
     # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
     # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-    # main agent engine. For the main agent engine, router values ('router',
-    # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
-    # are rejected for other engines.
+    # main agent engine.
     # (optional)
     model: "example-value"
 
@@ -4386,7 +4382,7 @@ engine:
 
     # Format 2: Disable the implicit cost/auto model-routing default without pinning a
     # model; the existing model variables and fallback model apply.
-    model-routing: true
+    model-routing: false
 
     # Optional inference provider override for this engine. Defaults to the engine's
     # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
@@ -4440,7 +4436,7 @@ max-tool-calls: "example-value"
 # Format 1: Configuration object
 
 # Format 2: integer
-max-ai-credits: 1
+max-ai-credits: -1
 
 # Format 3: string
 max-ai-credits: "example-value"
@@ -4460,7 +4456,7 @@ max-turn-cache-misses: 1
 # Format 1: Configuration object
 
 # Format 2: integer
-max-daily-ai-credits: 1
+max-daily-ai-credits: -1
 
 # Format 3: string
 max-daily-ai-credits: "example-value"
@@ -10420,6 +10416,7 @@ safe-outputs:
 
     # Format 1: Array of label names
     labels: []
+      # Array items: string
 
     # Format 2: GitHub Actions expression resolving to a comma-separated list of label
     # names (e.g. '${{ inputs.labels }}')
@@ -20166,7 +20163,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable missing tool reporting (false). Missing tool
   # reporting is enabled by default when safe-outputs is configured.
-  report-missing-tool: true
+  report-missing-tool: false
 
   # Enable AI agents to report when required data or context is missing. Used for
   # workflow troubleshooting and data validation.
@@ -20452,7 +20449,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable missing data reporting (false). Missing data
   # reporting is enabled by default when safe-outputs is configured.
-  report-missing-data: true
+  report-missing-data: false
 
   # Enable AI agents to explicitly indicate no action is needed. Used for workflow
   # control flow and conditional logic.
@@ -20720,7 +20717,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable noop output (false). Noop is enabled by default
   # when safe-outputs is configured.
-  noop: true
+  noop: false
 
   # Enable AI agents to publish files (images, charts, reports) to an orphaned git
   # branch for persistent storage and web access.
@@ -22411,7 +22408,7 @@ safe-outputs:
     # Accepted formats:
 
     # Format 1: Disable AI engine for threat detection (only run custom steps)
-    engine: true
+    engine: false
 
     # Format 2: Configuration object
 
@@ -22454,9 +22451,7 @@ safe-outputs:
       # can typically be omitted. Supports full model IDs (e.g.,
       # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
       # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-      # main agent engine. For the main agent engine, router values ('router',
-      # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
-      # are rejected for other engines.
+      # main agent engine.
       # (optional)
       model: "example-value"
 
@@ -22504,7 +22499,7 @@ safe-outputs:
 
       # Format 2: Disable the implicit cost/auto model-routing default without pinning a
       # model; the existing model variables and fallback model apply.
-      model-routing: true
+      model-routing: false
 
       # Optional model context window metadata for engines that need to register
       # explicit model catalog entries. Supported by the Pi engine when generating its
@@ -22831,7 +22826,7 @@ safe-outputs:
         retention-days: 1
 
       # Format 2: Disable durable mode when the selected engine enables it by default.
-      durable: true
+      durable: false
 
       # Engine-specific plugin names to install before launching the engine. Currently
       # used by the Pi engine: each entry is passed to `pi install <extension>`.
@@ -22989,7 +22984,7 @@ safe-outputs:
         retention-days: 1
 
       # Format 2: Disable durable mode when the selected engine enables it by default.
-      durable: true
+      durable: false
 
       # Runtime adapter identifier. Maps to the CodingAgentEngine registered in the
       # engine registry. Defaults to id when omitted.
@@ -23432,15 +23427,13 @@ safe-outputs:
           retention-days: 1
 
         # Format 2: Disable durable mode when the selected engine enables it by default.
-        durable: true
+        durable: false
 
         # Model for this engine, overriding the top-level model. Has sensible defaults and
         # can typically be omitted. Supports full model IDs (e.g.,
         # 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine
         # (e.g. safe-outputs.threat-detection.engine) needs a different model than the
-        # main agent engine. For the main agent engine, router values ('router',
-        # 'router/economy', 'router/balanced', 'router/robust') choose model routing; they
-        # are rejected for other engines.
+        # main agent engine.
         # (optional)
         model: "example-value"
 
@@ -23589,7 +23582,7 @@ safe-outputs:
 
         # Format 2: Disable the implicit cost/auto model-routing default without pinning a
         # model; the existing model variables and fallback model apply.
-        model-routing: true
+        model-routing: false
 
         # Optional inference provider override for this engine. Defaults to the engine's
         # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
@@ -23610,7 +23603,7 @@ safe-outputs:
     engine-timeout: "example-value"
 
     # Format 2: integer
-    engine-timeout: 1
+    engine-timeout: 0
 
     # Detector-only per-attempt max-turns override passed to threat-detect. When
     # omitted, threat-detect falls back to GH_AW_MAX_TURNS (if set) and then to its
@@ -23641,7 +23634,7 @@ safe-outputs:
     # Format 1: Configuration object
 
     # Format 2: integer
-    max-ai-credits: 1
+    max-ai-credits: -1
 
     # Format 3: string
     max-ai-credits: "example-value"
@@ -24602,7 +24595,7 @@ safe-outputs:
 
   # Format 3: Explicitly disable report_incomplete (false). report_incomplete is
   # enabled by default when safe-outputs is configured.
-  report-incomplete: true
+  report-incomplete: false
 
   # Enable AI agents to replace one label with another on GitHub issues or pull
   # requests in a single atomic operation. Ideal for maintaining label-based state

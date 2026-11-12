@@ -117,7 +117,7 @@ func (c *Compiler) durableWorkflowIncompatibility(data *WorkflowData) string {
 	if c.hasExplicitDurableConcurrencyConflict(data) {
 		return "explicit concurrency settings are configured"
 	}
-	if hasWorkflowCallTrigger(data.On) || frontmatterHasWorkflowCallTrigger(data.RawFrontmatter) {
+	if hasWorkflowCallTrigger(data.On) || frontmatterHasTrigger(data.RawFrontmatter["on"], "workflow_call") {
 		return "workflow_call triggers are not supported"
 	}
 	if data.WorkQueuePolicy != nil || isWorkQueueEnabled(data) {
@@ -135,32 +135,6 @@ func (c *Compiler) hasExplicitDurableConcurrencyConflict(data *WorkflowData) boo
 		return true
 	}
 	return data.RawFrontmatter != nil && c.extractConcurrencySection(data.RawFrontmatter) != ""
-}
-
-func frontmatterHasWorkflowCallTrigger(frontmatter map[string]any) bool {
-	if frontmatter == nil {
-		return false
-	}
-	switch on := frontmatter["on"].(type) {
-	case string:
-		return strings.TrimSpace(on) == "workflow_call"
-	case []any:
-		for _, item := range on {
-			if name, ok := item.(string); ok && strings.TrimSpace(name) == "workflow_call" {
-				return true
-			}
-		}
-	case []string:
-		for _, item := range on {
-			if strings.TrimSpace(item) == "workflow_call" {
-				return true
-			}
-		}
-	case map[string]any:
-		_, exists := on["workflow_call"]
-		return exists
-	}
-	return false
 }
 
 func (c *Compiler) emitEngineDefaultDurableSkipWarning(workflowData *WorkflowData, markdownPath string) {
@@ -192,8 +166,13 @@ func (c *Compiler) validateEngineDurable(data *WorkflowData) error {
 	if c.hasExplicitDurableConcurrencyConflict(data) {
 		return errors.New("engine.durable manages workflow concurrency; remove explicit concurrency settings to serialize checkpoint publication")
 	}
-	if hasWorkflowCallTrigger(data.On) || frontmatterHasWorkflowCallTrigger(data.RawFrontmatter) ||
-		data.WorkQueuePolicy != nil || isWorkQueueEnabled(data) {
+	unsupportedTriggerOrWorkQueue := hasWorkflowCallTrigger(data.On) || data.WorkQueuePolicy != nil
+	if data.EngineConfig.Durable.implicit {
+		unsupportedTriggerOrWorkQueue = unsupportedTriggerOrWorkQueue ||
+			frontmatterHasTrigger(data.RawFrontmatter["on"], "workflow_call") ||
+			isWorkQueueEnabled(data)
+	}
+	if unsupportedTriggerOrWorkQueue {
 		return errors.New("engine.durable does not support workflow_call or work-queue workers; use a single workflow invocation")
 	}
 	engine, err := c.getAgenticEngine(data.AI)

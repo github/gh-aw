@@ -26,7 +26,7 @@ func validateEngineDefinitionDurableConsistency(engineJSON string, def *EngineDe
 	}
 	var raw map[string]any
 	if err := jsonutil.UnmarshalString(engineJSON, &raw); err != nil {
-		return nil
+		return fmt.Errorf("engine definition %q: parse engine JSON: %w", def.ID, err)
 	}
 	if durableBool, ok := raw["durable"].(bool); ok && !durableBool {
 		return fmt.Errorf("engine definition %q cannot set engine.durable: false alongside behaviors.durable.default-retention-days", def.ID)

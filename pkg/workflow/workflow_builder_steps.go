@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/goccy/go-yaml"
@@ -249,10 +250,16 @@ func (c *Compiler) processAndMergePostSteps(frontmatter map[string]any, workflow
 func frontmatterHasTrigger(onVal any, trigger string) bool {
 	switch v := onVal.(type) {
 	case string:
-		return v == trigger
+		return strings.TrimSpace(v) == trigger
 	case []any:
 		for _, item := range v {
-			if s, ok := item.(string); ok && s == trigger {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) == trigger {
+				return true
+			}
+		}
+	case []string:
+		for _, item := range v {
+			if strings.TrimSpace(item) == trigger {
 				return true
 			}
 		}

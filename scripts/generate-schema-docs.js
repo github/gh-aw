@@ -129,6 +129,10 @@ function formatComment(text, indent = 0) {
  * Generate YAML example value based on schema type
  */
 function getExampleValue(prop, propName = "") {
+  if (Object.prototype.hasOwnProperty.call(prop, "const")) {
+    return prop.const;
+  }
+
   if (prop.enum && prop.enum.length > 0) {
     return prop.enum[0];
   }

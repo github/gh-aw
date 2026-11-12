@@ -577,11 +577,13 @@ func TestFrontmatterHasTrigger(t *testing.T) {
 	}{
 		// scalar string form: on: pull_request_target
 		{name: "scalar matches", onVal: "pull_request_target", trigger: "pull_request_target", expected: true},
+		{name: "scalar trims whitespace", onVal: " workflow_call ", trigger: "workflow_call", expected: true},
 		{name: "scalar no match", onVal: "push", trigger: "pull_request_target", expected: false},
 		// sequence form: on: [pull_request_target, push]
 		{name: "slice matches first", onVal: []any{"pull_request_target", "push"}, trigger: "pull_request_target", expected: true},
 		{name: "slice matches second", onVal: []any{"push", "pull_request_target"}, trigger: "pull_request_target", expected: true},
 		{name: "slice no match", onVal: []any{"push", "schedule"}, trigger: "pull_request_target", expected: false},
+		{name: "string slice trims whitespace", onVal: []string{" push ", " workflow_call "}, trigger: "workflow_call", expected: true},
 		// mapping form: on:\n  pull_request_target:\n    types: [closed]
 		{name: "map matches", onVal: map[string]any{"pull_request_target": map[string]any{"types": []any{"closed"}}}, trigger: "pull_request_target", expected: true},
 		{name: "map no match", onVal: map[string]any{"push": nil}, trigger: "pull_request_target", expected: false},
