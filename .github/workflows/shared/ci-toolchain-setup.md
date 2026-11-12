@@ -1,43 +1,37 @@
 ---
-# Shared Go and Node.js setup actions for agent job steps.
-# Disable an unused toolchain with the corresponding setup input.
+# Combined Go and Node.js setup for workflows that need both toolchains.
+# Import ci-go-setup.md or ci-node-setup.md directly when only one is needed.
 import-schema:
-  setup-go:
-    type: boolean
-    default: false
   go-cache:
     type: boolean
     default: true
+    description: "Enable setup-go's module cache."
   go-step-name:
     type: string
     default: "Setup Go"
-  setup-node:
-    type: boolean
-    default: false
   node-version:
     type: string
     default: "24"
   node-cache:
     type: string
     default: ""
+    description: "Optional setup-node cache package manager (npm, yarn, or pnpm)."
   node-cache-dependency-path:
     type: string
     default: ""
+    description: "Optional dependency-file path used by setup-node's cache."
   node-step-name:
     type: string
     default: "Setup Node.js"
-steps:
-  - name: ${{ github.aw.import-inputs.go-step-name }}
-    if: ${{ github.aw.import-inputs.setup-go }}
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: ${{ github.aw.import-inputs.go-cache }}
-  - name: ${{ github.aw.import-inputs.node-step-name }}
-    if: ${{ github.aw.import-inputs.setup-node }}
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: ${{ github.aw.import-inputs.node-version }}
-      cache: ${{ github.aw.import-inputs.node-cache }}
-      cache-dependency-path: ${{ github.aw.import-inputs.node-cache-dependency-path }}
+imports:
+  - path: shared/ci-go-setup.md
+    inputs:
+      go-cache: ${{ github.aw.import-inputs.go-cache }}
+      go-step-name: "${{ github.aw.import-inputs.go-step-name }}"
+  - path: shared/ci-node-setup.md
+    inputs:
+      node-version: "${{ github.aw.import-inputs.node-version }}"
+      node-cache: "${{ github.aw.import-inputs.node-cache }}"
+      node-cache-dependency-path: "${{ github.aw.import-inputs.node-cache-dependency-path }}"
+      node-step-name: "${{ github.aw.import-inputs.node-step-name }}"
 ---

@@ -34,6 +34,7 @@ network:
   allowed: [defaults, go, node]
 imports:
   - shared/otlp.md
+  - shared/ci-toolchain-setup.md
 checkout:
   ref: ${{ needs.preflight.outputs.head_sha }}
   fetch-depth: 0
@@ -93,15 +94,6 @@ steps:
         "GH_AW_PR_HEAD_BASE_BRANCH=$PR_HEAD_REF" \
         "GH_AW_PR_HEAD_BASE_REPO=$GITHUB_REPOSITORY" \
         "GH_AW_PR_HEAD_BASE_PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
-  - name: Setup Go
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
 safe-outputs:
   needs: [preflight]
   push-to-pull-request-branch:

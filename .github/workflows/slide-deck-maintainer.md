@@ -31,6 +31,10 @@ imports:
       title-prefix: "[slides] "
       expires: "1d"
   - shared/otlp.md
+  - path: shared/ci-node-setup.md
+    inputs:
+      node-cache: npm
+      node-cache-dependency-path: docs/package-lock.json
 timeout-minutes: 45
 checkout:
   lfs: false
@@ -83,13 +87,6 @@ steps:
         wait_time=$((wait_time * 2))
       done
 
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
-      cache: npm
-      cache-dependency-path: docs/package-lock.json
-  
   - name: Install Marp dependencies
     run: |
       cd docs || exit 1

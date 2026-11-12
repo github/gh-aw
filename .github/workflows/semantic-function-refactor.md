@@ -24,6 +24,9 @@ engine:
 imports:
   - shared/otlp.md
   - shared/reporting.md
+  - path: shared/ci-go-setup.md
+    inputs:
+      go-step-name: Setup Go for analysis inventory
 safe-outputs:
   close-issue:
     required-title-prefix: "[refactor] "
@@ -45,11 +48,6 @@ tools:
   edit: false
 
 steps:
-  - name: Setup Go for analysis inventory
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
   - name: Pre-compute semantic refactor slice
     run: |
       set -euo pipefail

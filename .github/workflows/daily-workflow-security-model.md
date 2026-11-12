@@ -21,14 +21,12 @@ checkout:
   fetch-depth: 0
 imports:
   - shared/tla-plus.md
+  - path: shared/ci-go-setup.md
+    inputs:
+      go-step-name: Setup Go for the compiled-profile verifier
 env:
   PYTHONDONTWRITEBYTECODE: "1"
 steps:
-  - name: Setup Go for the compiled-profile verifier
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
   - name: Build compiled-profile verifier
     run: |
       set -euo pipefail

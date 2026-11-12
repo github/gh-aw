@@ -129,12 +129,9 @@ safe-outputs:
                   return;
                 }
               }
+imports:
+  - shared/ci-go-setup.md
 steps:
-  - name: Setup Go
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
   - name: Install dependencies
     run: make deps-dev
   - name: Install binary as 'gh-aw'

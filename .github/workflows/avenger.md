@@ -94,17 +94,6 @@ steps:
     run: |
       sudo apt-get update
       sudo apt-get install -y make
-  - name: Setup Go
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
-      cache: npm
-      cache-dependency-path: actions/setup/js/package-lock.json
   - name: Install npm dependencies
     run: npm ci
     working-directory: ./actions/setup/js
@@ -124,6 +113,10 @@ timeout-minutes: 45
 imports:
   - shared/otlp.md
   - shared/graders.md
+  - path: shared/ci-toolchain-setup.md
+    inputs:
+      node-cache: npm
+      node-cache-dependency-path: actions/setup/js/package-lock.json
 features:
   gh-aw-detection: true
 evals:

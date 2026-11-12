@@ -13,6 +13,10 @@
 
 imports:
   - ../skills/jqschema/SKILL.md
+  - path: shared/ci-toolchain-setup.md
+    inputs:
+      node-cache: npm
+      node-cache-dependency-path: actions/setup/js/package-lock.json
 
 tools:
   cache-memory: true
@@ -65,19 +69,6 @@ steps:
 
       echo "## CI Summary" >> "$GITHUB_STEP_SUMMARY"
       jq -r '"- runs analyzed: \(.total_runs)\n- avg duration (sec): \(.avg_duration_seconds // "n/a")\n- recent failure records: \(.top_recent_failures | length)"' /tmp/gh-aw/agent/ci-summary.json >> "$GITHUB_STEP_SUMMARY"
-  
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
-      cache: npm
-      cache-dependency-path: actions/setup/js/package-lock.json
-  
-  - name: Setup Go
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
   
   # Pre-flight validation. All steps run non-fatally so the agent can analyze
   # broken CI state instead of the job dying before the agent starts. Each

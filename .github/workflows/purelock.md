@@ -39,6 +39,10 @@ imports:
   - shared/mcp/serena-go.md
   - shared/otlp.md
   - shared/reporting.md
+  - path: shared/ci-go-setup.md
+    inputs:
+      # Sandbox mounts the Go module cache, so avoid setup-go restoring it.
+      go-cache: false
 if: needs.purelock_precompute.outputs.has_candidates == 'true'
 jobs:
   purelock_precompute:
@@ -137,13 +141,6 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 steps:
-  - name: Setup Go
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      # The sandbox mounts the runner's Go module cache, so restoring it again
-      # causes setup-go's tar extraction to fail on existing files.
-      cache: false
   - name: Download PureLock bundle
     uses: actions/download-artifact@v8.0.2
     with:

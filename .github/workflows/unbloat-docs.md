@@ -49,6 +49,10 @@ imports:
       expires: "2d"
       labels: [documentation, automation, doc-unbloat]
       reviewers: [copilot]
+  - path: shared/ci-node-setup.md
+    inputs:
+      node-cache: npm
+      node-cache-dependency-path: docs/package-lock.json
 
 # Network access for documentation best practices research
   - shared/otlp.md
@@ -183,13 +187,6 @@ steps:
       path: .agentics
       persist-credentials: false
       sparse-checkout: workflows
-
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: '24'
-      cache: 'npm'
-      cache-dependency-path: 'docs/package-lock.json'
 
   - name: Install dependencies
     working-directory: ./docs

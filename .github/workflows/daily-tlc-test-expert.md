@@ -25,6 +25,9 @@ network:
   allowed: [defaults, go, node]
 imports:
   - shared/tla-plus.md
+  - path: shared/ci-go-setup.md
+    inputs:
+      go-step-name: Setup Go for implementation tests
 tools:
   github:
     mode: gh-proxy
@@ -38,11 +41,6 @@ runtimes:
   node:
     version: "24"
 steps:
-  - name: Setup Go for implementation tests
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
   - name: Install locked JavaScript test dependencies
     working-directory: actions/setup/js
     run: npm ci --ignore-scripts --no-audit --no-fund

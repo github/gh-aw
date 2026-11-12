@@ -75,12 +75,6 @@ network:
     - node
 
 steps:
-  - name: Setup Node.js for rendering verification
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
-      cache: npm
-      cache-dependency-path: actions/setup/js/package-lock.json
   - name: Install locked JavaScript test dependencies
     working-directory: actions/setup/js
     run: npm ci --ignore-scripts --no-audit --no-fund
@@ -93,6 +87,11 @@ imports:
     with:
       title-prefix: "[rendering-scripts]"
       kind: "pr"
+  - path: shared/ci-node-setup.md
+    inputs:
+      node-cache: npm
+      node-cache-dependency-path: actions/setup/js/package-lock.json
+      node-step-name: Setup Node.js for rendering verification
   - uses: shared/daily-pr-base.md
     with:
       title-prefix: "[rendering-scripts] "

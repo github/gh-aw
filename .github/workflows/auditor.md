@@ -29,6 +29,11 @@ concurrency:
 timeout-minutes: 40
 network:
   allowed: [defaults, go, node]
+imports:
+  - path: shared/ci-toolchain-setup.md
+    inputs:
+      go-step-name: Setup Go for focused regression tests
+      node-step-name: Setup Node.js for focused regression tests
 tools:
   bash: ["*"]
   edit:
@@ -511,15 +516,6 @@ steps:
     with:
       name: auditor-collection
       path: /tmp/gh-aw/auditor
-  - name: Setup Go for focused regression tests
-    uses: actions/setup-go@v7.0.0
-    with:
-      go-version-file: go.mod
-      cache: true
-  - name: Setup Node.js for focused regression tests
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "24"
 ---
 
 # Auditor

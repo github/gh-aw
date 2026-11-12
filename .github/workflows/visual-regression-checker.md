@@ -21,6 +21,10 @@ engine:
 imports:
   - shared/otlp.md
   - shared/reporting.md
+  - path: shared/ci-node-setup.md
+    inputs:
+      node-cache: npm
+      node-cache-dependency-path: docs/package-lock.json
 tools:
   cli-proxy: true
   playwright:
@@ -57,13 +61,6 @@ steps:
       path: .agentics
       persist-credentials: false
       sparse-checkout: workflows
-
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: '24'
-      cache: 'npm'
-      cache-dependency-path: 'docs/package-lock.json'
 
   - name: Install dependencies
     working-directory: ./docs

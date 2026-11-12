@@ -53,10 +53,6 @@ steps:
     with:
       persist-credentials: false
 
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: "22"
 
   - name: Prepare DeepSec workspace
     env:
@@ -108,6 +104,9 @@ steps:
 imports:
   - shared/otlp.md
   - shared/reporting.md
+  - path: shared/ci-node-setup.md
+    inputs:
+      node-version: "22"
 evals:
   - id: deepsec_scan_completed
     question: Did the agent complete the prepared DeepSec scan workflow or explicitly noop when credentials or actionable findings were unavailable?

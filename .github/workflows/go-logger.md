@@ -21,8 +21,6 @@ imports:
 - shared/otlp.md
 - path: shared/ci-toolchain-setup.md
   inputs:
-    setup-go: true
-    setup-node: true
     node-cache: npm
     node-cache-dependency-path: actions/setup/js/package-lock.json
 safe-outputs:

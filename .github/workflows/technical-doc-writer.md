@@ -32,6 +32,10 @@ imports:
 
   - shared/otlp.md
   - shared/reporting.md
+  - path: shared/ci-node-setup.md
+    inputs:
+      node-cache: npm
+      node-cache-dependency-path: docs/package-lock.json
 safe-outputs:
   add-comment:
     max: 1
@@ -51,13 +55,6 @@ safe-outputs:
     run-failure: "✍️ Writer's block! [{workflow_name}]({run_url}) {status}. The page remains blank..."
 
 steps:
-  - name: Setup Node.js
-    uses: actions/setup-node@v7.1.0
-    with:
-      node-version: '24'
-      cache: 'npm'
-      cache-dependency-path: 'docs/package-lock.json'
-
   - name: Install dependencies
     working-directory: ./docs
     run: npm ci
