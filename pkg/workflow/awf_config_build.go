@@ -143,12 +143,13 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	if config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil {
 		enableTokenSteering = *config.WorkflowData.SandboxConfig.Agent.TokenSteering
 	}
-	if maxAICredits < 0 {
+	tokenSteeringDisabledByBudget := maxAICredits < 0
+	if tokenSteeringDisabledByBudget {
 		// Negative signals "disabled" — omit the budget from the AWF config.
 		maxAICredits = 0
 	}
 	var tokenSteeringEnabled *bool
-	if awfSupportsTokenSteering(firewallConfig) && (enableTokenSteering || (config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil)) {
+	if awfSupportsTokenSteering(firewallConfig) && (enableTokenSteering || tokenSteeringDisabledByBudget || (config.WorkflowData != nil && config.WorkflowData.SandboxConfig != nil && config.WorkflowData.SandboxConfig.Agent != nil && config.WorkflowData.SandboxConfig.Agent.TokenSteering != nil)) {
 		tokenSteeringEnabled = &enableTokenSteering
 	}
 

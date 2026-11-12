@@ -126,9 +126,20 @@
           "type": "string",
           "description": "Host path to an additional CA certificate for api-proxy upstream TLS verification. The file is bind-mounted read-only into the sidecar and exposed via NODE_EXTRA_CA_CERTS."
         },
+        "steering": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Steering notices the API proxy injects into agent requests. Each kind of steering has its own key.",
+          "properties": {
+            "budget": {
+              "type": "boolean",
+              "description": "Enable advisory AI-credit and time budget notices. Credit notices use apiProxy.maxAiCredits (or the AI-credit hard cap when unset); time notices use container.agentTimeout. Notices are queued at 80%, 90%, 95%, and 99% of the limit and injected into the next eligible agent request; they do not interrupt running work or guarantee completion. Thresholds, triggers, wording, and placement are fixed. Alias: apiProxy.enableTokenSteering (CLI: --steering-budget / --no-steering-budget, alias --enable-token-steering). Default: true; set to false (CLI: --no-steering-budget) to turn budget notices off."
+            }
+          }
+        },
         "enableTokenSteering": {
           "type": "boolean",
-          "description": "Enable effective token budget steering. When true, the proxy injects budget-warning system messages at 80%, 90%, 95%, and 99% usage to nudge the agent to wrap up, and sets AWF_ENABLE_TOKEN_STEERING=true in the api-proxy sidecar. Set to false (or omit) to opt out. Requires maxEffectiveTokens. Default: false."
+          "description": "Alias for apiProxy.steering.budget. Enables advisory AI-credit and time budget notices. Setting both fields to different values is a configuration error. Default: true; set to false to turn budget notices off."
         },
         "anthropicAutoCache": {
           "type": "boolean",
@@ -159,7 +170,7 @@
         "maxAiCredits": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "Maximum cumulative AI credits allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. AWF always enforces an operator-controlled hard cap, defaulting to 10,000 accounted AI credits. Set AWF_AI_CREDITS_HARD_CAP in the host environment or api-proxy container to a positive finite number to lower or raise it; unset, empty, invalid, nonpositive, or non-finite values retain the default. Values above the hard cap are effectively clamped, and the agent cannot raise or disable it."
+          "description": "Maximum cumulative AI credits allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. With apiProxy.steering.budget, advisory notices are queued at 80%, 90%, 95%, and 99% of the effective limit. AWF always enforces an operator-controlled hard cap, defaulting to 10,000 accounted AI credits. Set AWF_AI_CREDITS_HARD_CAP in the host environment or api-proxy container to a positive finite number to lower or raise it; unset, empty, invalid, nonpositive, or non-finite values retain the default. Values above the hard cap are effectively clamped, and the agent cannot raise or disable it."
         },
         "defaultAiCreditsPricing": {
           "type": "object",
@@ -729,7 +740,7 @@
         "agentTimeout": {
           "type": "integer",
           "minimum": 1,
-          "description": "Maximum time (in minutes) the agent command is allowed to run."
+          "description": "Maximum time (in minutes) the agent command is allowed to run. With apiProxy.steering.budget, advisory notices are queued at 80%, 90%, 95%, and 99% of the runtime deadline."
         },
         "enableDind": {
           "type": "boolean",
