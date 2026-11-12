@@ -84,7 +84,7 @@ const scopedRequire = name => {
 const result = new Function("require", "item", "temporaryIdMap", script)(scopedRequire, item, {});
 process.stdout.write(JSON.stringify(result));
 `)
-	command.Env = []string{"RUNNER_TEMP=" + root}
+	command.Env = []string{"RUNNER_TEMP=" + root, connectorEnvPrefix("datadog") + "PLAN=" + data.Connectors["datadog"].SafeOutputPlan}
 	command.Stdin = strings.NewReader(string(input))
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, "%s", output)

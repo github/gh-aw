@@ -119,6 +119,39 @@ describe("minimum title length", () => {
 });
 
 describe("compiler-frozen connector snapshots", () => {
+  it("verifies readable JSON without evaluating expressions or template literals", () => {
+    const doc = document();
+    doc.binding.definition = "literal ${{ secrets.DO_NOT_EVALUATE }} ${notJavaScript} `backticks` <spec>&\u2028.md";
+    doc.spec.safeOutputs.operation.responseChecks = { "/version": 1.5 };
+    const raw = Buffer.from(encode(doc), "base64").toString("utf8");
+    const readable = JSON.stringify(JSON.parse(raw), null, 2).replaceAll("${", "\\u0024{").replaceAll("`", "\\u0060");
+    const decoded = decodePlan(readable);
+    expect(decoded.binding.definition).toBe(doc.binding.definition);
+    expect(decoded.digest).toBe(decodePlan(encode(doc)).digest);
+    expect(() => decodePlan(readable.replace("/records/{record}", "/different"))).toThrow(/digest mismatch/);
+  });
+
+  it("preserves exact numeric tokens when verifying formatted JSON", () => {
+    const doc = document("safe-output", { responseChecks: { "/version": 1 } });
+    const spec = goJSON(doc.spec).replace('"/version":1', '"/version":1.0');
+    const connection = goJSON(doc.connection);
+    const binding = goJSON(doc.binding);
+    const digest = createHash("sha256").update(`{"Spec":${spec},"Connection":${connection},"Binding":${binding}}`).digest("hex");
+    const readable = `{\n  "digest": "${digest}",\n  "spec": ${spec},\n  "connection": ${connection},\n  "binding": ${binding}\n}`;
+    expect(decodePlan(readable).digest).toBe(digest);
+    expect(() => decodePlan(readable.replace('"/version":1.0', '"/version":1'))).toThrow(/digest mismatch/);
+  });
+
+  it("bounds readable snapshots by UTF-8 bytes, not string length", () => {
+    const raw = Buffer.from(encode(document()), "base64").toString("utf8");
+    const boundary = " ".repeat(65536 - Buffer.byteLength(raw)) + raw;
+    expect(decodePlan(boundary).spec.id).toBe("example.com/issues");
+    expect(() => decodePlan(boundary + " ")).toThrow(/byte bound/);
+    const multibyte = boundary.replace("approved", "approvéd");
+    expect(multibyte.length).toBeLessThanOrEqual(65536);
+    expect(() => decodePlan(multibyte)).toThrow(/byte bound/);
+  });
+
   it("verifies raw Go value slices, including map order and HTML escaping", () => {
     const doc = document();
     doc.binding.definition = "<spec>&\u2028.md";
