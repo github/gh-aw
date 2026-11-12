@@ -37,6 +37,18 @@ func TestCompilerCacheModeSchema(t *testing.T) {
 	}
 }
 
+func TestCompilerIssuesStatusChangedSchema(t *testing.T) {
+	t.Parallel()
+	statusChanged := "on:\n  issues:\n    types: [status_changed]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: [{run: echo hi}]\n"
+	require.NoError(t, ValidateWorkflowWithCacheMode("issues.yml", statusChanged))
+
+	_, err := ParseWorkflow("upstream.yml", statusChanged)
+	require.ErrorContains(t, err, "status_changed")
+
+	statusChange := "on:\n  issues:\n    types: [status_change]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: [{run: echo hi}]\n"
+	require.Error(t, ValidateWorkflowWithCacheMode("issues.yml", statusChange))
+}
+
 func TestCompilerCacheModePreservesValidation(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
