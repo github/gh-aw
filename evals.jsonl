@@ -1,0 +1,2 @@
+{"id":"directory-size-map","question":"Does the proposed report show directory size distribution using proportionally scaled ASCII bars?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-13T12:44:50.113Z","runid":"43426713916"}
+{"id":"metadata-only-scope","question":"Does the agent output show that repository statistics exclude .git and package-manager directories?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-13T12:44:50.113Z","runid":"43426713916"}
