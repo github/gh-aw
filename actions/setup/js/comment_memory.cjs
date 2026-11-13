@@ -39,18 +39,18 @@ function sanitizeMemoryID(memoryID) {
 }
 
 /** @returns {import("./report_ast.cjs").ReportBlock} */
-function buildCollapsedMemorySection(rawBody, memoryID, memoryTag) {
+function buildCollapsedMemorySection(rawBody, memoryID, memoryTag, memoryBlock) {
   return {
     type: "details",
     summary: `Peek at saved memory (${memoryID})`,
     agentTainted: false,
-    children: [{ type: "code_block", language: `${memoryTag}:${memoryID}`, fenceLength: 6, value: sanitizeContent(rawBody), agentTainted: true, sizeProtected: true }],
+    children: [memoryBlock || { type: "code_block", language: `${memoryTag}:${memoryID}`, fenceLength: 6, value: sanitizeContent(rawBody), agentTainted: true, sizeProtected: true }],
   };
 }
 
 /** @returns {import("./report_ast.cjs").Report} */
 function buildManagedMemoryReport(rawBody, memoryID, options) {
-  const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber, memoryTag = COMMENT_MEMORY_TAG } = options;
+  const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber, memoryTag = COMMENT_MEMORY_TAG, memoryBlock } = options;
   if (!/^[a-zA-Z0-9_-]+$/.test(memoryID)) {
     throw new Error(`${SAFE_OUTPUT_E001}: memory_id must contain only alphanumeric characters, hyphens, and underscores`);
   }
@@ -72,7 +72,7 @@ function buildManagedMemoryReport(rawBody, memoryID, options) {
   const children = [
     ...markdownParts.detectionCaution,
     { type: "heading", level: 3, agentTainted: false, children: [{ type: "text", value: "Comment Memory", agentTainted: false }] },
-    buildCollapsedMemorySection(rawBody, memoryID, memoryTag),
+    buildCollapsedMemorySection(rawBody, memoryID, memoryTag, memoryBlock),
   ];
 
   const tracker = getTrackerID("markdown");

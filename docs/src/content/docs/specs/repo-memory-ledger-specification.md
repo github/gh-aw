@@ -162,13 +162,17 @@ tools:
 ```
 
 Both backends use the same ledger operations, transaction validation,
-deterministic IDs, canonical record DAG, and read-only SQLite projections.
+deterministic IDs, canonical record DAG, and built-in replay validation.
+Comment-backed history MUST remain readable JSONL, both in persisted comments
+and in the read-only `/tmp/gh-aw/ledgers/<name>/ledger.jsonl` file exposed to the
+agent. It MUST NOT be stored as base64 or exposed as a binary SQLite database.
+Git-backed ledgers retain their existing disposable SQLite query projections.
 Comment-backed persistence MUST run only in the trusted persistence job, using
 the configured comment-memory token, target repository, and repository allowlist.
 The target MUST be `triggering`, `*`, or a literal positive issue/PR number;
 `target-repo` MUST be literal. Staged runs MUST NOT publish ledger comments.
 
-Each accepted batch creates a new managed comment containing a base64-encoded
+Each accepted batch creates a new managed comment containing a plain JSONL
 canonical shard under a `gh-aw-comment-ledger:<ledger-name>` code fence.
 The separate marker prevents ordinary editable comment-memory files from
 overwriting ledger history. Persistence MUST NOT update or delete prior ledger
@@ -179,7 +183,7 @@ MUST coordinate externally.
 GitHub Actions concurrency may replace pending jobs; workloads requiring every
 queued run to persist SHOULD serialize the entire workflow upstream.
 
-The existing comment-memory limits apply to encoded shards: 16 KiB per batch
+The existing comment-memory limits apply to JSONL shards: 16 KiB per batch
 and 48 KiB total per ledger. Readers MUST fail on malformed shards or incomplete
 history, including the 50-page comment scan limit. Comment storage does not
 support compaction; explicit enabled compaction MUST be rejected. Larger or

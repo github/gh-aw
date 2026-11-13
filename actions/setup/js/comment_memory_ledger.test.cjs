@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { Ledger } from "./ledger_store.cjs";
+import { replayBuiltin } from "./ledger_builtin.cjs";
 import { materializeCommentLedger, persistCommentLedgerAppends, LEDGER_TAG } from "./comment_memory_ledger.cjs";
 import { extractCommentMemoryEntries, COMMENT_MEMORY_MAX_FILE_BYTES } from "./comment_memory_helpers.cjs";
 import { createProjection } from "./create_ledger_projection.cjs";
@@ -57,7 +58,7 @@ function remote() {
 }
 
 test.each([
-  ["log", [{ operation: "append", value: { text: "@user <tag> `fence` \u00e9" } }], "state", 1],
+  ["log", [{ operation: "append", value: { text: "@user <tag> \n``````\n</details> \u00e9" } }], "state", 1],
   [
     "set",
     [
@@ -88,7 +89,7 @@ test.each([
     1,
   ],
   ["notes", [{ operation: "note", subject: "Parser", note: "A note", reason: "Evidence", citations: [{ type: "repository", path: "pkg/parser/parser.go", start_line: 1 }] }], "notes", 1],
-])("comment-backed %s reuses transaction validation, persistence and SQLite replay", async (type, operations, table, count) => {
+])("comment-backed %s persists readable JSONL and reuses validation and replay without SQLite", async (type, operations, table, count) => {
   const definition = { ...config, type, ...(type === "table" ? { key: "key" } : {}) };
   const { githubClient, comments } = remote();
   const appends = requests(definition, operations);
@@ -98,7 +99,11 @@ test.each([
   assert.match(first.url, /issuecomment-1$/);
   assert.equal(comments.length, 1);
   assert.deepEqual(extractCommentMemoryEntries(comments[0].body), []);
-  assert.equal(extractCommentMemoryEntries(comments[0].body, undefined, LEDGER_TAG).length, 1);
+  const entries = extractCommentMemoryEntries(comments[0].body, undefined, LEDGER_TAG);
+  assert.equal(entries.length, 1);
+  const publishedRecords = entries[0].content.split("\n").map(line => JSON.parse(line));
+  assert.equal(publishedRecords.length, appends.length);
+  assert.equal(publishedRecords[0].version, 1);
   const retry = await persistCommentLedgerAppends(options);
   assert.equal(retry.persisted, 0);
   assert.equal(retry.already_present, appends.length);
@@ -106,16 +111,27 @@ test.each([
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "comment-ledger-test-"));
   try {
     await materializeCommentLedger({ githubClient, config: definition, sourceDir: root, commentMemoryConfig });
-    const databasePath = path.join(root, "ledger.db");
-    createProjection({ sourceDir: root, databasePath, config: definition });
-    const database = new DatabaseSync(databasePath, { readOnly: true });
+    const jsonlPath = path.join(root, "ledger.jsonl");
+    const originalProject = Ledger.prototype.project;
+    Ledger.prototype.project = () => {
+      throw new Error("Comment-backed ledgers must not create SQLite databases");
+    };
     try {
-      assert.equal(database.prepare(`SELECT count(*) AS n FROM ${table}`).get().n, count);
-      assert.equal(database.prepare("SELECT count(*) AS n FROM records").get().n, appends.length);
-      if (type === "log") assert.deepEqual(JSON.parse(database.prepare("SELECT value FROM state").get().value), operations[0].value);
+      createProjection({ sourceDir: root, jsonlPath, config: definition });
     } finally {
-      database.close();
+      Ledger.prototype.project = originalProject;
     }
+    const records = fs
+      .readFileSync(jsonlPath, "utf8")
+      .trimEnd()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    assert.equal(records.length, appends.length);
+    assert.equal(fs.statSync(jsonlPath).mode & 0o777, 0o444);
+    assert.equal(fs.existsSync(path.join(root, "ledger.db")), false);
+    const replay = replayBuiltin(definition, records);
+    assert.equal(replay.tables[table].rows.length, count);
+    if (type === "log") assert.deepEqual(JSON.parse(replay.tables.state.rows[0].value), operations[0].value);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -163,7 +179,7 @@ test("full comment scans and aggregate history limits cannot silently discard ea
   const { githubClient, comments } = remote();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "comment-ledger-limits-"));
   try {
-    for (let index = 0; index < 8; index++) {
+    for (let index = 0; index < 11; index++) {
       await persistCommentLedgerAppends({
         appends: requests(config, [{ operation: "append", value: "x".repeat(4000) }], `batch-${index}:1`),
         config,
@@ -180,7 +196,7 @@ test("full comment scans and aggregate history limits cannot silently discard ea
       }),
       /comment-memory size limits/
     );
-    assert.equal(comments.length, 8);
+    assert.equal(comments.length, 11);
     let pages = 0;
     githubClient.rest.issues.listComments = async () => {
       pages++;
@@ -213,6 +229,20 @@ test("size limits and staged mode fail closed without publishing records", async
   assert.equal(comments.length, 0);
 });
 
+test("publication cannot silently change hashed JSONL records", async () => {
+  const { githubClient, comments } = remote();
+  await assert.rejects(
+    persistCommentLedgerAppends({
+      appends: requests(config, [{ operation: "append", value: "invisible\u200btext" }]),
+      config,
+      githubClient,
+      commentMemoryConfig,
+    }),
+    /changed by publication sanitization/
+  );
+  assert.equal(comments.length, 0);
+});
+
 test("missing targets, cross-repository denial, corrupt history and API errors are not empty-ledger fallbacks", async () => {
   const { githubClient, comments } = remote();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "comment-ledger-errors-"));
@@ -223,7 +253,7 @@ test("missing targets, cross-repository denial, corrupt history and API errors a
     global.context.payload = { issue: { number: 42 } };
     await assert.rejects(materializeCommentLedger({ ...options, commentMemoryConfig: { "target-repo": "other/repo" } }), /No allowlist/);
     comments.push({ body: `<!-- gh-aw-agentic-workflow: test -->\n\`\`\`\`\`\`${LEDGER_TAG}:history\ncorrupt\n\`\`\`\`\`\`` });
-    await assert.rejects(materializeCommentLedger(options), /Invalid comment-backed ledger encoding/);
+    await assert.rejects(materializeCommentLedger(options), /Invalid comment-backed ledger JSONL shard/);
     comments.length = 0;
     githubClient.rest.issues.createComment = async () => {
       throw new Error("Permission denied");
