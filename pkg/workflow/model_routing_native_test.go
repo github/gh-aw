@@ -336,7 +336,7 @@ func TestNativeRoutingSmokeEvidence(t *testing.T) {
 		credential string
 	}{
 		{name: "smoke-claude-routed-anthropic", provider: "anthropic", candidates: []any{"claude-sonnet-5"}, endpoint: `mainEndpoint: "/v1/messages"`, credential: "ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}"},
-		{name: "smoke-codex-routed-openai", provider: "openai", candidates: []any{"gpt-5.4"}, endpoint: `mainEndpoint: "/responses"`, credential: "CODEX_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}"},
+		{name: "smoke-codex-routed-openai", provider: "openai", candidates: []any{"gpt-5.4*"}, endpoint: `mainEndpoint: "/responses"`, credential: "CODEX_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := filepath.Join("..", "..", ".github", "workflows")
