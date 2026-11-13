@@ -32,6 +32,8 @@ const require = createRequire(import.meta.url);
 const { COMMENT_PREAMBLE } = require("./issue_body.cjs");
 const { renderReport } = require("./report_ast.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { buildSafeOutputOutcomes } = require("./safe_output_outcomes.cjs");
+const { generateSafeOutputSummary } = require("./safe_output_summary.cjs");
 
 function renderedCommentMessage(message) {
   return {
@@ -203,6 +205,67 @@ describe("Safe Output Handler Manager", () => {
     });
 
     describe("merge decision audit", () => {
+      it.each([false, true].flatMap(deferred => [false, true].map(throws => ({ deferred, throws }))))("minimizes raw merge errors (deferred=$deferred, throws=$throws)", async ({ deferred, throws }) => {
+        const privateError = "private-repository-context\n::error::forged-log credential=opaque-value";
+        const handler = vi.fn();
+        if (throws) handler.mockRejectedValue(new Error(privateError));
+        else handler.mockResolvedValue({ success: false, error: privateError, failure_reasons: [{ code: "merge_operation_error", message: privateError }], decision_evidence: { privateError } });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0]).toMatchObject({ success: false, error: "merge_pull_request failed" });
+        expect(JSON.stringify(result)).not.toContain(privateError);
+        for (const log of [global.core.info, global.core.error, global.core.warning, global.core.debug]) expect(JSON.stringify(log.mock.calls)).not.toContain("private-repository-context");
+        expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
+      it.each(
+        [false, true].flatMap(deferred =>
+          [
+            "E007: Missing check producer evidence for required check",
+            "E007: Unexpected check producer for required check",
+            "E007: Ambiguous check producers for required check",
+            "merge_pull_request gate checks failed",
+            ...[405, 409, 422].map(status => `E007: GitHub rejected the merge request (HTTP ${status}); the merge was not retried`),
+          ].map(error => ({
+            deferred,
+            error,
+          }))
+        )
+      )("preserves fixed merge rejection diagnostics (deferred=$deferred, error=$error)", async ({ deferred, error }) => {
+        const handler = vi.fn().mockResolvedValue({ success: false, error });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0]).toMatchObject({ success: false, error });
+        expect(global.core.error).toHaveBeenCalledWith(expect.stringContaining(`failed: ${error}`));
+        expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
+      it.each([false, true])("does not preserve private suffixes on fixed diagnostics (deferred=%s)", async deferred => {
+        const handler = vi.fn().mockResolvedValue({ success: false, error: "E007: Unexpected check producer for required check\nprivate-repository-context" });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0]).toMatchObject({ success: false, error: "merge_pull_request failed" });
+        expect(JSON.stringify(result)).not.toContain("private-repository-context");
+        expect(JSON.stringify(global.core.error.mock.calls)).not.toContain("private-repository-context");
+      });
+
+      it.each([false, true])("preserves indeterminate merge outcomes without leaking error text (deferred=%s)", async deferred => {
+        const handler = vi.fn().mockResolvedValue({
+          success: false,
+          merged: null,
+          operation_outcome: "indeterminate",
+          error: "private raw transport details",
+          failure_reasons: [{ code: "merge_outcome_indeterminate" }],
+        });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0].result).toMatchObject({ merged: null, operation_outcome: "indeterminate", audit_recorded: true });
+        expect(result.results[0].error).toContain("indeterminate");
+        expect(JSON.stringify(result)).not.toContain("private raw");
+        expect(computeSafeOutputsStatus(result.results)).toMatchObject({ status: "failure", itemsApplied: 0 });
+        expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
       it.each([false, true])("surfaces audit write failures without retrying an executed merge (deferred: %s)", async deferred => {
         const decision = {
           success: true,
@@ -794,6 +857,19 @@ describe("Safe Output Handler Manager", () => {
   });
 
   describe("loadHandlers", () => {
+    it("does not publish raw merge authentication failures during initialization", async () => {
+      const original = global.getOctokit;
+      global.getOctokit = vi.fn().mockRejectedValue(new Error("private-auth-context credential=opaque-value"));
+      try {
+        await loadHandlers({ merge_pull_request: { allowed_base_branches: ["integration"], "github-token": "opaque-value" } });
+        expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("merge_pull_request handler initialization failed"));
+        expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("private-auth-context");
+        expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("opaque-value");
+      } finally {
+        global.getOctokit = original;
+      }
+    });
+
     // These tests are skipped because they require actual handler modules to exist
     // In a real environment, handlers are loaded dynamically via require()
     it.skip("should load handlers for enabled safe output types", async () => {
@@ -1173,6 +1249,47 @@ describe("Safe Output Handler Manager", () => {
   });
 
   describe("processMessages", () => {
+    it.each([false, true])("preserves non-merge indeterminate failures in summaries and persisted outcomes (deferred=%s)", async deferred => {
+      const handler = vi.fn().mockResolvedValue({
+        success: false,
+        operation_outcome: "indeterminate",
+        error: "Operation could not be confirmed",
+      });
+      if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+
+      const result = await processMessages(new Map([["add_comment", handler]]), [{ type: "add_comment", body: "Comment" }]);
+
+      expect(result.results[0]).toMatchObject({
+        success: false,
+        result: { operation_outcome: "indeterminate" },
+      });
+      expect(computeSafeOutputsStatus(result.results)).toMatchObject({ status: "failure", itemsApplied: 0 });
+      expect(generateSafeOutputSummary({ ...result.results[0], message: { type: "add_comment", body: "Comment" } })).toContain("**Operation outcome: indeterminate.**");
+      expect(buildSafeOutputOutcomes(result.results)).toEqual([expect.objectContaining({ type: "add_comment", status: "failed", operation_outcome: "indeterminate" })]);
+      expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+    });
+
+    it.each(["indeterminate", "unrecognized"])("only retains the allowlisted marker from initial non-merge failure results (%s)", async operationOutcome => {
+      const handler = vi.fn().mockResolvedValue({
+        success: false,
+        operation_outcome: operationOutcome,
+        error: "Operation could not be confirmed",
+        private_api_response: { body: "private response details" },
+        url: "https://github.com/owner/repo/issues/123",
+      });
+
+      const result = await processMessages(new Map([["add_comment", handler]]), [{ type: "add_comment", body: "Comment" }]);
+
+      expect(result.results[0]).toEqual({
+        type: "add_comment",
+        messageIndex: 0,
+        success: false,
+        error: "Operation could not be confirmed",
+        ...(operationOutcome === "indeterminate" ? { result: { operation_outcome: "indeterminate" } } : {}),
+      });
+      expect(JSON.stringify(result)).not.toContain("private response details");
+    });
+
     it("should process messages in order of appearance", async () => {
       const messages = [
         { type: "add_comment", body: "Comment" },

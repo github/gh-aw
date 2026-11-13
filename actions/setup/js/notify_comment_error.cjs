@@ -18,6 +18,7 @@ const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { normalizeReportAllowedURL } = require("./report_ast.cjs");
 const { buildNoopConclusionSummary } = require("./conclusion_summary.cjs");
+const { generateHistoryUrl } = require("./generate_history_link.cjs");
 
 /**
  * Collect generated asset URLs from safe output jobs
@@ -280,6 +281,13 @@ async function main() {
   const triggeringIssueNumber = context.payload?.issue?.number;
   const triggeringPRNumber = context.payload?.pull_request?.number;
   const triggeringDiscussionNumber = context.payload?.discussion?.number;
+  const historyUrl = generateHistoryUrl({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    itemType: "comment",
+    workflowId: process.env.GH_AW_WORKFLOW_ID || "",
+    serverUrl: context.serverUrl,
+  });
   const markdownParts = assembleReportBodyParts({
     includeFooter: true,
     workflowName,
@@ -289,6 +297,7 @@ async function main() {
     triggeringIssueNumber,
     triggeringPRNumber,
     triggeringDiscussionNumber,
+    historyUrl: historyUrl || undefined,
   });
   const sanitizedMessage = renderSizedReport({ type: "report", title: "Workflow status", children: [...children, ...markdownParts.footer] }).body;
 

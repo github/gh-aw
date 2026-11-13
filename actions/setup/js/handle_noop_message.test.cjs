@@ -216,12 +216,59 @@ safe-outputs:
       await main();
 
       const body = mockGithub.rest.issues.createComment.mock.calls[0][0].body;
+      const completionBody = mockCore.setOutput.mock.calls.find(call => call[0] === "noop_comment_body")[1];
       expect(body).toContain("**Outcome:** `reported_no_action`");
       expect(body).toContain("does not verify");
       expect(body).not.toContain(message);
       expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain(message);
+      expect(body.match(/> Generated from /g)).toHaveLength(1);
+      expect(completionBody).not.toMatch(/Generated (?:by|from)/);
     }
   );
+
+  it("reads one shared no-op template for distinct completion and tracker bodies", async () => {
+    process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
+    process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "noop", message: "private noop prose" }] }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
+    mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+      data: { total_count: 1, items: [{ number: 42, node_id: "ID", html_url: "url" }] },
+    });
+    mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
+
+    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    await main();
+
+    expect(fs.readFileSync.mock.calls.filter(([filePath]) => String(filePath).endsWith("noop_comment.md"))).toHaveLength(1);
+    const completionBody = mockCore.setOutput.mock.calls.find(call => call[0] === "noop_comment_body")[1];
+    const trackerBody = mockGithub.rest.issues.createComment.mock.calls[0][0].body;
+    expect(trackerBody).toContain(completionBody);
+    expect(trackerBody.match(/> Generated from /g)).toHaveLength(1);
+    expect(trackerBody).toContain("[Test Workflow](https://github.com/test-owner/test-repo/actions/runs/123)");
+    expect(completionBody).not.toContain("Generated from");
+    expect(trackerBody).not.toContain("private noop prose");
+  });
+
+  it("preserves an exact-limit completion export when the attributed tracker body cannot fit", async () => {
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "noop", message: "private noop prose" }] }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
+    mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+      data: { total_count: 1, items: [{ number: 42, node_id: "ID", html_url: "url" }] },
+    });
+    const readFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn((filePath, encoding) => (String(filePath).endsWith("noop_comment.md") ? "x".repeat(65000) : readFileSync(filePath, encoding)));
+
+    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    await main();
+
+    expect(mockCore.setOutput).toHaveBeenCalledWith("noop_comment_body", "x".repeat(65000));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not render no-op comment body"));
+    expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+  });
 
   it.each(["cancelled", "skipped", "", "private unknown status"])("keeps completion unconfirmed for status %s", async conclusion => {
     process.env.GH_AW_AGENT_CONCLUSION = conclusion;
@@ -286,6 +333,7 @@ safe-outputs:
     expect(commentBodyCall[1]).toContain("### Test Workflow");
     expect(commentBodyCall[1]).toContain("reported_no_action");
     expect(commentBodyCall[1]).not.toContain("Nothing to do");
+    expect(commentBodyCall[1]).not.toMatch(/Generated (?:by|from)/);
     expect(mockCore.setOutput).toHaveBeenCalledWith("noop_message", "Nothing to do");
   });
 
