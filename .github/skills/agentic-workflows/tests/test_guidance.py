@@ -498,6 +498,25 @@ class GuidanceTests(unittest.TestCase):
             self.assertIn(required, guide)
         self.assertNotIn("Dispatch timeout/no run ID |", DEBUG_GUIDE.read_text())
 
+    def test_unmodified_default_branch_runs_do_not_require_dry_run(self):
+        guide = normalized(LIVE_TESTING.read_text().split(
+            "## Run an Unmodified Default-Branch Workflow\n", 1
+        )[1].split("\n## ", 1)[0])
+        for required in (
+            "user explicitly requests",
+            "**dry-run is not required** if the workflow is unmodified",
+            "Do not recompile",
+            "actual default branch",
+            "Review the published source, generated lock, imports and pins",
+            "[Live Debug Loop](#live-debug-loop)",
+            "gh aw run WORKFLOW --ref DEFAULT_BRANCH",
+            "verifying the resulting run SHA",
+            "does not override stricter host or repository restrictions",
+            "Any workflow change returns to the branch preparation and review gates",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, guide)
+
     def test_cli_mapping_uses_capabilities_not_client_assumptions(self):
         commands = (ROOT / ".github/aw/cli-commands.md").read_text()
         mapping = commands.split("## CLI vs MCP Tool", 1)[1].split("## Command Reference", 1)[0]
