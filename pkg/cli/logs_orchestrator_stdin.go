@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,6 +25,8 @@ import (
 // This is used when the --stdin flag is passed to the logs command.
 func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (err error) { //nolint:largefunc // Existing stdin orchestration remains centralized.
 	opts = normalizeStdinLogsOptions(opts)
+	ctx, stream, finish := startLogsJSONL(ctx, opts.Format, opts.Verbose, workQueueEvidenceRequested(opts.ArtifactSets) || len(ResolveArtifactFilter(opts.ArtifactSets)) == 0)
+	defer finish(&err)
 	logsOrchestratorLog.Printf("Starting stdin log download: runs=%d, outputDir=%s", len(opts.RunURLs), opts.OutputDir)
 
 	if err := ValidateArtifactSets(opts.ArtifactSets); err != nil {
@@ -75,6 +78,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			if err := exportLogsHarbor(ctx, opts.OutputDir, nil, opts.AdditionalGraders); err != nil {
 				return fmt.Errorf("harbor export: %w", err)
 			}
+		}
+		if stream != nil {
+			data := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
+			data.Message = "No run IDs or URLs provided on stdin."
+			return stream.summary(data)
 		}
 		return nil
 	}
@@ -172,29 +180,23 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			return fmt.Errorf("run %q does not include repository information; pass --repo owner/repo or provide full run URLs", rawURL)
 		}
 
+		stream.emit(logsJSONLEvent{Type: "progress", Stage: "fetching", RunID: components.Number, Repository: path.Join(owner, repo)})
 		run, err := fetchWorkflowRunMetadata(ctx, components.Number, owner, repo, host, opts.Verbose)
 		if err != nil {
+			stream.emit(logsJSONLEvent{Type: "progress", Stage: "failed", RunID: components.Number, Repository: path.Join(owner, repo), Message: err.Error()})
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping run %d: failed to fetch metadata: %v", components.Number, err)))
 			continue
 		}
 		runs = append(runs, run)
+		stream.emit(logsJSONLEvent{Type: "progress", Stage: "discovered", RunID: run.DatabaseID, Repository: run.Repository, Count: 1})
 	}
 	logsOrchestratorLog.Printf("Resolved %d/%d run(s) from stdin input", len(runs), len(opts.RunURLs))
 
 	if len(runs) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
 		cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)
-		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
-		if opts.JSONOutput {
-			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
-			logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
-			logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
-			logsData.Message = "No runs found. No valid runs could be loaded from the provided input."
-			if opts.JSONOutput {
-				if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
-					return fmt.Errorf("failed to render JSON output: %w", err)
-				}
-			}
+		if err := emitStdinEmptySummary(stream, opts, "No runs found. No valid runs could be loaded from the provided input.", allAPIRateLimits); err != nil {
+			return err
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No valid runs could be loaded from stdin"))
 		if opts.Harbor {
@@ -220,13 +222,37 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		evalsOnly:         opts.EvalsOnly,
 		gradersOnly:       opts.GradersOnly,
 	}
-	downloadResults := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{outputDir: opts.OutputDir, verbose: opts.Verbose, maxRuns: len(runs), repoOverride: opts.RepoOverride, artifactFilter: artifactFilter, evalsOnly: opts.EvalsOnly, artifactSets: opts.ArtifactSets, storageLimit: storageLimit, cachedRuns: cachedRuns, filters: filters})
 	collectionStats := &logsCollectionStats{}
 	collectionStats.recordDiscovered(len(runs))
 
 	// Process download results applying the same filters as DownloadWorkflowLogs.
 	var processedRuns []ProcessedRun
 	var storageLimitReached bool
+	var downloadResults []DownloadResult
+	if stream != nil {
+		var processingErr error
+		processedRuns, _, storageLimitReached = appendProcessedWorkflowRuns(ctx, nil, runs, 0, processWorkflowRunBatchOptions{
+			count:             len(runs),
+			outputDir:         opts.OutputDir,
+			verbose:           opts.Verbose,
+			repoOverride:      opts.RepoOverride,
+			artifactFilter:    artifactFilter,
+			evalsOnly:         opts.EvalsOnly,
+			artifactSets:      opts.ArtifactSets,
+			parse:             opts.Parse,
+			filters:           filters,
+			storageLimit:      storageLimit,
+			cachedRuns:        cachedRuns,
+			cachedJSONLWriter: cachedJSONLWriter,
+			collectionStats:   collectionStats,
+			atifError:         &processingErr,
+		})
+		if processingErr != nil {
+			return processingErr
+		}
+	} else {
+		downloadResults = downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{outputDir: opts.OutputDir, verbose: opts.Verbose, maxRuns: len(runs), repoOverride: opts.RepoOverride, artifactFilter: artifactFilter, evalsOnly: opts.EvalsOnly, artifactSets: opts.ArtifactSets, storageLimit: storageLimit, cachedRuns: cachedRuns, filters: filters})
+	}
 	for _, result := range downloadResults {
 		collectionStats.recordResult(result)
 		if result.CachedRun != nil {
@@ -305,18 +331,9 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if len(processedRuns) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
 		cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)
-		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 		renderLogsDownloadStatsSummary(collectionStats, allAPIRateLimits...)
-		if opts.JSONOutput {
-			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
-			logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
-			logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
-			logsData.Message = noRunsMessage("", false, storageLimitReached)
-			if opts.JSONOutput {
-				if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
-					return fmt.Errorf("failed to render JSON output: %w", err)
-				}
-			}
+		if err := emitStdinEmptySummary(stream, opts, noRunsMessage("", false, storageLimitReached), allAPIRateLimits); err != nil {
+			return err
 		}
 		if storageLimitReached {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Storage limit reached before any new runs could be processed"))
@@ -343,6 +360,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 	renderLogsDownloadStatsSummary(collectionStats, allAPIRateLimits...)
 	return renderLogsOutput(processedRuns, renderLogsOutputOptions{
+		jsonlStream:       stream,
 		outputDir:         opts.OutputDir,
 		summaryFile:       opts.SummaryFile,
 		format:            opts.Format,
@@ -362,4 +380,22 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		cachedJSONLWriter: cachedJSONLWriter,
 		outcomeReports:    outcomeReports,
 	})
+}
+
+func emitStdinEmptySummary(stream *logsJSONLStream, opts StdinLogsOptions, message string, reports []*GitHubAPIRateLimitReport) error {
+	if !opts.JSONOutput && stream == nil {
+		return nil
+	}
+	apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(reports)
+	logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
+	logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
+	logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
+	logsData.Message = message
+	if stream != nil {
+		return stream.summary(logsData)
+	}
+	if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
+		return fmt.Errorf("failed to render JSON output: %w", err)
+	}
+	return nil
 }
