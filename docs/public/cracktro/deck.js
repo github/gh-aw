@@ -1379,6 +1379,297 @@
     });
   }
 
+  // Research → Assign → Observe: production telemetry (OpenTelemetry) feeds the next round of research
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#raoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["q0", "M856 140 H352", "p", ["queries telemetry"], 600, 122, "middle"],
+      ["e0", "M170 168 V312", "p", ["researches", "the repository"], 192, 236, "start"],
+      ["e1", "M170 388 V522", "p", ["creates", "issues"], 192, 450, "start"],
+      ["e2", "M208 560 H472", "p", ["picked up by"], 340, 544, "middle"],
+      ["e3", "M738 560 H842", "p", ["assigns to", "Copilot"], 790, 502, "middle"],
+      ["e4", "M1056 560 H1122", "p", ["PR"], 1089, 544, "middle"],
+      ["e5", "M1160 526 V474 H880 V522", "b", ["iterates"], 1020, 464, "middle"],
+      ["e6", "M1366 560 H1582", "b", ["review &", "merge"], 1474, 520, "middle"],
+      ["e7", "M1620 524 V418", "b", ["deploy", "to prod"], 1600, 466, "end"],
+    ];
+    const SEQ = [
+      ["q0", "nResearch"],
+      ["e0", "nRepo"],
+      ["e1", "nIssues"],
+      ["e2", "nMonster"],
+      ["e3", "nCopilot"],
+      ["e4", "nDev"],
+      ["e5", "nCopilot"],
+      ["e6", "nMerge"],
+      ["e7", "nProd"],
+    ];
+    const LANE = { nResearch: 0, nRepo: 0, nIssues: 0, nMonster: 1, nCopilot: 2, nDev: 2, nMerge: 2, nProd: 2 };
+    // Simulated production fleet; every number below is generated in the browser.
+    const SRV = [
+      ["prod-1", "us-east-1", 1240, 80],
+      ["prod-2", "eu-west-1", 880, 195],
+      ["prod-3", "ap-south-1", 610, 310],
+    ];
+    const CX = 858,
+      CR = 1190,
+      PX = 1290,
+      PW = 400,
+      N = 48,
+      ROUTES = [
+        ["POST", "/checkout", 0.45],
+        ["GET", "/cart", 0.25],
+        ["GET", "/search", 0.2],
+        ["GET", "/healthz", 0.1],
+      ];
+    const KIND = [
+      ["#ab7df8", 0.6],
+      ["#3fb950", 0.25],
+      ["#d29922", 0.15],
+    ];
+    let g = `<defs><radialGradient id="raoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="raoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="raoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 440, "RESEARCH"],
+      [440, 820, "ASSIGN"],
+      [820, VW, "OBSERVE"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="raoLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rao${c === "p" ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    // OTLP export wires from each server to the collector
+    const wire = i => [PX - 2, SRV[i][3] + 50, CR + 2, 150 + i * 70];
+    SRV.forEach((_, i) => {
+      const [x0, y0, x1, y1] = wire(i);
+      g += `<path class="fm-wire p" d="M${x0} ${y0} C1240 ${y0} 1240 ${y1} ${x1} ${y1}" style="opacity:.3"/>`;
+    });
+    g += `<text class="mra-l" x="1240" y="446" text-anchor="middle"><tspan x="1240">OTLP</tspan><tspan x="1240" dy="24">export</tspan></text>`;
+    // the collector: live counters, a span stream, and the fleet p95 against its SLO
+    g += `<g id="nCollector"><rect class="rao-card on" x="${CX}" y="80" width="${CR - CX}" height="340" rx="14" style="--rc:#ab7df8"/>
+      <circle cx="${CX + 22}" cy="108" r="10" fill="none" stroke="#f5a800" stroke-width="3"/><circle cx="${CX + 22}" cy="108" r="4" fill="#4f62ad"/>
+      <text class="rao-h" x="${CX + 42}" y="116">OTel Collector</text>
+      <circle class="rao-led" cx="${CX + 24}" cy="136" r="4" fill="#3fb950"/><text class="rao-sub" x="${CX + 36}" y="141">otlp/grpc :4317 · receiving</text>`;
+    [
+      ["spans/s", 20],
+      ["metrics/s", 130],
+      ["logs/s", 240],
+    ].forEach(([k, x], i) => (g += `<text class="rao-k" x="${CX + x}" y="174">${k}</text><text class="rao-v" id="raoCnt${i}" x="${CX + x}" y="196">0</text>`));
+    g += `<line class="fm-div" x1="${CX + 14}" y1="210" x2="${CR - 14}" y2="210"/>`;
+    for (let i = 0; i < 5; i++) g += `<text class="rao-span" id="raoSpan${i}" x="${CX + 20}" y="${234 + i * 22}"></text>`;
+    g += `<line class="fm-div" x1="${CX + 14}" y1="336" x2="${CR - 14}" y2="336"/>
+      <text class="rao-k" x="${CX + 20}" y="356">p95 latency · fleet</text><text class="rao-breach" id="raoBreach" x="${CR - 18}" y="356" text-anchor="end">⚠ SLO breach</text>
+      <line class="rao-slo" x1="${CX + 20}" y1="385" x2="${CR - 18}" y2="385"/><polyline class="rao-spark" id="raoAgg" points=""/></g>`;
+    // production servers
+    g += `<g class="rao-prod" id="nProd">`;
+    SRV.forEach(([name, region, , Y], i) => {
+      g += `<rect class="rao-card on" id="raoCard${i}" x="${PX}" y="${Y}" width="${PW}" height="100" rx="14"/>
+        <rect x="${PX + 14}" y="${Y + 18}" width="44" height="64" rx="5" fill="#161b22" stroke="#3d444d" stroke-width="1.5"/>`;
+      for (let s = 0; s < 3; s++)
+        g += `<rect x="${PX + 19}" y="${Y + 24 + s * 19}" width="34" height="14" rx="2" fill="#0d1117" stroke="#30363d"/><circle class="rao-led" cx="${PX + 47}" cy="${Y + 31 + s * 19}" r="2.5" fill="#3fb950" style="animation-delay:${-(i * 3 + s) * 0.37}s"/>`;
+      g += `<text class="rao-h" x="${PX + 72}" y="${Y + 36}">${name}</text><text class="rao-sub" id="raoVer${i}" x="${PX + 158}" y="${Y + 35}">v1.4.2</text>
+        <text class="rao-sub" x="${PX + 72}" y="${Y + 58}">${region} · err <tspan id="raoErr${i}">0%</tspan></text>
+        <text class="rao-v" id="raoRps${i}" x="${PX + PW - 16}" y="${Y + 32}" text-anchor="end"></text>
+        <text class="rao-v" id="raoP95${i}" x="${PX + PW - 16}" y="${Y + 56}" text-anchor="end"></text>
+        <polyline class="rao-spark" id="raoSpark${i}" points=""/>`;
+    });
+    g += `</g>`;
+    g += agent("nResearch", 90, 140, 250, "Deep Research") + agent("nMonster", 510, 560, 220, "Issue Monster") + agent("nCopilot", 880, 560, 170, "Copilot");
+    g += box("nRepo", 170, 350, "repo") + box("nIssues", 170, 560, "issue") + box("nMerge", 1620, 560, "merge") + dev("nDev", 1160, 560);
+    g += `<g id="raoPkts"></g><circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg rpa-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const pkts = [];
+    for (let i = 0; i < 28; i++) {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("class", "rao-pkt");
+      c.setAttribute("r", "4.5");
+      $("raoPkts").appendChild(c);
+      pkts.push({ el: c, t: -1 });
+    }
+    const pick = list => {
+      let r = Math.random();
+      for (const item of list) if ((r -= item[item.length - 1]) <= 0) return item;
+      return list[0];
+    };
+    const hex = () => Math.floor(Math.random() * 65536).toString(16).padStart(4, "0");
+    const fmt = n => Math.round(n).toLocaleString("en-US");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 1600,
+      HOLD = 4600,
+      CYC = START + SEQ.length * STEP + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1,
+      deployed = false,
+      lastSample = 0,
+      lastPkt = 0,
+      tick = 0,
+      p95 = SRV.map(() => 450),
+      hist = SRV.map((_, i) => Array.from({ length: N }, () => 430 + i * 35 + (Math.random() - 0.5) * 50)),
+      agg = Array.from({ length: N }, () => 465 + (Math.random() - 0.5) * 30),
+      spans = [];
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("raoLane" + LANE[nid]).classList.add("on");
+    };
+    const spark = (el, data, x0, x1, yb, h) =>
+      el.setAttribute("points", data.map((v, j) => `${(x0 + ((x1 - x0) * j) / (N - 1)).toFixed(1)},${(yb - (Math.min(v, 600) / 600) * h).toFixed(1)}`).join(" "));
+    const sample = () => {
+      tick++;
+      let rpsSum = 0;
+      SRV.forEach(([, , base, Y], i) => {
+        const target = deployed ? 165 + i * 14 : 430 + i * 35;
+        p95[i] += (target - p95[i]) * 0.09 + (Math.random() - 0.5) * target * 0.12;
+        hist[i].push(p95[i]);
+        if (hist[i].length > N) hist[i].shift();
+        const rps = base * (1 + 0.08 * Math.sin(tick / 9 + i) + (Math.random() - 0.5) * 0.06),
+          err = Math.max(0, (p95[i] > 300 ? 1.8 : 0.2) + (Math.random() - 0.5) * 0.3),
+          warn = p95[i] > 300;
+        rpsSum += rps;
+        $("raoRps" + i).textContent = `${fmt(rps)} rps`;
+        const pe = $("raoP95" + i);
+        pe.textContent = `p95 ${Math.round(p95[i])}ms`;
+        pe.setAttribute("class", "rao-v " + (warn ? "warn" : "ok"));
+        const ee = $("raoErr" + i);
+        ee.textContent = `${err.toFixed(1)}%`;
+        ee.setAttribute("class", warn ? "warn" : "ok");
+        $("raoCard" + i).style.setProperty("--rc", warn ? "#d29922" : "#3fb950");
+        const sp = $("raoSpark" + i);
+        sp.setAttribute("stroke", warn ? "#d29922" : "#3fb950");
+        spark(sp, hist[i], PX + 72, PX + PW - 16, Y + 92, 22);
+      });
+      const a = p95.reduce((s, v) => s + v, 0) / p95.length;
+      agg.push(a);
+      if (agg.length > N) agg.shift();
+      const ag = $("raoAgg");
+      ag.setAttribute("stroke", a > 300 ? "#d29922" : "#3fb950");
+      spark(ag, agg, CX + 20, CR - 18, 410, 50);
+      $("raoBreach").style.opacity = a > 300 ? 1 : 0;
+      $("raoCnt0").textContent = fmt(rpsSum * 3.2);
+      $("raoCnt1").textContent = fmt(420 + Math.random() * 40);
+      $("raoCnt2").textContent = fmt(rpsSum * 0.6 + (a > 300 ? 300 : 0));
+      if (tick % 2) {
+        const i = Math.floor(Math.random() * SRV.length),
+          [m, route] = pick(ROUTES),
+          ms = route === "/checkout" ? p95[i] * (0.55 + Math.random() * 0.5) : 12 + Math.random() * 70;
+        spans.unshift(`<tspan class="id">${hex()}</tspan> ${SRV[i][0]}  ${m} ${route}  <tspan class="${ms > 300 ? "warn" : "ok"}">${Math.round(ms)}ms</tspan>`);
+        spans.length = Math.min(spans.length, 5);
+        spans.forEach((s, k) => ($("raoSpan" + k).innerHTML = s));
+      }
+    };
+    const pump = (t, dt) => {
+      if (t - lastPkt > 110) {
+        lastPkt = t;
+        const p = pkts.find(q => q.t < 0);
+        if (p) {
+          p.t = 0;
+          p.w = wire(Math.floor(Math.random() * SRV.length));
+          p.el.setAttribute("fill", pick(KIND)[0]);
+        }
+      }
+      for (const p of pkts) {
+        if (p.t < 0) continue;
+        p.t += dt / 750;
+        if (p.t >= 1) {
+          p.t = -1;
+          p.el.style.opacity = 0;
+          continue;
+        }
+        const [x0, y0, x1, y1] = p.w,
+          u = p.t,
+          v = 1 - u,
+          x = v * v * v * x0 + 3 * v * u * (v * 1240 + u * 1240) + u * u * u * x1,
+          y = v * v * v * y0 + 3 * v * u * (v * y0 + u * y1) + u * u * u * y1;
+        p.el.setAttribute("cx", x.toFixed(1));
+        p.el.setAttribute("cy", y.toFixed(1));
+        p.el.style.opacity = 1;
+      }
+    };
+    let prevT = 0;
+    slides.push({
+      sound: "loop",
+      palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
+      notes:
+        "Research, assign, observe: an agentic feedback loop. The production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
+      enter() {
+        t0 = prevT = lastSample = lastPkt = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = prevT = t;
+        const dt = Math.min(100, t - prevT);
+        prevT = t;
+        if (t - lastSample > 220) {
+          lastSample = t;
+          sample();
+        }
+        pump(t, dt);
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".fm-task.on, .fm-out.on, .mra-lane.on, .rao-prod.on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          $("raoLane2").classList.add("on");
+          deployed = false;
+          SRV.forEach((_, i) => ($("raoVer" + i).textContent = "v1.4.2"));
+          popK = -1;
+        }
+        const k = Math.floor((u - START) / STEP),
+          f = ((u - START) % STEP) / STEP;
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || k >= SEQ.length) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const [eid, nid] = SEQ[k],
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+            if (nid === "nProd") {
+              deployed = true;
+              SRV.forEach((_, i) => ($("raoVer" + i).textContent = "v1.4.3"));
+            }
+          }
+          light(nid);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic feedback loop"), h("h2", {}, letters("Research · Assign · "), letters("Observe", "l-grad"))), svg),
+    });
+  }
+
   // Mine → Refine → Apply: harvesting developer interventions into linters
   {
     resetIndex();
