@@ -708,6 +708,7 @@ async function main(config = {}) {
     const evidence = { data_trust: "untrusted", repository: `${owner}/${repo}`, pull_request_number: pullNumber, evaluated_at: new Date().toISOString(), authorization: mergeAuthorizationEvidence(config, requiredChecks) };
     let phase = "pull_request";
     let mergeAttempted = false;
+    let branchChecksDiscovered = false;
     let pullRequestUrl;
 
     try {
@@ -844,6 +845,7 @@ async function main(config = {}) {
       phase = "branch_policy";
       if (baseBranch) {
         branchPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
+        branchChecksDiscovered = !branchPolicy.isProtected;
         if (branchPolicy.isProtected) {
           failureReasons.push({
             code: "target_branch_protected",
@@ -871,12 +873,12 @@ async function main(config = {}) {
 
       branchPolicy.requiredChecks = [...new Set([...branchPolicy.requiredChecks, ...requiredChecks])].sort();
       evidence.authorization.policy_sha256 = mergeAuthorizationEvidence(config, branchPolicy.requiredChecks).policy_sha256;
-      evidence.authorization.required_checks = branchPolicy.requiredChecks.length > 0 ? "not_evaluated" : "not_required";
+      if (branchChecksDiscovered) evidence.authorization.required_checks = branchPolicy.requiredChecks.length > 0 ? "not_evaluated" : "not_required";
       evidence.branch_policy = branchPolicy;
       phase = "required_checks";
       evidence.checks = { required: branchPolicy.requiredChecks, required_apps: requiredCheckApps };
       const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
-      if (branchPolicy.requiredChecks.length > 0) evidence.authorization.required_checks = checkSummary.missing.length === 0 && checkSummary.failing.length === 0 ? "passed" : "failed";
+      if (branchChecksDiscovered && branchPolicy.requiredChecks.length > 0) evidence.authorization.required_checks = checkSummary.missing.length === 0 && checkSummary.failing.length === 0 ? "passed" : "failed";
       core.debug(
         `merge_pull_request: ${JSON.stringify({ event: "check_evidence", required: branchPolicy.requiredChecks.length, passing: checkSummary.passing.length, missing: checkSummary.missing.length, failing: checkSummary.failing.length })}`
       );
@@ -1119,8 +1121,11 @@ async function main(config = {}) {
         };
         return result;
       }
+      core.debug(`merge_pull_request: ${JSON.stringify({ event: "operation_failed", phase })}`);
+      core.error(`merge_pull_request failed for PR #${pullNumber} during ${phase}`);
+      evidence.failure_phase = phase;
       if (error instanceof CheckProducerError) {
-        if (phase === "required_checks") evidence.authorization.required_checks = "failed";
+        if (phase === "required_checks" && branchChecksDiscovered) evidence.authorization.required_checks = "failed";
         const checks = { producer_rejections: [error.rejection] };
         if (phase === "revalidation") {
           evidence.revalidation = { checks, evaluated_at: new Date().toISOString() };

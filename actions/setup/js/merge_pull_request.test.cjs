@@ -856,6 +856,21 @@ describe("merge_pull_request policy hardening", () => {
     expect(JSON.stringify(debugRecords())).not.toContain(secret);
   });
 
+  it.each(["pull_request", "branch_policy", "revalidation"])("reports bounded pre-merge failure diagnostics during %s", async phase => {
+    const secret = "private-api-error-token-123";
+    const error = Object.assign(new Error(secret), { status: 403 });
+    if (phase === "pull_request") client.rest.pulls.get.mockRejectedValue(error);
+    if (phase === "branch_policy") client.rest.repos.getBranch.mockRejectedValue(error);
+    if (phase === "revalidation") client.rest.pulls.get.mockResolvedValueOnce({ data: structuredClone(pr) }).mockRejectedValue(error);
+    const result = await run();
+    expect(result.success).toBe(false);
+    expect(result.decision_evidence.failure_phase).toBe(phase);
+    expect(debugRecords()).toContainEqual({ event: "operation_failed", phase });
+    expect(global.core.error).toHaveBeenCalledExactlyOnceWith(`merge_pull_request failed for PR #100 during ${phase}`);
+    expect(JSON.stringify({ debug: debugRecords(), errors: global.core.error.mock.calls })).not.toContain(secret);
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
   it("records staged and blocked decisions without claiming a merge", async () => {
     expect((await run({ staged: true })).success).toBe(true);
     expect(debugRecords()).toContainEqual({ event: "staged_preview" });
@@ -1042,6 +1057,8 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.get).toHaveBeenCalledTimes(3);
     expect(JSON.stringify(result)).not.toContain("private connection");
     expect(global.core.error).not.toHaveBeenCalled();
+    expect(result.decision_evidence.failure_phase).toBeUndefined();
+    expect(debugRecords().some(record => record.event === "operation_failed")).toBe(false);
     const entry = persistDecision(result);
     expect(entry).toMatchObject({ success: true, merged: true, reconciled: true });
     expect(entry.decision_evidence.reconciled_at).toBe(result.decision_evidence.reconciled_at);
@@ -1093,6 +1110,27 @@ describe("merge_pull_request policy hardening", () => {
     expect(result.decision_evidence.authorization.required_checks).toBe("not_evaluated");
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
+
+  it.each(["invalid", "protected"].flatMap(branch => ["optional", "passing", "failing", "wrong-producer"].map(checks => ({ branch, checks }))))(
+    "keeps branch checks unevaluated when discovery is skipped ($branch branch, $checks configured checks)",
+    async ({ branch, checks }) => {
+      pr.head.sha = "a".repeat(40);
+      pr.base.sha = "b".repeat(40);
+      reviewPR.headRefOid = pr.head.sha;
+      if (branch === "invalid") pr.base.ref = "integration\nprivate";
+      else client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true } });
+      if (checks !== "optional") {
+        checkResults.mockResolvedValue([{ id: 1, name: "ci", head_sha: pr.head.sha, status: "completed", conclusion: checks === "failing" ? "failure" : "success", app: { id: checks === "wrong-producer" ? 9 : 5 } }]);
+      }
+      const result = await run(checks === "optional" ? {} : { required_checks: ["ci"], required_check_apps: { ci: 5 } });
+      expect(result.success).toBe(false);
+      expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: branch === "invalid" ? "target_base_branch_invalid" : "target_branch_protected" }));
+      expect(result.decision_evidence.authorization.required_checks).toBe("not_evaluated");
+      expect(persistDecision(result).decision_evidence.authorization.required_checks).toBe("not_evaluated");
+      expect(client.rest.repos.getBranchProtection).not.toHaveBeenCalled();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    }
+  );
 
   it("fingerprints effective policy independently of credentials and collection ordering", async () => {
     const { mergeAuthorizationEvidence } = await import("./merge_pull_request_evidence.cjs");

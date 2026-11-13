@@ -32,6 +32,8 @@ const require = createRequire(import.meta.url);
 const { COMMENT_PREAMBLE } = require("./issue_body.cjs");
 const { renderReport } = require("./report_ast.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { buildSafeOutputOutcomes } = require("./safe_output_outcomes.cjs");
+const { generateSafeOutputSummary } = require("./safe_output_summary.cjs");
 
 function renderedCommentMessage(message) {
   return {
@@ -1247,6 +1249,47 @@ describe("Safe Output Handler Manager", () => {
   });
 
   describe("processMessages", () => {
+    it.each([false, true])("preserves non-merge indeterminate failures in summaries and persisted outcomes (deferred=%s)", async deferred => {
+      const handler = vi.fn().mockResolvedValue({
+        success: false,
+        operation_outcome: "indeterminate",
+        error: "Operation could not be confirmed",
+      });
+      if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+
+      const result = await processMessages(new Map([["add_comment", handler]]), [{ type: "add_comment", body: "Comment" }]);
+
+      expect(result.results[0]).toMatchObject({
+        success: false,
+        result: { operation_outcome: "indeterminate" },
+      });
+      expect(computeSafeOutputsStatus(result.results)).toMatchObject({ status: "failure", itemsApplied: 0 });
+      expect(generateSafeOutputSummary({ ...result.results[0], message: { type: "add_comment", body: "Comment" } })).toContain("**Operation outcome: indeterminate.**");
+      expect(buildSafeOutputOutcomes(result.results)).toEqual([expect.objectContaining({ type: "add_comment", status: "failed", operation_outcome: "indeterminate" })]);
+      expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+    });
+
+    it.each(["indeterminate", "unrecognized"])("only retains the allowlisted marker from initial non-merge failure results (%s)", async operationOutcome => {
+      const handler = vi.fn().mockResolvedValue({
+        success: false,
+        operation_outcome: operationOutcome,
+        error: "Operation could not be confirmed",
+        private_api_response: { body: "private response details" },
+        url: "https://github.com/owner/repo/issues/123",
+      });
+
+      const result = await processMessages(new Map([["add_comment", handler]]), [{ type: "add_comment", body: "Comment" }]);
+
+      expect(result.results[0]).toEqual({
+        type: "add_comment",
+        messageIndex: 0,
+        success: false,
+        error: "Operation could not be confirmed",
+        ...(operationOutcome === "indeterminate" ? { result: { operation_outcome: "indeterminate" } } : {}),
+      });
+      expect(JSON.stringify(result)).not.toContain("private response details");
+    });
+
     it("should process messages in order of appearance", async () => {
       const messages = [
         { type: "add_comment", body: "Comment" },

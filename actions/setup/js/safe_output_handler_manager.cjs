@@ -1428,7 +1428,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
           messageIndex: i,
           success: false,
           error: errorMsg,
-          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : {}),
+          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : result.operation_outcome === "indeterminate" ? { result: { operation_outcome: "indeterminate" } } : {}),
         });
         // Track code-push failures for later comment annotations and conclusion reporting.
         if (CODE_PUSH_TYPES.has(messageType)) {
