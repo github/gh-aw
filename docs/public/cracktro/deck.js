@@ -175,6 +175,31 @@
   .mra-svg { left: 60px; top: 290px; width: 1800px; height: 566px; }
   .mra-svg .fm-pill text { font-size: 26px; }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
+  .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
+  .rpa-code .card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
+  .rpa-code.on .card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .rpa-file { fill: #9198a1; font: 500 14px var(--mono); }
+  .rpa-row { opacity: .45; transition: opacity .3s; } .rpa-row.seen { opacity: 1; }
+  .rpa-dup, .rpa-link, .rpa-badge { opacity: 0; transition: opacity .4s; }
+  .rpa-dup { fill: #d2992226; stroke: #d29922; stroke-width: 2; }
+  .rpa-link { fill: none; stroke: #d29922; stroke-width: 2.5; stroke-dasharray: 5 4; } .rpa-link.dot { fill: #d29922; stroke: none; }
+  .rpa-badge { fill: #d29922; font: 600 17px var(--mono); }
+  .rpa-dup.on, .rpa-link.on, .rpa-badge.on { opacity: 1; }
+  .rpa-scan { opacity: 0; } .rpa-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
+  .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
+  .rao-card.on { stroke: var(--rc, #3fb950); filter: drop-shadow(0 0 12px var(--rc, #3fb950)); }
+  .rao-h { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
+  .rao-sub, .rao-k { fill: #9198a1; font: 500 14px var(--mono); }
+  .rao-v { fill: #e6edf3; font: 600 17px var(--mono); }
+  .rao-v.warn, .rao-span .warn { fill: #d29922; } .rao-v.ok, .rao-span .ok { fill: #3fb950; }
+  .rao-span { fill: #c9d1d9; font: 500 14px var(--mono); }
+  .rao-span .id { fill: #6e7681; }
+  .rao-spark { fill: none; stroke-width: 2; stroke-linejoin: round; transition: stroke .6s; }
+  .rao-slo { stroke: #f85149; stroke-width: 1.5; stroke-dasharray: 5 5; opacity: .7; }
+  .rao-breach { fill: #f85149; font: 700 14px var(--mono); transition: opacity .4s; }
+  .rao-led { animation: rao-led 1.1s steps(2) infinite; }
+  @keyframes rao-led { 50% { opacity: .25; } }
+  .rao-pkt { opacity: 0; }
   .mra-repo { fill: #0d111799; stroke: #3d444d; stroke-width: 2; }
   .mra-repo-t { fill: #9198a1; font: 600 20px var(--mono); }
   .mra-row { transition: transform .6s cubic-bezier(.2,.9,.2,1); }
@@ -1169,11 +1194,61 @@
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // Two synthetic source files as syntax-coloured bars; rows 3–6 of A repeat as rows 4–7 of B.
+    const TOK = ["#ff7b72", "#d2a8ff", "#79c0ff", "#a5d6ff", "#8b949e"];
+    const DUP = [
+      [16, [28, 90, 24]],
+      [32, [60, 40]],
+      [32, [44, 70, 18]],
+      [16, [24, 52]],
+    ];
+    const FILES = [
+      ["handlers/checkout.go", 24, [[0, [34, 60, 20]], [16, [50, 70]], [16, [40, 30, 50]], ...DUP, [16, [64, 30]], [0, [10]]], 3],
+      ["handlers/cart.go", 266, [[0, [34, 48, 26]], [16, [70, 30]], [16, [56]], [16, [36, 40, 30]], ...DUP, [0, [10]]], 4],
+    ];
+    const ROW0 = 258,
+      ROWH = 18,
+      CW = 220;
+    const codeScan = () => {
+      let c = `<g class="rpa-code" id="nCode">`;
+      for (const [name, x, rows, d] of FILES) {
+        c += `<rect class="card" x="${x}" y="214" width="${CW}" height="200" rx="12"/><text class="rpa-file" x="${x + 14}" y="236">${name}</text>`;
+        c += `<rect class="rpa-dup" x="${x + 6}" y="${ROW0 + d * ROWH - 12}" width="${CW - 12}" height="${DUP.length * ROWH + 6}" rx="6"/>`;
+        rows.forEach(([ind, segs], i) => {
+          let cx = x + 14 + ind;
+          c += `<g class="rpa-row" data-y="${ROW0 + i * ROWH}">`;
+          segs.forEach((w, j) => {
+            c += `<rect x="${cx}" y="${ROW0 + i * ROWH - 4}" width="${w}" height="8" rx="4" fill="${TOK[(i + j) % TOK.length]}"/>`;
+            cx += w + 6;
+          });
+          c += `</g>`;
+        });
+      }
+      const ya = ROW0 + 3 * ROWH + 21,
+        yb = ROW0 + 4 * ROWH + 21;
+      c += `<path class="rpa-link" d="M238 ${ya} C255 ${ya} 255 ${yb} 272 ${yb}"/><circle class="rpa-link dot" cx="255" cy="${(ya + yb) / 2}" r="5"/>`;
+      c += `<text class="rpa-badge" x="24" y="446">≈ duplicate block · 94% similar</text>`;
+      // the beam is carried by two researcher agents, one on each side of the files
+      c += `<g class="rpa-scan" id="rpaScan"><rect x="24" y="-28" width="462" height="28" fill="url(#rpaBeam)"/><line x1="24" y1="0" x2="486" y2="0"/>`;
+      for (const x of [8, 502]) c += `<circle cx="${x}" cy="0" r="14" fill="url(#rpaAgent)"/>${ico("copilot", x, 1, 18)}`;
+      return c + `</g></g>`;
+    };
+    const scan = f => {
+      const s = $("rpaScan"),
+        y = 248 + Math.min(1, f / 0.75) * 164;
+      s.setAttribute("transform", `translate(0,${y})`);
+      s.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      svg.querySelectorAll(".rpa-row").forEach(r => r.classList.toggle("seen", +r.dataset.y <= y));
+      if (f >= 0.68 && !$("nCode").querySelector(".rpa-dup.on")) {
+        svg.querySelectorAll(".rpa-dup, .rpa-link, .rpa-badge").forEach(x => x.classList.add("on"));
+        sfx.pop(5);
+      }
+    };
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
-      ["e0", "M200 168 V292", "p", ["researches", "the repository"], 222, 222, "start"],
-      ["e1", "M200 372 V500", "p", ["creates", "artifact"], 222, 430, "start"],
-      ["e2", "M238 540 H636", "p", ["discussion"], 400, 524, "middle"],
+      ["e0", "M200 168 V206", "p", ["scans for duplicate code"], 222, 196, "start"],
+      ["e1", "M380 418 V500", "p", ["creates", "artifact"], 402, 452, "start"],
+      ["e2", "M418 540 H636", "p", ["discussion"], 580, 524, "middle"],
       ["e3", "M680 506 V376", "b", ["runs /plan", "on discussion"], 702, 436, "start"],
       ["e4", "M718 338 H882", "p", ["sub-issues"], 800, 322, "middle"],
       ["e5", "M920 300 V168", "p", ["picked", "up by"], 942, 222, "start"],
@@ -1183,9 +1258,10 @@
       ["e9", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
       ["e10", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
     ];
-    // the token's journey: [edge, node lit on arrival]
+    // the token's journey: [edge, node lit on arrival, duration]; a null edge is the duplicate-code scan
     const SEQ = [
-      ["e0", "nRepo"],
+      ["e0", "nCode"],
+      [null, "nCode", 3000],
       ["e1", "nDisc"],
       ["e2", "nDev1"],
       ["e3", "nIssue"],
@@ -1197,9 +1273,10 @@
       ["e10", "nCopilot"],
       ["e9", "nMerge"],
     ];
-    const LANE = { nRepo: 0, nDisc: 0, nDev1: 1, nIssue: 1, nTasks: 1, nMonster: 1, nCopilot: 2, nPR: 2, nDev2: 2, nMerge: 2 };
+    const LANE = { nCode: 0, nDisc: 0, nDev1: 1, nIssue: 1, nTasks: 1, nMonster: 1, nCopilot: 2, nPR: 2, nDev2: 2, nMerge: 2 };
     let g = `<defs><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="rpaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="rpaBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
       <marker id="rpaB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
@@ -1215,7 +1292,7 @@
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
     g += agent("nResearch", 120, 140, 250, "Deep Research") + agent("nMonster", 800, 140, 250, "Issue Monster") + agent("nCopilot", 1300, 140, 236, "Copilot");
-    g += box("nRepo", 200, 332, "repo") + box("nDisc", 200, 540, "discussion") + box("nIssue", 680, 338, "issue") + box("nTasks", 920, 338, "tasklist") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
+    g += codeScan() + box("nDisc", 380, 540, "discussion") + box("nIssue", 680, 338, "issue") + box("nTasks", 920, 338, "tasklist") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
     g += dev("nDev1", 680, 540) + dev("nDev2", 1300, 540);
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1229,7 +1306,13 @@
     const STEP = 1050,
       START = 900,
       HOLD = 2600,
-      CYC = START + SEQ.length * STEP + HOLD;
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
     let t0 = 0,
       cyc = -1,
       popK = -1;
@@ -1241,7 +1324,7 @@
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Research, plan, assign: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow. A deep research agent studies the repository and writes its findings to a discussion. A developer runs /plan on that discussion to turn it into an issue with sub-issues. Issue Monster picks up the tasks and dispatches them to Copilot, which works on each task and opens a pull request. The pull request is assigned back to the developer, who iterates with Copilot, then reviews and merges. Humans stay in the loop at the plan and at the merge.",
+        "Research, plan, assign: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is written to a discussion. A developer runs /plan on that discussion to turn it into an issue with sub-issues. Issue Monster picks up the tasks and dispatches them to Copilot, which works on each task and opens a pull request. The pull request is assigned back to the developer, who iterates with Copilot, then reviews and merges. Humans stay in the loop at the plan and at the merge.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -1253,20 +1336,28 @@
           u = e % CYC;
         if (c !== cyc) {
           cyc = c;
-          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          $("rpaScan").style.opacity = 0;
           $("nResearch").classList.add("on");
           $("rpaLane0").classList.add("on");
           popK = -1;
         }
-        const k = Math.floor((u - START) / STEP),
-          f = ((u - START) % STEP) / STEP;
         svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || k >= SEQ.length) {
+        if (u < START || u >= END) {
           dot.style.opacity = 0;
           return;
         }
-        const [eid, nid] = SEQ[k],
-          p = $(eid),
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (!eid) {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(SEQ[j][1]);
+          scan(f);
+          return;
+        }
+        const p = $(eid),
           n = p.getTotalLength(),
           q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
         p.classList.add("hot");
