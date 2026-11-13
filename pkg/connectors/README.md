@@ -25,6 +25,29 @@ that contract as the source of truth when adding or changing connector behavior.
 | `SafeOutputRequest`, `Plan.PrepareSafeOutput`, `Plan.ExecuteSafeOutput` | Prepare credential-free write intent and validate it again in the safe-output phase. |
 | `Plan.ProjectEvent`, `Plan.ActivateTriggers` | Project event evidence for inspection; trigger activation remains unavailable without an approved ingress. |
 
+### Declaration and execution types
+
+| Area | Exported symbols | Description |
+|------|------------------|-------------|
+| Requests | `Credential`, `Input`, `Value`, `BinaryRequest`, `Patch`, `Operation`, `RetryPolicy` | Describe phase-bound credentials, bounded inputs, typed request values, request bodies, and explicitly bounded retries. |
+| Trusted writes | `TrustedInput`, `TrustedPreflight`, `InputLookup`, `CreatedResource`, `CreatedResourceHost` | Model authored safe-output inputs, preflight checks, canonical identity lookups, and invocation-local temporary resources. |
+| Read and MCP capabilities | `ReadTool`, `HTTPMCP`, `MCPTool`, `Result`, `ToolCapability` | Describe REST-backed reads, remote streamable-HTTP MCP tools, and untrusted execution results. |
+| Events | `Trigger`, `EventPredicate`, `EventFilter`, `EventVariant`, `EventProjection`, `EventEvaluationVersion` | Represent bounded matching and projection rules over authenticated evidence; variants cannot grant resource authority. |
+| Connections and payloads | `APIVersion`, `SecretRef`, `Connection`, `Binding`, `InputSchema`, `Inputs`, `Secrets`, `Origins`, `ToolNames`, `SafeOutputNames`, `TriggerNames`, `UsesStagedFile` | Represent the versioned declaration contract, credential names, selected capabilities, and staged-file requirements in the frozen, phase-restricted plan. |
+
+### Additional exported operations
+
+`Decode`, `LoadSpec`, `LoadServiceSpec`, `Schema`,
+`Plan.ValidateContext`, `ValidateEventPredicate`, and
+`EvaluateEventPredicate` provide strict document loading, editor schema
+generation, context checks, and event-rule validation.
+`Plan.Encode`, `Plan.EncodeJSON`, and `DecodePlan` freeze or verify plan
+snapshots; `MaxDocumentBytes` and `MaxEncodedPlanBytes` bound their inputs.
+`Plan.PrepareSafeOutputIntent` and `Plan.ExecuteCreatedSafeOutput` handle
+temporary references within the safe-output boundary. `Plan.CallMCP` and
+`Plan.MCPServer` provide the constrained MCP adapter. `ErrIngressUnavailable`
+makes the uninstalled trigger boundary explicit.
+
 Connector plans do not fetch remote definitions or resolve credentials while
 lowering. Execution bounds responses, refuses redirects, validates inputs and
 resources, and labels remote results untrusted. Safe outputs require an explicit
