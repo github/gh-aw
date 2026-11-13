@@ -158,7 +158,7 @@ async function hasOnlyNonBlockingRules(githubClient, owner, repo, branch, { sign
  * @param {string} repo - Repository name
  * @param {string} branchName - Target branch to validate
  * @param {boolean} checkBranchProtection - Whether to call the branch API to check protection
- * @param {{signedCommits?: boolean}} [options] - Whether the push uses signed commits
+ * @param {{signedCommits?: boolean, onProtectionException?: () => void}} [options] - Signed push configuration and callback when a protected branch is allowed
  * @returns {Promise<string|null>} Error message if push is blocked, null if safe
  */
 async function checkBranchPushable(githubClient, owner, repo, branchName, checkBranchProtection, options = {}) {
@@ -202,6 +202,7 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
               throw new Error("Classic branch protection query did not return a ref update rule");
             }
             if (classicRule === null) {
+              options.onProtectionException?.();
               core.info(`Branch "${branchName}" only has non-blocking rules and no classic protection; proceeding to push`);
               isBranchProtected = false;
             }

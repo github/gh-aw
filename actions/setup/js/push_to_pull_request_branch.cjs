@@ -1021,8 +1021,15 @@ async function main(config = {}) {
     // protection rules. PR head branches must never be default or protected branches.
     // This prevents agents from pushing directly to branches that should only receive
     // changes through reviewed pull requests.
+    let allowGitPushFallback = true;
     {
-      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, checkBranchProtection, { signedCommits });
+      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, checkBranchProtection, {
+        signedCommits,
+        onProtectionException: () => {
+          // A ruleset exception must not turn a signed push into an unsigned fallback.
+          allowGitPushFallback = false;
+        },
+      });
       if (blockReason) {
         core.error(blockReason);
         return { success: false, error: blockReason };
@@ -1724,6 +1731,7 @@ async function main(config = {}) {
             pushRemoteUrl,
             pushToken: headGitHubToken,
             signedCommits,
+            allowGitPushFallback,
             requireExistingBranch: true,
             resolvedTemporaryIds,
             currentRepo: itemRepo,

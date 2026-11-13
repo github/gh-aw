@@ -1038,6 +1038,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       createPatchFile("signature-rules-branch");
       mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
 
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockResolvedValue("pushed-sha");
       const module = await loadModule();
       const handler = await module.main({ signed_commits: signedCommits });
       const result = await handler({ branch: "signature-rules-branch" }, {});
@@ -1047,9 +1048,11 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         expect(result.error).toContain("protection rules");
         expect(mockExec.exec).not.toHaveBeenCalled();
         expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+        expect(pushSignedSpy).not.toHaveBeenCalled();
       } else {
         expect(result.success).toBe(true);
         expect(result.branch_name).toBe("feature-branch");
+        expect(pushSignedSpy).toHaveBeenCalledWith(expect.objectContaining({ signedCommits: true, allowGitPushFallback: false }));
       }
     });
 
