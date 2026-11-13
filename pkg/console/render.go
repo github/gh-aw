@@ -282,12 +282,47 @@ func buildTableConfig(val reflect.Value, title string) TableConfig {
 
 	// Build headers from struct fields
 	headers, fieldPaths, fieldTags := buildTableHeaders(elemType)
-	config.Headers = headers
+	config.Headers, fieldPaths, fieldTags = omitEmptyColumns(val, headers, fieldPaths, fieldTags)
 
 	// Build rows
 	config.Rows = buildTableRows(val, fieldPaths, fieldTags)
 
 	return config
+}
+
+func omitEmptyColumns(val reflect.Value, headers []string, fieldPaths [][]int, fieldTags []consoleTag) ([]string, [][]int, []consoleTag) {
+	filteredHeaders := make([]string, 0, len(headers))
+	filteredPaths := make([][]int, 0, len(fieldPaths))
+	filteredTags := make([]consoleTag, 0, len(fieldTags))
+	for i, tag := range fieldTags {
+		if tag.omitempty && !tableFieldHasValue(val, fieldPaths[i]) {
+			continue
+		}
+		filteredHeaders = append(filteredHeaders, headers[i])
+		filteredPaths = append(filteredPaths, fieldPaths[i])
+		filteredTags = append(filteredTags, tag)
+	}
+	return filteredHeaders, filteredPaths, filteredTags
+}
+
+func tableFieldHasValue(rows reflect.Value, fieldPath []int) bool {
+	for i := range rows.Len() {
+		row := rows.Index(i)
+		for row.Kind() == reflect.Pointer {
+			if row.IsNil() {
+				break
+			}
+			row = row.Elem()
+		}
+		if row.Kind() != reflect.Struct {
+			continue
+		}
+		field, ok := fieldByIndexSafe(row, fieldPath)
+		if ok && !isZeroValue(field) {
+			return true
+		}
+	}
+	return false
 }
 
 // buildTableHeaders extracts column headers, field index paths, and tags from a struct type,

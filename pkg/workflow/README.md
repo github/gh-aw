@@ -500,7 +500,6 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 |----------|-----------|-------------|
 | `SanitizeName` | `func(string, *SanitizeOptions) string` | Sanitizes a name for use in GitHub Actions |
 | `SanitizeWorkflowName` | `func(string) string` | Sanitizes a workflow name |
-| `SanitizeIdentifier` | `func(string) string` | Sanitizes a generic identifier |
 | `SanitizeWorkflowIDForCacheKey` | `func(string) string` | Sanitizes a workflow ID for use as a cache key |
 | `PrettifyToolName` | `func(string) string` | Returns a human-readable tool name |
 | `ShortenCommand` | `func(string) string` | Shortens a long command for display |

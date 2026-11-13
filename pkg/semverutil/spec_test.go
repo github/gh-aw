@@ -258,6 +258,11 @@ func TestSpec_PublicAPI_NormalizeGitDescribeSemver(t *testing.T) {
 			input:    "v1.2.3",
 			expected: "v1.2.3",
 		},
+		{
+			name:     "adds prefix to invalid input",
+			input:    "not-a-version",
+			expected: "vnot-a-version",
+		},
 	}
 
 	for _, tt := range tests {
@@ -267,9 +272,6 @@ func TestSpec_PublicAPI_NormalizeGitDescribeSemver(t *testing.T) {
 		})
 	}
 }
-
-// SPEC_MISMATCH: The README states that invalid input is returned unchanged,
-// but NormalizeGitDescribeSemver("not-a-version") returns "vnot-a-version".
 
 // TestSpec_PublicAPI_IsMorePreciseVersion validates the documented behavior of
 // IsMorePreciseVersion as described in the semverutil README.md specification.

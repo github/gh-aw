@@ -10,12 +10,30 @@ import (
 	"github.com/github/gh-aw/pkg/intent"
 )
 
-// SPEC_MISMATCH: README.md documents func ResolveRisk(rec IntentRecord) string,
-// but the intent package does not currently export that function. A behavioral
-// test cannot be compiled until the documented public API exists.
-
 // TestSpec tests derive from pkg/intent/README.md. They enforce the documented
 // public surface of the intent package without coupling to implementation internals.
+
+// TestSpec_PublicAPI_ResolveRisk validates explicit and derived risk classification.
+func TestSpec_PublicAPI_ResolveRisk(t *testing.T) {
+	tests := []struct {
+		name string
+		rec  intent.IntentRecord
+		want string
+	}{
+		{name: "explicit risk takes precedence", rec: intent.IntentRecord{Risk: "urgent", Domains: []string{"production"}}, want: "urgent"},
+		{name: "critical security is high", rec: intent.IntentRecord{Domains: []string{"security"}, Priority: "critical"}, want: "high"},
+		{name: "production is high", rec: intent.IntentRecord{Domains: []string{"production"}}, want: "high"},
+		{name: "infrastructure is medium", rec: intent.IntentRecord{Domains: []string{"infrastructure"}}, want: "medium"},
+		{name: "documentation is low", rec: intent.IntentRecord{Domains: []string{"documentation"}}, want: "low"},
+		{name: "other domains are unknown", rec: intent.IntentRecord{Domains: []string{"security"}, Priority: "high"}, want: "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, intent.ResolveRisk(tt.rec))
+		})
+	}
+}
 
 // TestSpec_PublicAPI_AttributionStatusConstants validates the documented
 // AttributionStatus constant values.

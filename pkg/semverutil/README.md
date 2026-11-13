@@ -100,13 +100,14 @@ semverutil.IsMorePreciseVersion("v4.3.0", "v4.3.0") // false (equal precision)
 
 ### `NormalizeGitDescribeSemver(v string) string`
 
-Normalizes a version string produced by `git describe` into a canonical semver. Strips `git describe` prerelease suffixes of the form `N-gHEX` or `N-gHEX-dirty` (which indicate commits-since-tag metadata rather than real prerelease labels), leaving only the base semver. Non-`git describe` prerelease suffixes (e.g. `-beta.1`) are preserved. Returns the input unchanged if it is not a valid semver.
+Normalizes a version string produced by `git describe` into a canonical semver. Trims surrounding whitespace and adds a leading `v` before validation. Strips `git describe` prerelease suffixes of the form `N-gHEX` or `N-gHEX-dirty` (which indicate commits-since-tag metadata rather than real prerelease labels), leaving only the base semver. Non-`git describe` prerelease suffixes (e.g. `-beta.1`) are preserved. Invalid input is returned after trimming and adding the `v` prefix.
 
 ```go
 semverutil.NormalizeGitDescribeSemver("v1.2.3-14-gabcdef")       // → "v1.2.3"
 semverutil.NormalizeGitDescribeSemver("v1.2.3-14-gabcdef-dirty") // → "v1.2.3"
 semverutil.NormalizeGitDescribeSemver("v1.2.3-beta.1")           // → "v1.2.3-beta.1"
 semverutil.NormalizeGitDescribeSemver("v1.2.3")                  // → "v1.2.3"
+semverutil.NormalizeGitDescribeSemver("not-a-version")           // → "vnot-a-version"
 ```
 
 ### `IsCompatible(pinVersion, requestedVersion string) bool`
