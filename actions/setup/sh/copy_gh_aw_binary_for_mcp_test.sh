@@ -41,9 +41,10 @@ run_script() {
   local root="$1"
   local path_prefix="${2:-}"
   local gh_config_dir="${3:-}"
+  local runner_temp="${4:-${root}/runner-temp}"
   set +e
   PATH="${path_prefix}:${root}/path:${PATH}" \
-    RUNNER_TEMP="${root}/runner-temp" \
+    RUNNER_TEMP="${runner_temp}" \
     HOME="${root}/home" \
     GITHUB_WORKSPACE="${root}/workspace" \
     GH_CONFIG_DIR="${gh_config_dir}" \
@@ -170,6 +171,23 @@ if [ "${code}" -ne 0 ] && [ "$(cat "${root}/sentinel")" = "external sentinel" ] 
 else
   cat "${root}/out.log"
   fail "did not safely reject a symlinked output directory"
+fi
+
+root="$(new_env symlinked_runner_temp_parent)"
+mkdir -p "${root}/real-runner-temp"
+printf 'external sentinel\n' > "${root}/sentinel"
+ln -s "${root}/real-runner-temp" "${root}/linked-runner-temp"
+cat > "${root}/path/gh-aw" <<'EOF'
+#!/usr/bin/env bash
+echo "path gh-aw"
+EOF
+chmod +x "${root}/path/gh-aw"
+code="$(run_script "${root}" "" "" "${root}/linked-runner-temp")"
+if [ "${code}" -ne 0 ] && [ "$(cat "${root}/sentinel")" = "external sentinel" ] && [ ! -e "${root}/real-runner-temp/gh-aw" ]; then
+  pass "rejects a symlinked RUNNER_TEMP parent"
+else
+  cat "${root}/out.log"
+  fail "did not safely reject a symlinked RUNNER_TEMP parent"
 fi
 
 echo

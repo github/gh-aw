@@ -90,6 +90,40 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+create_install_directory_without_symlinks() {
+    local directory="$HOME"
+    local component
+    local -a components=(.local share gh extensions gh-aw)
+
+    if [ ! -d "$directory" ]; then
+        print_error "Installation root is not a directory: '$directory'."
+        return 1
+    fi
+
+    for component in "${components[@]}"; do
+        directory="$directory/$component"
+        if [ -L "$directory" ]; then
+            print_error "Cannot install gh-aw through a symlinked path component: '$directory'."
+            return 1
+        fi
+        if [ -e "$directory" ]; then
+            if [ ! -d "$directory" ]; then
+                print_error "Installation path component is not a directory: '$directory'."
+                return 1
+            fi
+        else
+            if ! mkdir -- "$directory"; then
+                print_error "Failed to create installation directory: '$directory'."
+                return 1
+            fi
+            if [ -L "$directory" ] || [ ! -d "$directory" ]; then
+                print_error "Installation path is not a real directory: '$directory'."
+                return 1
+            fi
+        fi
+    done
+}
+
 append_github_output() {
     local value="$1"
     if [ -L "${GITHUB_OUTPUT:-}" ]; then
@@ -494,17 +528,7 @@ BINARY_PATH="$INSTALL_DIR/$BINARY_NAME"
 print_info "Download URL: $DOWNLOAD_URL"
 print_info "Installation directory: $INSTALL_DIR"
 
-# Create the installation directory if it doesn't exist
-if [ -L "$INSTALL_DIR" ]; then
-    print_error "Cannot install gh-aw: '$INSTALL_DIR' is a symlink."
-    exit 1
-fi
-if [ ! -d "$INSTALL_DIR" ]; then
-    print_info "Creating installation directory..."
-    mkdir -p "$INSTALL_DIR"
-fi
-if [ -L "$INSTALL_DIR" ] || [ ! -d "$INSTALL_DIR" ]; then
-    print_error "Installation path is not a real directory: '$INSTALL_DIR'."
+if ! create_install_directory_without_symlinks; then
     exit 1
 fi
 

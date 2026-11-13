@@ -3,14 +3,55 @@ set +o histexpand
 
 set -euo pipefail
 
+ensure_directory_path_without_symlinks() {
+  local path="$1"
+  local current_path
+  local component
+  local -a components
+
+  if [[ "$path" = /* ]]; then
+    current_path="/"
+  else
+    current_path="$(pwd -P)"
+  fi
+
+  IFS='/' read -r -a components <<< "$path"
+  for component in "${components[@]}"; do
+    case "$component" in
+      ""|.) continue ;;
+      ..) current_path="$(dirname "$current_path")"; continue ;;
+    esac
+
+    if [[ "$current_path" = "/" ]]; then
+      current_path="/$component"
+    else
+      current_path="$current_path/$component"
+    fi
+    if [[ -L "$current_path" ]]; then
+      echo "::error::Refusing to use a path with a symlinked component: $current_path"
+      return 1
+    fi
+    if [[ -e "$current_path" ]]; then
+      if [[ ! -d "$current_path" ]]; then
+        echo "::error::Output path component is not a directory: $current_path"
+        return 1
+      fi
+    else
+      if ! mkdir -- "$current_path"; then
+        echo "::error::Failed to create output path component: $current_path"
+        return 1
+      fi
+      if [[ -L "$current_path" || ! -d "$current_path" ]]; then
+        echo "::error::Output path component is not a real directory: $current_path"
+        return 1
+      fi
+    fi
+  done
+}
+
 # Copy the gh-aw binary to ${RUNNER_TEMP}/gh-aw for MCP Server containerization
 OUTPUT_DIR="${RUNNER_TEMP}/gh-aw"
-if [ -L "$OUTPUT_DIR" ]; then
-  echo "::error::Refusing to use a symlinked gh-aw output directory"
-  exit 1
-fi
-mkdir -p "$OUTPUT_DIR"
-if [ -L "$OUTPUT_DIR" ] || [ ! -d "$OUTPUT_DIR" ]; then
+if ! ensure_directory_path_without_symlinks "$OUTPUT_DIR"; then
   echo "::error::gh-aw output directory is not a real directory"
   exit 1
 fi
