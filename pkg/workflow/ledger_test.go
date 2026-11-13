@@ -10,8 +10,56 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLedgerPersistenceRequiresSuccessfulSafeOutputs(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		ledger string
+	}{
+		{name: "git", ledger: "  ledger: {}\n"},
+		{name: "comment", ledger: "  comment-memory:\n    target: 42\n  ledger:\n    storage: comment-memory\n"},
+		{name: "mixed", ledger: "  comment-memory:\n    target: 42\n  ledger:\n    thread:\n      storage: comment-memory\n    archive: {}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			filename := filepath.Join(dir, "ledger.md")
+			source := "---\non: workflow_dispatch\nengine: copilot\ntools:\n" + tc.ledger + "---\nRecord findings.\n"
+			require.NoError(t, os.WriteFile(filename, []byte(source), 0o600))
+			require.NoError(t, NewCompiler().CompileWorkflow(filename))
+			lock, err := os.ReadFile(filepath.Join(dir, "ledger.lock.yml"))
+			require.NoError(t, err)
+			var compiled struct {
+				Jobs map[string]struct {
+					If    string `yaml:"if"`
+					Needs any    `yaml:"needs"`
+					Steps []struct {
+						Name            string `yaml:"name"`
+						If              string `yaml:"if"`
+						ContinueOnError bool   `yaml:"continue-on-error"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal(lock, &compiled))
+			job, ok := compiled.Jobs[pushLedgerChangesJobName]
+			require.True(t, ok)
+			require.Equal(t, "always() && needs.safe_outputs.result == 'success'", job.If)
+			require.Contains(t, job.Needs, "safe_outputs")
+			var guardedSteps []string
+			for _, step := range job.Steps {
+				switch step.Name {
+				case "Download validated ledger transactions", "Reconcile and push ledger changes":
+					guardedSteps = append(guardedSteps, step.Name)
+					require.Empty(t, step.If, "step must retain the implicit success() guard")
+					require.False(t, step.ContinueOnError)
+				}
+			}
+			require.Equal(t, []string{"Download validated ledger transactions", "Reconcile and push ledger changes"}, guardedSteps)
+		})
+	}
+}
 
 func TestParseStandaloneLedgerForms(t *testing.T) {
 	single, err := parseLedgerToolConfig(map[string]any{
@@ -75,6 +123,7 @@ func TestCommentBackedLedgerConfiguration(t *testing.T) {
 	require.Contains(t, extractJobSection(string(lock), pushLedgerChangesJobName), "queue: max")
 	job, err := compiler.buildPushLedgerChangesJob(data, false)
 	require.NoError(t, err)
+	require.Equal(t, "always() && needs.safe_outputs.result == 'success'", job.If)
 	require.Contains(t, job.Permissions, "contents: read")
 	require.Contains(t, job.Permissions, "issues: write")
 	require.NotContains(t, job.Permissions, "contents: write")
@@ -146,6 +195,7 @@ func TestLedgerPersistenceConcurrencyQueue(t *testing.T) {
 					Features: queue.features,
 				}, false)
 				require.NoError(t, err)
+				require.Equal(t, "always() && needs.safe_outputs.result == 'success'", job.If)
 				if !storage.hasComments {
 					require.Empty(t, job.Concurrency)
 					return

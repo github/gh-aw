@@ -13,7 +13,7 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
-const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
@@ -554,8 +554,9 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
           throw error;
         }
         // For other errors (e.g., module not found), log warning and continue
-        handlerLoadErrors.set(type, errorMessage);
-        core.warning(`Failed to load handler for ${type}: ${errorMessage}`);
+        const diagnostic = type === "merge_pull_request" ? "merge_pull_request handler initialization failed; check trusted policy and authentication configuration" : errorMessage;
+        handlerLoadErrors.set(type, diagnostic);
+        core.warning(`Failed to load handler for ${type}: ${diagnostic}`);
       }
     } else {
       core.debug(`Handler not enabled: ${type}`);
@@ -945,6 +946,7 @@ function buildSkippedResult(type, messageIndex, result) {
 /** @param {string} type @param {any} result @param {number} messageIndex */
 function recordMergeDecision(type, result, messageIndex) {
   if (type !== "merge_pull_request" || !result || result.deferred) return result;
+  if (result.success === false) result = { ...result, error: mergeProcessingError(result) };
   try {
     writeMergePullRequestDecision(result, messageIndex);
     return { ...result, audit_recorded: true };
@@ -955,6 +957,24 @@ function recordMergeDecision(type, result, messageIndex) {
   }
 }
 
+/** @param {any} [result] */
+function mergeProcessingError(result) {
+  if (result?.operation_outcome === "indeterminate") return "Merge outcome is indeterminate; inspect the live pull request before any further action. The merge was not retried.";
+  // Only preserve exact fixed diagnostics; other handler errors can contain private API data.
+  switch (result?.error) {
+    case "merge_pull_request gate checks failed":
+    case `${SAFE_OUTPUT_E007}: Missing check producer evidence for required check`:
+    case `${SAFE_OUTPUT_E007}: Unexpected check producer for required check`:
+    case `${SAFE_OUTPUT_E007}: Ambiguous check producers for required check`:
+    case `${SAFE_OUTPUT_E007}: GitHub rejected the merge request (HTTP 405); the merge was not retried`:
+    case `${SAFE_OUTPUT_E007}: GitHub rejected the merge request (HTTP 409); the merge was not retried`:
+    case `${SAFE_OUTPUT_E007}: GitHub rejected the merge request (HTTP 422); the merge was not retried`:
+      return result.error;
+    default:
+      return "merge_pull_request failed";
+  }
+}
+
 /** @param {any} result */
 function projectMergeFailure(result) {
   return {
@@ -962,6 +982,7 @@ function projectMergeFailure(result) {
     ...(result.audit_recorded ? { audit_recorded: true } : {}),
     ...(result.audit_failed ? { audit_failed: true, audit_error: result.audit_error } : {}),
     ...(typeof result.staged === "boolean" ? { staged: result.staged } : {}),
+    ...(result.operation_outcome === "indeterminate" ? { operation_outcome: "indeterminate", merged: null, data_trust: "untrusted" } : {}),
   };
 }
 
@@ -1407,7 +1428,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
           messageIndex: i,
           success: false,
           error: errorMsg,
-          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : {}),
+          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : result.operation_outcome === "indeterminate" ? { result: { operation_outcome: "indeterminate" } } : {}),
         });
         // Track code-push failures for later comment annotations and conclusion reporting.
         if (CODE_PUSH_TYPES.has(messageType)) {
@@ -1546,12 +1567,13 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
 
       core.info(`✓ Message ${i + 1} (${messageType}) completed successfully`);
     } catch (error) {
-      core.error(`✗ Message ${i + 1} (${messageType}) failed: ${getErrorMessage(error)}`);
+      const errorMsg = messageType === "merge_pull_request" ? mergeProcessingError() : getErrorMessage(error);
+      core.error(`✗ Message ${i + 1} (${messageType}) failed: ${errorMsg}`);
       results.push({
         type: messageType,
         messageIndex: i,
         success: false,
-        error: getErrorMessage(error),
+        error: errorMsg,
       });
       // Track code-push failures for later comment annotations and conclusion reporting.
       if (CODE_PUSH_TYPES.has(messageType)) {
@@ -1692,7 +1714,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
             logCreatedItemFromResult(onItemCreated, deferred.type, result);
           }
         } catch (error) {
-          const errorMsg = getErrorMessage(error);
+          const errorMsg = deferred.type === "merge_pull_request" ? mergeProcessingError() : getErrorMessage(error);
           core.error(`✗ Retry of message ${deferred.messageIndex + 1} (${deferred.type}) failed: ${errorMsg}`);
           // Replace the deferred record so terminal retry exceptions classify as failed.
           const resultIndex = results.findIndex(r => r.messageIndex === deferred.messageIndex);

@@ -77,6 +77,19 @@ provision secrets, escalate credentials, or retry dispatch.
 
 5. **Constrain credentials.** Recommend, not require, a protected test environment and rotated, restricted development credentials. Inspect environments; provision only with authorization and revoke replaced credentials at their issuer. Never copy/rotate production secrets. Authorized repository/organization/enterprise shared secrets remain job-scoped, not automatically OS-exported; test environments do not isolate them. Keep production/dispatch credentials out of harnesses.
 
+## Evidence and completion contract
+
+Follow [evidence collection](#collect-existing-evidence) before diagnosis:
+preserve supplied host/repository/job/step URLs; scope bare IDs explicitly.
+Separate command failures from workflow failures and absent evidence from zero
+findings. For model/endpoint/version failures use
+[model triage](#model-and-engine-misconfiguration); for other signatures use the
+playbook linked above. Report mode, cause/uncertainty, patch, regression evidence
+and unmet gates. Keep static, fixture and live results distinct; never claim an
+active loop completed from compilation alone.
+
+<!-- instruction-prefix-end -->
+
 ## Test Workflow Changes from a Branch
 
 Notify the user before live-test authorization: a published feature branch
