@@ -454,6 +454,8 @@ export interface SafeOutputData {
   output_id?: string;
   messageIndex?: number;
   staged?: boolean;
+  /** The operation may have applied even though processing failed to confirm it. */
+  operation_outcome?: "indeterminate";
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {
