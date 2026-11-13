@@ -295,6 +295,9 @@ func omitEmptyColumns(val reflect.Value, headers []string, fieldPaths [][]int, f
 	filteredPaths := make([][]int, 0, len(fieldPaths))
 	filteredTags := make([]consoleTag, 0, len(fieldTags))
 	for i, tag := range fieldTags {
+		if i >= len(headers) || i >= len(fieldPaths) {
+			continue
+		}
 		if tag.omitempty && !tableFieldHasValue(val, fieldPaths[i]) {
 			continue
 		}
@@ -503,20 +506,8 @@ func isZeroValue(val reflect.Value) bool {
 	}
 
 	switch val.Kind() {
-	case reflect.Array:
-		for i := range val.Len() {
-			if !isZeroValue(val.Index(i)) {
-				return false
-			}
-		}
-		return true
-	case reflect.Struct:
-		for i := range val.NumField() {
-			if !isZeroValue(val.Field(i)) {
-				return false
-			}
-		}
-		return true
+	case reflect.Array, reflect.Struct:
+		return val.IsZero()
 	case reflect.Map, reflect.Slice, reflect.String:
 		return val.Len() == 0
 	case reflect.Bool:
