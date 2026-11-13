@@ -23,6 +23,31 @@ func TestNoopCommentBodyOutputRequiresNoopStep(t *testing.T) {
 	}
 }
 
+func TestCompletionCommentFooterMetadata(t *testing.T) {
+	data := &WorkflowData{
+		Name:         "Test workflow",
+		WorkflowID:   "test-workflow",
+		EngineConfig: &EngineConfig{ID: "copilot"},
+		Model:        "gpt-5.6-luna",
+		SafeOutputs:  &SafeOutputsConfig{NoOp: &NoOpConfig{}, ThreatDetection: &ThreatDetectionConfig{}},
+		Evals:        &EvalsConfig{Questions: []EvalDefinition{{ID: "result", Question: "Done?"}}},
+	}
+	env := strings.Join(NewCompiler().buildConclusionScriptEnvVars(data, "agent", nil, ""), "")
+	for _, expected := range []string{
+		`GH_AW_ENGINE_ID: "copilot"`,
+		`GH_AW_ENGINE_MODEL: "gpt-5.6-luna"`,
+		`GH_AW_AIC: ${{ needs.agent.outputs.aic }}`,
+		`GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}`,
+		`GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}`,
+		`GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}`,
+		`GH_AW_WORKFLOW_ID: "test-workflow"`,
+	} {
+		if !strings.Contains(env, expected) {
+			t.Errorf("Completion comment footer is missing %s", expected)
+		}
+	}
+}
+
 func TestNoopStepInConclusionJob(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "noop-in-conclusion-test")

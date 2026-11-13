@@ -580,7 +580,13 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_TRACKER_ID: %q\n", data.TrackerID))
 	}
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
-	envVars = append(envVars, buildModelRoutingOutputEnvVars(data.EngineConfig, mainJobName)...)
+	envVars = append(envVars, buildEngineMetadataEnvVars(data.EngineConfig, data.Model)...)
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_AIC: ${{ needs.%s.outputs.aic }}\n", mainJobName))
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_AMBIENT_CONTEXT: ${{ needs.%s.outputs.ambient_context }}\n", mainJobName))
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_WORKFLOW_ID: %q\n", data.WorkflowID))
+	if data.Evals != nil && data.Evals.HasEvals() {
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_EVALS_AIC: ${{ needs.%s.outputs.aic }}\n", constants.EvalsJobName))
+	}
 	if data.SafeOutputs.NoOp != nil {
 		envVars = append(envVars, "          GH_AW_NOOP_COMMENT_BODY: ${{ steps.noop.outputs.noop_comment_body }}\n")
 	}
@@ -595,6 +601,7 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_REASON: ${{ needs.%s.outputs.detection_reason }}\n", constants.DetectionJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_THREAT_KINDS: ${{ needs.%s.outputs.detection_threat_kinds }}\n", constants.DetectionJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_THREAT_DETECTION_AIC: ${{ needs.%s.outputs.aic }}\n", constants.DetectionJobName))
 		notifyCommentLog.Print("Added detection conclusion and reason environment variables to conclusion job")
 	}
 	if data.SafeOutputs.AssignToAgent != nil {

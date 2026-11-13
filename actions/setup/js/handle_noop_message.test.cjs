@@ -216,10 +216,13 @@ safe-outputs:
       await main();
 
       const body = mockGithub.rest.issues.createComment.mock.calls[0][0].body;
+      const completionBody = mockCore.setOutput.mock.calls.find(call => call[0] === "noop_comment_body")[1];
       expect(body).toContain("**Outcome:** `reported_no_action`");
       expect(body).toContain("does not verify");
       expect(body).not.toContain(message);
       expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain(message);
+      expect(body.match(/> Generated from /g)).toHaveLength(1);
+      expect(completionBody).not.toMatch(/Generated (?:by|from)/);
     }
   );
 
@@ -286,6 +289,7 @@ safe-outputs:
     expect(commentBodyCall[1]).toContain("### Test Workflow");
     expect(commentBodyCall[1]).toContain("reported_no_action");
     expect(commentBodyCall[1]).not.toContain("Nothing to do");
+    expect(commentBodyCall[1]).not.toMatch(/Generated (?:by|from)/);
     expect(mockCore.setOutput).toHaveBeenCalledWith("noop_message", "Nothing to do");
   });
 

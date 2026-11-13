@@ -206,21 +206,31 @@ function buildHistoryLink() {
  * @param {string} runUrl
  * @param {boolean} hasIncompleteReport
  * @param {boolean} hasNonNoopOutput
+ * @param {boolean} [includeFooter]
  * @returns {string}
  */
-function buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput) {
+function buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput, includeFooter = false) {
   const outcome = classifyNoopOutcome(agentConclusion, hasIncompleteReport, hasNonNoopOutput);
   const commentTemplatePath = getPromptPath("noop_comment.md");
+  const footer = includeFooter
+    ? parseReportMarkdown("> Generated from [{workflow_name}]({run_url}){aic_suffix}{ambient_context_suffix}{history_link}", {
+        context: {
+          workflow_name: workflowName,
+          run_url: runUrl,
+          aic_suffix: buildAICSuffix(),
+          ambient_context_suffix: buildAmbientContextSuffix(),
+          history_link: { type: "inline_slot", children: buildHistoryLink() },
+        },
+        agentTainted: false,
+      })
+    : [];
   const children = parseReportMarkdown(fs.readFileSync(commentTemplatePath, "utf8"), {
     context: {
       workflow_name: workflowName,
       category: outcome.category,
       description: outcome.description,
-      run_url: runUrl,
-      aic_suffix: buildAICSuffix(),
-      ambient_context_suffix: buildAmbientContextSuffix(),
-      history_link: { type: "inline_slot", children: buildHistoryLink() },
     },
+    blockSlots: { footer },
     minimumHeadingLevel: 2,
     agentTainted: false,
   });
@@ -294,7 +304,7 @@ async function main() {
     const hasNonNoopOutput = nonNoopItems.length > 0;
     const reportAsIssue = process.env.GH_AW_NOOP_REPORT_AS_ISSUE !== "false"; // Default to true
 
-    // Reuse this privacy-safe body in the run's completion status comment.
+    // Completion comments add their own attribution footer.
     let commentBody = "";
     try {
       commentBody = buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput);
@@ -358,7 +368,7 @@ async function main() {
         owner,
         repo,
         issue_number: noopRunsIssue.number,
-        body: commentBody,
+        body: buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput, true),
       });
 
       core.info(`✓ Posted no-op message to no-op runs issue #${noopRunsIssue.number}`);
