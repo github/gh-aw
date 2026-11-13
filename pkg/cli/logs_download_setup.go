@@ -3,10 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
-	"github.com/github/gh-aw/pkg/console"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/github/gh-aw/pkg/console"
 )
 
 type logsDownloadRuntime struct {

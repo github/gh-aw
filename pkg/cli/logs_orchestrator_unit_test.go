@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1300,7 +1301,7 @@ func TestLogsCollectionErrorHelpers(t *testing.T) {
 		state := logsCollectionState{iteration: 2}
 		stop, err := handleLogsRateLimitWaitError(&state, true, LogsDownloadOptions{}, context.DeadlineExceeded)
 		assert.True(t, stop)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, state.timeoutReached)
 
 		countLimit := newLogsCountLimit(1)
@@ -1308,7 +1309,7 @@ func TestLogsCollectionErrorHelpers(t *testing.T) {
 		state = logsCollectionState{}
 		stop, err = handleLogsRateLimitWaitError(&state, true, LogsDownloadOptions{countLimit: countLimit}, context.Canceled)
 		assert.True(t, stop)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, state.countLimitReached)
 
 		rateLimitState := newLogsRateLimitState(nil)
@@ -1324,7 +1325,7 @@ func TestLogsCollectionErrorHelpers(t *testing.T) {
 		assert.Zero(t, state)
 
 		state = logsCollectionState{iteration: 3}
-		stop, err = handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, fmt.Errorf("temporary"))
+		stop, err = handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, errors.New("temporary"))
 		assert.False(t, stop)
 		assert.NoError(t, err)
 		assert.Equal(t, 4, state.iteration)
@@ -1354,7 +1355,7 @@ func TestLogsCollectionErrorHelpers(t *testing.T) {
 		stop, err = handleLogsBatchError(&state, false, nil, nil, context.Canceled)
 		assert.True(t, stop)
 		assert.ErrorIs(t, err, context.Canceled)
-		stop, err = handleLogsBatchError(&state, false, nil, nil, fmt.Errorf("batch failed"))
+		stop, err = handleLogsBatchError(&state, false, nil, nil, errors.New("batch failed"))
 		assert.False(t, stop)
 		assert.Error(t, err)
 	})
@@ -1400,9 +1401,9 @@ func TestLogsCollectionErrorHelpers(t *testing.T) {
 	})
 
 	t.Run("ATIF errors and iteration logging", func(t *testing.T) {
-		state := logsCollectionState{atifError: fmt.Errorf("export failed")}
+		state := logsCollectionState{atifError: errors.New("export failed")}
 		err := handleLogsATIFBatchError(&state, false, LogsDownloadOptions{}, false)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		_, stderr := captureOutput(t, func() error {
 			logLogsIterationFetch(LogsDownloadOptions{Verbose: true, Count: 3}, false, 2, 1)

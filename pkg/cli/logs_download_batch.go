@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/github/gh-aw/pkg/console"
-	"github.com/github/gh-aw/pkg/fileutil"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/fileutil"
 )
 
 type workflowRunBatch struct {

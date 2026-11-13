@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/github/gh-aw/pkg/console"
 	"os"
 	"time"
+
+	"github.com/github/gh-aw/pkg/console"
 )
 
 // logsFetchWorkflowRunBatch and logsProcessWorkflowRunBatch are indirection points so
