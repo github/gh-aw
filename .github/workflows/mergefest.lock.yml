@@ -1207,7 +1207,7 @@ jobs:
           export COPILOT_API_KEY="$COPILOT_DUMMY_BYOK"
           (umask 177 && touch /tmp/gh-aw/agent-stdio.log)
           GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-1000}"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then
+          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[0-9]+)$ ]]; then
             GH_AW_MAX_AI_CREDITS="1000"
           fi
           if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -z "${GH_AW_ADMISSION_MAX_AI_CREDITS:-}" ]]; then
@@ -2283,7 +2283,7 @@ jobs:
 
           (umask 177 && touch /tmp/gh-aw/threat-detection/detection.log)
           GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-400}"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then
+          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[0-9]+)$ ]]; then
             GH_AW_MAX_AI_CREDITS="400"
           fi
 
