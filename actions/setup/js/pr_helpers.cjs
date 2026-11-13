@@ -114,13 +114,27 @@ function buildBranchInstruction(effectiveBaseBranch, resolvedDefaultBranch) {
  * @param {string} owner
  * @param {string} repo
  * @param {string} branch
+ * @param {{signedCommits?: boolean}} options
  * @returns {Promise<boolean>}
  */
-async function hasOnlyCopilotReviewRules(githubClient, owner, repo, branch) {
+async function hasOnlyNonBlockingRules(githubClient, owner, repo, branch, { signedCommits }) {
+  const allowedRuleTypes = new Set([
+    "copilot_code_review",
+    "branch_name_pattern",
+    "commit_message_pattern",
+    "commit_author_email_pattern",
+    "committer_email_pattern",
+    "file_path_restriction",
+    "file_extension_restriction",
+    "max_file_path_length",
+    "max_file_size",
+  ]);
+  if (signedCommits === true) allowedRuleTypes.add("required_signatures");
+
   // Read pages directly: Octokit's paginator can swallow a later-page HTTP 409.
   for (let page = 1; page <= MAX_BRANCH_RULE_PAGES; page++) {
     const { data: rules } = await githubClient.rest.repos.getBranchRules({ owner, repo, branch, per_page: 100, page });
-    if (!Array.isArray(rules) || (page === 1 && rules.length === 0) || !rules.every(rule => rule?.type === "copilot_code_review")) {
+    if (!Array.isArray(rules) || (page === 1 && rules.length === 0) || !rules.every(rule => allowedRuleTypes.has(rule?.type))) {
       return false;
     }
     if (rules.length < 100) return true;
@@ -134,7 +148,7 @@ async function hasOnlyCopilotReviewRules(githubClient, owner, repo, branch) {
  * Performs two security checks:
  * 1. Ensures the branch is not the repository's default branch.
  * 2. When `checkBranchProtection` is true, queries the branch API to
- *    verify the branch has no protection rules other than Copilot code review.
+ *    verify the branch has no blocking protection rules.
  *
  * Returns null when the push is safe to proceed, or a string error message that
  * should be surfaced as a hard failure when the push must be blocked.
@@ -144,9 +158,10 @@ async function hasOnlyCopilotReviewRules(githubClient, owner, repo, branch) {
  * @param {string} repo - Repository name
  * @param {string} branchName - Target branch to validate
  * @param {boolean} checkBranchProtection - Whether to call the branch API to check protection
+ * @param {{signedCommits?: boolean}} [options] - Whether the push uses signed commits
  * @returns {Promise<string|null>} Error message if push is blocked, null if safe
  */
-async function checkBranchPushable(githubClient, owner, repo, branchName, checkBranchProtection) {
+async function checkBranchPushable(githubClient, owner, repo, branchName, checkBranchProtection, options = {}) {
   // Check whether the branch is the repository default branch
   /** @type {any} */
   let defaultBranch = null;
@@ -167,10 +182,10 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
     try {
       const { data: branchData } = await githubClient.rest.repos.getBranch({ owner, repo, branch: branchName });
       isBranchProtected = branchData.protected;
-      // The protected flag includes advisory rulesets. Confirm classic protection separately.
+      // The protected flag includes non-blocking rulesets. Confirm classic protection separately.
       if (isBranchProtected && typeof defaultBranch === "string" && defaultBranch.length > 0 && branchName !== defaultBranch && branchData.protection?.enabled === false) {
         try {
-          if (await hasOnlyCopilotReviewRules(githubClient, owner, repo, branchName)) {
+          if (await hasOnlyNonBlockingRules(githubClient, owner, repo, branchName, options)) {
             // refUpdateRule exposes classic protection to non-admins.
             const result = await githubClient.graphql(
               `query($owner: String!, $repo: String!, $ref: String!) {
@@ -187,7 +202,7 @@ async function checkBranchPushable(githubClient, owner, repo, branchName, checkB
               throw new Error("Classic branch protection query did not return a ref update rule");
             }
             if (classicRule === null) {
-              core.info(`Branch "${branchName}" only has Copilot code review rules and no classic protection; proceeding to push`);
+              core.info(`Branch "${branchName}" only has non-blocking rules and no classic protection; proceeding to push`);
               isBranchProtected = false;
             }
           }

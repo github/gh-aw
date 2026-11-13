@@ -1022,7 +1022,7 @@ async function main(config = {}) {
     // This prevents agents from pushing directly to branches that should only receive
     // changes through reviewed pull requests.
     {
-      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, checkBranchProtection);
+      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, checkBranchProtection, { signedCommits });
       if (blockReason) {
         core.error(blockReason);
         return { success: false, error: blockReason };

@@ -1029,6 +1029,30 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       });
     });
 
+    it.each([undefined, true, false])("should allow signature rules only with signed-commits enabled: %s", async signedCommits => {
+      mockGithub.rest.repos.getBranch.mockResolvedValue({ data: { protected: true, protection: { enabled: false } } });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({
+        data: [{ type: "required_signatures" }, { type: "branch_name_pattern" }, { type: "file_extension_restriction" }],
+      });
+      mockGithub.graphql.mockResolvedValueOnce({ repository: { ref: { refUpdateRule: null } } });
+      createPatchFile("signature-rules-branch");
+      mockExec.getExecOutput.mockResolvedValue({ exitCode: 0, stdout: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", stderr: "" });
+
+      const module = await loadModule();
+      const handler = await module.main({ signed_commits: signedCommits });
+      const result = await handler({ branch: "signature-rules-branch" }, {});
+
+      if (signedCommits === false) {
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("protection rules");
+        expect(mockExec.exec).not.toHaveBeenCalled();
+        expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      } else {
+        expect(result.success).toBe(true);
+        expect(result.branch_name).toBe("feature-branch");
+      }
+    });
+
     it.each([
       [404, "Not Found"],
       [403, "Resource not accessible by integration"],
