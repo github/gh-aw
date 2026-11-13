@@ -252,6 +252,32 @@
   .confetti { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; z-index: 5; }
   .sec-lane { position: absolute; left: 0; top: 880px; width: 1920px; height: 120px; }
 
+  /* --- compiler hardening --- */
+  .ch-slide .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8, #3fb950); }
+  .ch-cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+  .ch-file { position: absolute; left: 110px; width: 520px; border-radius: 16px; background: #0d1117f2; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -28px var(--c); overflow: hidden; opacity: 0; }
+  .active .ch-file { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 300ms); }
+  .ch-file .cm-tab { height: 44px; font-size: 18px; }
+  .ch-file .cm-tab .sv { color: var(--c); }
+  .ch-file pre { margin: 0; padding: 12px 22px 16px; font: 500 18px/25px var(--mono); color: #d1d7e0; white-space: pre; }
+  .ch-file pre span { display: block; }
+  .ch-k { color: #ff7b72; } .ch-v { color: #a5d6ff; } .ch-c { color: #656c76; } .ch-p { color: #f0f6fc; font-family: "Mona Sans"; font-weight: 600; }
+  .ch-file pre .ch-g { margin: 0 -22px; padding: 0 22px; background: #3fb95014; box-shadow: inset 3px 0 #3fb950; }
+  .ch-cmd { position: absolute; left: 110px; top: 712px; width: 520px; display: flex; align-items: center; gap: 12px; font: 600 17px/1 var(--mono); color: #3fb950; opacity: 0; }
+  .ch-cmd b { color: #9198a1; font-weight: 500; }
+  .active .ch-cmd { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .7s; }
+  .ch-legend { position: absolute; left: 1340px; top: 296px; width: 480px; display: flex; flex-direction: column; gap: 10px; }
+  .ch-row { display: grid; grid-template-columns: 46px 1fr auto; column-gap: 14px; align-items: center; padding: 11px 18px; border-radius: 14px;
+    background: #0d1117f8; border: 1px solid #3d444d; opacity: 0; transition: border-color .4s, box-shadow .4s, background .4s; }
+  .active .ch-row { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 110ms + 600ms); }
+  .ch-row.hit { border-color: var(--c); box-shadow: 0 0 34px -8px var(--c); background: color-mix(in srgb, var(--c) 12%, #0d1117e6); transition: none; }
+  .ch-row i { grid-row: span 2; font: 700 22px/1 var(--mono); color: var(--c); font-style: normal; }
+  .ch-row b { font-size: 25px; line-height: 1.15; font-variation-settings: "wght" 700, "wdth" 100; }
+  .ch-row span { font: 500 14px/1.35 var(--mono); color: #9198a1; }
+  .ch-row em { grid-row: span 2; grid-column: 3; font: 700 26px/1 var(--mono); font-style: normal; color: var(--c); font-variant-numeric: tabular-nums; min-width: 2.2em; text-align: right; }
+  .ch-scan { position: absolute; left: 1340px; top: 928px; width: 480px; font: 500 15px/1 var(--mono); letter-spacing: .08em; color: #9198a1; text-align: center; opacity: 0; }
+  .active .ch-scan { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.4s; }
+
   /* --- prompt to factory --- */
   .pf-card { position: absolute; top: 360px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -25px var(--c); opacity: 0; transform: translateY(30px) scale(.97); transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1); }
   .pf-card.on { opacity: 1; transform: none; }
@@ -827,6 +853,322 @@
         ),
         [0, 1].map(i => h("div", { class: "sec-arrow", style: { left: `${BX[i] + 500}px` } }, "→")),
         lane
+      ),
+    });
+  }
+
+  // Compiler hardening: the compiler threat detection spec as concentric layers around the lock file
+  {
+    resetIndex();
+    const CX = 975,
+      CY = 650,
+      CORE = 92;
+    // outermost layer first: attacks pierce until the layer whose rules catch them
+    const layers = [
+      ["Trigger admission", "fork PRs · PR target · bot sync", "CTR-008 · 027 · 034", "#d29922"],
+      ["Expression safety", "untrusted ${{ }} → env vars", "CTR-006 · 010 · 026", "#f778ba"],
+      ["Pinned supply chain", "SHA pins · manifest drift", "CTR-002 · 016 · 018", "#ab7df8"],
+      ["Package & arg hygiene", "install scripts · arg injection", "CTR-013 · 014 · 022", "#79c0ff"],
+      ["Least privilege", "read-only token · safe outputs", "CTR-001 · 005 · 015", "#4493f8"],
+      ["Sandbox & egress", "egress allowlist · no bypass", "CTR-004 · 011 · 031", "#3fb950"],
+    ].map(([title, sub, ids, c], i) => ({ title, sub, ids, c, r: 330 - i * 40, flash: 0, n: 0, rot: Math.random() * 6 }));
+    const attacks = [
+      [0, "fork PR pwn request"],
+      [0, "pull_request_target + secrets"],
+      [0, "spoofed bot sync"],
+      [1, "${{ github.event.issue.title }}"],
+      [1, "timeout-minutes: ${{ … }}"],
+      [1, "multiline expression"],
+      [2, "tag moved: @v4"],
+      [2, "unpinned action"],
+      [2, "new secret vs manifest"],
+      [3, "npm postinstall"],
+      [3, "--upload-pack=evil"],
+      [3, "-rf as package name"],
+      [4, "contents: write"],
+      [4, "direct push to main"],
+      [4, "labels: *"],
+      [5, "curl | sh"],
+      [5, "egress to *.com"],
+      [5, "sandbox: false"],
+    ];
+    const rows = layers.map((l, i) => h("div", { class: "ch-row", "--c": l.c, "--i": i }, h("i", {}, String(i + 1).padStart(2, "0")), h("b", {}, l.title), h("em", {}, "0"), h("span", {}, l.sub, h("br"), l.ids)));
+    const line = (...parts) =>
+      h(
+        "span",
+        { class: parts[0] === "g" ? "ch-g" : "" },
+        parts.filter(p => p !== "g").map(([cls, t]) => (cls ? h("span", { class: cls, style: { display: "inline" } }, t) : t))
+      );
+    const md = h(
+      "div",
+      { class: "ch-file", "--c": "#9198a1", "--i": 0, style: { top: "296px" } },
+      h("div", { class: "cm-tab" }, "triage.md", h("span", { class: "sv" }, "AUTHORED")),
+      h(
+        "pre",
+        {},
+        line([null, "---"]),
+        line(["ch-k", "on"], [null, ":"]),
+        line(["ch-k", "  issues"], [null, ": "], ["ch-v", "{ types: [opened] }"]),
+        line(["ch-k", "permissions"], [null, ": "], ["ch-v", "read-all"]),
+        line(["ch-k", "network"], [null, ": "], ["ch-v", "defaults"]),
+        line(["ch-k", "safe-outputs"], [null, ":"]),
+        line(["ch-k", "  add-labels"], [null, ": "], ["ch-v", "{ allowed: [bug] }"]),
+        line([null, "---"]),
+        line(["ch-p", "Triage issue #${{ github.event.issue.number }}"]),
+        line(["ch-p", "and label it."])
+      )
+    );
+    const cmd = h("div", { class: "ch-cmd", style: { top: "640px" } }, h("b", {}, "$"), "gh aw compile --strict", h("b", {}, "↓"));
+    const lock = h(
+      "div",
+      { class: "ch-file", "--c": "#3fb950", "--i": 1, style: { top: "684px" } },
+      h("div", { class: "cm-tab" }, "triage.lock.yml", h("span", { class: "sv" }, "HARDENED")),
+      h(
+        "pre",
+        {},
+        line("g", ["ch-k", "uses"], [null, ": "], ["ch-v", "actions/checkout@de0fac2"], ["ch-c", " # v6"]),
+        line("g", ["ch-k", "permissions"], [null, ": "], ["ch-v", "{ issues: read }"]),
+        line("g", ["ch-k", "env"], [null, ": "], ["ch-v", "{ ISSUE_NUMBER: ${{ … }} }"]),
+        line("g", ["ch-k", "run"], [null, ": "], ["ch-v", 'awf --allow-domains "$ALLOW"']),
+        line("g", ["ch-k", "needs"], [null, ": "], ["ch-v", "[agent, detection]"]),
+        line("g", ["ch-k", "timeout-minutes"], [null, ": "], ["ch-v", "20"])
+      )
+    );
+    const cv = h("canvas", { class: "ch-cv", width: 1920, height: 1080 });
+    const ctx = cv.getContext("2d");
+    let shots = [],
+      bits = [],
+      pops = [],
+      flow = [],
+      last = 0,
+      spawn = 0,
+      total = 0,
+      deck = [];
+    const draw = t => {
+      ctx.clearRect(0, 0, 1920, 1080);
+      // compile path: triage.md → core → triage.lock.yml
+      ctx.setLineDash([4, 10]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffffff22";
+      ctx.beginPath();
+      ctx.moveTo(630, 470);
+      ctx.quadraticCurveTo(800, 470, CX - CORE, CY - 20);
+      ctx.moveTo(CX - CORE, CY + 20);
+      ctx.quadraticCurveTo(800, 830, 630, 830);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (const f of flow) {
+        const p = f.p,
+          q = 1 - p;
+        let x, y, col;
+        if (f.out) {
+          x = q * q * (CX - CORE) + 2 * q * p * 800 + p * p * 630;
+          y = q * q * (CY + 20) + 2 * q * p * 830 + p * p * 830;
+          col = "#3fb950";
+        } else {
+          x = q * q * 630 + 2 * q * p * 800 + p * p * (CX - CORE);
+          y = q * q * 470 + 2 * q * p * 470 + p * p * (CY - 20);
+          col = "#9198a1";
+        }
+        ctx.fillStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 10;
+        ctx.fillRect(x - 4, y - 4, 8, 8);
+      }
+      ctx.shadowBlur = 0;
+      // layers: rotating dashed shells that flare when they catch something
+      layers.forEach((l, i) => {
+        ctx.save();
+        ctx.translate(CX, CY);
+        ctx.rotate(l.rot + t * 0.00012 * (i % 2 ? -1 : 1) * (1 + i * 0.25));
+        ctx.strokeStyle = l.c;
+        ctx.globalAlpha = 0.28 + l.flash * 0.72;
+        ctx.lineWidth = 3 + l.flash * 4;
+        ctx.shadowColor = l.c;
+        ctx.shadowBlur = 8 + l.flash * 30;
+        ctx.setLineDash([l.r * 0.42, 14 + i * 3]);
+        ctx.beginPath();
+        ctx.arc(0, 0, l.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        const a = -Math.PI / 2 - 0.62;
+        const bx = CX + Math.cos(a) * l.r,
+          by = CY + Math.sin(a) * l.r;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#0d1117";
+        ctx.beginPath();
+        ctx.arc(bx, by, 15, 0, 7);
+        ctx.fill();
+        ctx.strokeStyle = l.c;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = l.c;
+        ctx.font = "700 14px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1), bx, by + 1);
+      });
+      ctx.setLineDash([]);
+      // core: the hardened lock file
+      const pulse = 0.5 + 0.5 * Math.sin(t / 420);
+      const g = ctx.createRadialGradient(CX, CY, 10, CX, CY, CORE + 40);
+      g.addColorStop(0, "#3fb95055");
+      g.addColorStop(0.7, "#3fb95018");
+      g.addColorStop(1, "#3fb95000");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(CX, CY, CORE + 40, 0, 7);
+      ctx.fill();
+      ctx.fillStyle = "#0d1117";
+      ctx.strokeStyle = "#3fb950";
+      ctx.lineWidth = 3;
+      ctx.shadowColor = "#3fb950";
+      ctx.shadowBlur = 18 + pulse * 18;
+      ctx.beginPath();
+      ctx.arc(CX, CY, CORE, 0, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#3fb950";
+      ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+      ctx.fillText(".lock.yml", CX, CY - 34);
+      ctx.fillStyle = "#f0f6fc";
+      ctx.font = "800 46px 'Mona Sans', sans-serif";
+      ctx.fillText(String(total), CX, CY + 4);
+      ctx.fillStyle = "#9198a1";
+      ctx.font = "600 13px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+      ctx.fillText("BLOCKED", CX, CY + 40);
+      // incoming attacks
+      ctx.textBaseline = "middle";
+      for (const s of shots) {
+        const x = CX + Math.cos(s.a) * s.d,
+          y = CY + Math.sin(s.a) * s.d;
+        ctx.globalAlpha = Math.min(1, (s.d0 - s.d) / 50 + 0.15);
+        ctx.fillStyle = "#ff7b72";
+        ctx.shadowColor = "#f85149";
+        ctx.shadowBlur = 16;
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, 7);
+        ctx.fill();
+        ctx.strokeStyle = "#f8514966";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(s.a) * 40, y + Math.sin(s.a) * 40);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.font = "500 17px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+        const right = Math.cos(s.a) >= 0;
+        ctx.textAlign = right ? "left" : "right";
+        ctx.fillText(s.label, x + (right ? 16 : -16), y - 16);
+      }
+      ctx.globalAlpha = 1;
+      for (const b of bits) {
+        ctx.globalAlpha = Math.max(0, b.life);
+        ctx.fillStyle = b.c;
+        ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+      }
+      ctx.textAlign = "center";
+      ctx.font = "700 16px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+      for (const p of pops) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
+        ctx.fillStyle = p.c;
+        ctx.fillText(p.text, p.x, p.y);
+      }
+      ctx.globalAlpha = 1;
+    };
+    slides.push({
+      sound: "forge",
+      palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
+      notes:
+        "Compiler hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and the sandbox with an egress firewall. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
+      enter() {
+        shots = [];
+        bits = [];
+        pops = [];
+        flow = [];
+        deck = [];
+        last = spawn = total = 0;
+        layers.forEach((l, i) => {
+          l.flash = 0;
+          l.n = 0;
+          rows[i].querySelector("em").textContent = "0";
+          rows[i].classList.remove("hit");
+        });
+      },
+      tick(t) {
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (t - spawn > 520) {
+          spawn = t;
+          if (!deck.length) deck = attacks.map((_, i) => i).sort(() => Math.random() - 0.5);
+          const [k, label] = attacks[deck.pop()];
+          // stay clear of the file cards on the left
+          const a = -Math.PI * 0.62 + Math.random() * Math.PI * 1.24;
+          // start off-screen-ish, but below the heading and above the slide chrome
+          const sn = Math.sin(a),
+            d0 = Math.min(600, sn < 0 ? (CY - 300) / -sn : (1030 - CY) / Math.max(0.01, sn));
+          shots.push({ a, d: d0, d0, k, label, v: 0.24 + Math.random() * 0.08 });
+          if (Math.random() < 0.8) flow.push({ p: 0, out: false });
+        }
+        for (const s of shots) {
+          s.d -= dt * s.v;
+          const l = layers[s.k];
+          if (s.d <= l.r) {
+            s.dead = true;
+            l.flash = 1;
+            l.n++;
+            total++;
+            const row = rows[s.k];
+            row.querySelector("em").textContent = String(l.n);
+            row.classList.add("hit");
+            clearTimeout(row._t);
+            row._t = setTimeout(() => row.classList.remove("hit"), 260);
+            const x = CX + Math.cos(s.a) * l.r,
+              y = CY + Math.sin(s.a) * l.r;
+            for (let j = 0; j < 16; j++) {
+              const ang = s.a + (Math.random() - 0.5) * 2.4,
+                sp = 0.08 + Math.random() * 0.25;
+              bits.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, c: j % 3 ? l.c : "#ff7b72" });
+            }
+            pops.push({ x: x + Math.cos(s.a) * 34, y: y + Math.sin(s.a) * 34, text: l.ids.split(" · ")[0] + " ✓", c: l.c, life: 1 });
+          }
+        }
+        shots = shots.filter(s => !s.dead);
+        for (const b of bits) {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.life -= dt / 700;
+        }
+        bits = bits.filter(b => b.life > 0);
+        for (const p of pops) {
+          p.y -= dt * 0.03;
+          p.life -= dt / 1300;
+        }
+        pops = pops.filter(p => p.life > 0);
+        for (const f of flow) {
+          f.p += dt / 1100;
+          if (f.p >= 1 && !f.out) {
+            f.out = true;
+            f.p = 0;
+          }
+        }
+        flow = flow.filter(f => !(f.out && f.p >= 1));
+        for (const l of layers) l.flash = Math.max(0, l.flash - dt / 600);
+        draw(t);
+      },
+      el: h(
+        "section",
+        { class: "slide ch-slide" },
+        cv,
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Compiler threat detection spec"), h("h2", {}, letters("Compiler "), letters("hardening", "l-grad"))),
+        md,
+        cmd,
+        lock,
+        h("div", { class: "ch-legend" }, rows),
+        h("div", { class: "ch-scan" }, "+ --validate · actionlint · zizmor · poutine")
       ),
     });
   }
@@ -2483,6 +2825,14 @@
       },
       // prompt: keyboard typing then a compile whir and success chime
       typing: () => {}, // live keystrokes + compile chime are played by the slide itself
+      // compiler hardening: anvil strikes ringing out, then a low shield hum
+      forge: t => {
+        [0, 0.34, 0.68].forEach((d, i) => {
+          click(t + 0.2 + d, 2400 + i * 400, 0.1, 6);
+          [1, 2.76, 5.4].forEach(r => osc("sine", 523 * r, t + 0.2 + d, 0.6 - i * 0.1, 0.03 / r));
+        });
+        pad([40, 47, 52], t + 1.1, 2.4, 0.03, "triangle", 900);
+      },
       // factory mindset: rhythmic metallic machinery
       factory: t => {
         for (let i = 0; i < 8; i++) {
