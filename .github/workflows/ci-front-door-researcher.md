@@ -1,9 +1,8 @@
 ---
 name: CI Front Door Researcher
-description: Daily offline evaluation of CI Front Door using already cached PR and workflow evidence.
+description: On-demand offline evaluation of CI Front Door using already cached PR and workflow evidence.
 intent: Improve CI suite selection without missing regressions, downloading duplicate evidence, or weakening fail-open safeguards.
 on:
-  schedule: daily
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,6 +17,7 @@ engine:
 network:
   allowed: []
 tools:
+  github: false
   cache-memory:
     key: copilot-pr-data
     restore-only: true
@@ -27,7 +27,15 @@ tools:
     - "git diff *"
     - "git status *"
 safe-outputs:
+  report-failure-as-issue: false
+  report-failed-jobs: false
   create-issue: false
+  report-missing-data:
+    report-as-failure: false
+  report-incomplete:
+    create-issue: false
+  noop:
+    report-as-issue: false
   create-pull-request:
     title-prefix: "[ci-front-door] "
     draft: true
@@ -37,7 +45,7 @@ safe-outputs:
     allowed-files:
       - ".github/ci/suite-catalog.json"
       - ".github/ci/decision-prompt.txt"
-      - "scripts/ci-front-door.cjs"
+      - "scripts/ci-front-door-diff.cjs"
     github-token-for-extra-empty-commit: none
     protected-files: request-review
 timeout-minutes: 20
@@ -46,7 +54,7 @@ strict: true
 
 # CI Front Door Researcher
 
-Evaluate the existing CI Front Door daily. Treat this as offline research, not a
+Evaluate the existing CI Front Door when manually invoked. Treat this as offline research, not a
 CI dispatcher. The only publication is at most one evidence-backed **draft** PR.
 If there is no justified improvement, use `noop` with a compact findings report.
 Do not open an issue or change a workflow.
@@ -187,8 +195,10 @@ baseline/candidate replay on a nonempty disjoint holdout with complete outcomes,
 no new missed regressions, and positive measured benefit. Otherwise leave the
 checkout unchanged and `noop` with findings and missing-evidence details.
 Only edit the three allowed files: catalog metadata/descriptions/durations,
-decision prompt, or **diff summarizer only** inside `scripts/ci-front-door.cjs`.
-Never modify any other part of that script. Do not persist research scratch files
+decision prompt, or **the diff summarizer module only** in
+`scripts/ci-front-door-diff.cjs`.
+Do not modify the selector module `scripts/ci-front-door.cjs`.
+Never modify any other part of the diff summarizer module. Do not persist research scratch files
 in the PR, executable cache content, secrets, or raw PR/log bodies.
 
 Before calling `create_pull_request`, inspect `git diff` and run the existing

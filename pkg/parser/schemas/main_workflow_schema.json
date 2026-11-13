@@ -11938,6 +11938,10 @@
                   "description": "Whether to create or update GitHub issues when tools are missing (default: true). Supports literal boolean or GitHub Actions expression (e.g. '${{ inputs.create-issue }}').",
                   "default": true
                 },
+                "report-as-failure": {
+                  "$ref": "#/$defs/templatable_boolean",
+                  "description": "Whether to surface missing tools as agent failures (default: true). Supports literal boolean or GitHub Actions expression."
+                },
                 "title-prefix": {
                   "type": "string",
                   "description": "Prefix for issue titles when creating issues for missing tools (default: '[missing tool]')",
@@ -12026,6 +12030,10 @@
                   "$ref": "#/$defs/templatable_boolean",
                   "description": "Whether to create or update GitHub issues when data is missing (default: true). Supports literal boolean or GitHub Actions expression (e.g. '${{ inputs.create-missing-data-issue }}').",
                   "default": true
+                },
+                "report-as-failure": {
+                  "$ref": "#/$defs/templatable_boolean",
+                  "description": "Whether to surface missing data as agent failures (default: true). Supports literal boolean or GitHub Actions expression."
                 },
                 "title-prefix": {
                   "type": "string",

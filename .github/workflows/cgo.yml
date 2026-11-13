@@ -2334,7 +2334,6 @@ jobs:
 
   cross-platform-build:
     needs: [checkout-cache, build]
-    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'cross-platform-build')
     name: Build & Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -2343,9 +2342,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-        - macos-latest
-        - windows-latest
+        os: ${{ fromJSON(github.event_name == 'pull_request' && needs.checkout-cache.outputs.suite_ids && !contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'cross-platform-build') && '["windows-latest"]' || '["macos-latest","windows-latest"]') }}
     concurrency:
       group: ci-${{ github.ref }}-cross-platform-${{ matrix.os }}
       cancel-in-progress: true

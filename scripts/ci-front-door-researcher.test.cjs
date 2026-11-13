@@ -18,12 +18,31 @@ test("CGO runs researcher conformance independently alongside selector conforman
   assert.match(job, /name: Test CI Front Door conformance\s+run: \|\s+node --test scripts\/ci-front-door\.test\.cjs\s+node --test scripts\/ci-front-door-researcher\.test\.cjs/);
 });
 
-test("daily researcher has no event-driven or downloading imports", () => {
-  assert.match(frontmatter, /schedule: daily/);
+test("researcher is manually invoked and has no event-driven or downloading imports", () => {
+  assert.doesNotMatch(frontmatter, /^\s+schedule:/m);
   assert.match(frontmatter, /workflow_dispatch:/);
-  assert.doesNotMatch(frontmatter, /^\s*(imports|jobs|steps|post-steps|github|agentic-workflows|web-fetch|web-search):/m);
+  assert.match(frontmatter, /^\s+github: false$/m);
+  assert.doesNotMatch(frontmatter, /^\s*(imports|jobs|steps|post-steps|agentic-workflows|web-fetch|web-search):/m);
   assert.doesNotMatch(frontmatter, /^\s*(pull_request|push|workflow_run):/m);
   assert.match(frontmatter, /allowed: \[\]/);
+});
+
+test("compiled researcher cannot use GitHub MCP tools or publish failure issues", () => {
+  const manifestLine = lock.match(/^# gh-aw-manifest: (.+)$/m);
+  assert.ok(manifestLine);
+  const manifest = JSON.parse(manifestLine[1]);
+  assert.ok(!(manifest.mcp_servers || []).some(server => server.name === "github"));
+  assert.doesNotMatch(lock, /github-mcp-server/);
+  assert.ok(manifest.mcp_servers?.find(server => server.name === "safeoutputs")?.tools.includes("report_missing_data"));
+  assert.match(lock, /GH_AW_FAILURE_REPORT_AS_ISSUE: "false"/);
+  assert.match(lock, /GH_AW_MISSING_DATA_REPORT_AS_FAILURE: "false"/);
+  assert.match(lock, /create_report_incomplete_issue.*create_issue.*false/);
+  assert.match(frontmatter, /report-failure-as-issue: false/);
+  assert.match(frontmatter, /report-failed-jobs: false/);
+  assert.match(frontmatter, /report-missing-data:\s*\n\s+report-as-failure: false/);
+  assert.match(frontmatter, /report-incomplete:\s*\n\s+create-issue: false/);
+  assert.match(frontmatter, /noop:\s*\n\s+report-as-issue: false/);
+  assert.match(prompt, /report_missing_data/);
 });
 
 test("shared PR evidence is restored without modifying the producer cache", () => {
@@ -37,7 +56,7 @@ test("shared PR evidence is restored without modifying the producer cache", () =
   assert.match(prompt, /continue with available local records/);
 });
 
-test("publication is draft-only and confined to catalog, prompt, and summarizer", () => {
+test("publication is draft-only and confined to catalog, prompt, and diff summarizer module", () => {
   assert.match(frontmatter, /create-issue: false/);
   assert.match(frontmatter, /draft: true/);
   assert.match(frontmatter, /max: 1/);
@@ -46,10 +65,11 @@ test("publication is draft-only and confined to catalog, prompt, and summarizer"
   assert.ok(allowed);
   assert.deepEqual(
     [...allowed[1].matchAll(/"([^"]+)"/g)].map(match => match[1]),
-    [".github/ci/suite-catalog.json", ".github/ci/decision-prompt.txt", "scripts/ci-front-door.cjs"]
+    [".github/ci/suite-catalog.json", ".github/ci/decision-prompt.txt", "scripts/ci-front-door-diff.cjs"]
   );
-  assert.match(prompt, /\*\*diff summarizer only\*\*/);
-  assert.match(prompt, /Never modify any other part of that script/);
+  assert.match(prompt, /\*\*the diff summarizer module only\*\*/);
+  assert.match(prompt, /scripts\/ci-front-door-diff\.cjs/);
+  assert.match(prompt, /Do not modify the selector module/);
   assert.doesNotMatch(frontmatter, /^\s+(contents|actions|issues|pull-requests): write/m);
 });
 

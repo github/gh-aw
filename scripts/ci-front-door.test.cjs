@@ -164,7 +164,7 @@ test("invalid local inputs still call the configured API once but force all suit
 });
 
 test("endpoint provisioning errors fail open and cannot contact GitHub APIs", async () => {
-  for (const url of [undefined, "", "http://decision.example.test", "https://api.github.com/graphql", "https://github.com/api/v3", "******decision.example.test"]) {
+  for (const url of [undefined, "", "http://decision.example.test", "https://api.github.com/graphql", "https://api.github.com./graphql", "https://github.com/api/v3", "https://github.com./api/v3", "******decision.example.test"]) {
     const { result, calls } = await exercise({ endpoint: url });
     assert.equal(calls.length, 0);
     assert.equal(result.metrics.decision_api_requests, 0);
@@ -269,7 +269,7 @@ test("CGO uses needs outputs only for optional jobs and fails open if the select
   assert.match(workflow, /suite_ids: \$\{\{ steps\.front-door\.outcome == 'success' && steps\.front-door\.outputs\.suite_ids \|\| '' \}\}/);
   assert.match(workflow, /id: front-door\n\s+continue-on-error: true/);
   const jobs = Object.fromEntries([...workflow.matchAll(/^  ([\w-]+):\n([\s\S]*?)(?=^  [\w-]+:\n|$(?![\s\S]))/gm)].map(match => [match[1], match[2]]));
-  for (const id of SUITE_IDS.filter(id => !MANDATORY.includes(id))) {
+  for (const id of SUITE_IDS.filter(id => !MANDATORY.includes(id) && id !== "cross-platform-build")) {
     assert.ok(jobs[id], id);
     assert.ok(jobs[id].includes("!needs.checkout-cache.outputs.suite_ids"), id);
     assert.ok(jobs[id].includes(`contains(fromJSON(needs.checkout-cache.outputs.suite_ids), '${id}')`), id);
@@ -279,6 +279,11 @@ test("CGO uses needs outputs only for optional jobs and fails open if the select
     assert.ok(!jobs[id].includes("outputs.suite_ids"), id);
     assert.ok(!jobs[id].includes("- front-door-conformance"), id);
   }
+  assert.doesNotMatch(jobs["cross-platform-build"], /^    if:/m);
+  assert.match(jobs["cross-platform-build"], /os: \$\{\{ fromJSON\(/);
+  assert.match(jobs["cross-platform-build"], /!contains\(fromJSON\(needs\.checkout-cache\.outputs\.suite_ids\), 'cross-platform-build'\)/);
+  assert.match(jobs["cross-platform-build"], /'\["windows-latest"\]'/);
+  assert.match(jobs["cross-platform-build"], /'\["macos-latest","windows-latest"\]'/);
   assert.match(workflow, /schedule:\n[\s\S]*cron:/);
 });
 
