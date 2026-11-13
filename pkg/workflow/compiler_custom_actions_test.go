@@ -469,7 +469,16 @@ Test workflow with action mode.
 	lockStr := string(lockContent)
 
 	// Verify it uses the external gh-aw-actions/setup action
-	if !strings.Contains(lockStr, "github/gh-aw-actions/setup@v1.2.3") {
+	setupActionUse := "uses: github/gh-aw-actions/setup@"
+	setupActionStart := strings.Index(lockStr, setupActionUse)
+	setupAction := ""
+	if setupActionStart >= 0 {
+		setupActionEnd := strings.IndexByte(lockStr[setupActionStart:], '\n')
+		if setupActionEnd >= 0 {
+			setupAction = lockStr[setupActionStart : setupActionStart+setupActionEnd]
+		}
+	}
+	if !strings.Contains(setupAction, "@v1.2.3") && !strings.Contains(setupAction, "# v1.2.3") {
 		t.Errorf("Action mode should use 'github/gh-aw-actions/setup@v1.2.3', lock file:\n%s", lockStr)
 	}
 
