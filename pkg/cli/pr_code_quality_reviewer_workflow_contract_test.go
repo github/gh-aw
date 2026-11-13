@@ -19,6 +19,28 @@ import (
 // declaration (for example "model: openai/gpt-5.4") in the workflow frontmatter.
 var explicitMainAgentModelPattern = regexp.MustCompile(`(?m)^model: \S+/\S+$`)
 
+func TestPRReviewerLedgerAppendContract(t *testing.T) {
+	t.Parallel()
+	repoRoot, err := gitutil.FindGitRoot()
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		workflow string
+		ledger   string
+	}{
+		{"pr-code-quality-reviewer", "review-history"},
+		{"pr-specification-reviewer", "spec-review-history"},
+	} {
+		t.Run(tc.workflow, func(t *testing.T) {
+			content, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", tc.workflow+".md"))
+			require.NoError(t, err)
+			text := string(content)
+			assert.Contains(t, text, "`ledger: "+tc.ledger+"`, `operation: append`, and a `value` object")
+			assert.Contains(t, text, "integer `finding_count`")
+			assert.Contains(t, text, "`record` or store")
+		})
+	}
+}
+
 func TestPRCodeQualityReviewerWorkflowSubAgentModelContract(t *testing.T) {
 	t.Parallel()
 	repoRoot, err := gitutil.FindGitRoot()
