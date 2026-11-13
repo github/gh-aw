@@ -280,32 +280,26 @@ func buildTableConfig(val reflect.Value, title string) TableConfig {
 		elemType = elemType.Elem()
 	}
 
-	// Build headers from struct fields
-	headers, fieldPaths, fieldTags := buildTableHeaders(elemType)
-	config.Headers, fieldPaths, fieldTags = omitEmptyColumns(val, headers, fieldPaths, fieldTags)
+	fields := omitEmptyColumns(val, collectTableFields(elemType, nil))
+	for _, field := range fields {
+		config.Headers = append(config.Headers, field.header)
+	}
 
 	// Build rows
-	config.Rows = buildTableRows(val, fieldPaths, fieldTags)
+	config.Rows = buildTableRows(val, fields)
 
 	return config
 }
 
-func omitEmptyColumns(val reflect.Value, headers []string, fieldPaths [][]int, fieldTags []consoleTag) ([]string, [][]int, []consoleTag) {
-	filteredHeaders := make([]string, 0, len(headers))
-	filteredPaths := make([][]int, 0, len(fieldPaths))
-	filteredTags := make([]consoleTag, 0, len(fieldTags))
-	for i, tag := range fieldTags {
-		if i >= len(headers) || i >= len(fieldPaths) {
+func omitEmptyColumns(val reflect.Value, fields []tableField) []tableField {
+	filtered := make([]tableField, 0, len(fields))
+	for _, field := range fields {
+		if field.tag.omitempty && !tableFieldHasValue(val, field.path) {
 			continue
 		}
-		if tag.omitempty && !tableFieldHasValue(val, fieldPaths[i]) {
-			continue
-		}
-		filteredHeaders = append(filteredHeaders, headers[i])
-		filteredPaths = append(filteredPaths, fieldPaths[i])
-		filteredTags = append(filteredTags, tag)
+		filtered = append(filtered, field)
 	}
-	return filteredHeaders, filteredPaths, filteredTags
+	return filtered
 }
 
 func tableFieldHasValue(rows reflect.Value, fieldPath []int) bool {
@@ -328,30 +322,13 @@ func tableFieldHasValue(rows reflect.Value, fieldPath []int) bool {
 	return false
 }
 
-// buildTableHeaders extracts column headers, field index paths, and tags from a struct type,
-// flattening anonymous embedded struct fields into the top-level column list.
-func buildTableHeaders(elemType reflect.Type) (headers []string, fieldPaths [][]int, fieldTags []consoleTag) {
-	fields := collectTableFields(elemType, nil)
-	headers = make([]string, 0, len(fields))
-	fieldPaths = make([][]int, 0, len(fields))
-	fieldTags = make([]consoleTag, 0, len(fields))
-	for _, field := range fields {
-		headers = append(headers, field.header)
-		fieldPaths = append(fieldPaths, field.path)
-		fieldTags = append(fieldTags, field.tag)
-	}
-	return headers, fieldPaths, fieldTags
-}
-
 // collectTableFields recursively walks a struct type, inlining the fields of any
 // anonymous embedded structs so they appear as top-level table columns.
 func collectTableFields(t reflect.Type, prefix []int) []tableField {
 	fields := make([]tableField, 0, t.NumField())
 	for i := range t.NumField() {
 		field := t.Field(i)
-		fieldPath := make([]int, len(prefix)+1)
-		copy(fieldPath, prefix)
-		fieldPath[len(prefix)] = i
+		fieldPath := append(append([]int(nil), prefix...), i)
 
 		if field.Anonymous {
 			if parseConsoleTag(field.Tag.Get("console")).skip {
@@ -384,7 +361,7 @@ func collectTableFields(t reflect.Type, prefix []int) []tableField {
 }
 
 // buildTableRows builds the row data for a slice of struct elements.
-func buildTableRows(val reflect.Value, fieldPaths [][]int, fieldTags []consoleTag) [][]string {
+func buildTableRows(val reflect.Value, fields []tableField) [][]string {
 	var rows [][]string
 	for i := range val.Len() {
 		elem := val.Index(i)
@@ -401,13 +378,13 @@ func buildTableRows(val reflect.Value, fieldPaths [][]int, fieldTags []consoleTa
 		}
 
 		var row []string
-		for j, fieldPath := range fieldPaths {
-			field, ok := fieldByIndexSafe(elem, fieldPath)
+		for _, column := range fields {
+			field, ok := fieldByIndexSafe(elem, column.path)
 			if !ok {
 				row = append(row, "")
 				continue
 			}
-			row = append(row, formatFieldValueWithTag(field, fieldTags[j]))
+			row = append(row, formatFieldValueWithTag(field, column.tag))
 		}
 		rows = append(rows, row)
 	}
