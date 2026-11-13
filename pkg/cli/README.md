@@ -933,9 +933,22 @@ Method-form symbols on exported types (e.g. `(*FileTracker).TrackCreated`, `(*Do
 
 Methods on unexported types (e.g. `cachedLogsJSONLWriter.Append*`, `githubGraderRunArtifactSource.Load`) are not part of the public API.
 
+### Additional exported report and analysis symbols
+
+| Area | Exported symbols | Description |
+|------|------------------|-------------|
+| Audit and detection | `AuditComparisonRoute`, `AuditComparisonRouteDelta`, `AuditDecision`, `AuditDecisionQuestion`, `AuditHarnessRoutingOutcome`, `AuditModelCatalog`, `AuditModelCatalogEndpoint`, `AuditCatalogModel`, `AuditRetrySummary`, `AuditEngineRetry`, `AuditRetryAttempt`, `AuditEvidenceSearch`, `AuditEvidenceMatch`, `AuditEvidenceExcerpt`, `AuditEvidenceRef`, `AuditEvidenceNativeRef`, `DetectionModelUsage`, `EvalsSummary`, `ObsoletePREvidence` | Structured audit comparisons, advisory decisions, model and retry observations, query-specific evidence, detection traffic, and PR lifecycle evidence. These records do not establish completeness, authorization, or root cause. |
+| Doctor and health | `DoctorAgentAssignmentCheck`, `DoctorAssignmentRunHistory`, `DoctorAssignmentRunEvidence`, `DoctorTokenValidation`, `DoctorReleaseCheck`, `DoctorCompiledWorkflowCheck`, `HealthApprovalEvidence`, `HealthCacheEvidence`, `HealthCollection`, `HealthDetectionFailure`, `HealthDurableRun`, `HealthDurableSessions`, `HealthPotentialIssue`, `HealthJobEvidence`, `HealthPRLifecycleEvidence`, `HealthRevisionCohort`, `HealthRevisionStatus`, `HealthSubagentFailure`, `HealthWorkQueue` | Bounded repository, run, cache, revision, durable-session, and work-queue observations used by doctor and health reports. |
+| Dry-run, durable sessions, and graders | `DryRunCompileReport`, `DryRunScannerCheck`, `DryRunScannerDifferential`, `DurableSessionReport`, `ValidationScriptLocation`, `RegradedRun`, `RegradeDefinition`, `RegradeOriginalEvidence`, `SecondaryMetricAnalysis`, `SecondaryMetricVariantAnalysis`, `OutcomeMetricCoverage`, `OutcomeWindowInfo` | Compilation and scanner-gate results, validated session restoration, grader evidence, secondary metrics, and outcome maturity coverage. |
+| Episodes and failures | `EpisodeRoot`, `EpisodeCoverage`, `EpisodeHop`, `EpisodeHopEdge`, `EpisodeRunCost`, `EpisodeExplanation`, `EpisodeRetrievalIssue`, `EpisodeOutcomeObservation`, `EpisodeOutcomesData`, `EpisodeOutcomeMembershipCoverage`, `EpisodeOutcomeData`, `FailureSignal`, `FailureCluster`, `FailureRunIdentity`, `FailureClusterTarget`, `FailureInvestigation`, `FailureInvestigationTarget`, `FailureClusterStatistics` | Bounded workflow-invocation and failure-sample evidence; shared symptoms are not diagnoses, and selected runs are not presumed to exhaust an episode. |
+| Model routing and usage | `AwInfoModelConfig`, `AwInfoModelConfigRouting`, `AwInfoModelSelection`, `AwInfoModelRouting`, `ModelEndpointMismatch`, `ModelRoutingLogsSummary`, `ModelRoutingRouteSummary`, `ModelRoutingLabels`, `ModelRoutingChoice`, `ModelRoutingFailure`, `ModelRoutingCost`, `ModelRoutingDeviation`, `ModelRoutingAgentCost`, `ModelRoutingSummary`, `AgentUsageBreakdown`, `AgentModelUsage`, `TokenUsageSteering`, `SteeringNotice` | Configured and observed model routes, endpoint compatibility, costs, failures, agent attribution, and steering notices. Detection traffic remains separate from agent usage. |
+| Work-queue and cached-log reports | `WorkQueueCurrentSnapshot`, `WorkQueueAssignmentReceipt`, `WorkQueueClaimReceipt`, `WorkQueueFinishReceipt`, `WorkQueueDiagnostics`, `WorkQueueAssignedClaimDiagnostics` | Snapshot-based queue diagnostics; receipts describe validated facts. |
+
 ## Source Synchronization
 
 Re-verified on 2026-10-06: the exported symbols listed above were previously undocumented and are now covered.
+
+Verified against source on 2026-11-13: added grouped coverage for the audit, doctor, health, episode, failure, model-routing, grader, and work-queue report types above.
 
 Reviewed against recent source updates on 2026-08-08; the "Additional exported top-level functions" table above was added after diffing the full exported-symbol list against this README. Re-verified on 2026-09-26: diffed the full exported top-level function list against all documented tables and added the "Additional exported top-level functions (verified 2026-09-26)" table above for 10 previously undocumented functions. No other public-contract deltas were identified beyond the sections above.
 

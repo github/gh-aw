@@ -37,7 +37,18 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 | `NativeDeliveryHost` | struct | Native host for verifying and publishing queue delivery outputs. |
 | `LedgerSession` | struct | Scoped set of ledger operations sharing one isolated Git object store. |
 
-Other exported types represent typed operation parameters, dependencies and external resources, policies and worker profiles, queue limits, explanations, statistics, delivery verification, and settings overrides.
+### Additional ledger and policy types
+
+| Area | Exported symbols | Description |
+|------|------------------|-------------|
+| Operation data | `CheckpointOperation`, `CheckpointParameters`, `ClaimOperation`, `Dependency`, `Replacement`, `ResultReference`, `OperationsParameters`, `SubmitParameters`, `Position` | Typed inputs and references used to validate checkpoint, claim, dependency, replacement, and submission transitions; `Position` identifies a commit and operation index in the ledger. |
+| Issue projection | `IssueLinkOperation`, `IssueCommentOperation`, `IssueSynchronizationPending`, `IssuesSettings` | Optional issue projection operations and synchronization state; they do not make Issues the queue's source of truth. |
+| Scheduling and routing | `ProducerRule`, `ProjectorRule`, `PoolPolicy`, `PoolInstallOperation`, `WorkerProfile`, `WorkerRevision`, `WorkerDeployment`, `RetryPolicy`, `ReconciliationPolicy`, `Limits` | Admission rules, installed pool configuration, worker routes, bounded retry/reconciliation behavior, and resource limits. |
+| Inspection and delivery | `Capacity`, `NativeRun`, `RunBinding`, `DeliveryVerification`, `RemediationVerifier`, `Clock`, `PoolClocks` | Bounded native-run evidence, host delivery verification, reconciliation inputs, capacity observations, and deterministic pool clocks. |
+
+These types are the payloads and supporting records for the public replay,
+planning, settings, inspection, and delivery APIs above. They do not independently
+grant actor, worker-route, or effect authority.
 
 ### Inspection and Delivery Types
 

@@ -147,6 +147,47 @@ func TestSpec_PublicAPI_Render(t *testing.T) {
 	assert.Equal(t, expected, buf.String(), "rendered output should use the shared console format")
 }
 
-// SPEC_MISMATCH: The README documents exported Sort and CountAtLeast functions,
-// but the package currently exposes neither signature, so their contracts cannot
-// be exercised by a compiling specification test.
+// TestSpec_PublicAPI_Sort validates the documented stable ordering criteria.
+func TestSpec_PublicAPI_Sort(t *testing.T) {
+	findings := []scanfindings.Finding{
+		{File: "b.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh},
+		{File: "a.yml", Line: 2, Column: 1, Severity: scanfindings.SeverityLow},
+		{File: "a.yml", Line: 1, Column: 2, Severity: scanfindings.SeverityLow},
+		{File: "a.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "b"},
+		{File: "a.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityCritical, RuleID: "z"},
+		{File: "a.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "a"},
+	}
+
+	scanfindings.Sort(findings)
+
+	assert.Equal(t, []scanfindings.Finding{
+		{File: "a.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityCritical, RuleID: "z"},
+		{File: "a.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "a"},
+		{File: "a.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "b"},
+		{File: "a.yml", Line: 1, Column: 2, Severity: scanfindings.SeverityLow},
+		{File: "a.yml", Line: 2, Column: 1, Severity: scanfindings.SeverityLow},
+		{File: "b.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh},
+	}, findings)
+
+	tied := []scanfindings.Finding{
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "first"},
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "second"},
+	}
+	scanfindings.Sort(tied)
+	assert.Equal(t, []scanfindings.Finding{
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "first"},
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "second"},
+	}, tied, "findings with equal sort keys should retain their input order")
+}
+
+// TestSpec_PublicAPI_CountAtLeast validates the documented severity threshold count.
+func TestSpec_PublicAPI_CountAtLeast(t *testing.T) {
+	findings := []scanfindings.Finding{
+		{Severity: scanfindings.SeverityCritical},
+		{Severity: scanfindings.SeverityHigh},
+		{Severity: scanfindings.SeverityMedium},
+		{Severity: scanfindings.SeverityUnknown},
+	}
+
+	assert.Equal(t, 2, scanfindings.CountAtLeast(findings, scanfindings.SeverityHigh))
+}
