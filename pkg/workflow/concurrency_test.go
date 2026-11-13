@@ -11,6 +11,20 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
+func TestCommentMemoryWorkflowConcurrencyNoCancellation(t *testing.T) {
+	for _, command := range []bool{false, true} {
+		data := &WorkflowData{
+			On:                  "on:\n  pull_request:",
+			CommentMemoryConfig: &CommentMemoryConfig{},
+			CommandOtherEvents:  map[string]any{"pull_request": nil},
+		}
+		config := GenerateConcurrencyConfig(data, command)
+		if strings.Contains(config, "cancel-in-progress:") || !strings.Contains(config, "queue: max") {
+			t.Errorf("comment-memory workflow must queue rather than cancel a writer (command=%v):\n%s", command, config)
+		}
+	}
+}
+
 func TestConcurrencyRules(t *testing.T) {
 	// Test the new concurrency rules for pull_request and alias workflows
 	tmpDir := testutil.TempDir(t, "concurrency-test")

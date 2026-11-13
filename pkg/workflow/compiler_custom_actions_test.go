@@ -455,6 +455,12 @@ Test workflow with action mode.
 	compiler := NewCompiler(WithVersion("v1.2.3"))
 	compiler.SetActionMode(ActionModeAction)
 	compiler.SetNoEmit(false)
+	const setupSHA = "0123456789abcdef0123456789abcdef01234567"
+	compiler.actionCache = NewActionCache(tempDir)
+	if !compiler.actionCache.Set("github/gh-aw-actions/setup", "v1.2.3", setupSHA) {
+		t.Fatal("Failed to seed setup action pin")
+	}
+	compiler.actionResolver = NewActionResolver(compiler.actionCache)
 
 	if err := compiler.CompileWorkflow(workflowPath); err != nil {
 		t.Fatalf("Compilation failed: %v", err)
@@ -468,9 +474,10 @@ Test workflow with action mode.
 
 	lockStr := string(lockContent)
 
-	// Verify it uses the external gh-aw-actions/setup action
-	if !strings.Contains(lockStr, "github/gh-aw-actions/setup@v1.2.3") {
-		t.Errorf("Action mode should use 'github/gh-aw-actions/setup@v1.2.3', lock file:\n%s", lockStr)
+	// Verify the external setup action uses the fixture pin, not a live resolution.
+	expectedSetupRef := "uses: github/gh-aw-actions/setup@" + setupSHA + " # v1.2.3"
+	if !strings.Contains(lockStr, expectedSetupRef) {
+		t.Errorf("Action mode should use %q", expectedSetupRef)
 	}
 
 	// Verify it does NOT use the internal gh-aw/actions/setup path
