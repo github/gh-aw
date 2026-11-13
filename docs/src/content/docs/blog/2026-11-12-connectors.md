@@ -1,68 +1,70 @@
 ---
-title: "Connectors: Agentic Workflows Beyond GitHub"
-description: "Bring context from Linear and other services into agentic workflows, without handing an agent the keys to your entire workspace."
+title: "Connectors: A Clear Integration Point for Services"
+description: "Connectors give services a shared, declarative integration point in gh-aw, with YAML definitions for access, capabilities, and boundaries."
 authors:
   - copilot
 date: 2026-11-12
 metadata:
-  seoDescription: "Explore experimental gh-aw connectors with a Linear bug-triage example using scoped reads, separate credentials, and a staged comment."
+  seoDescription: "Explore connectors, the experimental declarative service integration point in gh-aw, with a small YAML example and explicit read/write boundaries."
 ---
 
-A bug lands in Linear. The code lives on GitHub. Before anyone can investigate, someone has to read the report, work out what's missing, and turn it into a useful next step.
+Every service integration has to answer the same questions: where does the service live, how does authentication work, and what can a workflow do with it?
 
-That's a good job for an agent. But helping with one bug shouldn't mean handing it the keys to your entire tracker.
+Without a clear integration point, those answers end up scattered across scripts, custom tools, and prompts. Each new service becomes another special case.
 
-The new experimental **connectors** in GitHub Agentic Workflows bring that outside context into your workflows, with explicit boundaries around what an agent can read and what it can ask to change. Declarations are available for Linear, Jira, Azure DevOps, Slack, Teams, and other services.
+The new experimental **connectors** give services a shared integration point in GitHub Agentic Workflows. A **declarative YAML definition** describes the service contract. gh-aw's compiler and runtime use that contract to expose selected capabilities to workflows.
 
-## Bring the context, keep the boundaries
+The goal isn't a different integration mechanism for every provider. It's one place to define how a service fits into gh-aw.
 
-A connector is a Markdown file, not a new integration service to deploy. You can review it, commit it alongside your workflow, and choose the capabilities that task actually needs.
+## One contract, shared infrastructure
 
-For Linear triage, that might mean reading one issue and its comments, then proposing a single response. Not searching every team. Not changing priorities. Not closing issues.
+A connector brings the pieces of an integration together: fixed endpoints, credential routes, resource grants, read capabilities, and safe outputs. It can describe bounded REST or GraphQL readers, read-only HTTP MCP tools, and typed mutations. Trigger declarations use the shared webhook gateway path rather than inventing a separate dispatch mechanism for each service.
 
-The important split is between **reading evidence** and **taking action**. Readers go under `tools`. Changes go through `safe-outputs`, outside the agent's writer-credential boundary. Importing a connector alone enables neither.
+The provider-specific details live in the declaration. The compiler and runtime supply the common machinery for validation, tool exposure, and safe-output execution. Adding a supported operation is a declaration change, not a reason to build a new provider-specific execution path.
 
-## From a Linear report to a useful next step
+That also makes the integration reviewable. A new endpoint, a different secret reference, or an added write operation is visible in a diff. The contract can be versioned and reused alongside the workflows that consume it.
 
-Imagine an intake workflow that answers a practical question: *Is this bug ready to investigate, or does the reporter need to add something first?*
+## A small look at the YAML
 
-It reads the approved report and discussion, looks for reproduction steps and expected versus actual behavior, and drafts a short comment with the next action. If an equivalent assessment already exists, it skips the comment. If the discussion is incomplete or a read fails, it stops rather than guessing.
+In gh-aw, connector YAML lives in the frontmatter of an importable Markdown file under `.github/workflows/connectors/`. Here's a short excerpt from the [Linear declaration](https://github.com/github/gh-aw/blob/main/.github/workflows/connectors/linear.md):
 
-Here's the connector-specific configuration from the [complete Linear triage example](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/linear-golden.md):
-
-```aw wrap
-imports:
-  - uses: ".github/workflows/connectors/linear.md"
-    with:
-      issues: [22222222-2222-4222-8222-222222222222]
-      organizations: [11111111-1111-4111-8111-111111111111]
-      teams: [33333333-3333-4333-8333-333333333333]
-tools:
-  linear: [get-issue, list-comments]
-safe-outputs:
-  staged: true
-  linear-add-comment:
-    max: 1
+```yaml wrap
+connectors:
+  linear:
+    experimental: true
+    endpoints:
+      api: https://api.linear.app
+    credentials:
+      reader:
+        phase: agent
+        header: Authorization
+        scheme: raw
+        scopes: [read]
+        secret: ${{ github.aw.import-inputs.reader-secret }}
+    resources:
+      issues: ${{ github.aw.import-inputs.issues }}
 ```
 
-Two readers. One possible comment. One approved destination.
+The shape matters more than the provider: a named endpoint, an explicit credential phase, and resource bindings supplied by the consuming workflow. Secret values stay in GitHub Actions secrets.
 
-This is an excerpt, not a standalone workflow. The complete example includes the manual trigger, permissions, network settings, credential bindings, and prompt. To try it, use a connector-capable compiler and matching runtime, copy the reviewed [Linear declaration](https://github.com/github/gh-aw/blob/main/.github/workflows/connectors/linear.md) to its imported path, and replace the specimen UUIDs consistently in the configuration and prompt. Pin the source you adopt to a reviewed commit.
+This isn't a complete connector. The full declaration adds typed operation inputs, request mappings, response limits, resource checks, and import input definitions. Its commented documentation explains setup and provider-specific limits.
 
-Supply a read-only Linear key through the `LINEAR_READ_API_KEY` Actions secret and configure the engine's inference access. Credentials stay in secrets, not in the Markdown.
+Linear, Jira, Azure DevOps, Slack, Teams, and other services already have declarations using this shared model. Their capabilities differ, but they have a common place to plug in.
 
-## Preview the comment before posting it
+## Define once, select per workflow
 
-Notice `staged: true`. It lets you inspect the proposed comment without posting it to Linear or resolving a writer credential. The reads are still live when the workflow runs; staging previews the write, not the entire execution.
+The connector defines what's available. The workflow selects what it needs. Importing alone enables no provider tools or writes.
 
-The `max: 1` limit is enforced by the dispatcher, not just requested in the prompt. Issue text and comments remain untrusted evidence, and IDs found in a response don't grant access to more resources.
+Reads go under `tools`; mutations are selected separately under `safe-outputs`, outside the agent's writer-credential boundary. Resource bindings constrain access, and IDs returned by the service don't expand those grants.
 
-Moving to live comments is a deliberate configuration change: provision the example's separate `LINEAR_COMMENT_WRITE_API_KEY` with Create comments access, disable staging, and recompile. Staged comments aren't automatically delivered later.
+For example, the [Linear triage workflow](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/linear-golden.md) selects two readers and one staged comment. Another workflow can consume the same declaration with different selections and approved resources. Staging previews the write without delivering it; reads remain live.
 
-## Start with one task
+The service contract is reusable. The authority stays specific to the task.
 
-The useful starting point isn't "connect everything." It's one recurring handoff: a Linear bug that needs reproduction details, a Slack thread that needs action items, or an incident that needs an engineering follow-up.
+## A place to build integrations
 
-All included connectors are experimental, and provider coverage varies. They don't provision credentials or install webhook receivers. Start with manual dispatch and a staged output, then review what the workflow actually produces.
+Connectors are experimental, and they aren't turnkey service installations. Declarations don't provision credentials, install webhook receivers, or turn scope metadata into provider permissions. Start with a connector-capable compiler and matching runtime, a reviewed source revision, manual dispatch, and staged outputs.
 
-Pick a scenario from the [example catalog](/gh-aw/reference/connectors/#golden-workflows), or explore the [connector reference](/gh-aw/reference/connectors/) for setup details. Bring the context your workflow needs, and keep the authority no broader than the task.
+If you're bringing a service into gh-aw, start with the [connector reference](/gh-aw/reference/connectors/) or the [create-connector skill](https://github.com/github/gh-aw/blob/main/.github/skills/create-connector/SKILL.md). The [example catalog](/gh-aw/reference/connectors/#golden-workflows) shows how workflows consume the contract.
+
+Define the service once, in YAML. Let workflows choose the capabilities they need. Keep integration behavior in a clear, reviewable place.
