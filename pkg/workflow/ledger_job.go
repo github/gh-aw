@@ -24,8 +24,6 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 	}
 	steps = append(steps,
 		"      - name: Download validated ledger transactions\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", ledgerTransactionsArtifactName),
@@ -38,7 +36,6 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		"          persist-credentials: false\n",
 		"      - name: Reconcile and push ledger changes\n",
 		"        id: push_ledger_changes\n",
-		"        if: always()\n",
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_TOKEN: ${{ github.token }}\n",
