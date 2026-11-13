@@ -7,7 +7,7 @@ const { iterateJsonl, readJsonlFileEvents, iterateLines } = require("./jsonl_hel
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
+const { redactAndBoundDiagnostics, redactDiagnosticText } = require("./diagnostic_sanitization.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { getDetectionCautionBlocks, getFooterAgentFailureCommentBlocks } = require("./messages_footer.cjs");
 const { getPromptPath } = require("./messages_core.cjs");
@@ -2014,9 +2014,50 @@ async function getSecretRedactionError(jobId, step) {
 }
 
 /**
- * Find the failed agent step using Actions metadata only, never agent-generated log text.
+ * Extract a shell step's output without the runner's script and environment dump.
+ * The runner's exit marker and group boundaries disambiguate steps that share
+ * the same second in the Actions metadata.
+ * @param {number} jobId
+ * @param {{started_at?: string, completed_at?: string}} step
+ * @returns {Promise<string>}
+ */
+async function getStartupStepLogTail(jobId, step) {
+  const start = Date.parse(step.started_at || "");
+  const end = Date.parse(step.completed_at || "");
+  if (!Number.isSafeInteger(jobId) || jobId <= 0) return "";
+  if (!Number.isFinite(start)) return "";
+  if (!Number.isFinite(end)) return "";
+  if (end < start) return "";
+  try {
+    const { data } = await github.rest.actions.downloadJobLogsForWorkflowRun({ ...context.repo, job_id: jobId });
+    if (typeof data !== "string" && !(data instanceof ArrayBuffer) && !(data instanceof Uint8Array)) return "";
+    const log = typeof data === "string" ? data : Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data).toString("utf8");
+    const records = log.split(/\r?\n/).flatMap(line => {
+      const match = line.match(/^(\d{4}-\d{2}-\d{2}T\S+Z) (.*)$/);
+      if (!match) return [];
+      const timestamp = Date.parse(match[1]);
+      if (!Number.isFinite(timestamp)) return [];
+      return timestamp >= start && timestamp < end + 1000 ? [match[2]] : [];
+    });
+    const exit = records.findIndex(line => /^##\[error\]Process completed with exit code \d+\./.test(line));
+    if (exit < 0) return "";
+    let group = exit - 1;
+    while (group >= 0 && !records[group].startsWith("##[group]Run ")) group--;
+    const output = records.findIndex((line, index) => index > group && line === "##[endgroup]");
+    if (group < 0 || output < 0 || output >= exit) return "";
+    const maskedValues = collectAddMaskedValues(log);
+    const redacted = redactDiagnosticText(records.slice(output + 1, exit + 1).join("\n"), { maskedValues });
+    return redactAndBoundDiagnostics(redacted.split("\n").slice(-30).join("\n").slice(-4000), { maskedValues, maxLength: 4000 });
+  } catch {
+    core.warning("Could not retrieve startup step diagnostics; see the failing step in the linked run.");
+    return "";
+  }
+}
+
+/**
+ * Find the failed agent step, excluding agent-generated log text.
  * @param {{startupFailure?: boolean}} [options] - Select the first failed step only for a validated collector startup failure.
- * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean, preAgentFailure?: boolean, checkoutRef?: string}>}
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, startupLogTail?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean, preAgentFailure?: boolean, checkoutRef?: string}>}
  */
 async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   let jobs;
@@ -2094,7 +2135,8 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   if (!startupFailure) steps?.reverse();
   const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && isFailedStep(step));
   // Failed redaction blocks safe diagnostics even after an agent crash; startup keeps priority.
-  const failedStep = (!startupFailure && redactionStep) || setupFailure || steps?.find(step => (isFailedStep(step) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
+  const firstFailedStep = steps?.find(step => (isFailedStep(step) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
+  const failedStep = startupFailure ? firstFailedStep : redactionStep || setupFailure || firstFailedStep;
   if (!failedStep) {
     return { failingStep: "", agentConclusion, ...(isCancelledTimeout ? { isTimedOut: true } : {}), attributionUnavailable: "The failed agent job had no failed step metadata." };
   }
@@ -2103,6 +2145,8 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   if (!failingStep) {
     return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no valid failed step name." };
   }
+  const executionIndex = steps.findIndex(isExecuteAgentStep);
+  const startupLogTail = startupFailure && !redactionStep && executionIndex >= 0 && steps.indexOf(failedStep) < executionIndex && isFailedStep(failedStep) ? await getStartupStepLogTail(agentJob.id, failedStep) : "";
   return {
     failingStep,
     agentConclusion,
@@ -2112,12 +2156,13 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
       : {}),
     ...(isCancelledTimeout ? { isTimedOut: true } : {}),
     ...(failedStep === redactionStep ? { secretRedactionFailed: true, stepError: await getSecretRedactionError(agentJob.id, redactionStep) } : {}),
+    ...(startupLogTail ? { startupLogTail } : {}),
   };
 }
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>, preAgentFailure?: boolean, checkoutRef?: string}} options
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, startupLogTail?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>, preAgentFailure?: boolean, checkoutRef?: string}} options
  * @returns {ReportBlock[]}
  */
 function buildFailureDiagnosticsContext({
@@ -2126,6 +2171,7 @@ function buildFailureDiagnosticsContext({
   agentConclusion = "",
   attributionUnavailable = "",
   stepError = "",
+  startupLogTail = "",
   engineFailureContext,
   checkoutError = "",
   items = [],
@@ -2178,6 +2224,8 @@ function buildFailureDiagnosticsContext({
   }
   if (stepError) {
     context.push(...renderErrorDetails(stepError));
+  } else if (startupLogTail && failureCategories.includes("agent_startup_failure")) {
+    context.push(nodes.details("Startup step log tail (redacted)", [nodes.codeBlock(startupLogTail, "text")]));
   } else if (engineFailureContext.length) {
     context.push(...engineFailureContext);
   } else if (hasModelEndpointMismatch) {
@@ -2190,7 +2238,17 @@ function buildFailureDiagnosticsContext({
   if (attributionUnavailable) {
     context.push(nodes.details("Why step details are unavailable", [nodes.paragraph([nodes.text(attributionUnavailable)])]));
   }
-  context.push(nodes.paragraph([{ type: "emphasis", children: [nodes.text("Only runtime metadata is shown; agent-generated text is excluded.")], agentTainted: false }]));
+  context.push(
+    nodes.paragraph([
+      {
+        type: "emphasis",
+        children: [
+          nodes.text(startupLogTail && failureCategories.includes("agent_startup_failure") ? "The startup step log is redacted; agent-generated text is excluded." : "Only runtime metadata is shown; agent-generated text is excluded."),
+        ],
+        agentTainted: false,
+      },
+    ])
+  );
 
   return context;
 }
