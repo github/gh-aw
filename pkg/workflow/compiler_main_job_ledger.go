@@ -18,10 +18,10 @@ func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *Wor
 	}
 	yaml.WriteString("      - name: Create read-only ledger projections\n")
 	yaml.WriteString("        id: ledger_projections\n")
-	yaml.WriteString(fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")))
+	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script"))
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-	yaml.WriteString(fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig))
+	fmt.Fprintf(yaml, "          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig)
 	for _, line := range ledgerCommentMemoryCredentialEnv(data) {
 		yaml.WriteString(line)
 	}

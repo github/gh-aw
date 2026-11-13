@@ -193,13 +193,13 @@ Read prior memory.
 				section := extractJobSection(string(lock), job.name)
 				require.NotEmpty(t, section, job.name)
 				require.Equal(t, 1, strings.Count(section, "- name: Write comment-memory configuration"), job.name)
-				assertStepOrderInSection(t, section,
+				assertLedgerStepOrderInSection(t, section,
 					"- name: Write comment-memory configuration",
 					"- name: Prepare comment memory files",
 					"- name: "+job.customStep,
 				)
 				if job.name == "agent" && strings.Contains(tc.ledger, "storage: comment-memory") {
-					assertStepOrderInSection(t, section,
+					assertLedgerStepOrderInSection(t, section,
 						"- name: Write comment-memory configuration",
 						"- name: Create read-only ledger projections",
 						"- name: Prepare comment memory files",
@@ -207,6 +207,17 @@ Read prior memory.
 				}
 			}
 		})
+	}
+}
+
+func assertLedgerStepOrderInSection(t *testing.T, section string, orderedSteps ...string) {
+	t.Helper()
+	previousIndex := -1
+	for _, step := range orderedSteps {
+		index := strings.Index(section, step)
+		require.NotEqual(t, -1, index, "step %q not found", step)
+		require.Greater(t, index, previousIndex, "step %q appears out of order", step)
+		previousIndex = index
 	}
 }
 

@@ -176,9 +176,13 @@ The target MUST be `triggering`, `*`, or a literal positive issue/PR number;
 Each accepted batch creates one new managed comment containing every new plain
 JSONL shard under separate `gh-aw-comment-ledger:<ledger-name>` code fences.
 Segment rotation MUST retain all accepted records, not just the final writer
-segment. Persistence MUST validate the complete transition, aggregate batch
-size, and exact rendered JSONL before its single publication request. An API
-failure MUST NOT report success; a retry MUST reconcile against durable history.
+segment, and MUST publish every newly created segment in that same comment.
+The `rotation publishes every shard atomically and restores every record into
+the SQLite projection` test in `actions/setup/js/comment_memory_ledger.test.cjs`
+MUST verify that every record is recoverable after materialization. Persistence
+MUST validate the complete transition, aggregate batch size, and exact rendered
+JSONL before its single publication request. An API failure MUST NOT report
+success; a retry MUST reconcile against durable history.
 The separate marker prevents ordinary editable comment-memory files from
 overwriting ledger history. Persistence MUST NOT update or delete prior ledger
 comments. Retrying an already persisted transaction MUST NOT duplicate records.
