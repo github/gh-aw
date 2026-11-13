@@ -34,7 +34,7 @@ The command clones the target repository, updates existing workflows from source
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` deploy githubnext/agentics/ci-doctor --repo owner/repo
   ` + string(constants.CLIExtensionPrefix) + ` deploy githubnext/agentics/repo-assist githubnext/agentics/ci-doctor --repo owner/repo --force
   ` + string(constants.CLIExtensionPrefix) + ` deploy ./my-workflow.md --repo owner/repo
-  ` + string(constants.CLIExtensionPrefix) + ` deploy ./my-workflow.md --repo owner/repo --pr --auto-merge
+  ` + string(constants.CLIExtensionPrefix) + ` deploy ./my-workflow.md --repo owner/repo --create-pull-request --auto-merge
   ` + string(constants.CLIExtensionPrefix) + ` deploy githubnext/agentics/ci-doctor --org my-org --yes
   ` + string(constants.CLIExtensionPrefix) + ` deploy githubnext/agentics/ci-doctor --org my-org --repos '*-service' --yes`,
 		Args: validateDeployArgs,
@@ -108,7 +108,7 @@ func registerDeployFlags(cmd *cobra.Command) {
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
 	_ = cmd.Flags().MarkHidden("pr")
-	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the deployment pull request (requires --pr or --create-pull-request)")
+	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the deployment pull request (requires --create-pull-request)")
 	cmd.Flags().String("append", "", "Append extra content to the end of the agentic workflow on installation")
 	cmd.Flags().Bool("no-gitattributes", false, "Skip updating .gitattributes file")
 	cmd.Flags().StringP("dir", "d", "", "Workflow directory (default: $GH_AW_WORKFLOWS_DIR or .github/workflows)")

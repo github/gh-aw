@@ -54,7 +54,7 @@ Note: For guided interactive setup, use the 'add-wizard' command instead.`
   ` + string(constants.CLIExtensionPrefix) + ` add https://example.com/my-workflow.md           # Add workflow from any HTTPS URL
   ` + string(constants.CLIExtensionPrefix) + ` add https://example.com/workflow.json            # Import JSON workflow definition
   ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor --create-pull-request --force
-  ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor --pr --auto-merge  # Open a pull request and enable auto-merge
+  ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor --create-pull-request --auto-merge  # Open a pull request and enable auto-merge
   ` + string(constants.CLIExtensionPrefix) + ` add ./my-workflow.md                             # Add local workflow
   ` + string(constants.CLIExtensionPrefix) + ` add ./*.md                                       # Add all local workflows
   ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor --dir .github/workflows/shared   # Add to .github/workflows/shared/`
@@ -240,7 +240,7 @@ func registerAddCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("create-pull-request", false, "Create a pull request with the workflow changes")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
-	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --pr or --create-pull-request)")
+	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
 	_ = cmd.Flags().MarkHidden("pr") // Hide the short alias from help output
 
 	// Add force flag to add command

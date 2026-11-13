@@ -61,7 +61,7 @@ func TestNewAddCommand(t *testing.T) {
 	autoMergeFlag := flags.Lookup("auto-merge")
 	require.NotNil(t, autoMergeFlag)
 	assert.Equal(t, "false", autoMergeFlag.DefValue)
-	assert.Contains(t, autoMergeFlag.Usage, "requires --pr or --create-pull-request")
+	assert.Contains(t, autoMergeFlag.Usage, "requires --create-pull-request")
 
 	// Check force flag
 	forceFlag := flags.Lookup("force")

@@ -52,7 +52,7 @@ Note: To create a new workflow from scratch, use the 'new' command instead.`,
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard https://example.com/workflow.json        # Import JSON workflow definition with guided setup
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --engine copilot   # Pre-select engine
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --no-secret        # Skip secret prompt
-  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --pr --auto-merge  # Use pull request delivery with auto-merge
+  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --create-pull-request --auto-merge  # Use pull request delivery with auto-merge
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --append "custom footer"            # Append custom content
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --no-security-scanner             # Skip security scan
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --no-config # Skip GitHub App permission/event inference from package workflows`,
@@ -158,7 +158,7 @@ Note: To create a new workflow from scratch, use the 'new' command instead.`,
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
 	_ = cmd.Flags().MarkHidden("pr")
-	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --pr or --create-pull-request)")
+	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
 
 	// Register completions
 	RegisterEngineFlagCompletion(cmd)

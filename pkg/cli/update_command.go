@@ -58,7 +58,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
   ` + string(constants.CLIExtensionPrefix) + ` update repo-assist.md     # Same (alternative format)
   ` + string(constants.CLIExtensionPrefix) + ` update https://github.com/owner/package  # Reapply an installed package
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org       # Preview workflow updates across an organization
-  ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --interactive --pr  # Select repositories and watch PR creation
+  ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --interactive --create-pull-request  # Select repositories and watch PR creation
   ` + string(constants.CLIExtensionPrefix) + ` update --enterprise my-enterprise --dry-run  # Preview across accessible enterprise organizations
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --repos '*-service'  # Limit org mode to matching repositories
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --create-issue  # Open issues in repos with pending updates
@@ -73,8 +73,8 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
   ` + string(constants.CLIExtensionPrefix) + ` update --dir custom/workflows  # Update workflows in custom directory
   ` + string(constants.CLIExtensionPrefix) + ` update --repo owner/repo        # Update workflows in another repository
   ` + string(constants.CLIExtensionPrefix) + ` update --create-pull-request   # Update and open a pull request
-  ` + string(constants.CLIExtensionPrefix) + ` update --pr --auto-merge       # Open a pull request and enable auto-merge
-  ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --pr --auto-merge --yes  # Enable auto-merge for org update pull requests
+  ` + string(constants.CLIExtensionPrefix) + ` update --create-pull-request --auto-merge       # Open a pull request and enable auto-merge
+  ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --create-pull-request --auto-merge --yes  # Enable auto-merge for org update pull requests
   ` + string(constants.CLIExtensionPrefix) + ` update --cool-down 0           # Disable cooldown and apply all pending releases immediately
   ` + string(constants.CLIExtensionPrefix) + ` update --cool-down 3d          # Apply a custom 3-day cooldown period`,
 		RunE: func(cmd *cobra.Command, args []string) error { //nolint:largefunc
@@ -217,7 +217,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 	addRepoFlag(cmd)
 	cmd.Flags().Bool("create-pull-request", false, "Create a pull request with the update changes")
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
-	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --pr or --create-pull-request)")
+	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("create-issue", false, "Open a GitHub issue in each org repository that has pending workflow updates (requires --org)")
 	cmd.Flags().BoolP("yes", "y", false, "Auto-accept org-mode update confirmations (required in CI)")

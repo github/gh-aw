@@ -21,9 +21,37 @@ func TestUpdateUpgradeAutoMergeFlag(t *testing.T) {
 			flag := cmd.Flags().Lookup("auto-merge")
 			require.NotNil(t, flag)
 			assert.Equal(t, "false", flag.DefValue)
-			assert.Contains(t, flag.Usage, "--pr or --create-pull-request")
-			assert.Contains(t, cmd.Example, "--pr --auto-merge")
-			assert.Contains(t, cmd.Example, "--org my-org --pr --auto-merge --yes")
+			assert.Contains(t, flag.Usage, "requires --create-pull-request")
+			assert.NotContains(t, flag.Usage, "--pr")
+			assert.Contains(t, cmd.Example, "--create-pull-request --auto-merge")
+			assert.Contains(t, cmd.Example, "--org my-org --create-pull-request --auto-merge --yes")
+		})
+	}
+}
+
+func TestPullRequestAutoMergeHelpUsesVisibleFlag(t *testing.T) {
+	commands := []struct {
+		name string
+		new  func() *cobra.Command
+	}{
+		{name: "add", new: func() *cobra.Command { return NewAddCommand(validateEngineStub) }},
+		{name: "add-wizard", new: func() *cobra.Command { return NewAddWizardCommand(validateEngineStub) }},
+		{name: "deploy", new: func() *cobra.Command { return NewDeployCommand(validateEngineStub) }},
+		{name: "init", new: NewInitCommand},
+		{name: "pr transfer", new: NewPRTransferSubcommand},
+		{name: "update", new: func() *cobra.Command { return NewUpdateCommand(validateEngineStub) }},
+		{name: "upgrade", new: func() *cobra.Command { return NewUpgradeCommand(validateEngineStub) }},
+	}
+
+	for _, tc := range commands {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := tc.new()
+			flag := cmd.Flags().Lookup("auto-merge")
+			require.NotNil(t, flag)
+			assert.Contains(t, flag.Usage, "requires --create-pull-request")
+			assert.NotContains(t, flag.Usage, "requires --pr")
+			assert.Contains(t, cmd.Example, "--create-pull-request --auto-merge")
+			assert.NotContains(t, cmd.Example, "--pr --auto-merge")
 		})
 	}
 }
