@@ -48,27 +48,40 @@ func applyGatewaySteeringSummary(summary *TokenUsageSummary, runDir string) {
 }
 
 // applySteeringNotices records the AWF steering notices delivered on model
-// requests. The unified session is the source of truth: notices are read from the
-// steering field of firewall.token_usage events. Runs without a unified session or
-// from AWF versions that do not record the field leave the list empty. When the
-// unified session cannot be read, the notices are marked unavailable and a
-// warning is recorded so that an empty list keeps meaning "no notices".
+// requests and every per-conversation delivery of them. The unified session is
+// the source of truth: notices are read from the steering field, and deliveries
+// from the steeringDelivery field, of firewall.token_usage events. Runs without a
+// unified session or from AWF versions that do not record the fields leave the
+// lists empty. When the unified session cannot be read, the notices are marked
+// unavailable and a warning is recorded so that an empty list keeps meaning "no
+// notices".
 func applySteeringNotices(summary *TokenUsageSummary, runDir string) {
 	if summary == nil {
 		return
 	}
-	_, notices, err := readUnifiedTokenUsage(runDir)
+	collected, err := readUnifiedTokenUsage(runDir)
 	if err != nil {
 		tokenUsageLog.Printf("Failed to read steering notices from unified session in %s: %v", runDir, err)
 		summary.SteeringNotices = nil
+		summary.SteeringDeliveries = nil
 		summary.SteeringNoticesUnavailable = true
 		addTokenUsageWarning(summary, "steering notices unavailable: failed to read unified session: "+err.Error())
 		return
 	}
-	if len(notices) > 0 {
-		tokenUsageLog.Printf("Found %d steering notice(s) in unified session", len(notices))
+	if len(collected.notices) > 0 || len(collected.deliveries) > 0 {
+		tokenUsageLog.Printf("Found %d steering notice(s) and %d delivery(ies) in unified session", len(collected.notices), len(collected.deliveries))
 	}
-	summary.SteeringNotices = notices
+	summary.SteeringNotices = collected.notices
+	summary.SteeringDeliveries = collected.deliveries
+}
+
+// tokenUsageSteeringDeliveries returns the steering notice deliveries recorded on
+// a token usage summary, or nil when there is no summary.
+func tokenUsageSteeringDeliveries(summary *TokenUsageSummary) []SteeringDelivery {
+	if summary == nil {
+		return nil
+	}
+	return summary.SteeringDeliveries
 }
 
 // tokenUsageSteeringNotices returns the steering notices recorded on a token
@@ -268,14 +281,37 @@ func gatewaySteeringEventsFromEntries(entries []proxyEventsEntry) []GatewaySteer
 	events := make([]GatewaySteeringEvent, 0, len(entries))
 	for _, entry := range entries {
 		events = append(events, GatewaySteeringEvent{
-			Type:      entry.eventName(),
-			Message:   strings.TrimSpace(entry.Message),
-			Timestamp: entry.Timestamp,
-			Threshold: int(entry.Threshold),
-			RequestID: strings.TrimSpace(entry.RequestID),
+			Type:         entry.eventName(),
+			Message:      strings.TrimSpace(entry.Message),
+			Timestamp:    entry.Timestamp,
+			Threshold:    int(entry.Threshold),
+			RequestID:    strings.TrimSpace(entry.RequestID),
+			Trigger:      steeringEventTrigger(entry),
+			Conversation: steeringEventConversation(entry),
 		})
 	}
 	return events
+}
+
+// steeringEventTrigger returns the AWF trigger of a steering event: "threshold"
+// or "little_left". Events from AWF v0.29.11 and older carry none and return "".
+func steeringEventTrigger(entry proxyEventsEntry) string {
+	switch trigger := optionalJSONString(entry.Trigger); trigger {
+	case steeringTriggerThreshold, steeringTriggerLittleLeft:
+		return trigger
+	default:
+		return ""
+	}
+}
+
+// steeringEventConversation returns the opaque conversation key of a steering
+// event, or "" when it is absent, null or malformed.
+func steeringEventConversation(entry proxyEventsEntry) string {
+	conversation, ok := steeringConversation(entry.Conversation)
+	if !ok {
+		return ""
+	}
+	return conversation
 }
 
 func containsSteeringKeyword(line string) bool {

@@ -74,7 +74,7 @@ After running this command, you can:
   ` + string(constants.CLIExtensionPrefix) + ` init --codespaces=repo1,repo2       # Codespaces with additional repos
   ` + string(constants.CLIExtensionPrefix) + ` init --completions                  # Install shell completions
   ` + string(constants.CLIExtensionPrefix) + ` init --create-pull-request          # Initialize and create a pull request
-  ` + string(constants.CLIExtensionPrefix) + ` init --pr --auto-merge              # Initialize and enable pull request auto-merge`,
+  ` + string(constants.CLIExtensionPrefix) + ` init --create-pull-request --auto-merge  # Initialize and enable pull request auto-merge`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			mcpFlag, _ := cmd.Flags().GetBool("mcp")
@@ -164,7 +164,7 @@ After running this command, you can:
 	cmd.Flags().Bool("create-pull-request", false, "Create a pull request with the initialization changes")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
-	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --pr or --create-pull-request)")
+	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
 	_ = cmd.Flags().MarkHidden("pr") // Hide the short alias from help output
 	cmd.Flags().Bool("mcp", false, "Configure GitHub Copilot Agent MCP server integration (deprecated; use --engine copilot)")
 	// Hide the deprecated --mcp flag from help (kept for backward compatibility)

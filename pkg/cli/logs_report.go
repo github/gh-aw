@@ -252,6 +252,7 @@ type RunData struct {
 	EpisodeHops                []EpisodeHop           `json:"episode_hops,omitempty" console:"-"`
 	TokenUsageSummary          *TokenUsageSummary     `json:"token_usage_summary,omitempty" console:"-"`                                            // Token usage from firewall proxy
 	SteeringNotices            []SteeringNotice       `json:"steering_notices,omitempty" console:"-"`                                               // AWF steering notices delivered on model requests
+	SteeringDeliveries         []SteeringDelivery     `json:"steering_deliveries,omitempty" console:"-"`                                            // Every AWF steering notice delivery, one per conversation per notice
 	SteeringNoticesUnavailable bool                   `json:"steering_notices_unavailable,omitempty" console:"-"`                                   // True when the unified session could not be read
 	ModelRouting               *ModelRoutingSummary   `json:"model_routing,omitempty" console:"-"`                                                  // AWF model routing and per-run cost attribution
 	GitHubAPICalls             int                    `json:"github_api_calls,omitempty" console:"header:GitHub API Calls,format:number,omitempty"` // GitHub API calls made during the run
@@ -532,6 +533,14 @@ func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
 	}
 }
 
+// applyRunDataSteering copies the AWF steering notices and notice deliveries read
+// from the unified session onto a run's JSON record.
+func applyRunDataSteering(runData *RunData, summary *TokenUsageSummary) {
+	runData.SteeringNotices = tokenUsageSteeringNotices(summary)
+	runData.SteeringDeliveries = tokenUsageSteeringDeliveries(summary)
+	runData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(summary)
+}
+
 // buildRunData converts a processed run into RunData while accumulating rollup totals.
 // localRepo guards against cross-repo misclassification of intentional-failure workflows.
 func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo string, agg *logsAggregate, classifyLocal bool) RunData {
@@ -565,8 +574,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	runData := newRunData(pr, engineInfo, chainMetrics, comparison, failureKind, gitHubAPICalls)
 	runData.EpisodeHops = collectRunEpisodeHops(pr, engineInfo.awContext)
 	runData.ModelRouting = pr.ModelRouting
-	runData.SteeringNotices = tokenUsageSteeringNotices(pr.TokenUsage)
-	runData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(pr.TokenUsage)
+	applyRunDataSteering(&runData, pr.TokenUsage)
 	runData.Ledger = pr.Ledger
 	runData.awInfo = engineInfo.awInfo
 	if engineInfo.awInfo != nil {

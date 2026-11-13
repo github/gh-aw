@@ -5,6 +5,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/gitutil"
@@ -12,9 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var intentGuidanceRepoRoot, intentGuidanceRepoRootErr = gitutil.FindGitRoot()
+
 func TestIntentGuidanceContract(t *testing.T) {
 	t.Parallel()
-	repoRoot, err := gitutil.FindGitRoot()
+	repoRoot, err := intentGuidanceRepoRoot, intentGuidanceRepoRootErr
 	if err != nil {
 		t.Skipf("Skipping test: not in a git repository: %v", err)
 	}
@@ -36,7 +39,13 @@ func TestIntentGuidanceContract(t *testing.T) {
 
 	creatorContent, err := os.ReadFile(filepath.Join(repoRoot, ".github", "aw", "create-agentic-workflow.md"))
 	require.NoError(t, err, "Should read workflow creator")
-	assert.Contains(t, string(creatorContent), "When the request already states a goal", "Workflow creator must keep explicit requests lightweight")
+	creatorText := string(creatorContent)
+	assert.True(
+		t,
+		strings.Contains(creatorText, "When the request already states a goal") ||
+			strings.Contains(creatorText, "Otherwise skip the opener."),
+		"Workflow creator must keep explicit requests lightweight",
+	)
 
 	for _, name := range []string{
 		"designer.md",

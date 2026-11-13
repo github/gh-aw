@@ -67,7 +67,7 @@ func TestBuildSafeOutputsSectionsReportIncomplete(t *testing.T) {
 			config := &SafeOutputsConfig{NoOp: &NoOpConfig{}, ReportIncomplete: tt.config}
 			sections := buildSafeOutputsSections(config, nil, nil)
 			require.NotEmpty(t, sections)
-			manifestTools := collectSafeOutputsManifestTools(config)
+			manifestTools := collectSafeOutputsManifestTools(&WorkflowData{SafeOutputs: config})
 			assert.Equal(t, tt.config != nil, slices.Contains(manifestTools, "report_incomplete"))
 			_, enabled := computeEnabledToolNames(&WorkflowData{SafeOutputs: config})["report_incomplete"]
 			assert.Equal(t, tt.config != nil, enabled)
@@ -515,6 +515,10 @@ func TestBuildSafeOutputsSectionsLedgerTools(t *testing.T) {
 				data := &WorkflowData{SafeOutputs: safeOutputs, LedgerConfig: config}
 				names := extractToolNamesFromSections(t, NewCompiler().collectPromptSections(data))
 				require.Subset(t, names, tt.expected)
+				assert.ElementsMatch(t, names, collectSafeOutputsManifestTools(data))
+				for _, tool := range tt.expected {
+					assert.True(t, promptToolAvailable(data, promptToolRequirement{server: "safeoutputs", tool: tool}, EngineCapabilities{}))
+				}
 			}
 		})
 	}

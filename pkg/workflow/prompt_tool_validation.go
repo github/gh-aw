@@ -404,7 +404,7 @@ func promptToolAvailable(data *WorkflowData, requirement promptToolRequirement, 
 	case "native-read":
 		return ResolveEngineID(data) != "codex" || NewCodexEngine().ResolveLLMProvider(data) != LLMProviderGitHub
 	case "safeoutputs":
-		return slices.Contains(collectSafeOutputsManifestTools(data.SafeOutputs), requirement.tool)
+		return slices.Contains(collectSafeOutputsManifestTools(data), requirement.tool)
 	case "mcpscripts":
 		if !IsMCPScriptsEnabled(data.MCPScripts) {
 			return false
