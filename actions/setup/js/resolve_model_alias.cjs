@@ -100,9 +100,9 @@ function marshalParams(params) {
  * @returns {boolean}
  */
 function globMatch(pattern, entry) {
-  const patternParts = pattern.split("/", 2);
-  const entryParts = entry.split("/", 2);
-  if (patternParts.length === 1) {
+  const patternParts = [pattern.slice(0, pattern.indexOf("/")), pattern.slice(pattern.indexOf("/") + 1)];
+  const entryParts = [entry.slice(0, entry.indexOf("/")), entry.slice(entry.indexOf("/") + 1)];
+  if (!pattern.includes("/")) {
     if (!pattern.includes("*")) {
       return pattern.toLowerCase() === entry.toLowerCase();
     }
@@ -110,7 +110,7 @@ function globMatch(pattern, entry) {
     const regex = new RegExp(`^${escapedPattern}$`, "i");
     return regex.test(entry);
   }
-  if (entryParts.length === 1) {
+  if (!entry.includes("/")) {
     return false;
   }
   if (patternParts[0].toLowerCase() !== entryParts[0].toLowerCase()) {

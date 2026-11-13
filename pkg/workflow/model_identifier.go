@@ -26,7 +26,8 @@
 //	provider-token    = ALPHA 0*( ALPHA / DIGIT / "-" )
 //	                    ; starts with a letter; hyphens allowed but not at end
 //
-//	model-token       = model-char 0*( model-char / "." model-char )
+//	model-token       = model-segment *( "/" model-segment )
+//	model-segment     = model-char 0*( model-char / "." model-char )
 //
 //	model-char        = ALPHA / DIGIT / "-" / "_"
 //
@@ -91,8 +92,8 @@ var (
 	reProviderToken = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]*$`)
 
 	// model-char: ALPHA / DIGIT / "-" / "_"
-	// model-token: model-char segments separated by "."; each segment starts with ALPHA or DIGIT
-	reModelToken = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9][A-Za-z0-9_-]*)*$`)
+	// model-token: nonempty slash-separated segments; each dot-separated component starts with ALPHA or DIGIT
+	reModelToken = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*([./][A-Za-z0-9][A-Za-z0-9_-]*)*$`)
 
 	// bare-name: starts with ALPHA/DIGIT; contains ALPHA/DIGIT/"-"/"_"/"."
 	reBareName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
@@ -117,11 +118,11 @@ func firstForbiddenCharInProviderOrParam(s string) rune {
 }
 
 // firstForbiddenCharInModelToken returns the first character in s that is not in
-// [A-Za-z0-9_.-], or 0 if all characters are allowed.
+// [A-Za-z0-9_./-], or 0 if all characters are allowed.
 // Used for model tokens (V-MAF-006).
 func firstForbiddenCharInModelToken(s string) rune {
 	for _, r := range s {
-		if !isAlpha(r) && !isDigit(r) && r != '_' && r != '.' && r != '-' {
+		if !isAlpha(r) && !isDigit(r) && r != '_' && r != '.' && r != '/' && r != '-' {
 			return r
 		}
 	}
@@ -256,7 +257,7 @@ func validateModelToken(token string) error {
 		if r := firstForbiddenCharInModelToken(token); r != 0 {
 			return fmt.Errorf("model identifier: character %q is not allowed in model token %q (segment type: model)", r, token)
 		}
-		return fmt.Errorf("model identifier: model token %q is syntactically invalid (segment type: model). Expected letters, digits, '-', '_', or '.'. Example: model: openai/gpt-4o", token)
+		return fmt.Errorf("model identifier: model token %q is syntactically invalid (segment type: model). Expected nonempty slash-separated segments of letters, digits, '-', '_', or '.'. Example: model: openrouter/anthropic/claude-sonnet-4", token)
 	}
 	return nil
 }

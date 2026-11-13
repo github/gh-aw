@@ -694,6 +694,23 @@ describe("pi_models_json.cjs", () => {
       return { fetchReflect, promise: piModelsJson.main({ loadSDK, loadModelsJson: () => ({ providers: {} }), fetchReflect, ...extra }) };
     };
 
+    it.each(["anthropic/claude-sonnet-4", "moonshotai/kimi-k3"])("preserves the exact OpenRouter catalog ID %s through the OpenAI gateway", async modelId => {
+      configure(`openrouter/${modelId}`);
+      process.env.GH_AW_PI_NATIVE_PROVIDER = "openrouter";
+      process.env.GH_AW_LLM_PROVIDER = "openai";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "OPENAI_API_KEY";
+      const reflectData = {
+        models_fetch_complete: true,
+        endpoints: [{ provider: "openai", configured: true, port: 10000, models: [modelId] }],
+      };
+      await run([reflectData]).promise;
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"].baseUrl).toBe("http://api-proxy:10000");
+      expect(written.providers["aw-gateway"].models.map(model => model.id)).toEqual([modelId]);
+      expect(fs.readFileSync(process.env.GH_AW_PI_MODEL_FILE, "utf8")).toBe(modelId);
+      expect(() => piModelsJson.validatePiModelAvailability({ provider: "openai", modelId: modelId.slice(modelId.indexOf("/") + 1), reflectData })).toThrow("is not advertised");
+    });
+
     it("resolves copilot/opus to the newest live Opus", async () => {
       configure("copilot/opus");
       const { fetchReflect, promise } = run([reflectFixtures.ddgReflect()]);

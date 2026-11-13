@@ -156,7 +156,10 @@ provider-scoped   = provider-token "/" model-token
 provider-token    = ALPHA 0*( ALPHA / DIGIT / "-" )
                     ; starts with a letter; hyphens allowed but not at end
 
-model-token       = model-char 0*( model-char / "." model-char )
+model-token       = model-segment *( "/" model-segment )
+                    ; slash-separated namespaces are preserved in exact model IDs
+
+model-segment     = model-char 0*( model-char / "." model-char )
                     ; segments separated by "."; each segment starts with ALPHA or DIGIT
 
 model-char        = ALPHA / DIGIT / "-" / "_"
@@ -182,17 +185,18 @@ param-value       = 1*( ALPHA / DIGIT / "-" / "_" / "." )
 | Segment | Allowed characters | Notes |
 |---------|-------------------|-------|
 | Provider token | `[A-Za-z0-9-]` | MUST start with a letter; MUST NOT end with `-` |
-| Model token | `[A-Za-z0-9-_.]` | Dot separates version segments; underscore allowed within a segment only |
+| Model token | `[A-Za-z0-9-_./]` | Slash separates nonempty namespace segments; dot separates version segments |
 | Bare name | `[A-Za-z0-9-_.]` | MUST NOT start with `-` or `.` |
 | Glob wildcard | `*` | Only in model-glob-token; provider token MUST NOT contain `*` |
 | Parameter key | `[A-Za-z0-9-]` | MUST start with a letter |
 | Parameter value | `[A-Za-z0-9-_.]` | |
 
-Characters explicitly PROHIBITED in all segments: whitespace, `@`, `!`, `#`, `$`, `%`, `^`, `&` (except as separator), `(`, `)`, `+`, `=`, `[`, `]`, `{`, `}`, `|`, `\`, `:`, `;`, `,`, `<`, `>`, `/` (except as provider/model separator), `?` (except as parameter separator), `"`, `'`.
+Characters explicitly PROHIBITED in all segments: whitespace, `@`, `!`, `#`, `$`, `%`, `^`, `&` (except as separator), `(`, `)`, `+`, `=`, `[`, `]`, `{`, `}`, `|`, `\`, `:`, `;`, `,`, `<`, `>`, `/` (except as provider/model or exact model namespace separator), `?` (except as parameter separator), `"`, `'`.
 
 **Notes:**
 
 - The `?` character separates the base identifier from the query string.
+- The first `/` separates the provider from the exact model ID. Remaining slashes belong to the model ID, for example `openrouter/anthropic/claude-sonnet-4`. Empty namespace segments are invalid. Glob tokens retain their separate grammar; `*` does not match `/`.
 - An implementation MUST NOT percent-encode or percent-decode the model identifier string; the syntax is self-contained.
 - Multiple parameters are separated by `&`.
 - A bare identifier with no `?` and no `/` is treated as an alias name during resolution (see Section 8).
