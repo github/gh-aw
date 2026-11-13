@@ -51,6 +51,42 @@ type IntentRecord struct {
 	ResolverVersion string `json:"resolver_version,omitempty"`
 }
 
+// ResolveRisk returns the explicit risk when set, otherwise derives it from the
+// record's domains and priority.
+func ResolveRisk(rec IntentRecord) string {
+	if rec.Risk != "" {
+		return rec.Risk
+	}
+
+	hasSecurity := false
+	hasProduction := false
+	hasInfrastructure := false
+	hasDocumentation := false
+	for _, domain := range rec.Domains {
+		switch domain {
+		case "security":
+			hasSecurity = true
+		case "production":
+			hasProduction = true
+		case "infrastructure":
+			hasInfrastructure = true
+		case "documentation":
+			hasDocumentation = true
+		}
+	}
+
+	if hasProduction || (hasSecurity && rec.Priority == "critical") {
+		return "high"
+	}
+	if hasInfrastructure {
+		return "medium"
+	}
+	if hasDocumentation {
+		return "low"
+	}
+	return "unknown"
+}
+
 type RootReference struct {
 	NodeID string
 	Type   string

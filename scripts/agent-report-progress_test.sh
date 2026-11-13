@@ -94,6 +94,16 @@ if grep -Eq '^(lint|gofmt|compile):|make:<(build|check-stale-schema-binary|check
 fi
 echo "PASS: non-Go changes tolerate empty Go arrays under nounset"
 
+grep -Fxq "make:<check-instruction-prefixes>" "$CALL_LOG"
+export FAIL_TARGET=check-instruction-prefixes
+if run_gate; then
+    echo "Expected instruction prefix violations to block validation" >&2
+    exit 1
+fi
+grep -Fq "fixture failure: check-instruction-prefixes" "$OUTPUT"
+unset FAIL_TARGET
+echo "PASS: instruction prefix violations block saves before expensive validation"
+
 printf '%s\n' "pkg/space name/one.go" > "$CHANGED_LIST_FILE"
 run_gate
 grep -Fxq "compile:<test>" "$CALL_LOG"

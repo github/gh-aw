@@ -1068,8 +1068,6 @@ func TestResolveActionPinPrefixMapping(t *testing.T) {
 }
 
 // TestSpec_PublicAPI_ApplyContainerPinMapping validates the exported ApplyContainerPinMapping function.
-// SPEC_MISMATCH: The README says this function applies PinContext.Mappings;
-// this legacy test instead exercises the separate ContainerMappings field.
 // Spec: ApplyContainerPinMapping redirects container image references via ctx.ContainerMappings,
 // requiring a valid @sha256:<64-hex-char> digest in the mapped value.
 func TestSpec_PublicAPI_ApplyContainerPinMapping(t *testing.T) {

@@ -643,7 +643,7 @@ func TestBuildEngineMetadataEnvVars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := buildEngineMetadataEnvVars(tt.engineConfig, tt.model)
+			result := buildEngineMetadataEnvVars(tt.engineConfig, tt.model, "agent")
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected %d env vars, got %d", len(tt.expected), len(result))

@@ -39,6 +39,7 @@ Resolution supports two modes:
 | `RecordResolutionFailure` | `func(ResolutionFailure)` | Optional callback for unresolved pinning events |
 | `SkipHardcodedFallback` | `bool` | Skips version→SHA hardcoded fallback after dynamic resolver failure while preserving SHA→version labeling |
 | `Mappings` | `map[string]string` | Optional `owner/repo@ref` remapping before pin resolution |
+| `ContainerMappings` | `map[string]string` | Optional container image remapping to digest-pinned references |
 
 ### Functions
 
@@ -53,7 +54,7 @@ Resolution supports two modes:
 | `ExtractVersion` | `func(uses string) string` | Extracts the version from a `uses` reference |
 | `ResolveActionPin` | `func(actionRepo, version string, ctx *PinContext) (string, error)` | Resolves a pinned reference with optional dynamic SHA lookup and fallback behavior |
 | `ResolveLatestActionPin` | `func(repo string, ctx *PinContext) string` | Resolves a pinned reference for the latest known version, preferring cache/dynamic resolution when available |
-| `ApplyContainerPinMapping` | `func(image string, ctx *PinContext) string` | Applies `PinContext.Mappings` remapping rules to a container image reference before lookup |
+| `ApplyContainerPinMapping` | `func(image string, ctx *PinContext) string` | Applies `PinContext.ContainerMappings` to a container image reference; rejects replacements without a valid SHA-256 digest |
 | `ApplyResolvedActionPinPrefix` | `func(repo, pinnedRef string, ctx *PinContext) string` | Applies an action repository mapping to an already-resolved reference while retaining its pinned SHA and version label. |
 | `ResolveGHESActionPin` | `func(repo string) (string, bool)` | Returns a GHES-compatible pin for a repository when one is required. |
 
@@ -94,7 +95,7 @@ actionpins.ResolveActionPin("unknown/action", "v1", ctx)
 
 ### Action Pin Mappings
 
-`PinContext.Mappings` redirects `owner/repo@ref` references to replacement references before pin resolution. This is used to substitute private or mirror repositories for well-known public actions (set from `aw.json` `action_pins`).
+`PinContext.Mappings` redirects `owner/repo@ref` action references to replacement references before pin resolution. This is used to substitute private or mirror repositories for well-known public actions (set from `aw.json` `action_pins`).
 
 Keys and values use the format `"owner/repo@ref"`. When a key matches the incoming `actionRepo@version`, resolution proceeds against the mapped value instead. An informational message is emitted once per mapping via `PinContext.Warnings`.
 
@@ -121,6 +122,10 @@ if ok {
     fmt.Println(pin.PinnedImage) // ghcr.io/some/image@sha256:abc123
 }
 ```
+
+`PinContext.ContainerMappings` separately redirects source image references to
+replacement references from `aw.json` `container_pins`. Replacements must end in
+a valid `@sha256:` digest; invalid mappings are ignored and reported as warnings.
 
 ## Dependencies
 
