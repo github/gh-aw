@@ -407,7 +407,7 @@ fi
 `
 	}
 	return fmt.Sprintf(`%s
-if [[ ! "$%s" =~ ^(-1|[1-9][0-9]{0,17})$ ]]; then
+if [[ ! "$%s" =~ ^(-1|[1-9][0-9]{0,18})$ ]]; then
   echo "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld); expected a positive whole number or -1. Using default budget of %s AI credits."
   %s="%s"
 fi

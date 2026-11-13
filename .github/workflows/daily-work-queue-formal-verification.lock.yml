@@ -1158,7 +1158,7 @@ jobs:
           export COPILOT_API_KEY="$COPILOT_DUMMY_BYOK"
           (umask 177 && touch /tmp/gh-aw/agent-stdio.log)
           GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-1000}"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,17})$ ]]; then
+          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,18})$ ]]; then
             echo "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld); expected a positive whole number or -1. Using default budget of 1000 AI credits."
             GH_AW_MAX_AI_CREDITS="1000"
           fi
@@ -2167,7 +2167,7 @@ jobs:
 
           (umask 177 && touch /tmp/gh-aw/threat-detection/detection.log)
           GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-400}"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,17})$ ]]; then
+          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,18})$ ]]; then
             echo "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld); expected a positive whole number or -1. Using default budget of 400 AI credits."
             GH_AW_MAX_AI_CREDITS="400"
           fi

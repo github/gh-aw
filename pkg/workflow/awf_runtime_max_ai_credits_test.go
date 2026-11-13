@@ -98,7 +98,9 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 		{"1", "1"},
 		{"750", "750"},
 		{"1500", "1500"},
+		{"9223372036854775807", "9223372036854775807"},
 		{"0", "default"},
+		{"10000000000000000000", "default"},
 		{"0100", "default"},
 		{"5K", "default"},
 		{"100M", "default"},
@@ -155,6 +157,7 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 	}{
 		{-1, "-1"},
 		{"5K", "5000"},
+		{int64(9223372036854775807), "9223372036854775807"},
 	}
 	for _, tc := range frontmatter {
 		t.Run("frontmatter "+fmt.Sprint(tc.raw)+" emits no warning", func(t *testing.T) {

@@ -1213,7 +1213,7 @@ jobs:
           export GH_AW_NODE_BIN
           (umask 177 && touch /tmp/gh-aw/agent-stdio.log)
           GH_AW_MAX_AI_CREDITS="50"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,17})$ ]]; then
+          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,18})$ ]]; then
             echo "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld); expected a positive whole number or -1. Using default budget of 50 AI credits."
             GH_AW_MAX_AI_CREDITS="50"
           fi
