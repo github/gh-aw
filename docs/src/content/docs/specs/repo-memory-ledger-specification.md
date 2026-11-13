@@ -162,11 +162,12 @@ tools:
 ```
 
 Both backends use the same ledger operations, transaction validation,
-deterministic IDs, canonical record DAG, and built-in replay validation.
-Comment-backed history MUST remain readable JSONL, both in persisted comments
-and in the read-only `/tmp/gh-aw/ledgers/<name>/ledger.jsonl` file exposed to the
-agent. It MUST NOT be stored as base64 or exposed as a binary SQLite database.
-Git-backed ledgers retain their existing disposable SQLite query projections.
+deterministic IDs, canonical record DAG, and read-only SQLite projections.
+Comment-backed history MUST remain readable JSONL in persisted comments, never
+base64 or a binary SQLite database. Trusted preparation reconstructs the JSONL
+records and creates the same disposable `/tmp/gh-aw/ledgers/<name>/ledger.db`
+projection used by Git-backed ledgers. The agent queries this read-only SQLite
+projection; only JSONL comments are durable state.
 Comment-backed persistence MUST run only in the trusted persistence job, using
 the configured comment-memory token, target repository, and repository allowlist.
 The target MUST be `triggering`, `*`, or a literal positive issue/PR number;

@@ -4,8 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { Ledger } from "./ledger_store.cjs";
-import { replayBuiltin } from "./ledger_builtin.cjs";
+import { DatabaseSync } from "node:sqlite";
 import { materializeCommentLedger, persistCommentLedgerAppends, LEDGER_TAG } from "./comment_memory_ledger.cjs";
 import { extractCommentMemoryEntries, COMMENT_MEMORY_MAX_FILE_BYTES } from "./comment_memory_helpers.cjs";
 import { createProjection } from "./create_ledger_projection.cjs";
@@ -89,7 +88,7 @@ test.each([
     1,
   ],
   ["notes", [{ operation: "note", subject: "Parser", note: "A note", reason: "Evidence", citations: [{ type: "repository", path: "pkg/parser/parser.go", start_line: 1 }] }], "notes", 1],
-])("comment-backed %s persists readable JSONL and reuses validation and replay without SQLite", async (type, operations, table, count) => {
+])("comment-backed %s persists readable JSONL and builds a read-only SQLite projection for the agent", async (type, operations, table, count) => {
   const definition = { ...config, type, ...(type === "table" ? { key: "key" } : {}) };
   const { githubClient, comments } = remote();
   const appends = requests(definition, operations);
@@ -111,27 +110,24 @@ test.each([
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "comment-ledger-test-"));
   try {
     await materializeCommentLedger({ githubClient, config: definition, sourceDir: root, commentMemoryConfig });
-    const jsonlPath = path.join(root, "ledger.jsonl");
-    const originalProject = Ledger.prototype.project;
-    Ledger.prototype.project = () => {
-      throw new Error("Comment-backed ledgers must not create SQLite databases");
-    };
+    const databasePath = path.join(root, "ledger.db");
+    createProjection({ sourceDir: root, databasePath, config: definition });
+    const database = new DatabaseSync(databasePath, { readOnly: true });
     try {
-      createProjection({ sourceDir: root, jsonlPath, config: definition });
+      assert.equal(database.prepare(`SELECT count(*) AS n FROM ${table}`).get().n, count);
+      assert.equal(database.prepare("SELECT count(*) AS n FROM records").get().n, appends.length);
+      assert.deepEqual(
+        database
+          .prepare("SELECT sha FROM records ORDER BY sha")
+          .all()
+          .map(row => row.sha),
+        publishedRecords.map(record => record.sha).sort()
+      );
+      if (type === "log") assert.deepEqual(JSON.parse(database.prepare("SELECT value FROM state").get().value), operations[0].value);
     } finally {
-      Ledger.prototype.project = originalProject;
+      database.close();
     }
-    const records = fs
-      .readFileSync(jsonlPath, "utf8")
-      .trimEnd()
-      .split("\n")
-      .map(line => JSON.parse(line));
-    assert.equal(records.length, appends.length);
-    assert.equal(fs.statSync(jsonlPath).mode & 0o777, 0o444);
-    assert.equal(fs.existsSync(path.join(root, "ledger.db")), false);
-    const replay = replayBuiltin(definition, records);
-    assert.equal(replay.tables[table].rows.length, count);
-    if (type === "log") assert.deepEqual(JSON.parse(replay.tables.state.rows[0].value), operations[0].value);
+    assert.equal(fs.statSync(databasePath).mode & 0o777, 0o444);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

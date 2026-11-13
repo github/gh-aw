@@ -8,11 +8,11 @@
 
 ### Context
 
-Standalone ledgers (`tools.ledger`) store typed, append-only records using the built-in `log`, `set`, `map`, `table`, `counter`, and `notes` reducers. Today every ledger persists only to a Git branch named `ledgers/<name>`, which requires `contents: write` and creates repository branches even for workflows whose state already lives on an issue or pull request through `tools.comment-memory`. Those workflows need durable, reviewable ledger history on the same thread without granting repository write access. The solution must keep Git as the default, preserve transaction validation, deterministic IDs and reducers, and stay within the existing comment-memory size and permission limits. Comment-backed ledgers must remain readable JSONL in comments and agent-visible files; Git-backed SQLite query projections remain unchanged.
+Standalone ledgers (`tools.ledger`) store typed, append-only records using the built-in `log`, `set`, `map`, `table`, `counter`, and `notes` reducers. Today every ledger persists only to a Git branch named `ledgers/<name>`, which requires `contents: write` and creates repository branches even for workflows whose state already lives on an issue or pull request through `tools.comment-memory`. Those workflows need durable, reviewable ledger history on the same thread without granting repository write access. The solution must keep Git as the default, preserve transaction validation, deterministic IDs and reducers, and stay within the existing comment-memory size and permission limits. Comment-backed ledgers must persist readable JSONL in comments while exposing the same read-only SQLite query projections as Git-backed ledgers.
 
 ### Decision
 
-We will add `storage: comment-memory` to standalone ledger configuration, with `git` remaining the default. A comment-backed ledger persists each accepted batch as a new, immutable managed comment on the issue or PR selected by `tools.comment-memory`, containing a plain JSONL shard under a separate `gh-aw-comment-ledger:<name>` fence. Agents read validated history from `/tmp/gh-aw/ledgers/<name>/ledger.jsonl`, not a binary SQLite database. Persistence runs only in the trusted `push_ledger_changes` job and never updates or deletes earlier ledger comments. The primary driver is removing the need for repository write access for comment-only ledgers while reusing the existing ledger pipeline and comment-memory targeting.
+We will add `storage: comment-memory` to standalone ledger configuration, with `git` remaining the default. A comment-backed ledger persists each accepted batch as a new, immutable managed comment on the issue or PR selected by `tools.comment-memory`, containing a plain JSONL shard under a separate `gh-aw-comment-ledger:<name>` fence. Trusted preparation reconstructs those records into `/tmp/gh-aw/ledgers/<name>/ledger.db`, a disposable read-only SQLite projection for agent queries, just as with repo-memory. Persistence runs only in the trusted `push_ledger_changes` job and never updates or deletes earlier ledger comments. The primary driver is removing the need for repository write access for comment-only ledgers while reusing the existing ledger pipeline and comment-memory targeting.
 
 ### Alternatives Considered
 
@@ -28,7 +28,7 @@ This reuses the existing comment-memory model directly: keep one managed comment
 
 #### Positive
 - Comment-only ledgers run with `contents: read` plus `issues: write` and `pull-requests: write`, so workflows no longer need repository write access to persist ledger state.
-- Ledger semantics are unchanged: transaction validation, deterministic IDs, reducers, and the canonical record DAG apply identically to both backends. Comment-backed history is directly readable as JSONL without SQLite.
+- Ledger semantics are unchanged: transaction validation, deterministic IDs, reducers, the canonical record DAG, and read-only SQLite projections apply identically to both backends. Persisted comment history remains directly readable as JSONL.
 - Immutable per-batch comments give an auditable history on the issue or PR, and retried transactions do not duplicate records.
 
 #### Negative

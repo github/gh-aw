@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { Ledger, canonicalJSON, configuredLedgerLimits } = require("./ledger_store.cjs");
+const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./schema-validation.cjs");
@@ -83,8 +83,8 @@ function materializeLedger({ refName, workspaceDir, sourceDir, config }) {
   }
 }
 
-/** @param {{sourceDir: string, databasePath?: string, jsonlPath?: string, config: any}} options */
-function createProjection({ sourceDir, databasePath, jsonlPath, config }) {
+/** @param {{sourceDir: string, databasePath: string, config: any}} options */
+function createProjection({ sourceDir, databasePath, config }) {
   if (Object.hasOwn(config, "replay")) throw new TypeError("Custom ledger replay is no longer supported; use a built-in ledger type");
   const limits = configuredLedgerLimits(config);
   const ledger = new Ledger({
@@ -105,20 +105,12 @@ function createProjection({ sourceDir, databasePath, jsonlPath, config }) {
         }
       }
     }
-    const output = config.type ? replayBuiltin(config, state.records) : null;
-    if (config.storage === "comment-memory") {
-      if (typeof jsonlPath !== "string") throw new TypeError("Comment-backed ledger requires a JSONL view path");
-      fs.mkdirSync(path.dirname(jsonlPath), { recursive: true });
-      fs.writeFileSync(jsonlPath, state.records.map(record => `${canonicalJSON(record)}\n`).join(""), { mode: 0o444 });
-      fs.chmodSync(jsonlPath, 0o444);
-      return output?.tables || null;
-    }
-    if (typeof databasePath !== "string") throw new TypeError("Git-backed ledger requires a SQLite projection path");
     const database = ledger.project(state);
     if (!database) throw new Error("Node.js SQLite support is required to create the ledger projection");
     /** @type {Record<string, { columns: Record<string, string> }> | null} */
     let tables = null;
-    if (output) {
+    if (config.type) {
+      const output = replayBuiltin(config, state.records);
       const maxRows = config.type === "notes" ? Object.values(output.tables).reduce((count, table) => count + table.rows.length, 0) : state.records.length;
       materializeReplay(database, config.name, `builtin:${config.type}`, state.records, output, maxRows);
       tables = output.tables;
@@ -151,7 +143,7 @@ async function main(options = {}) {
       const refName = `refs/gh-aw/ledgers/${ledger.name}`;
       const sourceDir = path.join(sourceRoot, ledger.name);
       const projectionDir = path.join(PROJECTION_ROOT, ledger.name);
-      const projectionPath = path.join(projectionDir, ledger.storage === "comment-memory" ? "ledger.jsonl" : "ledger.db");
+      const databasePath = path.join(projectionDir, "ledger.db");
       fs.mkdirSync(projectionDir, { recursive: true });
       if (ledger.storage === "comment-memory") {
         const { materializeCommentLedger } = require("./comment_memory_ledger.cjs");
@@ -170,11 +162,9 @@ async function main(options = {}) {
         if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
         else fs.mkdirSync(sourceDir, { recursive: true });
       }
-      const tables = createProjection({ sourceDir, ...(ledger.storage === "comment-memory" ? { jsonlPath: projectionPath } : { databasePath: projectionPath }), config: ledger });
-      if (ledger.storage === "comment-memory") {
-        replayGuidance.push(`Ledger ${ledger.name} (${projectionPath}): read-only canonical JSONL event history. Read with file tools or jq; submit changes only through the configured ledger safe-output tools.`);
-      } else if (ledger.type) {
-        replayGuidance.push(`Ledger ${ledger.name} (${projectionPath}):`);
+      const tables = createProjection({ sourceDir, databasePath, config: ledger });
+      if (ledger.type) {
+        replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);
         if (tables && Object.keys(tables).length) {
           replayGuidance.push(...Object.entries(tables).map(([name, table]) => formatReplayTable(name, table)));
           replayGuidance.push("Use these derived, read-only tables for current state; use generic records for immutable event history. Persist new events only through the configured ledger safe-output tools. Do not update replay tables.");
@@ -190,7 +180,7 @@ async function main(options = {}) {
   } finally {
     fs.rmSync(sourceRoot, { recursive: true, force: true });
   }
-  return config.map(ledger => path.join(PROJECTION_ROOT, ledger.name, ledger.storage === "comment-memory" ? "ledger.jsonl" : "ledger.db"));
+  return config.map(ledger => path.join(PROJECTION_ROOT, ledger.name, "ledger.db"));
 }
 
 if (require.main === module) {
