@@ -5,10 +5,10 @@ package workflow
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -59,22 +59,24 @@ func runRuntimeMaxAICreditsScript(t *testing.T, script string, env ...string) ru
 	return runtimeMaxAICreditsResult{apiProxy: apiProxy, output: string(out)}
 }
 
-// TestRuntimeMaxAICreditsNormalization_Shellcheck verifies the runtime normalization
+// TestRuntimeMaxAICreditsScript_Shellcheck verifies the generated budget resolution
 // script passes ShellCheck, which gh aw compile --dry-run runs on generated steps.
-func TestRuntimeMaxAICreditsNormalization_Shellcheck(t *testing.T) {
+func TestRuntimeMaxAICreditsScript_Shellcheck(t *testing.T) {
 	if _, err := exec.LookPath("shellcheck"); err != nil {
 		t.Skip("shellcheck is not installed")
 	}
-	script := buildRuntimeMaxAICreditsNormalization(&WorkflowData{}, "1000")
+	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot"}, NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}}}
+	script := runtimeMaxAICreditsConfigScript(t, data)
 	cmd := exec.Command("shellcheck", "-s", "bash", "-")
 	cmd.Stdin = strings.NewReader(script)
 	output, err := cmd.CombinedOutput()
-	require.NoError(t, err, "runtime max AI credits normalization must pass ShellCheck:\n%s", output)
+	require.NoError(t, err, "runtime max AI credits script must pass ShellCheck:\n%s", output)
 }
 
 // TestRuntimeMaxAICreditsVariableValues runs the compiled AWF step with runtime
-// GH_AW_MAX_AI_CREDITS values (as resolved from vars.GH_AW_DEFAULT_*_MAX_AI_CREDITS)
-// and verifies they are accepted exactly like frontmatter values. Covers T-AIC-PR-003.
+// GH_AW_MAX_AI_CREDITS values (as resolved from vars.GH_AW_DEFAULT_*_MAX_AI_CREDITS).
+// -1 and positive whole numbers pass through; anything else falls back to the
+// built-in default with a value-withheld warning. Covers T-AIC-PR-003.
 func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash is required")
@@ -82,38 +84,28 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 	runs := []struct {
 		name          string
 		data          *WorkflowData
-		source        string
 		defaultBudget string
 	}{
-		{"agent", &WorkflowData{}, "vars.GH_AW_DEFAULT_MAX_AI_CREDITS", "1000"},
-		{"detection", &WorkflowData{IsDetectionRun: true}, "vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS", "400"},
-		{"evals", &WorkflowData{IsEvalsRun: true}, "vars.GH_AW_DEFAULT_EVALS_MAX_AI_CREDITS", "400"},
+		{"agent", &WorkflowData{}, "1000"},
+		{"detection", &WorkflowData{IsDetectionRun: true}, "400"},
+		{"evals", &WorkflowData{IsEvalsRun: true}, "400"},
 	}
 	values := []struct {
 		value string
 		want  string // "default" means the built-in default
 	}{
 		{"-1", "-1"},
-		{" -1 ", "-1"},
-		{"0", "default"},
+		{"1", "1"},
+		{"750", "750"},
 		{"1500", "1500"},
-		{"5K", "5000"},
-		{"5k", "5000"},
-		{"2M", "2000000"},
-		{"2m", "2000000"},
-		{" 7K ", "7000"},
-		{"+010", "10"},
-		{"9223372036854775807", "9223372036854775807"},
-		{"9223372036854775808", "default"},
-		{"9223372036854776K", "default"},
-		{"0K", "default"},
-		{"-5", "default"},
-		{"-1K", "default"},
-		{"1.5K", "default"},
-		{"K", "default"},
-		{"5 K", "default"},
-		{"unlimited", "default"},
-		{"$(echo s3cr3t)", "default"},
+		{"0", "default"},
+		{"0100", "default"},
+		{"5K", "default"},
+		{"100M", "default"},
+		{"-2", "default"},
+		{" -1 ", "default"},
+		{"abc", "default"},
+		{"s3cr3t", "default"},
 	}
 	for _, run := range runs {
 		run.data.EngineConfig = &EngineConfig{ID: "copilot"}
@@ -127,23 +119,14 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 					want = run.defaultBudget
 				}
 
-				// Runtime acceptance must match the compiler's frontmatter parser.
-				parsed, ok := parseMaxAICLimitValue(tc.value)
-				if ok {
-					expected := strconv.FormatInt(parsed, 10)
-					assert.Equal(t, expected, want, "runtime value must expand like the frontmatter value")
-				} else {
-					assert.Equal(t, "default", tc.want, "values the compiler rejects must fall back to the default")
-				}
-
 				credits, present := result.apiProxy["maxAiCredits"]
 				require.True(t, present, "maxAiCredits must be present")
 				assert.Equal(t, json.Number(want), credits)
 
 				if tc.want == "default" {
-					assert.Contains(t, result.output, "::warning::Ignoring invalid "+run.source+" (value withheld)")
+					assert.Contains(t, result.output, "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld)")
 					assert.Contains(t, result.output, "default budget of "+run.defaultBudget+" AI credits")
-					assert.NotContains(t, result.output, "s3cr3t")
+					assert.NotContains(t, result.output, "s3cr3t", "raw value must be withheld")
 				} else {
 					assert.NotContains(t, result.output, "::warning::")
 				}
@@ -166,45 +149,21 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 		assert.Contains(t, result.output, "Admission allowance applied")
 	})
 
-	t.Run("frontmatter -1 keeps the compiled literal", func(t *testing.T) {
-		data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", MaxAICredits: -1}, NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}}}
-		script := runtimeMaxAICreditsConfigScript(t, data)
-		assert.Contains(t, script, awfMaxAICreditsVarName+`="-1"`)
-		assert.NotContains(t, script, "::warning::")
-		result := runRuntimeMaxAICreditsScript(t, script, awfMaxAICreditsVarName+"=5K")
-		assert.Equal(t, json.Number("-1"), result.apiProxy["maxAiCredits"])
-	})
-}
-
-// TestRuntimeMaxAICreditsDryRunSourceLabel verifies the dry-run fallback warning names
-// the frontmatter field the user configured, even when dry-run preparation promotes an
-// expression-valued max-daily-ai-credits into the per-run budget.
-func TestRuntimeMaxAICreditsDryRunSourceLabel(t *testing.T) {
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("bash is required")
-	}
-	daily := "${{ vars.DAILY_BUDGET }}"
-	for _, tc := range []struct {
-		name, source string
-		raw          map[string]any
+	frontmatter := []struct {
+		raw  any
+		want string
 	}{
-		{"max-daily-ai-credits", maxDailyAICreditsField, map[string]any{maxDailyAICreditsField: daily}},
-		{"max-ai-credits", "max-ai-credits", map[string]any{maxDailyAICreditsField: daily, "max-ai-credits": "${{ vars.RUN_BUDGET }}"}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			compiler := NewCompiler()
-			compiler.SetDryRun(true)
-			data := compiler.dryRunWorkflowData(&WorkflowData{
-				MaxDailyAICredits:         &daily,
-				MaxDailyAICreditsExplicit: true,
-				EngineConfig:              &EngineConfig{ID: "copilot"},
-				NetworkPermissions:        &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
-				RawFrontmatter:            tc.raw,
-			})
-			assert.Equal(t, tc.source, data.DryRunMaxAICreditsSource)
-			result := runRuntimeMaxAICreditsScript(t, runtimeMaxAICreditsConfigScript(t, data), awfMaxAICreditsVarName+"=unlimited")
-			assert.Contains(t, result.output, "::warning::Ignoring invalid "+tc.source+" (value withheld)")
-			assert.Equal(t, json.Number("1000"), result.apiProxy["maxAiCredits"])
+		{-1, "-1"},
+		{"5K", "5000"},
+	}
+	for _, tc := range frontmatter {
+		t.Run("frontmatter "+fmt.Sprint(tc.raw)+" emits no warning", func(t *testing.T) {
+			data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", MaxAICredits: parseMaxAICreditsValue(tc.raw)}, NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}}}
+			script := runtimeMaxAICreditsConfigScript(t, data)
+			assert.Contains(t, script, awfMaxAICreditsVarName+`="`+tc.want+`"`)
+			result := runRuntimeMaxAICreditsScript(t, script, awfMaxAICreditsVarName+"=abc")
+			assert.Equal(t, json.Number(tc.want), result.apiProxy["maxAiCredits"])
+			assert.NotContains(t, result.output, "::warning::")
 		})
 	}
 }

@@ -13,7 +13,6 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
 const copilotAWFSessionStateDir = constants.TmpGhAwDir + "/sandbox/agent/session-state"
@@ -395,13 +394,9 @@ func buildMaxAICreditsExport(config AWFCommandConfig, awfConfigJSON string) (str
 	}
 	awfConfigJSON = injectMaxAICreditsExpression(awfConfigJSON, fmt.Sprintf("${%s}", awfMaxAICreditsVarName))
 	awfHelpersLog.Printf("Injected maxAiCredits local var reference into AWF config JSON")
-	validation := fmt.Sprintf(`%s="${%s:-%s}"
-%s`, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits, buildRuntimeMaxAICreditsNormalization(config.WorkflowData, defaultMaxAICredits))
-	if hasCompileTimeMaxAICredits(config.WorkflowData) {
-		validation = fmt.Sprintf(`%s="%s"
-if [[ ! "$%s" =~ ^[0-9]+$ ]]; then
-  %s="%s"
-fi`, awfMaxAICreditsVarName, defaultMaxAICredits, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits)
+	assignment := fmt.Sprintf(`%s="${%s:-%s}"`, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits)
+	if config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && config.WorkflowData.EngineConfig.MaxAICredits != 0 {
+		assignment = fmt.Sprintf(`%s="%s"`, awfMaxAICreditsVarName, defaultMaxAICredits)
 	}
 	requirePrimary := ""
 	if config.WorkflowData != nil && !config.WorkflowData.IsDetectionRun && !config.WorkflowData.IsEvalsRun {
@@ -412,6 +407,10 @@ fi
 `
 	}
 	return fmt.Sprintf(`%s
+if [[ ! "$%s" =~ ^(-1|[1-9][0-9]{0,17})$ ]]; then
+  echo "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld); expected a positive whole number or -1. Using default budget of %s AI credits."
+  %s="%s"
+fi
 %s
 if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_AI_CREDITS:-}" ]]; then
   if [[ ! "$GH_AW_ADMISSION_MAX_AI_CREDITS" =~ ^[1-9][0-9]{0,9}$ ]] || (( GH_AW_ADMISSION_MAX_AI_CREDITS > 2147483647 )); then
@@ -423,56 +422,7 @@ if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_A
 else
   echo "No component admission allowance; retaining existing budget policy (value withheld)."
 fi
-unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS`, validation, requirePrimary), awfConfigJSON
-}
-
-func hasCompileTimeMaxAICredits(data *WorkflowData) bool {
-	return data != nil && data.EngineConfig != nil && data.EngineConfig.MaxAICredits != 0
-}
-
-// runtimeMaxAICreditsSourceName names the setting that supplies GH_AW_MAX_AI_CREDITS
-// at run time, mirroring applyDefaultMaxAICreditsEnvToMap.
-func runtimeMaxAICreditsSourceName(data *WorkflowData) string {
-	if data != nil && data.DryRun && data.DryRunMaxAICreditsSource != "" {
-		return data.DryRunMaxAICreditsSource
-	}
-	switch {
-	case data != nil && data.IsEvalsRun:
-		return "vars." + compilerenv.DefaultEvalsMaxAICredits
-	case data != nil && data.IsDetectionRun:
-		return "vars." + compilerenv.DefaultDetectionMaxAICredits
-	default:
-		return "vars." + compilerenv.DefaultMaxAICredits
-	}
-}
-
-// runtimeMaxAICreditsNormalizationTemplate normalizes a runtime GH_AW_MAX_AI_CREDITS value
-// with the same accepted forms as parseMaxAICLimitValue: surrounding whitespace is ignored,
-// -1 disables the budget, and positive base-10 integers with an optional K/k or M/m suffix
-// are expanded. Any other value falls back to the default with a warning that names the
-// source setting but withholds the value.
-const runtimeMaxAICreditsNormalizationTemplate = `GH_AW_AIC_LIMIT=""
-if [[ "$GH_AW_MAX_AI_CREDITS" =~ ^[[:space:]]*(-1|[+]?0*([1-9][0-9]{0,18})([kKmM]?))[[:space:]]*$ ]]; then
-  case "${BASH_REMATCH[3]}" in [kK]) GH_AW_AIC_SCALE=1000 ;; [mM]) GH_AW_AIC_SCALE=1000000 ;; *) GH_AW_AIC_SCALE=1 ;; esac
-  # shellcheck disable=SC2071 # intentional lexical compare of 19-digit strings avoids 64-bit arithmetic overflow
-  if [[ "${BASH_REMATCH[1]}" == "-1" ]]; then
-    GH_AW_AIC_LIMIT="-1"
-  elif [[ "${#BASH_REMATCH[2]}" -lt 19 || "${BASH_REMATCH[2]}" < "9223372036854775808" ]] && (( BASH_REMATCH[2] <= 9223372036854775807 / GH_AW_AIC_SCALE )); then
-    GH_AW_AIC_LIMIT="$(( BASH_REMATCH[2] * GH_AW_AIC_SCALE ))"
-  fi
-fi
-if [[ -z "$GH_AW_AIC_LIMIT" ]]; then
-  echo "::warning::Ignoring invalid __SOURCE__ (value withheld); expected a positive whole number, a K/M suffix value such as 5K, or -1. Using the default budget of __DEFAULT__ AI credits."
-  GH_AW_AIC_LIMIT="__DEFAULT__"
-fi
-GH_AW_MAX_AI_CREDITS="$GH_AW_AIC_LIMIT"
-unset GH_AW_AIC_LIMIT GH_AW_AIC_SCALE`
-
-func buildRuntimeMaxAICreditsNormalization(data *WorkflowData, defaultMaxAICredits string) string {
-	return strings.NewReplacer(
-		"__SOURCE__", runtimeMaxAICreditsSourceName(data),
-		"__DEFAULT__", defaultMaxAICredits,
-	).Replace(runtimeMaxAICreditsNormalizationTemplate)
+unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS`, assignment, awfMaxAICreditsVarName, defaultMaxAICredits, awfMaxAICreditsVarName, defaultMaxAICredits, requirePrimary), awfConfigJSON
 }
 
 func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) string {

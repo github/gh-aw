@@ -651,7 +651,7 @@ This expression MUST be embedded in the compiled YAML (not pre-evaluated at comp
 
 ### 10.5 Disable Sentinel
 
-A `max-ai-credits` frontmatter value of `-1` MUST disable the per-run budget. When this sentinel is present at runtime (via the organization variable resolving to `-1`), a conforming implementation MUST disable AWF budget enforcement and omit the `maxAiCredits` field from the firewall configuration. Budget notices are controlled separately by `sandbox.agent.token-steering`; with AWF releases after v0.29.11 they remain on by default when the budget is disabled.
+A `max-ai-credits` frontmatter value of `-1` MUST disable the per-run budget. When this sentinel is present at runtime (via the organization variable resolving to `-1`), a conforming implementation MUST disable AWF budget enforcement by omitting `maxAiCredits` or setting `maxAiCredits` to `-1` in the firewall configuration (which AWF treats identically). Budget notices are controlled separately by `sandbox.agent.token-steering`; with AWF releases after v0.29.11 they remain on by default when the budget is disabled.
 
 ### 10.6 Value Validation
 

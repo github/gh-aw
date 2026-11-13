@@ -65,7 +65,6 @@ type WorkflowData struct {
 	MaxDailyAICBackend             string            // optional backend for the daily AIC guardrail ("repo-memory" for git-backed JSONL ledger)
 	MaxDailyAICreditsGitHubApp     *GitHubAppConfig  // optional GitHub App for minting the token used by the daily AIC guardrail
 	MaxDailyAICContinueOnError     bool              // when true, unknown/unverifiable daily AIC accounting is a warning instead of failing closed
-	DryRunMaxAICreditsSource       string            // dry-run only: frontmatter field that supplies an expression-valued per-run budget
 	ImportedFiles                  []string          // list of files imported via imports field (rendered as comment in lock file)
 	ImportedMetadataDocuments      map[string]string // compiler-resolved raw imports for JSON metadata generation
 	Skills                         []string          // skill specs from frontmatter (owner/repo@sha or owner/repo/skill/path@sha)
