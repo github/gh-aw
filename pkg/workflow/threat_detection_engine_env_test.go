@@ -861,7 +861,7 @@ func TestBuildDetectionEngineExecutionStepPropagatesModelCostsProviders(t *testi
 		EngineConfig: &EngineConfig{
 			ID: "claude",
 		},
-		ModelCosts: map[string]any{
+		ModelCostOverrides: map[string]any{
 			"providers": map[string]any{
 				"anthropic": map[string]any{
 					"models": map[string]any{

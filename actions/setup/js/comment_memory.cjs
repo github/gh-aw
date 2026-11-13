@@ -49,12 +49,12 @@ function sanitizeMemoryID(memoryID) {
 }
 
 /** @returns {import("./report_ast.cjs").ReportBlock} */
-function buildCollapsedMemorySection(rawBody, memoryID) {
+function buildCollapsedMemorySection(rawBody, memoryID, memoryTag, memoryBlock) {
   return {
     type: "details",
     summary: `Peek at saved memory (${memoryID})`,
     agentTainted: false,
-    children: [{ type: "code_block", language: `${COMMENT_MEMORY_TAG}:${memoryID}`, fenceLength: 6, value: sanitizeContent(rawBody), agentTainted: true, sizeProtected: true }],
+    children: [memoryBlock || { type: "code_block", language: `${memoryTag}:${memoryID}`, fenceLength: 6, value: sanitizeContent(rawBody), agentTainted: true, sizeProtected: true }],
   };
 }
 
@@ -124,7 +124,7 @@ function buildTransactionHistory(previousBody, runUrl, workflowName) {
 
 /** @returns {import("./report_ast.cjs").Report} */
 function buildManagedMemoryReport(rawBody, memoryID, options) {
-  const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber, previousBody = "" } = options;
+  const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber, memoryTag = COMMENT_MEMORY_TAG, memoryBlock, previousBody = "" } = options;
   if (!/^[a-zA-Z0-9_-]+$/.test(memoryID)) {
     throw new Error(`${SAFE_OUTPUT_E001}: memory_id must contain only alphanumeric characters, hyphens, and underscores`);
   }
@@ -146,7 +146,7 @@ function buildManagedMemoryReport(rawBody, memoryID, options) {
   const children = [
     ...markdownParts.detectionCaution,
     { type: "heading", level: 3, agentTainted: false, children: [{ type: "text", value: "Comment Memory", agentTainted: false }] },
-    buildCollapsedMemorySection(rawBody, memoryID),
+    buildCollapsedMemorySection(rawBody, memoryID, memoryTag, memoryBlock),
     buildTransactionHistory(previousBody, runUrl, workflowName),
   ];
 

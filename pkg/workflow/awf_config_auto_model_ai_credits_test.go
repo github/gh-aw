@@ -62,7 +62,7 @@ func TestZeroConfigCopilotAutoModelWithMaxAiCredits(t *testing.T) {
 			"no fallback pricing may be synthesized for the dynamic 'auto' selector")
 	})
 
-	t.Run("concrete models keep their own resolved pricing", func(t *testing.T) {
+	t.Run("concrete model defaults remain report-only", func(t *testing.T) {
 		c := &Compiler{}
 		c.modelPricingResolver = func(_ context.Context, _, _ string) (map[string]float64, bool) {
 			return map[string]float64{"input": 1.25e-06, "output": 1e-05}, true
@@ -73,6 +73,9 @@ func TestZeroConfigCopilotAutoModelWithMaxAiCredits(t *testing.T) {
 			EngineConfig: &EngineConfig{ID: "copilot"},
 		}
 		workflowData.ModelCosts = c.resolveModelPricingIfMissing(nil, workflowData)
+		require.True(t, modelCostsHasPricingFor(workflowData.ModelCosts, "github-copilot", "gpt-5.1"))
+		assert.Nil(t, extractModelCostProviders(workflowData),
+			"compiler-generated reporting prices must not become apiProxy.providers overrides")
 
 		config := AWFCommandConfig{
 			EngineName:     "copilot",
@@ -93,10 +96,7 @@ func TestZeroConfigCopilotAutoModelWithMaxAiCredits(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
 
-		copilotProvider, ok := parsed.APIProxy.Providers["github-copilot"]
-		require.True(t, ok, "concrete model pricing must be emitted for the resolved model")
-		assert.Contains(t, copilotProvider.Models, "gpt-5.1")
-		assert.NotContains(t, copilotProvider.Models, "auto",
-			"the dynamic selector must never receive its own pricing entry")
+		assert.Empty(t, parsed.APIProxy.Providers,
+			"automatically resolved prices must not be sent to AWF as operator overrides")
 	})
 }

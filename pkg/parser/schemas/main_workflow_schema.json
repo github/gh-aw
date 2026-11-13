@@ -6140,9 +6140,13 @@
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
         "ledger": {
-          "description": "Standalone Git-backed ledger configuration. Declare type: log, set, map, table, counter, or notes for trusted built-in replay. Custom replay and compaction scripts are not supported. Tables require key (the string primary-key field). Built-ins accept typed operations via the configured ledger safe-output tools. Each ledger may set compaction; compaction is lossless and preserves all source transactions.",
+          "description": "Standalone ledger configuration. Storage defaults to git; storage: comment-memory uses the configured tools.comment-memory target without Git branches or compaction. Declare type: log, set, map, table, counter, or notes for trusted built-in replay. Tables require key (the string primary-key field). Custom replay and compaction scripts are not supported.",
           "type": "object",
           "properties": {
+            "storage": {
+              "oneOf": [{ "type": "string", "enum": ["git", "comment-memory"] }, { "type": "object" }],
+              "description": "Persistence backend, or a named object-valued ledger. Comment storage requires tools.comment-memory."
+            },
             "type": {
               "oneOf": [{ "type": "string", "enum": ["log", "set", "map", "table", "counter", "notes"] }, { "type": "object" }],
               "description": "Built-in ledger reducer type, or a named object-valued ledger."
@@ -6162,6 +6166,7 @@
                   { "required": ["max-patch-kb"] },
                   { "required": ["type"], "properties": { "type": { "type": "string" } } },
                   { "required": ["key"], "properties": { "key": { "type": "string" } } },
+                  { "required": ["storage"], "properties": { "storage": { "type": "string" } } },
                   {
                     "required": ["compaction"],
                     "properties": {
@@ -15065,6 +15070,10 @@
     "ledgerScriptRestrictions": {
       "type": "object",
       "properties": {
+        "storage": {
+          "type": "string",
+          "enum": ["git", "comment-memory"]
+        },
         "replay": {
           "not": {},
           "description": "Removed. Use a built-in ledger type instead of custom replay."

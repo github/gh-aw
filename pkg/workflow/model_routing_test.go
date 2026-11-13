@@ -1115,8 +1115,10 @@ func TestCompileDefaultModelRouting_RuntimeOverrideGuard(t *testing.T) {
 	require.NoError(t, compiled.err)
 
 	activation := extractJobSection(compiled.lock, "activation")
-	require.Contains(t, activation, "GH_AW_MODEL_AGENT_VAR: ${{ vars.GH_AW_MODEL_AGENT_COPILOT }}")
-	require.Contains(t, activation, "GH_AW_DEFAULT_MODEL_VAR: ${{ vars.GH_AW_DEFAULT_MODEL_COPILOT }}")
+	require.Contains(t, activation, "GH_AW_MODEL_ROUTING: ${{ vars.GH_AW_MODEL_AGENT_COPILOT == '' && vars.GH_AW_DEFAULT_MODEL_COPILOT == '' }}")
+	require.Contains(t, activation, "GH_AW_MODEL_AGENT_OVERRIDE: ${{ vars.GH_AW_MODEL_AGENT_COPILOT != '' }}")
+	require.Contains(t, activation, "GH_AW_DEFAULT_MODEL_OVERRIDE: ${{ vars.GH_AW_DEFAULT_MODEL_COPILOT != '' }}")
+	require.Contains(t, activation, `run: bash "${RUNNER_TEMP}/gh-aw/actions/resolve_model_routing.sh"`)
 	require.Contains(t, activation, "model-routing: ${{ steps.resolve-model-routing.outputs.model-routing }}")
 
 	env := agentExecutionEnv(t, compiled.lock)

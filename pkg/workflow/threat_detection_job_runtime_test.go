@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -646,6 +647,51 @@ func TestBuildThreatDetectionWorkflowDataPropagatesImageOverrides(t *testing.T) 
 	}
 	if containerPins["ghcr.io/github/gh-aw-firewall/squid:v1"] == "changed" {
 		t.Error("detection container pin mappings must not alias the parent map")
+	}
+}
+
+func TestBuildThreatDetectionWorkflowDataPropagatesModelCosts(t *testing.T) {
+	modelCosts := map[string]any{
+		"providers": map[string]any{
+			"openai": map[string]any{
+				"models": map[string]any{
+					"reporting-model": map[string]any{"cost": map[string]any{"input": "0.000001"}},
+				},
+			},
+		},
+	}
+	modelCostOverrides := map[string]any{
+		"providers": map[string]any{
+			"openai": map[string]any{
+				"models": map[string]any{
+					"authored-model": map[string]any{"cost": map[string]any{"input": "0"}},
+				},
+			},
+		},
+	}
+	data := &WorkflowData{
+		AI:                 "codex",
+		ModelCosts:         modelCosts,
+		ModelCostOverrides: modelCostOverrides,
+	}
+
+	detectionData := buildThreatDetectionWorkflowData(data, "")
+	if !reflect.DeepEqual(detectionData.ModelCosts, modelCosts) {
+		t.Fatal("detection workflow should inherit reporting model costs")
+	}
+	if !reflect.DeepEqual(detectionData.ModelCostOverrides, modelCostOverrides) {
+		t.Fatal("detection workflow should inherit authored model cost overrides")
+	}
+	if got := extractModelCostProviders(detectionData); !reflect.DeepEqual(got, modelCostOverrides["providers"]) {
+		t.Fatalf("detection proxy providers = %#v, want authored overrides %#v", got, modelCostOverrides["providers"])
+	}
+
+	reportingOnly := buildThreatDetectionWorkflowData(&WorkflowData{
+		AI:         "codex",
+		ModelCosts: modelCosts,
+	}, "")
+	if got := extractModelCostProviders(reportingOnly); got != nil {
+		t.Fatalf("reporting-only model costs must not become proxy providers: %#v", got)
 	}
 }
 
