@@ -248,7 +248,7 @@ describe("merge_pull_request branch validation", () => {
     };
 
     const { main } = await import("./merge_pull_request.cjs");
-    const handler = await main({ "target-repo": "github/gh-aw", target: "*" });
+    const handler = await main({ "target-repo": "github/gh-aw", target: "*", allowed_base_branches: ["integration-branch"] });
     const result = await handler({ pull_request_number: 100 }, {});
 
     expect(result.success).toBe(false);
@@ -339,6 +339,7 @@ describe("merge_pull_request policy hardening", () => {
   async function run(config = {}, message = {}) {
     const { main } = await import("./merge_pull_request.cjs");
     const handler = await main({
+      allowed_base_branches: ["integration"],
       protected_files: ["package.json", "AGENTS.md", "README.md"],
       protected_path_prefixes: [".github/"],
       protect_top_level_dot_folders: true,
@@ -346,6 +347,94 @@ describe("merge_pull_request policy hardening", () => {
     });
     return handler(message, {});
   }
+
+  it.each(
+    [
+      undefined,
+      null,
+      [],
+      "*",
+      ["*"],
+      ["**"],
+      ["***"],
+      ["*/*"],
+      ["**/*"],
+      ["*/**"],
+      ["**/**"],
+      ["integration", "*"],
+      [""],
+      [" "],
+      ["integration branch"],
+      [42],
+      ["${{ inputs.branch }}"],
+      ["${{inputs.branch}}"],
+      ["agent-work/${{inputs.branch}}"],
+      ["agent-work/**", "!agent-work/prod"],
+      ["agent-work/[ab]"],
+      ["agent-work/next?"],
+      ["agent-work/next+"],
+      ["agent-work/{next,prod}"],
+      ["agent-work/@(next|prod)"],
+      ["agent-work/\\*"],
+    ].map(allowed_base_branches => ({ allowed_base_branches }))
+  )("rejects invalid destination policy $allowed_base_branches before fetching or merging", async ({ allowed_base_branches }) => {
+    await expect(run({ allowed_base_branches })).rejects.toThrow("allowed-base-branches requires");
+    expect(client.rest.pulls.get).not.toHaveBeenCalled();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true].flatMap(staged => [false, true].map(crossRepository => ({ staged, crossRepository }))))(
+    "blocks a disallowed destination despite an allowed source (staged=$staged, crossRepository=$crossRepository)",
+    async ({ staged, crossRepository }) => {
+      const result = await run(
+        { staged, target: "*", allowed_branches: ["feature/*"], allowed_base_branches: ["agent-work/*"], ...(crossRepository ? { "target-repo": "trusted/other" } : {}) },
+        { pull_request_number: 100, allowed_base_branches: ["integration"] }
+      );
+      expect(result.success).toBe(false);
+      expect(result.failure_reasons).toContainEqual({ code: "base_branch_not_allowed", message: "Target base branch does not match allowed-base-branches" });
+      expect(result.decision_evidence.allowed_base_branches).toEqual(["agent-work/*"]);
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ["integration", "integration", true],
+    ["agent-work/*", "agent-work/next", true],
+    ["agent-work/**", "agent-work/team/next", true],
+    ["agent-work/*", "agent-work/team/next", false],
+    ["agent-work/*", "Agent-work/next", false],
+    ["agent-work/*", "other/agent-work/next", false],
+  ])("matches destination pattern %s against %s (allowed=%s)", async (pattern, branch, allowed) => {
+    pr.base.ref = branch;
+    const result = await run({ allowed_base_branches: [pattern] });
+    expect(result.success).toBe(allowed);
+    expect(client.rest.pulls.merge).toHaveBeenCalledTimes(allowed ? 1 : 0);
+  });
+
+  it("does not allow a destination match to bypass the source filter", async () => {
+    const result = await run({ allowed_base_branches: ["integration"], allowed_branches: ["agent-work/*"] });
+    expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: "branch_not_allowed" }));
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true].flatMap(staged => [false, true].map(allowRetargetedBase => ({ staged, allowRetargetedBase }))))(
+    "blocks destination retargeting at final revalidation (staged=$staged, allowRetargetedBase=$allowRetargetedBase)",
+    async ({ staged, allowRetargetedBase }) => {
+      client.rest.pulls.get.mockResolvedValueOnce({ data: structuredClone(pr) }).mockResolvedValueOnce({ data: { ...structuredClone(pr), base: { ...pr.base, ref: "other/next" } } });
+      const result = await run({ staged, allowed_base_branches: allowRetargetedBase ? ["integration", "other/next"] : ["integration"] });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("policy state changed");
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["protected", "default"])("keeps matched %s destinations blocked", async policy => {
+    if (policy === "protected") client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true } });
+    else client.rest.repos.get.mockResolvedValue({ data: { default_branch: "integration" } });
+    const result = await run({ allowed_base_branches: ["integration"] });
+    expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: policy === "protected" ? "target_branch_protected" : "target_branch_default" }));
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
 
   it.each([false, true].flatMap(staged => [false, true].map(crossRepository => ({ staged, crossRepository }))))(
     "blocks live protected files without caution notices (staged=$staged, crossRepository=$crossRepository)",
@@ -1205,7 +1294,7 @@ describe("merge_pull_request policy hardening", () => {
 
   it.each([false, true])("preserves and audits max=1 (staged=%s)", async staged => {
     const { main } = await import("./merge_pull_request.cjs");
-    const handler = await main({ staged });
+    const handler = await main({ staged, allowed_base_branches: ["integration"] });
     expect((await handler({})).success).toBe(true);
     const result = await handler({});
     expect(result.success).toBe(false);

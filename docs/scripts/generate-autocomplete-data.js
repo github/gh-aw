@@ -174,7 +174,7 @@ function canBeArray(node) {
 /**
  * Build a compact autocomplete entry from a schema property.
  */
-function buildEntry(propSchema, depth) {
+function buildEntry(propSchema, depth, expandAtLimit = false) {
   const resolved = resolveRef(propSchema);
   const entry = {};
 
@@ -202,12 +202,13 @@ function buildEntry(propSchema, depth) {
     entry["x-deprecation-message"] = resolved["x-deprecation-message"];
   }
 
-  if (depth < MAX_DEPTH) {
+  if (depth < MAX_DEPTH || expandAtLimit) {
     const childProps = getObjectProperties(resolved);
     if (childProps) {
       const children = {};
       for (const [key, childSchema] of Object.entries(childProps)) {
-        children[key] = buildEntry(childSchema, depth + 1);
+        const expandMergePullRequest = depth === MAX_DEPTH - 1 && key === "merge-pull-request";
+        children[key] = buildEntry(childSchema, depth + 1, expandMergePullRequest);
       }
       if (Object.keys(children).length > 0) {
         entry.children = children;
@@ -234,13 +235,15 @@ for (const [key, propSchema] of Object.entries(schema.properties)) {
   root[key] = buildEntry(propSchema, effectiveDepth);
 }
 
-const output = {
+export const autocompleteData = {
   root,
   sortOrder: ROOT_SORT_ORDER,
 };
 
-fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2));
-const stats = fs.statSync(OUTPUT_PATH);
-console.log(`Generated ${OUTPUT_PATH}`);
-console.log(`  Size: ${(stats.size / 1024).toFixed(1)} KB`);
-console.log(`  Root keys: ${Object.keys(root).length}`);
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(autocompleteData, null, 2));
+  const stats = fs.statSync(OUTPUT_PATH);
+  console.log(`Generated ${OUTPUT_PATH}`);
+  console.log(`  Size: ${(stats.size / 1024).toFixed(1)} KB`);
+  console.log(`  Root keys: ${Object.keys(root).length}`);
+}

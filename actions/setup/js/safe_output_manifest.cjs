@@ -29,6 +29,7 @@ const MERGE_FAILURE_CODES = new Set([
   "missing_required_labels",
   "title_prefix_mismatch",
   "branch_not_allowed",
+  "base_branch_not_allowed",
   "target_branch_protected",
   "target_branch_default",
   "target_branch_has_no_open_pr",
