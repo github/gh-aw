@@ -24,6 +24,7 @@ max-tool-denials: 3
 network: defaults
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/reporting.md
 
   - shared/otlp.md
@@ -37,12 +38,9 @@ tools:
     toolsets: [default]
 
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[docs] "
     labels: [documentation, automation]
-    draft: false
     auto-merge: true
 
 timeout-minutes: 10

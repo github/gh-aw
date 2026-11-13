@@ -36,6 +36,7 @@ tools:
   bash: ["*"]
   edit:
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/mcp/serena-go.md
   - shared/otlp.md
   - shared/reporting.md
@@ -150,7 +151,6 @@ steps:
       name: purelock-bundle-${{ github.run_id }}
       path: /tmp/gh-aw/purelock
 safe-outputs:
-  steer: true
   create-pull-request:
     title-prefix: "[purelock] "
     labels: [automation, testing, coverage]

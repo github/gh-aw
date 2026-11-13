@@ -17,6 +17,7 @@ runtimes:
   node:
     version: "24"
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
   - shared/reporting.md
 tools:
@@ -42,8 +43,8 @@ steps:
     working-directory: actions/setup/js
     run: npm ci
 safe-outputs:
+  steer: false
   create-pull-request:
-    expires: 2d
     title-prefix: "[jsweep] "
     branch-prefix: "signed/"
     labels: [unbloat, automation]
