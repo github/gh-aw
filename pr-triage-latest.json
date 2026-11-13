@@ -1,45 +1,57 @@
 {
-  "run_date": "2026-11-12T12:32:04Z",
-  "run_id": "pr-triage-20261112T123204Z",
-  "open_copilot_prs": 30,
-  "eligible_total": 6,
+  "run_date": "2026-11-13T00:37:57Z",
+  "run_id": "pr-triage-20261113T003757Z",
+  "open_copilot_prs": 28,
+  "eligible_total": 4,
   "cooldown_skipped": 24,
   "category_counts": {
-    "bug": 1,
-    "refactor": 3,
-    "feature": 1,
-    "docs": 1
+    "bug": 2,
+    "refactor": 2
   },
   "risk_counts": {
-    "low": 1,
-    "medium": 5
+    "high": 1,
+    "medium": 3
   },
   "priority_counts": {
-    "low": 1,
-    "medium": 5
+    "medium": 4
   },
   "action_counts": {
-    "batch_review": 5,
-    "defer": 1,
+    "fast_track": 1,
+    "batch_review": 3,
+    "defer": 0,
     "auto_merge": 0,
-    "fast_track": 0,
     "close": 0
   },
   "selected_candidates": [
     {
-      "number": 77082,
-      "title": "Bump firewall to v0.29.12 and MCP gateway to v0.5.8",
+      "number": 77088,
+      "title": "Read AWF per-conversation steering deliveries from the unified session",
+      "category": "bug",
+      "risk": "high",
+      "priority": "medium",
+      "action": "fast_track",
+      "score": 65,
+      "score_breakdown": {
+        "impact": 34,
+        "urgency": 18,
+        "quality": 13
+      },
+      "reason": "Large audit/logging fix for session-based steering notices; it addresses a correctness bug in critical billing/threshold accounting and is already well-scoped with test coverage."
+    },
+    {
+      "number": 77206,
+      "title": "audit: make `model_downgrade_available` routing-aware",
       "category": "bug",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 58,
+      "score": 62,
       "score_breakdown": {
-        "impact": 30,
-        "urgency": 16,
+        "impact": 32,
+        "urgency": 18,
         "quality": 12
       },
-      "reason": "Dependency and schema bump for security-critical networking components; draft status keeps it out of auto-merge, but the change is coherent and reviewable as a batch."
+      "reason": "Routing-aware audit improvement for a user-visible model selection recommendation; behavior is narrow but still worth a focused review with adjacent automation changes."
     },
     {
       "number": 77050,
@@ -54,7 +66,7 @@
         "urgency": 11,
         "quality": 14
       },
-      "reason": "Shared PR defaults extraction with clear automation benefit; low churn but medium operational risk because it affects multiple workflow outputs."
+      "reason": "Shared default extraction reduces duplication and preserves workflow behavior across many PR handlers; low direct feature risk but medium operational blast radius."
     },
     {
       "number": 77049,
@@ -69,52 +81,7 @@
         "urgency": 9,
         "quality": 14
       },
-      "reason": "Shared CI toolchain refactor with moderate blast radius; draft status and CodeQL timeout keep it from auto-merge, but the pattern matches the bundled setup batch."
-    },
-    {
-      "number": 77048,
-      "title": "Extract shared Python setup for analysis workflows",
-      "category": "refactor",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 49,
-      "score_breakdown": {
-        "impact": 25,
-        "urgency": 10,
-        "quality": 14
-      },
-      "reason": "Shared workflow extraction is low-risk in isolation but affects several automation paths, making a grouped review appropriate."
-    },
-    {
-      "number": 77010,
-      "title": "Add daily conformance workflows for all 14 connectors",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 56,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 14,
-        "quality": 12
-      },
-      "reason": "Broad workflow addition with operational value but moderate review overhead; best reviewed as a batch with related automation changes."
-    },
-    {
-      "number": 76985,
-      "title": "docs: lead model-choice guidance with default routing and `model: router`",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "action": "defer",
-      "score": 32,
-      "score_breakdown": {
-        "impact": 12,
-        "urgency": 6,
-        "quality": 14
-      },
-      "reason": "Documentation-only change with low operational impact; defer while the higher-risk automation PRs are reviewed."
+      "reason": "Shared CI setup refactor with a clearly bounded scope; the large blast radius keeps it in a grouped review rather than auto-merge."
     }
   ],
   "batches": [
@@ -122,52 +89,36 @@
       "id": "pr-batch:ci-shared-setup",
       "prs": [
         77050,
-        77049,
-        77048
+        77049
       ]
     }
   ],
   "skipped": [
     {
-      "number": 77088,
-      "title": "Read AWF per-conversation steering deliveries from the unified session",
+      "number": 77232,
+      "title": "Fix review dependencies on buffered inline comments",
       "reason": "updated within 1 hour of current run; skipped by cooldown"
     },
     {
-      "number": 77087,
-      "title": "docs: describe AWF's on-by-default budget notices for `token-steering` and `max-ai-credits`",
+      "number": 77212,
+      "title": "Align model routing with AWF runtime, topology, and host support",
       "reason": "updated within 1 hour of current run; skipped by cooldown"
     },
     {
-      "number": 77082,
-      "title": "Bump firewall to v0.29.12 and MCP gateway to v0.5.8",
-      "reason": "included in eligible set; not skipped"
+      "number": 77203,
+      "title": "Add fail-open CI Front Door and cache-first daily researcher",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
     },
     {
-      "number": 77050,
-      "title": "Extract shared PR safe-output defaults",
-      "reason": "included in eligible set; not skipped"
+      "number": 77185,
+      "title": "Accept `-1` and `K`/`M` values for runtime `GH_AW_DEFAULT_*MAX_AI_CREDITS`, and warn on values that fall back",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
     },
     {
-      "number": 77049,
-      "title": "[WIP] Refactor to extract shared Go and Node CI toolchain setup",
-      "reason": "included in eligible set; not skipped"
-    },
-    {
-      "number": 77048,
-      "title": "Extract shared Python setup for analysis workflows",
-      "reason": "included in eligible set; not skipped"
-    },
-    {
-      "number": 77010,
-      "title": "Add daily conformance workflows for all 14 connectors",
-      "reason": "included in eligible set; not skipped"
-    },
-    {
-      "number": 76985,
-      "title": "docs: lead model-choice guidance with default routing and `model: router`",
-      "reason": "included in eligible set; not skipped"
+      "number": 77176,
+      "title": "Fix relative import destinations in `gh aw add`",
+      "reason": "updated within 1 hour of current run; skipped by cooldown"
     }
   ],
-  "summary": "Six eligible Copilot-authored PRs aged past the one-hour cooldown. Shared CI setup extraction is the dominant batch cluster, with one docs-only deferral and one dependency/budgeting update at medium risk. No PRs are auto-merge or fast-track ready under the current evidence."
+  "summary": "Four eligible Copilot PRs are older than the one-hour cooldown. The highest-value item is the AWF steering-delivery fix, while the shared CI setup extraction remains a coherent batch review cluster. No PRs are currently auto-merge ready."
 }
