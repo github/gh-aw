@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.9.0"
+version: "2.10.0"
 status: Draft
-publication_date: "2026-11-11"
+publication_date: "2026-11-12"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.9.0<br>
+**Version**: 2.10.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-11<br>
+**Publication Date**: 2026-11-12<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -911,12 +911,20 @@ imply that an engine selected the wrong skill.
 source-dependent fields: `provider`, `model`, `purpose` (for example `agent`,
 `subagent`, or `routing_classification`), `agentName`, `callerSource`, `path`,
 `xInitiator`, `requestId`,
-`status`, `durationMs`, `aic`, `totalAic`, `premiumRequests`, `steering`, and
-`usage`. `steering` is the AWF notice delivered on that request, retaining only
-its `type` (`ai_credit`, `timeout`, or `token`) and `threshold` (80, 90, 95, or
-99); unrecognized values are dropped. `firewall.steering` retains the event-log
-`threshold` and maps `ai_credit_steering`, `token_steering`, and
-`timeout_steering` events.
+`status`, `durationMs`, `aic`, `totalAic`, `premiumRequests`, `steering`,
+`steeringDelivery`, and `usage`. `steering` is the AWF notice delivered on that
+request, retaining only its `type` (`ai_credit`, `timeout`, or `token`) and
+`threshold` (80, 90, 95, or 99); unrecognized values are dropped. AWF writes it
+at most once per threshold per run. `steeringDelivery` is AWF's
+`steering_delivery` record, written on every delivery of a notice to a
+conversation; it retains only `type` (`ai_credit` or `timeout`), `trigger`
+(`threshold` or `little_left`), `threshold` (80, 90, 95, or 99, or `null`
+exactly when `trigger` is `little_left`), `conversation` (an opaque
+12-hex-character key comparable only within the run, or `null`), and `first`
+(whether this was the run's first delivery of the notice); records that do not
+match are dropped. `firewall.steering` retains the event-log `threshold`
+(`null` for a `little_left` notice), `trigger`, and `conversation`, and maps
+`ai_credit_steering`, `token_steering`, and `timeout_steering` events.
 Consumers identify router and classifier traffic by `purpose`; a missing
 `purpose` means unknown, not agent.
 
@@ -956,7 +964,14 @@ send a provider- or process-wide `main` that sub-agent requests would inherit.
 `steering` notice type and threshold on `firewall.token_usage` and
 `usage.report` events. A consumer MUST treat a missing `steering` field as "no
 notice recorded", not "no notice delivered", because earlier AWF versions never
-write it.
+write it. A producer MUST preserve a supplied `steering_delivery` as
+`steeringDelivery`, and `trigger` and `conversation` on `firewall.steering`. A
+consumer MUST accept records without `steeringDelivery` (AWF v0.29.11 and
+earlier), MUST present a `little_left` notice as such rather than as a threshold
+of 0, and MUST read notice deliveries from the unified session rather than from
+`token-usage.jsonl` or the api-proxy event log. Checks that a notice is sent at
+most once per threshold per run MUST use `steering`, not `steeringDelivery`,
+which AWF writes once per conversation.
 
 **T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
 firewall, or accounting observations to produce another session total. Readers
@@ -2178,7 +2193,7 @@ evidence; compilation alone is not a conformance claim.
 | T-UAS-067 | Repeated native/canonical/detector error observations, live timeout evidence, final-zero and missing exits, malformed or duplicate aggregate records, quoted errors and tool failures | One deterministic `agent.execution` record with distinct native codes/types, stable categories, observed exit precedence, unchanged error evidence, and matching JS/Go reader validation. |
 | T-UAS-068 | Goose stream messages/deltas, tool requests/results, cumulative completion usage, source-second timestamps, malformed records, error-only and partial sessions | Exact supported content and IDs, observed outcomes only, no duplicated snapshots or invented partial results, explicit diagnostics. |
 | T-UAS-070 | Firewall token usage with supplied or absent purpose/path/initiator; `usage.report` alias; recorded AWF selection, request, and failure records in snake_case and camelCase, with and without ranked choices, pool counts, endpoints, `unavailable`, status, and phase, and with private fields | Supplied routing metadata survives projection; consumers treat absent purpose as unknown, not agent; ranked choices keep source order with one-based ranks; absent fields stay absent; private fields and nested candidate payloads are excluded; projection is idempotent. |
-| T-UAS-071 | Firewall token usage with supplied, absent, or malformed `steering`; AI-credit, token, and time steering event-log entries | Type and threshold survive projection, malformed notices are dropped, steering events keep threshold and request ID, and absent notices remain unrecorded rather than undelivered. |
+| T-UAS-071 | Firewall token usage with supplied, absent, or malformed `steering` and `steering_delivery`; AI-credit, token, and time steering event-log entries, including `little_left` notices | Type and threshold survive projection, every delivery keeps its trigger, threshold, conversation, and first flag, malformed notices and deliveries are dropped, steering events keep threshold, trigger, conversation, and request ID, and absent notices remain unrecorded rather than undelivered. |
 | T-UAS-073 | Copilot built-in and declared sub-agents with distinct display names, provider-qualified SDK model IDs, declared concrete and alias models, and sessions without `agentName` | Rows keyed by `agentName` with sorted `display_names`, one audit row per definition and one logs row per definition and effort, bare served model IDs without aliases, unchanged counts and credits, and display-name rows when `agentName` is absent. |
 | T-UAS-074 | `agent/model-resolution.json` with resolved, exact, and failed records for main and sub-agent roles; empty, non-array, malformed, and contract-violating records | One `model.resolution` event per record in array order with `model_resolution` provenance and only the contract fields; invalid sources emit collection warnings and no events. |
 | T-UAS-075 | Recorded AWF reflection from run 38995410124 with four unconfigured null endpoints; pending-fetch, legacy, and malformed-ID or capability-metadata variants | One inventory event per valid source with endpoint order, `configured`, model IDs, routing endpoints, reasoning efforts, and known context windows; null lists absent rather than empty; malformed sources warn and publish no inventory; projection is idempotent. |
@@ -2711,6 +2726,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.10.0 - Draft (2026-11-12)
+
+- Retained AWF's per-conversation `steering_delivery` record as `steeringDelivery` on `firewall.token_usage` and `usage.report`, and `trigger` and `conversation` on `firewall.steering`, with `null` thresholds for `little_left` notices (T-UAS-071).
+- Retained serialization-format version 1.
 
 ### Version 2.9.0 - Draft (2026-11-11)
 

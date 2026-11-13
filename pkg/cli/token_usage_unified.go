@@ -13,21 +13,22 @@ import (
 )
 
 func readUnifiedTokenUsageEntries(runDir string) ([]TokenUsageEntry, error) {
-	entries, _, err := readUnifiedTokenUsage(runDir)
-	return entries, err
+	collected, err := readUnifiedTokenUsage(runDir)
+	return collected.entries, err
 }
 
 // readUnifiedTokenUsage returns the agent-phase firewall.token_usage entries and
-// the AWF steering notices recorded on firewall.token_usage events of the agent
-// and threat-detection phases, in session order.
-func readUnifiedTokenUsage(runDir string) (entries []TokenUsageEntry, notices []SteeringNotice, err error) {
+// the AWF steering notices and notice deliveries recorded on
+// firewall.token_usage events of the agent and threat-detection phases, in
+// session order.
+func readUnifiedTokenUsage(runDir string) (collected unifiedTokenUsageCollection, err error) {
 	path, err := findUnifiedSessionPath(runDir)
 	if err != nil || path == "" {
-		return nil, nil, err
+		return unifiedTokenUsageCollection{}, err
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, nil, err
+		return unifiedTokenUsageCollection{}, err
 	}
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
@@ -35,18 +36,18 @@ func readUnifiedTokenUsage(runDir string) (entries []TokenUsageEntry, notices []
 		}
 	}()
 
-	collected := unifiedTokenUsageCollection{entries: make([]TokenUsageEntry, 0)}
+	collected = unifiedTokenUsageCollection{entries: make([]TokenUsageEntry, 0)}
 	var routingEvents []unifiedRoutingEvent
 	reader := bufio.NewReader(file)
 	for lineNumber := 1; ; lineNumber++ {
 		line, oversized, readErr := readUnifiedSessionLine(reader)
 		if oversized {
-			return nil, nil, fmt.Errorf("oversized session record on line %d", lineNumber)
+			return unifiedTokenUsageCollection{}, fmt.Errorf("oversized session record on line %d", lineNumber)
 		}
 		if line = bytes.TrimSpace(line); len(line) > 0 {
 			var event sessionSubagentEvent
 			if err := json.Unmarshal(line, &event); err != nil {
-				return nil, nil, fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
+				return unifiedTokenUsageCollection{}, fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 			}
 			if event.Type == "firewall.model_routing" && event.Provenance.Component == "firewall" && event.Provenance.Phase == "agent" {
 				var data unifiedModelRoutingData
@@ -55,18 +56,18 @@ func readUnifiedTokenUsage(runDir string) (entries []TokenUsageEntry, notices []
 				}
 			}
 			if err := collected.add(event, lineNumber); err != nil {
-				return nil, nil, err
+				return unifiedTokenUsageCollection{}, err
 			}
 		}
 		if readErr != nil {
 			if !errors.Is(readErr, io.EOF) {
-				return nil, nil, fmt.Errorf("failed to read session: %w", readErr)
+				return unifiedTokenUsageCollection{}, fmt.Errorf("failed to read session: %w", readErr)
 			}
 			break
 		}
 	}
 	enrichUnifiedTokenUsageEntries(runDir, collected.entries, routingEvents)
-	return collected.entries, collected.notices, nil
+	return collected, nil
 }
 
 // findUnifiedSessionPath returns the unified session file of a run directory, or
@@ -88,10 +89,12 @@ func findUnifiedSessionPath(runDir string) (string, error) {
 }
 
 // unifiedTokenUsageCollection accumulates agent-phase token usage entries and the
-// steering notices of agent and threat-detection firewall.token_usage events.
+// steering notices and notice deliveries of agent and threat-detection
+// firewall.token_usage events.
 type unifiedTokenUsageCollection struct {
-	entries []TokenUsageEntry
-	notices []SteeringNotice
+	entries    []TokenUsageEntry
+	notices    []SteeringNotice
+	deliveries []SteeringDelivery
 }
 
 func (c *unifiedTokenUsageCollection) add(event sessionSubagentEvent, lineNumber int) error {
@@ -115,6 +118,18 @@ func (c *unifiedTokenUsageCollection) add(event sessionSubagentEvent, lineNumber
 			Threshold: int(entry.Steering.Threshold),
 			RequestID: entry.RequestID,
 			Phase:     phase,
+		})
+	}
+	if entry.SteeringDelivery.valid() {
+		threshold, conversation := entry.SteeringDelivery.thresholdAndConversation()
+		c.deliveries = append(c.deliveries, SteeringDelivery{
+			Type:         entry.SteeringDelivery.Type,
+			Trigger:      entry.SteeringDelivery.Trigger,
+			Threshold:    threshold,
+			Conversation: conversation,
+			First:        entry.SteeringDelivery.First,
+			RequestID:    entry.RequestID,
+			Phase:        phase,
 		})
 	}
 	if phase == "agent" {
@@ -288,7 +303,9 @@ func unifiedTokenUsageEntry(event sessionSubagentEvent) (TokenUsageEntry, error)
 		TotalAIC        json.RawMessage     `json:"totalAic"`
 		DurationMs      int                 `json:"durationMs"`
 		Steering        *TokenUsageSteering `json:"steering"`
-		Usage           struct {
+		// SteeringDelivery is absent on sessions from AWF v0.29.11 and older.
+		SteeringDelivery *TokenUsageSteeringDelivery `json:"steeringDelivery"`
+		Usage            struct {
 			InputTokens              int             `json:"inputTokens"`
 			OutputTokens             int             `json:"outputTokens"`
 			CacheReadInputTokens     int             `json:"cacheReadInputTokens"`
@@ -319,6 +336,9 @@ func unifiedTokenUsageEntry(event sessionSubagentEvent) (TokenUsageEntry, error)
 	}
 	if data.Steering.valid() {
 		entry.Steering = data.Steering
+	}
+	if data.SteeringDelivery.valid() {
+		entry.SteeringDelivery = data.SteeringDelivery
 	}
 	return entry, nil
 }

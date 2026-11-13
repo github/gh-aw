@@ -137,7 +137,12 @@ export interface DurableStartupData extends DurableSessionMetadata {
 
 /** AWF API proxy steering event-log observation. */
 export interface FirewallSteeringData extends RuntimeObservationData {
+  /** Budget percentage of the notice; null for a `little_left` notice. */
   threshold?: JsonValue;
+  /** Why AWF sent the notice: `threshold` or `little_left`; absent before per-conversation delivery. */
+  trigger?: JsonValue;
+  /** Opaque 12-character conversation key, comparable only within the run; null when AWF could not key the conversation. */
+  conversation?: JsonValue;
 }
 
 /** AWF steering notice delivered on a model request. */
@@ -145,6 +150,40 @@ export interface SteeringNotice {
   type: "ai_credit" | "timeout" | "token";
   threshold: 80 | 90 | 95 | 99;
 }
+
+interface SteeringDeliveryBase {
+  type: "ai_credit" | "timeout";
+  /**
+   * Opaque per-run conversation key; null when AWF could not key the conversation.
+   * @pattern ^[0-9a-f]{12}$
+   */
+  conversation: string | null;
+  /** Whether this was the run's first delivery of the notice. */
+  first: boolean;
+}
+
+/** Steering notice delivered because a budget percentage was crossed. */
+export interface SteeringThresholdDelivery extends SteeringDeliveryBase {
+  /** A budget percentage was crossed. */
+  trigger: "threshold";
+  /** Budget percentage that was crossed. */
+  threshold: 80 | 90 | 95 | 99;
+}
+
+/** Steering notice delivered because only a few requests' worth of credits, or a few minutes, remain. */
+export interface SteeringLittleLeftDelivery extends SteeringDeliveryBase {
+  /** Only a few requests' worth of credits, or a few minutes, remain. */
+  trigger: "little_left";
+  /** Always null: no budget percentage applies. */
+  threshold: null;
+}
+
+/**
+ * One delivery of an AWF steering notice to a conversation; AWF records one per conversation per notice.
+ * `threshold` is null exactly when `trigger` is `little_left`.
+ * @discriminator trigger
+ */
+export type SteeringDelivery = SteeringThresholdDelivery | SteeringLittleLeftDelivery;
 
 export interface ModelRoutingData {
   schema?: JsonValue;
@@ -399,6 +438,7 @@ export interface UsageReportData extends UnifiedSessionContextData {
   premiumRequests?: JsonValue;
   durationMs?: JsonValue;
   steering?: SteeringNotice;
+  steeringDelivery?: SteeringDelivery;
   usage?: UnifiedSessionUsage | null;
 }
 

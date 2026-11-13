@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            5
+            6
           ]
         },
         "kind": {
@@ -3183,6 +3183,93 @@
                     "additionalProperties": false
                   }
                 },
+                "steering_deliveries": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ai_credit",
+                          "timeout"
+                        ]
+                      },
+                      "trigger": {
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "conversation": {
+                        "type": [
+                          "null",
+                          "string"
+                        ],
+                        "pattern": "^[0-9a-f]{12}$"
+                      },
+                      "first": {
+                        "type": "boolean"
+                      },
+                      "request_id": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "trigger",
+                      "threshold",
+                      "conversation",
+                      "first"
+                    ],
+                    "additionalProperties": false,
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "integer",
+                            "enum": [
+                              80,
+                              90,
+                              95,
+                              99
+                            ]
+                          },
+                          "trigger": {
+                            "const": "threshold"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "null"
+                          },
+                          "trigger": {
+                            "const": "little_left"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      }
+                    ]
+                  }
+                },
                 "steering_notices_unavailable": {
                   "type": "boolean"
                 },
@@ -3238,6 +3325,93 @@
                   "threshold"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "steering_deliveries": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "ai_credit",
+                      "timeout"
+                    ]
+                  },
+                  "trigger": {
+                    "type": "string"
+                  },
+                  "threshold": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "conversation": {
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "pattern": "^[0-9a-f]{12}$"
+                  },
+                  "first": {
+                    "type": "boolean"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "phase": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "trigger",
+                  "threshold",
+                  "conversation",
+                  "first"
+                ],
+                "additionalProperties": false,
+                "oneOf": [
+                  {
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "enum": [
+                          80,
+                          90,
+                          95,
+                          99
+                        ]
+                      },
+                      "trigger": {
+                        "const": "threshold"
+                      }
+                    },
+                    "required": [
+                      "trigger",
+                      "threshold"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "threshold": {
+                        "type": "null"
+                      },
+                      "trigger": {
+                        "const": "little_left"
+                      }
+                    },
+                    "required": [
+                      "trigger",
+                      "threshold"
+                    ]
+                  }
+                ]
               }
             },
             "steering_notices_unavailable": {
@@ -5831,6 +6005,12 @@
                       },
                       "request_id": {
                         "type": "string"
+                      },
+                      "trigger": {
+                        "type": "string"
+                      },
+                      "conversation": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -5866,6 +6046,93 @@
                       "threshold"
                     ],
                     "additionalProperties": false
+                  }
+                },
+                "steering_deliveries": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ai_credit",
+                          "timeout"
+                        ]
+                      },
+                      "trigger": {
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
+                      },
+                      "conversation": {
+                        "type": [
+                          "null",
+                          "string"
+                        ],
+                        "pattern": "^[0-9a-f]{12}$"
+                      },
+                      "first": {
+                        "type": "boolean"
+                      },
+                      "request_id": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "trigger",
+                      "threshold",
+                      "conversation",
+                      "first"
+                    ],
+                    "additionalProperties": false,
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "integer",
+                            "enum": [
+                              80,
+                              90,
+                              95,
+                              99
+                            ]
+                          },
+                          "trigger": {
+                            "const": "threshold"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "threshold": {
+                            "type": "null"
+                          },
+                          "trigger": {
+                            "const": "little_left"
+                          }
+                        },
+                        "required": [
+                          "trigger",
+                          "threshold"
+                        ]
+                      }
+                    ]
                   }
                 },
                 "steering_notices_unavailable": {
@@ -6349,6 +6616,93 @@
                           "threshold"
                         ],
                         "additionalProperties": false
+                      }
+                    },
+                    "steering_deliveries": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "ai_credit",
+                              "timeout"
+                            ]
+                          },
+                          "trigger": {
+                            "type": "string"
+                          },
+                          "threshold": {
+                            "type": [
+                              "null",
+                              "integer"
+                            ]
+                          },
+                          "conversation": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "pattern": "^[0-9a-f]{12}$"
+                          },
+                          "first": {
+                            "type": "boolean"
+                          },
+                          "request_id": {
+                            "type": "string"
+                          },
+                          "phase": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "trigger",
+                          "threshold",
+                          "conversation",
+                          "first"
+                        ],
+                        "additionalProperties": false,
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "threshold": {
+                                "type": "integer",
+                                "enum": [
+                                  80,
+                                  90,
+                                  95,
+                                  99
+                                ]
+                              },
+                              "trigger": {
+                                "const": "threshold"
+                              }
+                            },
+                            "required": [
+                              "trigger",
+                              "threshold"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "threshold": {
+                                "type": "null"
+                              },
+                              "trigger": {
+                                "const": "little_left"
+                              }
+                            },
+                            "required": [
+                              "trigger",
+                              "threshold"
+                            ]
+                          }
+                        ]
                       }
                     },
                     "steering_notices_unavailable": {
@@ -10635,7 +10989,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            5
+            6
           ]
         },
         "kind": {
@@ -10752,7 +11106,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            5
+            6
           ]
         },
         "kind": {
@@ -10841,7 +11195,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            5
+            6
           ]
         },
         "kind": {

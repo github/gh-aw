@@ -34,6 +34,7 @@ type AuditData struct {
 	SkillActivations           []SkillActivation        `json:"skill_activations,omitempty"`
 	GatewaySteeringEvents      []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"`
 	SteeringNotices            []SteeringNotice         `json:"steering_notices,omitempty"`
+	SteeringDeliveries         []SteeringDelivery       `json:"steering_deliveries,omitempty"`
 	SteeringNoticesUnavailable bool                     `json:"steering_notices_unavailable,omitempty"`
 	FirewallTokenUsage         *TokenUsageSummary       `json:"firewall_token_usage,omitempty"`
 	DetectionModelUsage        []DetectionModelUsage    `json:"detection_model_usage,omitempty"`
