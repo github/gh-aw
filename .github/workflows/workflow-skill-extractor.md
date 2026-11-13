@@ -45,6 +45,7 @@ steps:
       
         const workflowPath = path.join(workflowDir, entry.name);
         const content = fs.readFileSync(workflowPath, 'utf8');
+        const sourceBytes = Buffer.byteLength(content, 'utf8');
         const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
         const frontmatter = frontmatterMatch ? frontmatterMatch[1] : '';
       
@@ -75,6 +76,9 @@ steps:
         index.push({
           file: entry.name,
           path: workflowPath,
+          source_bytes: sourceBytes,
+          query_visible_bytes: Math.min(sourceBytes, 8000),
+          query_omitted_bytes: Math.max(0, sourceBytes - 8000),
           imports,
           engine,
           has_github_tools: frontmatter.includes('github:'),
@@ -110,6 +114,8 @@ evals:
     question: When a recommendation issue is proposed, does it describe a migration to a named shared-component path? Return UNKNOWN when no issue is proposed.
   - id: no-opportunity-noop
     question: When analysis finds no actionable extraction opportunity, does the agent request noop? Return UNKNOWN when an actionable opportunity is identified.
+  - id: prefix-packing
+    question: For instruction or skill extraction recommendations, does the migration preserve a complete task contract within the first 7500 UTF-8 bytes and identify required rules/routes that would be lost under an 8000-byte query? Return UNKNOWN when no such recommendation is proposed.
 ---
 # Workflow Skill Extractor
 
@@ -141,6 +147,19 @@ For each of the top 3 recommendations, provide:
 4. Estimated impact (workflows affected, approximate line savings, maintenance benefit)
 5. Migration plan (concise step list)
 6. Example usage snippet with `imports:`
+7. For instruction/skill extraction, a prefix-packing plan: objective, activation,
+   constraints, task routes, verification and stop conditions within 7,500 UTF-8
+   bytes including metadata; optional examples/detail later with early links.
+   Use short grammatical imperatives and exact identifiers; preserve safety,
+   exceptions and behavior. Include byte counts and the proposed command
+   `python3 scripts/check-instruction-prefixes.py <instruction-or-skill-paths>`.
+
+The index's `source_bytes` and query-visible/omitted bytes describe source-file
+retrieval, not compiled runtime context. Inspect selected exact 8,000-byte prefixes
+for lost rules/routes; do not infer semantic completeness from counts or truncate
+captured runtime requests. Prefer complete files under 7,500 bytes; longer files
+need a complete contract ending with `<!-- instruction-prefix-end -->` by that
+boundary. Keep byte compliance separate from comprehension evidence.
 
 Use this priority rubric:
 - **High**: appears in 5+ workflows with substantial duplication and low/medium extraction complexity

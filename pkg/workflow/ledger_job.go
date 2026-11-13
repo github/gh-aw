@@ -59,7 +59,7 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 	return &Job{
 		Name:        pushLedgerChangesJobName,
 		RunsOn:      c.formatFrameworkJobRunsOn(data),
-		If:          "always()",
+		If:          "always() && needs.safe_outputs.result != 'skipped'",
 		Permissions: permissions,
 		Concurrency: concurrency,
 		Needs:       needs,
