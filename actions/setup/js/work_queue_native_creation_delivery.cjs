@@ -305,6 +305,32 @@ async function verifyPullRequest(options, receipt) {
   const authority = await resolveParentResourceTarget(github, { repository: receipt.repository, kind: "pull_request", number: receipt.number }, data);
   const head = await resolveRepositoryTarget(github, { repository: receipt.headRepository, repository_id: nativeDecimalIdentity(data.head.repo.id), ref: `refs/heads/${receipt.branch}` });
   const effects = [];
+  const staged = (options.effects || []).filter(effect => receiptMatchesClaim(effect, claim) && effect.outcome === "succeeded" && effect.repository === receipt.headRepository && ["git_blob", "git_tree", "git_commit"].includes(effect.kind));
+  const stagedTrees = new Set();
+  const [headOwner, headRepo] = receipt.headRepository.split("/");
+  for (const effect of staged.filter(effect => effect.kind === "git_commit")) {
+    if (
+      !REVISION.test(effect.id) ||
+      !(await readAncestry(github, receipt.repository, receipt.base, receipt.headRepository === receipt.repository ? effect.id : `${headOwner}:${effect.id}`)) ||
+      (effect.id !== receipt.commit && !(await readAncestry(github, receipt.headRepository, effect.id, receipt.commit)))
+    )
+      return { verified: false, diagnostics: { event: "pull_request.effect_commit_mismatch" } };
+    const { data: commit } = await github.rest.git.getCommit({ owner: headOwner, repo: headRepo, commit_sha: effect.id });
+    if (commit?.sha !== effect.id || !REVISION.test(commit.tree?.sha)) return { verified: false, diagnostics: { event: "pull_request.effect_commit_mismatch" } };
+    stagedTrees.add(commit.tree.sha);
+  }
+  const stagedBlobs = new Set();
+  if (staged.some(effect => effect.kind === "git_blob")) {
+    for (const treeSha of stagedTrees) {
+      const { data: tree } = await github.rest.git.getTree({ owner: headOwner, repo: headRepo, tree_sha: treeSha, recursive: "1" });
+      if (tree?.sha !== treeSha || tree.truncated !== false || !Array.isArray(tree.tree)) return { verified: false, diagnostics: { event: "pull_request.effect_tree_mismatch" } };
+      for (const entry of tree.tree) if (entry.type === "blob" && REVISION.test(entry.sha)) stagedBlobs.add(entry.sha);
+    }
+  }
+  for (const effect of staged) {
+    if ((effect.kind === "git_tree" && !stagedTrees.has(effect.id)) || (effect.kind === "git_blob" && !stagedBlobs.has(effect.id))) return { verified: false, diagnostics: { event: "pull_request.effect_object_mismatch" } };
+    effects.push({ kind: effect.kind, repository: receipt.headRepository, id: effect.id });
+  }
   for (const effect of options.effects || []) {
     if (!receiptMatchesClaim(effect, claim) || effect.outcome !== "succeeded") continue;
     if (effect.repository === receipt.headRepository && effect.kind === "git_ref") {
