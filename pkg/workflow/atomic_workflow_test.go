@@ -550,6 +550,130 @@ func TestAtomicHarnessDriveWorkflowRuns(t *testing.T) {
 	})
 }
 
+// TestAtomicHarnessDriveWorkflowRunsPublishedCLI interrupts a workflow run, carries its redacted export through a
+// drive directory, and resumes it in a fresh harness run with the real Atomic storage commands and SDK.
+func TestAtomicHarnessDriveWorkflowRunsPublishedCLI(t *testing.T) {
+	command := os.Getenv("GH_AW_ATOMIC_TEST_CLI")
+	if command == "" {
+		t.Skip("set GH_AW_ATOMIC_TEST_CLI to an Atomic with storage export --workflows to resume a run through the drive")
+	}
+	binary, err := exec.LookPath(command)
+	require.NoError(t, err)
+	binary, err = filepath.EvalSymlinks(binary)
+	require.NoError(t, err)
+	packageRoot := filepath.Dir(filepath.Dir(binary))
+	require.FileExists(t, filepath.Join(packageRoot, "package.json"))
+	encodedBinary, err := json.Marshal(binary)
+	require.NoError(t, err)
+
+	work := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(work, "node_modules", "@bastani"), 0o700))
+	require.NoError(t, os.Symlink(packageRoot, filepath.Join(work, "node_modules", "@bastani", "atomic")))
+	// The harness runs this wrapper as Atomic: storage commands go to the real CLI, the agent run to an SDK workflow.
+	wrapper := filepath.Join(work, "atomic")
+	require.NoError(t, os.WriteFile(wrapper, []byte(`#!/usr/bin/env node
+const { spawnSync } = require("child_process"), path = require("path");
+const args = process.argv.slice(2);
+const target = args[0] === "storage" ? [`+string(encodedBinary)+`, args] : [process.execPath, [path.join(__dirname, "workflow.mjs")]];
+const result = spawnSync(target[0], target[1], { stdio: "inherit" });
+if (result.signal) process.kill(process.pid, result.signal);
+process.exit(result.status ?? 1);`), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(work, "workflow.mjs"), []byte(`
+import { run, workflow } from "@bastani/atomic/workflows";
+import fs from "node:fs";
+import path from "node:path";
+const here = path.dirname(new URL(import.meta.url).pathname);
+const count = name => {
+  const file = path.join(here, name);
+  const next = (fs.existsSync(file) ? Number(fs.readFileSync(file, "utf8")) : 0) + 1;
+  fs.writeFileSync(file, String(next));
+  return next;
+};
+const definition = workflow({
+  name: "drive-resume",
+  description: "Interrupted once, then resumed from the drive.",
+  inputs: {},
+  outputs: {},
+  run: async ctx => {
+    const first = await ctx.tool("first", {}, async () => { count("first.count"); return "token ghp_`+strings.Repeat("a", 36)+`"; });
+    const second = await ctx.tool("second", {}, async () => {
+      if (count("second.count") === 1) process.kill(process.pid, "SIGKILL");
+      return "done";
+    });
+    fs.writeFileSync(path.join(here, "result.json"), JSON.stringify({ first, second }));
+    return {};
+  },
+});
+const runIdFile = path.join(here, "run-id");
+const runId = fs.existsSync(runIdFile) ? fs.readFileSync(runIdFile, "utf8").trim() : undefined;
+const result = await run(definition, {}, { cwd: process.cwd(), ...(runId ? { runId } : {}) });
+console.log(JSON.stringify({ status: result.status }));`), 0o600))
+
+	drive := t.TempDir()
+	savedRuns := func(t *testing.T) map[string]string {
+		t.Helper()
+		entries, err := os.ReadDir(filepath.Join(drive, "workflows"))
+		require.NoError(t, err)
+		runs := map[string]string{}
+		for _, entry := range entries {
+			content, err := os.ReadFile(filepath.Join(drive, "workflows", entry.Name()))
+			require.NoError(t, err)
+			runs[strings.TrimSuffix(entry.Name(), ".jsonl")] = string(content)
+		}
+		return runs
+	}
+	headerStatus := func(t *testing.T, content string) string {
+		t.Helper()
+		var header struct {
+			Type   string `json:"type"`
+			Status string `json:"status"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(strings.SplitN(content, "\n", 2)[0]), &header))
+		assert.Equal(t, "atomic.workflow-run", header.Type)
+		return header.Status
+	}
+	harness := func(t *testing.T) (string, error) {
+		t.Helper()
+		dir := filepath.Join(work, "harness")
+		require.NoError(t, os.MkdirAll(dir, 0o700))
+		cmd := atomicDriveHarnessCommand(t, dir, drive, wrapper, "--no-session")
+		for index, entry := range cmd.Env {
+			if strings.HasPrefix(entry, "GITHUB_WORKSPACE=") {
+				cmd.Env[index] = "GITHUB_WORKSPACE=" + work
+			}
+		}
+		cmd.Env = append(cmd.Env, "HOME="+work)
+		output, err := cmd.CombinedOutput()
+		return string(output), err
+	}
+
+	output, err := harness(t)
+	require.Error(t, err, "the first run is interrupted: %s", output)
+	runs := savedRuns(t)
+	require.Len(t, runs, 1, "%s", output)
+	var runID string
+	for id, content := range runs {
+		runID = id
+		assert.Equal(t, "running", headerStatus(t, content))
+		assert.NotContains(t, content, "ghp_")
+		assert.Contains(t, content, "REDACTED")
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(work, "run-id"), []byte(runID), 0o600))
+
+	output, err = harness(t)
+	require.NoError(t, err, "the resumed run completes: %s", output)
+	result, err := os.ReadFile(filepath.Join(work, "result.json"))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"first":"token ***REDACTED***","second":"done"}`, string(result),
+		"the completed first step replays from the redacted export")
+	firstCount, err := os.ReadFile(filepath.Join(work, "first.count"))
+	require.NoError(t, err)
+	assert.Equal(t, "1", string(firstCount), "the completed first step does not run again")
+	runs = savedRuns(t)
+	require.Contains(t, runs, runID)
+	assert.Equal(t, "completed", headerStatus(t, runs[runID]))
+}
+
 func TestAtomicMCPAdapter(t *testing.T) {
 	adapter := loadAtomicSample(t).Behaviors.MCP.ConfigAdapter
 	for _, scenario := range []string{"success", "missing URL"} {
