@@ -1209,9 +1209,12 @@ function extractTokenCountFromOutput(output) {
 /** @param {string} output @returns {boolean} */
 function isCopilotContentFilterError(output) {
   for (const event of iterateJsonl(output)) {
-    if (event?.type !== "assistant.message") continue;
+    if (event?.type !== "assistant.message" && event?.type !== "session.error") continue;
     const context = copilotSessionContext(event);
-    if (context.agentId === undefined && !context.parentToolUseId && getCopilotMessageRefusal(event.data)?.reason === "content_filter") return true;
+    if (context.agentId !== undefined || context.parentToolUseId) continue;
+    if (event.type === "assistant.message" && getCopilotMessageRefusal(event.data)?.reason === "content_filter") return true;
+    if (event.type === "session.error" && ["query", "sdk_driver"].includes(event.data?.errorType) && typeof event.data?.message === "string" && /^422 This content was flagged for possible cybersecurity risk\./.test(event.data.message))
+      return true;
   }
   return false;
 }
