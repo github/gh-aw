@@ -547,7 +547,7 @@ func resolveLogsDateRange(startDate, endDate string, now time.Time) (string, str
 
 func validateLogsOptions(options LogsDownloadOptions) error {
 	if options.Format == "jsonl" && options.JSONOutput {
-		return errors.New("--format jsonl cannot be combined with --json")
+		return errors.New("--format jsonl cannot be combined with --json. Use --format jsonl for streaming events or --json for a single JSON document")
 	}
 	if err := validateMaxStorageMB(options.MaxStorageMB); err != nil {
 		return err

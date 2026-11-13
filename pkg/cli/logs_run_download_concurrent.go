@@ -64,6 +64,7 @@ type runArtifactsConcurrentOptions struct {
 }
 
 var processConcurrentRunDownload = processSingleRunDownload
+var errRunDownloadPanicked = errors.New("run download panicked")
 
 // buildConcurrentDownloadParams constructs download parameters by parsing the optional
 // repoOverride ("owner/repo" or "HOST/owner/repo") once for the whole batch.
@@ -247,7 +248,7 @@ func executeConcurrentRunDownload(
 			result = DownloadResult{
 				RunAnalysis: RunAnalysis{Run: run},
 				Skipped:     true,
-				Error:       fmt.Errorf("run download panicked: %v", recovered),
+				Error:       fmt.Errorf("%w: %v", errRunDownloadPanicked, recovered),
 			}
 		}
 	}()

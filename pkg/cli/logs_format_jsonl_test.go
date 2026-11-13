@@ -102,7 +102,7 @@ func TestLogsJSONLStreamsRunBeforeBatchFinishes(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer reader.Close()
 	defer writer.Close()
-	stream := newLogsJSONLStream(writer, false)
+	stream := newLogsJSONLStream(writer, false, true)
 	ctx = context.WithValue(ctx, logsJSONLContextKey{}, stream)
 	events := make(chan logsJSONLEvent, 10)
 	decodeDone := make(chan error, 1)
@@ -178,7 +178,7 @@ func TestLogsJSONLStreamsRunBeforeBatchFinishes(t *testing.T) {
 func TestLogsJSONLConcurrentProgressAndCachedRun(t *testing.T) {
 	t.Parallel()
 	var output bytes.Buffer
-	stream := newLogsJSONLStream(&output, false)
+	stream := newLogsJSONLStream(&output, false, true)
 	ctx := context.WithValue(context.Background(), logsJSONLContextKey{}, stream)
 	var workers sync.WaitGroup
 	for id := range 20 {
@@ -213,6 +213,7 @@ func TestLogsJSONLDownloadProgressStages(t *testing.T) {
 	panicked := executeConcurrentRunDownload(context.Background(), run, concurrentRunDownloadParams{}, nil, nil)
 	require.True(t, panicked.Skipped)
 	require.ErrorContains(t, panicked.Error, "run download panicked")
+	require.ErrorIs(t, panicked.Error, errRunDownloadPanicked)
 
 	for _, tt := range []struct {
 		name    string
@@ -220,11 +221,38 @@ func TestLogsJSONLDownloadProgressStages(t *testing.T) {
 		stage   string
 		message string
 	}{
-		{name: "canceled", result: canceledDownloadResult(run, context.Canceled), stage: "skipped"},
-		{name: "deadline exceeded", result: canceledDownloadResult(run, context.DeadlineExceeded), stage: "skipped"},
-		{name: "wrapped cancellation", result: canceledDownloadResult(run, errors.Join(errors.New("download interrupted"), context.Canceled)), stage: "skipped"},
+		{name: "canceled", result: canceledDownloadResult(run, context.Canceled), stage: "skipped", message: context.Canceled.Error()},
+		{name: "deadline exceeded", result: canceledDownloadResult(run, context.DeadlineExceeded), stage: "skipped", message: context.DeadlineExceeded.Error()},
+		{name: "wrapped cancellation", result: canceledDownloadResult(run, errors.Join(errors.New("download interrupted"), context.Canceled)), stage: "skipped", message: "download interrupted\ncontext canceled"},
 		{name: "panicked", result: panicked, stage: "failed", message: panicked.Error.Error()},
+		{
+			name: "wrapped panic",
+			result: DownloadResult{
+				RunAnalysis: RunAnalysis{Run: run},
+				Skipped:     true,
+				Error:       errors.Join(errors.New("download interrupted"), panicked.Error),
+			},
+			stage: "failed", message: "download interrupted\n" + panicked.Error.Error(),
+		},
 		{name: "skipped", result: DownloadResult{RunAnalysis: RunAnalysis{Run: run}, Skipped: true}, stage: "skipped"},
+		{
+			name: "missing artifact",
+			result: DownloadResult{
+				RunAnalysis: RunAnalysis{Run: run},
+				Skipped:     true,
+				Error:       errors.New("no artifacts found"),
+			},
+			stage: "skipped", message: "no artifacts found",
+		},
+		{
+			name: "storage limit",
+			result: DownloadResult{
+				RunAnalysis: RunAnalysis{Run: run},
+				Skipped:     true,
+				Error:       errLogsStorageLimitReached,
+			},
+			stage: "skipped", message: errLogsStorageLimitReached.Error(),
+		},
 		{
 			name: "error without skipped flag",
 			result: DownloadResult{
@@ -236,7 +264,7 @@ func TestLogsJSONLDownloadProgressStages(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var output bytes.Buffer
-			stream := newLogsJSONLStream(&output, false)
+			stream := newLogsJSONLStream(&output, false, true)
 			ctx := context.WithValue(context.Background(), logsJSONLContextKey{}, stream)
 			emitLogsDownloadProgress(ctx, tt.result)
 			events := decodeLogsJSONLEvents(t, output.String())
@@ -255,7 +283,7 @@ func TestLogsJSONLSummaryAndTerminalEvents(t *testing.T) {
 	for _, verbose := range []bool{false, true} {
 		t.Run(strconv.FormatBool(verbose), func(t *testing.T) {
 			var output bytes.Buffer
-			stream := newLogsJSONLStream(&output, verbose)
+			stream := newLogsJSONLStream(&output, verbose, true)
 			continuation := &ContinuationData{BeforeRunID: 123, Message: "Count limit reached"}
 			err := renderLogsOutput(nil, renderLogsOutputOptions{
 				format: "jsonl", jsonlStream: stream, episodes: true,
@@ -274,7 +302,7 @@ func TestLogsJSONLSummaryAndTerminalEvents(t *testing.T) {
 		})
 	}
 	var output bytes.Buffer
-	stream := newLogsJSONLStream(&output, false)
+	stream := newLogsJSONLStream(&output, false, true)
 	err := errors.New("collection failed")
 	stream.finish(&err)
 	require.ErrorContains(t, err, "collection failed")
@@ -287,7 +315,7 @@ func TestLogsJSONLSummaryAndTerminalEvents(t *testing.T) {
 func TestLogsJSONLRunMatchesFinalReportCounts(t *testing.T) {
 	t.Parallel()
 	var output bytes.Buffer
-	stream := newLogsJSONLStream(&output, false)
+	stream := newLogsJSONLStream(&output, false, true)
 	run := ProcessedRun{
 		Run:          WorkflowRun{DatabaseID: 42, WorkflowPath: ".github/workflows/test.lock.yml"},
 		MissingTools: []MissingToolReport{{}},
@@ -307,6 +335,79 @@ func TestLogsJSONLRunMatchesFinalReportCounts(t *testing.T) {
 	assert.Equal(t, events[1].Data.Runs[0].MissingDataCount, events[0].Run.MissingDataCount)
 }
 
+func TestLogsJSONLWorkQueueArtifactScope(t *testing.T) {
+	t.Chdir(t.TempDir())
+	originalFetch, originalRateLimit := logsFetchWorkflowRunBatch, fetchRateLimitForHostFunc
+	originalProcess, originalBuild := processConcurrentRunDownload, buildLogsProcessedRun
+	t.Cleanup(func() {
+		logsFetchWorkflowRunBatch, fetchRateLimitForHostFunc = originalFetch, originalRateLimit
+		processConcurrentRunDownload, buildLogsProcessedRun = originalProcess, originalBuild
+	})
+	run := WorkflowRun{DatabaseID: 42, Repository: "owner/repo", WorkflowPath: ".github/workflows/test.lock.yml"}
+	queue := &WorkQueueReport{FinishIntent: "cached queue evidence"}
+	logsFetchWorkflowRunBatch = func(context.Context, LogsDownloadOptions, string, int, bool) (workflowRunBatch, error) {
+		return workflowRunBatch{runs: []WorkflowRun{run}, totalFetched: 1, batchSize: 1}, nil
+	}
+	fetchRateLimitForHostFunc = func(context.Context, string) (rateLimitResource, error) {
+		return rateLimitResource{}, errors.New("rate limit unavailable in test")
+	}
+	processConcurrentRunDownload = func(context.Context, WorkflowRun, concurrentRunDownloadParams, *atomic.Int64, *console.ProgressBar) (DownloadResult, error) {
+		return DownloadResult{RunAnalysis: RunAnalysis{Run: run, WorkQueue: queue}, Cached: true}, nil
+	}
+	for _, mode := range []string{"discovery", "targets"} {
+		for _, verbose := range []bool{false, true} {
+			for _, cachedJSONL := range []bool{false, true} {
+				for _, tt := range []struct {
+					name    string
+					sets    []string
+					include bool
+				}{
+					{name: "usage only", sets: []string{"usage"}},
+					{name: "explicit work queue", sets: []string{"usage", "work-queue"}, include: true},
+					{name: "all", sets: []string{"all"}, include: true},
+					{name: "default", include: true},
+				} {
+					t.Run(mode+"/verbose="+strconv.FormatBool(verbose)+"/cached-jsonl="+strconv.FormatBool(cachedJSONL)+"/"+tt.name, func(t *testing.T) {
+						buildLogsProcessedRun = func(_ context.Context, result DownloadResult, _, _ bool) ProcessedRun {
+							if cachedJSONL {
+								return ProcessedRun{Run: result.Run, cachedData: &RunData{RunID: run.DatabaseID, WorkQueue: queue}}
+							}
+							return ProcessedRun{Run: result.Run, WorkQueue: result.WorkQueue}
+						}
+						output, _ := captureOutput(t, func() error {
+							opts := LogsDownloadOptions{
+								Format: "jsonl", Verbose: verbose, Count: 1, OutputDir: t.TempDir(),
+								ArtifactSets: tt.sets, RepoOverride: "owner/repo",
+							}
+							if mode == "targets" {
+								return DownloadWorkflowLogsForTargets(context.Background(), opts, []logsWorkflowTarget{
+									{workflowName: "test", repoOverride: "owner/repo"},
+								}, nil)
+							}
+							return DownloadWorkflowLogs(context.Background(), opts)
+						})
+						var streamed, summary *RunData
+						for _, event := range decodeLogsJSONLEvents(t, output) {
+							switch event.Type {
+							case "run":
+								streamed = event.Run
+							case "summary":
+								require.Len(t, event.Data.Runs, 1)
+								summary = &event.Data.Runs[0]
+							}
+						}
+						require.NotNil(t, streamed)
+						require.NotNil(t, summary)
+						assert.Equal(t, tt.include, streamed.WorkQueue != nil)
+						assert.Equal(t, summary.WorkQueue, streamed.WorkQueue)
+						assert.Equal(t, "cached queue evidence", queue.FinishIntent, "projection must not mutate cached evidence")
+					})
+				}
+			}
+		}
+	}
+}
+
 type failingLogsJSONLWriter struct{}
 
 func (failingLogsJSONLWriter) Write([]byte) (int, error) {
@@ -317,7 +418,7 @@ func TestLogsJSONLWriteFailureCancelsCollection(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream := newLogsJSONLStream(failingLogsJSONLWriter{}, false)
+	stream := newLogsJSONLStream(failingLogsJSONLWriter{}, false, true)
 	stream.cancel = cancel
 	stream.emit(logsJSONLEvent{Type: "progress"})
 	require.ErrorIs(t, ctx.Err(), context.Canceled)

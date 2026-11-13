@@ -28,23 +28,24 @@ type logsJSONLEvent struct {
 // logsJSONLStream serializes concurrent producers without buffering output.
 // The first write failure cancels collection and is returned by finish.
 type logsJSONLStream struct {
-	mu      sync.Mutex
-	encoder *json.Encoder
-	verbose bool
-	err     error
-	cancel  context.CancelFunc
+	mu               sync.Mutex
+	encoder          *json.Encoder
+	verbose          bool
+	includeWorkQueue bool
+	err              error
+	cancel           context.CancelFunc
 }
 
-func newLogsJSONLStream(w io.Writer, verbose bool) *logsJSONLStream {
-	return &logsJSONLStream{encoder: json.NewEncoder(w), verbose: verbose}
+func newLogsJSONLStream(w io.Writer, verbose, includeWorkQueue bool) *logsJSONLStream {
+	return &logsJSONLStream{encoder: json.NewEncoder(w), verbose: verbose, includeWorkQueue: includeWorkQueue}
 }
 
-func startLogsJSONL(ctx context.Context, format string, verbose bool) (context.Context, *logsJSONLStream, func(*error)) {
+func startLogsJSONL(ctx context.Context, format string, verbose, includeWorkQueue bool) (context.Context, *logsJSONLStream, func(*error)) {
 	if format != "jsonl" {
 		return ctx, nil, func(*error) {}
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	stream := newLogsJSONLStream(os.Stdout, verbose)
+	stream := newLogsJSONLStream(os.Stdout, verbose, includeWorkQueue)
 	stream.cancel = cancel
 	ctx = context.WithValue(ctx, logsJSONLContextKey{}, stream)
 	stream.emit(logsJSONLEvent{Type: "progress", Stage: "started"})
@@ -96,6 +97,7 @@ func (s *logsJSONLStream) run(run ProcessedRun) {
 	}
 	updateLogsRunMessageCounts(&run)
 	data := buildLogsData([]ProcessedRun{run}, "", nil)
+	data.Runs = workQueueReportRuns(data.Runs, s.includeWorkQueue)
 	if !s.verbose {
 		data = compactLogsData(data)
 	}
@@ -123,13 +125,17 @@ func emitLogsDownloadProgress(ctx context.Context, result DownloadResult) {
 		Repository: result.Run.Repository, Cached: result.Cached,
 	}
 	switch {
-	case result.Skipped && (errors.Is(result.Error, context.Canceled) || errors.Is(result.Error, context.DeadlineExceeded)):
+	// Panic recovery marks the run skipped to exclude it from analysis, not
+	// because downloading was intentionally skipped.
+	case errors.Is(result.Error, errRunDownloadPanicked):
+		event.Stage = "failed"
+	case result.Skipped:
 		event.Stage = "skipped"
 	case result.Error != nil:
 		event.Stage = "failed"
+	}
+	if result.Error != nil {
 		event.Message = result.Error.Error()
-	case result.Skipped:
-		event.Stage = "skipped"
 	}
 	logsJSONLFromContext(ctx).emit(event)
 }

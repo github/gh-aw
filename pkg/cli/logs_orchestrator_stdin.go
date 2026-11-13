@@ -24,9 +24,9 @@ import (
 // provided as IDs or URLs, bypassing the GitHub API run-discovery step.
 // This is used when the --stdin flag is passed to the logs command.
 func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (err error) { //nolint:largefunc // Existing stdin orchestration remains centralized.
-	ctx, stream, finish := startLogsJSONL(ctx, opts.Format, opts.Verbose)
-	defer finish(&err)
 	opts = normalizeStdinLogsOptions(opts)
+	ctx, stream, finish := startLogsJSONL(ctx, opts.Format, opts.Verbose, workQueueEvidenceRequested(opts.ArtifactSets) || len(ResolveArtifactFilter(opts.ArtifactSets)) == 0)
+	defer finish(&err)
 	logsOrchestratorLog.Printf("Starting stdin log download: runs=%d, outputDir=%s", len(opts.RunURLs), opts.OutputDir)
 
 	if err := ValidateArtifactSets(opts.ArtifactSets); err != nil {
@@ -183,6 +183,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		stream.emit(logsJSONLEvent{Type: "progress", Stage: "fetching", RunID: components.Number, Repository: path.Join(owner, repo)})
 		run, err := fetchWorkflowRunMetadata(ctx, components.Number, owner, repo, host, opts.Verbose)
 		if err != nil {
+			stream.emit(logsJSONLEvent{Type: "progress", Stage: "failed", RunID: components.Number, Repository: path.Join(owner, repo), Message: err.Error()})
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping run %d: failed to fetch metadata: %v", components.Number, err)))
 			continue
 		}
