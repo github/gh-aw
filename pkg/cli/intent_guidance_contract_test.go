@@ -12,9 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var intentGuidanceRepoRoot, intentGuidanceRepoRootErr = gitutil.FindGitRoot()
+
 func TestIntentGuidanceContract(t *testing.T) {
 	t.Parallel()
-	repoRoot, err := gitutil.FindGitRoot()
+	repoRoot, err := intentGuidanceRepoRoot, intentGuidanceRepoRootErr
 	if err != nil {
 		t.Skipf("Skipping test: not in a git repository: %v", err)
 	}
