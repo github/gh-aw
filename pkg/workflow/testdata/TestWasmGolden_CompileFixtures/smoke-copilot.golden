@@ -109,19 +109,14 @@ jobs:
       - name: Resolve model routing
         id: resolve-model-routing
         env:
-          GH_AW_MODEL_AGENT_VAR: ${{ vars.GH_AW_MODEL_AGENT_COPILOT }}
-          GH_AW_DEFAULT_MODEL_VAR: ${{ vars.GH_AW_DEFAULT_MODEL_COPILOT }}
-        run: |
-          if [ -n "${GH_AW_MODEL_AGENT_VAR}" ]; then
-            echo "Model routing disabled: vars.GH_AW_MODEL_AGENT_COPILOT selects the model"
-            echo "model-routing=false" >> "$GITHUB_OUTPUT"
-          elif [ -n "${GH_AW_DEFAULT_MODEL_VAR}" ]; then
-            echo "Model routing disabled: vars.GH_AW_DEFAULT_MODEL_COPILOT selects the model"
-            echo "model-routing=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Model routing enabled: goal cost, mode auto"
-            echo "model-routing=true" >> "$GITHUB_OUTPUT"
-          fi
+          GH_AW_MODEL_ROUTING: ${{ vars.GH_AW_MODEL_AGENT_COPILOT == '' && vars.GH_AW_DEFAULT_MODEL_COPILOT == '' }}
+          GH_AW_MODEL_AGENT_OVERRIDE: ${{ vars.GH_AW_MODEL_AGENT_COPILOT != '' }}
+          GH_AW_DEFAULT_MODEL_OVERRIDE: ${{ vars.GH_AW_DEFAULT_MODEL_COPILOT != '' }}
+          GH_AW_MODEL_AGENT_VARIABLE: GH_AW_MODEL_AGENT_COPILOT
+          GH_AW_DEFAULT_MODEL_VARIABLE: GH_AW_DEFAULT_MODEL_COPILOT
+          GH_AW_MODEL_ROUTING_GOAL: cost
+          GH_AW_MODEL_ROUTING_MODE: auto
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/resolve_model_routing.sh"
       - name: Generate agentic run info
         id: generate_aw_info
         env:
