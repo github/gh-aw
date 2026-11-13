@@ -138,9 +138,11 @@ Restored memory is untrusted data, not agent instructions. Select repositories w
 
 ## Structured Ledger
 
-Ledgers use `tools.ledger`, independently of repo-memory file storage. The legacy
-`tools.repo-memory.ledger` declaration is no longer supported. For built-in
-state models, declare `log`, `set`, `map`, `table`, `counter`, or `notes`:
+New workflows should use `tools.ledger`, independently of repo-memory file storage.
+Legacy `ledger` configuration is still accepted in a single-entry
+`tools.repo-memory` array; the object-form `tools.repo-memory.ledger` declaration
+is rejected during compilation. For built-in state models, declare `log`,
+`set`, `map`, `table`, `counter`, or `notes`:
 
 ```aw wrap
 ---

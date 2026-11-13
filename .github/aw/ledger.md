@@ -7,10 +7,12 @@ description: tools.ledger — structured, immutable, append-only event history w
 Use the ledger for immutable, structured events when each run should add records
 and later runs need to query them. For example, a low-volume audit can append
 one result per scan and query prior results by a stable application-level key.
-Configure `tools.ledger` independently of repo-memory. The legacy
-`tools.repo-memory.ledger` declaration is unsupported. Each ledger has a
-`ledgers/<name>` branch and a disposable read-only SQLite projection rebuilt
-from persisted JSONL shards.
+Configure new workflows with `tools.ledger`, independently of repo-memory.
+Legacy `ledger` configuration is still accepted in a single-entry
+`tools.repo-memory` array; the object-form `tools.repo-memory.ledger` declaration
+is rejected during compilation. Each standalone ledger has a `ledgers/<name>`
+branch and a disposable read-only SQLite projection rebuilt from persisted
+JSONL shards.
 
 ```yaml
 tools:
