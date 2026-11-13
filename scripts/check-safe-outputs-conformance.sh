@@ -207,6 +207,11 @@ check_error_codes() {
         # Skip test files and non-safe-output modules
         [[ "$handler" =~ test|_checks\.cjs$ ]] && continue
         [[ "$handler" =~ (apm_unpack|run_apm_unpack|observability|generate_observability) ]] && continue
+
+        # Skip files with a documented USE-001 exemption annotation
+        if grep -q "@safe-outputs-exempt[[:space:]]\\+USE-001" "$handler"; then
+            continue
+        fi
         
         # Only check handlers that interact with GitHub via octokit or record safe output operations
         if ! grep -qE "octokit\.|safe_output|safeOutput|NDJSON" "$handler"; then
