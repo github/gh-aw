@@ -12568,6 +12568,11 @@
           ],
           "description": "Enable AI agents to edit and update GitHub release content, including release notes, assets, and metadata."
         },
+        "require-agent-success": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, require the agent job to succeed before running detection or processing safe outputs"
+        },
         "staged": {
           "$ref": "#/$defs/templatable_boolean",
           "description": "When true, emit step summary messages instead of making GitHub API calls (preview mode)",

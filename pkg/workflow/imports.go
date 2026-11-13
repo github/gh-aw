@@ -563,6 +563,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs 
 	}
 
 	// Merge meta-configuration fields (only set if empty/zero in result)
+	if _, defined := topRawSafeOutputs["require-agent-success"]; !defined {
+		result.RequireAgentSuccess = result.RequireAgentSuccess || importedConfig.RequireAgentSuccess
+	}
 	if !result.Steer && importedConfig.Steer {
 		result.Steer = true
 	}
