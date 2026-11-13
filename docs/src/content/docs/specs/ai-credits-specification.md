@@ -663,6 +663,8 @@ A conforming implementation MUST enforce the following at compile time when a fr
 - Reject integer values below `-1` with a compile-time validation error.
 - Reject non-numeric values.
 
+At runtime, when the budget is resolved from an organization variable (`GH_AW_DEFAULT_MAX_AI_CREDITS`, `GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`, or `GH_AW_DEFAULT_EVALS_MAX_AI_CREDITS`), the generated step accepts `-1` or a base-10 positive whole number without leading zeroes (up to 19 digits, covering positive `int64` values); `K` and `M` suffixes are compile-time frontmatter syntax only. Any other runtime value MUST fall back to the built-in default (`1000`, or `400` for detection and evals runs) and emit a step-log warning without echoing the raw value.
+
 ### 10.7 Compliance Tests
 
 | Test ID | Description | Requirement |
