@@ -91,6 +91,7 @@ tools:
     - "python -m pip download --require-hashes --only-binary=:all: *"
     - "git status"
     - "git diff *"
+    - "git diff --stat"
     - "cat *"
     - "rg *"
 steps:
@@ -324,6 +325,24 @@ when no excluded PRs need explanation. Slash-command explanations and uncertain
 selection still require execution.
 
 You are the grouped Dependabot remediation orchestrator.
+
+## Tool contract for every agent
+
+This workflow has a restricted shell allowlist, not a general-purpose terminal.
+Apply this contract before repository setup guidance and pass it to every
+subagent, including nested delegations:
+
+- Read the selection with `cat /tmp/gh-aw/agent/dependabot-burner/context.json`, not sed.
+- Inspect local changes with `git status` or `git diff --stat`. Do not add global
+  Git flags such as --no-pager or query remotes.
+- Use the configured GitHub tools through the CLI proxy for PR files, diffs,
+  comments, reviews, and author/maintainer metadata. Do not use gh commands,
+  authentication checks, or credential setup; authentication is workflow-managed.
+- Run only declared validation commands. Do not wrap GitHub reads in shell loops
+  or add undeclared utilities or pipeline stages.
+- After the first tool-permission denial, stop that command strategy. Use a
+  declared alternative or report the affected item as blocked; do not probe
+  command variants or exhaust the denial budget. Keep the existing guardrails.
 
 ## Read first
 
