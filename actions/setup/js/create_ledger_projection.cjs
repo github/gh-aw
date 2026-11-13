@@ -145,18 +145,23 @@ async function main(options = {}) {
       const projectionDir = path.join(PROJECTION_ROOT, ledger.name);
       const databasePath = path.join(projectionDir, "ledger.db");
       fs.mkdirSync(projectionDir, { recursive: true });
-      const exists = await fetchLedgerBranch({
-        githubClient: options.githubClient || github,
-        owner,
-        repo,
-        branchName,
-        refName,
-        workspaceDir,
-        serverHost,
-        token,
-      });
-      if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
-      else fs.mkdirSync(sourceDir, { recursive: true });
+      if (ledger.storage === "comment-memory") {
+        const { materializeCommentLedger } = require("./comment_memory_ledger.cjs");
+        await materializeCommentLedger({ githubClient: options.githubClient || github, config: ledger, sourceDir });
+      } else {
+        const exists = await fetchLedgerBranch({
+          githubClient: options.githubClient || github,
+          owner,
+          repo,
+          branchName,
+          refName,
+          workspaceDir,
+          serverHost,
+          token,
+        });
+        if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
+        else fs.mkdirSync(sourceDir, { recursive: true });
+      }
       const tables = createProjection({ sourceDir, databasePath, config: ledger });
       if (ledger.type) {
         replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);

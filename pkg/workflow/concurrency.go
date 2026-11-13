@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,30 @@ import (
 )
 
 var concurrencyLog = logger.New("workflow:concurrency")
+
+// generateSafeOutputsConcurrencyConfig serializes comment-memory read/merge/write
+// across workflows hosted in the same Actions repository. Targets and memory IDs
+// can be selected by agent outputs, so narrower compile-time keys are unsafe.
+// Actions concurrency does not coordinate writers hosted in other repositories.
+func generateSafeOutputsConcurrencyConfig(data *WorkflowData) (string, error) {
+	group := data.SafeOutputs.ConcurrencyGroup
+	if data.CommentMemoryConfig != nil {
+		const commentMemoryGroup = "gh-aw-comment-memory"
+		if group != "" && group != commentMemoryGroup {
+			return "", errors.New("safe-outputs.concurrency-group cannot be combined with tools.comment-memory: remove concurrency-group to use the shared comment-memory writer group")
+		}
+		group = commentMemoryGroup
+		config := fmt.Sprintf("concurrency:\n  group: %q\n  cancel-in-progress: false", group)
+		if isGroupConcurrencyQueueEnabled(data) {
+			config += "\n  queue: max"
+		}
+		return config, nil
+	}
+	if group == "" {
+		return "", nil
+	}
+	return fmt.Sprintf("concurrency:\n  group: %q\n  cancel-in-progress: false", group), nil
+}
 
 // GenerateConcurrencyConfig generates the concurrency configuration for a workflow
 // based on its trigger types and characteristics.
@@ -379,6 +404,11 @@ func appendEntityConcurrencyGroupKey(keys []string, workflowData *WorkflowData, 
 
 // shouldEnableCancelInProgress determines if cancel-in-progress should be enabled
 func shouldEnableCancelInProgress(workflowData *WorkflowData, isCommandTrigger bool) bool {
+	// A cancelled writer can still have an in-flight API update. Do not have a
+	// newer trigger cancel a workflow while it holds the comment-memory group.
+	if workflowData.CommentMemoryConfig != nil {
+		return false
+	}
 	if isCommandTrigger {
 		// Expanded command events include PR comments, not necessarily a PR trigger.
 		_, commandPR := workflowData.CommandOtherEvents["pull_request"]

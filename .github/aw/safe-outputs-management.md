@@ -40,6 +40,7 @@ description: Safe-output reference for update, label, milestone, project, releas
   ```yaml
   safe-outputs:
     merge-pull-request:
+      allowed-base-branches: ["agent-work/*"] # Required: owner-declared non-consequential destinations; not "*"
       required-labels: [ready-to-merge]   # Optional: ALL listed labels must be present on the PR
       required-title-prefix: "[bot] "     # Optional: only merge PRs with this title prefix
       allowed-branches: ["feature/*"]    # Optional: glob patterns for allowed source branch names
@@ -53,6 +54,8 @@ description: Safe-output reference for update, label, milestone, project, releas
   ```
 
   **⚠️ Experimental**: Compilation emits a warning when this feature is used. The merge is blocked unless all configured gates pass. Merges to the default branch are refused. Detection, protected-file, or other caution notices in the live PR or review bodies, and current detection warnings or failures, block the merge even when approvals and checks pass; these require independent manual review and merge. Any latest `CHANGES_REQUESTED` review blocks; without `required-approvers`, no affirmative human approval is required. PR authors, bots, and the merge identity cannot approve. `required-checks` must not name this workflow's own `create-check-run` check. Labels, titles, and branches are filters, not authorization; keep approver credentials and CI definitions outside the agent's control. See [merge-pull-request](https://github.github.com/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request).
+
+  `allowed-base-branches` must be a non-empty static scoped list using only `*` and `**` glob operators. Expressions and unsupported operators are rejected, as are entries made only of `*` and `/`, such as `"*"` or `"**/*"`. It restricts destinations independently of the source filter `allowed-branches`, including final revalidation and staged previews. The owner is responsible for assessing downstream effects and protecting this declaration from agent edits; matching a pattern does not prove those effects harmless. Existing workflows must add the declaration and recompile.
 
 - `close-pull-request:` - Safe pull request closing with filtering
 

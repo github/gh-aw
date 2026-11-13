@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/jsonutil"
@@ -616,6 +617,22 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 
 	// comment-memory belongs under tools: next to cache-memory and repo-memory.
 	workflowData.CommentMemoryConfig = c.extractCommentMemoryConfig(toolsConfig)
+	if workflowData.LedgerConfig.hasCommentStorage() {
+		if workflowData.CommentMemoryConfig == nil {
+			return errors.New("tools.ledger storage: comment-memory requires tools.comment-memory")
+		}
+		target := workflowData.CommentMemoryConfig.Target
+		if target != "" && target != "triggering" && target != "*" {
+			number, err := strconv.Atoi(target)
+			if err != nil || number <= 0 {
+				return fmt.Errorf("tools.comment-memory.target value %q is not supported for comment-backed ledgers. Expected triggering, '*', or a literal positive issue/PR number. Example:\ntools:\n  comment-memory:\n    target: 42", target)
+			}
+			workflowData.CommentMemoryConfig.Target = strconv.Itoa(number)
+		}
+		if strings.Contains(workflowData.CommentMemoryConfig.TargetRepoSlug, "${{") {
+			return fmt.Errorf("tools.comment-memory.target-repo value %q uses an expression. Expected a literal owner/repo for comment-backed ledgers. Example:\ntools:\n  comment-memory:\n    target-repo: github/gh-aw", workflowData.CommentMemoryConfig.TargetRepoSlug)
+		}
+	}
 
 	// Extract mcp-scripts configuration
 	workflowData.MCPScripts = c.extractMCPScriptsConfig(frontmatter)

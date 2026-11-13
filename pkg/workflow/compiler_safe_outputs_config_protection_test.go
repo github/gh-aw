@@ -32,6 +32,7 @@ safe-outputs:
     protected-files:
       exclude: [AGENTS.md, /pyproject.toml]
   merge-pull-request:
+    allowed-base-branches: [agent-work/*]
     protected-files:
       exclude: [AGENTS.md, /pyproject.toml]
   approve-workflow-run:

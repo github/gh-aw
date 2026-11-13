@@ -34,6 +34,7 @@
 
 const { iterateJsonl, JsonlParser } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 const fs = require("fs");
 const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
 const path = require("node:path");
@@ -1260,6 +1261,7 @@ async function main() {
       }
 
       const isRateLimit = isRateLimitError(result.output);
+      const isCybersecurityPolicyRejection = isGitHubProviderCybersecurityPolicyRejection(result.output, process.env.GH_AW_LLM_PROVIDER, "codex");
       const isTokenPerMinuteRateLimit = isTokenPerMinuteRateLimitError(result.output);
       const isAuthenticationFailed = isAuthenticationFailedError(result.output);
       const isMissingApiKey = isMissingApiKeyError(result.output);
@@ -1271,6 +1273,7 @@ async function main() {
       const permissionDeniedCount = countPermissionDeniedIssues(result.output);
       const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
       result.failureClasses = Object.entries({
+        content_filter: isCybersecurityPolicyRejection,
         rate_limit_error: isRateLimit,
         token_per_minute_rate_limit: isTokenPerMinuteRateLimit,
         authentication_failed: isAuthenticationFailed,
@@ -1289,6 +1292,7 @@ async function main() {
           ` watchdogFired=${result.watchdogFired}` +
           ` runtimeGuardFired=${result.runtimeGuardFired}` +
           ` isRateLimitError=${isRateLimit}` +
+          ` isCybersecurityPolicyRejection=${isCybersecurityPolicyRejection}` +
           ` isTokenPerMinuteRateLimitError=${isTokenPerMinuteRateLimit}` +
           ` isAuthenticationFailedError=${isAuthenticationFailed}` +
           ` isMissingApiKeyError=${isMissingApiKey}` +
@@ -1301,6 +1305,11 @@ async function main() {
           ` hasOutput=${result.hasOutput}` +
           ` retriesRemaining=${MAX_RETRIES - attempt}`
       );
+
+      if (isCybersecurityPolicyRejection) {
+        log(`attempt ${attempt + 1}: GitHub provider blocked the request for cybersecurity policy — not retrying; task completion could not be confirmed`);
+        return { action: "stop" };
+      }
 
       if (shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeOutputs, log })) {
         return { action: "stop", exitCode: 0 };

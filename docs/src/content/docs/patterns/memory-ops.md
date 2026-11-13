@@ -183,6 +183,10 @@ tools:
 
 Use a stable `memory-id`: runs update the state file at `/tmp/gh-aw/comment-memory/<memory-id>.md`, and changing the ID writes to a different file.
 
+The managed comment includes a collapsible **History** section linking to each workflow run that wrote the memory. Updates and clears preserve these links and deduplicate repeated run URLs, even when the generated footer is disabled. History stays outside the editable memory file.
+
+Older comments seed history from their most recent recorded attribution; earlier writers cannot be recovered. If the saved memory and accumulated history exceed the comment size limit, the update fails without changing the existing comment or dropping history. Reduce the saved memory size or use a new `memory-id`.
+
 ## Best Practices
 
 - Use JSON Lines for append-only logs and time-series data.

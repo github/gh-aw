@@ -120,6 +120,8 @@ describe("setup_comment_memory_files", () => {
     expect(listComments).not.toHaveBeenCalled();
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("E004"));
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("No allowlist is configured"));
+    const prompt = fs.readFileSync(PROMPT_PATH, "utf8");
+    expect(prompt).toContain("none yet; create new *.md files here when needed");
   });
 
   it("rejects cross-repo comment-memory setup when target repo is not in allowlist", async () => {
