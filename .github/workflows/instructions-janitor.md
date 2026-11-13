@@ -26,7 +26,7 @@ safe-outputs:
     - instructions
     protected-files: allowed
     title-prefix: "[instructions] "
-description: Reviews and cleans up instruction files to ensure clarity, low duplication, and sub-400-line files for agentic consumption
+description: Packs instruction execution contracts into the first 7500 UTF-8 bytes, removes duplication, and keeps topic files focused
 emoji: 🧹
 engine:
   id: claude
@@ -41,6 +41,8 @@ tools:
   bash:
   - cat .github/aw/*.md
   - wc -l .github/aw/*.md
+  - wc -c .github/aw/*.md
+  - "python3 scripts/check-instruction-prefixes.py *"
   - "git log --since=\"*\" --pretty=format:\"%h %s\" -- docs/ .github/aw/"
   - "git log --since=\"*\" --name-only --pretty=format:\"%h %s\" -- docs/ .github/aw/"
   - "git diff *..HEAD -- docs/ .github/aw/"
@@ -58,11 +60,19 @@ evals:
     question: For a proposed instruction-cleanup PR, do the resulting edited instruction files meet their applicable file-layout line targets? Return UNKNOWN when no PR is proposed.
   - id: duplication-consolidated
     question: When a patch addresses duplicated guidance, does it replace repeated rules with references to a single focused canonical location? Return UNKNOWN when no duplication cleanup is proposed.
+  - id: prefix-contract-preserved
+    question: For edited instructions, are objective, mandatory constraints, task routes, verification and stop conditions actionable within the first 7500 UTF-8 bytes, with preserved semantics and early links to required detail? Return UNKNOWN when no edits are proposed.
 ---
 
 # Instructions Janitor
 
-Keep instruction files in `.github/aw/` synchronized with the product, compact enough for agentic loading, and free of avoidable duplication.
+Keep `.github/aw/` accurate, truncation-safe and free of duplicate guidance.
+Copilot CLI prompt-file queries may expose only the first **8,000 UTF-8 bytes**.
+Within **7,500 bytes including frontmatter**, pack objective, mandatory rules,
+task-to-reference routes, verification/output contract and failure/stop conditions.
+Use short grammatical imperatives and exact identifiers; preserve safety,
+exceptions and behavior. Put examples and inventories after the contract.
+Never equate fewer bytes or passing compilation with preserved comprehension.
 
 ## File Layout Goals
 
@@ -113,17 +123,27 @@ Use small, topic-focused files.
 - inspect individual commits only when the diff alone is insufficient; cap detail inspection at **5 commits maximum**
 - inspect changed code when instruction accuracy depends on implementation details
 
-### 2. Size audit
+### 2. Byte-budget and size audit
 
 Run:
 
 ```bash
 wc -l .github/aw/*.md
+wc -c .github/aw/*.md
+python3 scripts/check-instruction-prefixes.py .github/aw/*.md
 ```
 
 Rules:
 
-- any file over `400` lines must be split or rewritten before the task is considered complete
+- Prefer complete files under 7,500 bytes. Longer references need a self-contained
+  contract ending with `<!-- instruction-prefix-end -->` by byte 7,500;
+  required detail must have a conditional loading link before that marker.
+- Read each changed file's exact first 8,000 bytes separately. Check whether an
+  agent can choose the task route, obey constraints, verify output and stop
+  safely without an undiscoverable tail. Repair missing rules, not just length.
+- The script checks structure/bytes, not semantic completeness. A nonzero exit
+  identifies violations to repair; report unreadable files as audit blockers.
+- Any file over `400` lines must also be split or rewritten before completion.
 - if a file is close to the limit, prefer extracting a dedicated sub-file before adding more content
 - keep index files short and route detail to sub-files
 
@@ -163,6 +183,8 @@ Update the instruction files if behavior changed even when docs commits did not 
 - keep examples representative and minimal
 - do not duplicate the same concept across multiple files
 - prefer references to detailed sub-files instead of restating them
+- Put safety and completion rules before persona tables, examples and catalogs.
+- Avoid cryptic shorthand, lost negation, undefined terms or weakened exceptions.
 
 ## PR Expectations
 
@@ -176,13 +198,15 @@ Include:
 
 - files changed
 - documentation commits reviewed
-- before/after line counts for modified instruction files
+- before/after UTF-8 byte and line counts, contract-end byte, and rules/routes
+  recovered within the 8,000-byte prefix
 - confirmation that duplicated content was removed or reduced
 - confirmation that every edited `.github/aw/*.md` file is under the target limit or explain the exception
 
 ## Edge Cases
 
-- if the Release/Change audit finds no relevant docs or `.github/aw/` changes **and** the Size audit confirms all files are under their limits, exit immediately without running the Duplication or Accuracy audits
+- If release/change evidence is empty and byte, semantic-prefix and line audits
+  all pass, exit before duplication/accuracy audits.
 - if no documentation changed, still run the size, duplication, and safe-output accuracy audits
 - if instructions are already current, exit without edits
 - if a file needs more than one new topic section to stay compact, create more than one focused sub-file instead of keeping one large catch-all file

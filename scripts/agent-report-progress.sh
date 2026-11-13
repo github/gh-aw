@@ -150,6 +150,7 @@ done
 echo "Validating ${#CHANGED_FILES[@]} changed file(s) relative to $BASE_REF..."
 
 CHECK_STALE_LOCK_BASE_REF="$BASE_REF" make --no-print-directory check-stale-lock-files
+make --no-print-directory check-instruction-prefixes
 
 bash "$(dirname "${BASH_SOURCE[0]}")/format-changed.sh" "${CHANGED_FILES[@]}"
 

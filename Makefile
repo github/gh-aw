@@ -565,6 +565,7 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	bash scripts/check-stale-lock-files_test.sh
 	$(MAKE) --no-print-directory test-agent-dev-loop
 	bash scripts/check-skill-file-paths_test.sh
+	python3 -m unittest discover -s scripts -p 'test_check_instruction_prefixes.py'
 	bash scripts/check-safe-outputs-conformance_test.sh
 	bash scripts/resolve-base-commit_test.sh
 	bash scripts/pr-data-prefetch_test.sh
@@ -1037,6 +1038,10 @@ check-stale-lock-files:
 check-skill-file-paths:
 	@bash scripts/check-skill-file-paths.sh
 
+.PHONY: check-instruction-prefixes
+check-instruction-prefixes:
+	@python3 scripts/check-instruction-prefixes.py
+
 # Check for drift between workflow markdown sources and generated lock files.
 # Compiles all .github/workflows/*.md files and fails if any .lock.yml would
 # change, reminding contributors to run 'make recompile' before committing.
@@ -1229,7 +1234,7 @@ shellcheck-setup-sh:
 
 # Validate all project files
 .PHONY: lint
-lint: check-stale-lock-files check-skill-file-paths fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh shellcheck-setup-sh check-stale-schema-binary check-otel-attributes
+lint: check-stale-lock-files check-skill-file-paths check-instruction-prefixes fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh shellcheck-setup-sh check-stale-schema-binary check-otel-attributes
 	@echo "✓ All validations passed"
 
 # Install the binary locally
@@ -1584,6 +1589,7 @@ help:
 	@echo "  check-workflow-drift - Check for drift between .md sources and .lock.yml files (builds binary if missing)"
 	@echo "  check-stale-lock-files - Fast guard: detect modified .md files without regenerated .lock.yml (no binary needed)"
 	@echo "  check-skill-file-paths - Guard: reject invalid backticked repo paths in .github/skills/**/SKILL.md"
+	@echo "  check-instruction-prefixes - Guard: keep instruction execution contracts within 7500 UTF-8 bytes"
 	@echo "  check-stale-schema-binary - Guard: detect modified schema files under pkg/parser/schemas/ without a binary rebuild"
 	@echo "  install          - Install binary locally"
 	@echo "  sync-action-pins - Sync actions-lock.json from .github/aw to pkg/actionpins/data and pkg/workflow/data (runs automatically during build)"
