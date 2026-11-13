@@ -91,6 +91,7 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddStringSlice("_protected_files_exclude", defaultProtectedFilesExclude(c.ProtectedFilesExclude)).
 			AddStringSlice("required_checks", c.RequiredChecks).
 			AddStringSlice("required_approvers", c.RequiredApprovers).
+			AddStringSlice("allowed_base_branches", c.AllowedBaseBranches).
 			AddStringSlice("required_labels", c.RequiredLabels).AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).AddStringSlice("allowed_branches", c.AllowedBranches).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).

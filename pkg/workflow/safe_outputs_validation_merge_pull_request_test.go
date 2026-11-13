@@ -3,6 +3,10 @@
 package workflow
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +23,8 @@ func TestValidateSafeOutputsMergePullRequestLabelValidation(t *testing.T) {
 			name: "empty required-labels entry fails",
 			config: &SafeOutputsConfig{
 				MergePullRequest: &MergePullRequestConfig{
-					RequiredLabels: []string{"safe-to-merge", "   "},
+					AllowedBaseBranches: []string{"agent-work/*"},
+					RequiredLabels:      []string{"safe-to-merge", "   "},
 				},
 			},
 			wantErr: "safe-outputs.merge-pull-request.required-labels[1] cannot be empty",
@@ -28,7 +33,8 @@ func TestValidateSafeOutputsMergePullRequestLabelValidation(t *testing.T) {
 			name: "non-empty labels pass",
 			config: &SafeOutputsConfig{
 				MergePullRequest: &MergePullRequestConfig{
-					RequiredLabels: []string{"safe-to-merge", "automerge"},
+					AllowedBaseBranches: []string{"agent-work/*"},
+					RequiredLabels:      []string{"safe-to-merge", "automerge"},
 				},
 			},
 			wantErr: "",
@@ -59,7 +65,8 @@ func TestValidateSafeOutputsMergePullRequestAllowedBranchesValidation(t *testing
 			name: "invalid pattern at index 0 fails",
 			config: &SafeOutputsConfig{
 				MergePullRequest: &MergePullRequestConfig{
-					AllowedBranches: []string{"feature branch"},
+					AllowedBaseBranches: []string{"agent-work/*"},
+					AllowedBranches:     []string{"feature branch"},
 				},
 			},
 			wantErr: `invalid glob pattern "feature branch" in safe-outputs.merge-pull-request.allowed-branches[0]`,
@@ -68,7 +75,8 @@ func TestValidateSafeOutputsMergePullRequestAllowedBranchesValidation(t *testing
 			name: "invalid pattern at index 1 reports index 1",
 			config: &SafeOutputsConfig{
 				MergePullRequest: &MergePullRequestConfig{
-					AllowedBranches: []string{"main", "feature branch"},
+					AllowedBaseBranches: []string{"agent-work/*"},
+					AllowedBranches:     []string{"main", "feature branch"},
 				},
 			},
 			wantErr: `invalid glob pattern "feature branch" in safe-outputs.merge-pull-request.allowed-branches[1]`,
@@ -77,7 +85,8 @@ func TestValidateSafeOutputsMergePullRequestAllowedBranchesValidation(t *testing
 			name: "valid patterns pass",
 			config: &SafeOutputsConfig{
 				MergePullRequest: &MergePullRequestConfig{
-					AllowedBranches: []string{"main", "feature/*"},
+					AllowedBaseBranches: []string{"agent-work/*"},
+					AllowedBranches:     []string{"main", "feature/*"},
 				},
 			},
 			wantErr: "",
@@ -103,14 +112,16 @@ func TestMergePullRequestExplicitPolicies(t *testing.T) {
 	compiler := NewCompiler()
 	cfg := compiler.parseMergePullRequestConfig(map[string]any{
 		"merge-pull-request": map[string]any{
-			"required-checks":     []any{"ci/test", "ci/lint"},
-			"required-approvers":  []any{"maintainer"},
-			"required-check-apps": map[string]any{"ci/test": 123},
+			"allowed-base-branches": []any{"agent-work/*"},
+			"required-checks":       []any{"ci/test", "ci/lint"},
+			"required-approvers":    []any{"maintainer"},
+			"required-check-apps":   map[string]any{"ci/test": 123},
 		},
 	})
 	require.NotNil(t, cfg)
 	assert.Equal(t, []string{"ci/test", "ci/lint"}, cfg.RequiredChecks)
 	assert.Equal(t, []string{"maintainer"}, cfg.RequiredApprovers)
+	assert.Equal(t, []string{"agent-work/*"}, cfg.AllowedBaseBranches)
 	assert.Equal(t, map[string]int64{"ci/test": 123}, cfg.RequiredCheckApps)
 	config := &SafeOutputsConfig{MergePullRequest: cfg}
 	require.NoError(t, validateSafeOutputsMergePullRequest(config))
@@ -118,6 +129,7 @@ func TestMergePullRequestExplicitPolicies(t *testing.T) {
 	handler := pullRequestHandlerRegistry["merge_pull_request"](config)
 	assert.Equal(t, []string{"ci/test", "ci/lint"}, handler["required_checks"])
 	assert.Equal(t, []string{"maintainer"}, handler["required_approvers"])
+	assert.Equal(t, []string{"agent-work/*"}, handler["allowed_base_branches"])
 	assert.Equal(t, map[string]int64{"ci/test": 123}, handler["required_check_apps"])
 	checkPermission, ok := ComputePermissionsForSafeOutputs(config).Get(PermissionChecks)
 	require.True(t, ok)
@@ -126,7 +138,7 @@ func TestMergePullRequestExplicitPolicies(t *testing.T) {
 	for _, field := range []string{"required-checks", "required-approvers"} {
 		t.Run(field, func(t *testing.T) {
 			invalid := compiler.parseMergePullRequestConfig(map[string]any{
-				"merge-pull-request": map[string]any{field: []any{"   "}},
+				"merge-pull-request": map[string]any{"allowed-base-branches": []any{"agent-work/*"}, field: []any{"   "}},
 			})
 			err := validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: invalid}, "Test Workflow")
 			require.ErrorContains(t, err, field+"[0] cannot be empty")
@@ -152,6 +164,12 @@ func TestMergePullRequestProtectedFiles(t *testing.T) {
 		{"object expression", map[string]any{"protected-files": map[string]any{"policy": "${{ inputs.policy }}"}}, "${{ inputs.policy }}"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			configMap, ok := tc.config.(map[string]any)
+			if !ok {
+				configMap = map[string]any{}
+			}
+			configMap["allowed-base-branches"] = []any{"agent-work/*"}
+			tc.config = configMap
 			cfg := NewCompiler().parseMergePullRequestConfig(map[string]any{"merge-pull-request": tc.config})
 			require.NotNil(t, cfg)
 			config := &SafeOutputsConfig{MergePullRequest: cfg}
@@ -172,7 +190,7 @@ func TestMergePullRequestProtectedFiles(t *testing.T) {
 			}
 		})
 	}
-	cfg := &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{ProtectedFilesPolicy: "request-review"}}
+	cfg := &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{AllowedBaseBranches: []string{"agent-work/*"}, ProtectedFilesPolicy: "request-review"}}
 	require.ErrorContains(t, validateMergePullRequestPolicies(cfg, "Test"), "protected-files")
 }
 
@@ -189,7 +207,7 @@ func TestMergePullRequestCheckProducers(t *testing.T) {
 		{"unsafe app ID", map[string]int64{"ci": 9007199254740992}, "positive GitHub App ID"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{RequiredChecks: []string{"ci"}, RequiredCheckApps: tt.apps}}
+			config := &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{AllowedBaseBranches: []string{"agent-work/*"}, RequiredChecks: []string{"ci"}, RequiredCheckApps: tt.apps}}
 			err := validateMergePullRequestPolicies(config, "Test Workflow")
 			if tt.wantErr == "" {
 				require.NoError(t, err)
@@ -204,8 +222,9 @@ func TestMergePullRequestCheckAppParsing(t *testing.T) {
 	for _, value := range []any{123, int64(9007199254740991), uint64(9007199254740991), float64(9007199254740991), 1.5, "123", uint64(9007199254740992)} {
 		cfg := NewCompiler().parseMergePullRequestConfig(map[string]any{
 			"merge-pull-request": map[string]any{
-				"required-checks":     []any{"ci"},
-				"required-check-apps": map[string]any{"ci": value},
+				"allowed-base-branches": []any{"agent-work/*"},
+				"required-checks":       []any{"ci"},
+				"required-check-apps":   map[string]any{"ci": value},
 			},
 		})
 		err := validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: cfg}, "Workflow")
@@ -241,15 +260,108 @@ func TestMergePullRequestRejectsAgentControlledChecks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := &SafeOutputsConfig{
-				MergePullRequest: &MergePullRequestConfig{RequiredChecks: []string{tt.requiredName}},
+				MergePullRequest: &MergePullRequestConfig{AllowedBaseBranches: []string{"agent-work/*"}, RequiredChecks: []string{tt.requiredName}},
 				CreateCheckRun:   &CreateCheckRunConfig{Name: tt.checkName},
 			}
+
 			err := validateMergePullRequestPolicies(config, tt.workflowName)
 			if tt.wantErr {
 				require.ErrorContains(t, err, "agent-controlled create-check-run name")
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestMergePullRequestAllowedBaseBranches(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		patterns []string
+		wantErr  string
+	}{
+		{"omitted", nil, "is required"},
+		{"empty", []string{}, "is required"},
+		{"blank", []string{" "}, "invalid glob pattern"},
+		{"wildcard", []string{"*"}, "unrestricted wildcard"},
+		{"globstar", []string{"**"}, "unrestricted wildcard"},
+		{"slash wildcard", []string{"*/*"}, "unrestricted wildcard"},
+		{"slash globstar prefix", []string{"**/*"}, "unrestricted wildcard"},
+		{"slash globstar suffix", []string{"*/**"}, "unrestricted wildcard"},
+		{"slash globstar", []string{"**/**"}, "unrestricted wildcard"},
+		{"mixed wildcard", []string{"agent-work/*", "*"}, "allowed-base-branches[1]"},
+		{"invalid ref", []string{"agent work/*"}, "invalid glob pattern"},
+		{"expression", []string{"${{ inputs.base }}"}, "static branch pattern"},
+		{"compact expression", []string{"${{inputs.base}}"}, "static branch pattern"},
+		{"embedded expression", []string{"agent-work/${{inputs.base}}"}, "static branch pattern"},
+		{"negation", []string{"agent-work/**", "!agent-work/prod"}, "allowed-base-branches[1]"},
+		{"character class", []string{"agent-work/[ab]"}, "static branch pattern"},
+		{"optional character", []string{"agent-work/next?"}, "static branch pattern"},
+		{"repetition", []string{"agent-work/next+"}, "static branch pattern"},
+		{"brace expansion", []string{"agent-work/{next,prod}"}, "static branch pattern"},
+		{"extglob", []string{"agent-work/@(next|prod)"}, "static branch pattern"},
+		{"escape", []string{`agent-work/\*`}, "static branch pattern"},
+		{"scoped", []string{"integration", "agent-work/*"}, ""},
+		{"nested scope", []string{"agent-work/**"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateMergePullRequestPolicies(&SafeOutputsConfig{
+				MergePullRequest: &MergePullRequestConfig{AllowedBaseBranches: tc.patterns},
+			}, "Test")
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+				require.ErrorContains(t, err, "allowed-base-branches")
+			}
+		})
+	}
+	cfg := NewCompiler().parseMergePullRequestConfig(map[string]any{"merge-pull-request": nil})
+	require.ErrorContains(t, validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: cfg}, "Test"), "allowed-base-branches is required")
+}
+
+func TestMergePullRequestAllowedBaseBranchesCompilation(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		patterns any
+		valid    bool
+	}{
+		{"scoped", []string{"integration", "agent-work/*", "agent-work/**"}, true},
+		{"expression string", "${{inputs.base}}", false},
+		{"expression entry", []string{"${{inputs.base}}"}, false},
+		{"embedded expression", []string{"agent-work/${{inputs.base}}"}, false},
+		{"negation", []string{"agent-work/**", "!agent-work/prod"}, false},
+		{"character class", []string{"agent-work/[ab]"}, false},
+		{"unrestricted", []string{"**/**"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			patterns, err := json.Marshal(tc.patterns)
+			require.NoError(t, err)
+			path := filepath.Join(t.TempDir(), "merge-policy.md")
+			content := fmt.Sprintf(`---
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  merge-pull-request:
+    allowed-base-branches: %s
+---
+# Merge policy
+Evaluate the pull request.
+`, patterns)
+			require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+			compiler := NewCompiler()
+			compiler.SetStrictMode(false)
+			err = compiler.CompileWorkflow(path)
+			if !tc.valid {
+				require.ErrorContains(t, err, "allowed-base-branches")
+				_, err = os.Stat(filepath.Join(filepath.Dir(path), "merge-policy.lock.yml"))
+				require.True(t, os.IsNotExist(err), "invalid policy must not produce an executable workflow")
+				return
+			}
+			require.NoError(t, err)
+			compiled, err := os.ReadFile(filepath.Join(filepath.Dir(path), "merge-policy.lock.yml"))
+			require.NoError(t, err)
+			assert.Contains(t, string(compiled), `\"allowed_base_branches\":[\"integration\",\"agent-work/*\",\"agent-work/**\"]`)
 		})
 	}
 }

@@ -1,5 +1,7 @@
 // @ts-check
 
+// @safe-outputs-exempt USE-001 — errors use ConnectorError/ConnectorHTTPError classes, and this runtime ships standalone to connector development tooling without error_codes.cjs.
+
 // Compiler-owned snapshots grant authority. The digest detects corruption, not
 // authorship; callers must never accept a snapshot from tool arguments.
 const { createHash, createHmac, timingSafeEqual } = require("node:crypto");

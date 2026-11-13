@@ -116,7 +116,7 @@ async function main(config = {}) {
    * @param {Object} resolvedTemporaryIds - Map of temporary IDs
    * @returns {Promise<Object>} Result with success status
    */
-  return async function handleSubmitPRReview(message, resolvedTemporaryIds) {
+  async function handleSubmitPRReview(message, resolvedTemporaryIds) {
     if (processedCount >= maxCount) {
       core.warning(`Skipping submit_pull_request_review: max count of ${maxCount} reached`);
       return {
@@ -163,7 +163,14 @@ async function main(config = {}) {
       return await handleWithRegistry(message, event, body);
     }
     return await handleWithLegacyBuffer(message, event, body);
+  }
+
+  handleSubmitPRReview.getReviewTarget = message => {
+    const target = resolveTarget({ targetConfig, item: message, context, itemType: "PR review", supportsPR: false, supportsIssue: false });
+    const repository = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "PR review");
+    return target.success && target.number && repository.success ? { repo: repository.repo, pull_request_number: target.number } : null;
   };
+  return handleSubmitPRReview;
 
   /**
    * Registry path: resolve target PR first, then obtain a per-PR buffer and store metadata.

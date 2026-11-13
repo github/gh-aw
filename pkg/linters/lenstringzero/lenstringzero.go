@@ -98,7 +98,7 @@ func matchLenLiteralExpr(pass *analysis.Pass, expr *ast.BinaryExpr, aliases map[
 	op := expr.Op
 
 	// Normal order: len/alias on the left, literal on the right.
-	if isLenCall(expr.X) {
+	if isLenCall(pass, expr.X) {
 		if isIntZero(expr.Y) {
 			return lenCallArg(expr.X), expr.X, true, op, 0, true
 		}
@@ -119,7 +119,7 @@ func matchLenLiteralExpr(pass *analysis.Pass, expr *ast.BinaryExpr, aliases map[
 
 	// Yoda order: literal on the left, len/alias on the right.
 	// Flip the operator so the normalized form has len on the left.
-	if isLenCall(expr.Y) {
+	if isLenCall(pass, expr.Y) {
 		if isIntZero(expr.X) {
 			return lenCallArg(expr.Y), expr.Y, true, astutil.FlipComparisonOp(op), 0, true
 		}
@@ -218,13 +218,16 @@ func exprTextOr(pass *analysis.Pass, node ast.Expr, fallback string) string {
 	return fallback
 }
 
-func isLenCall(expr ast.Expr) bool {
+// isLenCall reports whether expr is a call to the builtin len function. A
+// user-defined or shadowed "len" is ignored so its result is never rewritten
+// as a string comparison.
+func isLenCall(pass *analysis.Pass, expr ast.Expr) bool {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok || len(call.Args) != 1 {
 		return false
 	}
 	ident, ok := call.Fun.(*ast.Ident)
-	return ok && ident.Name == "len"
+	return ok && ident.Name == "len" && pass.TypesInfo.ObjectOf(ident) == types.Universe.Lookup("len")
 }
 
 func lenCallArg(expr ast.Expr) ast.Expr {
@@ -347,7 +350,7 @@ func lenAliasArg(pass *analysis.Pass, expr ast.Expr, aliases map[types.Object]as
 }
 
 func lenStringArg(pass *analysis.Pass, expr ast.Expr) (ast.Expr, bool) {
-	if !isLenCall(expr) {
+	if !isLenCall(pass, expr) {
 		return nil, false
 	}
 	arg := lenCallArg(expr)

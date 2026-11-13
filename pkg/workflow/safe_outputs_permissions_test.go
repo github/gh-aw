@@ -635,7 +635,7 @@ func TestCompileMergePullRequestCheckPermissions(t *testing.T) {
 					handlerApp = "    " + appConfig
 				}
 				content := "---\non: issues\nengine: copilot\nsafe-outputs:\n" +
-					globalApp + "  merge-pull-request:\n    max: 1\n" + checks + handlerApp + "---\n\nTest workflow.\n"
+					globalApp + "  merge-pull-request:\n    allowed-base-branches: [agent-work/*]\n    max: 1\n" + checks + handlerApp + "---\n\nTest workflow.\n"
 				testFile := filepath.Join(t.TempDir(), "merge-permissions.md")
 				require.NoError(t, os.WriteFile(testFile, []byte(content), 0600))
 				compiler := NewCompiler(WithVersion("1.0.0"))

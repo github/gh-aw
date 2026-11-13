@@ -1,6 +1,8 @@
 // @ts-check
 "use strict";
 
+// @safe-outputs-exempt USE-001 — thrown values are stable work_queue_* reason tokens matched by the work-queue reconciler, not user-facing messages.
+
 const { canonicalBytes, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { normalizeAssignment, normalizeClaimScope, claimIdentity } = require("./work_queue_claim_scope.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");

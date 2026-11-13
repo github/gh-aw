@@ -5767,9 +5767,8 @@ tools:
     # (optional)
     format-json: true
 
-    # Experimental. Enable the repo-memory ledger projection, optionally validated
-    # against a repository-relative JSON schema. Ledger workflows require AWF Cloud
-    # Hypervisor filesystem isolation. Using this field emits a compile-time warning.
+    # Enable the ledger projection, optionally validated against a repository-relative
+    # JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation.
     # (optional)
     ledger: null
 
@@ -16990,14 +16989,19 @@ safe-outputs:
   # approvals and checks pass. Independent manual review and manual merge are
   # required in these cases.
   # (optional)
-  # Accepted formats:
-
-  # Format 1: Enable pull request merge with default policy configuration
-  merge-pull-request: null
-
-  # Format 2: Experimental configuration for controlled pull request merges. The
-  # merge is blocked unless all configured gates pass.
+  # Experimental configuration for controlled pull request merges. The merge is
+  # blocked unless all configured gates pass.
+  # (optional)
   merge-pull-request:
+    # Required static scoped patterns for destination (base) branches declared by the
+    # owner as non-consequential automated integration targets. Only * and ** glob
+    # operators are supported; expressions, negation, character classes, braces,
+    # extglobs, and escapes are forbidden. Patterns consisting only of * and /, such
+    # as *, **, */*, and **/*, are forbidden. Default and protected branches remain
+    # blocked. This declaration is not proof of harmless downstream effects.
+    allowed-base-branches: []
+      # Array of strings
+
     # Block merges modifying protected files by default, using create-pull-request's
     # protected set and exclusions. allowed explicitly disables this file gate, not
     # other merge gates. Creation-specific request-review and fallback-to-issue

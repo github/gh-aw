@@ -753,43 +753,63 @@ func TestCodexModelFlagPositionAfterExec(t *testing.T) {
 	}
 }
 
+type testExpressionValue struct {
+	value     string
+	isBoolean bool
+}
+
+func (v testExpressionValue) isTruthy() bool {
+	if v.isBoolean {
+		return v.value == "true"
+	}
+	return v.value != ""
+}
+
 // evaluateTestExpression evaluates the subset of Actions expressions the model
 // routing guards use: string literals, context references, groups, ==, !=, &&, ||.
-func evaluateTestExpression(t *testing.T, expr *actionslanguageservice.Expression, contexts map[string]string) string {
+func evaluateTestExpression(t *testing.T, expr *actionslanguageservice.Expression, contexts map[string]string) testExpressionValue {
 	t.Helper()
 	switch expr.Kind {
 	case "literal":
 		value, _ := expr.Token.Value.(string)
-		return value
+		return testExpressionValue{value: value}
 	case "group":
 		return evaluateTestExpression(t, expr.Child(0), contexts)
 	case "context", "index":
 		path, ok := actionslanguageservice.Reference(expr)
 		require.True(t, ok, "unsupported reference")
-		return contexts[strings.Join(path, ".")]
+		return testExpressionValue{value: contexts[strings.Join(path, ".")]}
 	case "binary":
 		left := evaluateTestExpression(t, expr.Child(0), contexts)
 		right := evaluateTestExpression(t, expr.Child(1), contexts)
-		equal := strings.EqualFold(left, right)
+		equal := strings.EqualFold(left.value, right.value)
 		if expr.Token.Kind == "!=" {
 			equal = !equal
 		}
+		value := "false"
 		if equal {
-			return "true"
+			value = "true"
 		}
-		return ""
+		return testExpressionValue{value: value, isBoolean: true}
 	case "logical":
-		var value string
+		var value testExpressionValue
 		for _, child := range expr.Children {
 			value = evaluateTestExpression(t, child, contexts)
-			if (expr.Token.Kind == "&&") == (value == "") {
+			if (expr.Token.Kind == "&&") == !value.isTruthy() {
 				return value
 			}
 		}
 		return value
 	}
 	t.Fatalf("unsupported expression kind %q", expr.Kind)
-	return ""
+	return testExpressionValue{}
+}
+
+func evaluateTestCondition(t *testing.T, expr string, contexts map[string]string) bool {
+	t.Helper()
+	parsed, err := actionslanguageservice.ParseSyntax(expr)
+	require.NoError(t, err)
+	return evaluateTestExpression(t, parsed, contexts).isTruthy()
 }
 
 // evaluateTestTemplate substitutes every ${{ }} interpolation in value.
@@ -804,7 +824,7 @@ func evaluateTestTemplate(t *testing.T, value string, contexts map[string]string
 		require.Positive(t, end)
 		expr, err := actionslanguageservice.ParseSyntax(strings.TrimSpace(value[start+3 : start+end]))
 		require.NoError(t, err)
-		value = value[:start] + evaluateTestExpression(t, expr, contexts) + value[start+end+2:]
+		value = value[:start] + evaluateTestExpression(t, expr, contexts).value + value[start+end+2:]
 	}
 }
 
@@ -879,13 +899,26 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 			}
 			dir := t.TempDir()
 			outputFile := filepath.Join(dir, "output")
+			runnerTemp := filepath.Join(dir, "runner")
+			actionsDir := filepath.Join(runnerTemp, "gh-aw", "actions")
+			require.NoError(t, os.MkdirAll(actionsDir, 0o755))
+			routingScript, err := os.ReadFile("../../actions/setup/sh/resolve_model_routing.sh")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "resolve_model_routing.sh"), routingScript, 0o755))
 			cmd := exec.Command("bash", "-e", "-c", decision.Run)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile}
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile, "RUNNER_TEMP=" + runnerTemp}
 			for key, value := range decision.Env {
 				cmd.Env = append(cmd.Env, key+"="+evaluateTestTemplate(t, value, vars))
 			}
 			out, err := cmd.CombinedOutput()
 			require.NoError(t, err, string(out))
+			wantDiagnostic := "Model routing enabled: goal cost, mode auto"
+			if tc.agentVar != "" {
+				wantDiagnostic = "Model routing disabled: vars." + constants.EnvVarModelAgentCopilot + " selects the model"
+			} else if tc.defaultVar != "" {
+				wantDiagnostic = "Model routing disabled: vars." + compilerenv.DefaultModelCopilot + " selects the model"
+			}
+			require.Contains(t, string(out), wantDiagnostic)
 			outputs, err := os.ReadFile(outputFile)
 			require.NoError(t, err)
 			decisionValue := strings.TrimPrefix(strings.TrimSpace(string(outputs)), modelRoutingDecisionOutput+"=")
@@ -898,13 +931,11 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 
 			downstream := map[string]string{"needs.activation.outputs." + modelRoutingDecisionOutput: decisionValue}
 			maps.Copy(downstream, vars)
-			require.Equal(t, tc.wantRouting, evaluateTestTemplate(t, "${{ "+conversation.If+" }}", downstream) != "", "conversation step runs only when routed")
+			require.Equal(t, tc.wantRouting, evaluateTestCondition(t, conversation.If, downstream), "conversation step runs only when routed")
 			require.Equal(t, tc.wantModel, evaluateTestTemplate(t, execution.Env["COPILOT_MODEL"], downstream))
 			routingFlag := evaluateTestTemplate(t, execution.Env["GH_AW_MODEL_ROUTING"], downstream)
 			require.Equal(t, tc.wantRouting, routingFlag == "1")
 
-			runnerTemp := filepath.Join(dir, "runner")
-			require.NoError(t, os.MkdirAll(filepath.Join(runnerTemp, "gh-aw"), 0o755))
 			cmd = exec.Command("bash", "-e", "-c", configScript)
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RUNNER_TEMP=" + runnerTemp, "GH_AW_MODEL_ROUTING=" + routingFlag, "GH_AW_MAX_AI_CREDITS=0"}
 			out, err = cmd.CombinedOutput()

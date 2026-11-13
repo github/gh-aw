@@ -147,6 +147,16 @@ on:
     types: [opened, edited, labeled]
 ```
 
+`types` also accepts `status_changed` for GitHub's preview issue-status activity:
+
+```yaml wrap
+on:
+  issues:
+    types: [status_changed]
+```
+
+Compilation accepts this activity type; event delivery depends on GitHub's availability of the preview.
+
 #### Issue Locking (`lock-for-agent:`)
 
 Prevent concurrent modifications to an issue during workflow execution by setting `lock-for-agent: true`:

@@ -30,6 +30,8 @@ func TestSafeOutputsSpecificationDocumentsMergePullRequest(t *testing.T) {
 		"spec should document the target-branch open-PR gate for merge_pull_request")
 	assert.Contains(t, section, "`required-labels`",
 		"spec should document required-labels configuration for merge_pull_request")
+	assert.Contains(t, section, "`allowed-base-branches`: REQUIRED",
+		"spec should require an explicit destination scope for merge_pull_request")
 	assert.Contains(t, section, "`contents: write`",
 		"spec should document contents: write permission for merge_pull_request")
 	assert.Contains(t, section, "`pull-requests: write`",

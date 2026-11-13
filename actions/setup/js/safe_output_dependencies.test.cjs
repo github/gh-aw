@@ -331,6 +331,26 @@ describe("safe-output runtime dependencies", () => {
     expect(buildSafeOutputOutcomes([record])[0].status).toBe("deferred");
   });
 
+  it("only provisionally accepts a valid buffered comment for its own review", () => {
+    const plan = buildSafeOutputDependencyPlan([message(1, undefined, "create_pull_request_review_comment"), message(2, id(1), "submit_pull_request_review")]);
+    const record = { messageIndex: 0, type: "create_pull_request_review_comment", success: true, result: { success: true, buffered: true, deferred_manifest: true } };
+    expect(checkSafeOutputDependencies(plan, 1, [record], true)).toEqual({ state: "waiting" });
+    expect(checkSafeOutputDependencies(plan, 1, [record], true, new Set([0]))).toEqual({ state: "ready" });
+    for (const change of [
+      { skipped: true },
+      { cancelled: true },
+      { staged: true },
+      { success: false },
+      { result: { ...record.result, staged: true } },
+      { result: { ...record.result, queued: true } },
+      { result: { ...record.result, error: "failed" } },
+    ]) {
+      expect(checkSafeOutputDependencies(plan, 1, [{ ...record, ...change }], true, new Set([0])).state).not.toBe("ready");
+    }
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
+    expect(checkSafeOutputDependencies(plan, 1, [record], true, new Set([0])).state).not.toBe("ready");
+  });
+
   it("fails a skipped review prerequisite immediately with its skip reason", () => {
     const plan = buildSafeOutputDependencyPlan([message(1), message(2, id(1))]);
     const record = { messageIndex: 0, success: true, skipped: true, skipReason: "PR is closed", result: { deferred_manifest: true } };
