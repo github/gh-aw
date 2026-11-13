@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestModelsReportPreservesDeprecatedJSONFields(t *testing.T) {
+func TestModelsReportOfflineCatalogIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	report := buildModelsReport(context.Background(), modelsReportOptions{logsDir: t.TempDir()})
@@ -30,7 +30,7 @@ func TestModelsReportPreservesDeprecatedJSONFields(t *testing.T) {
 	require.NoError(t, json.Unmarshal(parsed["observed"], &observed))
 	require.Len(t, observed, 1)
 	assert.JSONEq(t, "false", string(observed[0]["in_catalog"]))
-	assert.NotContains(t, console.RenderStructStdout(report.Observed), "Catalog")
+	assert.Contains(t, console.RenderStructStdout(report.Observed), "AWF Inventory")
 }
 
 func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
@@ -60,6 +60,7 @@ func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
 	require.NoError(t, os.WriteFile(summaryPath, summaryBytes, 0o644))
 
 	reflectPayload := map[string]any{
+		"models_fetch_complete": true,
 		"endpoints": []any{
 			map[string]any{
 				"provider": "copilot",
@@ -72,9 +73,12 @@ func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
 	require.NoError(t, os.WriteFile(reflectPath, reflectBytes, 0o644))
 
 	_, aliasMap := buildModelAliasRows()
-	rows, warnings := collectObservedModelRows(logsDir, aliasMap)
+	rows, catalogRows, catalogComplete, warnings := collectObservedModelRows(logsDir, aliasMap)
 	require.Empty(t, warnings)
 	require.NotEmpty(t, rows)
+	require.Len(t, catalogRows, 2)
+	require.NotNil(t, catalogComplete)
+	assert.True(t, *catalogComplete)
 
 	lookup := make(map[string]observedModelRow, len(rows))
 	for _, row := range rows {
@@ -86,12 +90,12 @@ func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
 	assert.Contains(t, sonnet.Sources, "summary")
 	assert.Contains(t, sonnet.Sources, "awf-reflect")
 	assert.GreaterOrEqual(t, sonnet.Occurrences, 8)
-	assert.False(t, sonnet.InCatalog, "deprecated membership must not imply catalog knowledge")
+	assert.True(t, sonnet.InCatalog)
 
 	gpt, ok := lookup["github-copilot/gpt-5.4"]
 	require.True(t, ok)
 	assert.Contains(t, gpt.Sources, "awf-reflect")
-	assert.False(t, gpt.InCatalog)
+	assert.True(t, gpt.InCatalog)
 }
 
 func TestInferAliasHints(t *testing.T) {
@@ -101,6 +105,21 @@ func TestInferAliasHints(t *testing.T) {
 	hints := inferAliasHints("github-copilot", "claude-sonnet-4.6", aliasMap)
 	assert.NotEmpty(t, hints)
 	assert.Contains(t, hints, "sonnet")
+}
+
+func TestCollectObservedModelRowsReportsIncompleteAWFInventory(t *testing.T) {
+	t.Parallel()
+
+	logsDir := t.TempDir()
+	reflectPath := filepath.Join(logsDir, "run-123", "sandbox", "firewall", "awf-reflect.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(reflectPath), 0o755))
+	require.NoError(t, os.WriteFile(reflectPath, []byte(`{"models_fetch_complete":false,"endpoints":[]}`), 0o644))
+
+	_, aliasMap := buildModelAliasRows()
+	_, _, catalogComplete, warnings := collectObservedModelRows(logsDir, aliasMap)
+	require.Empty(t, warnings)
+	require.NotNil(t, catalogComplete)
+	assert.False(t, *catalogComplete)
 }
 
 func TestCollectObservedModelRowsSkipsRunsAlreadyInSummary(t *testing.T) {
@@ -135,9 +154,11 @@ func TestCollectObservedModelRowsSkipsRunsAlreadyInSummary(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(logsDir, "summary.json"), summaryBytes, 0o644))
 
 	_, aliasMap := buildModelAliasRows()
-	rows, warnings := collectObservedModelRows(logsDir, aliasMap)
+	rows, catalogRows, catalogComplete, warnings := collectObservedModelRows(logsDir, aliasMap)
 	require.Empty(t, warnings)
 	require.Len(t, rows, 1)
+	require.Empty(t, catalogRows)
+	assert.Nil(t, catalogComplete)
 	assert.Equal(t, "summary", rows[0].Sources)
 	assert.Equal(t, 1, rows[0].Occurrences)
 }

@@ -1108,17 +1108,19 @@ for the JSON contract and unavailable-cost semantics.
 
 #### `models`
 
-List model catalog pricing, built-in aliases and their resolution order, and models observed in local automation artifacts.
+List AWF models advertised by configured endpoints in recent workflow runs, built-in aliases, and models observed in local automation artifacts.
 
 ```bash wrap
 gh aw models                              # Catalog, aliases, and observed models
-gh aw models --json                       # JSON output
+gh aw models --json                       # JSON output, including recent AWF model inventories
 gh aw models --logs-dir .github/aw/logs   # Read observed models from another logs directory
 gh aw models --refresh-count 50           # Inspect more recent runs when refreshing
-gh aw models --refresh-observed=false     # Skip the artifact refresh (local data only)
+gh aw models --refresh-observed=false     # Use already-downloaded artifacts
 ```
 
 Observed models are aggregated from `summary.json` token usage, per-run token usage artifacts, and `awf-reflect.json` endpoint model lists. By default the command first refreshes those artifacts from recent runs; the refresh writes no report of its own, so `--json` output stays a single JSON document.
+
+`catalog` contains the provider/model pairs advertised by AWF in the downloaded `awf-reflect.json` files; it is a union of recent runtime inventories, not a global catalog or pricing source. `catalog_complete` reports whether model fetching completed in every collected AWF inventory (`false` when absent or incomplete, omitted when no AWF inventory was found). `observed[].in_catalog` indicates whether the observed provider/model pair appeared in those inventories.
 
 **Options:** `--json/-j`, `--logs-dir`, `--refresh-observed`, `--refresh-count`, `--repo/-r`
 
