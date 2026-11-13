@@ -71,6 +71,7 @@ function projectSafeOutputData(source) {
   if (source.identifier === null) data.identifier = null;
   if (OUTCOME_STATUSES.has(source.status)) data.status = source.status;
   if (typeof source.staged === "boolean") data.staged = source.staged;
+  if (source.operation_outcome === "indeterminate") data.operation_outcome = "indeterminate";
   const url = canonicalSafeOutputUrl(source.url);
   if (url) data.url = url;
   return data;
@@ -100,6 +101,7 @@ function buildSafeOutputOutcomes(results, staged = false) {
           errorCode: record.errorCode,
           status: isStaged && status === "success" ? "staged" : status,
           staged: isStaged,
+          operation_outcome: pickOutcomeField(item, "operation_outcome"),
           url,
         }),
       };
