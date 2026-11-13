@@ -298,13 +298,7 @@ func (c *Compiler) safeOutputGitHubTokenSource(data *WorkflowData) string {
 
 	safeOutputs := data.SafeOutputs
 	if safeOutputs.GitHubApp == nil {
-		if safeOutputs.GitHubToken != "" {
-			if safeOutputs.GitHubToken == "${{ secrets.GITHUB_TOKEN }}" || safeOutputs.GitHubToken == "${{ github.token }}" {
-				return `"github_actions"`
-			}
-			return `"unknown"`
-		}
-		return "${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}"
+		return safeOutputGitHubTokenSourceForToken(safeOutputs.GitHubToken)
 	}
 
 	if !safeOutputs.GitHubApp.shouldIgnoreMissingKey() && safeOutputsGlobalAppTokenMinted(safeOutputs) {
@@ -316,6 +310,19 @@ func (c *Compiler) safeOutputGitHubTokenSource(data *WorkflowData) string {
 		fallbackSource = "'unknown'"
 	}
 	return fmt.Sprintf("${{ steps.safe-outputs-app-token.outputs.token != '' && 'app' || %s }}", fallbackSource)
+}
+
+func safeOutputGitHubTokenSourceForToken(token string) string {
+	if isExpression(token) {
+		expression := strings.TrimSpace(token[3 : len(token)-2])
+		if strings.EqualFold(expression, "secrets.GITHUB_TOKEN") || strings.EqualFold(expression, "github.token") {
+			return `"github_actions"`
+		}
+	}
+	if token != "" {
+		return `"unknown"`
+	}
+	return "${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}"
 }
 
 // addSafeOutputGitHubTokenForConfig adds github-token to the with section for standard safe-output operations.
