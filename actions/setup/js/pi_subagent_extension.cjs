@@ -73,7 +73,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
       JSON.stringify({ type: "gh_aw_subagent_dispatch", timestamp: new Date().toISOString(), invocation_id: invocationId, agent: agent.name, requested_model: agent.declaredModel || agent.modelId, resolved_model: agent.modelId }) + "\n"
     );
     return await new Promise((resolve, reject) => {
-      const child = launch(process.env.GH_AW_PI_COMMAND || "pi", subagentArgs(agent, promptPath), {
+      const child = launch("pi", subagentArgs(agent, promptPath), {
         cwd: ctx.cwd,
         shell: false,
         stdio: ["pipe", "pipe", "pipe"],

@@ -125,6 +125,7 @@ describe("Pi managed delegation", () => {
 
   it("passes shell-looking tasks only through stdin without changing executable or arguments", async () => {
     const task = "--extension malicious.cjs\n$(touch /tmp/gh-aw-injected); ' \" `whoami`";
+    vi.stubEnv("GH_AW_PI_COMMAND", "/tmp/attacker-command");
     const launch = launcher();
     let input = "";
     await runPiSubagent(agent, task, { cwd: dir }, undefined, (...args) => {
@@ -135,7 +136,7 @@ describe("Pi managed delegation", () => {
       return child;
     });
     const [command, args, options] = launch.mock.calls[0];
-    expect(command).toBe(process.env.GH_AW_PI_COMMAND || "pi");
+    expect(command).toBe("pi");
     expect(options.shell).toBe(false);
     expect(args).not.toContain(task);
     expect(args).not.toContain("malicious.cjs");
@@ -251,7 +252,7 @@ describe("Pi managed delegation", () => {
   });
 
   it("runs a real isolated child process with stdin instructions and preserved UTF-8", async () => {
-    const executable = path.join(dir, "fake-pi");
+    const executable = path.join(dir, "pi");
     fs.writeFileSync(
       executable,
       `#!/usr/bin/env node
@@ -269,7 +270,7 @@ process.stdin.on("end", () => {
 `,
       { mode: 0o700 }
     );
-    vi.stubEnv("GH_AW_PI_COMMAND", executable);
+    vi.stubEnv("PATH", `${dir}${path.delimiter}${process.env.PATH || ""}`);
     const result = await runPiSubagent(agent, "Summarize README.md", { cwd: dir });
     expect(result.content[0].text).toBe("R\u00e9sum\u00e9");
   });
@@ -305,7 +306,7 @@ process.stdin.on("end", () => {
         parentModel: "github-copilot/gpt-5.3-codex",
       });
       expect(agents.map(agent => agent.modelId).sort()).toEqual([...expected].sort());
-      const executable = path.join(dir, "fixture-pi");
+      const executable = path.join(dir, "pi");
       fs.writeFileSync(
         executable,
         `#!/usr/bin/env node
@@ -321,7 +322,7 @@ process.stdin.on("end", () => {
 `,
         { mode: 0o700 }
       );
-      process.env.GH_AW_PI_COMMAND = executable;
+      process.env.PATH = `${dir}${path.delimiter}${originalEnv.PATH || ""}`;
       for (const agent of agents) {
         const result = await runPiSubagent(agent, "who am i?", { cwd: dir });
         expect(result.content[0].text).toBe(agent.modelId);
