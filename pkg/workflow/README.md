@@ -1658,6 +1658,18 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `WorkQueueClaimAdapter`, `WorkQueueGraphQL`, `WorkQueueGitTree`, `WorkQueueRestRequest`, `WorkQueueRestVerifier` | struct | Work-queue claim adapter binding custom output to a verified effect |
 | `WorkQueueIssuesConfig`, `WorkQueueMemoryConfig`, `WorkQueuePolicyConfig` | struct | Work-queue issues, memory, and policy configuration (policy is a proposal; the installed ledger policy grants authority) |
 
+### Additional exported declarations (verified 2026-11-13)
+
+| Area | Exported symbols | Description |
+|------|------------------|-------------|
+| Connector declarations and credentials | `DevelopmentConnector`, `LoadDevelopmentConnector`, `ConnectorWebhookSource`, `ConnectorGitHubApp`, `ConnectorToken`, `ConnectorGitHubOIDC`, `ConnectorOperationOptions`, `ConnectorRegistration`, `WorkflowConnector` | Compiler-resolved connector declarations, source policy, credential adapters, and workflow-owned operation controls. Selection remains phase-scoped. |
+| Durable and engine helpers | `DurableExecutionProvider`, `GetDurableExecutionPlan`, `GetInternalLogsDir`, `GetPluginInstallationSteps`, `GetLogParserScriptSource`, `GetPostConfigPluginInstallationSteps`, `EngineDurableDefinition`, `DurableConfig`, `DurableExecutionPlan`, `DurableRestoreStepName`, `PiSessionDirectory`, `DynamicWorkflowsEnabled`, `ResolveEffectiveEngineConfig` | Engine capabilities and helpers for durable execution, plugin setup, log capture, session restoration, and resolving effective engine configuration. |
+| Compiler controls | `SetSkipDefaultCheckout`, `SetDefaultPushToken`, `SetDynamicPushToken`, `SetRequireSelfHostedRunners`, `SetLockFileLogo`, `DefaultModelRoutingWorkflowCount`, `IsNoEmit`, `SetReadOnly`, `SetDryRun`, `SetEnvironmentOverride`, `IncrementExperimentalWarningCount`, `GetExperimentalWarningCount`, `SetConfiguredModelValidator` | Compiler mutators and accessors for checkout credentials, runner requirements, output mode, environment overrides, dry-run state, and optional model validation. |
+| Grader and security configuration | `BuiltinGraderRegistry`, `BuiltinGraderIDs`, `HasGraders`, `EnabledGraderIDs`, `CustomGraderIDs`, `DefaultGraderIDs`, `PrepareShellScript`, `AddSecurityAdvisoryCommentConfig`, `CreateSecurityAdvisoryConfig`, `ContentsIsNone`, `RepoProtectedFilesConfig`, `RepositoryResponse`, `TokenBrokerConfig`, `IsReportAsIssueEnabled`, `IsLockFileLogoEnabled` | Grader registry and selection helpers, security safe-output configuration, protected-file settings, token-broker selection, and permission or reporting checks. |
+| Workflow metadata and webhooks | `GHAWManifestWorkQueue`, `GHAWMarkdownMetadata`, `GHAWMarkdownMetadataRecord`, `WebhookFilter`, `WebhookCondition`, `WebhookContext`, `WebhookBatch`, `WebhookPayloadProjection`, `WebhookPayloadProjectionPolicy`, `WebhookCommandFilter`, `WebhookActivityNormalization` | Manifest and authored-metadata records plus bounded webhook matching, projection, batching, and activity-normalization declarations. |
+| Work-queue and MCP integration | `WorkQueueAssignmentInputName`, `WorkQueueClaimInputName`, `RenderWorkQueueMCP`, `RenderLedgerMCP`, `MCPScriptParamItems` | Agent input names and MCP rendering helpers for immutable queue snapshots and participant-scoped intent. |
+| Other package helpers | `AddTemplatableJSONSlice`, `AgyDefaultDomains`, `FindNewestEntryForRepo`, `ToFinding`, `ShellScriptResources`, `SafeOutputsUploadCodeCoverageStagingArtifactName`, `FindAllStringSubmatch`, `FindStringSubmatch`, `FindAllString`, `FindAllStringIndex`, `ParseError`, `MarshalYAML` | Template-value construction, engine defaults, scanner conversion, embedded-script discovery, cache lookup, and parsing/serialization helpers. |
+
 ### Additional exported functions
 
 | Function | Signature | Description |
@@ -1672,6 +1684,8 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 Subpackages have separate specifications for their package-level contracts: [`actions`](actions/README.md), [`actionslanguageservice`](actionslanguageservice/README.md), [`aw`](aw/README.md), [`cachepolicy`](cachepolicy/README.md), [`checkoutpolicy`](checkoutpolicy/README.md), [`codemod`](codemod/README.md), [`compilerenv`](compilerenv/README.md), [`gradershell`](gradershell/README.md), [`lint`](lint/README.md), [`shellpattern`](shellpattern/README.md), and [`taint`](taint/README.md).
 
 ## Source Synchronization
+
+Verified against source on 2026-11-13: added grouped coverage for connector declarations, durable runtime helpers, compiler controls, graders, webhook models, and queue integrations above.
 
 Reviewed against source on 2026-10-11: added previously-undocumented hosted-web, NVX, Agy, memory schema, and work-queue types plus `NewAgyEngine`, `ParseStaleCheckMode`, `ScanResourceSecurity`, and `ValidateEnvironmentOverride`.
 

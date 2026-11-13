@@ -503,7 +503,21 @@ func isZeroValue(val reflect.Value) bool {
 	}
 
 	switch val.Kind() {
-	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
+	case reflect.Array:
+		for i := range val.Len() {
+			if !isZeroValue(val.Index(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Struct:
+		for i := range val.NumField() {
+			if !isZeroValue(val.Field(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Map, reflect.Slice, reflect.String:
 		return val.Len() == 0
 	case reflect.Bool:
 		return !val.Bool()

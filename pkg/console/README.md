@@ -174,7 +174,7 @@ output := console.RenderStruct([]Overview{{
 fmt.Print(output)
 ```
 
-`RenderStruct` uses reflection and `console` struct tags such as `header`, `title`, `omitempty`, and `-` to choose headings, omit zero values, and build tables for slices of structs.
+`RenderStruct` uses reflection and `console` struct tags such as `header`, `title`, `omitempty`, and `-` to choose headings, omit zero values, and build tables for slices of structs. In a slice table, an `omitempty` column is omitted only when every row has a zero value for that field.
 
 ### Spinner lifecycle
 

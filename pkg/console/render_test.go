@@ -297,6 +297,11 @@ func TestIsZeroValue(t *testing.T) {
 		{"nil pointer", (*int)(nil), true},
 		{"empty slice", []int{}, true},
 		{"non-empty slice", []int{1}, false},
+		{"zero struct", struct{ Count int }{}, true},
+		{"non-zero struct", struct{ Count int }{Count: 1}, false},
+		{"zero array", [2]int{}, true},
+		{"non-zero array", [2]int{1}, false},
+		{"struct with empty slice", struct{ Values []int }{Values: []int{}}, true},
 		{"false bool", false, true},
 		{"true bool", true, false},
 	}

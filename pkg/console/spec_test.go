@@ -87,6 +87,13 @@ func TestSpec_DesignDecision_RenderStructTags(t *testing.T) {
 	assert.Contains(t, got, "agentic-token-audit", "rendered struct should include field values")
 	assert.NotContains(t, got, "Optional", "omitempty should omit a table column when every value is zero")
 	assert.NotContains(t, got, "hidden", "dash tag should omit a field")
+
+	mixed := console.RenderStruct([]Overview{
+		{Name: "first", Optional: "visible"},
+		{Name: "second"},
+	})
+	assert.Contains(t, mixed, "Optional", "omitempty should retain a table column when any row has a value")
+	assert.Contains(t, mixed, "visible", "retained omitempty columns should render non-zero values")
 }
 
 func TestSpec_PublicAPI_RenderTableOptionalSections(t *testing.T) {
