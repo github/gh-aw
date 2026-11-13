@@ -31,6 +31,9 @@ on: workflow_dispatch
 engine: copilot
 permissions:
   contents: read
+tools:
+  repo-memory:
+    branch-name: memory/test
 post-steps:
   - name: Deterministic gate
     run: exit 1
@@ -57,7 +60,12 @@ Test publication gate.
 				var compiled map[string]any
 				require.NoError(t, yaml.Unmarshal([]byte(output), &compiled))
 				jobs := compiled["jobs"].(map[string]any)
-				names := []string{"safe_outputs", "publish", "upload_assets"}
+				repoMemory := jobs["push_repo_memory"].(map[string]any)
+				repoMemorySteps, err := yaml.Marshal(repoMemory["steps"])
+				require.NoError(t, err)
+				assert.Contains(t, string(repoMemorySteps), "Download repo-memory artifact")
+				assert.Contains(t, string(repoMemorySteps), "Push repo-memory changes")
+				names := []string{"safe_outputs", "publish", "upload_assets", "push_repo_memory"}
 				if detection != "false" {
 					names = append(names, "detection")
 				}
@@ -83,10 +91,11 @@ Test publication gate.
 							if name == "upload_assets" && detection == "true" && detectionResult != "success" {
 								continue
 							}
-							allowed := result != "skipped" && (setting != "true" || result == "success")
+							allowed := (result != "skipped" || (name == "push_repo_memory" && detection == "false")) &&
+								(setting != "true" || result == "success")
 							if name != "detection" && detection != "false" {
-								allowed = allowed && (detectionResult == "success" ||
-									(detection != "true" && detectionResult == "skipped"))
+								allowed = allowed && (detectionResult == "success" || (detectionResult == "skipped" &&
+									(name == "push_repo_memory" || detection != "true")))
 							}
 							assert.Equal(t, allowed, evaluateTestCondition(t, condition, map[string]string{
 								"needs.agent.result":     result,

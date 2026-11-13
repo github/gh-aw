@@ -1847,7 +1847,7 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 
 ### Require Agent Success (`require-agent-success`)
 
-`safe-outputs.require-agent-success` is a boolean that defaults to `false`. When `true`, detection, built-in safe-output handlers, custom safe jobs, and asset publication require `needs.agent.result == 'success'`. Downstream uploads and workflow calls are also skipped when safe-output processing is skipped.
+`safe-outputs.require-agent-success` is a boolean that defaults to `false`. When `true`, detection, built-in safe-output handlers, custom safe jobs, asset publication, and repo-memory pushes require `needs.agent.result == 'success'`. Downstream uploads and workflow calls are also skipped when safe-output processing is skipped.
 
 ```aw wrap
 safe-outputs:
@@ -1855,7 +1855,7 @@ safe-outputs:
   add-comment:
 ```
 
-A failing agent step, including a deterministic `post-steps` check, blocks publication without needing to delete staged output files. The check must fail the agent job; a step with `continue-on-error: true` does not block publication. This setting does not provide a new gate hook or change the restrictions on accessing safe-output files from `post-steps`.
+A failing agent step, including a deterministic `post-steps` check, blocks these publication paths without needing to delete staged output or repo-memory files. The check must fail the agent job; a step with `continue-on-error: true` does not block publication. This setting does not provide a new gate hook or change the restrictions on accessing safe-output files from `post-steps`.
 
 When omitted or `false`, safe outputs can still run after an agent failure for failure reporting. Conclusion and failure-reporting jobs remain unchanged.
 
