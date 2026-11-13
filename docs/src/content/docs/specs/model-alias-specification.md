@@ -7,7 +7,7 @@ sidebar:
 
 # Model Alias Format Specification
 
-**Version**: 1.3.1\
+**Version**: 1.4.0\
 **Status**: Draft  
 **Publication Date**: 2026-05-03  
 **Editor**: GitHub Agentic Workflows Team  
@@ -609,7 +609,7 @@ A router value is accepted only as the main agent's model (top-level `model`, `e
 - router values for sub-agents, threat detection, evals, or other jobs;
 - a router value combined with `engine.model-routing` or `engine.fallback-models`.
 
-A main-agent model that is an expression or variable and resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
+A main-agent model that is a single expression, reading only contexts the activation job resolves as later jobs do, on a workflow eligible for routing MAY resolve to a router value at run time. The activation job MUST resolve it once, route the run at that level, and give later jobs the resolved value; any other reserved identifier MUST stop the run before the agent starts. A variable, or an expression on an ineligible workflow, that resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ---
 
@@ -1020,6 +1020,10 @@ Model parameters are compile-time configuration values and are not derived from 
 ---
 
 ## Change Log
+
+### Version 1.4.0 (Draft)
+
+- **Added**: §9.4 lets a main-agent model that is a single expression, on a workflow eligible for routing, resolve to a router value at run time.
 
 ### Version 1.3.1 (Draft)
 

@@ -53,6 +53,26 @@ Use a router level when the workflow's tasks have a known risk or complexity:
 
 These are estimated success rates from benchmarks, not guarantees. The router may choose below the target if no candidate meets it or if a choice just below it costs much less. `model: router` chooses a level for each run instead.
 
+## Choosing the level at run time
+
+The model can be an expression that resolves to a router value when the run starts, so a dispatch input, a pre-activation step, or an experiment can choose the level:
+
+```aw wrap
+---
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        type: string
+engine: copilot
+model: ${{ inputs.level || 'router/balanced' }}
+---
+```
+
+The activation job resolves the expression once, and later jobs use its result, so the expression can read pre-activation step outputs. A router value routes the run at that level; any other value, such as a model name, runs that model without routing, as before. An empty value uses the model variables and the engine's default without routing, so write a default into the expression if you want one. A value that looks like a router value but isn't one, such as `router/fast`, `Router/Economy`, or `router/economy?effort=high`, stops the run before the agent starts.
+
+This applies when the whole model is one expression, such as `${{ inputs.level }}` but not `${{ inputs.model }}?effort=high`, that reads only `inputs`, `vars`, run-wide `github` properties such as `github.event` or `github.run_attempt`, experiments, or pre-activation step outputs, and the workflow would otherwise be eligible for [default routing](#default-routing-for-workflows-without-a-model). Other expressions, such as ones that read an agent step's outputs or `github.job`, or call `hashFiles()`, run without routing as before. Pi isn't supported yet. Threat detection never receives the router value: when the run is routed, it uses its own default model. Router values in the `GH_AW_MODEL_AGENT_<ENGINE>` and `GH_AW_DEFAULT_MODEL_<ENGINE>` variables are still not accepted.
+
 ## Default routing for workflows without a model
 
 Eligible workflows without a model already behave like `model: router`. For Copilot, Claude, and Codex, a nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` repository or organization variable overrides this default at run time; the agent variable wins. Pi has no such variables. Set `engine.model-routing: false` to opt out without pinning a model, or set a specific model.
@@ -257,7 +277,7 @@ An importing workflow uses those settings. It must omit `engine` or use its obje
 
 ### Router value restrictions
 
-Router values are not model names. Unknown or differently cased values such as `router/fast` or `router/Economy`, and parameters such as `router/economy?effort=high`, are rejected. The router chooses effort; pin a model to set it. Router values can't appear in model policies, fallbacks, model aliases, sub-agents, threat detection, or evals, and can't be combined with a routing block or `engine.fallback-models`. Write the value directly in the workflow: an expression or variable that resolves to a router value at run time stops the run before the agent starts.
+Router values are not model names. Unknown or differently cased values such as `router/fast` or `router/Economy`, and parameters such as `router/economy?effort=high`, are rejected. The router chooses effort; pin a model to set it. Router values can't appear in model policies, fallbacks, model aliases, sub-agents, threat detection, or evals, and can't be combined with a routing block or `engine.fallback-models`. Write the value in the workflow, or in a model expression as described in [Choosing the level at run time](#choosing-the-level-at-run-time). Otherwise, a variable or expression that resolves to a router value at run time stops the run before the agent starts.
 
 ## Known limitations
 

@@ -310,6 +310,7 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	// Shared by every parse entry point so file, string, document, and Wasm
 	// compilation resolve the implicit model-routing default identically.
 	c.applyDefaultModelRouting(ctx)
+	c.applyDynamicModelRouting(ctx)
 	return nil
 }
 
