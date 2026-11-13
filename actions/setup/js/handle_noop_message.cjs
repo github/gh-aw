@@ -199,32 +199,43 @@ function buildHistoryLink() {
 }
 
 /**
- * Render the no-op comment body shared by the no-op runs issue comment and the
- * comment posted on other run-scoped tracking items.
+ * Parse the shared no-op report once for the footer-free completion summary
+ * and the attributed tracker comment.
  * @param {string} workflowName
  * @param {string} agentConclusion
  * @param {string} runUrl
  * @param {boolean} hasIncompleteReport
  * @param {boolean} hasNonNoopOutput
- * @returns {string}
+ * @returns {{commentReport: import("./report_ast.cjs").Report, issueReport: import("./report_ast.cjs").Report}}
  */
-function buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput) {
+function buildNoopCommentReports(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput) {
   const outcome = classifyNoopOutcome(agentConclusion, hasIncompleteReport, hasNonNoopOutput);
   const commentTemplatePath = getPromptPath("noop_comment.md");
-  const children = parseReportMarkdown(fs.readFileSync(commentTemplatePath, "utf8"), {
+  const footer = parseReportMarkdown("> Generated from [{workflow_name}]({run_url}){aic_suffix}{ambient_context_suffix}{history_link}", {
     context: {
       workflow_name: workflowName,
-      category: outcome.category,
-      description: outcome.description,
       run_url: runUrl,
       aic_suffix: buildAICSuffix(),
       ambient_context_suffix: buildAmbientContextSuffix(),
       history_link: { type: "inline_slot", children: buildHistoryLink() },
     },
+    agentTainted: false,
+  });
+  const children = parseReportMarkdown(fs.readFileSync(commentTemplatePath, "utf8"), {
+    context: {
+      workflow_name: workflowName,
+      category: outcome.category,
+      description: outcome.description,
+    },
     minimumHeadingLevel: 2,
     agentTainted: false,
   });
-  return renderSizedReport({ type: "report", title: "No-op run", children, agentTainted: false }, 65000).body;
+  /** @type {import("./report_ast.cjs").Report} */
+  const report = { type: "report", title: "No-op run", children, agentTainted: false };
+  return {
+    commentReport: report,
+    issueReport: { ...report, children: [...children, ...footer] },
+  };
 }
 
 /**
@@ -294,11 +305,14 @@ async function main() {
     const hasNonNoopOutput = nonNoopItems.length > 0;
     const reportAsIssue = process.env.GH_AW_NOOP_REPORT_AS_ISSUE !== "false"; // Default to true
 
-    // Reuse this privacy-safe body in the run's completion status comment.
+    // Completion comments add their own attribution footer.
     let commentBody = "";
+    let issueBody = "";
     try {
-      commentBody = buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput);
+      const { commentReport, issueReport } = buildNoopCommentReports(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput);
+      commentBody = renderSizedReport(commentReport, 65000).body;
       core.setOutput("noop_comment_body", commentBody);
+      issueBody = renderSizedReport(issueReport, 65000).body;
     } catch (error) {
       core.warning(`Could not render no-op comment body: ${getErrorMessage(error)}`);
     }
@@ -352,13 +366,14 @@ async function main() {
       core.warning("No-op comment body is unavailable, skipping no-op message posting");
       return;
     }
+    if (!issueBody) return;
 
     try {
       await github.rest.issues.createComment({
         owner,
         repo,
         issue_number: noopRunsIssue.number,
-        body: commentBody,
+        body: issueBody,
       });
 
       core.info(`✓ Posted no-op message to no-op runs issue #${noopRunsIssue.number}`);
