@@ -33,15 +33,15 @@ func (e *threatDetectionDiagnosticError) Unwrap() error {
 func validateThreatDetectionSuppressions(suppressions []ThreatDetectionSuppression) error {
 	for i, suppression := range suppressions {
 		if !threatDetectionSuppressionRulePattern.MatchString(suppression.Rule) {
-			return fmt.Errorf("threat-detection-suppress[%d].rule must be a CTR-* identifier", i)
+			return fmt.Errorf("threat-detection-suppress[%d].rule must be a CTR-* identifier. Example: rule: CTR-001", i)
 		}
 		if strings.TrimSpace(suppression.Reason) == "" {
-			return fmt.Errorf("threat-detection-suppress[%d].reason must not be empty", i)
+			return fmt.Errorf("threat-detection-suppress[%d].reason must not be empty. Example: reason: \"accepted risk for internal tool\"", i)
 		}
 		if suppression.Expires != "" {
 			expires, err := time.Parse("2006-01-02", suppression.Expires)
 			if err != nil || expires.Format("2006-01-02") != suppression.Expires {
-				return fmt.Errorf("threat-detection-suppress[%d].expires must be an ISO 8601 date", i)
+				return fmt.Errorf("threat-detection-suppress[%d].expires must be an ISO 8601 date. Example: expires: 2026-12-31", i)
 			}
 		}
 	}
