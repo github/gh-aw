@@ -7,7 +7,7 @@ sidebar:
 
 # Copilot SDK Driver Specification
 
-**Version**: 1.0.3  
+**Version**: 1.0.3<br />
 **Status**: Draft Specification  
 **Latest Version**: [copilot-sdk-driver-specification](/gh-aw/specs/copilot-sdk-driver-specification/)  
 **Editor**: GitHub Agentic Workflows Team

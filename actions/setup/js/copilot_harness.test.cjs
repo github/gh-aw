@@ -8,6 +8,7 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const { EventEmitter } = require("events");
 const { PassThrough } = require("stream");
+const { CYBERSECURITY_POLICY_REJECTION_PREFIX } = require("./github_provider_policy_rejection.cjs");
 const { hasWorkflowToolPermissionDenial, WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE } = require("./copilot_model_selection.cjs");
 const { COPILOT_SDK_SERVER_STARTUP_TIMEOUT_MS, buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
@@ -321,7 +322,7 @@ describe("copilot_harness.cjs", () => {
 
   describe("SDK content-filter rejection", () => {
     const content = "The model returned no content because the response was blocked by content filtering.";
-    const policyMessage = "422 This content was flagged for possible cybersecurity risk. If this seems wrong, try rephrasing your request.";
+    const policyMessage = `${CYBERSECURITY_POLICY_REJECTION_PREFIX} If this seems wrong, try rephrasing your request.`;
     it("skips corrupt JSONL and short-circuits without decoding later records", () => {
       const first = JSON.stringify({ type: "assistant.message", data: { content, rte: true } });
       const output = `[INFO] startup\r\n{"broken"\nnull\n${first}\r\n{"later":true}`;
@@ -3191,8 +3192,8 @@ process.stdin.on("end", () => fs.writeFileSync(process.env.COPILOT_HARNESS_STUB_
   describe("noop pre-flight and retry guard", () => {
     const filterEvents = [
       { type: "assistant.message", data: { content: "The model returned no content because the response was blocked by content filtering.", rte: true, toolRequests: [] } },
-      { type: "session.error", data: { errorType: "query", message: "422 This content was flagged for possible cybersecurity risk.", statusCode: 422 } },
-      { type: "session.error", data: { errorType: "sdk_driver", message: "422 This content was flagged for possible cybersecurity risk." } },
+      { type: "session.error", data: { errorType: "query", message: CYBERSECURITY_POLICY_REJECTION_PREFIX, statusCode: 422 } },
+      { type: "session.error", data: { errorType: "sdk_driver", message: CYBERSECURITY_POLICY_REJECTION_PREFIX } },
     ];
     it.each(filterEvents.flatMap(event => [false, true].map(writeNoop => ({ event, writeNoop }))))("keeps a content-filter rejection failed without retries %j", ({ event, writeNoop }) => {
       const tempDir = makeHarnessTempDir("copilot-filtered-retry-");

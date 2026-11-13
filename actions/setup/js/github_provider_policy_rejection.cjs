@@ -62,4 +62,4 @@ function isGitHubProviderCybersecurityPolicyRejection(output, provider, engine) 
   return false;
 }
 
-module.exports = { isGitHubProviderCybersecurityPolicyRejection };
+module.exports = { CYBERSECURITY_POLICY_REJECTION_PREFIX, isGitHubProviderCybersecurityPolicyRejection };

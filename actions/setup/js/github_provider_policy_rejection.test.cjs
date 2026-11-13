@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
+const { CYBERSECURITY_POLICY_REJECTION_PREFIX, isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 
-const message = "422 This content was flagged for possible cybersecurity risk. Try rephrasing your request.";
+const message = `${CYBERSECURITY_POLICY_REJECTION_PREFIX} Try rephrasing your request.`;
 
 describe("GitHub provider cybersecurity-policy rejection detection", () => {
   it.each([

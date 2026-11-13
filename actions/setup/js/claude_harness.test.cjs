@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 
 const require = createRequire(import.meta.url);
+const { CYBERSECURITY_POLICY_REJECTION_PREFIX } = require("./github_provider_policy_rejection.cjs");
 const { withCompilerFixtures, prepareMarkdownFixtures } = require("../../../scripts/markdown_metadata_test_adapter.cjs");
 const {
   resolveClaudePromptFileArgs,
@@ -1725,7 +1726,7 @@ process.exit(1);`,
           const fs = require("fs");
           fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, "{}\\n");
           fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify({type:"noop",message:"nothing to do"}) + "\\n");
-          console.log(JSON.stringify({type:"result",is_error:true,result:"422 This content was flagged for possible cybersecurity risk. Try rephrasing your request."}));
+          console.log(JSON.stringify({type:"result",is_error:true,result:${JSON.stringify(`${CYBERSECURITY_POLICY_REJECTION_PREFIX} Try rephrasing your request.`)}}));
           process.exit(1);
         `,
         });
