@@ -15,7 +15,7 @@ const { getErrorMessage, getErrorStatus } = require("./error_helpers.cjs");
 const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
 const { resolveTarget, isStagedMode } = require("./safe_output_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
-const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
+const { createAuthenticatedGitHubClient, createAuthenticatedLoginResolver } = require("./handler_auth.cjs");
 const { getMessages } = require("./messages_core.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { MAX_COMMENT_LENGTH, MAX_COMMENT_INPUT_LENGTH, MAX_MENTIONS, MAX_LINKS, enforceCommentLimits } = require("./comment_limit_helpers.cjs");
@@ -551,20 +551,7 @@ async function main(config = {}) {
   // Get workflow ID for hiding older comments
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
   const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
-  /** @type {Promise<string | null> | undefined} */
-  let authenticatedLoginPromise;
-  const getAuthenticatedLogin = () => {
-    if (!authenticatedLoginPromise) {
-      authenticatedLoginPromise = Promise.resolve()
-        .then(() => githubClient.rest.users.getAuthenticated())
-        .then(({ data }) => data.login || null)
-        .catch(() => {
-          core.info("Could not resolve the authenticated comment author; considering bot-authored comments only");
-          return null;
-        });
-    }
-    return authenticatedLoginPromise;
-  };
+  const getAuthenticatedLogin = createAuthenticatedLoginResolver(githubClient, core);
 
   /**
    * Message handler function

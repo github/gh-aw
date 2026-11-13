@@ -49,4 +49,28 @@ async function createAuthenticatedGitHubClient(config) {
   return global.getOctokit(token, /** @type {any} */ { credentialSource: "pat" });
 }
 
-module.exports = { createAuthenticatedGitHubClient };
+/**
+ * Lazily resolve the publishing identity, sharing one lookup across callers.
+ * @param {{rest: {users: {getAuthenticated: () => Promise<{data: {login?: string}}>}}}} githubClient
+ * @param {{info: (message: string) => void}} logger
+ * @returns {() => Promise<string | null>}
+ */
+function createAuthenticatedLoginResolver(githubClient, logger) {
+  /** @type {Promise<string | null> | undefined} */
+  let authenticatedLoginPromise;
+  return () => {
+    if (!authenticatedLoginPromise) {
+      authenticatedLoginPromise = Promise.resolve()
+        .then(() => githubClient.rest.users.getAuthenticated())
+        .then(({ data }) => data.login || null)
+        .catch(() => {
+          // Installation tokens cannot call /user; callers fall back to bot authors.
+          logger.info("Could not resolve the authenticated comment author; considering bot-authored comments only");
+          return null;
+        });
+    }
+    return authenticatedLoginPromise;
+  };
+}
+
+module.exports = { createAuthenticatedGitHubClient, createAuthenticatedLoginResolver };

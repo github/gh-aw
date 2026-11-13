@@ -37,6 +37,7 @@
 "use strict";
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 const fs = require("fs");
 const { openDurableSession, observeDurableSession } = require("./durable_native_session.cjs");
 const { runProcess, formatDuration, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
@@ -702,6 +703,7 @@ async function main() {
         return { action: "stop", exitCode: 0 };
       }
       const classifierOutput = claudeFailureEvidence(result.output);
+      const isCybersecurityPolicyRejection = isGitHubProviderCybersecurityPolicyRejection(result.output, process.env.GH_AW_LLM_PROVIDER, "claude");
       const isOverloaded = isOverloadedError(classifierOutput);
       const isRateLimit = isRateLimitError(classifierOutput);
       const isAuthenticationFailed = isAuthenticationFailedError(classifierOutput);
@@ -719,6 +721,7 @@ async function main() {
       const hasNumerousPermissionDenied = permissionDeniedCount >= 3;
       const crashSignalName = crashSignalNameForExitCode(result.exitCode);
       result.failureClasses = Object.entries({
+        content_filter: isCybersecurityPolicyRejection,
         overloaded_error: isOverloaded,
         rate_limit_error: isRateLimit,
         authentication_failed: isAuthenticationFailed,
@@ -745,12 +748,18 @@ async function main() {
           ` isInvalidModelError=${isInvalidModel}` +
           ` isInvalidJsonBodyError=${isInvalidJsonBody}` +
           ` isConnectionRefusedError=${isConnectionRefused}` +
+          ` isCybersecurityPolicyRejection=${isCybersecurityPolicyRejection}` +
           ` sessionHasProgress=${sessionHasProgress}` +
           ` permissionDeniedCount=${permissionDeniedCount}` +
           ` hasNumerousPermissionDenied=${hasNumerousPermissionDenied}` +
           ` hasOutput=${result.hasOutput}` +
           ` retriesRemaining=${maxRetries - attempt}`
       );
+
+      if (isCybersecurityPolicyRejection) {
+        log(`attempt ${attempt + 1}: GitHub provider blocked the request for cybersecurity policy — not retrying; task completion could not be confirmed`);
+        return { action: "stop" };
+      }
 
       if (shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeOutputs, log })) {
         return { action: "stop", exitCode: 0 };

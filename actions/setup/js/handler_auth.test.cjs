@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { createAuthenticatedGitHubClient } from "./handler_auth.cjs";
+import { createAuthenticatedGitHubClient, createAuthenticatedLoginResolver } from "./handler_auth.cjs";
 
 describe("createAuthenticatedGitHubClient", () => {
   let mockCore;
@@ -89,5 +89,53 @@ describe("createAuthenticatedGitHubClient", () => {
     // Global should be unchanged
     expect(global.github).toBe(originalGithub);
     expect(global.github._token).toBe("step-level-token");
+  });
+});
+
+describe("createAuthenticatedLoginResolver", () => {
+  it("defers the lookup and shares successful results across concurrent and later calls", async () => {
+    const getAuthenticated = vi.fn().mockResolvedValue({ data: { login: "publisher" } });
+    const logger = { info: vi.fn() };
+    const resolveLogin = createAuthenticatedLoginResolver({ rest: { users: { getAuthenticated } } }, logger);
+    expect(getAuthenticated).not.toHaveBeenCalled();
+
+    const first = resolveLogin();
+    expect(resolveLogin()).toBe(first);
+    expect(await first).toBe("publisher");
+    expect(await resolveLogin()).toBe("publisher");
+    expect(getAuthenticated).toHaveBeenCalledOnce();
+    expect(logger.info).not.toHaveBeenCalled();
+  });
+
+  it.each(["rejection", "synchronous throw"])("caches and logs the bot fallback after %s", async failure => {
+    const getAuthenticated = vi.fn(() => {
+      const error = new Error("Resource not accessible by integration");
+      if (failure === "synchronous throw") throw error;
+      return Promise.reject(error);
+    });
+    const logger = { info: vi.fn() };
+    const resolveLogin = createAuthenticatedLoginResolver({ rest: { users: { getAuthenticated } } }, logger);
+
+    expect(await Promise.all([resolveLogin(), resolveLogin()])).toEqual([null, null]);
+    expect(await resolveLogin()).toBeNull();
+    expect(getAuthenticated).toHaveBeenCalledOnce();
+    expect(logger.info).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("considering bot-authored comments only"));
+  });
+
+  it("caches a missing login as unavailable", async () => {
+    const getAuthenticated = vi.fn().mockResolvedValue({ data: {} });
+    const resolveLogin = createAuthenticatedLoginResolver({ rest: { users: { getAuthenticated } } }, { info: vi.fn() });
+
+    expect(await resolveLogin()).toBeNull();
+    expect(await resolveLogin()).toBeNull();
+    expect(getAuthenticated).toHaveBeenCalledOnce();
+  });
+
+  it("keeps publishing identities isolated between clients", async () => {
+    const logger = { info: vi.fn() };
+    const first = createAuthenticatedLoginResolver({ rest: { users: { getAuthenticated: vi.fn().mockResolvedValue({ data: { login: "first" } }) } } }, logger);
+    const second = createAuthenticatedLoginResolver({ rest: { users: { getAuthenticated: vi.fn().mockResolvedValue({ data: { login: "second" } }) } } }, logger);
+
+    expect(await Promise.all([first(), second()])).toEqual(["first", "second"]);
   });
 });

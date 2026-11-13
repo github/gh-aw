@@ -830,11 +830,11 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 	workflowID := GetWorkflowIDFromPath(markdownPath)
 	jobEnv := c.buildJobLevelSafeOutputEnvVars(data, workflowID)
 
-	var concurrency string
-	if data.SafeOutputs.ConcurrencyGroup != "" {
-		concurrency = c.indentYAMLLines(fmt.Sprintf("concurrency:\n  group: %q\n  cancel-in-progress: false", data.SafeOutputs.ConcurrencyGroup), "    ")
-		consolidatedSafeOutputsJobLog.Printf("Configuring safe_outputs job concurrency group: %s", data.SafeOutputs.ConcurrencyGroup)
+	concurrencyConfig, err := generateSafeOutputsConcurrencyConfig(data)
+	if err != nil {
+		return nil, nil, err
 	}
+	concurrency := c.indentYAMLLines(concurrencyConfig, "    ")
 
 	const defaultSafeOutputsTimeoutMinutes = 45
 	timeoutMinutes := defaultSafeOutputsTimeoutMinutes
