@@ -144,6 +144,34 @@ else
   fail "did not fail cleanly when no binary was available"
 fi
 
+root="$(new_env symlinked_output)"
+mkdir -p "${root}/runner-temp/gh-aw"
+printf 'external sentinel\n' > "${root}/sentinel"
+ln -s "${root}/sentinel" "${root}/runner-temp/gh-aw/gh-aw"
+cat > "${root}/path/gh-aw" <<'EOF'
+#!/usr/bin/env bash
+echo "path gh-aw"
+EOF
+chmod +x "${root}/path/gh-aw"
+code="$(run_script "${root}")"
+if [ "${code}" -ne 0 ] && [ "$(cat "${root}/sentinel")" = "external sentinel" ] && [ -L "${root}/runner-temp/gh-aw/gh-aw" ]; then
+  pass "rejects a symlinked output binary without changing its target"
+else
+  cat "${root}/out.log"
+  fail "did not safely reject a symlinked output binary"
+fi
+
+root="$(new_env symlinked_output_directory)"
+printf 'external sentinel\n' > "${root}/sentinel"
+ln -s "${root}" "${root}/runner-temp/gh-aw"
+code="$(run_script "${root}")"
+if [ "${code}" -ne 0 ] && [ "$(cat "${root}/sentinel")" = "external sentinel" ] && [ -L "${root}/runner-temp/gh-aw" ]; then
+  pass "rejects a symlinked output directory"
+else
+  cat "${root}/out.log"
+  fail "did not safely reject a symlinked output directory"
+fi
+
 echo
 echo "Tests passed: ${TESTS_PASSED}"
 echo "Tests failed: ${TESTS_FAILED}"

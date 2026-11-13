@@ -86,6 +86,10 @@ test_manual_binary_replacement() (
             ln -s "$target" "$binary_path"
             cp "$target" "$case_root/old-bytes"
             ;;
+        symlink-output)
+            printf 'external sentinel\n' > "$case_root/output-sentinel"
+            ln -s "$case_root/output-sentinel" "$case_root/github-output"
+            ;;
         partial-download|invalid-binary)
             make_binary "$binary_path" "v0.0.1"
             cp "$binary_path" "$case_root/old-bytes"
@@ -146,7 +150,15 @@ EOF
     chmod +x "$fixture_bin/curl" "$fixture_bin/sleep"
 
     echo "Test: $case_name"
-    if env -u INPUT_VERSION -u GITHUB_OUTPUT \
+    if [ "$case_name" = symlink-output ]; then
+        if env -u INPUT_VERSION \
+            HOME="$home" PATH="$fixture_bin:$PATH" REAL_CURL="$REAL_CURL" PLATFORM="$PLATFORM" \
+            FIXTURE_TAG="v1.2.3" FIXTURE_LATEST="$case_root/latest.json" FIXTURE_BINARY="$asset" \
+            FIXTURE_CHECKSUMS="$checksums" FIXTURE_PARTIAL_DOWNLOAD=false GITHUB_OUTPUT="$case_root/github-output" \
+            bash < "$INSTALLER_PATH" > "$output" 2>&1; then
+            fail "symlink-output unexpectedly succeeded"
+        fi
+    elif env -u INPUT_VERSION -u GITHUB_OUTPUT \
         HOME="$home" \
         PATH="$fixture_bin:$PATH" \
         REAL_CURL="$REAL_CURL" \
@@ -197,6 +209,10 @@ EOF
             [ -d "$binary_path" ] && [ "$(cat "$binary_path/sentinel")" = sentinel ] ||
                 fail "directory destination changed"
             [ ! -e "$binary_path/gh-aw" ] || fail "candidate was moved into destination directory"
+            ;;
+        symlink-output)
+            [ -L "$case_root/github-output" ] || fail "GITHUB_OUTPUT symlink was replaced"
+            [ "$(cat "$case_root/output-sentinel")" = "external sentinel" ] || fail "GITHUB_OUTPUT symlink target changed"
             ;;
     esac
     grep -q "No version specified, using 'latest'" "$output" || fail "unset INPUT_VERSION did not default to latest"
@@ -781,7 +797,7 @@ if command -v pwsh >/dev/null 2>&1; then
 fi
 
 if [ "$(uname -s)" = Linux ]; then
-    for case_name in dangling-symlink live-symlink partial-download checksum-mismatch invalid-binary directory-conflict; do
+    for case_name in dangling-symlink live-symlink symlink-output partial-download checksum-mismatch invalid-binary directory-conflict; do
         test_manual_binary_replacement "$case_name"
     done
     for case_name in channel-page-and-semver channel-no-v1-release exact-tag auth-pinned no-auth-pinned auth-401-fallback auth-latest gh-install-metadata-tag; do

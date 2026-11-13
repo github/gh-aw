@@ -583,6 +583,9 @@ test-scripts: build test-workflow-tool-contracts test-agent-local-settings test-
 	python3 scripts/test_parse_benchmark_results.py
 	bash actions/setup/sh/collect_usage_artifact_files_test.sh
 	bash actions/setup/sh/copy_gh_aw_binary_for_mcp_test.sh
+	bash actions/setup/sh/generate_git_patch_test.sh
+	bash actions/setup/sh/audit_pre_agent_workspace_test.sh
+	bash actions/setup/sh/commit_cache_memory_git_test.sh
 	bash actions/setup/sh/create_gh_aw_tmp_dir_test.sh
 	bash actions/setup/sh/download_docker_images_local_test.sh
 	bash actions/setup/sh/install_awf_binary_test.sh

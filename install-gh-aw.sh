@@ -90,6 +90,15 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+append_github_output() {
+    local value="$1"
+    if [ -L "${GITHUB_OUTPUT:-}" ]; then
+        print_error "Refusing to append to a symlinked GITHUB_OUTPUT file."
+        return 1
+    fi
+    printf '%s\n' "$value" >> "${GITHUB_OUTPUT}"
+}
+
 # Check if HOME is set
 if [ -z "$HOME" ]; then
     print_error "HOME environment variable is not set. Cannot determine installation directory."
@@ -367,6 +376,10 @@ if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
         print_error "Failed to create temporary gh extension install log directory."
         exit 1
     fi
+    if [ -L "$GH_INSTALL_LOG_DIR" ] || [ ! -d "$GH_INSTALL_LOG_DIR" ]; then
+        print_error "Refusing to use an invalid gh extension install log directory."
+        exit 1
+    fi
     GH_INSTALL_LOG="$GH_INSTALL_LOG_DIR/gh-install.log"
     print_info "Attempting to install gh-aw using 'gh extension install'..."
 
@@ -422,8 +435,8 @@ if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
                     print_info "Installed version: $INSTALLED_VERSION"
                     
                     # Set output for GitHub Actions
-                    if [ -n "${GITHUB_OUTPUT}" ]; then
-                        echo "installed_version=${INSTALLED_VERSION}" >> "${GITHUB_OUTPUT}"
+                    if [ -n "${GITHUB_OUTPUT:-}" ]; then
+                        append_github_output "installed_version=${INSTALLED_VERSION}"
                     fi
                     
                     exit 0
@@ -482,9 +495,17 @@ print_info "Download URL: $DOWNLOAD_URL"
 print_info "Installation directory: $INSTALL_DIR"
 
 # Create the installation directory if it doesn't exist
+if [ -L "$INSTALL_DIR" ]; then
+    print_error "Cannot install gh-aw: '$INSTALL_DIR' is a symlink."
+    exit 1
+fi
 if [ ! -d "$INSTALL_DIR" ]; then
     print_info "Creating installation directory..."
     mkdir -p "$INSTALL_DIR"
+fi
+if [ -L "$INSTALL_DIR" ] || [ ! -d "$INSTALL_DIR" ]; then
+    print_error "Installation path is not a real directory: '$INSTALL_DIR'."
+    exit 1
 fi
 
 # Check if binary already exists
@@ -494,6 +515,10 @@ fi
 
 if ! STAGING_DIR=$(mktemp -d "$INSTALL_DIR/.gh-aw-install.XXXXXX"); then
     print_error "Failed to create temporary installation directory in '$INSTALL_DIR'."
+    exit 1
+fi
+if [ -L "$STAGING_DIR" ] || [ ! -d "$STAGING_DIR" ]; then
+    print_error "Refusing to use an invalid installation staging directory."
     exit 1
 fi
 STAGED_BINARY_PATH="$STAGING_DIR/$BINARY_NAME"
@@ -704,5 +729,5 @@ $BINARY_EXEC_TIMEOUT "$BINARY_PATH" version || print_warning "Version check time
 
 # Set output for GitHub Actions
 if [ -n "${GITHUB_OUTPUT}" ]; then
-    echo "installed_version=${VERSION}" >> "${GITHUB_OUTPUT}"
+    append_github_output "installed_version=${VERSION}"
 fi
