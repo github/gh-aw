@@ -61,6 +61,7 @@ strict: false
 			name: "merge-pull-request required-labels bare * is literal label name, not CTR-015",
 			safeOutputs: `safe-outputs:
   merge-pull-request:
+    allowed-base-branches: [agent-work/*]
     required-labels: ["*"]
 `,
 			expectError: false,

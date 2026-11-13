@@ -19,6 +19,7 @@ type MergePullRequestConfig struct {
 	SafeOutputAllowedLabelsConfig `yaml:",inline"` // Deprecated: allowed-labels is migrated to required-labels
 	RequiredLabels                []string         `yaml:"required-labels,omitempty"`       // Labels that must ALL be present on the PR
 	AllowedBranches               []string         `yaml:"allowed-branches,omitempty"`      // Glob patterns for source branch names; PR branch must match one
+	AllowedBaseBranches           []string         `yaml:"allowed-base-branches,omitempty"` // Owner-declared non-consequential destinations; required and scoped
 	RequiredTitlePrefix           string           `yaml:"required-title-prefix,omitempty"` // Title prefix the PR must have
 	RequiredChecks                []string         `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
 	RequiredCheckApps             map[string]int64 `yaml:"required-check-apps,omitempty"`   // Expected GitHub App IDs by required check name
@@ -47,6 +48,7 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 		targetConfig, _ := ParseTargetConfig(configMap)
 		cfg.SafeOutputTargetConfig = targetConfig
 		cfg.AllowedBranches = ParseStringArrayFromConfig(configMap, "allowed-branches", mergePullRequestLog)
+		cfg.AllowedBaseBranches = ParseStringArrayFromConfig(configMap, "allowed-base-branches", mergePullRequestLog)
 		cfg.RequiredTitlePrefix = extractStringFromMap(configMap, "required-title-prefix", mergePullRequestLog)
 		cfg.RequiredChecks = ParseStringArrayFromConfig(configMap, "required-checks", mergePullRequestLog)
 		if apps, ok := configMap["required-check-apps"].(map[string]any); ok {
@@ -76,7 +78,7 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 		return cfg
 	}
 
-	// merge-pull-request: null enables defaults
+	// Validation rejects configurations without an explicit destination scope.
 	cfg.Max = defaultIntStr(1)
 	return cfg
 }
@@ -90,6 +92,9 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 		return nil
 	}
 	cfg := config.MergePullRequest
+	if err := validateMergePullRequestBaseBranches(cfg.AllowedBaseBranches); err != nil {
+		return err
+	}
 	if policy := cfg.ProtectedFilesPolicy; policy != "" && policy != "blocked" && policy != "allowed" && !strings.HasPrefix(policy, "${{") {
 		return errors.New("safe-outputs.merge-pull-request.protected-files must be 'blocked', 'allowed', or a GitHub Actions expression. Use 'blocked' to refuse protected-file changes")
 	}
@@ -132,4 +137,18 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName st
 		}
 	}
 	return nil
+}
+
+func validateMergePullRequestBaseBranches(patterns []string) error {
+	if len(patterns) == 0 {
+		return errors.New("safe-outputs.merge-pull-request.allowed-base-branches is required and must contain at least one scoped base branch pattern. Declare owner-authorized non-consequential destinations. Example:\n  safe-outputs:\n    merge-pull-request:\n      allowed-base-branches: [\"agent-work/*\"]")
+	}
+	for i, pattern := range patterns {
+		if strings.Trim(pattern, "*") == "" {
+			return fmt.Errorf("safe-outputs.merge-pull-request.allowed-base-branches[%d] cannot be an unrestricted wildcard. Expected a scoped base branch pattern such as \"agent-work/*\"", i)
+		}
+	}
+	return validateGlobPatternList(patterns, validateRefGlob, func(i int, pattern string, messages []string) error {
+		return fmt.Errorf("invalid glob pattern %q in safe-outputs.merge-pull-request.allowed-base-branches[%d]: %s. Expected a scoped base branch pattern such as \"agent-work/*\"", pattern, i, strings.Join(messages, "; "))
+	})
 }

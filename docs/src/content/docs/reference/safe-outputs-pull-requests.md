@@ -267,6 +267,7 @@ Merges a pull request only after configured policy gates pass — status checks,
 ```yaml wrap
 safe-outputs:
   merge-pull-request:
+    allowed-base-branches: ["agent-work/*"] # REQUIRED: owner-declared non-consequential destinations
     max: 1                            # max merges per run (default: 1, range: 1-10)
     required-labels: [ready-to-merge] # ALL listed labels must be present on the PR
     required-title-prefix: "[bot] "   # only merge PRs whose title starts with this prefix
@@ -288,6 +289,12 @@ safe-outputs:
 **Target**: `"triggering"` (requires a PR event) or `"*"` (the agent supplies `pull_request_number` in the tool call). When `target: "*"` is used with cross-repository configuration, the agent may also supply `repo` (in `owner/repo` format); the value must match `target-repo` or appear in `allowed-repos`.
 
 **Merge method**: The agent selects `merge`, `squash`, or `rebase` per tool call. The base branch is taken from the pull request; merges to the repository default branch are refused by this safe output type.
+
+**Destination scope**: `allowed-base-branches` is a mandatory, non-empty list of destination (base) branch patterns. The live base branch must match at least one pattern during evaluation and final revalidation, including staged and cross-repository operations. Matching is case-sensitive: `*` matches within one path segment, while `**` can span `/`. Bare wildcard-only entries such as `"*"` and `"**"` are forbidden, even alongside scoped entries. `allowed-branches` continues to filter the source (head) branch independently. Neither list overrides default/protected-branch refusals or any other gate.
+
+The owner declares these destinations suitable for non-consequential automated integration by configuring `allowed-base-branches`; the agent cannot supply or relax this policy through tool arguments. Owners must assess downstream effects, protect the declaration and related automation from agent edits, and reassess when those effects change. Matching a branch pattern is not proof of harmless effects or per-merge human approval.
+
+**Migration**: Existing workflows must add a scoped `allowed-base-branches` list and recompile. Null/default-only merge configuration, omitted or empty lists, and unrestricted wildcards are no longer accepted. The compiler does not infer a destination policy from `allowed-branches`.
 
 **Gate semantics**: The handler validates mergeability (not draft, no conflicts), required status checks, the GitHub review decision, unresolved review thread gating, `required-labels`, `required-title-prefix`, and `allowed-branches`. If any gate fails, the merge is skipped and the reason is reported. Idempotent: already-merged PRs return success.
 

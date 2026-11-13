@@ -425,6 +425,7 @@ func TestSafeOutputsImportMergePullRequestType(t *testing.T) {
 	sharedWorkflow := `---
 safe-outputs:
   merge-pull-request:
+    allowed-base-branches: [agent-work/*]
     required-labels:
       - ready-to-merge
 ---
@@ -537,7 +538,7 @@ func TestMergeSafeOutputsUnit(t *testing.T) {
 			name:      "import merge-pull-request to empty config",
 			topConfig: nil,
 			importedJSON: []string{
-				`{"merge-pull-request":{"required-labels":["ready-to-merge"]}}`,
+				`{"merge-pull-request":{"allowed-base-branches":["agent-work/*"],"required-labels":["ready-to-merge"]}}`,
 			},
 			expectError:   false,
 			expectedTypes: []string{"merge-pull-request"},

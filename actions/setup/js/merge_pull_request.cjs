@@ -606,6 +606,11 @@ function resolvePullRequestNumber(message, resolvedTemporaryIds) {
  * @type {HandlerFactoryFunction}
  */
 async function main(config = {}) {
+  const allowedBaseBranches = config.allowed_base_branches;
+  if (!Array.isArray(allowedBaseBranches) || allowedBaseBranches.length === 0 || allowedBaseBranches.some(pattern => typeof pattern !== "string" || !pattern || /\s/.test(pattern) || /^\*+$/.test(pattern))) {
+    throw new Error(`${SAFE_OUTPUT_E001}: merge-pull-request.allowed-base-branches requires a non-empty list of scoped base branch patterns, not unrestricted wildcards. Declare owner-authorized destinations such as "agent-work/*"`);
+  }
+  const allowedBaseBranchPatterns = compilePathGlobs(allowedBaseBranches);
   const githubClient = await createAuthenticatedGitHubClient(config);
   const isStaged = isStagedMode(config);
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
@@ -726,6 +731,13 @@ async function main(config = {}) {
         });
       }
       const baseBranch = baseBranchValidation.valid ? baseBranchValidation.value : null;
+      evidence.allowed_base_branches = allowedBaseBranches;
+      if (baseBranch && !allowedBaseBranchPatterns.some(pattern => pattern.test(baseBranch))) {
+        failureReasons.push({
+          code: "base_branch_not_allowed",
+          message: "Target base branch does not match allowed-base-branches",
+        });
+      }
 
       core.info(
         `PR state: merged=${pr.merged}, draft=${pr.draft}, mergeable=${pr.mergeable}, mergeable_state=${pr.mergeable_state || "unknown"}, head=${JSON.stringify(sourceBranch || pr.head?.ref || null)}, base=${JSON.stringify(baseBranch || pr.base?.ref || null)}`
@@ -952,6 +964,9 @@ async function main(config = {}) {
       }
       if (currentPR.mergeable !== true || currentPR.mergeable_state === "dirty") {
         throw new Error(`${SAFE_OUTPUT_E007}: Pull request mergeability is not confirmed or has unresolved conflicts after revalidation`);
+      }
+      if (!allowedBaseBranchPatterns.some(pattern => pattern.test(currentPR.base.ref))) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Target base branch no longer matches allowed-base-branches; fresh evaluation required`);
       }
       const currentPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
       currentPolicy.requiredChecks = [...new Set([...currentPolicy.requiredChecks, ...requiredChecks])].sort();

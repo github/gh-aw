@@ -16989,14 +16989,17 @@ safe-outputs:
   # approvals and checks pass. Independent manual review and manual merge are
   # required in these cases.
   # (optional)
-  # Accepted formats:
-
-  # Format 1: Enable pull request merge with default policy configuration
-  merge-pull-request: null
-
-  # Format 2: Experimental configuration for controlled pull request merges. The
-  # merge is blocked unless all configured gates pass.
+  # Experimental configuration for controlled pull request merges. The merge is
+  # blocked unless all configured gates pass.
+  # (optional)
   merge-pull-request:
+    # Required scoped glob patterns for destination (base) branches declared by the
+    # owner as non-consequential automated integration targets. Bare wildcard patterns
+    # such as * and ** are forbidden. Default and protected branches remain blocked.
+    # This declaration is not proof of harmless downstream effects.
+    allowed-base-branches: []
+      # Array of strings
+
     # Block merges modifying protected files by default, using create-pull-request's
     # protected set and exclusions. allowed explicitly disables this file gate, not
     # other merge gates. Creation-specific request-review and fallback-to-issue

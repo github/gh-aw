@@ -10892,13 +10892,21 @@
         "merge-pull-request": {
           "oneOf": [
             {
-              "type": "null",
-              "description": "Enable pull request merge with default policy configuration"
-            },
-            {
               "type": "object",
               "description": "Experimental configuration for controlled pull request merges. The merge is blocked unless all configured gates pass.",
+              "required": ["allowed-base-branches"],
               "properties": {
+                "allowed-base-branches": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[^\\s]+$",
+                    "not": { "pattern": "^\\*+$" }
+                  },
+                  "description": "Required scoped glob patterns for destination (base) branches declared by the owner as non-consequential automated integration targets. Bare wildcard patterns such as * and ** are forbidden. Default and protected branches remain blocked. This declaration is not proof of harmless downstream effects."
+                },
                 "protected-files": {
                   "oneOf": [
                     {

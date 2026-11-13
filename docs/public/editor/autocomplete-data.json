@@ -3051,9 +3051,8 @@
           "leaf": true
         },
         "merge-pull-request": {
-          "type": "null|object",
-          "desc": "Enable AI agents to merge pull requests under configured policy gates.",
-          "leaf": true
+          "type": "object",
+          "desc": "Enable AI agents to merge pull requests under configured policy gates."
         },
         "push-to-pull-request-branch": {
           "type": "null|object",
