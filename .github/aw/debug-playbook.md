@@ -6,7 +6,7 @@ disable-model-invocation: true
 # Debug Playbook
 
 Fix first failing boundary; [debugging gates](debug-agentic-workflow.md).
-Do not dispatch workflows/execute artifacts; keep secrets/prompts/config/reasoning private.
+Do not dispatch workflows/execute artifacts; keep secrets/prompts private.
 
 ## Start here
 
@@ -194,7 +194,7 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
+| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed`, `base_branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
 | `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR. | Use allowed PRs; retain protections. |
 | `pr_is_draft`, `pr_not_open` | Draft/open. | Honor author readiness; stop closed/merged PRs. |
 | `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
@@ -203,7 +203,7 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 | `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Reviews/vetoes/threads; current-head allowlisted human approval. | Address feedback; retain reviewer independence. |
 | `protected_files_modified` | All live PR files: deletions/both rename sides; shared rules/exclusions. | Independent manual review/merge or trusted authorized scoped exclusions + recompile. `protected-files: allowed` disables only this gate, not caution/other guards. |
 | `manual_review_caution` | PR/review/protected-files/caution. | Independent manual review/merge; approvals/dismissals/labels/green checks cannot clear guard. |
-| `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
+| `merge_not_completed`, `merge_operation_error`, `merge_outcome_indeterminate` | API/live state. | Reconcile possibly-merged state before retry. |
 
 ## Parser and ledger diagnostics
 
@@ -263,10 +263,10 @@ or bypass profiles/effect-scopes.
 
 | Codes or signature | Check | Remedy |
 | --- | --- | --- |
-| HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone insufficient. |
-| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server. |
-| `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning doesn't prove later inference failure. |
-| Unlisted code, compile/schema/scanner error | Identifier/revision/emitter/caller. | Trace cause; add regression/row; report gaps, never guess. |
+| HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone not enough. |
+| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/server. |
+| `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning ≠ inference failure. |
+| Unlisted code, compile/schema/scanner error | Identifier/revision/emitter. | Trace cause; add regression/row; report gaps, never guess. |
 
 No run: [compile-only gates](debug-compilation.md); inspect file/line.
 Compilation != execution authority.
