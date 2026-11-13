@@ -2193,6 +2193,59 @@ safe-outputs:
 	assert.Nil(t, workflowData.SafeOutputs.ThreatDetection, "ThreatDetection must remain nil when explicitly disabled by main workflow")
 }
 
+func TestSafeOutputsImportedDisabledDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		mainConfig  string
+		imports     string
+		legacyKeys  bool
+		wantEnabled bool
+	}{
+		{"own safe outputs", "safe-outputs:\n  add-comment:\n    max: 1\n", "[./shared.md]", false, false},
+		{"no safe outputs", "", "[./shared.md]", false, false},
+		{"later defaults", "safe-outputs:\n  add-comment:\n    max: 1\n", "[./shared.md, ./metadata.md]", false, false},
+		{"earlier defaults", "safe-outputs:\n  add-comment:\n    max: 1\n", "[./metadata.md, ./shared.md]", false, false},
+		{"main enables", "safe-outputs:\n  report-missing-tool: {}\n  report-missing-data: {}\n  noop: {}\n  report-incomplete: {}\n", "[./shared.md]", false, true},
+		{"main disables", "safe-outputs:\n  report-missing-tool: false\n  report-missing-data: false\n  noop: false\n  report-incomplete: false\n", "[./shared.md, ./metadata.md]", false, false},
+		{"legacy import keys", "safe-outputs:\n  add-comment:\n    max: 1\n", "[./shared.md, ./metadata.md]", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := NewCompiler(WithVersion("1.0.0"))
+			workflowsDir := filepath.Join(t.TempDir(), ".github", "workflows")
+			require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+			toolKey, dataKey := "report-missing-tool", "report-missing-data"
+			if tc.legacyKeys {
+				toolKey, dataKey = "missing-tool", "missing-data"
+			}
+			shared := "---\nsafe-outputs:\n  " + toolKey + ": false\n  " + dataKey + ": false\n  noop: false\n  report-incomplete: false\n---\n"
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "shared.md"), []byte(shared), 0644))
+			metadata := "---\nsafe-outputs:\n  messages:\n    footer: \"> custom footer\"\n---\n"
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "metadata.md"), []byte(metadata), 0644))
+			main := "---\non: workflow_dispatch\nimports: " + tc.imports + "\n" + tc.mainConfig + "---\nRun a task.\n"
+			mainFile := filepath.Join(workflowsDir, "main.md")
+			require.NoError(t, os.WriteFile(mainFile, []byte(main), 0644))
+
+			data, err := compiler.ParseWorkflowFile(mainFile)
+			require.NoError(t, err)
+			require.NotNil(t, data.SafeOutputs)
+			if tc.wantEnabled {
+				assert.NotNil(t, data.SafeOutputs.MissingTool)
+				assert.NotNil(t, data.SafeOutputs.MissingData)
+				assert.NotNil(t, data.SafeOutputs.NoOp)
+				assert.NotNil(t, data.SafeOutputs.ReportIncomplete)
+			} else {
+				assert.Nil(t, data.SafeOutputs.MissingTool)
+				assert.Nil(t, data.SafeOutputs.MissingData)
+				assert.Nil(t, data.SafeOutputs.NoOp)
+				assert.Nil(t, data.SafeOutputs.ReportIncomplete)
+			}
+			if tc.name == "own safe outputs" {
+				assert.NotNil(t, data.SafeOutputs.AddComments)
+			}
+		})
+	}
+}
+
 func TestSafeOutputsImportPreservesDisabledDiagnostics(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
