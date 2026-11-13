@@ -13,12 +13,22 @@ func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *Wor
 	if err != nil {
 		return fmt.Errorf("failed to encode ledger projection configuration: %w", err)
 	}
+	if data.LedgerConfig.hasCommentStorage() {
+		c.generateCommentMemoryEarlyConfigStep(yaml, data)
+	}
 	yaml.WriteString("      - name: Create read-only ledger projections\n")
 	yaml.WriteString("        id: ledger_projections\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script"))
+	if _, err := fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script")); err != nil {
+		return err
+	}
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-	fmt.Fprintf(yaml, "          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig)
+	if _, err := fmt.Fprintf(yaml, "          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig); err != nil {
+		return err
+	}
+	for _, line := range ledgerCommentMemoryCredentialEnv(data) {
+		yaml.WriteString(line)
+	}
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")

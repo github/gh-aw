@@ -370,7 +370,7 @@ func parseGitHubReposScope(value any) (GitHubReposScope, error) {
 		}
 		return result, nil
 	default:
-		return nil, fmt.Errorf("repository scope must be a string or array of strings, got %T", value)
+		return nil, fmt.Errorf("repository scope must be a string or array of strings, got %T. Example: allowed-repos: all", value)
 	}
 }
 

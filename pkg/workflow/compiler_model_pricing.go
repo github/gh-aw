@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/ctxutil"
@@ -11,13 +12,40 @@ import (
 
 var compilerModelPricingLog = logger.New("workflow:compiler_model_pricing")
 
+func cloneModelCosts(modelCosts map[string]any) map[string]any {
+	cloned := maps.Clone(modelCosts)
+	for key, value := range cloned {
+		cloned[key] = cloneModelCostsValue(value)
+	}
+	return cloned
+}
+
+func cloneModelCostsValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneModelCosts(typed)
+	case map[string]string:
+		return maps.Clone(typed)
+	case []any:
+		cloned := slices.Clone(typed)
+		for index, item := range cloned {
+			cloned[index] = cloneModelCostsValue(item)
+		}
+		return cloned
+	case []string:
+		return slices.Clone(typed)
+	default:
+		return value
+	}
+}
+
 // resolveModelPricingIfMissing checks whether the workflow's configured model has pricing
 // in the frontmatter ModelCosts overlay. When pricing is absent it calls
-// c.modelPricingResolver (injected by the cli package) to look up pricing and merges
-// the result into ModelCosts for both GH_AW_INFO_MODEL_COSTS and apiProxy.providers.
+// c.modelPricingResolver (injected by the cli package) to look up reporting-only pricing
+// and merges the result into ModelCosts for GH_AW_INFO_MODEL_COSTS.
 //
-// Frontmatter-provided pricing always takes precedence. Local catalog entries must
-// also be supplied to AWF, whose built-in pricing table can lag behind gh-aw's.
+// Frontmatter-provided pricing always takes precedence. Automatically resolved catalog
+// entries are reporting metadata and are not supplied as AWF operator overrides.
 func (c *Compiler) resolveModelPricingIfMissing(modelCosts map[string]any, workflowData *WorkflowData) map[string]any {
 	if c.modelPricingResolver == nil {
 		return modelCosts
@@ -94,13 +122,12 @@ func resolveProviderAndModelForPricing(workflowData *WorkflowData) (string, stri
 	model = strings.ToLower(model)
 
 	if strings.Contains(model, "/") {
-		parts := strings.SplitN(model, "/", 2)
-		if parts[0] == "" || parts[1] == "" {
+		embeddedProvider, embeddedModel, hasProvider := strings.Cut(model, "/")
+		if !hasProvider || embeddedProvider == "" || embeddedModel == "" {
 			return "", "", false
 		}
-		embeddedProvider := normalizeProviderForPricing(parts[0])
-		embeddedModel := strings.TrimSpace(parts[1])
-		provider = embeddedProvider
+		provider = normalizeProviderForPricing(embeddedProvider)
+		embeddedModel = strings.TrimSpace(embeddedModel)
 		model = strings.ToLower(embeddedModel)
 	}
 
