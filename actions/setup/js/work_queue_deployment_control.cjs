@@ -1,6 +1,8 @@
 // @ts-check
 "use strict";
 
+// @safe-outputs-exempt USE-001 — thrown values are stable work_queue_* reason tokens matched by the work-queue reconciler, not user-facing messages.
+
 const { canonical, digest, utf8Compare } = require("./work_queue_codec.cjs");
 const { policyProposalFor, loadQueue, publishOperations } = require("./work_queue_binding.cjs");
 const { verifiedDefaultReference, configuredWorkerDeployment } = require("./work_queue_provisioning.cjs");

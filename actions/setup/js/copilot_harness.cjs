@@ -50,6 +50,7 @@
 "use strict";
 
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { isGitHubProviderCybersecurityPolicyRejection } = require("./github_provider_policy_rejection.cjs");
 require("./shim.cjs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -1206,14 +1207,15 @@ function extractTokenCountFromOutput(output) {
   return total;
 }
 
-/** @param {string} output @returns {boolean} */
-function isCopilotContentFilterError(output) {
+/** @param {string} output @param {string} [provider] @returns {boolean} */
+function isCopilotContentFilterError(output, provider = "github") {
   for (const event of iterateJsonl(output)) {
     if (event?.type !== "assistant.message") continue;
     const context = copilotSessionContext(event);
-    if (context.agentId === undefined && !context.parentToolUseId && getCopilotMessageRefusal(event.data)?.reason === "content_filter") return true;
+    if (context.agentId !== undefined || context.parentToolUseId) continue;
+    if (event.type === "assistant.message" && getCopilotMessageRefusal(event.data)?.reason === "content_filter") return true;
   }
-  return false;
+  return isGitHubProviderCybersecurityPolicyRejection(output, provider, "copilot");
 }
 
 /**
@@ -2263,7 +2265,7 @@ async function main() {
           const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
           const isWorkflowToolPermissionDenied = hasWorkflowToolPermissionDenial(result.exitCode);
           const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
-          const isContentFiltered = isCopilotContentFilterError(result.output);
+          const isContentFiltered = isCopilotContentFilterError(result.output, copilotSDKMode ? primaryProviderName : process.env.GH_AW_LLM_PROVIDER || "github");
           let isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
           if (!isInvocationCapExceeded) {
             const budget = await detectExhaustedAWFInvocationBudget({ nativeTerminalRateLimitError: result.nativeTerminalRateLimitError === true, logger: log });
