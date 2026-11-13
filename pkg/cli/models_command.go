@@ -32,6 +32,9 @@ Outputs two dense sections:
 - Built-in model aliases and their resolution order
 - Models observed in local automation logs and AWF reflect artifacts
 
+JSON retains deprecated compatibility fields: catalog is always [] and
+observed[].in_catalog is always false. Use AWF model metadata instead of these fields.
+
 By default, the command attempts a lightweight log refresh focused on firewall artifacts
 so recent awf-reflect data can be discovered before reporting.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` models
@@ -63,9 +66,13 @@ type observedModelRow struct {
 	Sources     string `json:"sources" console:"header:Sources"`
 	Occurrences int    `json:"occurrences" console:"header:Seen"`
 	AliasHints  string `json:"alias_hints,omitempty" console:"header:Alias Hints,omitempty"`
+	// Deprecated: catalog membership is no longer tracked; always false.
+	InCatalog bool `json:"in_catalog" console:"-"`
 }
 
 type modelsReport struct {
+	// Deprecated: pricing catalogs are owned by AWF; retained as an empty JSON array.
+	Catalog  []any              `json:"catalog"`
 	Aliases  []modelAliasRow    `json:"aliases"`
 	Observed []observedModelRow `json:"observed"`
 	Warnings []string           `json:"warnings,omitempty"`
@@ -95,6 +102,8 @@ func runModelsCommand(cmd *cobra.Command) error {
 	})
 
 	if jsonOutput {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			"models JSON fields catalog and observed[].in_catalog are deprecated and now always empty/false; use AWF model metadata instead."))
 		jsonBytes, err := marshalIndentJSONOrWrap(report, "models report")
 		if err != nil {
 			return err
@@ -131,6 +140,7 @@ func buildModelsReport(ctx context.Context, opts modelsReportOptions) modelsRepo
 	warnings = append(warnings, observedWarnings...)
 
 	return modelsReport{
+		Catalog:  []any{},
 		Aliases:  aliasRows,
 		Observed: observedRows,
 		Warnings: warnings,

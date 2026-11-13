@@ -64,8 +64,8 @@ func TestReportedCumulativeCreditsSupplyMissingDelta(t *testing.T) {
 		{Model: "future-model", AICreditsTotal: json.RawMessage("3")},
 	})
 	assert.True(t, summary.AICFound)
-	assert.Equal(t, 3.0, summary.TotalAIC)
-	assert.Equal(t, 3.0, summary.ByModel["future-model"].AIC)
+	assert.InDelta(t, 3.0, summary.TotalAIC, 1e-9)
+	assert.InDelta(t, 3.0, summary.ByModel["future-model"].AIC, 1e-9)
 }
 
 func TestReportedCumulativeCreditsAgreeAcrossAttribution(t *testing.T) {
@@ -87,7 +87,7 @@ func TestReportedCumulativeCreditsAgreeAcrossAttribution(t *testing.T) {
 		}},
 	}
 	populateAICFromTokenUsageEntries(summary, entries)
-	assert.Equal(t, 2.0, summary.TotalAIC)
+	assert.InDelta(t, 2.0, summary.TotalAIC, 1e-9)
 	matchPiAgentUsageCredits(summary, entries, newModelIdentityResolver(""))
 	require.Len(t, summary.AgentUsage, 2)
 	assert.InDelta(t, 0.9, summary.AgentUsage[0].AIC, 1e-9)

@@ -3,14 +3,35 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestModelsReportPreservesDeprecatedJSONFields(t *testing.T) {
+	t.Parallel()
+
+	report := buildModelsReport(context.Background(), modelsReportOptions{logsDir: t.TempDir()})
+	require.NotNil(t, report.Catalog)
+	require.Empty(t, report.Catalog)
+	report.Observed = []observedModelRow{{Provider: "copilot", Model: "future-model", Sources: "awf-reflect", Occurrences: 1}}
+	data, err := json.Marshal(report)
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(data, &parsed))
+	assert.JSONEq(t, "[]", string(parsed["catalog"]))
+	var observed []map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(parsed["observed"], &observed))
+	require.Len(t, observed, 1)
+	assert.JSONEq(t, "false", string(observed[0]["in_catalog"]))
+	assert.NotContains(t, console.RenderStructStdout(report.Observed), "Catalog")
+}
 
 func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
 	t.Parallel()
@@ -65,10 +86,12 @@ func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
 	assert.Contains(t, sonnet.Sources, "summary")
 	assert.Contains(t, sonnet.Sources, "awf-reflect")
 	assert.GreaterOrEqual(t, sonnet.Occurrences, 8)
+	assert.False(t, sonnet.InCatalog, "deprecated membership must not imply catalog knowledge")
 
 	gpt, ok := lookup["github-copilot/gpt-5.4"]
 	require.True(t, ok)
 	assert.Contains(t, gpt.Sources, "awf-reflect")
+	assert.False(t, gpt.InCatalog)
 }
 
 func TestInferAliasHints(t *testing.T) {

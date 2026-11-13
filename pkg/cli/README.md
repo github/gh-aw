@@ -12,6 +12,8 @@ Besides Cobra entry points, the package also exposes reusable helpers for workfl
 
 All diagnostic output MUST go to `stderr` using `console` formatting helpers. Structured output (JSON, hashes, graphs) goes to `stdout`.
 
+`gh aw models --json` retains the deprecated `catalog` and `observed[].in_catalog` fields for compatibility. They always contain `[]` and `false`, respectively; no repository-owned pricing catalog or membership lookup is used. Use AWF model metadata for catalog information and `observed` for locally recorded model evidence. The console report lists aliases and observed models only.
+
 ## Command Groups
 
 | Command | Entry Point | Description |

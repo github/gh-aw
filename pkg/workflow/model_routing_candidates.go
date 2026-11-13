@@ -8,10 +8,11 @@ package workflow
 import (
 	"errors"
 	"fmt"
-	"github.com/github/gh-aw/pkg/logger"
 	"path"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var modelRoutingCandidatesLog = logger.New("workflow:model_routing_candidates")
@@ -49,9 +50,18 @@ func workflowProviderModelIDs(data *WorkflowData, provider string) map[string]an
 	if data == nil {
 		return nil
 	}
-	providers, _ := data.ModelCosts["providers"].(map[string]any)
-	entry, _ := providers[provider].(map[string]any)
-	models, _ := entry["models"].(map[string]any)
+	providers, ok := data.ModelCosts["providers"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	entry, ok := providers[provider].(map[string]any)
+	if !ok {
+		return nil
+	}
+	models, ok := entry["models"].(map[string]any)
+	if !ok {
+		return nil
+	}
 	return models
 }
 
