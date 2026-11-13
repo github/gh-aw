@@ -152,24 +152,12 @@ func generateModelRoutingDecisionStep(data *WorkflowData) string {
 		return ""
 	}
 	agentVar, defaultVar, _ := modelRoutingRuntimeVariables(data.EngineConfig.ID)
-	var b strings.Builder
-	b.WriteString("      - name: Resolve model routing\n")
-	fmt.Fprintf(&b, "        id: %s\n", modelRoutingDecisionStepID)
-	b.WriteString("        env:\n")
-	fmt.Fprintf(&b, "          GH_AW_MODEL_AGENT_VAR: ${{ vars.%s }}\n", agentVar)
-	fmt.Fprintf(&b, "          GH_AW_DEFAULT_MODEL_VAR: ${{ vars.%s }}\n", defaultVar)
-	b.WriteString("        run: |\n")
-	fmt.Fprintf(&b, "          if [ -n \"${GH_AW_MODEL_AGENT_VAR}\" ]; then\n")
-	fmt.Fprintf(&b, "            echo \"Model routing disabled: vars.%s selects the model\"\n", agentVar)
-	fmt.Fprintf(&b, "            echo \"%s=false\" >> \"$GITHUB_OUTPUT\"\n", modelRoutingDecisionOutput)
-	fmt.Fprintf(&b, "          elif [ -n \"${GH_AW_DEFAULT_MODEL_VAR}\" ]; then\n")
-	fmt.Fprintf(&b, "            echo \"Model routing disabled: vars.%s selects the model\"\n", defaultVar)
-	fmt.Fprintf(&b, "            echo \"%s=false\" >> \"$GITHUB_OUTPUT\"\n", modelRoutingDecisionOutput)
-	b.WriteString("          else\n")
-	fmt.Fprintf(&b, "            echo \"Model routing enabled: goal %s, mode %s\"\n", data.EngineConfig.ModelRouting.Goal, data.EngineConfig.ModelRouting.Mode)
-	fmt.Fprintf(&b, "            echo \"%s=true\" >> \"$GITHUB_OUTPUT\"\n", modelRoutingDecisionOutput)
-	b.WriteString("          fi\n")
-	return b.String()
+	return fmt.Sprintf(`      - name: Resolve model routing
+        id: %s
+        env:
+          GH_AW_MODEL_ROUTING: ${{ vars.%s == '' && vars.%s == '' }}
+        run: echo "%s=$GH_AW_MODEL_ROUTING" >> "$GITHUB_OUTPUT"
+`, modelRoutingDecisionStepID, agentVar, defaultVar, modelRoutingDecisionOutput)
 }
 
 // declaresModelOrRoutingChoice reports whether the main workflow or its resolved
