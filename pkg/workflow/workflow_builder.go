@@ -254,11 +254,6 @@ func (c *Compiler) buildInitialWorkflowData(
 	if len(mergedModelCosts) > 0 {
 		workflowData.ModelCosts = mergedModelCosts
 	}
-	// Attempt to resolve pricing for the workflow model from models.dev when it is absent
-	// from both the frontmatter overlay and the embedded models.json catalog.  The result
-	// is injected into ModelCosts so the runtime receives it via GH_AW_INFO_MODEL_COSTS.
-	workflowData.ModelCosts = c.resolveModelPricingIfMissing(workflowData.ModelCosts, workflowData)
-	workflowData.ModelCosts = c.resolveFallbackModelPricing(workflowData.ModelCosts, workflowData)
 	mainModelPolicy := extractMainModelPolicyOverlay(toolsResult, result.Frontmatter)
 	allowedModels, disallowedModels := mergeModelPolicyOverlays(importsResult.MergedModelPolicies, mainModelPolicy)
 	if len(allowedModels) > 0 {

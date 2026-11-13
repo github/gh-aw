@@ -6,16 +6,12 @@
 package workflow
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/github/gh-aw/pkg/logger"
 	"path"
 	"slices"
 	"strings"
-	"sync"
-
-	clidata "github.com/github/gh-aw/pkg/cli/data"
-	"github.com/github/gh-aw/pkg/logger"
 )
 
 var modelRoutingCandidatesLog = logger.New("workflow:model_routing_candidates")
@@ -48,48 +44,22 @@ func modelRoutingAliasMap(data *WorkflowData) map[string][]string {
 	return getBuiltinOnlyAliasMap()
 }
 
-// bundledProviderModelIDs returns the lower-cased model ids of each provider in gh-aw's
-// bundled model catalogue (pkg/cli/data/models.json).
-var bundledProviderModelIDs = sync.OnceValue(func() map[string]map[string]struct{} {
-	var catalog struct {
-		Providers map[string]struct {
-			Models map[string]json.RawMessage `json:"models"`
-		} `json:"providers"`
+// workflowProviderModelIDs returns model IDs explicitly declared in the workflow overlay.
+func workflowProviderModelIDs(data *WorkflowData, provider string) map[string]any {
+	if data == nil {
+		return nil
 	}
-	ids := make(map[string]map[string]struct{})
-	if err := json.Unmarshal(clidata.ModelsJSON, &catalog); err != nil {
-		return ids
-	}
-	for provider, entry := range catalog.Providers {
-		ids[provider] = make(map[string]struct{}, len(entry.Models))
-		for id := range entry.Models {
-			ids[provider][strings.ToLower(id)] = struct{}{}
-		}
-	}
-	return ids
-})
-
-func isBundledProviderModelID(provider, model string) bool {
-	_, ok := bundledProviderModelIDs()[provider][strings.ToLower(model)]
-	return ok
-}
-
-func bundledProviderModelMatches(provider, pattern string) bool {
-	pattern = strings.ToLower(pattern)
-	for id := range bundledProviderModelIDs()[provider] {
-		if matched, err := path.Match(pattern, id); err == nil && matched {
-			return true
-		}
-	}
-	return false
+	providers, _ := data.ModelCosts["providers"].(map[string]any)
+	entry, _ := providers[provider].(map[string]any)
+	models, _ := entry["models"].(map[string]any)
+	return models
 }
 
 // resolveModelRoutingCandidateGroups resolves each engine.model-routing.allowed-models
 // entry in the routing namespace: github-copilot, or the engine's native provider
 // (anthropic for Claude, openai for Codex). An entry with the namespace's provider
 // prefix (github-copilot/ or copilot/ for Copilot), or a model id of the namespace in
-// the bundled catalogue, is exact, even when an alias has the same name; this matches
-// resolveConfiguredModel, where a live model id wins over an alias. A native entry
+// the explicit workflow overlay, is exact, even when an alias has the same name. A native entry
 // with another provider's prefix is rejected rather than retargeted. Other aliases
 // expand through the workflow's alias map to patterns in the namespace, limited to
 // the engine's model family for Claude and Codex. Remaining entries must be GitHub
@@ -125,7 +95,8 @@ func resolveModelRoutingCandidateGroups(data *WorkflowData, engineName string) (
 		if !validModelRoutingCandidate(model) {
 			return nil, fmt.Errorf("engine.model-routing.allowed-models contains invalid %s %q", modelLabel, model)
 		}
-		exact := prefixed || containsExpression(model) || isBundledProviderModelID(namespace, model)
+		_, explicitModel := workflowProviderModelIDs(data, namespace)[model]
+		exact := prefixed || containsExpression(model) || explicitModel
 		key := model
 		if !exact && aliases[model] != nil {
 			key = "alias:" + model
@@ -215,9 +186,7 @@ func plausibleConcreteModelID(model string) bool {
 // engine's model family are kept. A pattern that does not start with the family, from
 // an alias that also lists the engine's native provider, is intersected with the
 // family (for example *sonnet* becomes claude-*sonnet*, and *claude-sonnet* becomes
-// claude-sonnet*); an intersection that matches no model of the namespace in the
-// bundled catalogue is dropped rather than emitted as a pattern that only fails at
-// run time.
+// claude-sonnet*). AWF resolves these patterns against its current model inventory.
 func expandModelRoutingAliasInNamespace(alias string, aliases map[string][]string, engineName, namespace string) ([]string, error) {
 	engineName = strings.ToLower(engineName)
 	familyPrefix, familyLimited := modelRoutingEngineFamilyPrefixes[engineName]
@@ -235,9 +204,7 @@ func expandModelRoutingAliasInNamespace(alias string, aliases map[string][]strin
 			}) {
 				return
 			}
-			names = slices.DeleteFunc(intersectModelPatternWithFamily(name, familyPrefix), func(narrowed string) bool {
-				return !bundledProviderModelMatches(namespace, narrowed)
-			})
+			names = intersectModelPatternWithFamily(name, familyPrefix)
 		}
 		for _, name := range names {
 			patterns = appendUnique(patterns, qualifiedModelID(namespace, name))

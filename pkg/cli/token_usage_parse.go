@@ -212,17 +212,6 @@ func usageNumericValue(parsed map[string]any, usage map[string]any, keys ...stri
 	return 0
 }
 
-func usageStringValue(parsed map[string]any, usage map[string]any, keys ...string) string {
-	for _, key := range keys {
-		for _, candidate := range []any{usage[key], parsed[key]} {
-			if value, ok := candidate.(string); ok && strings.TrimSpace(value) != "" {
-				return value
-			}
-		}
-	}
-	return ""
-}
-
 func isFinite(value float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0)
 }

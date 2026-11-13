@@ -14,12 +14,14 @@ const { parseCustomLog } = req("./parse_custom_log.cjs");
 const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
 const claudeFixtures = req("./fixtures/claude_ci_sessions.cjs");
 const { dynamicWorkflow } = req("./fixtures/claude_dynamic_workflow.cjs");
+const { useModelOverrides } = req("./fixtures/model_overrides.cjs");
 const codexNoTools = fs.readFileSync(new URL("./test_data/codex_ci_no_tools.jsonl", import.meta.url), "utf8");
 
 describe("Unified conclusion session", () => {
   let root;
   let originalEnv;
   let originalCore;
+  let restoreModels;
   beforeEach(() => {
     root = fs.mkdtempSync(path.resolve(".gh-aw-unified-session-"));
     originalEnv = { ...process.env };
@@ -29,6 +31,8 @@ describe("Unified conclusion session", () => {
     global.core = { info: vi.fn(), warning: vi.fn() };
   });
   afterEach(() => {
+    restoreModels?.();
+    restoreModels = undefined;
     process.env = originalEnv;
     global.core = originalCore;
     vi.restoreAllMocks();
@@ -1763,6 +1767,7 @@ describe("Unified conclusion session", () => {
   });
 
   it("resolves detection and eval AIC per observation without adding overlapping checkpoints", () => {
+    restoreModels = useModelOverrides({ openai: { models: { "gpt-4o-mini": { cost: { input: "0.000002", output: "0.000004" } } } } });
     write("threat-detection/detection_usage.jsonl", [
       { provider: "openai", model: "gpt-4o-mini", input_tokens: 1000, output_tokens: 100 },
       { provider: "openai", model: "unknown-model", input_tokens: 10 },

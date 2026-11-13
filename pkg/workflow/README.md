@@ -1277,7 +1277,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `compiler_mutators.go` | `(*Compiler).SetForceRefreshActionPins` | `func (*Compiler).SetForceRefreshActionPins(force bool)` | SetForceRefreshActionPins configures whether to force refresh of action pins |
 | `compiler_mutators.go` | `(*Compiler).SetForceStaged` | `func (*Compiler).SetForceStaged(force bool)` | SetForceStaged configures whether safe-outputs should always compile in staged mode. |
 | `compiler_mutators.go` | `(*Compiler).SetGHESCompat` | `func (*Compiler).SetGHESCompat(enabled bool)` | SetGHESCompat enables GHES compatibility mode via the --ghes CLI flag. |
-| `compiler_mutators.go` | `(*Compiler).SetModelPricingResolver` | `func (*Compiler).SetModelPricingResolver(fn func(ctx context.Context, provider, model string) (map[string]float64, bool))` | SetModelPricingResolver registers a callback used to resolve pricing for models that are not present in the embedded models. |
 | `compiler_mutators.go` | `(*Compiler).SetNoEmit` | `func (*Compiler).SetNoEmit(noEmit bool)` | SetNoEmit configures whether to validate without generating lock files |
 | `compiler_mutators.go` | `(*Compiler).SetPriorManifests` | `func (*Compiler).SetPriorManifests(manifests map[string]*GHAWManifest)` | SetPriorManifests replaces the entire pre-cached manifest map. |
 | `compiler_mutators.go` | `(*Compiler).SetQuiet` | `func (*Compiler).SetQuiet(quiet bool)` | SetQuiet configures whether to suppress success messages (for interactive mode) |

@@ -122,12 +122,7 @@ func deduplicateTokenUsageAICStream(entries []TokenUsageEntry, seenRequestIDs ma
 	duplicates := 0
 	for _, entry := range orderTokenUsageEntriesForAIC(entries) {
 		reportedTotal, _, totalValid := parseOptionalNonNegativeFloat(entry.AICreditsTotal)
-		delta, _, deltaValid := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse)
-		if !deltaValid {
-			includeCache, _, _ := parseOptionalBool(entry.InputTokensIncludeCache)
-			delta = computeModelInferenceAICWithCacheSemantics(entry.Provider, entry.Model, entry.InputTokens,
-				entry.OutputTokens, entry.CacheReadTokens, entry.CacheWriteTokens, entry.ReasoningTokens, includeCache)
-		}
+		delta, _, _ := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse)
 		nextAIC := runningAIC + delta
 		if totalValid {
 			nextAIC = reportedTotal
@@ -216,6 +211,7 @@ func legacyUsageRecordHasAccountingFields(parsed map[string]any) bool {
 	for _, record := range []map[string]any{parsed, extractUsageRecord(parsed["usage"])} {
 		for _, key := range []string{
 			"ai_credits", "aiCredits", "aic", "input_tokens", "inputTokens", "output_tokens", "outputTokens",
+			"cost_usd", "costUSD", "total_cost_usd", "totalCostUSD",
 			"cache_read_tokens", "cacheReadTokens", "cache_write_tokens", "cacheWriteTokens", "reasoning_tokens", "reasoningTokens",
 		} {
 			if _, present := record[key]; present {
@@ -245,14 +241,22 @@ func parseLegacyUsageAIC(parsed map[string]any) (float64, bool) {
 			return value, true
 		}
 	}
-	computedAIC := computeModelInferenceAIC(
-		usageStringValue(parsed, usage, "provider"),
-		usageStringValue(parsed, usage, "model"),
-		int(usageNumericValue(parsed, usage, "input_tokens", "inputTokens")),
-		int(usageNumericValue(parsed, usage, "output_tokens", "outputTokens")),
-		int(usageNumericValue(parsed, usage, "cache_read_tokens", "cacheReadTokens")),
-		int(usageNumericValue(parsed, usage, "cache_write_tokens", "cacheWriteTokens")),
-		int(usageNumericValue(parsed, usage, "reasoning_tokens", "reasoningTokens")),
-	)
-	return computedAIC, computedAIC > 0
+	for _, key := range []string{"total_cost_usd", "totalCostUSD", "cost_usd", "costUSD"} {
+		for _, candidate := range []any{usage[key], parsed[key]} {
+			var usd float64
+			var valid bool
+			switch value := candidate.(type) {
+			case float64:
+				usd, valid = value, true
+			case string:
+				var err error
+				usd, err = strconv.ParseFloat(strings.TrimSpace(value), 64)
+				valid = err == nil
+			}
+			if valid && usd >= 0 && isFinite(usd/0.01) {
+				return usd / 0.01, true
+			}
+		}
+	}
+	return 0, false
 }

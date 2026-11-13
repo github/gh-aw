@@ -314,7 +314,7 @@ func reconcileAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsage
 	}
 	expected := summary.TotalAIC
 	var endpoints []string
-	for _, entry := range entries {
+	for _, entry := range tokenUsageEntriesWithCreditDeltas(entries) {
 		if isAWFOwnedProxyRecord(entry) {
 			expected -= tokenUsageEntryCredits(entry)
 		} else if entry.Path != "" {
@@ -407,8 +407,7 @@ func matchPiAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsageEn
 		}
 		return strings.Compare(a.agent.AgentName, b.agent.AgentName)
 	})
-	entries = append([]TokenUsageEntry(nil), entries...)
-	sortProxyUsageEntries(entries)
+	entries = tokenUsageEntriesWithCreditDeltas(entries)
 	// Explicit caller records are attributed first and reserved, so the
 	// token/model/time correlation below only sees unlabelled records and only
 	// for sub-agents without explicit records.
@@ -491,23 +490,6 @@ func confirmedZeroUsagePiFailures(agents []*AgentUsageBreakdown) bool {
 		}
 	}
 	return true
-}
-
-func sortProxyUsageEntries(entries []TokenUsageEntry) {
-	slices.SortStableFunc(entries, func(a, b TokenUsageEntry) int {
-		aTime, aValid := parseTokenUsageTimestamp(a.Timestamp)
-		bTime, bValid := parseTokenUsageTimestamp(b.Timestamp)
-		if !aValid {
-			if !bValid {
-				return 0
-			}
-			return 1
-		}
-		if !bValid {
-			return -1
-		}
-		return aTime.Compare(bTime)
-	})
 }
 
 func matchPiSubagentRequests(summary *TokenUsageSummary, entries []TokenUsageEntry, requests []indexedPiRequest, resolver *modelIdentityResolver, reserved map[int]bool) map[int]bool {
@@ -638,11 +620,7 @@ func tokenUsageEntryCredits(entry TokenUsageEntry) float64 {
 	if credits, _, valid := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse); valid {
 		return credits
 	}
-	inputTokensIncludeCache, _, _ := parseOptionalBool(entry.InputTokensIncludeCache)
-	return computeModelInferenceAICWithCacheSemantics(
-		entry.Provider, entry.Model, entry.InputTokens, entry.OutputTokens,
-		entry.CacheReadTokens, entry.CacheWriteTokens, entry.ReasoningTokens, inputTokensIncludeCache,
-	)
+	return entry.reportedCreditDelta
 }
 
 func sortSubagentModelActuals(actuals []SubagentModelActual) {

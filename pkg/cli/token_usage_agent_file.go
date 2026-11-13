@@ -61,7 +61,7 @@ func buildAgentUsageSummary(entry agentUsageEntry) *TokenUsageSummary {
 		InputTokens:  ambientInputTokens,
 		CachedTokens: entry.CacheReadTokens,
 	}
-	populateAgentUsageAIC(summary, entry, model, provider, hasRawTokenData)
+	populateAgentUsageAIC(summary, entry, model, provider)
 	return summary
 }
 
@@ -79,14 +79,18 @@ func buildAgentModelTokenUsage(entry agentUsageEntry, provider string) *ModelTok
 	}
 }
 
-func populateAgentUsageAIC(summary *TokenUsageSummary, entry agentUsageEntry, model, provider string, hasRawTokenData bool) {
+func populateAgentUsageAIC(summary *TokenUsageSummary, entry agentUsageEntry, model, provider string) {
 	aic, present, valid := parseOptionalNonNegativeFloat(entry.AICredits)
 	if !present || !valid {
-		if hasRawTokenData {
-			populateAIC(summary)
-			summary.AICFound = summary.TotalAIC > 0
+		for _, raw := range []json.RawMessage{entry.TotalCostUSD, entry.CostUSD} {
+			if usd, _, ok := parseOptionalNonNegativeFloat(raw); ok && isFinite(usd/0.01) {
+				aic, valid = usd/0.01, true
+				break
+			}
 		}
-		return
+		if !valid {
+			return
+		}
 	}
 	summary.TotalAIC = aic
 	summary.AICFound = true

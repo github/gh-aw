@@ -12,23 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildModelCatalogRowsSorted(t *testing.T) {
-	t.Parallel()
-
-	rows := buildModelCatalogRows()
-	require.NotEmpty(t, rows)
-
-	for i := 1; i < len(rows); i++ {
-		prev := rows[i-1]
-		curr := rows[i]
-		if prev.Provider == curr.Provider {
-			assert.LessOrEqual(t, prev.Model, curr.Model)
-			continue
-		}
-		assert.LessOrEqual(t, prev.Provider, curr.Provider)
-	}
-}
-
 func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
 	t.Parallel()
 
@@ -82,12 +65,10 @@ func TestCollectObservedModelRowsFromSummaryAndReflect(t *testing.T) {
 	assert.Contains(t, sonnet.Sources, "summary")
 	assert.Contains(t, sonnet.Sources, "awf-reflect")
 	assert.GreaterOrEqual(t, sonnet.Occurrences, 8)
-	assert.True(t, sonnet.InCatalog)
 
 	gpt, ok := lookup["github-copilot/gpt-5.4"]
 	require.True(t, ok)
 	assert.Contains(t, gpt.Sources, "awf-reflect")
-	assert.True(t, gpt.InCatalog)
 }
 
 func TestInferAliasHints(t *testing.T) {
@@ -136,17 +117,4 @@ func TestCollectObservedModelRowsSkipsRunsAlreadyInSummary(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, "summary", rows[0].Sources)
 	assert.Equal(t, 1, rows[0].Occurrences)
-}
-
-func TestModelExistsInCatalogIsProviderScoped(t *testing.T) {
-	t.Parallel()
-
-	index := makeCatalogIndex()
-
-	assert.True(t, modelExistsInCatalog(index, "openai", "gpt-5.4"))
-	assert.True(t, modelExistsInCatalog(index, "", "gpt-5.4"))
-	assert.True(t, modelExistsInCatalog(index, "", "openai/gpt-5.4"))
-	assert.False(t, modelExistsInCatalog(index, "other", "gpt-5.4"))
-	assert.False(t, modelExistsInCatalog(index, "", "other/gpt-5.4"))
-	assert.False(t, modelExistsInCatalog(index, "openai", "not-a-real-model"))
 }

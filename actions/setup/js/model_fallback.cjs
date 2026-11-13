@@ -4,11 +4,6 @@ const { normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./aw
 const { buildCatalogFromReflect, selectLatestGlobMatch, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 
 const MODEL_FALLBACK_ENV_VAR = "GH_AW_MODEL_FALLBACK";
-const CLAUDE_COPILOT_MODEL_OVERRIDES = new Map(
-  Object.keys(require("./models.json").providers["github-copilot"].models)
-    .filter(id => id.startsWith("claude-") && id.includes("."))
-    .map(id => [id.replaceAll(".", "-"), id])
-);
 
 function readTrimmedEnv(env, name) {
   return typeof env?.[name] === "string" ? env[name].trim() : "";
@@ -126,7 +121,9 @@ function normalizeClaudeModel(model, provider, env, options = {}) {
   const resolved = resolveClaudeAutoModel(match ? match[1] : model.trim(), provider, options);
   if (!copilotProvider) return resolved;
   const { base } = splitModelIdentifier(resolved);
-  const mapped = CLAUDE_COPILOT_MODEL_OVERRIDES.get(base) || base.replace(/^(claude-[a-z]+-\d+)-(\d{1,2})$/, "$1.$2");
+  const endpoints = options.reflectData?.endpoints?.filter(endpoint => endpoint?.configured === true && REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(endpoint.provider))) || [];
+  const catalog = buildCatalogFromReflect({ endpoints });
+  const mapped = catalog.find(id => id.startsWith("claude-") && id.replaceAll(".", "-") === base) || base.replace(/^(claude-[a-z]+-\d+)-(\d{1,2})$/, "$1.$2");
   return mapped + resolved.slice(base.length);
 }
 

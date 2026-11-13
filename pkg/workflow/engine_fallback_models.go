@@ -60,26 +60,6 @@ func fallbackModelProviders(data *WorkflowData) []LLMProvider {
 	return providers
 }
 
-func (c *Compiler) resolveFallbackModelPricing(modelCosts map[string]any, data *WorkflowData) map[string]any {
-	if data.EngineConfig == nil {
-		return modelCosts
-	}
-	primary := fallbackModelProviders(data)
-	if len(primary) > 0 {
-		for _, model := range data.EngineConfig.FallbackModels {
-			for _, entry := range expandModelPatterns(model, data.ModelMappings, string(primary[0])) {
-				if strings.Contains(entry, "*") {
-					continue
-				}
-				modelData := *data
-				modelData.Model = entry
-				modelCosts = c.resolveModelPricingIfMissing(modelCosts, &modelData)
-			}
-		}
-	}
-	return modelCosts
-}
-
 func fallbackProviderSecretNames(data *WorkflowData) []string {
 	var names []string
 	for _, provider := range fallbackModelProviders(data) {

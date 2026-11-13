@@ -6,7 +6,6 @@ on:
     paths:
       - 'actions/setup/js/**'
       - 'actions/setup/md/**'
-      - 'pkg/cli/data/models.json'
       - 'scripts/**/*.js'
       - 'scripts/check-cgo-cjs-workflow-purity.sh'
       - 'Makefile'
@@ -17,7 +16,6 @@ on:
     paths:
       - 'actions/setup/js/**'
       - 'actions/setup/md/**'
-      - 'pkg/cli/data/models.json'
       - 'scripts/**/*.js'
       - 'scripts/check-cgo-cjs-workflow-purity.sh'
       - 'Makefile'
@@ -302,9 +300,6 @@ jobs:
 
       - name: Check JSON formatting
         run: make fmt-check-json
-
-      - name: Validate models.json mirror consistency
-        run: make validate-models-json-sync
 
   artifact-integration:
     name: Artifact API Integration

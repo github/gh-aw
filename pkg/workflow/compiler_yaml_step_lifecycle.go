@@ -265,8 +265,7 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 			}
 		}
 	}
-	// Embed the `models` overlay from frontmatter so the activation job can merge it with
-	// the built-in models.json and write the combined catalog to /tmp/gh-aw/models.json.
+	// Pass explicit frontmatter model overlays to activation and AWF.
 	if len(data.ModelCosts) > 0 {
 		if modelCostsJSON, err := json.Marshal(data.ModelCosts); err == nil {
 			// Escape single quotes for YAML single-quoted scalar safety

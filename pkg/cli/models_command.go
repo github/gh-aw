@@ -25,11 +25,10 @@ const defaultModelsRefreshCount = 20
 func NewModelsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "models",
-		Short: "List model catalog pricing, aliases, and observed automation models",
+		Short: "List model aliases and observed automation models",
 		Long: `List model data to help pick a model alias or explicit model name.
 
-Outputs three dense sections:
-- Catalog models and per-token pricing from the embedded models catalog
+Outputs two dense sections:
 - Built-in model aliases and their resolution order
 - Models observed in local automation logs and AWF reflect artifacts
 
@@ -53,16 +52,6 @@ so recent awf-reflect data can be discovered before reporting.`,
 	return cmd
 }
 
-type modelCatalogRow struct {
-	Provider   string `json:"provider" console:"header:Provider"`
-	Model      string `json:"model" console:"header:Model"`
-	Input      string `json:"input" console:"header:Input USD/token"`
-	Output     string `json:"output" console:"header:Output USD/token"`
-	CacheRead  string `json:"cache_read" console:"header:Cache Read USD/token"`
-	CacheWrite string `json:"cache_write" console:"header:Cache Write USD/token"`
-	Reasoning  string `json:"reasoning,omitempty" console:"header:Reasoning USD/token,omitempty"`
-}
-
 type modelAliasRow struct {
 	Alias   string `json:"alias" console:"header:Alias"`
 	Targets string `json:"targets" console:"header:Resolution Order"`
@@ -73,12 +62,10 @@ type observedModelRow struct {
 	Model       string `json:"model" console:"header:Model"`
 	Sources     string `json:"sources" console:"header:Sources"`
 	Occurrences int    `json:"occurrences" console:"header:Seen"`
-	InCatalog   bool   `json:"in_catalog" console:"header:Catalog"`
 	AliasHints  string `json:"alias_hints,omitempty" console:"header:Alias Hints,omitempty"`
 }
 
 type modelsReport struct {
-	Catalog  []modelCatalogRow  `json:"catalog"`
 	Aliases  []modelAliasRow    `json:"aliases"`
 	Observed []observedModelRow `json:"observed"`
 	Warnings []string           `json:"warnings,omitempty"`
@@ -116,9 +103,6 @@ func runModelsCommand(cmd *cobra.Command) error {
 		return nil
 	}
 
-	fmt.Fprintln(os.Stdout, "Catalog Models")
-	fmt.Fprint(os.Stdout, console.RenderStructStdout(report.Catalog))
-	fmt.Fprintln(os.Stdout)
 	fmt.Fprintln(os.Stdout, "Model Aliases")
 	fmt.Fprint(os.Stdout, console.RenderStructStdout(report.Aliases))
 	fmt.Fprintln(os.Stdout)
@@ -142,13 +126,11 @@ func buildModelsReport(ctx context.Context, opts modelsReportOptions) modelsRepo
 		}
 	}
 
-	catalogRows := buildModelCatalogRows()
 	aliasRows, aliasMap := buildModelAliasRows()
 	observedRows, observedWarnings := collectObservedModelRows(opts.logsDir, aliasMap)
 	warnings = append(warnings, observedWarnings...)
 
 	return modelsReport{
-		Catalog:  catalogRows,
 		Aliases:  aliasRows,
 		Observed: observedRows,
 		Warnings: warnings,
@@ -166,29 +148,6 @@ func refreshObservedArtifacts(ctx context.Context, logsDir string, refreshCount 
 		ArtifactSets:   []string{string(ArtifactSetFirewall), string(ArtifactSetUsage)},
 		SuppressRender: true,
 	})
-}
-
-func buildModelCatalogRows() []modelCatalogRow {
-	initModelPrices()
-	rows := make([]modelCatalogRow, 0, len(modelPriceRecords))
-	for _, record := range modelPriceRecords {
-		rows = append(rows, modelCatalogRow{
-			Provider:   record.provider,
-			Model:      record.model,
-			Input:      formatCost(record.pricing["input"]),
-			Output:     formatCost(record.pricing["output"]),
-			CacheRead:  formatCost(record.pricing["cache_read"]),
-			CacheWrite: formatCost(record.pricing["cache_write"]),
-			Reasoning:  formatCost(record.pricing["reasoning"]),
-		})
-	}
-	slices.SortFunc(rows, func(a, b modelCatalogRow) int {
-		if cmp := strings.Compare(a.Provider, b.Provider); cmp != 0 {
-			return cmp
-		}
-		return strings.Compare(a.Model, b.Model)
-	})
-	return rows
 }
 
 func buildModelAliasRows() ([]modelAliasRow, map[string][]string) {
@@ -216,7 +175,6 @@ type observedModelRecord struct {
 func collectObservedModelRows(logsDir string, aliasMap map[string][]string) ([]observedModelRow, []string) {
 	warnings := make([]string, 0)
 	records := make(map[string]*observedModelRecord)
-	catalogIndex := makeCatalogIndex()
 
 	addObserved := func(provider, model, source string, occurrences int) {
 		normalizedProvider := modelsdev.NormalizeProvider(provider)
@@ -246,12 +204,12 @@ func collectObservedModelRows(logsDir string, aliasMap map[string][]string) ([]o
 	warnings = appendObservedCollectionWarning(warnings, collectObservedFromRunDirs(logsDir, summarizedRuns, addObserved), "run directories")
 	warnings = appendObservedCollectionWarning(warnings, collectObservedFromAWFReflect(logsDir, addObserved), "awf-reflect artifacts")
 
-	return buildObservedModelRows(records, catalogIndex, aliasMap), warnings
+	return buildObservedModelRows(records, aliasMap), warnings
 }
 
 // buildObservedModelRows converts collected observations into sorted report rows,
 // ordered by descending occurrence count then provider and model.
-func buildObservedModelRows(records map[string]*observedModelRecord, catalogIndex catalogIndex, aliasMap map[string][]string) []observedModelRow {
+func buildObservedModelRows(records map[string]*observedModelRecord, aliasMap map[string][]string) []observedModelRow {
 	rows := make([]observedModelRow, 0, len(records))
 	for _, record := range records {
 		sourceList := make([]string, 0, len(record.sources))
@@ -265,7 +223,6 @@ func buildObservedModelRows(records map[string]*observedModelRecord, catalogInde
 			Model:       record.model,
 			Sources:     strings.Join(sourceList, ", "),
 			Occurrences: record.occurrences,
-			InCatalog:   modelExistsInCatalog(catalogIndex, record.provider, record.model),
 			AliasHints:  inferAliasHints(record.provider, record.model, aliasMap),
 		})
 	}
@@ -446,47 +403,4 @@ func wildcardMatch(pattern, value string) bool {
 		return false
 	}
 	return matched
-}
-
-// catalogIndex holds catalog model identifiers for observed-model lookups.
-// fullIDs is keyed by "provider/model" and is used for provider-scoped
-// observations; bareModels is keyed by model name alone and is only consulted
-// for observations whose provider is unknown.
-type catalogIndex struct {
-	fullIDs    map[string]struct{}
-	bareModels map[string]struct{}
-}
-
-func makeCatalogIndex() catalogIndex {
-	initModelPrices()
-	index := catalogIndex{
-		fullIDs:    make(map[string]struct{}, len(modelPriceRecords)),
-		bareModels: make(map[string]struct{}, len(modelPriceRecords)),
-	}
-	for _, record := range modelPriceRecords {
-		index.fullIDs[modelsdev.NormalizeComparableModelID(record.id)] = struct{}{}
-		index.bareModels[modelsdev.NormalizeComparableModelID(record.model)] = struct{}{}
-	}
-	return index
-}
-
-func modelExistsInCatalog(index catalogIndex, provider, model string) bool {
-	// A model that already carries its own provider scope is matched as-is.
-	if strings.Contains(model, "/") {
-		_, ok := index.fullIDs[modelsdev.NormalizeComparableModelID(model)]
-		return ok
-	}
-	if provider != "" {
-		_, ok := index.fullIDs[modelsdev.NormalizeComparableModelID(path.Join(provider, model))]
-		return ok
-	}
-	_, ok := index.bareModels[modelsdev.NormalizeComparableModelID(model)]
-	return ok
-}
-
-func formatCost(v float64) string {
-	if v == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%.9g", v)
 }

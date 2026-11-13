@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -62,17 +61,16 @@ func TestZeroConfigCopilotAutoModelWithMaxAiCredits(t *testing.T) {
 			"no fallback pricing may be synthesized for the dynamic 'auto' selector")
 	})
 
-	t.Run("concrete models keep their own resolved pricing", func(t *testing.T) {
-		c := &Compiler{}
-		c.modelPricingResolver = func(_ context.Context, _, _ string) (map[string]float64, bool) {
-			return map[string]float64{"input": 1.25e-06, "output": 1e-05}, true
-		}
-
+	t.Run("concrete models keep explicit workflow pricing", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Model:        "gpt-5.1",
 			EngineConfig: &EngineConfig{ID: "copilot"},
+			ModelCosts: map[string]any{"providers": map[string]any{
+				"github-copilot": map[string]any{"models": map[string]any{
+					"gpt-5.1": map[string]any{"cost": map[string]any{"input": "1.25e-06", "output": "1e-05"}},
+				}},
+			}},
 		}
-		workflowData.ModelCosts = c.resolveModelPricingIfMissing(nil, workflowData)
 
 		config := AWFCommandConfig{
 			EngineName:     "copilot",

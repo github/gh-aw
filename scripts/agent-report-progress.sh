@@ -89,7 +89,6 @@ setup_js_files=()
 eslint_factory_files=()
 action_shell_files=()
 workflow_drift_required=0
-model_alias_validation_required=0
 session_schema_validation_required=0
 schema_binary_validation_required=0
 go_module_changed=0
@@ -138,12 +137,6 @@ for file in "${CHANGED_FILES[@]}"; do
     case "$file" in
         Makefile|scripts/agent-report-progress*|scripts/format-changed*)
             dev_loop_validation_required=1
-            ;;
-    esac
-
-    case "$file" in
-        pkg/cli/data/models.json|actions/setup/js/models.json)
-            model_alias_validation_required=1
             ;;
     esac
 
@@ -346,9 +339,6 @@ if [ "${#setup_js_files[@]}" -gt 0 ] || [ "${#eslint_factory_files[@]}" -gt 0 ];
 fi
 if [ "${#action_shell_files[@]}" -gt 0 ]; then
     start_job "action shell lint" lint_action_shell_files
-fi
-if [ "$model_alias_validation_required" -eq 1 ]; then
-    start_job "model alias validation" make --no-print-directory validate-model-alias-chains
 fi
 if [ "$WITH_TESTS" -eq 1 ] || [ "$schema_binary_validation_required" -eq 1 ]; then
     start_job "schema freshness check" make --no-print-directory check-stale-schema-binary
