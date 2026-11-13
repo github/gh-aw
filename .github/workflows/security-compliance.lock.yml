@@ -167,7 +167,13 @@ jobs:
         id: resolve-model-routing
         env:
           GH_AW_MODEL_ROUTING: ${{ vars.GH_AW_MODEL_AGENT_COPILOT == '' && vars.GH_AW_DEFAULT_MODEL_COPILOT == '' }}
-        run: echo "model-routing=$GH_AW_MODEL_ROUTING" >> "$GITHUB_OUTPUT"
+          GH_AW_MODEL_AGENT_OVERRIDE: ${{ vars.GH_AW_MODEL_AGENT_COPILOT != '' }}
+          GH_AW_DEFAULT_MODEL_OVERRIDE: ${{ vars.GH_AW_DEFAULT_MODEL_COPILOT != '' }}
+          GH_AW_MODEL_AGENT_VARIABLE: GH_AW_MODEL_AGENT_COPILOT
+          GH_AW_DEFAULT_MODEL_VARIABLE: GH_AW_DEFAULT_MODEL_COPILOT
+          GH_AW_MODEL_ROUTING_GOAL: cost
+          GH_AW_MODEL_ROUTING_MODE: auto
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/resolve_model_routing.sh"
       - name: Generate agentic run info
         id: generate_aw_info
         env:

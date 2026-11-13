@@ -899,13 +899,26 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 			}
 			dir := t.TempDir()
 			outputFile := filepath.Join(dir, "output")
+			runnerTemp := filepath.Join(dir, "runner")
+			actionsDir := filepath.Join(runnerTemp, "gh-aw", "actions")
+			require.NoError(t, os.MkdirAll(actionsDir, 0o755))
+			routingScript, err := os.ReadFile("../../actions/setup/sh/resolve_model_routing.sh")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "resolve_model_routing.sh"), routingScript, 0o755))
 			cmd := exec.Command("bash", "-e", "-c", decision.Run)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile}
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_OUTPUT=" + outputFile, "RUNNER_TEMP=" + runnerTemp}
 			for key, value := range decision.Env {
 				cmd.Env = append(cmd.Env, key+"="+evaluateTestTemplate(t, value, vars))
 			}
 			out, err := cmd.CombinedOutput()
 			require.NoError(t, err, string(out))
+			wantDiagnostic := "Model routing enabled: goal cost, mode auto"
+			if tc.agentVar != "" {
+				wantDiagnostic = "Model routing disabled: vars." + constants.EnvVarModelAgentCopilot + " selects the model"
+			} else if tc.defaultVar != "" {
+				wantDiagnostic = "Model routing disabled: vars." + compilerenv.DefaultModelCopilot + " selects the model"
+			}
+			require.Contains(t, string(out), wantDiagnostic)
 			outputs, err := os.ReadFile(outputFile)
 			require.NoError(t, err)
 			decisionValue := strings.TrimPrefix(strings.TrimSpace(string(outputs)), modelRoutingDecisionOutput+"=")
@@ -923,8 +936,6 @@ func TestDefaultModelRoutingActivationHonorsModelVariables(t *testing.T) {
 			routingFlag := evaluateTestTemplate(t, execution.Env["GH_AW_MODEL_ROUTING"], downstream)
 			require.Equal(t, tc.wantRouting, routingFlag == "1")
 
-			runnerTemp := filepath.Join(dir, "runner")
-			require.NoError(t, os.MkdirAll(filepath.Join(runnerTemp, "gh-aw"), 0o755))
 			cmd = exec.Command("bash", "-e", "-c", configScript)
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RUNNER_TEMP=" + runnerTemp, "GH_AW_MODEL_ROUTING=" + routingFlag, "GH_AW_MAX_AI_CREDITS=0"}
 			out, err = cmd.CombinedOutput()

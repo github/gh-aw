@@ -156,8 +156,14 @@ func generateModelRoutingDecisionStep(data *WorkflowData) string {
         id: %s
         env:
           GH_AW_MODEL_ROUTING: ${{ vars.%s == '' && vars.%s == '' }}
-        run: echo "%s=$GH_AW_MODEL_ROUTING" >> "$GITHUB_OUTPUT"
-`, modelRoutingDecisionStepID, agentVar, defaultVar, modelRoutingDecisionOutput)
+          GH_AW_MODEL_AGENT_OVERRIDE: ${{ vars.%s != '' }}
+          GH_AW_DEFAULT_MODEL_OVERRIDE: ${{ vars.%s != '' }}
+          GH_AW_MODEL_AGENT_VARIABLE: %s
+          GH_AW_DEFAULT_MODEL_VARIABLE: %s
+          GH_AW_MODEL_ROUTING_GOAL: %s
+          GH_AW_MODEL_ROUTING_MODE: %s
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/resolve_model_routing.sh"
+`, modelRoutingDecisionStepID, agentVar, defaultVar, agentVar, defaultVar, agentVar, defaultVar, data.EngineConfig.ModelRouting.Goal, data.EngineConfig.ModelRouting.Mode)
 }
 
 // declaresModelOrRoutingChoice reports whether the main workflow or its resolved
