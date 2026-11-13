@@ -4,12 +4,40 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
+const { buildCopilotSDKPermissionHandler } = require("../actions/setup/js/copilot_sdk_permissions.cjs");
 
 const workflow = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.md"), "utf8");
 const script = workflow.match(/      script: \|\n([\s\S]*?)\nevals:/);
 assert.ok(script, "Missing burner prefetch script");
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const prefetch = new AsyncFunction("github", "context", "require", "process", "console", script[1].replace(/^        /gm, ""));
+
+test("burner tool-contract commands are executable under the compiled SDK policy", () => {
+  const contract = workflow.match(/## Tool contract for every agent\n([\s\S]*?)\n## Read first/);
+  assert.ok(contract, "Missing restricted-tool contract for the orchestrator and subagents");
+  const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
+  const toolConfig = lock.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/);
+  assert.ok(toolConfig, "Missing compiled SDK tool configuration");
+  const { permissions } = JSON.parse(toolConfig[1]);
+  assert.ok(permissions.allowedTools.length > 0, "Missing compiled permission policy");
+  const handler = buildCopilotSDKPermissionHandler(permissions, () => assert.fail("Unrestricted approval is not expected"));
+  const commands = [...contract[1].matchAll(/`([^`]+)`/g)].map(match => match[1]);
+  assert.ok(commands.length > 0, "Missing executable command examples");
+  for (const command of commands) {
+    assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once", command);
+  }
+  for (const command of [
+    "sed -n '1,240p' /tmp/gh-aw/agent/dependabot-burner/context.json",
+    "gh auth status",
+    "git --no-pager status --short --branch",
+    "git --no-pager status --short && git --no-pager remote -v",
+    "git diff --stat && gh auth status",
+    "git diff --ext-diff",
+    "go test -exec /tmp/unreviewed",
+  ]) {
+    assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "reject", command);
+  }
+});
 
 function pull(number, files, author = "dependabot[bot]") {
   return {

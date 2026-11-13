@@ -98,7 +98,7 @@ The command will:
 4. Copy the original title and body`,
 		Example: `  gh aw pr transfer https://github.com/owner/repo/pull/234
   gh aw pr transfer https://github.com/owner/repo/pull/234 --repo owner/target-repo
-  gh aw pr transfer https://github.com/owner/repo/pull/234 --pr --auto-merge`,
+  gh aw pr transfer https://github.com/owner/repo/pull/234 --create-pull-request --auto-merge`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			prURL := args[0]
@@ -119,7 +119,7 @@ The command will:
 	}
 
 	addRepoFlag(cmd)
-	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --pr or --create-pull-request)")
+	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
 	cmd.Flags().Bool("create-pull-request", false, "Create a pull request (always enabled for transfer)")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")

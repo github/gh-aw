@@ -19,7 +19,7 @@ func TestAddInteractiveAutoMergeRejectsLocalDelivery(t *testing.T) {
 	t.Parallel()
 	config := &AddInteractiveConfig{AutoMerge: true}
 	err := config.createWorkflowChangesAndConfigureSecret(context.Background(), nil, nil, "", "", false)
-	require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+	require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 	assert.Nil(t, config.addResult)
 }
 

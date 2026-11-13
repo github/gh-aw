@@ -61,7 +61,7 @@ func TestNewAddCommand(t *testing.T) {
 	autoMergeFlag := flags.Lookup("auto-merge")
 	require.NotNil(t, autoMergeFlag)
 	assert.Equal(t, "false", autoMergeFlag.DefValue)
-	assert.Contains(t, autoMergeFlag.Usage, "requires --pr or --create-pull-request")
+	assert.Contains(t, autoMergeFlag.Usage, "requires --create-pull-request")
 
 	// Check force flag
 	forceFlag := flags.Lookup("force")
@@ -105,7 +105,7 @@ func TestAddCommandAutoMergeRequiresPR(t *testing.T) {
 			}
 			err := cmd.RunE(cmd, []string{"owner/repo/workflow"})
 			if prFlag == "" {
-				require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+				require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 			} else {
 				require.ErrorIs(t, err, engineErr)
 			}
@@ -117,11 +117,11 @@ func TestAddOptionsAutoMergeRequiresPR(t *testing.T) {
 	t.Parallel()
 	opts := AddOptions{AutoMerge: true}
 	result, err := AddWorkflows(context.Background(), []string{"invalid-source"}, opts)
-	require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+	require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 	assert.Nil(t, result)
 
 	result, err = AddResolvedWorkflows(context.Background(), nil, nil, opts)
-	require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+	require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 	assert.Nil(t, result)
 }
 
