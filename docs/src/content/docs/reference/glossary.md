@@ -1644,6 +1644,18 @@ on:
   label_command: deploy
 ```
 
+### Ledger (`tools.ledger`)
+
+A structured, append-only record store that persists immutable records on a dedicated `ledgers/<name>` Git branch, independent of [Repo Memory](#repo-memory) file storage. Each ledger declares a built-in state model (`log`, `set`, `map`, `table`, `counter`, or `notes`) and an optional JSON schema for operation values. Agents submit mutations only through ledger safe-output tools; the trusted `push_ledger_changes` job validates and pushes them, so queued writes are not visible in the current run's projection. See [Repo Memory](/gh-aw/reference/repo-memory/#structured-ledger).
+
+### Ledger Compaction
+
+Merging of many small [Ledger](#ledger-toolsledger) segments into fewer, larger ones without losing history. Compaction runs in the generated Agentic Maintenance workflow through an untrusted `ledger_compaction_plan` job and a trusted `ledger_compaction_apply` job, never in the agent job. The `compaction` setting controls `schedule` (`daily`, `weekly`, or `manual`), `min-segments`, and `max-segments`; `compaction: false` disables it. See [Ledger compaction](/gh-aw/reference/ledger-compaction/).
+
+### Ledger Replay Projection
+
+A disposable, read-only SQLite database that trusted preparation rebuilds from immutable [Ledger](#ledger-toolsledger) history at `/tmp/gh-aw/ledgers/<name>/ledger.db`. The `state` view holds the built-in current state and `records` holds immutable history. Only built-in types are supported; custom `replay.script` and `replay.config` settings are rejected. See [Ledger replay](/gh-aw/reference/ledger-replay/).
+
 ### Repo Memory
 
 Persistent file storage via Git branches with unlimited retention. Unlike cache-memory (7-day retention), repo-memory stores files permanently in dedicated Git branches with automatic branch cloning, file access, commits, pushes, and merge conflict resolution. Setting `wiki: true` switches the backing to the GitHub Wiki's git endpoint (`{repo}.wiki.git`), and the agent receives guidance to follow GitHub Wiki Markdown conventions (e.g. `[[Page Name]]` links). See [Repo Memory](/gh-aw/reference/repo-memory/).

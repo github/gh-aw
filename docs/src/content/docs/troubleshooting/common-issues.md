@@ -252,6 +252,12 @@ If this fails, contact your organization administrator to enable Copilot for the
 > [!NOTE]
 > `COPILOT_GITHUB_TOKEN` must belong to a user account with an active Copilot subscription. Org-managed licenses may impose additional restrictions on programmatic API access.
 
+### GitHub Inference Cybersecurity Policy Rejections
+
+The provider error `422 This content was flagged for possible cybersecurity risk.` is a terminal policy rejection. For Copilot, Claude, and Codex using GitHub inference, the harness recognizes this prefix in supported top-level error events, classifies the failure as `content_filter`, and stops automatic retries. Quoted error text, unrelated HTTP 422 errors, and sub-agent errors do not trigger this classification.
+
+The run remains failed even if the agent previously emitted `noop`. Inspect the provider diagnostic with `gh aw audit <run-id>` and contact the organization administrator or provider support if access needs review.
+
 ## GitHub Enterprise Server Issues
 
 > [!IMPORTANT]
@@ -399,6 +405,8 @@ The failed workflow run is at https://github.com/OWNER/REPO/actions/runs/RUN_ID
 ```
 
 For manual investigation, use `gh aw audit <run-id>` and `gh aw logs`, then inspect the generated `.lock.yml`. See the [Debugging Workflows](/gh-aw/troubleshooting/debugging/) guide for a full walkthrough.
+
+If the failure annotation names `report_incomplete`, the agent reported that it could not complete the task. The conclusion can fail even when the agent job succeeded. Check the conclusion job summary for the reported reason, when available, and inspect `agent_output.json` in the `agent` artifact. The annotation omits agent-provided reasons and details; summaries can also be suppressed if secret redaction fails. Use `gh aw audit <run-id>` to compare the report with runtime evidence.
 
 ### Enable Debug Logging
 
