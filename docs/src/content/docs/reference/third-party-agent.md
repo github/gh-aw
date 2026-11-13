@@ -87,17 +87,17 @@ on itself:
 ```yaml wrap
 tools:
   drive-memory:
-    id: atomic
-    drive-name: my-workflow-atomic
-    disk-size: 100M
-    allowed-extensions: [".jsonl"]
-    validation:
-      json-schemas:
-        - schema:
-            type: object
-            required: [type]
-            properties:
-              type: { type: string }
+    - id: atomic
+      drive-name: my-workflow-atomic
+      disk-size: 100M
+      allowed-extensions: [".jsonl"]
+      validation:
+        json-schemas:
+          - schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string }
 ```
 
 When `/tmp/gh-aw/drive-memory-atomic/` is mounted, the harness:
