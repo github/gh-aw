@@ -6,6 +6,7 @@ package appendbytestring
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -49,6 +50,11 @@ func analyzeAppendByteString(pass *analysis.Pass, n ast.Node, generatedFiles fil
 	// Match append(b, x...) with exactly 2 arguments and an ellipsis.
 	ident, ok := call.Fun.(*ast.Ident)
 	if !ok || ident.Name != "append" {
+		return
+	}
+	// Ignore a user-defined or shadowed "append"; only the builtin accepts a
+	// string spread, so rewriting a shadowed call would not compile.
+	if pass.TypesInfo.ObjectOf(ident) != types.Universe.Lookup("append") {
 		return
 	}
 	if len(call.Args) != 2 || !call.Ellipsis.IsValid() {
