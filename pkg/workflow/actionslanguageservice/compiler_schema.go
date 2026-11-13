@@ -5,8 +5,8 @@ import (
 	"sync"
 )
 
-// ValidateWorkflowWithCacheMode validates compiler output with the cache-mode
-// field supported by GitHub Actions but absent from the pinned upstream schema.
+// ValidateWorkflowWithCacheMode validates compiler output with cache-mode and
+// status_changed support absent from the pinned upstream schema.
 // The ordinary parser and its conformance schema remain unchanged.
 func ValidateWorkflowWithCacheMode(name, content string) error {
 	schema, err := loadCacheModeSchema()
@@ -27,6 +27,10 @@ var loadCacheModeSchema = sync.OnceValues(func() (map[string]definition, error) 
 	}
 	schema := maps.Clone(upstream)
 	schema["cache-mode"] = definition{AllowedValues: []string{"read", "write", "write-only", "none"}}
+	issuesActivityType := schema["issues-activity-type"]
+	// Copy the slice before appending so the cached upstream schema remains unchanged.
+	issuesActivityType.AllowedValues = append(append([]string(nil), issuesActivityType.AllowedValues...), "status_changed")
+	schema["issues-activity-type"] = issuesActivityType
 	for _, name := range []string{"workflow-root", "workflow-root-strict", "job-factory", "workflow-job"} {
 		d := schema[name]
 		mapping := *d.Mapping

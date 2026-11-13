@@ -37,6 +37,7 @@ const (
 	AuditFindingDetectionJobFailed       AuditFindingCode = "threat_detection_job_failed"
 	AuditFindingThreatDetected           AuditFindingCode = "threat_detected"
 	AuditFindingEngineStepFailed         AuditFindingCode = "engine_step_failed"
+	AuditFindingSafeOutputsBlocked       AuditFindingCode = "safeoutputs_command_blocked"
 
 	AuditFindingAgenticResourceHeavy      AuditFindingCode = "agentic_resource_heavy_for_domain"
 	AuditFindingAgenticOverkill           AuditFindingCode = "agentic_overkill_for_agentic"

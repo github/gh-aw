@@ -249,7 +249,7 @@ jobs:
 name: Test
 on:
   issues:
-    types: [typed, untyped, field_added, field_removed]
+    types: [typed, untyped, field_added, field_removed, status_changed]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -257,6 +257,21 @@ jobs:
       - run: echo hello
 `,
 			expectError: false,
+		},
+		{
+			name: "invalid issue activity type fails",
+			yamlContent: `
+name: Test
+on:
+  issues:
+    types: [status_change]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hello
+`,
+			expectError: true,
 		},
 		// Note: We can't easily test invalid YAML here because the schema validation
 		// happens after YAML parsing, and most errors would be caught by the parser first.

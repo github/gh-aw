@@ -69,7 +69,7 @@ func TestAtomicSampleExecution(t *testing.T) {
 	}
 	assert.Contains(t, durableInstallation.String(), "@bastani/atomic-storage-libsql@"+def.Version)
 	_, err = engine.GetDurableExecutionPlan(&durableData, "/tmp/atomic.log")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	overrideData := &WorkflowData{
 		EngineConfig: &EngineConfig{ID: "atomic", Version: "0.9.80"},
 	}
