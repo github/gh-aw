@@ -5,18 +5,19 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIntentGuidanceContract(t *testing.T) {
 	t.Parallel()
-	_, testFile, _, ok := runtime.Caller(0)
-	require.True(t, ok, "should resolve current test file path")
-	repoRoot := filepath.Join(filepath.Dir(testFile), "..", "..")
+	repoRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		t.Skipf("Skipping test: not in a git repository: %v", err)
+	}
 
 	intentPath := filepath.Join(repoRoot, ".github", "aw", "intent.md")
 	intentContent, err := os.ReadFile(intentPath)
