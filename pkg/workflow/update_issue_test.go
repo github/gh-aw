@@ -3,12 +3,81 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
 )
+
+func TestUpdateIssueOperation(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		value     string
+		wantError bool
+	}{
+		{name: "omitted"},
+		{name: "append", value: "append"},
+		{name: "prepend", value: "prepend"},
+		{name: "replace", value: "replace"},
+		{name: "replace-island", value: "replace-island"},
+		{name: "invalid", value: "merge", wantError: true},
+		{name: "null", value: "null", wantError: true},
+		{name: "number", value: "123", wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			operationLine := ""
+			if tc.value != "" {
+				operationLine = "    operation: " + tc.value + "\n"
+			}
+			content := fmt.Sprintf(`---
+on: workflow_dispatch
+engine: claude
+strict: false
+safe-outputs:
+  update-issue:
+    body: true
+%s---
+Update the tracker issue.
+`, operationLine)
+			testFile := filepath.Join(testutil.TempDir(t, "update-issue-operation"), "workflow.md")
+			if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+				t.Fatal(err)
+			}
+			compiler := NewCompiler()
+			data, err := compiler.ParseWorkflowFile(testFile)
+			if tc.wantError {
+				if err == nil {
+					t.Fatal("Expected invalid operation to be rejected")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			operation := data.SafeOutputs.UpdateIssues.Operation
+			if tc.value == "" {
+				if operation != nil {
+					t.Fatalf("Expected no configured operation, got %q", *operation)
+				}
+			} else if operation == nil || *operation != tc.value {
+				t.Fatalf("Expected configured operation %q, got %v", tc.value, operation)
+			}
+			var steps []string
+			compiler.addHandlerManagerConfigEnvVar(&steps, data)
+			config := extractHandlerConfig(t, strings.Join(steps, ""))["update_issue"]
+			if tc.value == "" {
+				if _, exists := config["default_operation"]; exists {
+					t.Fatal("Expected omitted operation to preserve the runtime default")
+				}
+			} else if config["default_operation"] != tc.value {
+				t.Fatalf("Expected serialized default operation %q, got %v", tc.value, config["default_operation"])
+			}
+		})
+	}
+}
 
 func TestUpdateIssueConfigParsing(t *testing.T) {
 	// Create temporary directory for test files
