@@ -13,7 +13,7 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
-const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { buildSafeOutputDependencyPlan, checkSafeOutputDependencies } = require("./safe_output_dependencies.cjs");
 const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
@@ -959,7 +959,20 @@ function recordMergeDecision(type, result, messageIndex) {
 
 /** @param {any} [result] */
 function mergeProcessingError(result) {
-  return result?.operation_outcome === "indeterminate" ? "Merge outcome is indeterminate; inspect the live pull request before any further action. The merge was not retried." : "merge_pull_request gate checks failed";
+  if (result?.operation_outcome === "indeterminate") return "Merge outcome is indeterminate; inspect the live pull request before any further action. The merge was not retried.";
+  // Only preserve exact fixed diagnostics; other handler errors can contain private API data.
+  switch (result?.error) {
+    case "merge_pull_request gate checks failed":
+    case `${SAFE_OUTPUT_E007}: Missing check producer evidence for required check`:
+    case `${SAFE_OUTPUT_E007}: Unexpected check producer for required check`:
+    case `${SAFE_OUTPUT_E007}: Ambiguous check producers for required check`:
+    case `${SAFE_OUTPUT_E007}: GitHub rejected the merge request (HTTP 405); the merge was not retried`:
+    case `${SAFE_OUTPUT_E007}: GitHub rejected the merge request (HTTP 409); the merge was not retried`:
+    case `${SAFE_OUTPUT_E007}: GitHub rejected the merge request (HTTP 422); the merge was not retried`:
+      return result.error;
+    default:
+      return "merge_pull_request failed";
+  }
 }
 
 /** @param {any} result */

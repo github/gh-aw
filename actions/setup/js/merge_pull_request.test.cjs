@@ -992,12 +992,36 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
-  it("does not retry a SHA-mismatch merge error", async () => {
-    client.rest.pulls.merge.mockRejectedValue({ status: 409, message: "Head branch was modified" });
+  it.each([405, 409, 422])("treats HTTP %s merge rejection as definitive without reconciliation or retry", async status => {
+    pr.head.sha = "a".repeat(40);
+    pr.base.sha = "b".repeat(40);
+    reviewPR.headRefOid = pr.head.sha;
+    client.rest.pulls.merge.mockRejectedValue({ status, message: "private rejection details" });
     const result = await run();
-    expect(result.success).toBe(false);
-    expect(result.decision_evidence.head_sha).toBe("abc123");
+    expect(result).toMatchObject({ success: false, merged: false, failure_reasons: [{ code: "merge_not_completed" }] });
+    expect(result.operation_outcome).toBeUndefined();
+    expect(result.error).toContain(`HTTP ${status}`);
+    expect(result.decision_evidence.head_sha).toBe(pr.head.sha);
+    expect(result.decision_evidence.failure_phase).toBe("merge");
+    expect(result.decision_evidence.reconciled_at).toBeUndefined();
     expect(client.rest.pulls.merge).toHaveBeenCalledTimes(1);
+    expect(client.rest.pulls.get).toHaveBeenCalledTimes(2);
+    expect(debugRecords()).toContainEqual({ event: "merge_rejected", status });
+    expect(debugRecords()).not.toContainEqual({ event: "merge_response_unconfirmed" });
+    expect(JSON.stringify({ result, logs: Object.values(global.core).flatMap(log => log.mock.calls) })).not.toContain("private rejection details");
+    const entry = persistDecision(result);
+    expect(entry).toMatchObject({ success: false, merged: false, failure_codes: ["merge_not_completed"] });
+    expect(entry.operation_outcome).toBeUndefined();
+  });
+
+  it.each([408, 500, 502, 503, 504])("keeps HTTP %s merge errors uncertain and reconciles without retry", async status => {
+    client.rest.pulls.merge.mockRejectedValue({ status, message: "private transport details" });
+    const result = await run();
+    expect(result).toMatchObject({ success: false, merged: null, operation_outcome: "indeterminate" });
+    expect(result.decision_evidence.reconciled_at).toBeDefined();
+    expect(client.rest.pulls.merge).toHaveBeenCalledTimes(1);
+    expect(client.rest.pulls.get).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify({ result, logs: Object.values(global.core).flatMap(log => log.mock.calls) })).not.toContain("private transport details");
   });
 
   it.each(["merge", "squash", "rebase"])("reconciles an applied %s merge after response loss without another mutation", async merge_method => {

@@ -1070,6 +1070,21 @@ async function main(config = {}) {
         decision_evidence: evidence,
       };
     } catch (error) {
+      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+      if (mergeAttempted && typeof status === "number" && [405, 409, 422].includes(status)) {
+        const message = `${SAFE_OUTPUT_E007}: GitHub rejected the merge request (HTTP ${status}); the merge was not retried`;
+        core.debug(`merge_pull_request: ${JSON.stringify({ event: "merge_rejected", status })}`);
+        core.error(message);
+        evidence.failure_phase = phase;
+        return {
+          success: false,
+          data_trust: "untrusted",
+          merged: false,
+          error: message,
+          failure_reasons: [{ code: "merge_not_completed", message }],
+          decision_evidence: evidence,
+        };
+      }
       if (mergeAttempted) {
         core.debug('merge_pull_request: {"event":"merge_response_unconfirmed"}');
         core.warning("Merge response did not confirm an outcome; reconciling with a read-only pull request lookup");

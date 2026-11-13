@@ -210,10 +210,41 @@ describe("Safe Output Handler Manager", () => {
         else handler.mockResolvedValue({ success: false, error: privateError, failure_reasons: [{ code: "merge_operation_error", message: privateError }], decision_evidence: { privateError } });
         if (deferred) handler.mockResolvedValueOnce({ deferred: true });
         const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
-        expect(result.results[0]).toMatchObject({ success: false, error: "merge_pull_request gate checks failed" });
+        expect(result.results[0]).toMatchObject({ success: false, error: "merge_pull_request failed" });
         expect(JSON.stringify(result)).not.toContain(privateError);
         for (const log of [global.core.info, global.core.error, global.core.warning, global.core.debug]) expect(JSON.stringify(log.mock.calls)).not.toContain("private-repository-context");
         expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
+      it.each(
+        [false, true].flatMap(deferred =>
+          [
+            "E007: Missing check producer evidence for required check",
+            "E007: Unexpected check producer for required check",
+            "E007: Ambiguous check producers for required check",
+            "merge_pull_request gate checks failed",
+            ...[405, 409, 422].map(status => `E007: GitHub rejected the merge request (HTTP ${status}); the merge was not retried`),
+          ].map(error => ({
+            deferred,
+            error,
+          }))
+        )
+      )("preserves fixed merge rejection diagnostics (deferred=$deferred, error=$error)", async ({ deferred, error }) => {
+        const handler = vi.fn().mockResolvedValue({ success: false, error });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0]).toMatchObject({ success: false, error });
+        expect(global.core.error).toHaveBeenCalledWith(expect.stringContaining(`failed: ${error}`));
+        expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
+      it.each([false, true])("does not preserve private suffixes on fixed diagnostics (deferred=%s)", async deferred => {
+        const handler = vi.fn().mockResolvedValue({ success: false, error: "E007: Unexpected check producer for required check\nprivate-repository-context" });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0]).toMatchObject({ success: false, error: "merge_pull_request failed" });
+        expect(JSON.stringify(result)).not.toContain("private-repository-context");
+        expect(JSON.stringify(global.core.error.mock.calls)).not.toContain("private-repository-context");
       });
 
       it.each([false, true])("preserves indeterminate merge outcomes without leaking error text (deferred=%s)", async deferred => {
