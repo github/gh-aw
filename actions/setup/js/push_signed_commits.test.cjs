@@ -313,6 +313,13 @@ describe("push_signed_commits integration tests", () => {
       }),
       rest: {
         git: {
+          getCommit: vi.fn(async ({ commit_sha }) => ({ data: { tree: { sha: execGit(["rev-parse", `${commit_sha}^{tree}`], { cwd: workDir }).stdout.trim() } } })),
+          createBlob: vi.fn(async () => ({ data: { sha: "blob-oid" } })),
+          createTree: vi.fn(async () => ({ data: { sha: "tree-oid" } })),
+          createCommit: vi.fn(async () => {
+            if (failWithError) throw failWithError;
+            return { data: { sha: oid, verification: { verified: true } } };
+          }),
           createRef: vi.fn(async () => ({ data: {} })),
         },
       },
@@ -367,8 +374,8 @@ describe("push_signed_commits integration tests", () => {
       if (matching) {
         await expect(replay()).resolves.toBe("signed-oid-abc123");
         expect(source.rest.git.createRef).toHaveBeenCalledOnce();
-        expect(source.graphql).toHaveBeenCalledOnce();
-        expect(source.rest.repos.get).toHaveBeenCalledTimes(4);
+        expect(source.rest.git.createCommit).toHaveBeenCalledOnce();
+        expect(source.graphql).not.toHaveBeenCalled();
       } else {
         await expect(replay()).rejects.toThrow("immutable Work");
         expect(source.rest.git.createRef).not.toHaveBeenCalled();
@@ -820,7 +827,7 @@ describe("push_signed_commits integration tests", () => {
       expect(execGit(["ls-remote", "origin", "refs/heads/deleted-pr-branch"], { cwd: workDir }).stdout.trim()).toBe("");
     });
 
-    it("should create remote branch via REST and use parent OID for first commit (single commit)", async () => {
+    it("creates the first signed commit before publishing a new branch (single commit)", async () => {
       // Create a local branch with one commit but do NOT push it
       execGit(["checkout", "-b", "new-unpushed-branch"], { cwd: workDir });
       fs.writeFileSync(path.join(workDir, "new-file.txt"), "New file content\n");
@@ -833,7 +840,7 @@ describe("push_signed_commits integration tests", () => {
       global.exec = makeRealExec(workDir);
       const githubClient = makeMockGithubClient();
 
-      await pushSignedCommits({
+      const result = await pushSignedCommits({
         githubClient,
         owner: "test-owner",
         repo: "test-repo",
@@ -842,21 +849,35 @@ describe("push_signed_commits integration tests", () => {
         cwd: workDir,
       });
 
-      // Branch must be created via REST before the GraphQL mutation
+      expect(result).toBe("signed-oid-abc123");
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        message: "Add new-file.txt",
+        tree: "tree-oid",
+        parents: [expectedParentOid],
+      });
+      expect(githubClient.rest.git.createBlob).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        content: Buffer.from("New file content\n").toString("base64"),
+        encoding: "base64",
+      });
+      expect(githubClient.rest.git.createTree).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        base_tree: execGit(["rev-parse", `${expectedParentOid}^{tree}`], { cwd: workDir }).stdout.trim(),
+        tree: [{ path: "new-file.txt", mode: "100644", type: "blob", sha: "blob-oid" }],
+      });
       expect(githubClient.rest.git.createRef).toHaveBeenCalledTimes(1);
       expect(githubClient.rest.git.createRef).toHaveBeenCalledWith({
         owner: "test-owner",
         repo: "test-repo",
         ref: "refs/heads/new-unpushed-branch",
-        sha: expectedParentOid,
+        sha: "signed-oid-abc123",
       });
-
-      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-      const callArg = githubClient.graphql.mock.calls[0][1].input;
-      // expectedHeadOid must be the parent commit OID, not empty
-      expect(callArg.expectedHeadOid).toBe(expectedParentOid);
-      expect(callArg.branch.branchName).toBe("new-unpushed-branch");
-      expect(callArg.message.headline).toBe("Add new-file.txt");
+      expect(githubClient.rest.git.createCommit.mock.invocationCallOrder[0]).toBeLessThan(githubClient.rest.git.createRef.mock.invocationCallOrder[0]);
+      expect(githubClient.graphql).not.toHaveBeenCalled();
       // Verify the info log was emitted
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("not yet on the remote"));
     });
@@ -900,12 +921,10 @@ describe("push_signed_commits integration tests", () => {
         owner: "test-owner",
         repo: "test-repo",
         ref: "refs/heads/new-boundary-branch",
-        sha: baseRefOid,
+        sha: "signed-oid-abc123",
       });
-      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-      const callArg = githubClient.graphql.mock.calls[0][1].input;
-      expect(callArg.message.headline).toBe("Add boundary-file.txt");
-      expect(callArg.expectedHeadOid).toBe(baseRefOid);
+      expect(githubClient.graphql).not.toHaveBeenCalled();
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith(expect.objectContaining({ message: "Add boundary-file.txt", parents: [baseRefOid] }));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("baseRef boundary commit(s)"));
     });
 
@@ -954,13 +973,13 @@ describe("push_signed_commits integration tests", () => {
         owner: "test-owner",
         repo: "test-repo",
         ref: "refs/heads/new-boundary-multi-branch",
-        sha: baseRefOid,
+        sha: "signed-oid-first",
       });
-      expect(githubClient.graphql).toHaveBeenCalledTimes(2);
-      expect(githubClient.graphql.mock.calls[0][1].input.expectedHeadOid).toBe(baseRefOid);
-      expect(githubClient.graphql.mock.calls[1][1].input.expectedHeadOid).toBe("signed-oid-first");
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith(expect.objectContaining({ message: "Add boundary-alpha.txt", parents: [baseRefOid] }));
+      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      expect(githubClient.graphql.mock.calls[0][1].input.expectedHeadOid).toBe("signed-oid-first");
       const committedHeadlines = githubClient.graphql.mock.calls.map(call => call[1].input.message.headline);
-      expect(committedHeadlines).toEqual(["Add boundary-alpha.txt", "Add boundary-beta.txt"]);
+      expect(committedHeadlines).toEqual(["Add boundary-beta.txt"]);
 
       const attemptedBoundaryParentResolution = global.exec.getExecOutput.mock.calls.some(([program, args]) => program === "git" && args[0] === "rev-parse" && args[1] === `${baseRefOid}^`);
       expect(attemptedBoundaryParentResolution).toBe(false);
@@ -1003,11 +1022,10 @@ describe("push_signed_commits integration tests", () => {
         owner: "test-owner",
         repo: "test-repo",
         ref: "refs/heads/new-base-ref-failure-branch",
-        sha: expectedParentOid,
+        sha: "signed-oid-abc123",
       });
-      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-      expect(githubClient.graphql.mock.calls[0][1].input.message.headline).toBe("Add fallback-file.txt");
-      expect(githubClient.graphql.mock.calls[0][1].input.expectedHeadOid).toBe(expectedParentOid);
+      expect(githubClient.graphql).not.toHaveBeenCalled();
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith(expect.objectContaining({ message: "Add fallback-file.txt", parents: [expectedParentOid] }));
 
       const hasPerCommitParentCall = global.exec.getExecOutput.mock.calls.some(([program, args]) => program === "git" && args[0] === "rev-parse" && args[1] === `${newCommitOid}^`);
       expect(hasPerCommitParentCall).toBe(true);
@@ -1047,23 +1065,17 @@ describe("push_signed_commits integration tests", () => {
         owner: "test-owner",
         repo: "test-repo",
         ref: "refs/heads/new-multi-commit-branch",
-        sha: expectedParentOid,
+        sha: "signed-oid-first",
       });
 
-      expect(githubClient.graphql).toHaveBeenCalledTimes(2);
-
-      // First call: expectedHeadOid is the parent commit OID (resolved via git rev-parse)
-      const firstCallArg = githubClient.graphql.mock.calls[0][1].input;
-      expect(firstCallArg.expectedHeadOid).toBe(expectedParentOid);
-      expect(firstCallArg.message.headline).toBe("Add alpha.txt");
-
-      // Second call: expectedHeadOid is the OID returned by the first GraphQL mutation
-      const secondCallArg = githubClient.graphql.mock.calls[1][1].input;
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith(expect.objectContaining({ message: "Add alpha.txt", parents: [expectedParentOid] }));
+      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      const secondCallArg = githubClient.graphql.mock.calls[0][1].input;
       expect(secondCallArg.expectedHeadOid).toBe("signed-oid-first");
       expect(secondCallArg.message.headline).toBe("Add beta.txt");
     });
 
-    it("should continue with signed commits when createRef returns 422 (concurrent branch creation)", async () => {
+    it.each(["base", "initial"])("handles concurrent branch creation at the %s commit without overwriting the ref", async concurrentHead => {
       execGit(["checkout", "-b", "race-condition-branch"], { cwd: workDir });
       fs.writeFileSync(path.join(workDir, "race.txt"), "Race content\n");
       execGit(["add", "race.txt"], { cwd: workDir });
@@ -1078,10 +1090,11 @@ describe("push_signed_commits integration tests", () => {
         getExecOutput: vi.fn(async (program, args, opts = {}) => {
           if (program === "git" && args[0] === "ls-remote" && args[2] === "refs/heads/race-condition-branch") {
             lsRemoteCallCount += 1;
-            if (lsRemoteCallCount === 1) {
+            if (lsRemoteCallCount <= 2) {
               return { exitCode: 0, stdout: "", stderr: "" };
             }
-            return { exitCode: 0, stdout: `${expectedParentOid}\trefs/heads/race-condition-branch\n`, stderr: "" };
+            const oid = concurrentHead === "base" ? expectedParentOid : "signed-oid-abc123";
+            return { exitCode: 0, stdout: `${oid}\trefs/heads/race-condition-branch\n`, stderr: "" };
           }
           return realExec.getExecOutput(program, args, opts);
         }),
@@ -1089,16 +1102,8 @@ describe("push_signed_commits integration tests", () => {
 
       // Simulate concurrent branch creation: createRef throws 422 (GitHub API exact format)
       const concurrentError = Object.assign(new Error("Reference refs/heads/race-condition-branch already exists"), { status: 422 });
-      const githubClient = {
-        graphql: vi.fn(async () => ({ createCommitOnBranch: { commit: { oid: "signed-oid-race" } } })),
-        rest: {
-          git: {
-            createRef: vi.fn(async () => {
-              throw concurrentError;
-            }),
-          },
-        },
-      };
+      const githubClient = makeMockGithubClient();
+      githubClient.rest.git.createRef.mockRejectedValue(concurrentError);
 
       await pushSignedCommits({
         githubClient,
@@ -1109,13 +1114,89 @@ describe("push_signed_commits integration tests", () => {
         cwd: workDir,
       });
 
-      // Signed replay should proceed even if branch creation races; depending on
-      // ls-remote timing, createRef may be attempted once or skipped.
-      expect(githubClient.rest.git.createRef.mock.calls.length).toBeLessThanOrEqual(1);
-      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-      const callArg = githubClient.graphql.mock.calls[0][1].input;
-      expect(callArg.expectedHeadOid).toBe(expectedParentOid);
-      expect(callArg.message.headline).toBe("Race commit");
+      expect(githubClient.rest.git.createRef).toHaveBeenCalledExactlyOnceWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        ref: "refs/heads/race-condition-branch",
+        sha: "signed-oid-abc123",
+      });
+      if (concurrentHead === "base") {
+        expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+        const callArg = githubClient.graphql.mock.calls[0][1].input;
+        expect(callArg.expectedHeadOid).toBe(expectedParentOid);
+        expect(callArg.message.headline).toBe("Race commit");
+      } else {
+        expect(githubClient.graphql).not.toHaveBeenCalled();
+      }
+    });
+
+    it.each([false, undefined])("never publishes an initial commit without a verified signature (%s)", async verified => {
+      execGit(["checkout", "-b", "unverified-initial"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "new.txt"), "new\n");
+      execGit(["add", "."], { cwd: workDir });
+      execGit(["commit", "-m", "New file"], { cwd: workDir });
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+      githubClient.rest.git.createCommit.mockResolvedValue({ data: { sha: "unsigned-oid", verification: { verified } } });
+
+      await expect(pushSignedCommits({ githubClient, owner: "test-owner", repo: "test-repo", branch: "unverified-initial", baseRef: "origin/main", cwd: workDir })).rejects.toThrow("did not verify the initial commit signature");
+      expect(githubClient.rest.git.createRef).not.toHaveBeenCalled();
+      expect(githubClient.graphql).not.toHaveBeenCalled();
+      expect(execGit(["ls-remote", "origin", "refs/heads/unverified-initial"], { cwd: workDir }).stdout.trim()).toBe("");
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("falling back to git push"));
+    });
+
+    it.each(["createBlob", "createTree", "createCommit"])("does not create a ref when initial %s fails", async method => {
+      execGit(["checkout", "-b", "initial-failure"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "new.txt"), "new\n");
+      execGit(["add", "."], { cwd: workDir });
+      execGit(["commit", "-m", "New file"], { cwd: workDir });
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+      githubClient.rest.git[method].mockRejectedValue(new Error("API unavailable"));
+
+      await expect(pushSignedCommits({ githubClient, owner: "test-owner", repo: "test-repo", branch: "initial-failure", baseRef: "origin/main", cwd: workDir, allowGitPushFallback: false })).rejects.toThrow("API unavailable");
+      expect(githubClient.rest.git.createRef).not.toHaveBeenCalled();
+      expect(githubClient.graphql).not.toHaveBeenCalled();
+    });
+
+    it("preserves binary contents, deletions, temporary IDs, and the full message in the initial commit", async () => {
+      execGit(["checkout", "-b", "initial-payload"], { cwd: workDir });
+      const binary = Buffer.from([0, 255, 128, 10]);
+      fs.writeFileSync(path.join(workDir, "binary.dat"), binary);
+      fs.writeFileSync(path.join(workDir, "reference.txt"), "Fixes #aw_issue1\n");
+      execGit(["rm", "README.md"], { cwd: workDir });
+      execGit(["add", "."], { cwd: workDir });
+      execGit(["commit", "-m", "Update files", "-m", "Full message body"], { cwd: workDir });
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+      await pushSignedCommits({
+        githubClient,
+        owner: "test-owner",
+        repo: "test-repo",
+        branch: "initial-payload",
+        baseRef: "origin/main",
+        cwd: workDir,
+        resolvedTemporaryIds: { aw_issue1: { repo: "test-owner/test-repo", number: 42 } },
+      });
+      expect(githubClient.rest.git.createBlob.mock.calls.map(([input]) => input.content)).toEqual([binary.toString("base64"), Buffer.from("Fixes #42\n").toString("base64")]);
+      expect(githubClient.rest.git.createTree.mock.calls[0][0].tree).toEqual([
+        { path: "binary.dat", mode: "100644", type: "blob", sha: "blob-oid" },
+        { path: "reference.txt", mode: "100644", type: "blob", sha: "blob-oid" },
+        { path: "README.md", mode: "100644", type: "blob", sha: null },
+      ]);
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith(expect.objectContaining({ message: "Update files\n\nFull message body" }));
+    });
+
+    it("reuses the parent tree for an empty initial commit", async () => {
+      execGit(["checkout", "-b", "initial-empty"], { cwd: workDir });
+      execGit(["commit", "--allow-empty", "-m", "Empty change"], { cwd: workDir });
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+      await pushSignedCommits({ githubClient, owner: "test-owner", repo: "test-repo", branch: "initial-empty", baseRef: "origin/main", cwd: workDir });
+      expect(githubClient.rest.git.createTree).not.toHaveBeenCalled();
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith(expect.objectContaining({ tree: execGit(["rev-parse", "HEAD^{tree}"], { cwd: workDir }).stdout.trim() }));
+      expect(githubClient.rest.git.createRef).toHaveBeenCalled();
     });
   });
 
@@ -2333,8 +2414,9 @@ describe("push_signed_commits integration tests", () => {
       expect(execGit(["rev-parse", branch], { cwd: workDir }).stdout.trim()).toBe(rebasedTip);
       expect(rebasedTip).not.toBe(originalTip);
       expect(execGit(["rev-parse", "HEAD^"], { cwd: workDir }).stdout.trim()).toBe(baseTip);
-      expect(githubClient.graphql).toHaveBeenCalledOnce();
-      expect(githubClient.rest.git.createRef).toHaveBeenCalledWith({ owner: "test-owner", repo: "test-repo", ref: `refs/heads/${branch}`, sha: baseTip });
+      expect(githubClient.graphql).not.toHaveBeenCalled();
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledWith(expect.objectContaining({ parents: [baseTip] }));
+      expect(githubClient.rest.git.createRef).not.toHaveBeenCalled();
 
       const remoteTip = execGit(["rev-parse", `refs/heads/${branch}`], { cwd: bareDir }).stdout.trim();
       expect(pushedSha).toBe(rebasedTip);
@@ -2455,8 +2537,8 @@ describe("push_signed_commits integration tests", () => {
       expect(backfillTargets).not.toBeNull();
       expect(backfillTargets.length).toBeGreaterThan(0);
       expect(backfillTargets.every(sha => /^[0-9a-f]{40}$/i.test(sha))).toBe(true);
-      // The signed-commit GraphQL replay proceeded after recovery.
-      expect(githubClient.graphql).toHaveBeenCalled();
+      // Initial signed commit creation proceeded after recovery.
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalled();
       expect(result).toBeDefined();
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("backfilling object content"));
     });
@@ -2765,7 +2847,7 @@ describe("push_signed_commits integration tests", () => {
         })
       ).resolves.toBe("signed-oid-abc123");
 
-      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledTimes(1);
     });
 
     it("should allow fallback-to-issue protected-files policy against synthesized GraphQL payload", async () => {
@@ -2792,7 +2874,7 @@ describe("push_signed_commits integration tests", () => {
         })
       ).resolves.toBe("signed-oid-abc123");
 
-      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      expect(githubClient.rest.git.createCommit).toHaveBeenCalledTimes(1);
     });
 
     it("should enforce max-patch-files against synthesized GraphQL payload", async () => {
