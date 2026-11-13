@@ -607,7 +607,7 @@ function resolvePullRequestNumber(message, resolvedTemporaryIds) {
  */
 async function main(config = {}) {
   const allowedBaseBranches = config.allowed_base_branches;
-  if (!Array.isArray(allowedBaseBranches) || allowedBaseBranches.length === 0 || allowedBaseBranches.some(pattern => typeof pattern !== "string" || !pattern || /\s/.test(pattern) || /^\*+$/.test(pattern))) {
+  if (!Array.isArray(allowedBaseBranches) || allowedBaseBranches.length === 0 || allowedBaseBranches.some(pattern => typeof pattern !== "string" || !pattern || /\s/.test(pattern) || /^[*/]+$/.test(pattern))) {
     throw new Error(`${SAFE_OUTPUT_E001}: merge-pull-request.allowed-base-branches requires a non-empty list of scoped base branch patterns, not unrestricted wildcards. Declare owner-authorized destinations such as "agent-work/*"`);
   }
   const allowedBaseBranchPatterns = compilePathGlobs(allowedBaseBranches);
@@ -964,9 +964,6 @@ async function main(config = {}) {
       }
       if (currentPR.mergeable !== true || currentPR.mergeable_state === "dirty") {
         throw new Error(`${SAFE_OUTPUT_E007}: Pull request mergeability is not confirmed or has unresolved conflicts after revalidation`);
-      }
-      if (!allowedBaseBranchPatterns.some(pattern => pattern.test(currentPR.base.ref))) {
-        throw new Error(`${SAFE_OUTPUT_E007}: Target base branch no longer matches allowed-base-branches; fresh evaluation required`);
       }
       const currentPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
       currentPolicy.requiredChecks = [...new Set([...currentPolicy.requiredChecks, ...requiredChecks])].sort();

@@ -3052,7 +3052,95 @@
         },
         "merge-pull-request": {
           "type": "object",
-          "desc": "Enable AI agents to merge pull requests under configured policy gates."
+          "desc": "Enable AI agents to merge pull requests under configured policy gates.",
+          "children": {
+            "allowed-base-branches": {
+              "type": "array",
+              "desc": "Required scoped glob patterns for destination (base) branches declared by the owner as non-consequential automated in...",
+              "array": true
+            },
+            "protected-files": {
+              "type": "string|object",
+              "desc": "Block merges modifying protected files by default, using create-pull-request's protected set and exclusions.",
+              "enum": ["blocked", "allowed"],
+              "leaf": true
+            },
+            "max": {
+              "type": "integer|string",
+              "desc": "Maximum number of pull request merges to perform per run (default: 1).",
+              "leaf": true
+            },
+            "required-labels": {
+              "type": "array",
+              "desc": "List of labels that must ALL be present on the pull request before merge is allowed.",
+              "array": true
+            },
+            "required-checks": {
+              "type": "array",
+              "desc": "Exact check-run names that must complete successfully on the evaluated PR head SHA, in addition to branch-policy checks.",
+              "array": true
+            },
+            "required-check-apps": {
+              "type": "object",
+              "desc": "Expected GitHub App ID for each named check."
+            },
+            "required-approvers": {
+              "type": "array",
+              "desc": "Human GitHub logins.",
+              "array": true
+            },
+            "allowed-labels": {
+              "type": "array",
+              "desc": "Deprecated alias for required-labels",
+              "deprecated": true,
+              "x-deprecation-message": "'allowed-labels' is deprecated in safe-outputs.merge-pull-request. Use 'required-labels' instead.",
+              "array": true
+            },
+            "allowed-branches": {
+              "type": "array",
+              "desc": "Glob patterns for allowed source branch names (pull request head ref).",
+              "array": true
+            },
+            "target": {
+              "type": "string",
+              "desc": "Target for merging: 'triggering' (default, current PR), or '*' (any PR with pull_request_number field)",
+              "leaf": true
+            },
+            "target-repo": {
+              "type": "string",
+              "desc": "Target repository in format 'owner/repo' for cross-repository operations.",
+              "leaf": true
+            },
+            "allowed-repos": {
+              "type": "array",
+              "desc": "List of additional repositories in format 'owner/repo' that pull requests can be merged in.",
+              "array": true
+            },
+            "github-token": {
+              "type": "string",
+              "desc": "GitHub token to use for this specific output type.",
+              "leaf": true
+            },
+            "staged": {
+              "type": "boolean|string",
+              "desc": "When true, evaluate merge gates and emit preview results without executing the merge API call.",
+              "leaf": true
+            },
+            "samples": {
+              "type": "array|object",
+              "desc": "Internal hidden feature.",
+              "array": true
+            },
+            "required-title-prefix": {
+              "type": "string",
+              "desc": "The target item's title must start with this prefix for this operation to proceed",
+              "leaf": true
+            },
+            "github-app": {
+              "type": "object",
+              "desc": "GitHub App authentication."
+            }
+          }
         },
         "push-to-pull-request-branch": {
           "type": "null|object",

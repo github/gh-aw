@@ -348,7 +348,7 @@ describe("merge_pull_request policy hardening", () => {
     return handler(message, {});
   }
 
-  it.each([undefined, null, [], "*", ["*"], ["**"], ["***"], ["integration", "*"], [""], [" "], ["integration branch"], [42], ["${{ inputs.branch }}"]])(
+  it.each([undefined, null, [], "*", ["*"], ["**"], ["***"], ["*/*"], ["**/*"], ["*/**"], ["**/**"], ["integration", "*"], [""], [" "], ["integration branch"], [42], ["${{ inputs.branch }}"]])(
     "rejects invalid destination policy %j before fetching or merging",
     async allowed_base_branches => {
       await expect(run({ allowed_base_branches })).rejects.toThrow("allowed-base-branches requires");

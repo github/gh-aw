@@ -2,7 +2,11 @@
 
 package parser
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"testing"
+)
 
 func TestMainWorkflowSchema_MergePullRequestProtectedFiles(t *testing.T) {
 	t.Parallel()
@@ -115,6 +119,10 @@ func TestMainWorkflowSchema_MergePullRequestAllowedBaseBranches(t *testing.T) {
 		{"empty", map[string]any{"allowed-base-branches": []any{}}, false},
 		{"wildcard", map[string]any{"allowed-base-branches": []any{"*"}}, false},
 		{"globstar", map[string]any{"allowed-base-branches": []any{"**"}}, false},
+		{"slash wildcard", map[string]any{"allowed-base-branches": []any{"*/*"}}, false},
+		{"slash globstar prefix", map[string]any{"allowed-base-branches": []any{"**/*"}}, false},
+		{"slash globstar suffix", map[string]any{"allowed-base-branches": []any{"*/**"}}, false},
+		{"slash globstar", map[string]any{"allowed-base-branches": []any{"**/**"}}, false},
 		{"mixed wildcard", map[string]any{"allowed-base-branches": []any{"agent-work/*", "*"}}, false},
 		{"blank", map[string]any{"allowed-base-branches": []any{" "}}, false},
 		{"not array", map[string]any{"allowed-base-branches": "agent-work/*"}, false},
@@ -128,5 +136,25 @@ func TestMainWorkflowSchema_MergePullRequestAllowedBaseBranches(t *testing.T) {
 				t.Fatalf("schema validity = %v, want %v: %v", err == nil, tc.valid, err)
 			}
 		})
+	}
+}
+
+func TestMergePullRequestAutocompleteIncludesRequiredConfiguration(t *testing.T) {
+	type editorEntry struct {
+		Children map[string]editorEntry `json:"children"`
+	}
+	data, err := os.ReadFile("../../docs/public/editor/autocomplete-data.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var autocomplete struct {
+		Root map[string]editorEntry `json:"root"`
+	}
+	if err := json.Unmarshal(data, &autocomplete); err != nil {
+		t.Fatal(err)
+	}
+	mergePullRequest := autocomplete.Root["safe-outputs"].Children["merge-pull-request"]
+	if _, ok := mergePullRequest.Children["allowed-base-branches"]; !ok {
+		t.Fatal("merge-pull-request autocomplete is missing allowed-base-branches")
 	}
 }

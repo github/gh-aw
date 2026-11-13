@@ -16994,9 +16994,10 @@ safe-outputs:
   # (optional)
   merge-pull-request:
     # Required scoped glob patterns for destination (base) branches declared by the
-    # owner as non-consequential automated integration targets. Bare wildcard patterns
-    # such as * and ** are forbidden. Default and protected branches remain blocked.
-    # This declaration is not proof of harmless downstream effects.
+    # owner as non-consequential automated integration targets. Patterns consisting
+    # only of * and /, such as *, **, */*, and **/*, are forbidden. Default and
+    # protected branches remain blocked. This declaration is not proof of harmless
+    # downstream effects.
     allowed-base-branches: []
       # Array of strings
 

@@ -144,7 +144,7 @@ func validateMergePullRequestBaseBranches(patterns []string) error {
 		return errors.New("safe-outputs.merge-pull-request.allowed-base-branches is required and must contain at least one scoped base branch pattern. Declare owner-authorized non-consequential destinations. Example:\n  safe-outputs:\n    merge-pull-request:\n      allowed-base-branches: [\"agent-work/*\"]")
 	}
 	for i, pattern := range patterns {
-		if strings.Trim(pattern, "*") == "" {
+		if strings.Trim(pattern, "*/") == "" {
 			return fmt.Errorf("safe-outputs.merge-pull-request.allowed-base-branches[%d] cannot be an unrestricted wildcard. Expected a scoped base branch pattern such as \"agent-work/*\"", i)
 		}
 	}

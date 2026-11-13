@@ -174,7 +174,7 @@ function canBeArray(node) {
 /**
  * Build a compact autocomplete entry from a schema property.
  */
-function buildEntry(propSchema, depth) {
+function buildEntry(propSchema, depth, expandAtLimit = false) {
   const resolved = resolveRef(propSchema);
   const entry = {};
 
@@ -202,12 +202,13 @@ function buildEntry(propSchema, depth) {
     entry["x-deprecation-message"] = resolved["x-deprecation-message"];
   }
 
-  if (depth < MAX_DEPTH) {
+  if (depth < MAX_DEPTH || expandAtLimit) {
     const childProps = getObjectProperties(resolved);
     if (childProps) {
       const children = {};
       for (const [key, childSchema] of Object.entries(childProps)) {
-        children[key] = buildEntry(childSchema, depth + 1);
+        const expandMergePullRequest = depth === MAX_DEPTH - 1 && key === "merge-pull-request";
+        children[key] = buildEntry(childSchema, depth + 1, expandMergePullRequest);
       }
       if (Object.keys(children).length > 0) {
         entry.children = children;
