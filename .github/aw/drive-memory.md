@@ -46,6 +46,8 @@ tools:
       restore-only: true
 ```
 
+Atomic workflows (`imports: [shared/atomic.md]`) keep their sessions only through a drive entry with `id: atomic` declared in the workflow's own frontmatter. Add it when the workflow should resume earlier Atomic sessions; the shared engine definition never adds it. See [Atomic sessions on drive memory](https://github.github.com/gh-aw/reference/third-party-agent/#atomic-sessions-on-drive-memory) for the recommended entry.
+
 ## Compiler effects
 
 - Grants the generated job `contents: read`, `id-token: write`, and the required `drives` permission.
