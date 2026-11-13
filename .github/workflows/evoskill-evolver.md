@@ -31,8 +31,8 @@ tools:
     - "mkdir -p /tmp/gh-aw/cache-memory"
     - "python3 *"
 safe-outputs:
-  steer: true
   create-pull-request:
+    draft: true
     title-prefix: "[evoskill] "
     labels: [automation, prompt-quality]
     expires: 7d
@@ -51,6 +51,7 @@ evals:
   - id: evidence_based_selection
     question: Was the candidate accepted only when its validation score exceeded the baseline without a regression?
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/reporting.md
 ---
 

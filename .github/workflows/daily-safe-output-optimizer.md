@@ -26,9 +26,10 @@ engine:
   mcp:
     tool-timeout: 10m
 safe-outputs:
+  steer: false
   create-pull-request:
+    draft: true
     exclude-lock-yml: true
-    expires: 2d
     title-prefix: "[safeoutputs] "
     labels: [bug, safe-outputs, tool-improvement, automated-analysis, cookie]
     max: 1
@@ -39,6 +40,7 @@ max-ai-credits: 1500
 strict: true
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/lock-safe-pull-request.md
   - uses: shared/skip-if-issue-open.md
     with:

@@ -19,6 +19,7 @@ engine:
 network: 
    allowed: [defaults, node, go, "api.github.com", containers]
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/lock-safe-pull-request.md
   - ../skills/jqschema/SKILL.md
   - shared/reporting.md
@@ -35,9 +36,10 @@ tools:
     - "*"
   edit:
 safe-outputs:
+  steer: false
   create-pull-request:
+    draft: true
     exclude-lock-yml: true
-    expires: 2d
     title-prefix: "[ca] "
     labels: [automation, dependencies, cookie]
     close-older-pull-requests: true

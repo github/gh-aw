@@ -29,7 +29,6 @@ tools:
     - "*"
   edit:
 safe-outputs:
-  steer: true
   create-pull-request:
     expires: 7d
     title-prefix: "[yamllint-fixer] "
@@ -100,6 +99,7 @@ steps:
       pip3 install yamllint==1.38.0 --quiet
       yamllint --version
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
 sandbox:
   agent:

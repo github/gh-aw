@@ -7,7 +7,7 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.23<br>
+**Version**: 1.29.24<br>
 **Status**: Working Draft<br>
 **Publication Date**: 2026-11-11<br>
 **Editor**: GitHub Agentic Workflows Team<br>
@@ -1317,6 +1317,8 @@ MUST NOT:
 
 This mode requires top-level `issues: read` permission for comment reads. The activation and conclusion jobs require `issues: write` through the global safe-output credential (`safe-outputs.github-token` or `safe-outputs.github-app`); a GitHub App token MUST be minted with `issues: write`.
 
+The effective value of `safe-outputs.steer` is resolved after imported workflow configuration is applied. An explicit local value MUST take precedence over an imported value. An imported `steer: true` therefore enables steering only when the local workflow omits the setting; an explicit local `steer: false` MUST disable it. The built-in default remains `false` when neither local nor imported configuration supplies a value.
+
 **Constraints**:
 
 - `steer` MUST NOT be combined with `safe-outputs.failure-issue-repo`.
@@ -1847,10 +1849,13 @@ submit-pull-request-review:
 
 **Pull Request Extensions**:
 
+Imported safe-output configuration participates in effective configuration resolution. For `create-pull-request`, imported `expires` and `draft` values apply only when the local handler omits those fields. A local handler value MUST take precedence over the imported value. These workflow-level defaults do not change the handler defaults documented below.
+
 ```yaml
 create-pull-request:
   base-branch: main              # Target branch (default: repo default)
-  draft: true                    # Create as draft (default: true)
+  expires: 2d                    # Expiration for the created pull request
+  draft: true                    # Create as draft (handler default: true)
   commit-changes: true           # Auto-commit workspace changes
   reviewers: [user1, copilot]    # Auto-request reviewers
   labels: [automated]            # Auto-apply labels
@@ -6899,6 +6904,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.24** (2026-11-12):
+
+- **Clarified**: Imported safe-output configuration precedence for `steer` and `create-pull-request` fields; explicit local values take precedence and imported values apply only when local fields are omitted.
+- **Added**: `create-pull-request.expires` to the type-specific extension documentation without changing the handler default.
 
 **Version 1.29.23** (2026-11-11):
 

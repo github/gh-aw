@@ -95,6 +95,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs -v                        # Verbose compact output (extra columns + sections)
   %[1]s logs --json                    # JSON format (compact by default, use -v for full)
   %[1]s logs --json -v                 # Full JSON with audit metadata
+  %[1]s logs --format jsonl            # Stream progress, run records, and a final report as JSON Lines
   %[1]s logs --cached-jsonl logs.jsonl # Reuse matching records and append new results immediately
   %[1]s logs --cached-jsonl 'logs-*'   # Reuse logs-*.jsonl files and write new data to a unique logs-*.jsonl file
   %[1]s logs --format tsv              # Tab-separated (minimal, raw data)
@@ -545,6 +546,9 @@ func resolveLogsDateRange(startDate, endDate string, now time.Time) (string, str
 }
 
 func validateLogsOptions(options LogsDownloadOptions) error {
+	if options.Format == "jsonl" && options.JSONOutput {
+		return errors.New("--format jsonl cannot be combined with --json. Use --format jsonl for streaming events or --json for a single JSON document")
+	}
 	if err := validateMaxStorageMB(options.MaxStorageMB); err != nil {
 		return err
 	}
@@ -712,7 +716,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("summary-file", "summary.json", "Path to write the summary JSON file relative to output directory (use empty string to disable)")
 	logsCmd.Flags().Bool("train", false, "Analyze log patterns across downloaded runs and save pattern weights to drain3_weights.json in the output directory")
 	logsCmd.Flags().String("drain3-weights", "", "Path to existing Drain3 weights JSON used to seed log pattern training")
-	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
+	logsCmd.Flags().String("format", "", "Output format: jsonl (streaming JSON Lines), console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
 	logsCmd.Flags().String("report-file", "", "Write --format markdown output directly to this file path instead of stdout (creates parent directories as needed)")
 	logsCmd.Flags().String("cached-jsonl", "", "Path to cached logs JSONL to reuse, append new results, and retain runs in the requested date range")
 	logsCmd.Flags().Int("last", 0, "Alias for --count/-c: number of recent runs to download")
