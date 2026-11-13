@@ -26,6 +26,7 @@ network:
     - mossaka.github.io
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
   - shared/noop-reminder.md
 tools:
@@ -40,8 +41,8 @@ safe-outputs:
   upload-asset:
     max: 5
     allowed-exts: [.png, .jpg, .jpeg, .svg]
-  steer: true
   create-pull-request:
+    draft: true
     title-prefix: "[docs] "
     labels: [documentation, automation]
     reviewers: [copilot]

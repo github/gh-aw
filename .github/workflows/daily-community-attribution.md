@@ -56,7 +56,6 @@ tools:
   edit:
 
 safe-outputs:
-  steer: true
   create-pull-request:
     expires: 1d
     title-prefix: "[community] "
@@ -77,6 +76,7 @@ experiments:
   prompt_style: [concise, verbose]
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/community-attribution.md
   - shared/otlp.md
   - shared/issue-dedup.md

@@ -12,16 +12,17 @@ const main = createEngineLogParser({
 });
 
 /**
- * Parse Pi CLI JSONL streaming log output and format as markdown.
+ * Parse Pi-compatible CLI JSONL streaming log output and format as markdown.
  * Normalize native streaming events and historical flat records directly into
  * canonical session events, then render the shared conversation and usage view.
  * @param {string} logContent - The raw log content to parse
+ * @param {{sourceEngine?: string, displayName?: string}} [options]
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parsePiLog(logContent) {
+function parsePiStreamLog(logContent, { sourceEngine = "pi", displayName = "Pi" } = {}) {
   if (!logContent) {
     return {
-      markdown: buildStepSummaryDetailsSection("Pi", "No log content provided."),
+      markdown: buildStepSummaryDetailsSection(displayName, "No log content provided."),
       logEntries: [],
       mcpFailures: [],
       maxTurnsHit: false,
@@ -32,7 +33,7 @@ function parsePiLog(logContent) {
 
   if (rawEntries.length === 0) {
     return {
-      markdown: buildStepSummaryDetailsSection("Pi", "Log format not recognized as Pi JSONL."),
+      markdown: buildStepSummaryDetailsSection(displayName, `Log format not recognized as ${displayName} JSONL.`),
       logEntries: [],
       mcpFailures: [],
       maxTurnsHit: false,
@@ -45,13 +46,13 @@ function parsePiLog(logContent) {
   // Detect which schema this log uses and transform accordingly so the step summary
   // renders the conversation and token stats for both.
   const useV3Schema = isPiV3Schema(rawEntries);
-  const stats = useV3Schema ? computePiV3Stats(rawEntries) : null;
-  const canonicalLogEntries = transformPiV3Entries(rawEntries);
+  const stats = useV3Schema ? computePiV3Stats(rawEntries, { sourceEngine }) : null;
+  const canonicalLogEntries = transformPiV3Entries(rawEntries, undefined, { sourceEngine });
   if (stats) {
     const terminal = [...canonicalLogEntries].reverse().find(event => event.type === "session.result");
     const selected = selectSessionResult(canonicalLogEntries);
     const data = {
-      sourceEngine: selected?.sourceEngine ?? "pi",
+      sourceEngine: selected?.sourceEngine ?? sourceEngine,
       numTurns: stats.turns ?? selected?.numTurns,
       usage: reconcileSessionUsage(selected?.usage, stats.usage),
       totalCostUsd: stats.total_cost_usd ?? selected?.totalCostUsd,
@@ -65,7 +66,7 @@ function parsePiLog(logContent) {
     }
   }
   if (canonicalLogEntries.length === 0) {
-    return { markdown: buildStepSummaryDetailsSection("Pi", "Log format not recognized as Pi JSONL."), logEntries: [], mcpFailures: [], maxTurnsHit: false };
+    return { markdown: buildStepSummaryDetailsSection(displayName, `Log format not recognized as ${displayName} JSONL.`), logEntries: [], mcpFailures: [], maxTurnsHit: false };
   }
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
     includeInformation: false,
@@ -83,6 +84,24 @@ function parsePiLog(logContent) {
     mcpFailures: [],
     maxTurnsHit: false,
   };
+}
+
+/**
+ * @param {string} logContent - The raw log content to parse
+ * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
+ */
+function parsePiLog(logContent) {
+  return parsePiStreamLog(logContent, { sourceEngine: "pi", displayName: "Pi" });
+}
+
+/**
+ * Parse Atomic CLI `--mode json` streaming log output through the shared Pi parser
+ * while attributing canonical session events to `atomic`.
+ * @param {string} logContent - The raw log content to parse
+ * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
+ */
+function parseAtomicLog(logContent) {
+  return parsePiStreamLog(logContent, { sourceEngine: "atomic", displayName: "Atomic" });
 }
 
 /**
@@ -153,6 +172,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     main,
     parsePiLog,
+    parseAtomicLog,
     transformPiEntries,
     isPiV3Schema,
     transformPiV3Entries,
