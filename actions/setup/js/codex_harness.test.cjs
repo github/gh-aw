@@ -2184,6 +2184,35 @@ process.exit(1);`,
       expect(result.stderr).toContain("noop message found in safe-outputs — not retrying");
     });
 
+    it("preserves failure and stops after a GitHub cybersecurity-policy rejection even when noop is written", () => {
+      const tempDir = makeHarnessTempDir("codex-provider-policy-noop-");
+      try {
+        const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");
+        const { result, calls, harnessRetry } = runHarnessFixture(
+          `
+          fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify({type:"noop",message:"nothing to do"}) + "\\n");
+          console.log(JSON.stringify({type:"turn.failed",error:{message:"422 This content was flagged for possible cybersecurity risk. Try rephrasing your request."}}));
+          process.exit(1);
+        `,
+          {
+            env: {
+              GH_AW_LLM_PROVIDER: "github",
+              GH_AW_MODEL_AGENT_CODEX: "copilot/gpt-5",
+              GH_AW_HARNESS_MAX_RETRIES: "2",
+              GH_AW_SAFE_OUTPUTS: safeOutputsPath,
+            },
+          }
+        );
+
+        expect(result.status, result.stderr).toBe(1);
+        expect(calls).toHaveLength(1);
+        expect(harnessRetry.attempt_results[0].failure_classes).toContain("content_filter");
+        expect(result.stderr).toContain("GitHub provider blocked the request for cybersecurity policy");
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
     it("exits 0 without retrying when the LLM invocation cap is saturated but the expected safe-output was already produced", () => {
       const tempDir = makeHarnessTempDir("codex-invocation-cap-suppression-");
       const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");

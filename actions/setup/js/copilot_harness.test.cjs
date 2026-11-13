@@ -344,6 +344,7 @@ describe("copilot_harness.cjs", () => {
     it.each(["query", "sdk_driver"])("stops retries on a top-level provider policy rejection (%s)", errorType => {
       const output = JSON.stringify({ type: "session.error", data: { errorType, message: policyMessage, ...(errorType === "query" ? { statusCode: 422 } : {}) } });
       expect(isCopilotContentFilterError(output)).toBe(true);
+      expect(isCopilotContentFilterError(output, "openai")).toBe(false);
       expect(classifyCopilotFailure({ hasOutput: true, isContentFiltered: isCopilotContentFilterError(output) })).toBe("content_filter");
       expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(false);
     });

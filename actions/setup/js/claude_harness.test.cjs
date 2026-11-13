@@ -1708,6 +1708,36 @@ process.exit(1);`,
       expect(result.status).toBe(0);
       expect(result.stderr).toContain("noop message found in safe-outputs — not retrying");
     });
+
+    it("preserves failure and stops after a GitHub cybersecurity-policy rejection even when noop is written", () => {
+      const tempDir = makeHarnessTempDir("claude-provider-policy-noop-");
+      try {
+        const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");
+        const { result, calls, harnessRetry } = runHarnessWithStub({
+          extraEnv: {
+            GH_AW_LLM_PROVIDER: "github",
+            GH_AW_HARNESS_MAX_RETRIES: "2",
+            GH_AW_SAFE_OUTPUTS: safeOutputsPath,
+            ANTHROPIC_MODEL: "claude-sonnet-5",
+          },
+          reflectData: { endpoints: [{ provider: "copilot", configured: true, port: 43123, models_url: "http://api-proxy:43123/models" }] },
+          stubScript: `
+          const fs = require("fs");
+          fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, "{}\\n");
+          fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify({type:"noop",message:"nothing to do"}) + "\\n");
+          console.log(JSON.stringify({type:"result",is_error:true,result:"422 This content was flagged for possible cybersecurity risk. Try rephrasing your request."}));
+          process.exit(1);
+        `,
+        });
+
+        expect(result.status, result.stderr).toBe(1);
+        expect(calls).toHaveLength(1);
+        expect(harnessRetry.attempt_results[0].failure_classes).toContain("content_filter");
+        expect(result.stderr).toContain("GitHub provider blocked the request for cybersecurity policy");
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("AI credits budget enforcement exits 0", () => {
