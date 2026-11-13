@@ -10,6 +10,25 @@ compile-only checks or existing-run health. First follow the
 [shared strategy](debug-agentic-workflow.md) for requested scope, host
 restrictions and review requirements. This procedure grants no authorization.
 
+## Run an Unmodified Default-Branch Workflow
+
+When the user explicitly requests an existing workflow from the repository's
+default branch, **dry-run is not required** if the workflow is unmodified.
+Do not recompile, replace its published lock with a diagnostic lock, or require
+a feature branch solely to dispatch that workflow.
+
+Resolve the repository's actual default branch and record its current commit.
+Review the published source, generated lock, imports and pins at that commit;
+apply the authorization, effect-scope, run/time/spend bounds, monitoring and
+stop conditions in [Live Debug Loop](#live-debug-loop). Dispatch with
+`gh aw run WORKFLOW --ref DEFAULT_BRANCH`, rechecking the remote commit before
+dispatch and verifying the resulting run SHA.
+
+This exception does not override stricter host or repository restrictions,
+including Copilot cloud's dry-run-only dispatch rule. Any workflow change
+returns to the branch preparation and review gates below; authorization for an
+unmodified default-branch run does not cover a changed revision.
+
 ## Test Workflow Changes from a Branch
 
 Notify the user before live-test authorization: a published feature branch
@@ -49,11 +68,11 @@ execution contexts to evade a failed gate.
 
 ## Live Debug Loop
 
-Include the published test branch and exact reviewed commit in the user-visible
-authorization packet. Notify the user that this branch is required to live test
-changes; a PR alone does not establish which revision will run. Branch
-publication is agent-owned preparation, not a substitute for live-effect
-authorization.
+Include the dispatch ref and exact reviewed commit in the user-visible
+authorization packet. For workflow changes, publish the reviewed test branch
+first; a PR alone does not establish which revision will run. Unmodified
+default-branch runs use the published revision above without a test branch.
+Branch publication is not a substitute for live-effect authorization.
 
 Before each upload/dispatch, require a completed [agentic security review](debug-security-review.md) for the current source/lock hashes and valid human authorization: source/lock hashes,
 triggers/imports/pins, permissions/OIDC, declared credential sources and flows, destinations,
