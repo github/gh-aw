@@ -1,5 +1,7 @@
 // @ts-check
 
+// @safe-outputs-exempt USE-001 — errors carry JSON-RPC numeric codes (-32602) per the MCP protocol, not E/ERR_ catalog codes.
+
 const { normalizeTool } = require("./mcp_server_core.cjs");
 const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 const { normalizeCreateIssueLabels } = require("./safe_output_type_validator.cjs");

@@ -8,6 +8,7 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const { EventEmitter } = require("events");
 const { PassThrough } = require("stream");
+const { CYBERSECURITY_POLICY_REJECTION_PREFIX } = require("./github_provider_policy_rejection.cjs");
 const { hasWorkflowToolPermissionDenial, WORKFLOW_TOOL_PERMISSION_DENIED_EXIT_CODE } = require("./permission_denied_helpers.cjs");
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE } = require("./copilot_model_selection.cjs");
 const { COPILOT_SDK_SERVER_STARTUP_TIMEOUT_MS, buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
@@ -321,6 +322,7 @@ describe("copilot_harness.cjs", () => {
 
   describe("SDK content-filter rejection", () => {
     const content = "The model returned no content because the response was blocked by content filtering.";
+    const policyMessage = `${CYBERSECURITY_POLICY_REJECTION_PREFIX} If this seems wrong, try rephrasing your request.`;
     it("skips corrupt JSONL and short-circuits without decoding later records", () => {
       const first = JSON.stringify({ type: "assistant.message", data: { content, rte: true } });
       const output = `[INFO] startup\r\n{"broken"\nnull\n${first}\r\n{"later":true}`;
@@ -338,6 +340,30 @@ describe("copilot_harness.cjs", () => {
       expect(isCopilotContentFilterError(output)).toBe(true);
       expect(classifyCopilotFailure({ hasOutput: true, isContentFiltered: true, tokenCount: 27719 })).toBe("content_filter");
       expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(false);
+    });
+
+    it.each(["query", "sdk_driver"])("stops retries on a top-level provider policy rejection (%s)", errorType => {
+      const output = JSON.stringify({ type: "session.error", data: { errorType, message: policyMessage, ...(errorType === "query" ? { statusCode: 422 } : {}) } });
+      expect(isCopilotContentFilterError(output)).toBe(true);
+      expect(isCopilotContentFilterError(output, "openai")).toBe(false);
+      expect(classifyCopilotFailure({ hasOutput: true, isContentFiltered: isCopilotContentFilterError(output) })).toBe("content_filter");
+      expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(false);
+    });
+
+    it.each([
+      { type: "assistant.message", data: { content: policyMessage, rte: true } },
+      { type: "user.message", data: { errorType: "query", message: policyMessage } },
+      { type: "session.error", data: { errorType: "query", message: "422 Invalid request", statusCode: 422 } },
+      { type: "session.error", data: { errorType: "query", message: "Possible cybersecurity risk", statusCode: 422 } },
+      { type: "session.error", data: { errorType: "query", message: `Quoted: ${policyMessage}` } },
+      { type: "session.error", data: { errorType: "tool", message: policyMessage } },
+      { type: "session.error", data: { errorType: "query", message: policyMessage, parentToolCallId: "child" } },
+      { type: "session.error", agentId: "child", data: { errorType: "sdk_driver", message: policyMessage } },
+      { type: "session.error", data: { errorType: "query", message: null } },
+    ])("does not mistake unrelated or nested errors for a terminal policy rejection %j", event => {
+      const output = JSON.stringify(event);
+      expect(isCopilotContentFilterError(output)).toBe(false);
+      expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(true);
     });
 
     it.each([
@@ -3164,7 +3190,12 @@ process.stdin.on("end", () => fs.writeFileSync(process.env.COPILOT_HARNESS_STUB_
   });
 
   describe("noop pre-flight and retry guard", () => {
-    it.each([false, true])("keeps a content-filter rejection failed without retries even when noop is written: %s", writeNoop => {
+    const filterEvents = [
+      { type: "assistant.message", data: { content: "The model returned no content because the response was blocked by content filtering.", rte: true, toolRequests: [] } },
+      { type: "session.error", data: { errorType: "query", message: CYBERSECURITY_POLICY_REJECTION_PREFIX, statusCode: 422 } },
+      { type: "session.error", data: { errorType: "sdk_driver", message: CYBERSECURITY_POLICY_REJECTION_PREFIX } },
+    ];
+    it.each(filterEvents.flatMap(event => [false, true].map(writeNoop => ({ event, writeNoop }))))("keeps a content-filter rejection failed without retries %j", ({ event, writeNoop }) => {
       const tempDir = makeHarnessTempDir("copilot-filtered-retry-");
       const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");
       const stubPath = path.join(tempDir, "stub.cjs");
@@ -3175,7 +3206,7 @@ process.stdin.on("end", () => fs.writeFileSync(process.env.COPILOT_HARNESS_STUB_
         `const fs = require("fs");
 fs.appendFileSync(process.env.COPILOT_HARNESS_STUB_CALLS, "attempt\\n");
 if (${writeNoop}) fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify({type:"noop",message:"nothing to do"}) + "\\n");
-process.stderr.write(JSON.stringify({type:"assistant.message",data:{content:"The model returned no content because the response was blocked by content filtering.",rte:true,toolRequests:[]}}) + "\\n");
+process.stderr.write(${JSON.stringify(JSON.stringify(event))} + "\\n");
 process.exit(1);`,
         "utf8"
       );

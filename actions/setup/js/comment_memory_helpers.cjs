@@ -52,6 +52,15 @@ function isSafeMemoryId(memoryId) {
   return /^[A-Za-z0-9_-]+$/.test(memoryId);
 }
 
+function commentMemoryCodeFencePattern() {
+  return new RegExp(`(?:^|\\n)(\`{6,})${COMMENT_MEMORY_TAG}:([^\\n]{1,${MAX_MEMORY_ID_LENGTH}})\\n([\\s\\S]*?)\\n\\1(?=\\n|$)`, "g");
+}
+
+/** @param {string} commentBody @returns {string} */
+function stripCommentMemoryPayloads(commentBody) {
+  return commentBody.replace(commentMemoryCodeFencePattern(), "\n").replace(new RegExp(`<${COMMENT_MEMORY_TAG} id="[^"]*">[\\s\\S]*?(?:</${COMMENT_MEMORY_TAG}>|$)`, "g"), "\n");
+}
+
 /**
  * @param {string} commentBody
  * @param {(message: string) => void} [warn]
@@ -67,7 +76,7 @@ function extractCommentMemoryEntries(commentBody, warn = () => {}) {
 
   // New format: ``````gh-aw-comment-memory:<id>\ncontent\n``````
   // Use a broad character class and then validate with isSafeMemoryId() to keep validation in one place.
-  const codeFenceOpenerPattern = new RegExp(`(?:^|\\n)(\`{6,})${COMMENT_MEMORY_TAG}:([^\\n]{1,${MAX_MEMORY_ID_LENGTH}})\\n([\\s\\S]*?)\\n\\1(?=\\n|$)`, "g");
+  const codeFenceOpenerPattern = commentMemoryCodeFencePattern();
   let match;
   while ((match = codeFenceOpenerPattern.exec(commentBody)) !== null) {
     const memoryId = match[2];
@@ -158,6 +167,7 @@ module.exports = {
   buildCodeFenceOpener,
   stripCommentMemoryCodeFence,
   extractCommentMemoryEntries,
+  stripCommentMemoryPayloads,
   listCommentMemoryFiles,
   resolveCommentMemoryConfig,
 };

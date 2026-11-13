@@ -20,6 +20,8 @@ on:
     - '.github/aw/releases.schema.json'
     - '.github/aw/compat.json'
     - '.github/aw/compat.schema.json'
+    - '.github/ci/**'
+    - '.github/workflows/ci-front-door-researcher.*'
     - 'install-gh-aw.sh'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -40,7 +42,12 @@ on:
     - '.github/aw/releases.schema.json'
     - '.github/aw/compat.json'
     - '.github/aw/compat.schema.json'
+    - '.github/ci/**'
+    - '.github/workflows/ci-front-door-researcher.*'
     - 'install-gh-aw.sh'
+  schedule:
+    # Independent full-suite control: never use the Decision API on scheduled runs.
+    - cron: '23 4 * * 1'
   workflow_dispatch:
 jobs:
   checkout-cache:
@@ -50,6 +57,8 @@ jobs:
       contents: read
     outputs:
       dependencies-changed: ${{ steps.dependencies.outputs.changed }}
+      suite_ids: ${{ steps.front-door.outcome == 'success' && steps.front-door.outputs.suite_ids || '' }}
+      front-door-metrics: ${{ steps.front-door.outputs.metrics }}
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -70,12 +79,34 @@ jobs:
       run: bash scripts/check-cgo-cjs-workflow-purity.sh
     - name: Test workflow timing summaries
       run: node --test scripts/workflow-timing.test.cjs
+    - name: Select CI suites with one Decision API request
+      id: front-door
+      continue-on-error: true
+      env:
+        CI_DECISION_URL: ${{ vars.CI_DECISION_URL }}
+      run: node scripts/ci-front-door.cjs
     - name: Cache repository checkout
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
       with:
         path: .
         # Keep reservations and cleanup isolated from other runs of this commit.
         key: checkout-cgo-${{ github.run_id }}-${{ github.sha }}
+
+  front-door-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        fetch-depth: 2
+        persist-credentials: false
+    - name: Test CI Front Door conformance
+      run: |
+        node --test scripts/ci-front-door.test.cjs
+        node --test scripts/ci-front-door-researcher.test.cjs
 
   verify-integration-build:
     needs: [checkout-cache]
@@ -608,6 +639,7 @@ jobs:
 
   build-wasm:
     needs: [checkout-cache]
+    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'build-wasm')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1744,6 +1776,7 @@ jobs:
 
   actions-build:
     needs: [checkout-cache]
+    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'actions-build')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -2117,6 +2150,7 @@ jobs:
 
   mcp-server-compile-test:
     needs: [checkout-cache]
+    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'mcp-server-compile-test')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -2308,9 +2342,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-        - macos-latest
-        - windows-latest
+        os: ${{ fromJSON(github.event_name == 'pull_request' && needs.checkout-cache.outputs.suite_ids && !contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'cross-platform-build') && '["windows-latest"]' || '["macos-latest","windows-latest"]') }}
     concurrency:
       group: ci-${{ github.ref }}-cross-platform-${{ matrix.os }}
       cancel-in-progress: true
@@ -2693,6 +2725,7 @@ jobs:
         rm -f .github/workflows/test-cross-platform.lock.yml
 
   alpine-container-test:
+    if: github.event_name != 'pull_request' || !needs.checkout-cache.outputs.suite_ids || contains(fromJSON(needs.checkout-cache.outputs.suite_ids), 'alpine-container-test')
     name: Alpine Container Test
     needs: [checkout-cache]
     runs-on: ubuntu-latest
@@ -2908,6 +2941,7 @@ jobs:
   summarize-timing:
     name: Summarize workflow timing
     needs:
+    - front-door-conformance
     - checkout-cache
     - verify-integration-build
     - test
