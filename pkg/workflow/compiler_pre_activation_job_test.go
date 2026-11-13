@@ -3,9 +3,12 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,6 +98,7 @@ func TestBuildPreActivationPermissions(t *testing.T) {
 		data := &WorkflowData{
 			Name:                      "wf",
 			RateLimit:                 &RateLimitConfig{},
+			SkipIfMatch:               &SkipIfMatchConfig{Query: "is:issue is:open"},
 			LabelCommandDecentralized: true,
 			LabelCommandEvents:        []string{"pull_request"},
 			OnPermissions: NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
@@ -112,6 +116,41 @@ func TestBuildPreActivationPermissions(t *testing.T) {
 		assert.Contains(t, permissions, "issues: write")
 		assert.Contains(t, permissions, "pull-requests: read")
 	})
+}
+
+func TestPreActivationSearchPermissions(t *testing.T) {
+	for _, gate := range []string{
+		`skip-if-match: 'is:issue is:open in:title "[airgap-guide-drift] "'`,
+		`skip-if-no-match: "is:pr is:open"`,
+		"skip-if-match: \"is:issue is:open\"\n  skip-if-no-match: \"is:pr is:open\"",
+	} {
+		t.Run(gate, func(t *testing.T) {
+			workflowFile := filepath.Join(testutil.TempDir(t, "search-permissions"), "workflow.md")
+			content := "---\non:\n  pull_request:\n    types: [opened]\n  " + gate + "\nengine: claude\n---\n\nSearch gate workflow.\n"
+			require.NoError(t, os.WriteFile(workflowFile, []byte(content), 0600))
+
+			compiler := NewCompiler()
+			compiler.SetActionMode(ActionModeRelease)
+			require.NoError(t, compiler.CompileWorkflow(workflowFile))
+
+			lockContent, err := os.ReadFile(strings.TrimSuffix(workflowFile, ".md") + ".lock.yml")
+			require.NoError(t, err)
+			var workflow struct {
+				Permissions map[string]string `yaml:"permissions"`
+				Jobs        map[string]struct {
+					Permissions map[string]string `yaml:"permissions"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal(lockContent, &workflow))
+			assert.Empty(t, workflow.Permissions)
+			job, ok := workflow.Jobs["pre_activation"]
+			require.True(t, ok)
+			assert.Equal(t, map[string]string{
+				"issues":        "read",
+				"pull-requests": "read",
+			}, job.Permissions)
+		})
+	}
 }
 
 func TestApplyPreActivationIfConditionGuards(t *testing.T) {
