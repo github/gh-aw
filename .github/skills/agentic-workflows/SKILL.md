@@ -100,7 +100,10 @@ Use the task routes above first. This inventory is not required startup context.
 - `.github/aw/configure-agentic-engine.md`
 - `.github/aw/connectors.md`
 - `.github/aw/context.md`
+- `.github/aw/create-agentic-workflow-design.md`
+- `.github/aw/create-agentic-workflow-evaluation.md`
 - `.github/aw/create-agentic-workflow-trigger-details.md`
+- `.github/aw/create-agentic-workflow-validation.md`
 - `.github/aw/create-agentic-workflow.md`
 - `.github/aw/create-shared-agentic-workflow.md`
 - `.github/aw/debug-agentic-workflow.md`
