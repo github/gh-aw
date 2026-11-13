@@ -95,7 +95,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs -v                        # Verbose compact output (extra columns + sections)
   %[1]s logs --json                    # JSON format (compact by default, use -v for full)
   %[1]s logs --json -v                 # Full JSON with audit metadata
-  %[1]s logs --jsonl                   # Stream progress, run records, and a final report as JSON Lines
+  %[1]s logs --format jsonl            # Stream progress, run records, and a final report as JSON Lines
   %[1]s logs --cached-jsonl logs.jsonl # Reuse matching records and append new results immediately
   %[1]s logs --cached-jsonl 'logs-*'   # Reuse logs-*.jsonl files and write new data to a unique logs-*.jsonl file
   %[1]s logs --format tsv              # Tab-separated (minimal, raw data)
@@ -483,20 +483,9 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		ArtifactSets:          logsCommandArtifactSets(cmd),
 		CachedJSONL:           getStringFlag(cmd, "cached-jsonl"),
 	}
-	return finalizeLogsCommandOptions(cmd, options)
-}
-
-func finalizeLogsCommandOptions(cmd *cobra.Command, options LogsDownloadOptions) (LogsDownloadOptions, error) {
-	var err error
 	options.IgnoreWorkflowRuns, err = parseIgnoredWorkflowRunIDs(getStringSliceFlag(cmd, "ignore-workflow-runs"))
 	if err != nil {
 		return LogsDownloadOptions{}, err
-	}
-	if getBoolFlag(cmd, "jsonl") {
-		if options.Format != "" && options.Format != "jsonl" {
-			return LogsDownloadOptions{}, errors.New("--jsonl cannot be combined with another --format")
-		}
-		options.Format = "jsonl"
 	}
 	if err := validateLogsOptions(options); err != nil {
 		return LogsDownloadOptions{}, err
@@ -558,7 +547,7 @@ func resolveLogsDateRange(startDate, endDate string, now time.Time) (string, str
 
 func validateLogsOptions(options LogsDownloadOptions) error {
 	if options.Format == "jsonl" && options.JSONOutput {
-		return errors.New("--jsonl/--format jsonl cannot be combined with --json")
+		return errors.New("--format jsonl cannot be combined with --json")
 	}
 	if err := validateMaxStorageMB(options.MaxStorageMB); err != nil {
 		return err
@@ -718,7 +707,6 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().Bool("parse", false, "Run JavaScript parsers on agent logs and firewall logs, writing Markdown to log.md and firewall.md")
 	logsCmd.Flags().Bool("audit", false, "Generate audit.json in each workflow run cache directory (comparisons use downloaded runs only)")
 	addJSONFlag(logsCmd)
-	logsCmd.Flags().Bool("jsonl", false, "Stream progress, processed runs, and the final report as JSON Lines")
 	logsCmd.Flags().Int("timeout", 0, "Total download timeout in minutes across all targets (0 = no timeout)")
 	logsCmd.Flags().Int("timeout-seconds", 0, "Download timeout in seconds (0 = use --timeout)")
 	_ = logsCmd.Flags().MarkHidden("timeout-seconds")

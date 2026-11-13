@@ -26,14 +26,10 @@ func TestLogsJSONLFlags(t *testing.T) {
 		args     []string
 		conflict bool
 	}{
-		{args: []string{"--jsonl"}},
 		{args: []string{"--format", "jsonl"}},
-		{args: []string{"--jsonl", "--format", "jsonl"}},
-		{args: []string{"--stdin", "--jsonl", "--cached-jsonl", "cache.jsonl"}},
-		{args: []string{"--jsonl", "--json"}, conflict: true},
+		{args: []string{"--stdin", "--format", "jsonl", "--cached-jsonl", "cache.jsonl"}},
 		{args: []string{"--format", "jsonl", "--json"}, conflict: true},
-		{args: []string{"--jsonl", "--format", "tsv"}, conflict: true},
-		{args: []string{"--jsonl", "--report-file", "report.md"}, conflict: true},
+		{args: []string{"--format", "jsonl", "--report-file", "report.md"}, conflict: true},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			cmd := NewLogsCommand()
@@ -51,6 +47,10 @@ func TestLogsJSONLFlags(t *testing.T) {
 			assert.Equal(t, "jsonl", stdinOpts.Format)
 		})
 	}
+	t.Run("no standalone jsonl flag", func(t *testing.T) {
+		cmd := NewLogsCommand()
+		require.ErrorContains(t, cmd.ParseFlags([]string{"--jsonl"}), "unknown flag: --jsonl")
+	})
 }
 
 func TestLogsJSONLOrchestrationEmptyResults(t *testing.T) {
