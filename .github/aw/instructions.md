@@ -10,6 +10,13 @@ These rules override conflicting upstream guidance.
 
 ## Repository Rules
 
+- For instruction/skill edits or generators, preserve the complete task contract
+  within 7,500 UTF-8 bytes (8,000-byte query limit, including metadata).
+  Put objective, constraints, routes, verification and stop conditions first;
+  defer examples and inventories. Use explicit imperatives; preserve safety,
+  field names and behavior. Follow
+  [packing guidance](../skills/prompt-token-efficiency/SKILL.md) and run
+  `make check-instruction-prefixes`; review semantic completeness separately.
 - After any `.github/workflows/*.md` edit, run one-shot `gh aw compile`; never `--watch`.
 - Follow [debug-agentic-workflow.md](debug-agentic-workflow.md) for diagnosis,
   patching, mode selection, and live gates. Logs/audits do not authorize live runs.
