@@ -609,7 +609,7 @@ func TestEngineConformanceCatalogCoverage(t *testing.T) {
 			compiled := string(lock)
 			require.Contains(t, compiled, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS: "%d"`, budget), "the firewall must receive the authored credit limit")
 			if id == "codex" {
-				require.Contains(t, compiled, `"providers":{"openai":{"models":{"gpt-6.1-sol":{"cost":`, "the firewall must receive model-specific Codex pricing")
+				require.NotContains(t, compiled, "GH_AW_INFO_MODEL_COSTS:", "the compiler must not inject catalog pricing into reporting metadata")
 				require.NotContains(t, compiled, `"defaultAiCreditsPricing"`, "conformance must not guess pricing for unknown models")
 			}
 			require.Contains(t, compiled, "work_queue_assignment:")

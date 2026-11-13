@@ -39,7 +39,10 @@ func (c *Compiler) buildInitialWorkflowData(
 	importsResult *parser.ImportsResult,
 ) (*WorkflowData, error) {
 	workflowBuilderLog.Print("Building initial workflow data")
-	_, subAgents, _ := parser.ExtractInlineSubAgents(result.Markdown)
+	_, subAgents, err := parser.ExtractInlineSubAgents(result.Markdown)
+	if err != nil {
+		return nil, err
+	}
 
 	inlinedImports := resolveInlinedImports(result.Frontmatter)
 
@@ -252,6 +255,7 @@ func (c *Compiler) buildInitialWorkflowData(
 	mainModelCosts := extractMainModelCostsOverlay(toolsResult, result.Frontmatter)
 	mergedModelCosts := mergeModelCostOverlays(importsResult.MergedModelCosts, mainModelCosts)
 	if len(mergedModelCosts) > 0 {
+		workflowData.ModelCostOverrides = mergedModelCosts
 		workflowData.ModelCosts = mergedModelCosts
 	}
 	mainModelPolicy := extractMainModelPolicyOverlay(toolsResult, result.Frontmatter)

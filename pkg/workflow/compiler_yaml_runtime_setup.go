@@ -315,8 +315,8 @@ func (c *Compiler) generateActivationArtifactAndCommentMemorySteps(yaml *strings
 
 	// Write a minimal comment-memory config so setup_comment_memory_files.cjs can locate the
 	// comment_memory section. The full safeoutputs config (generated in MCP setup) is written
-	// later; this early write provides only what the read step needs.
-	if !c.generateCommentMemoryEarlyConfigStep(yaml, data) {
+	// later; comment-backed ledger projections already wrote this shared config.
+	if !data.LedgerConfig.hasCommentStorage() && !c.generateCommentMemoryEarlyConfigStep(yaml, data) {
 		return
 	}
 

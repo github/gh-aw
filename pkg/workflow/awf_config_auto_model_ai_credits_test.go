@@ -71,6 +71,7 @@ func TestZeroConfigCopilotAutoModelWithMaxAiCredits(t *testing.T) {
 				}},
 			}},
 		}
+		workflowData.ModelCostOverrides = workflowData.ModelCosts
 
 		config := AWFCommandConfig{
 			EngineName:     "copilot",
@@ -92,7 +93,7 @@ func TestZeroConfigCopilotAutoModelWithMaxAiCredits(t *testing.T) {
 		require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
 
 		copilotProvider, ok := parsed.APIProxy.Providers["github-copilot"]
-		require.True(t, ok, "concrete model pricing must be emitted for the resolved model")
+		require.True(t, ok, "explicit workflow pricing must be emitted for the resolved model")
 		assert.Contains(t, copilotProvider.Models, "gpt-5.1")
 		assert.NotContains(t, copilotProvider.Models, "auto",
 			"the dynamic selector must never receive its own pricing entry")

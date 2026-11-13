@@ -106,7 +106,7 @@ func resolveModelRoutingCandidateGroups(data *WorkflowData, engineName string) (
 			return nil, fmt.Errorf("engine.model-routing.allowed-models contains invalid %s %q", modelLabel, model)
 		}
 		_, explicitModel := workflowProviderModelIDs(data, namespace)[model]
-		exact := prefixed || containsExpression(model) || explicitModel
+		exact := prefixed || containsExpression(model) || explicitModel || plausibleConcreteModelID(model)
 		key := model
 		if !exact && aliases[model] != nil {
 			key = "alias:" + model

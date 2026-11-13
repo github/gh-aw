@@ -501,7 +501,10 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
             // Invalid JSON examples remain literal code.
           }
         }
-        nodes.push(fromSource({ type: "code_block", language: /^[a-zA-Z0-9_+:-]*$/.test(language) ? language : "text", value, ...(fence[0] === "`" && fence.length > 3 ? { fenceLength: Math.min(fence.length, 128) } : {}) }));
+        // Only trusted persistence may construct ledger blocks as typed nodes.
+        // Markdown imports include ordinary comments published by the same bot.
+        const safeLanguage = !language.startsWith("gh-aw-comment-ledger:") && /^[a-zA-Z0-9_+:-]*$/.test(language) ? language : "text";
+        nodes.push(fromSource({ type: "code_block", language: safeLanguage, value, ...(fence[0] === "`" && fence.length > 3 ? { fenceLength: Math.min(fence.length, 128) } : {}) }));
       } else if ((match = /^(#{1,6})\s+(.+)$/.exec(line))) {
         nodes.push(fromSource({ type: "heading", level: Math.max(minimumHeadingLevel, match[1].length), children: inline(match[2]) }));
         index++;

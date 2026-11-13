@@ -23,6 +23,8 @@ func TestIsSingleLedgerMap(t *testing.T) {
 		{name: "string type identifies a single ledger", config: map[string]any{"type": "jsonl"}, want: true},
 		{name: "empty string type still identifies a single ledger", config: map[string]any{"type": ""}, want: true},
 		{name: "string key identifies a single ledger", config: map[string]any{"key": "識別子"}, want: true},
+		{name: "storage identifies a single ledger", config: map[string]any{"storage": "comment-memory"}, want: true},
+		{name: "named ledger called storage remains a named ledger", config: map[string]any{"storage": map[string]any{"type": "log"}}},
 		{name: "empty string key still identifies a single ledger", config: map[string]any{"key": ""}, want: true},
 		{name: "nil type does not identify a single ledger", config: map[string]any{"type": nil}},
 		{name: "numeric type does not identify a single ledger", config: map[string]any{"type": 1}},
