@@ -48,6 +48,51 @@ func TestCompletionCommentFooterMetadata(t *testing.T) {
 	}
 }
 
+func TestCompletionCommentFooterMetadataUsesMainJobName(t *testing.T) {
+	tests := []struct {
+		name         string
+		engineConfig *EngineConfig
+		model        string
+		expected     []string
+	}{
+		{
+			name:         "model routing",
+			engineConfig: &EngineConfig{ID: "copilot", ModelRouting: &CopilotModelRoutingConfig{}},
+			expected: []string{
+				`GH_AW_ENGINE_MODEL: ${{ needs.custom-agent.outputs.model }}`,
+				`GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.custom-agent.outputs.model_effort }}`,
+				`GH_AW_MODEL_ROUTING_STATUS: ${{ needs.custom-agent.outputs.model_routing_status }}`,
+			},
+		},
+		{
+			name:         "empty model",
+			engineConfig: &EngineConfig{ID: "copilot"},
+			expected: []string{
+				`GH_AW_ENGINE_MODEL: ${{ needs.custom-agent.outputs.model }}`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: tt.engineConfig,
+				Model:        tt.model,
+				SafeOutputs:  &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+			}
+			env := strings.Join(NewCompiler().buildConclusionScriptEnvVars(data, "custom-agent", nil, ""), "")
+			for _, expected := range tt.expected {
+				if !strings.Contains(env, expected) {
+					t.Errorf("Completion comment footer is missing %s", expected)
+				}
+			}
+			if strings.Contains(env, "needs.agent.outputs.") {
+				t.Error("Completion comment footer must use the caller-selected main job")
+			}
+		})
+	}
+}
+
 func TestNoopStepInConclusionJob(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "noop-in-conclusion-test")

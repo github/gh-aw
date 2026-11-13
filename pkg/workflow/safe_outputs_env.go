@@ -154,7 +154,7 @@ func (c *Compiler) buildStandardSafeOutputEnvVars(data *WorkflowData, targetRepo
 	customEnvVars = append(customEnvVars, buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))...)
 
 	// Add engine metadata (id, version, model) for XML comment marker
-	customEnvVars = append(customEnvVars, buildEngineMetadataEnvVars(data.EngineConfig, data.Model)...)
+	customEnvVars = append(customEnvVars, buildEngineMetadataEnvVars(data.EngineConfig, data.Model, string(constants.AgentJobName))...)
 
 	// Add common safe output job environment variables (staged/target repo)
 	customEnvVars = append(customEnvVars, buildSafeOutputJobEnvVars(
@@ -179,7 +179,7 @@ func (c *Compiler) buildStandardSafeOutputEnvVars(data *WorkflowData, targetRepo
 
 // buildEngineMetadataEnvVars builds engine metadata environment variables (id, version, model)
 // These are used by the JavaScript footer generation to create XML comment markers for traceability
-func buildEngineMetadataEnvVars(engineConfig *EngineConfig, model string) []string {
+func buildEngineMetadataEnvVars(engineConfig *EngineConfig, model, mainJobName string) []string {
 	var customEnvVars []string
 
 	if engineConfig == nil {
@@ -204,12 +204,12 @@ func buildEngineMetadataEnvVars(engineConfig *EngineConfig, model string) []stri
 	if model != "" && engineConfig.ModelRouting == nil {
 		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_ENGINE_MODEL: %q\n", model))
 	} else {
-		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_ENGINE_MODEL: ${{ needs.%s.outputs.model }}\n", string(constants.AgentJobName)))
+		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_ENGINE_MODEL: ${{ needs.%s.outputs.model }}\n", mainJobName))
 	}
 	if engineConfig.ModelRouting != nil {
 		customEnvVars = append(customEnvVars,
-			fmt.Sprintf("          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.%s.outputs.model_effort }}\n", string(constants.AgentJobName)),
-			fmt.Sprintf("          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.%s.outputs.model_routing_status }}\n", string(constants.AgentJobName)),
+			fmt.Sprintf("          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.%s.outputs.model_effort }}\n", mainJobName),
+			fmt.Sprintf("          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.%s.outputs.model_routing_status }}\n", mainJobName),
 		)
 	}
 

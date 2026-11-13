@@ -306,9 +306,11 @@ async function main() {
 
     // Completion comments add their own attribution footer.
     let commentBody = "";
+    let issueBody = "";
     try {
       commentBody = buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput);
       core.setOutput("noop_comment_body", commentBody);
+      issueBody = buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput, true);
     } catch (error) {
       core.warning(`Could not render no-op comment body: ${getErrorMessage(error)}`);
     }
@@ -362,13 +364,14 @@ async function main() {
       core.warning("No-op comment body is unavailable, skipping no-op message posting");
       return;
     }
+    if (!issueBody) return;
 
     try {
       await github.rest.issues.createComment({
         owner,
         repo,
         issue_number: noopRunsIssue.number,
-        body: buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport, hasNonNoopOutput, true),
+        body: issueBody,
       });
 
       core.info(`✓ Posted no-op message to no-op runs issue #${noopRunsIssue.number}`);
