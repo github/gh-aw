@@ -5,26 +5,20 @@ applyTo: ".github/workflows/*.md,.github/workflows/**/*.md"
 
 # GitHub Agentic Workflows
 
+Use for workflow authoring. Start with the [creator](create-agentic-workflow.md),
+[updater](update-agentic-workflow.md), or [debugger](debug-agentic-workflow.md).
+Load only the topic references required by the task.
+
 ## Persona-to-Pattern Quick Matrix
 
-Persona-lens view of the same facts as the canonical [Decision Matrix](triggers.md#decision-matrix) in triggers.md; update both when a trigger/tool/output mapping changes.
-
-| Persona | Preferred trigger and scope | Typical read tools | Typical write path | Explicit `noop` rule |
-|---|---|---|---|---|
-| Backend Engineer | `pull_request` with `paths:` scoped to migrations, schema, and API contracts | `github` (`gh-proxy`) | `add-comment` for PR-local findings; `create-issue` only for cross-cutting incidents | `noop` when no backend contract files changed |
-| Frontend Developer | `pull_request` with `paths:` scoped to UI, design-token, and asset files | `github` (`gh-proxy`), optional `playwright`, optional `cache-memory` for baselines | `add-comment` | `noop` when no UI/token files changed or no actionable visual/token issues were found |
-| DevOps Engineer | `workflow_run` for GitHub Actions failures, `deployment_status` for external deployment failures | `github` (`gh-proxy`) with `actions: read` or `deployments: read` | `create-issue` with stable dedup key | `noop` when status is non-terminal, self-recovered, or an open incident already exists for the same dedup key |
-| Program Manager | `schedule` (+ `workflow_dispatch` for previews and backfills) | `github` (`gh-proxy`) | `create-issue` with `close-older-issues: true` for recurring digests | `noop` when the reporting window contains no qualifying updates |
-| Designer | `pull_request` with `paths:` scoped to UI, design-token, copy, and asset files | `github` (`gh-proxy`); optional `playwright` for visual checks | `add-comment` on the PR | `noop` when scoped paths are unchanged or no actionable design/token issue is found |
-| Legal / Compliance | `pull_request` with `paths:` scoped to dependency manifests or policy docs for PR reviews; `schedule` for recurring audits | `github` (`gh-proxy`) | `add-comment` for findings; `create-issue` only for violations requiring team-wide follow-up | `noop` when no in-scope files changed or all findings are in the allowed tier; always search for an existing open issue before escalating |
+Use the canonical [Decision Matrix](triggers.md#decision-matrix) and
+[persona scenario map](create-agentic-workflow-trigger-details.md#persona-oriented-scenario-map)
+for triggers, path scope, outputs and `noop` conditions.
 
 ## Persona-to-Toolset Matrix
 
-| Persona | Default toolset is enough when... | Name optional tools when... |
-|---|---|---|
-| Program Manager | Digest/report uses GitHub data only (`tools.github.toolsets: [default]`) | Add `cache-memory` only when trend baselines/deltas must persist across runs |
-| Designer | PR review is metadata/content-aware via GitHub reads only | Add `playwright` for screenshot/visual checks; add `cache-memory` when baselines or snapshot history are required |
-| Legal / Compliance | Policy/dependency review is repo-state and metadata driven | Add `cache-memory` when recurring audits need prior-run evidence/comparison state |
+Use GitHub's default toolset for GitHub-only reads. Add `playwright` for visual
+checks; add `cache-memory` only for persistent baselines or comparisons.
 
 ## Replace Previous Results
 
@@ -95,65 +89,25 @@ Use `pull_request` with `paths:` for checks that need only changed files. When a
 
 ## Ad Hoc Scenario Evaluation
 
-Installed gh-aw agents should support scenario evaluation requests that do not create workflow files.
-
-- Treat prompts such as `agentic-workflows evaluate this scenario without creating files` as ad hoc evaluation mode.
-- For explicit research/evaluation requests, invoke with wording such as `agentic-workflows evaluate this scenario without creating files` or `agentic-workflows research this workflow pattern and return recommendations only`.
-- Return a compact design recommendation covering trigger, scope, tools, permissions, safe outputs, `noop` behavior, and any report window / grouping / deduplication requirements.
-- Offer to turn the recommendation into `.github/workflows/<workflow-id>.md` only if the user asks to proceed.
-
-### Supported Invocation Surface
-
-Ad hoc scenario evaluation is a **conversation-mode capability** of the installed `agentic-workflows` custom agent, not a CLI flag or MCP tool parameter — no `gh aw` CLI/MCP command accepts a freeform `prompt`/`scenario`/`query` parameter. See [Invocation Surface](create-agentic-workflow.md#ad-hoc-evaluation-mode) in create-agentic-workflow.md for the full explanation and recovery steps if a tool call returns `Unknown parameter`.
-
-### Program Manager digest example
-
-```yaml
-on:
-  schedule: weekly
-  workflow_dispatch:
-permissions:
-  contents: read
-  issues: read
-tools:
-  github:
-    mode: gh-proxy
-    toolsets: [default]
-safe-outputs:
-  create-issue:
-    close-older-issues: true
-```
-
-- Reporting window: 7 days, ending at run time; use `workflow_dispatch` for previews, reruns, or backfills of a prior window.
-- Grouping dimensions: group items by owning team or repository, then by status (in-progress, blocked, at-risk).
-- Dedup key example: `pm-digest:<window-id>` (for example `pm-digest:2026-W33`); combine with `close-older-issues: true` so each run supersedes the previous digest issue instead of accumulating duplicates.
-- Call `noop` when the reporting window has no qualifying updates.
-
-### Non-technical persona examples
-
-Trigger and write-path are the same as the [Persona-to-Pattern Quick Matrix](#persona-to-pattern-quick-matrix) above. For ad hoc evaluation, also gather:
-
-| Persona | Key prompt details |
-|---|---|
-| Program Manager | Report window, grouping dimensions, stable dedup key, and `noop` for empty windows |
-| Designer | Review rubric (accessibility, token consistency, asset policy); `noop` when scoped files unchanged |
-| Legal / Compliance | Classify against policy tiers; dedup before escalating; `noop` when no in-scope change or violation |
+For exploration/persona requests, follow
+[ad hoc evaluation](create-agentic-workflow.md#ad-hoc-evaluation-mode).
+Do not create/edit workflows without an explicit implementation request.
+Address the custom agent in conversation; CLI/MCP workflow-management tools
+do not accept freeform `prompt`, `scenario` or `query` parameters.
+Return trigger, scope, tools, permissions, safe outputs and `noop` criteria.
+For recurring reports, state window, grouping dimensions and a stable dedup key;
+replace superseded digests with `create-issue.close-older-issues: true`.
+Name design/accessibility rubrics and policy tiers when relevant; deduplicate
+before escalating compliance findings.
 
 ## PR Checks with Linked References
 
-When a PR analysis requires verifying or attaching a linked artifact (design doc, policy link, architecture decision record, or approval), follow this compact pattern:
-
-1. **Read the linked reference** from the PR body or comments (for example, a URL, a markdown link, or an ADR reference token like `ADR-NN`) using `gh pr view`.
-2. **Validate the link** — confirm the document exists and is accessible before assessing compliance.
-3. **Classify the result**:
-   - Link present and satisfies requirement → `add-comment` with a ✅ summary
-   - Link present but does not satisfy requirement → `add-comment` flagging the specific gap
-   - Link missing → `add-comment` requesting it, or `create-issue` if policy requires a blocking escalation
-4. **Call `noop`** when the PR is not in scope (for example `paths:` guard excludes all changed files).
-
-Permissions: `pull-requests: read` only; all writes route through `add-comment` safe output.
-
-For the full dependency-license/compliance review pattern (paths scoping, license-tier classification, escalation table), see [Compliance review guidance](create-agentic-workflow-trigger-details.md#compliance-review-guidance).
+Read PR-body/comment references with `gh pr view`; verify access and content
+before assessing compliance. Use `add-comment` for satisfied requirements,
+specific gaps or missing links; escalate via `create-issue` only when policy
+requires it. Call `noop` for out-of-scope PRs. Keep agent permissions read-only.
+Use [compliance guidance](create-agentic-workflow-trigger-details.md#compliance-review-guidance)
+for license tiers, path scope and escalation.
 
 ## Reference Files
 

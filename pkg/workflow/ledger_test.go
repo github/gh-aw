@@ -75,6 +75,7 @@ func TestCommentBackedLedgerConfiguration(t *testing.T) {
 	require.Contains(t, extractJobSection(string(lock), pushLedgerChangesJobName), "queue: max")
 	job, err := compiler.buildPushLedgerChangesJob(data, false)
 	require.NoError(t, err)
+	require.Equal(t, "always() && needs.safe_outputs.result == 'success'", job.If)
 	require.Contains(t, job.Permissions, "contents: read")
 	require.Contains(t, job.Permissions, "issues: write")
 	require.NotContains(t, job.Permissions, "contents: write")
