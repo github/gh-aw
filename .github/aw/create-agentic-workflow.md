@@ -42,7 +42,8 @@ If no automation goal is stated, start with exactly:
 
 > What do you want to automate today?
 
-Otherwise skip the opener. Ask only for missing decisions that change the design;
+When the request already states a goal, reuse supplied facts; skip the opener.
+Ask only for missing design decisions;
 keep conversation short and iterative, without option dumps.
 Follow the [interview](designer.md#interview-framework) for intent, repository
 survey, architecture/trigger, scope, data, guardrails, context/network, engine

@@ -141,12 +141,17 @@ Say hello.
 `
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644))
 
+	const setupSHA = "1234567890abcdef1234567890abcdef12345678"
+	cache := workflow.NewActionCache(tempDir)
+	require.True(t, cache.Set("github/gh-aw-actions/setup", "v1.2.3", setupSHA))
+	require.NoError(t, cache.Save())
+
 	require.NoError(t, compileWorkflowsForUpdate(context.Background(), nil, "", "", false, false))
 
 	for _, filename := range []string{"agentic_commands.yml", "agentics-maintenance.yml"} {
 		content, err := os.ReadFile(filepath.Join(workflowsDir, filename))
 		require.NoError(t, err, "expected update compilation to generate %s", filename)
-		require.Contains(t, string(content), "github/gh-aw-actions/setup@v1.2.3")
+		require.Contains(t, string(content), "github/gh-aw-actions/setup@"+setupSHA+" # v1.2.3")
 		require.NotContains(t, string(content), "github/gh-aw-actions/setup@dev")
 	}
 }

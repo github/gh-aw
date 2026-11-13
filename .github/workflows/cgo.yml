@@ -208,9 +208,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: A-C
-          pattern: ^Test[A-C]
-          shard: a-c
+        - name: A-B
+          pattern: ^Test[A-B]
+          shard: a-b
+        - name: C
+          pattern: ^TestC
+          shard: c
         - name: D-G
           pattern: ^Test[D-G]
           shard: d-g
