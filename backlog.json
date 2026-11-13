@@ -1,23 +1,5 @@
 [
  {
-  "id": "notglossy/agentic-workflows",
-  "kind": "workflow-collection",
-  "source": "search: gh aw add/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
-  "id": "pulumi-labs/gh-aw-internal",
-  "kind": "other",
-  "source": "search: gh aw add/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
-  "id": "mohith-e/gh-aw-trial",
-  "kind": "other",
-  "source": "search: gh-aw safe-outputs/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
   "id": "ymd65536/GitHubAgenticWorkflows",
   "kind": "other",
   "source": "search: gh aw add/agentic repo search",
@@ -45,12 +27,6 @@
   "id": "githubnext/repo-mind-light-aw",
   "kind": "shared-component",
   "source": "repo search 2026-11-12: companion gh-aw shared workflow repo",
-  "discovered": "2026-11-12"
- },
- {
-  "id": "githubnext/gh-aw-dashboard",
-  "kind": "tool",
-  "source": "repo search 2026-11-12: dashboard for gh-aw central agentic ops",
   "discovered": "2026-11-12"
  },
  {

@@ -43,3 +43,4 @@
 2026-11-10: discovery (repo search); reviewed oblt-aw (8, blogged), docs-actions (6), gh-cao (dup of gh-aw-cao); blog PR; backlog 0.
 2026-11-11: discovery (repo search; code search rate-limited 429); 74 unique hits, ~12 gh-aw-specific queued; reviewed OneRose awesome-agentic-workflows (6), SkylineCommunications/_ReusableAgenticWorkflows (7), balcsida/pig-gh-aw-test (7); no blog (none >=8 unblogged); backlog 9.
 2026-11-12: discovery (repo search, 3 queries; 7 gh-aw hits + 5 agentics-linked queued); reviewed UnclesLibrary/agentic-workflows-library (5), tomsiwik/laboratory (4), jcampb/mm-bmad (6); no blog (none >=8 unblogged); backlog 17.
+2026-11-13: discovery skipped (backlog 17); reviewed notglossy/agentic-workflows (7), mohith-e/gh-aw-trial (7), pulumi-labs/gh-aw-internal (5; shared/ subtree withheld by access policy), githubnext/gh-aw-dashboard (2); no blog (none >=8 unblogged); backlog 13.
