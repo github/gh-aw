@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-09-29",
-    "workflow_name": "[aw] Failure Investigator (6h)",
-    "workflow_file": "aw-failure-investigator",
-    "total_aic_analyzed": 87.2,
-    "runs_audited": 3,
-    "recommendations_count": 3,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 10
-  },
-  {
     "date": "2026-09-30",
     "workflow_name": "Matt Pocock Skills Reviewer",
     "workflow_file": "mattpocock-skills-reviewer",
@@ -298,5 +288,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 6
+  },
+  {
+    "date": "2026-11-13",
+    "workflow_name": "Smoke Claude Dynamic Workflow",
+    "workflow_file": "smoke-claude-dynamic",
+    "total_aic_analyzed": 48.89,
+    "runs_audited": 2,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 1.2
   }
 ]
