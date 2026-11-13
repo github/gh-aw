@@ -1667,11 +1667,10 @@ func TestExtractManifestIncludesSliceNormalization(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		include     string
-		wantSource  string
-		wantWarning bool
-		wantError   bool
+		name       string
+		include    string
+		wantSource string
+		wantError  bool
 	}{
 		{
 			name:       "trims whitespace",
@@ -1684,9 +1683,8 @@ func TestExtractManifestIncludesSliceNormalization(t *testing.T) {
 			wantSource: "aw.yml",
 		},
 		{
-			name:        "warns for unsupported path",
-			include:     "README.md",
-			wantWarning: true,
+			name:    "warns for unsupported path",
+			include: "README.md",
 		},
 		{
 			name:      "rejects invalid manifest import",
@@ -1723,10 +1721,37 @@ func TestExtractManifestIncludesSliceNormalization(t *testing.T) {
 				} else {
 					assert.Empty(t, includes)
 					require.Len(t, warnings, 1)
-					assert.Equal(t, tt.wantWarning, strings.Contains(warnings[0], "Ignoring includes entry"))
+					assert.Contains(t, warnings[0], "Ignoring includes entry")
 				}
 			})
 		}
+	}
+}
+
+func TestExtractManifestIncludesNormalizedDuplicates(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name  string
+		value any
+	}{
+		{
+			name:  "[]any",
+			value: []any{"workflows/review.md", " workflows/review.md "},
+		},
+		{
+			name:  "[]string",
+			value: []string{"workflows/review.md", " workflows/review.md "},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			includes, warnings, err := extractManifestIncludes(test.value, "aw.yml")
+			require.NoError(t, err)
+			assert.Equal(t, []string{"workflows/review.md"}, manifestIncludeSources(includes))
+			assert.Empty(t, warnings)
+		})
 	}
 }
 
