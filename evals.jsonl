@@ -160,3 +160,5 @@
 {"id":"summary_with_charts_created","question":"Was a daily performance summary with trend charts produced?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-10T20:52:33.315Z","runid":"42897771945"}
 {"id":"performance_data_collected","question":"Did the agent collect performance data for the 90-day window?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-11T21:16:40.063Z","runid":"43100046314"}
 {"id":"summary_with_charts_created","question":"Was a daily performance summary with trend charts produced?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-11T21:16:40.063Z","runid":"43100046314"}
+{"id":"performance_data_collected","question":"Did the agent collect performance data for the 90-day window?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-13T20:51:45.541Z","runid":"43503959520"}
+{"id":"summary_with_charts_created","question":"Was a daily performance summary with trend charts produced?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-13T20:51:45.541Z","runid":"43503959520"}
