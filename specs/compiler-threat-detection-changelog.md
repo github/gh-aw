@@ -109,6 +109,18 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 ## Mapping Audits
 
+### Mapping Audit (2026-11-13)
+
+Reviewed commits from the last two days touching compiler, parser, bootstrap, and runtime security boundaries.
+
+Findings and disposition:
+
+- Firewall v0.29.12 checksum pin (#77231, #77082): already covered by the independently provisioned release-digest bootstrap controls mapped in security architecture §6.8 and the Section 2 bootstrap note; the checksum entry in `actions/setup/sh/release_integrity.sh` matches `DefaultFirewallVersion`. No rule change.
+- Quote-adjacent HTML attribute sanitization (#77007) and the earlier temporary-file, symlink, and step-summary hardening (#76954, #76958, #76974): runtime content-sanitization and filesystem controls that the compiler does not detect in authored workflows. Existing CTR-017 coverage is unchanged. No new `CTR-*` rule.
+- `status_changed` issue trigger acceptance (#77179): schema/trigger validation only; it grants no permission and introduces no new threat class.
+- Open high-severity code-scanning alerts: none returned (one item was withheld by the secrecy policy). No `threat-detection-suppress` annotations exist in workflow sources, so no suppression SLA action applies.
+- Go tests could not be executed in this environment (the required Go 1.27.4 toolchain could not be downloaded); no implementation or normative specification text changed, so no version bump was made.
+
 ### Mapping Audit (2026-11-12)
 
 Reviewed commits from the last two days touching compiler, parser, and runtime security boundaries.

@@ -55,9 +55,10 @@ tools:
     mode: local
     toolsets: [default, issues]
 safe-outputs:
+  steer: false
   create-pull-request:
+    draft: true
     exclude-lock-yml: true
-    expires: 2d
     title-prefix: "[performance] "
     labels: [performance, automation, cookie]
     max: 3
@@ -66,6 +67,7 @@ safe-outputs:
 timeout-minutes: 20
 strict: true
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/lock-safe-pull-request.md
   - shared/mcp-pagination.md
   - uses: shared/daily-audit-base.md

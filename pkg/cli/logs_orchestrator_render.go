@@ -30,6 +30,9 @@ func renderLogsOutput(processedRuns []ProcessedRun, opts renderLogsOutputOptions
 	if opts.suppressRender {
 		return nil
 	}
+	if opts.format == "jsonl" {
+		return opts.jsonlStream.summary(logsData)
+	}
 	if !opts.jsonOutput && (opts.format != "markdown" || opts.reportFile == "") {
 		defer func() {
 			if err == nil {
@@ -71,9 +74,7 @@ func renderLogsOutput(processedRuns []ProcessedRun, opts renderLogsOutputOptions
 func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions) (LogsData, error) {
 	// Update MissingToolCount, MissingDataCount, and NoopCount in runs
 	for i := range processedRuns {
-		processedRuns[i].Run.MissingToolCount = len(processedRuns[i].MissingTools)
-		processedRuns[i].Run.MissingDataCount = len(processedRuns[i].MissingData)
-		processedRuns[i].Run.NoopCount = len(processedRuns[i].Noops)
+		updateLogsRunMessageCounts(&processedRuns[i])
 	}
 	if opts.audit {
 		if err := writeLogsAuditsAndTrain(processedRuns, opts); err != nil {
@@ -123,6 +124,12 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 		}
 	}
 	return logsData, nil
+}
+
+func updateLogsRunMessageCounts(run *ProcessedRun) {
+	run.Run.MissingToolCount = len(run.MissingTools)
+	run.Run.MissingDataCount = len(run.MissingData)
+	run.Run.NoopCount = len(run.Noops)
 }
 
 func logsCollectionMessage(opts renderLogsOutputOptions) string {

@@ -47,7 +47,7 @@ engine:
       args:
         - --print
         - --mode
-        - text
+        - json
         - --no-session
         - --no-themes
         - --approve
@@ -83,15 +83,13 @@ engine:
       const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
       const { join } = require("path");
       const { spawnSync } = require("child_process");
-      const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
+      const { createAtomicOutputSanitizers } = require("./atomic_output_redaction.cjs");
       const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...args] = process.argv.slice(2);
       const sensitiveValues = new Set();
-      const sanitize = output => redactArtifactMaskedValues(
-        output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
-      );
-      const log = message => process.stderr.write(sanitize(`[atomic-harness] ${message}\n`));
+      const { sanitizeText, sanitizeStdout } = createAtomicOutputSanitizers(() => [...sensitiveValues]);
+      const log = message => process.stderr.write(sanitizeText(`[atomic-harness] ${message}\n`));
       const main = async () => {
         if (!command) throw new Error("Atomic command is required");
         if (process.env.AWF_REFLECT_ENABLED !== "1") {
@@ -203,8 +201,8 @@ engine:
           if (result.error?.code === "ENOBUFS") {
             throw new Error("Atomic output exceeded the 64 MiB capture limit; incomplete output withheld");
           }
-          const stdout = sanitize(result.stdout);
-          const stderr = sanitize(result.stderr);
+          const stdout = sanitizeStdout(result.stdout);
+          const stderr = sanitizeText(result.stderr);
           process.stdout.write(stdout);
           process.stderr.write(stderr);
           if (result.error) throw result.error;
@@ -224,6 +222,10 @@ engine:
         }
         process.exitCode = 1;
       });
+    log-parser: |
+      function parseLog(logContent) {
+        return require("./parse_pi_log.cjs").parseAtomicLog(logContent);
+      }
 ---
 
 <!--
@@ -290,10 +292,10 @@ registered by the repository's extensions; only the interactive
 `ask_user_question` is excluded, because no person answers in a workflow run.
 Headless runs return a workflow's run ID at launch, and a durable approval gate
 stays pending rather than proceeding. Web tools reach only domains the workflow
-allows. This sample does not advertise
-gh-aw tool allowlists, native iteration limits, Agent Plugins, or structured
-session/token parsing. Plain-text output does
-not establish tool, usage, or MCP-failure telemetry. The smoke workflow runs
+allows. JSONL event output feeds the step summary and unified session converter
+with session identity, tool calls and results, assistant messages, errors, turn
+count, and token usage. This sample does not advertise
+gh-aw tool allowlists, native iteration limits, or Agent Plugins. The smoke workflow runs
 every two days and on manual dispatch, and checks native MCP, file readback, build
 status, and credentials.
 -->

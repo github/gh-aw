@@ -17,16 +17,14 @@ network:
   - defaults
   - github
 imports:
+- shared/pr-safe-output-defaults.md
 - uses: shared/daily-audit-base.md
   with:
     title-prefix: "[developer-docs] "
 - shared/mcp/serena-go.md
 - shared/otlp.md
 safe-outputs:
-  steer: true
   create-pull-request:
-    draft: false
-    expires: 2d
     labels:
     - documentation
     - automation
