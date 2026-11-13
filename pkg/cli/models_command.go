@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -372,41 +373,17 @@ func collectObservedFromAWFReflect(logsDir string, addObserved func(provider, mo
 			return nil
 		}
 		inventoryFound = true
-		content, readErr := os.ReadFile(filePath)
-		if readErr != nil {
-			allInventoriesComplete = false
-			return nil
-		}
-		var payload struct {
-			ModelsFetchComplete *bool `json:"models_fetch_complete"`
-			Endpoints           []struct {
-				Provider string   `json:"provider"`
-				Models   []string `json:"models"`
-			} `json:"endpoints"`
-		}
-		if unmarshalErr := json.Unmarshal(content, &payload); unmarshalErr != nil {
-			allInventoriesComplete = false
-			return nil
-		}
-		if payload.ModelsFetchComplete == nil || !*payload.ModelsFetchComplete {
+		complete, rows := collectAWFReflectInventoryRows(filePath, addObserved)
+		if !complete {
 			allInventoriesComplete = false
 		}
-		for _, endpoint := range payload.Endpoints {
-			for _, model := range endpoint.Models {
-				addObserved(endpoint.Provider, model, "awf-reflect", 1)
-				provider := modelsdev.NormalizeProvider(endpoint.Provider)
-				trimmedModel := strings.TrimSpace(model)
-				if trimmedModel == "" {
-					continue
-				}
-				normalizedModel := strings.ToLower(trimmedModel)
-				key := path.Join(provider, normalizedModel)
-				catalog[key] = modelCatalogRow{Provider: provider, Model: normalizedModel}
-			}
+		for _, row := range rows {
+			key := path.Join(row.Provider, row.Model)
+			catalog[key] = row
 		}
 		return nil
 	})
-	if walkErr != nil && !os.IsNotExist(walkErr) {
+	if walkErr != nil && !errors.Is(walkErr, fs.ErrNotExist) {
 		return nil, nil, walkErr
 	}
 	rows := make([]modelCatalogRow, 0, len(catalog))
@@ -423,6 +400,37 @@ func collectObservedFromAWFReflect(logsDir string, addObserved func(provider, mo
 		return rows, nil, nil
 	}
 	return rows, &allInventoriesComplete, nil
+}
+
+func collectAWFReflectInventoryRows(filePath string, addObserved func(provider, model, source string, occurrences int)) (bool, []modelCatalogRow) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, nil
+	}
+	var payload struct {
+		ModelsFetchComplete *bool `json:"models_fetch_complete"`
+		Endpoints           []struct {
+			Provider string   `json:"provider"`
+			Models   []string `json:"models"`
+		} `json:"endpoints"`
+	}
+	if err := json.Unmarshal(content, &payload); err != nil {
+		return false, nil
+	}
+	rows := make([]modelCatalogRow, 0)
+	for _, endpoint := range payload.Endpoints {
+		provider := modelsdev.NormalizeProvider(endpoint.Provider)
+		for _, model := range endpoint.Models {
+			addObserved(endpoint.Provider, model, "awf-reflect", 1)
+			normalizedModel := strings.TrimSpace(model)
+			if normalizedModel == "" {
+				continue
+			}
+			normalizedModel = strings.ToLower(normalizedModel)
+			rows = append(rows, modelCatalogRow{Provider: provider, Model: normalizedModel})
+		}
+	}
+	return payload.ModelsFetchComplete != nil && *payload.ModelsFetchComplete, rows
 }
 
 func inferAliasHints(provider, model string, aliasMap map[string][]string) string {
