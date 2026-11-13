@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "go-tests",
+      "description": "Existing impacted Go tests, integration compilation, and dependency-change full unit shards.",
+      "historical_duration_seconds": null,
+      "mandatory": true
+    },
+    {
+      "id": "security",
+      "description": "Security tests, vulnerability checks, safe-output conformance, and their build prerequisites; never skippable.",
+      "historical_duration_seconds": null,
+      "mandatory": true
+    },
+    {
+      "id": "native-javascript-tests",
+      "description": "Native JavaScript taint analysis security regressions and Actions parser conformance; never skippable.",
+      "historical_duration_seconds": null,
+      "mandatory": true
+    },
+    {
+      "id": "build-wasm",
+      "description": "WASM build and compiler golden tests for browser-compatible packages.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    {
+      "id": "mcp-server-compile-test",
+      "description": "CLI MCP server workflow compilation checks.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    {
+      "id": "cross-platform-build",
+      "description": "Cross-platform CLI builds and generated shell syntax checks.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    {
+      "id": "alpine-container-test",
+      "description": "Linux CLI compatibility in Alpine containers.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    },
+    {
+      "id": "actions-build",
+      "description": "Build and validate the bundled GitHub Actions.",
+      "historical_duration_seconds": null,
+      "mandatory": false
+    }
+  ]
+}

@@ -82,8 +82,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}-${{ github.event_name == 'pull_request' && 'pull_request' || 'command' }}"
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}"
+  queue: max
 
 run-name: "PR Code Quality Reviewer"
 
@@ -2979,6 +2979,10 @@ jobs:
       checks: write # Create or update check runs.
       issues: write # Create or update issues and comments.
       pull-requests: write # Create or update pull requests and review comments.
+    concurrency:
+      group: "gh-aw-comment-memory"
+      cancel-in-progress: false
+      queue: max
     timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}

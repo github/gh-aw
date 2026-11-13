@@ -113,7 +113,7 @@ Write the current advisory IDs to `/tmp/gh-aw/repo-memory/default/vuln-baseline.
 - **Engine restriction** — `repo-memory` requires Claude or a custom engine; it is **not available** for the Copilot engine
 - **Baseline schema** — store only stable identifiers (advisory ID strings), not mutable fields like severity, to avoid false "new" alerts when metadata changes
 
-## Append-only Event History (standalone ledger; experimental)
+## Append-only Event History (standalone ledger)
 
 Use a standalone ledger when a workflow needs a durable event log rather than
 a replaceable baseline: for example, a low-volume audit that appends one
