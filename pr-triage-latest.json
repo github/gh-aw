@@ -1,23 +1,22 @@
 {
-  "run_date": "2026-11-13T00:37:57Z",
-  "run_id": "pr-triage-20261113T003757Z",
-  "open_copilot_prs": 28,
-  "eligible_total": 4,
-  "cooldown_skipped": 24,
+  "run_date": "2026-11-13T06:32:07Z",
+  "run_id": "pr-triage-20261113T062705Z",
+  "eligible_total": 3,
+  "cooldown_skipped": 0,
   "category_counts": {
     "bug": 2,
-    "refactor": 2
+    "chore": 1
   },
   "risk_counts": {
     "high": 1,
-    "medium": 3
+    "medium": 2
   },
   "priority_counts": {
-    "medium": 4
+    "medium": 3
   },
   "action_counts": {
     "fast_track": 1,
-    "batch_review": 3,
+    "batch_review": 2,
     "defer": 0,
     "auto_merge": 0,
     "close": 0
@@ -36,11 +35,11 @@
         "urgency": 18,
         "quality": 13
       },
-      "reason": "Large audit/logging fix for session-based steering notices; it addresses a correctness bug in critical billing/threshold accounting and is already well-scoped with test coverage."
+      "reason": "Correctness fix for AWF steering notices; it addresses a user-visible billing/audit issue with clear test coverage and a bounded patch."
     },
     {
-      "number": 77206,
-      "title": "audit: make `model_downgrade_available` routing-aware",
+      "number": 77212,
+      "title": "Align model routing with AWF runtime, topology, and host support",
       "category": "bug",
       "risk": "medium",
       "priority": "medium",
@@ -51,74 +50,32 @@
         "urgency": 18,
         "quality": 12
       },
-      "reason": "Routing-aware audit improvement for a user-visible model selection recommendation; behavior is narrow but still worth a focused review with adjacent automation changes."
+      "reason": "Compatibility fix for runtime model routing; targeted but still user-visible and worth a focused review alongside adjacent automation."
     },
     {
-      "number": 77050,
-      "title": "Extract shared PR safe-output defaults",
-      "category": "refactor",
+      "number": 77338,
+      "title": "Bump firewall to v0.29.13 and MCP gateway to v0.5.9",
+      "category": "chore",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 51,
+      "score": 50,
       "score_breakdown": {
-        "impact": 26,
-        "urgency": 11,
+        "impact": 24,
+        "urgency": 12,
         "quality": 14
       },
-      "reason": "Shared default extraction reduces duplication and preserves workflow behavior across many PR handlers; low direct feature risk but medium operational blast radius."
-    },
-    {
-      "number": 77049,
-      "title": "[WIP] Refactor to extract shared Go and Node CI toolchain setup",
-      "category": "refactor",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 49,
-      "score_breakdown": {
-        "impact": 26,
-        "urgency": 9,
-        "quality": 14
-      },
-      "reason": "Shared CI setup refactor with a clearly bounded scope; the large blast radius keeps it in a grouped review rather than auto-merge."
+      "reason": "Dependency bump with image pinning and compiled lock updates; low feature risk but high operational blast radius for infra defaults."
     }
   ],
   "batches": [
     {
-      "id": "pr-batch:ci-shared-setup",
+      "id": "pr-batch:awf-runtime-compat",
       "prs": [
-        77050,
-        77049
+        77212,
+        77338
       ]
     }
   ],
-  "skipped": [
-    {
-      "number": 77232,
-      "title": "Fix review dependencies on buffered inline comments",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    },
-    {
-      "number": 77212,
-      "title": "Align model routing with AWF runtime, topology, and host support",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    },
-    {
-      "number": 77203,
-      "title": "Add fail-open CI Front Door and cache-first daily researcher",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    },
-    {
-      "number": 77185,
-      "title": "Accept `-1` and `K`/`M` values for runtime `GH_AW_DEFAULT_*MAX_AI_CREDITS`, and warn on values that fall back",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    },
-    {
-      "number": 77176,
-      "title": "Fix relative import destinations in `gh aw add`",
-      "reason": "updated within 1 hour of current run; skipped by cooldown"
-    }
-  ],
-  "summary": "Four eligible Copilot PRs are older than the one-hour cooldown. The highest-value item is the AWF steering-delivery fix, while the shared CI setup extraction remains a coherent batch review cluster. No PRs are currently auto-merge ready."
+  "summary": "Three eligible Copilot PRs are older than the one-hour cooldown. The highest-value item is the AWF steering-delivery fix; routing compatibility and dependency pinning are a coherent batch review pair. No PRs are auto-merge ready."
 }
