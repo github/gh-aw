@@ -108,7 +108,10 @@ jobs:
             const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
             const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value));
             const stateFile = path.join(cache, 'checkpoint.json');
+            const retryFile = path.join(cache, 'health-retry.json');
+            const retry = fs.existsSync(retryFile) ? read(retryFile) : undefined;
             const end = new Date().toISOString();
+            const evidenceDeadline = Date.parse(end) + 18 * 60000;
             const bootstrap = !fs.existsSync(stateFile);
             const repository = context.repo.owner + '/' + context.repo.repo;
             core.setOutput('has_new_failures', 'false');
@@ -117,7 +120,7 @@ jobs:
               if (++requests > 1025) throw new Error('Metadata request budget exceeded');
               return method({...context.repo, ...params});
             };
-            if (bootstrap) {
+            if (bootstrap && !retry?.initial_state) {
               const attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
               const prior = await request(github.rest.actions.listWorkflowRuns, {
                 workflow_id: 'auditor.lock.yml', per_page: 2
@@ -136,7 +139,7 @@ jobs:
                   'restore the previous checkpoint and recovery files before resuming; history is not reset');
               }
             }
-            const state = fs.existsSync(stateFile) ? read(stateFile) : {
+            const state = fs.existsSync(stateFile) ? read(stateFile) : retry?.initial_state || {
               version: 1, repository: context.repo.owner + '/' + context.repo.repo,
               checkpoint: new Date(Date.parse(end) - 3600000).toISOString(), seen: [], backlog: [], pending: []
             };
@@ -147,6 +150,12 @@ jobs:
                 (state.sampling_gaps !== undefined && !Array.isArray(state.sampling_gaps)) ||
                 (state.recoveries !== undefined && !Array.isArray(state.recoveries))) {
               throw new Error('Invalid collection checkpoint; refusing to reset it silently');
+            }
+            if (retry && (retry.version !== 1 || retry.repository !== repository ||
+                retry.checkpoint !== state.checkpoint ||
+                ![600, 900].includes(retry.timeout_seconds) ||
+                (retry.initial_state !== undefined && !bootstrap))) {
+              throw new Error('Invalid health retry state; checkpoint unchanged');
             }
             const retentionStart = new Date(Date.parse(end) - 86400000).toISOString();
             const samplingGaps = [...(state.sampling_gaps || [])];
@@ -201,6 +210,7 @@ jobs:
                 'Recovery is durable only if the cache save succeeds.').write();
               write(stateFile, {...state, checkpoint: end,
                 recoveries: [...(state.recoveries || []), recovery]});
+              if (retry) fs.unlinkSync(retryFile);
               return;
             }
             // This checkpoint records a bounded health sample, not a census cursor.
@@ -223,7 +233,7 @@ jobs:
                 state_file: `checkpoint-${crypto.createHash('sha256').update(newSnapshot).digest('hex')}.json`
               });
             }
-            const healthTimeoutSeconds = 300;
+            const healthTimeoutSeconds = retry?.timeout_seconds || 300;
             const health = JSON.parse(execFileSync('gh', ['aw', 'health',
               '--repo', repository, '--start-date', retentionStart, '--end-date', end,
               '--logs-dir', path.join(cache, 'health'), '--timeout', `${healthTimeoutSeconds}s`, '--json'], {
@@ -231,9 +241,34 @@ jobs:
               maxBuffer: 16 * 1024 * 1024
             }));
             const discovery = health.collection;
+            if (discovery?.partial === true && discovery.reason === 'time_budget' &&
+                Array.isArray(health.workflows) &&
+                (discovery.potential_issues === undefined || Array.isArray(discovery.potential_issues)) &&
+                (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) {
+              const nextTimeout = Math.min(healthTimeoutSeconds + 300, 900);
+              write(retryFile, {
+                version: 1, repository, checkpoint: state.checkpoint, timeout_seconds: nextTimeout,
+                ...(bootstrap ? {initial_state: state} : {})
+              });
+              write(path.join(data, 'health.json'), health);
+              write(path.join(data, 'manifest.json'), {
+                complete: false, repository, window_start: retentionStart, window_end: end,
+                discovery, new_failures: 0, evidence_complete: false,
+                retry: {timeout_seconds: nextTimeout, maximum_timeout_seconds: 900}
+              });
+              const message = `Health discovery timed out after ${healthTimeoutSeconds}s; ` +
+                `checkpoint, seen identities and backlog unchanged; no agent activation. ` +
+                (healthTimeoutSeconds < 900 ? `Next hourly collection allows ${nextTimeout}s.` :
+                  'The 900s maximum was reached; discovery remains unverified and needs investigation.');
+              core.warning(message);
+              await core.summary.addRaw(message + ' Partial diagnostics are in auditor-collection/health.json.').write();
+              return;
+            }
             if (!discovery || !Array.isArray(health.workflows) ||
                 (discovery.partial !== false &&
-                  !(discovery.partial === true && discovery.reason === 'failure_listing_limit')) ||
+                  !(discovery.partial === true && (discovery.reason === 'failure_listing_limit' ||
+                    (discovery.reason === 'time_budget' &&
+                      discovery.failure_listing_complete === true && discovery.failure_pass_complete === true)))) ||
                 (discovery.partial === false &&
                   (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) ||
                 (discovery.potential_issues !== undefined && !Array.isArray(discovery.potential_issues))) {
@@ -331,6 +366,7 @@ jobs:
               return report;
             };
             for (const run of batch) {
+              if (Date.now() + 120000 > evidenceDeadline) break;
               const currentRate = (await github.rest.rateLimit.get()).data.resources.core;
               if (currentRate.used >= ceiling - 25 || currentRate.reset !== rate.reset) {
                 if (currentRate.reset !== rate.reset) throw new Error('API rate window reset');
@@ -365,13 +401,15 @@ jobs:
                 if (!Array.isArray(report.failure_clusters) || !report.failure_clusters.length) {
                   throw new Error('Missing failure clustering evidence');
                 }
-                backlog.push({key, run, report_file: path.relative(cache, reportFile)});
+                if (!backlog.some(item => item.key === key)) {
+                  backlog.push({key, run, report_file: path.relative(cache, reportFile)});
+                }
               }
               seen.add(key);
             }
             const pending = agentic.filter(r => r.status !== 'completed' ||
               (r.conclusion === 'failure' && !seen.has(identity(r)))).map(r => r.id);
-            const deferred = fresh.filter(r => !seen.has(identity(r))).length;
+            let deferred = fresh.filter(r => !seen.has(identity(r))).length;
             // Recompute the union of query-local clusters; never add overlapping
             // counts. Cluster IDs identify symptoms, NOT PR root-cause fingerprints.
             const clusters = new Map();
@@ -398,6 +436,15 @@ jobs:
             let auditCount = 0;
             for (const cluster of ranked) {
               if (newFailures === 0 || deferred > 0 || auditCount >= 3) break;
+              if (Date.now() + 120000 > evidenceDeadline) {
+                // Cached reports survive, but these failures must remain new until audits can finish.
+                for (const run of fresh) {
+                  seen.delete(identity(run));
+                  if (!pending.includes(run.id)) pending.push(run.id);
+                }
+                deferred = fresh.length;
+                break;
+              }
               const member = cluster.members[0];
               const dir = path.join(cache, path.dirname(member.report_file));
               const currentRate = (await github.rest.rateLimit.get()).data.resources.core;
@@ -443,7 +490,7 @@ jobs:
               evidence_complete: deferred === 0, pending_runs: pending.length, deferred_failures: deferred,
               open_prs_complete: true, open_prs: openPRs, clusters: ranked,
               limits: {health_timeout_seconds: healthTimeoutSeconds, metadata_requests: 1025, metadata_runs: 999,
-                pr_pages: 10, new_runs: 25, audits: 3, api_used_ceiling: ceiling}
+                pr_pages: 10, new_runs: 25, audits: 3, evidence_timeout_seconds: 1080, api_used_ceiling: ceiling}
             };
             for (const [index, cluster] of manifest.clusters.entries()) {
               cluster.count = cluster.members.length;
@@ -482,6 +529,7 @@ jobs:
             write(stateFile, {...state, checkpoint: end, sampling_gaps: samplingGaps,
               seen: eligible.filter(r => Date.parse(r.updated_at) >= Date.parse(retentionStart))
                 .map(identity).filter(key => seen.has(key)), backlog, pending});
+            if (retry) fs.unlinkSync(retryFile);
             if (samplingGaps.length) {
               core.warning(`${samplingGaps.length} historical sampling gap(s) remain unresolved. ` +
                 'Previous checkpoint states are preserved in recovery/; current health evidence does not backfill them.');
@@ -500,7 +548,7 @@ jobs:
           path: ${{ runner.temp }}/auditor-data
           if-no-files-found: error
           retention-days: 2
-      - name: Save successful collection checkpoint and query cache
+      - name: Save collection checkpoint, retry state and query cache
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/auditor-cache
@@ -631,8 +679,24 @@ default-branch recovery only and cannot activate the agent. Only revision-checke
 representatives of registered agentic workflows are eligible; superseded,
 jobless, unverified, intentional and auditor failures are excluded.
 `discovery` describes a bounded sample, not a census or fleet failure rate.
-The `failure_listing_limit` may leave rankings partial; other partial or invalid
-health results fail closed without advancing the last-successful-sample checkpoint.
+The `failure_listing_limit` may leave rankings partial. A `time_budget` result is
+usable only if both failure inventory and representative verification completed;
+unfinished success sampling is not required for failure collection.
+
+When either failure pass times out, collection defers without activating the agent
+or advancing the last-successful-sample checkpoint. It uploads `health.json` and an
+explicitly incomplete manifest, preserves seen/backlog/pending state, and caches
+`health-retry.json`. The next hourly attempt increases the health budget from 300
+to 600, then at most 900 seconds, reserving roughly five minutes of the collection job for
+evidence and persistence. Continued exhaustion at the cap emits an investigation
+warning, not a healthy verdict. A deferred first-ever sample retains its validated
+initial state separately so it can retry without resetting history. A successful
+collection removes retry state and restores the normal 300-second budget.
+Other partial reasons, malformed reports and evidence errors still fail closed.
+Logs and audits stop starting two-minute queries when they cannot fit before an
+18-minute script deadline, reserving time for artifact upload and cache saving.
+If audits must defer, new failures remain unseen/pending and cached reports are
+reused next hour without duplicating backlog entries or activating the agent early.
 
 Gaps over 24 hours are recorded in `sampling_gaps`, with content-addressed prior
 state and compact reports retained in `recovery/` and uploaded. Gaps persist and
@@ -675,8 +739,8 @@ Only a successful cache save persists recovery. Verify that save before treating
 it as durable; GitHub cache expiry/eviction still applies to all cached evidence.
 The next hourly collection resumes the existing bounded 24-hour health sample,
 not a census or validation of the accepted gap. Health errors still fail closed;
-the error now reports completeness flags and the partial reason to distinguish
-schema incompatibility from time/API budgets without accepting partial failures.
+time-budget deferrals retain diagnostics and bounded retry state, not permission
+to treat incomplete failure discovery as a successful sample.
 Backlog retention uses a separate now-minus-24-hours boundary, regardless of discovery
 start. Rankings cover retained sampled failures updated in that period plus this batch;
 do not activate the agent while failures remain unprocessed. Refresh retained

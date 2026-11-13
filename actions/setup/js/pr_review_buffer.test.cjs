@@ -1822,6 +1822,22 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Retrying with 2 resolvable inline comment(s)"));
     });
 
+    it.each([0, 1])("retains required inline comment when fallback drops index %i", async invalidIndex => {
+      buffer.addComment({ path: "required.js", line: 1, body: "Required", side: "RIGHT" });
+      buffer.addComment({ path: "optional.js", line: 2, body: "Optional", side: "RIGHT" });
+      buffer.setReviewMetadata("Summary", "COMMENT");
+      buffer.setReviewContext({ repo: "owner/repo", repoParts: { owner: "owner", repo: "repo" }, pullRequestNumber: 42, pullRequest: { head: { sha: "abc123" } } });
+      const error = new Error("Line could not be resolved");
+      // @ts-ignore - Simulate an Octokit validation error.
+      error.response = { data: { errors: [{ field: `comments[${invalidIndex}].line`, message: "Line could not be resolved" }] } };
+      mockGithub.rest.pulls.createReview.mockRejectedValueOnce(error);
+      if (invalidIndex === 1) mockGithub.rest.pulls.createReview.mockResolvedValueOnce({ data: { id: 800, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-800" } });
+      const result = await buffer.submitReview([{ path: "required.js", line: 1, side: "RIGHT" }]);
+      expect(result.success).toBe(invalidIndex === 1);
+      expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(invalidIndex === 1 ? 2 : 1);
+      if (invalidIndex === 1) expect(mockGithub.rest.pulls.createReview.mock.calls[1][0].comments.map(comment => comment.path)).toEqual(["required.js"]);
+    });
+
     it("should retry with resolvable inline comments when API identifies a specific unresolvable path index", async () => {
       buffer.addComment({ path: "src/valid-one.js", line: 11, body: "First resolvable inline comment" });
       buffer.addComment({ path: "src/missing.js", line: 99, body: "This path is not in the diff" });

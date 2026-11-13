@@ -631,7 +631,7 @@ A safe output capability for setting one issue field value on existing issues. T
 
 ### Parameterized Safe-Output Fields
 
-A pattern for `workflow_call` reuse where safe-output policy and list fields accept GitHub Actions expression strings (e.g., `${{ inputs.protected-files-policy }}`) in addition to literal values. At compile time the compiler detects the `${{...}}` form and passes it through unchanged; GitHub Actions evaluates the expression at runtime before the handler executes. Enum-valued policy fields such as `protected-files` and `patch-format` validate literal values at compile time but defer expression-based values to runtime (failing closed on unrecognized input). List-valued fields such as `labels`, `allowed-repos`, and `allowed-base-branches` accept either a YAML array or a single expression string. This enables a single reusable workflow to serve callers with different constraint configurations without duplicating files. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#parameterizing-policy-fields-in-reusable-workflows).
+A pattern for `workflow_call` reuse where safe-output policy and list fields accept GitHub Actions expression strings (e.g., `${{ inputs.protected-files-policy }}`) in addition to literal values. At compile time the compiler detects the `${{...}}` form and passes it through unchanged; GitHub Actions evaluates the expression at runtime before the handler executes. Enum-valued policy fields such as `protected-files` and `patch-format` validate literal values at compile time but defer expression-based values to runtime (failing closed on unrecognized input). List-valued fields such as `labels`, `allowed-repos`, and `allowed-base-branches` accept either a YAML array or a single expression string, except `merge-pull-request.allowed-base-branches`, which requires a static list without expressions. This enables a single reusable workflow to serve callers with different constraint configurations without duplicating files. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#parameterizing-policy-fields-in-reusable-workflows).
 
 ### Normalize Closing Keywords (`normalize-closing-keywords:`)
 
@@ -1544,7 +1544,9 @@ Persistent storage for workflows preserving data between runs using GitHub Actio
 
 ### Comment Memory (`tools.comment-memory`)
 
-Persistent agent memory backed by a managed GitHub issue or PR comment. The comment keeps memory in a collapsible details section containing a tagged code block. Before each agent run, content from that code block is extracted into markdown files under `/tmp/gh-aw/comment-memory/`. Agents edit these files using standard file tools; the safe-output handler automatically upserts the managed comment after the run. Unlike [Cache Memory](#cache-memory) (7-day GitHub Actions cache retention) and [Repo Memory](#repo-memory) (permanent git branch storage), comment memory uses the triggering issue or PR as its backing store — no separate infrastructure required. Configured via `tools.comment-memory:` in frontmatter.
+Persistent agent memory backed by a managed GitHub issue or PR comment. The comment keeps memory in a collapsible details section containing a tagged code block. A separate **History** details section preserves links to all distinct workflow runs recorded as creating or updating the comment, including when the generated footer is disabled. Older comments seed this history from their most recent recorded run; earlier runs cannot be recovered. The history is not imported into editable memory. If the complete memory and history exceed GitHub's comment size limit, the update fails without overwriting the comment or discarding history. Before each agent run, content from the memory code block is extracted into markdown files under `/tmp/gh-aw/comment-memory/`. Agents edit these files using standard file tools; the safe-output handler automatically upserts the managed comment after the run. Unlike [Cache Memory](#cache-memory) (7-day GitHub Actions cache retention) and [Repo Memory](#repo-memory) (permanent git branch storage), comment memory uses the triggering issue or PR as its backing store — no separate infrastructure required. Configured via `tools.comment-memory:` in frontmatter.
+
+Comment-memory writers use a shared `gh-aw-comment-memory` safe-output job concurrency group across workflows hosted in the same Actions repository, including workflows with dynamic or cross-repository targets. A different `safe-outputs.concurrency-group` is rejected because Actions cannot acquire both groups. The group disables cancellation of running jobs, and automatically generated workflow concurrency does not cancel earlier runs. Both use `queue: max` unless `features.group-concurrency-queue` is disabled; disabling that feature permits pending jobs to be replaced. This serialization does not coordinate writers hosted in different repositories, protect against explicit or manual whole-workflow cancellation, or merge stale agent memory edits; comment memory is not an atomic history store.
 
 ### Command Triggers
 
@@ -1641,6 +1643,18 @@ A trigger that activates a workflow when a specific label is added to an issue, 
 on:
   label_command: deploy
 ```
+
+### Ledger (`tools.ledger`)
+
+A structured, append-only record store that persists immutable records on a dedicated `ledgers/<name>` Git branch, independent of [Repo Memory](#repo-memory) file storage. Each ledger declares a built-in state model (`log`, `set`, `map`, `table`, `counter`, or `notes`) and an optional JSON schema for operation values. Agents submit mutations only through ledger safe-output tools; the trusted `push_ledger_changes` job validates and pushes them, so queued writes are not visible in the current run's projection. See [Repo Memory](/gh-aw/reference/repo-memory/#structured-ledger).
+
+### Ledger Compaction
+
+Merging of many small [Ledger](#ledger-toolsledger) segments into fewer, larger ones without losing history. Compaction runs in the generated Agentic Maintenance workflow through an untrusted `ledger_compaction_plan` job and a trusted `ledger_compaction_apply` job, never in the agent job. The `compaction` setting controls `schedule` (`daily`, `weekly`, or `manual`), `min-segments`, and `max-segments`; `compaction: false` disables it. See [Ledger compaction](/gh-aw/reference/ledger-compaction/).
+
+### Ledger Replay Projection
+
+A disposable, read-only SQLite database that trusted preparation rebuilds from immutable [Ledger](#ledger-toolsledger) history at `/tmp/gh-aw/ledgers/<name>/ledger.db`. The `state` view holds the built-in current state and `records` holds immutable history. Only built-in types are supported; custom `replay.script` and `replay.config` settings are rejected. See [Ledger replay](/gh-aw/reference/ledger-replay/).
 
 ### Repo Memory
 

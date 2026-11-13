@@ -2,6 +2,7 @@
 
 const { iterateJsonl, readJsonlFile } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { ERR_SYSTEM } = require("./error_codes.cjs");
 const { computeInferenceAIC } = require("./model_costs.cjs");
 
 const ROUTING_STATUSES = new Set(["selected", "pending", "failed", "rejected", "unavailable"]);
@@ -45,7 +46,7 @@ function readFallbackMetadata(filePath) {
   try {
     return JSON.parse(require("fs").readFileSync(filePath, "utf8"));
   } catch (error) {
-    throw new Error(`Cannot read model fallback metadata '${filePath}': ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`${ERR_SYSTEM}: Cannot read model fallback metadata '${filePath}': ${getErrorMessage(error)}`, { cause: error });
   }
 }
 
@@ -67,7 +68,7 @@ function recordFallbackModel(model, env, infoPath) {
     fs.mkdirSync(require("path").dirname(infoPath), { recursive: true });
     fs.writeFileSync(infoPath, JSON.stringify(info, null, 2));
   } catch (error) {
-    throw new Error(`Cannot record model fallback metadata '${infoPath}': ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`${ERR_SYSTEM}: Cannot record model fallback metadata '${infoPath}': ${getErrorMessage(error)}`, { cause: error });
   }
 }
 
@@ -124,7 +125,7 @@ function recordModelRouting(routing, env = process.env, infoPath = `${env.GH_AW_
     fs.mkdirSync(require("path").dirname(infoPath), { recursive: true });
     fs.writeFileSync(infoPath, JSON.stringify(info, null, 2));
   } catch (error) {
-    throw new Error(`Cannot record model routing metadata '${infoPath}': ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`${ERR_SYSTEM}: Cannot record model routing metadata '${infoPath}': ${getErrorMessage(error)}`, { cause: error });
   }
   return modelRouting;
 }

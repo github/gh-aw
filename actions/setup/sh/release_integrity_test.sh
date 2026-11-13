@@ -391,6 +391,8 @@ echo "PASS: missing-pin errors explain upgrade, recompile, and independently tru
 test -n "$(release_artifact_sha256 github/gh-aw-firewall v0.28.62 checksums.txt)"
 test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.0 checksums.txt)" = \
   "2d49727b3b65630b5d0ba5375168687a852afac319d05c911d4769c43fa2ed61"
+test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.13 checksums.txt)" = \
+  "8b26d786ec7fef8b44d9d71b8ba52627c8696f6655d5554c3c40c44ee70f67fa"
 for version in v0.29.10 0.29.10; do
   test "$(release_artifact_sha256 github/gh-aw-firewall "$version" checksums.txt)" = \
     "a60c61e67aad4810e9a4f52ae26d3b2a58a7cf190aff66aeb338238b7b0e1467"

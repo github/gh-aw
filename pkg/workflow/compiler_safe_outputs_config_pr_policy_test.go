@@ -257,6 +257,7 @@ func TestMergePullRequestProtectedFilesExpressionSerialization(t *testing.T) {
 					RequiredLabels:       []string{"ready"},
 					RequiredTitlePrefix:  "fix:",
 					AllowedBranches:      []string{"main"},
+					AllowedBaseBranches:  []string{"agent-work/*"},
 				}},
 			}
 			mcpConfig, err := generateSafeOutputsConfig(data)
@@ -290,6 +291,7 @@ func TestMergePullRequestProtectedFilesExpressionSerialization(t *testing.T) {
 						assert.Equal(t, []any{"ready"}, handler["required_labels"])
 						assert.Equal(t, "fix:", handler["required_title_prefix"])
 						assert.Equal(t, []any{"main"}, handler["allowed_branches"])
+						assert.Equal(t, []any{"agent-work/*"}, handler["allowed_base_branches"])
 						assert.Equal(t, true, handler["protect_top_level_dot_folders"])
 						assert.Contains(t, handler["protected_files"], "package.json")
 					}

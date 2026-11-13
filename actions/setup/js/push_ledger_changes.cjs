@@ -57,6 +57,7 @@ function readLedgerConfig(value = process.env.GH_AW_LEDGER_CONFIG_BASE64) {
     if (ledger && Object.hasOwn(ledger, "replay")) throw new TypeError("Custom ledger replay is no longer supported; use a built-in ledger type");
     if (
       !ledger ||
+      (ledger.storage !== undefined && !["git", "comment-memory"].includes(ledger.storage)) ||
       typeof ledger.name !== "string" ||
       !LEDGER_NAME.test(ledger.name) ||
       names.has(ledger.name) ||
@@ -210,35 +211,8 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
       maxPatchBytes: limits.maxPatchBytes,
     });
 
-    // Validate the entire state transition before the first append mutates this branch.
-    const current = ledger.reconstruct();
-    if (current.diagnostics.length) throw new TypeError("Invalid canonical ledger history");
-    if (config.type) {
-      const reducer = createReducer(config);
-      for (const record of current.records) reducer.apply(record.payload, record);
-      const existing = new Set(current.records.map(record => (config.type === "notes" ? record.id : record.payload?.id)));
-      for (const append of appends)
-        if (!existing.has(append.record.id)) {
-          const record = config.type === "notes" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
-          reducer.apply(record, config.type === "notes" ? { id: append.record.id } : undefined);
-        }
-    }
-    let persisted = 0;
-    let alreadyPresent = 0;
-    const persistedIds = [];
-    for (const append of appends) {
-      const payload = config.type === "notes" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
-      const prior = current.records.find(record => (config.type === "notes" ? record.id === append.record.id : record.payload?.id === append.record.id));
-      if (prior && canonicalJSON(prior.payload) !== canonicalJSON(payload)) throw new TypeError("Conflicting ledger record ID");
-      const exists = Boolean(prior);
-      if (exists) {
-        alreadyPresent++;
-        continue;
-      }
-      ledger.append("ledger_append", payload, config.type === "notes" ? append.record.id : undefined);
-      persisted++;
-      persistedIds.push(append.record.id);
-    }
+    const result = appendLedgerRecords(ledger, appends, config);
+    const { persisted, already_present: alreadyPresent, persisted_ids: persistedIds } = result;
     ledger.close();
     ledger = null;
     if (!persisted) return { persisted: 0, already_present: alreadyPresent, reconciled: alreadyPresent, persisted_ids: [] };
@@ -303,6 +277,33 @@ function repoUrl(host, owner, repo) {
   return `https://${host}/${owner}/${repo}.git`;
 }
 
+// Both persistence backends validate the complete transition before writing a shard.
+function appendLedgerRecords(ledger, appends, config) {
+  const current = ledger.reconstruct();
+  if (current.diagnostics.length) throw new TypeError("Invalid canonical ledger history");
+  if (config.type) {
+    const reducer = createReducer(config);
+    for (const record of current.records) reducer.apply(record.payload, record);
+    const existing = new Set(current.records.map(record => (config.type === "notes" ? record.id : record.payload?.id)));
+    for (const append of appends)
+      if (!existing.has(append.record.id)) {
+        const record = config.type === "notes" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
+        reducer.apply(record, config.type === "notes" ? { id: append.record.id } : undefined);
+      }
+  }
+  const pending = [];
+  let alreadyPresent = 0;
+  for (const append of appends) {
+    const payload = config.type === "notes" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
+    const prior = current.records.find(record => (config.type === "notes" ? record.id === append.record.id : record.payload?.id === append.record.id));
+    if (prior && canonicalJSON(prior.payload) !== canonicalJSON(payload)) throw new TypeError("Conflicting ledger record ID");
+    if (prior) alreadyPresent++;
+    else pending.push({ append, payload });
+  }
+  for (const { append, payload } of pending) ledger.append("ledger_append", payload, config.type === "notes" ? append.record.id : undefined);
+  return { persisted: pending.length, already_present: alreadyPresent, reconciled: alreadyPresent, persisted_ids: pending.map(({ append }) => append.record.id) };
+}
+
 async function main(options = {}) {
   const artifact = options.artifact || readTransactions(options.file);
   const ledgerConfigs = options.ledgerConfigs || readLedgerConfig(options.config);
@@ -312,8 +313,9 @@ async function main(options = {}) {
     const appends = artifact.ledgers[config.name]?.appends || [];
     let persisted;
     try {
+      const persistLedger = options.persistLedger || (config.storage === "comment-memory" ? require("./comment_memory_ledger.cjs").persistCommentLedgerAppends : persistLedgerAppends);
       persisted = appends.length
-        ? await (options.persistLedger || persistLedgerAppends)({
+        ? await persistLedger({
             appends,
             config,
             githubClient: options.githubClient || github,
@@ -345,8 +347,9 @@ async function main(options = {}) {
       persisted: persisted.persisted,
       already_present: persisted.already_present,
       reconciled: persisted.reconciled,
+      ...(persisted.staged ? { staged: true } : {}),
       rejected: 0,
-      branch: `ledgers/${config.name}`,
+      ...(config.storage === "comment-memory" ? { storage: "comment-memory", ...(persisted.url ? { url: persisted.url } : {}) } : { branch: `ledgers/${config.name}` }),
       ...(config.type
         ? {
             type: config.type,
@@ -386,4 +389,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, persistLedgerAppends, readLedgerConfig, readTransactions, validateTransactions };
+module.exports = { main, appendLedgerRecords, persistLedgerAppends, readLedgerConfig, readTransactions, validateTransactions };

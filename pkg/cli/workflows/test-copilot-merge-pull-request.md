@@ -7,6 +7,7 @@ permissions:
 engine: copilot
 safe-outputs:
   merge-pull-request:
+    allowed-base-branches: ["agent-work/*"]
     max: 1
     required-labels: ["automerge"]
     allowed-branches: ["feature/*", "fix/*"]

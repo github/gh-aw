@@ -37,7 +37,7 @@ func resolveUniversalLLMBackendFromModel(model string) (UniversalLLMBackend, err
 	universalLLMConsumerLog.Printf("Resolving LLM backend from model: %q", model)
 	model = strings.TrimSpace(model)
 	if model == "" {
-		return "", errors.New("for universal consumer engines, engine.model is required and must use provider/model format (supported providers: copilot, anthropic, openai, codex)")
+		return "", errors.New("for universal consumer engines, engine.model is required and must use provider/model format (supported providers: copilot, anthropic, openai, codex). Example: engine.model: copilot/gpt-5")
 	}
 
 	provider, modelID, ok := strings.Cut(model, "/")
@@ -56,7 +56,7 @@ func resolveUniversalLLMBackendFromModel(model string) (UniversalLLMBackend, err
 		universalLLMConsumerLog.Printf("Resolved backend: codex/openai (model=%s)", modelID)
 		return UniversalLLMBackendCodex, nil
 	default:
-		return "", fmt.Errorf("unsupported provider %q in engine.model; supported providers: copilot, anthropic, openai, codex", provider)
+		return "", fmt.Errorf("unsupported provider %q in engine.model; supported providers: copilot, anthropic, openai, codex. Example: engine.model: copilot/gpt-5", provider)
 	}
 }
 

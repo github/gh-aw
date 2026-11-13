@@ -1,5 +1,7 @@
 // @ts-check
 
+// @safe-outputs-exempt USE-001 — validation errors are TypeError/Error with connector-specific messages; this module ships with connector_runtime.cjs to standalone connector tooling without error_codes.cjs.
+
 require("./shim.cjs");
 
 const { sanitizeTitle } = require("./sanitize_title.cjs");

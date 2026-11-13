@@ -2705,6 +2705,9 @@ func TestProtectedFilesExclusionsRequireScope(t *testing.T) {
 				if handler == "approve-workflow-run" {
 					config["allowed-workflows"] = []any{"ci.yml"}
 				}
+				if handler == "merge-pull-request" {
+					config["allowed-base-branches"] = []any{"agent-work/*"}
+				}
 				frontmatter := map[string]any{
 					"on":           map[string]any{"workflow_dispatch": nil},
 					"engine":       "copilot",

@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.24<br>
+**Version**: 1.29.25<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-11<br>
+**Publication Date**: 2026-11-12<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -1588,6 +1588,19 @@ Persistence MUST NOT widen App repository scope or permission aggregation under 
 
 **Conformance**: Generated-step tests MUST cover the host App token, missing-key fallback, mixed global/per-handler Apps, additional static checkouts, a distinct cross-organization target, and work-queue reconciliation/mint/checkout ordering. These tests establish compiler wiring, not live installation access or downstream workflow execution. Existing locks require recompilation to adopt the changed token selection and ordering.
 
+#### GP5d: Authenticated Author and Bot Validation
+
+Automatic comment selection for `add_comment` with `replace-older-comments: true` and for privileged `comment_memory` upserts MUST validate GitHub API author metadata in addition to each handler's required body markers. Body markers alone MUST NOT establish ownership. These rules do not replace the trusted comment-ID authorization paths for explicit or status-comment reuse.
+
+1. **Effective Credential**: Implementations MUST resolve the authenticated login through the same GitHub client and effective credential used by the handler. `github.actor`, `context.actor`, and event authors identify triggering users, not necessarily the publishing identity, and MUST NOT substitute for credential identity.
+2. **Lazy, Scoped Lookup**: The authenticated-user lookup MUST occur only when matching comment candidates exist and MUST NOT occur in staged mode. Implementations MUST share concurrent lookups and cache both resolved and unavailable identities within the resolver's lifetime; cached identity MUST NOT be shared across clients with different credentials.
+3. **Resolved Identity**: When a non-empty authenticated login is available, a candidate MUST have a non-empty `user.login` from GitHub API metadata that exactly matches that login. This includes PAT-authored comments; bot type alone MUST NOT override a known login mismatch.
+4. **Unavailable Identity**: When the authenticated-user endpoint fails or supplies no login, a candidate MUST have a non-empty API-provided `user.login` and `user.type` equal to `Bot`. Missing author metadata and human accounts MUST be rejected; a `[bot]` login suffix alone MUST NOT establish bot status. Lookup failures MUST log that selection is falling back to bot-authored comments.
+
+GitHub App installation tokens can lack access to the authenticated-user endpoint. The fallback intentionally supports API-identified bots without hard-coding `github-actions[bot]`, so configured App publishers remain supported. It establishes bot type, not ownership by a specific App installation. Bot-authored content MUST still undergo the applicable sanitization and metadata validation; bot status MUST NOT make body text trusted.
+
+**Conformance**: Tests MUST cover exact authenticated-author matching, a mismatching bot, PAT-authored comments, unavailable identity, a human account with a `[bot]` suffix, missing author metadata, lazy/concurrent lookup caching, and client isolation.
+
 #### GP6: data
 
 **Syntax**: `safe-outputs.data: false | true | <schema-object> | <github-expression>`
@@ -2511,9 +2524,9 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 
 **Requirement DSB1 (Eligible Review Prerequisites):** Implementations MUST permit `submit_pull_request_review` and `create_pull_request_review_comment` outputs to serve as `depends-on` prerequisites.
 
-**Requirement DSB2 (Review Buffer Drain):** Implementations MUST drain and finalize the applicable buffered review batch before releasing outputs that depend on it.
+**Requirement DSB2 (Review Buffer Drain):** Implementations MUST drain and finalize the applicable buffered review batch before releasing outputs that depend on it, except for the review submission that publishes its own buffered comments.
 
-**Requirement DSB3 (Publication-Based Success):** Buffering MUST NOT establish prerequisite success; success requires confirmed publication. Failed, skipped, staged, queued, or otherwise unconfirmed outputs MUST NOT establish prerequisite success. Unsupported or delegated outputs, including custom jobs and standalone steps, MUST NOT establish prerequisite success.
+**Requirement DSB3 (Publication-Based Success):** Buffering MUST NOT establish prerequisite success; success requires confirmed publication. A review submission MAY include its own buffered comment prerequisites in the same publication, but MUST NOT treat them as published before that publication succeeds. Failed, skipped, staged, queued, or otherwise unconfirmed outputs MUST NOT establish prerequisite success. Unsupported or delegated outputs, including custom jobs and standalone steps, MUST NOT establish prerequisite success.
 
 **Requirement DSB4 (Deferred-Dependent Retry):** Newly eligible deferred dependents MUST be retried without replaying completed handlers. Implementations MUST finalize newly buffered batches, including batches created by in-place retries, before releasing their dependents. Retries MUST be bounded and contingent on resolution progress; unresolved prerequisites MUST fail closed.
 
@@ -2735,7 +2748,7 @@ These extensions apply to safe-output processor messages for `add_comment` (incl
 5. When an agent supplies `comment_id`, implementations MUST reject the operation unless `safe-outputs.add-comment.allows-comment-ids` is configured and contains that exact positive integer ID. The allowlist is trusted workflow state and MAY be computed by earlier workflow steps.
 6. Agent-supplied `comment_id` MUST NOT be honored for discussion comments and MUST NOT be treated as a substitute for the trusted status comment ID used by `target: "status"`.
 7. When updating an existing comment through either controlled reuse path, implementations SHOULD skip hide-older-comments behavior for that operation.
-8. With `replace-older-comments: true`, implementations MUST update the newest issue/PR comment on the target item authored by the authenticated workflow identity whose `gh-aw-workflow-call-id` marker matches the current caller workflow, or create a new comment if none matches. If the authenticated identity cannot be resolved, only bot-authored comments are eligible. When no caller ID is available, implementations MAY use the workflow ID marker instead. The replacement MUST include the newly generated body, footer, and markers; staged mode MUST NOT perform the lookup or update. Explicit trusted comment reuse takes precedence.
+8. With `replace-older-comments: true`, implementations MUST update the newest issue/PR comment on the target item authored by the authenticated workflow identity whose `gh-aw-workflow-call-id` marker matches the current caller workflow, or create a new comment if none matches. Author eligibility and unavailable-identity bot fallback MUST follow [GP5d](#gp5d-authenticated-author-and-bot-validation). When no caller ID is available, implementations MAY use the workflow ID marker instead. The replacement MUST include the newly generated body, footer, and markers; staged mode MUST NOT perform the lookup or update. Explicit trusted comment reuse takes precedence.
 
 **Enforced Constraints**:
 
@@ -3322,6 +3335,8 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 
 - `memory_id` MUST be validated as `[A-Za-z0-9_-]+` with path traversal patterns rejected.
 - Managed comment scan MUST be bounded by a maximum page limit.
+- Privileged upsert selection MUST require a matching memory marker, a framework provenance marker outside editable memory, and an eligible author under [GP5d](#gp5d-authenticated-author-and-bot-validation). If no eligible comment exists, the handler MUST create a new managed comment without updating or importing History from an ineligible candidate.
+- Framework history/provenance discovery MUST exclude tagged fenced memory and legacy XML memory payloads. Imported history links MUST match the execution server and repository's Actions run URL prefix with a positive numeric run ID; labels MUST be rebuilt from validated run IDs rather than copied from comment text.
 - Materialized comment-memory files MUST enforce a per-file cap of 16 KiB and an aggregate cap of 48 KiB during setup.
 - Body content MUST undergo sanitization and comment size/mention/link limit validation before upsert.
 - Cross-repository targets MUST be validated against `allowed-repos`.
@@ -4066,6 +4081,7 @@ or review bodies to returned or persisted decision evidence.
 - `required-labels`: Labels that must ALL be present on the pull request
 - `required-title-prefix`: Title prefix the pull request must start with
 - `allowed-branches`: Source branch glob patterns; the PR's branch must match at least one
+- `allowed-base-branches`: REQUIRED non-empty list of static destination branch patterns declared by the owner as non-consequential automated integration targets. Only `*` and `**` glob operators are supported. Expressions, negation, character classes, braces, extglobs, `?`, `+`, and backslash escapes MUST be rejected by the schema, compiler, and runtime. Patterns consisting only of `*` and `/`, such as `"*"`, `"**"`, `"*/*"`, and `"**/*"`, MUST be rejected. The live base branch MUST match at evaluation and final revalidation, including staged and cross-repository operations. Matching MUST be case-sensitive, with `*` restricted to one path segment and `**` spanning `/`. This policy MUST NOT override any other gate. Null/default-only merge configuration MUST be rejected; destination scope MUST NOT be inferred from `allowed-branches`.
 - `required-checks`: Exact check-run names, unioned with branch-policy requirements. Each MUST complete with `success` on the evaluated head SHA. Missing, pending, skipped, neutral, failed, or wrong-revision checks block merging. Missing app identities or multiple apps publishing the same required name also block merging; this does not authenticate an expected producer. The compiler rejects overlap with the workflow's resolved agent-controlled `create-check-run` name. Legacy commit-status contexts are not supported. An empty or omitted list adds no workflow-owned CI requirement; if the union is empty, CI is not queried.
 - `required-check-apps`: Optional map from names in `required-checks` to positive GitHub App IDs. For mapped names, every observed non-deployment check run MUST have the configured app ID, including during final revalidation. Unknown names and invalid IDs MUST fail compilation. App identity does not establish which workflow produced a check; CI workflow definitions still require independent protection.
 - `required-approvers`: Human GitHub logins (case-insensitive). When non-empty, at least one allowlisted human MUST have a current `APPROVED` review on the evaluated head SHA. Later decisive review state supersedes earlier approval by validated submission time, not review ID; invalid/missing timestamps or ambiguous same-reviewer ordering block merging. Dismissed approvals and active changes requested block merging. The PR author, bot accounts, and authenticated merge identity cannot authorize. Empty or omitted requires no affirmative approval.
@@ -4082,6 +4098,7 @@ or review bodies to returned or persisted decision evidence.
 - Any individual reviewer's latest effective `CHANGES_REQUESTED` review MUST block merging, regardless of the aggregate review decision.
 - The PR author, bot accounts, and the authenticated merge identity MUST NOT satisfy `required-approvers`.
 - Merges into protected branches or the repository default branch MUST be refused, and the base branch MUST have an associated open upstream pull request.
+- The base branch MUST match the mandatory `allowed-base-branches` policy independently of the source branch filter. Owners MUST assess downstream effects and protect the declaration from agent edits; a configured declaration does not prove harmless downstream effects or per-merge human approval.
 - Policy state MUST be revalidated immediately before execution or staged preview.
 - Target selection MUST follow MPR-001 through MPR-005, and cross-repository targets MUST be validated against `allowed-repos`.
 - Results and decision audit records MUST be treated as untrusted data and MUST NOT persist secrets or the fields excluded by the Decision Audit requirements.
@@ -6904,6 +6921,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.25** (2026-11-12):
+
+- **Specified**: Shared authenticated-author validation for automatic comment replacement and managed comment-memory upserts, including effective-credential identity, lazy scoped lookup caching, and the API-identified bot fallback when identity is unavailable.
+- **Clarified**: Bot type does not establish a specific App's ownership or make comment content trusted; managed memory payloads are excluded from framework metadata discovery and imported history values are validated independently.
 
 **Version 1.29.24** (2026-11-12):
 

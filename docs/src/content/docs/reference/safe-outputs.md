@@ -90,6 +90,14 @@ together at the end of message processing, before dependent outputs run.
 Buffering alone does not confirm success: dependents wait for submission and
 run only if their prerequisite was actually published.
 Review comments released by a dependency are submitted in a subsequent batch.
+Do not make a review depend on its own inline comments: they are included
+automatically. If such a dependency is supplied, the review and its comments
+are submitted together; other dependents still wait for publication. If the
+review cannot run, its buffered batch is not submitted without the review.
+If a required inline comment cannot be anchored, the batch fails instead of
+falling back to a review without that comment.
+Avoid indirect cycles too: a review cannot wait for an output that itself
+requires publication of a comment in that same review.
 
 Dependencies apply within a single safe-output processing pass (and within the
 same Claim in queue workflows). Custom safe jobs, `call_workflow`,
