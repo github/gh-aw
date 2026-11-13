@@ -15,7 +15,7 @@ This directory contains design specifications and implementation documentation f
 
 | Document | Status | Implementation |
 |----------|--------|----------------|
-| [Safe Outputs System Specification](./safe-outputs-specification.md) | ✅ Documented | W3C-style formal specification for safe outputs architecture, security, and operations |
+| [Safe Outputs System Specification](../docs/src/content/docs/specs/safe-outputs-specification.md) | ✅ Documented | W3C-style formal specification for safe outputs architecture, security, and operations |
 | [Capitalization Guidelines](./capitalization.md) | ✅ Documented | `cmd/gh-aw/capitalization_test.go` |
 | [Safe Output Messages Design System](./safe-output-messages.md) | ✅ Implemented | `pkg/workflow/safe_outputs.go` |
 | [Safe Output Environment Variables Reference](./safe-output-environment-variables.md) | ✅ Documented | Environment variable requirements for safe output jobs |

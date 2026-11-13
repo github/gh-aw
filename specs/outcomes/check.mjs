@@ -104,7 +104,7 @@ function project(fixture) {
   }
   if (kind === "dispatch") {
     const id = item.metadata?.run_id;
-    facts.execution = Number.isSafeInteger(id) && id > 0 ? "present" : "missing";
+    facts.execution = executionID(id) !== null ? "present" : "missing";
     endpoint = `actions/runs/${id}`;
   }
   if (kind === "requested") endpoint += "/reviews";
@@ -230,10 +230,15 @@ function project(fixture) {
     facts.afterAction = Boolean(linked) && after(linked.created_at, item.timestamp);
     if (errors[`issues/${number}/timeline`] || !Array.isArray(timeline)) facts.primary = "error";
     if (linked) {
-      const linkedEndpoint = `pulls/${linked.source.issue.number}`;
-      const pr = responses[linkedEndpoint];
-      if (errors[linkedEndpoint] || !pr) facts.primary = "error";
-      facts.state = pr?.merged ? "merged" : pr?.state || "open";
+      const linkedRepository = typeof linked.source.issue.repository_url === "string" ? linked.source.issue.repository_url.match(/\/repos\/([^/]+\/[^/]+)\/?$/)?.[1] : null;
+      if (!linkedRepository) {
+        facts.execution = "missing";
+      } else {
+        const linkedEndpoint = linkedRepository.toLowerCase() !== "acme/repo" ? `repos/${linkedRepository}/pulls/${linked.source.issue.number}` : `pulls/${linked.source.issue.number}`;
+        const pr = responses[linkedEndpoint];
+        if (errors[linkedEndpoint] || !pr) facts.primary = "error";
+        facts.state = pr?.merged ? "merged" : pr?.state || "open";
+      }
     }
   }
   if (kind === "requested" || kind === "submitted") {

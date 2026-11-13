@@ -47,16 +47,14 @@ label-to-intent selectors derived from `.github/objective-mapping.json` — duri
 or CI. Keys present in one source but not the other SHOULD surface as a sync warning or
 compliance failure so attribution and authorization stay aligned.
 
-**Escalation norm**: A sync warning that persists across **3 or more consecutive CI runs**
-without a corresponding corrective PR or explicit waiver **MUST** be escalated to a compliance
-failure. When a sync warning escalates, the CI check responsible for drift detection **MUST**
-fail with a non-zero exit code and open (or update) a tracking issue recording the affected
-keys, the first-detected date, and the on-call maintainer as the default assignee. This norm
-ensures that aspirational migration language does not mask persistent, unaddressed
-configuration drift.
+**Aspirational escalation norm (currently unenforced)**: A sync warning that persists across
+**3 or more consecutive CI runs** without a corresponding corrective PR or explicit waiver
+should be escalated to a compliance failure. An implementing CI check should fail with a
+non-zero exit code and open or update a tracking issue recording the affected keys, the
+first-detected date, and the on-call maintainer as the default assignee.
 
-**Status (2026-11-09)**: The escalation norm remains in force. This pass did not verify that
-a CI check currently enforces the threshold or opens/updates the required tracking issue.
+**Status (2026-11-13)**: No CI check enforcing this threshold or tracking-issue behavior has
+been verified. The escalation norm is aspirational, not an enforced requirement.
 
 ## Runtime enforcement map
 
@@ -78,4 +76,6 @@ a CI check currently enforces the threshold or opens/updates the required tracki
 
 **Risk**: Policy constraints defined in `.github/intent-policy.json` (or the equivalent `rules` array) have no runtime effect until the orchestrator calls `Authorizer.AuthorizeTool` and enforces `WriteScope`, `HumanApprovalRequired`, and `RequiredChecks`. Any policy compiled by `PolicyCompiler.Compile()` today is purely advisory.
 
-**Required follow-up**: Wire the now-implemented `Authorizer.AuthorizeTool` (in `pkg/intent`) into the execution path. Gate enforcement behind a feature flag until the policy model is validated in production.
+**Deferred follow-up**: `Authorizer.AuthorizeTool` remains unwired; no orchestrator call site or feature flag exists. Policy enforcement remains advisory. Wiring is deferred until the policy model is validated, and any implementation must add a passing tool-call test before enforcement is enabled.
+
+**Sync note (2026-11-13)**: This pass records the `AuthorizeTool` call-site wiring as deferred. The objective-mapping escalation norm is also aspirational and currently unenforced; neither behavior is claimed as implemented.

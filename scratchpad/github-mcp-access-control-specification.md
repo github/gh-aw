@@ -2866,7 +2866,7 @@ When a new access-control field is added (e.g., `trusted-users`, `approval-label
 
 - **[Safe Inputs Spec]** Safe Inputs Specification, GitHub Agentic Workflows. [/gh-aw/reference/safe-inputs-specification/](/gh-aw/reference/safe-inputs-specification/)
 
-- **[Safe Outputs Spec]** Safe Outputs System Specification, GitHub Agentic Workflows. [/gh-aw/scratchpad/safe-outputs-specification/](/gh-aw/scratchpad/safe-outputs-specification/)
+- **[Safe Outputs Spec]** Safe Outputs System Specification, GitHub Agentic Workflows. [/gh-aw/specs/safe-outputs-specification/](/gh-aw/specs/safe-outputs-specification/)
 
 - **[GitHub MCP Server]** GitHub MCP Server Documentation. [/gh-aw/skills/github-mcp-server/](/gh-aw/skills/github-mcp-server/)
 

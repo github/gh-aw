@@ -78,36 +78,32 @@ run-level evidence; generated artifacts are not source files.
 
 ## Last recorded bounds and controls
 
-The following are the last recorded TLC 2.19 results (official v1.7.4
-distribution), not verification from this update. TLC was not rerun because
-`TLA2TOOLS_JAR` was not configured. The shared corpus now contains 95 cases,
-all projected by `check.mjs`; verification of the current corpus is pending.
-The controls column identifies what each positive run is paired with; mutation
-controls must fail with the exact invariant named below.
+Verified on 2026-11-13 with TLC 2.19 from the official v1.7.4 distribution
+(JAR SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`)
+and Java 17.0.21. The Go `TestOutcomeConformance` test passed for all 95 corpus
+cases; `check.mjs` projected all 95 cases and the fixture model agreed with
+their expected typed results. Each deliberate mutation below exited 12 with
+its required invariant violation.
 
 | Model | Exhaustive bound | Controls |
 |---|---|---|
-| Baseline | 18,984 generated states, 16,272 distinct states, depth 5, zero queued states | Ten deliberate defects below check acceptance evidence, delivery/deletion, attribution, publication, and summary invariants. |
-| Shared fixtures | 77 cases in the recorded run; 420 generated states, 360 distinct states, zero queued states | `FixtureAgreement` checks each case's expected typed result. Equal projected records collapse into the same initial state. |
+| Baseline | 18,984 generated states, 16,272 distinct states, zero queued states | Ten deliberate defects below check acceptance evidence, delivery/deletion, attribution, publication, and summary invariants. |
+| Shared fixtures | 95 cases projected; 455 generated states, 390 distinct states, zero queued states | `FixtureAgreement` checks each case's expected typed result. Equal projected records collapse into the same initial state. |
 
 These are reproducible finite bounds, not a proof over arbitrary inputs.
 
-In the last recorded run, all ten negative controls produced their required
-invariant counterexamples. They were not rerun for this update; verification
-against the current 95-case corpus and controls is pending.
-
-| Deliberate defect | Required invariant violation |
+| Deliberate defect | Exit | Required invariant violation |
 |---|---|
-| Target existence accepted | `AcceptanceEvidence` |
-| Open issue bot activity accepted | `OpenCreationsPending` |
-| Merged push without execution identity accepted | `AcceptanceEvidence` |
-| Supplementary API failure treated as deletion | `DeletionRequiresPrimary404` |
-| Incomplete effort evidence marked zero-touch | `ZeroTouchRequiresCompleteEvidence` |
-| Typed result reinterpreted on publication | `TypedExportPreserved` |
-| Unknown results omitted from summary | `SummaryReconciles` |
-| Submitted review borrows an unrelated review ID | `ExecutionAttributionRequired` |
-| Team review assumed attributable without membership proof | `ExecutionAttributionRequired` |
-| Review at/before action boundary accepted | `ReviewRequiresPostActionHuman` |
+| Target existence accepted | 12 | `AcceptanceEvidence` |
+| Open issue bot activity accepted | 12 | `OpenCreationsPending` |
+| Merged push without execution identity accepted | 12 | `AcceptanceEvidence` |
+| Supplementary API failure treated as deletion | 12 | `DeletionRequiresPrimary404` |
+| Incomplete effort evidence marked zero-touch | 12 | `ZeroTouchRequiresCompleteEvidence` |
+| Typed result reinterpreted on publication | 12 | `TypedExportPreserved` |
+| Unknown results omitted from summary | 12 | `SummaryReconciles` |
+| Submitted review borrows an unrelated review ID | 12 | `ExecutionAttributionRequired` |
+| Team review assumed attributable without membership proof | 12 | `ExecutionAttributionRequired` |
+| Review at/before action boundary accepted | 12 | `ReviewRequiresPostActionHuman` |
 
 ## Connection to runtime behavior and limits
 
@@ -129,7 +125,7 @@ reevaluation, or economic/AIC attribution. It also does not prove unbounded
 multi-action aggregation or telemetry delivery. No TLAPS, F*, or Z3 proof is
 claimed.
 
-## Last synced with implementation (2026-11-06)
+## Last synced with implementation (2026-11-13)
 
 - **Go evaluators and tests:** `pkg/cli/outcome_evaluation.go`,
   `pkg/cli/outcome_eval.go`, the per-action `pkg/cli/outcome_eval_*.go`

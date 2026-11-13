@@ -8,4 +8,8 @@ The missed deadline was reset to **2026-11-08**, with **@gh-aw-bot** accountable
 
 - [x] Replace remaining references with the canonical specification.
 - [x] Delete the deprecated scratchpad specification.
-- [x] Verify that no repository references resolve to the deleted scratchpad path.
+- [x] Verify that no active links target the deleted scratchpad path; canonical specification links remain.
+
+Verification on 2026-11-13 found no active links to
+`scratchpad/safe-outputs-specification.md`. The specification links in `scratchpad/`
+now target the canonical documentation page; historical changelog mentions remain.
