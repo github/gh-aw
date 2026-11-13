@@ -5767,9 +5767,8 @@ tools:
     # (optional)
     format-json: true
 
-    # Experimental. Enable the repo-memory ledger projection, optionally validated
-    # against a repository-relative JSON schema. Ledger workflows require AWF Cloud
-    # Hypervisor filesystem isolation. Using this field emits a compile-time warning.
+    # Enable the ledger projection, optionally validated against a repository-relative
+    # JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation.
     # (optional)
     ledger: null
 

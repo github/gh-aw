@@ -15065,7 +15065,7 @@
     },
     "repoMemoryLedger": {
       "type": ["object", "null"],
-      "description": "Experimental. Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation. Using this field emits a compile-time warning.",
+      "description": "Enable the ledger projection, optionally validated against a repository-relative JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation.",
       "properties": {
         "schema": {
           "type": "string",

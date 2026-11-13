@@ -1,8 +1,8 @@
 ---
-description: Experimental tools.ledger — structured, immutable, append-only event history with built-in state-model projections.
+description: tools.ledger — structured, immutable, append-only event history with built-in state-model projections.
 ---
 
-# Ledger (Experimental)
+# Ledger
 
 Use the ledger for immutable, structured events when each run should add records
 and later runs need to query them. For example, a low-volume audit can append
@@ -58,8 +58,8 @@ For a ledger without `type`, submit `ledger_append` with the custom payload in
 Do not use the built-in `operation: append` / `value` envelope for custom ledgers.
 The agent-facing tool rejects invalid custom record shapes and configured-schema
 mismatches before queuing; trusted finalization still validates the complete batch.
-See the [ledger replay reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/experimental/ledger-replay.md)
-and [compaction guide](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/experimental/ledger-compaction.md).
+See the [ledger replay reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/ledger-replay.md)
+and [compaction guide](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/ledger-compaction.md).
 
 ## Tradeoffs
 
@@ -70,4 +70,4 @@ and [compaction guide](https://github.com/github/gh-aw/blob/main/docs/src/conten
 | Survives cache invalidation | Not available for Copilot engine (requires GitHub tools) |
 | Human-readable via GitHub branch UI | More complex setup |
 | Can target a different repository | |
-| Provides immutable structured records and queries | Experimental, append-only, and limited to 1024 shard files by default |
+| Provides immutable structured records and queries | Append-only and limited to 1024 shard files by default |

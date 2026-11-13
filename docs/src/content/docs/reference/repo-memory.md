@@ -138,10 +138,6 @@ Restored memory is untrusted data, not agent instructions. Select repositories w
 
 ## Structured Ledger
 
-:::caution[Experimental]
-Ledgers are experimental and their configuration or behavior may change.
-:::
-
 Ledgers use `tools.ledger`, independently of repo-memory file storage. The legacy
 `tools.repo-memory.ledger` declaration is no longer supported. For built-in
 state models, declare `log`, `set`, `map`, `table`, `counter`, or `notes`:
@@ -193,7 +189,7 @@ response confirms queuing, not durability. The trusted `push_ledger_changes`
 job validates and reconciles accepted requests against the latest branch state
 before pushing. Queued writes are not immediately visible in the run's projection.
 
-Ledger compaction never runs in the agent or persistence job. Standalone `tools.ledger` ledgers are compacted by Agentic Maintenance through an untrusted plan job and a trusted apply job; see [Ledger compaction](/gh-aw/experimental/ledger-compaction/).
+Ledger compaction never runs in the agent or persistence job. Standalone `tools.ledger` ledgers are compacted by Agentic Maintenance through an untrusted plan job and a trusted apply job; see [Ledger compaction](/gh-aw/reference/ledger-compaction/).
 
 Custom `replay.script`, `replay.config`, and `compaction.script` settings are
 rejected. Use schemas for domain-specific values and the built-in compaction
@@ -203,7 +199,7 @@ remains supported; it is a separate file-storage validator.
 Existing raw-record ledgers can retain their generic projection by omitting
 `type` and querying `records.payload` with SQLite JSON functions. Adding a
 built-in type does not convert historical raw payloads into operations.
-See [Ledger replay projections](/gh-aw/experimental/ledger-replay/) for type
+See [Ledger replay projections](/gh-aw/reference/ledger-replay/) for type
 semantics and migration guidance.
 
 **File Glob Matching Rules**:
