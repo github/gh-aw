@@ -1092,7 +1092,8 @@ async function main(config = {}) {
         core.debug(`merge_pull_request: ${JSON.stringify({ event: "operation_failed", phase })}`);
         core.error(`merge_pull_request failed for PR #${pullNumber} during ${phase}`);
         evidence.failure_phase = phase;
-        return {
+        /** @type {import('./types/handler-factory').MergePullRequestIndeterminateResult} */
+        const result = {
           success: false,
           data_trust: "untrusted",
           merged: null,
@@ -1101,6 +1102,7 @@ async function main(config = {}) {
           failure_reasons: [{ code: "merge_outcome_indeterminate", message: "Merge outcome could not be confirmed by read-only reconciliation" }],
           decision_evidence: evidence,
         };
+        return result;
       }
       if (error instanceof CheckProducerError) {
         if (phase === "required_checks") evidence.authorization.required_checks = "failed";
