@@ -13,17 +13,17 @@ import (
 var compilerModelPricingLog = logger.New("workflow:compiler_model_pricing")
 
 func cloneModelCosts(modelCosts map[string]any) map[string]any {
-	return cloneModelCostsValue(modelCosts).(map[string]any)
+	cloned := maps.Clone(modelCosts)
+	for key, value := range cloned {
+		cloned[key] = cloneModelCostsValue(value)
+	}
+	return cloned
 }
 
 func cloneModelCostsValue(value any) any {
 	switch typed := value.(type) {
 	case map[string]any:
-		cloned := maps.Clone(typed)
-		for key, item := range cloned {
-			cloned[key] = cloneModelCostsValue(item)
-		}
-		return cloned
+		return cloneModelCosts(typed)
 	case map[string]string:
 		return maps.Clone(typed)
 	case []any:
@@ -122,13 +122,12 @@ func resolveProviderAndModelForPricing(workflowData *WorkflowData) (string, stri
 	model = strings.ToLower(model)
 
 	if strings.Contains(model, "/") {
-		parts := strings.SplitN(model, "/", 2)
-		if parts[0] == "" || parts[1] == "" {
+		embeddedProvider, embeddedModel, hasProvider := strings.Cut(model, "/")
+		if !hasProvider || embeddedProvider == "" || embeddedModel == "" {
 			return "", "", false
 		}
-		embeddedProvider := normalizeProviderForPricing(parts[0])
-		embeddedModel := strings.TrimSpace(parts[1])
-		provider = embeddedProvider
+		provider = normalizeProviderForPricing(embeddedProvider)
+		embeddedModel = strings.TrimSpace(embeddedModel)
 		model = strings.ToLower(embeddedModel)
 	}
 
