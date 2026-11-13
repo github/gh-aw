@@ -502,6 +502,12 @@ func TestEnsureCopilotSetupSteps_ReleaseMode(t *testing.T) {
 
 	// Call function with release mode
 	testVersion := "v1.2.3"
+	testSHA := "1111111111111111111111111111111111111111"
+	cache := workflow.NewActionCache(tmpDir)
+	cache.Set("github/gh-aw-actions/setup-cli", testVersion, testSHA)
+	if err := cache.Save(); err != nil {
+		t.Fatalf("Failed to save action cache: %v", err)
+	}
 	err = ensureCopilotSetupSteps(context.Background(), false, workflow.ActionModeRelease, testVersion)
 	if err != nil {
 		t.Fatalf("ensureCopilotSetupSteps(context.Background()) failed: %v", err)
@@ -516,9 +522,9 @@ func TestEnsureCopilotSetupSteps_ReleaseMode(t *testing.T) {
 
 	contentStr := string(content)
 
-	// Verify it uses the release setup-cli action; the action ref may be SHA-pinned.
-	if !strings.Contains(contentStr, "github/gh-aw-actions/setup-cli@") {
-		t.Errorf("Expected copilot-setup-steps.yml to use github/gh-aw-actions/setup-cli in release mode, got:\n%s", contentStr)
+	// Verify it uses the cached action pin and version
+	if !strings.Contains(contentStr, "uses: github/gh-aw-actions/setup-cli@"+testSHA+" # "+testVersion) {
+		t.Errorf("Expected copilot-setup-steps.yml to use the pinned setup-cli action, got:\n%s", contentStr)
 	}
 
 	// Verify it uses the correct version in the with parameter
@@ -599,6 +605,12 @@ func TestEnsureCopilotSetupSteps_CreateWithReleaseMode(t *testing.T) {
 
 	// Create new file with release mode and specific version
 	testVersion := "v2.0.0"
+	testSHA := "2222222222222222222222222222222222222222"
+	cache := workflow.NewActionCache(tmpDir)
+	cache.Set("github/gh-aw-actions/setup-cli", testVersion, testSHA)
+	if err := cache.Save(); err != nil {
+		t.Fatalf("Failed to save action cache: %v", err)
+	}
 	err = ensureCopilotSetupSteps(context.Background(), false, workflow.ActionModeRelease, testVersion)
 	if err != nil {
 		t.Fatalf("ensureCopilotSetupSteps(context.Background()) failed: %v", err)
@@ -613,8 +625,8 @@ func TestEnsureCopilotSetupSteps_CreateWithReleaseMode(t *testing.T) {
 	contentStr := string(content)
 
 	// Verify release mode characteristics
-	if !strings.Contains(contentStr, "actions/setup-cli@v2.0.0") {
-		t.Errorf("Expected action reference with version tag @v2.0.0, got:\n%s", contentStr)
+	if !strings.Contains(contentStr, "uses: github/gh-aw-actions/setup-cli@"+testSHA+" # "+testVersion) {
+		t.Errorf("Expected pinned action reference, got:\n%s", contentStr)
 	}
 	if !strings.Contains(contentStr, "version: v2.0.0") {
 		t.Errorf("Expected version parameter v2.0.0, got:\n%s", contentStr)

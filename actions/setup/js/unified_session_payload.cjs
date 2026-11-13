@@ -76,6 +76,27 @@ const STEERING_FIELDS = { type: ["type"], threshold: ["threshold"] };
 const STEERING_TYPES = new Set(["ai_credit", "timeout", "token"]);
 const STEERING_THRESHOLDS = new Set([80, 90, 95, 99]);
 /** @type {Fields} */
+const STEERING_DELIVERY_FIELDS = { type: ["type"], trigger: ["trigger"], threshold: ["threshold"], conversation: ["conversation"], first: ["first"] };
+const STEERING_DELIVERY_TYPES = new Set(["ai_credit", "timeout"]);
+const STEERING_CONVERSATION = /^[0-9a-f]{12}$/;
+
+/**
+ * Projects an AWF steering_delivery record, or returns undefined when it does not
+ * match the AWF contract: a threshold notice carries 80, 90, 95 or 99, a
+ * little_left notice a null threshold, and the conversation is a 12-hex-digit
+ * per-run key or null.
+ * @param {any} value
+ * @returns {Record<string, any> | undefined}
+ */
+function normalizeSteeringDelivery(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const delivery = selectFields(value, STEERING_DELIVERY_FIELDS);
+  if (!STEERING_DELIVERY_TYPES.has(delivery.type) || typeof delivery.first !== "boolean") return undefined;
+  if (delivery.trigger === "threshold" ? !STEERING_THRESHOLDS.has(delivery.threshold) : delivery.trigger !== "little_left" || delivery.threshold !== null) return undefined;
+  if (delivery.conversation !== null && !(typeof delivery.conversation === "string" && STEERING_CONVERSATION.test(delivery.conversation))) return undefined;
+  return delivery;
+}
+/** @type {Fields} */
 const MCP_FIELDS = {
   serverName: ["serverName", "server_name", "server_id"],
   direction: ["direction"],
@@ -338,7 +359,7 @@ const EVENT_FIELDS = {
     bytes: ["bytes"],
     durationMs: ["durationMs", "duration_ms"],
   },
-  "firewall.steering": { ...RUNTIME_FIELDS, threshold: ["threshold"] },
+  "firewall.steering": { ...RUNTIME_FIELDS, threshold: ["threshold"], trigger: ["trigger"], conversation: ["conversation"] },
   "firewall.event": RUNTIME_FIELDS,
   "firewall.token_usage": {
     provider: ["provider"],
@@ -355,6 +376,7 @@ const EVENT_FIELDS = {
     premiumRequests: ["premiumRequests", "premium_requests"],
     durationMs: ["durationMs", "duration_ms"],
     steering: ["steering"],
+    steeringDelivery: ["steeringDelivery", "steering_delivery"],
   },
   "firewall.model_routing": {
     schema: ["_schema", "schema"],
@@ -850,6 +872,12 @@ function normalizeUnifiedSessionEvent(event, phase) {
       const steering = data.steering && typeof data.steering === "object" && !Array.isArray(data.steering) ? selectFields(data.steering, STEERING_FIELDS) : {};
       if (STEERING_TYPES.has(steering.type) && STEERING_THRESHOLDS.has(steering.threshold)) data.steering = steering;
       else delete data.steering;
+    }
+    if (Object.hasOwn(data, "steeringDelivery")) {
+      // Keep every AWF notice delivery with its conversation; drop malformed records.
+      const delivery = normalizeSteeringDelivery(data.steeringDelivery);
+      if (delivery) data.steeringDelivery = delivery;
+      else delete data.steeringDelivery;
     }
   }
   if (event.type === "tool.execution_complete" && (source.is_error === true || source.result?.isError === true || source.result?.is_error === true)) data.isError = true;

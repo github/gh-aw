@@ -712,20 +712,7 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 		tools = append(tools, toolWithMaxBudget("noop", safeOutputs.NoOp.Max))
 	}
 
-	ledgerTools := computeEnabledToolNames(&WorkflowData{LedgerConfig: ledgerConfig})
-	if ledgerConfig.Enabled() {
-		for _, ledger := range ledgerConfig.Ledgers {
-			switch ledger.Type {
-			case "map":
-				ledgerTools["ledger_map_put"] = struct{}{}
-				ledgerTools["ledger_map_delete"] = struct{}{}
-			case "notes":
-				ledgerTools["ledger_note_add"] = struct{}{}
-				ledgerTools["ledger_note_vote"] = struct{}{}
-			}
-		}
-	}
-	tools = append(tools, sliceutil.SortedKeys(ledgerTools)...)
+	tools = append(tools, collectLedgerSafeOutputToolNames(ledgerConfig)...)
 
 	// Add custom job tools from SafeOutputs.Jobs (sorted for deterministic output).
 	if len(safeOutputs.Jobs) > 0 {

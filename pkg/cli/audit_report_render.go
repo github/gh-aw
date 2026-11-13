@@ -536,6 +536,7 @@ func renderConsoleOperationalSections(data AuditData) {
 	renderConsoleSkillActivations(data.SkillActivations)
 	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)
 	renderConsoleSteeringNotices(data.SteeringNotices, data.SteeringNoticesUnavailable)
+	renderConsoleSteeringDeliveries(data.SteeringDeliveries)
 	renderConsoleMissingTools(data.MissingTools)
 	renderConsoleMCPFailures(data.MCPFailures)
 	renderCompactMCPHealth(data.MCPServerHealth)
@@ -622,9 +623,15 @@ func renderConsoleGatewaySteeringEvents(events []GatewaySteeringEvent) {
 	}
 	fmt.Fprintln(os.Stderr, "  gateway_steering_events:")
 	for _, event := range events {
-		line := fmt.Sprintf("    %s: %s", event.Type, event.Message)
+		line := fmt.Sprintf("    %s: %s", sanitizeControlChars(event.Type), sanitizeControlChars(event.Message))
+		if event.Trigger == steeringTriggerLittleLeft {
+			line += " [little left]"
+		}
+		if event.Conversation != "" {
+			line += " conversation=" + sanitizeControlChars(event.Conversation)
+		}
 		if event.Timestamp != "" {
-			line += " (" + event.Timestamp + ")"
+			line += " (" + sanitizeControlChars(event.Timestamp) + ")"
 		}
 		fmt.Fprintln(os.Stderr, line)
 	}
@@ -640,15 +647,52 @@ func renderConsoleSteeringNotices(notices []SteeringNotice, unavailable bool) {
 	}
 	fmt.Fprintln(os.Stderr, "  steering_notices:")
 	for _, notice := range notices {
-		line := fmt.Sprintf("    %s %d%%", notice.Type, notice.Threshold)
+		line := fmt.Sprintf("    %s %d%%", sanitizeControlChars(notice.Type), notice.Threshold)
 		if notice.RequestID != "" {
-			line += " request_id=" + notice.RequestID
+			line += " request_id=" + sanitizeControlChars(notice.RequestID)
 		}
 		if notice.Phase != "" && notice.Phase != "agent" {
-			line += " phase=" + notice.Phase
+			line += " phase=" + sanitizeControlChars(notice.Phase)
 		}
 		fmt.Fprintln(os.Stderr, line)
 	}
+}
+
+// renderConsoleSteeringDeliveries lists every AWF steering notice delivery with
+// its conversation; a little_left notice is shown as "little left" because it
+// has no threshold.
+func renderConsoleSteeringDeliveries(deliveries []SteeringDelivery) {
+	if len(deliveries) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "  steering_deliveries:")
+	for _, delivery := range deliveries {
+		fmt.Fprintln(os.Stderr, "    "+formatSteeringDelivery(delivery))
+	}
+}
+
+func formatSteeringDelivery(delivery SteeringDelivery) string {
+	line := sanitizeControlChars(delivery.Type)
+	if delivery.Trigger == steeringTriggerLittleLeft || delivery.Threshold == nil {
+		line += " little left"
+	} else {
+		line += fmt.Sprintf(" %d%%", *delivery.Threshold)
+	}
+	if delivery.Conversation != nil {
+		line += " conversation=" + sanitizeControlChars(*delivery.Conversation)
+	} else {
+		line += " conversation=unknown"
+	}
+	if delivery.First {
+		line += " first"
+	}
+	if delivery.RequestID != "" {
+		line += " request_id=" + sanitizeControlChars(delivery.RequestID)
+	}
+	if delivery.Phase != "" && delivery.Phase != "agent" {
+		line += " phase=" + sanitizeControlChars(delivery.Phase)
+	}
+	return line
 }
 
 func renderConsoleSkillActivations(activations []SkillActivation) {
