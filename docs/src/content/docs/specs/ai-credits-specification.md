@@ -7,9 +7,9 @@ sidebar:
 
 # AI Credits Specification
 
-**Version**: 1.5.3<br />
+**Version**: 1.5.4<br />
 **Status**: Draft  
-**Publication Date**: 2026-11-05<br />
+**Publication Date**: 2026-11-13<br />
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [ai-credits-specification](/gh-aw/specs/ai-credits-specification/)  
 **Latest Published Version**: This document
@@ -663,7 +663,7 @@ A conforming implementation MUST enforce the following at compile time when a fr
 - Reject integer values below `-1` with a compile-time validation error.
 - Reject non-numeric values.
 
-At runtime, when the budget is resolved from an organization variable (`GH_AW_DEFAULT_MAX_AI_CREDITS`, `GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`, or `GH_AW_DEFAULT_EVALS_MAX_AI_CREDITS`), the generated step accepts `-1` or a base-10 positive whole number without leading zeroes (up to 19 digits, covering positive `int64` values); `K` and `M` suffixes are compile-time frontmatter syntax only. Any other runtime value MUST fall back to the built-in default (`1000`, or `400` for detection and evals runs) and emit a step-log warning without echoing the raw value.
+At runtime, when the budget is resolved from an organization variable (`GH_AW_DEFAULT_MAX_AI_CREDITS`, `GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`, or `GH_AW_DEFAULT_EVALS_MAX_AI_CREDITS`), the generated step accepts `-1` or a base-10 positive whole number without leading zeroes, no greater than `9223372036854775807`; `K` and `M` suffixes are compile-time frontmatter syntax only. Any other runtime value MUST fall back to the built-in default (`1000`, or `400` for detection and evals runs) and emit a step-log warning without echoing the raw value.
 
 ### 10.7 Compliance Tests
 
@@ -769,6 +769,10 @@ This specification MUST be revalidated when any of the following occurs:
 
 <a id="change-log"></a>
 ## Change Log
+
+### Version 1.5.4 (2026-11-13)
+
+- **Clarified**: Sections 10.5–10.6 specify runtime organization-variable formats, the positive `int64` maximum, invalid-value fallback warnings, and the `-1` disable sentinel; T-AIC-PR-003 verifies runtime disabling.
 
 ### Version 1.5.3 (2026-11-10)
 

@@ -1466,7 +1466,8 @@ jobs:
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
           (umask 177 && touch /tmp/gh-aw/agent-stdio.log)
           GH_AW_MAX_AI_CREDITS="5"
-          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,18})$ ]]; then
+          # shellcheck disable=SC2071  # Compare decimal strings without overflowing shell arithmetic.
+          if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[1-9][0-9]{0,18})$ ]] || { [[ ${#GH_AW_MAX_AI_CREDITS} -eq 19 ]] && [[ "$GH_AW_MAX_AI_CREDITS" > "9223372036854775807" ]]; }; then
             echo "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld); expected a positive whole number or -1. Using default budget of 5 AI credits."
             GH_AW_MAX_AI_CREDITS="5"
           fi

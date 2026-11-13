@@ -407,7 +407,8 @@ fi
 `
 	}
 	return fmt.Sprintf(`%s
-if [[ ! "$%s" =~ ^(-1|[1-9][0-9]{0,18})$ ]]; then
+# shellcheck disable=SC2071  # Compare decimal strings without overflowing shell arithmetic.
+if [[ ! "$%s" =~ ^(-1|[1-9][0-9]{0,18})$ ]] || { [[ ${#%s} -eq 19 ]] && [[ "$%s" > "9223372036854775807" ]]; }; then
   echo "::warning::Ignoring invalid GH_AW_MAX_AI_CREDITS value (value withheld); expected a positive whole number or -1. Using default budget of %s AI credits."
   %s="%s"
 fi
@@ -422,7 +423,7 @@ if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_A
 else
   echo "No component admission allowance; retaining existing budget policy (value withheld)."
 fi
-unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS`, assignment, awfMaxAICreditsVarName, defaultMaxAICredits, awfMaxAICreditsVarName, defaultMaxAICredits, requirePrimary), awfConfigJSON
+unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS`, assignment, awfMaxAICreditsVarName, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits, awfMaxAICreditsVarName, defaultMaxAICredits, requirePrimary), awfConfigJSON
 }
 
 func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) string {
