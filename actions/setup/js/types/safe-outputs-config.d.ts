@@ -266,6 +266,7 @@ interface PushToPullRequestBranchConfig extends SafeOutputConfig {
  * Configuration for merging pull requests with policy checks.
  */
 interface MergePullRequestConfig extends SafeOutputConfig {
+  "allowed-base-branches": string[];
   "required-labels"?: string[];
   "required-title-prefix"?: string;
   "required-checks"?: string[];

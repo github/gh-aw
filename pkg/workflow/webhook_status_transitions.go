@@ -14,7 +14,7 @@ func applyWebhookStatusTransitions(subscription *WebhookSubscription, config map
 	const path = "on.gateway-dispatch.projects-items.status-transitions"
 	transitions, ok := raw.([]any)
 	if !ok || len(transitions) == 0 {
-		return fmt.Errorf("%s must be a non-empty list of from/to status pairs", path)
+		return fmt.Errorf("%s must be a non-empty list of from/to status pairs. Example: [{from: Todo, to: Done}]", path)
 	}
 	if !slices.Contains(subscription.Types, "edited") {
 		return fmt.Errorf("%s requires types to include edited", path)
@@ -22,13 +22,13 @@ func applyWebhookStatusTransitions(subscription *WebhookSubscription, config map
 	for index, raw := range transitions {
 		pair, ok := raw.(map[string]any)
 		if !ok || len(pair) != 2 {
-			return fmt.Errorf("%s[%d] must be an object containing only from and to", path, index)
+			return fmt.Errorf("%s[%d] must be an object containing only from and to. Example: {from: Todo, to: Done}", path, index)
 		}
 		group := make([]WebhookCondition, 0, 2)
 		for _, direction := range []string{"from", "to"} {
 			value, ok := pair[direction].(string)
 			if !ok || strings.TrimSpace(value) == "" {
-				return fmt.Errorf("%s[%d].%s must be a non-empty status name", path, index, direction)
+				return fmt.Errorf("%s[%d].%s must be a non-empty status name. Example: %s: Done", path, index, direction, direction)
 			}
 			filter := "field." + direction + ".name"
 			spec := definition.Filters[filter]

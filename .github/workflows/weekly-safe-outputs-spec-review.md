@@ -28,6 +28,7 @@ sandbox:
   agent:
     id: awf
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/github-guard-policy.md
 
   - shared/otlp.md
@@ -44,13 +45,11 @@ tools:
       - pull_requests
 
 safe-outputs:
-  steer: true
   create-pull-request:
     expires: 7d
     title-prefix: "[spec-review] "
     labels: [documentation, safe-outputs, automation]
     reviewers: []
-    draft: false
     auto-merge: false
 
 timeout-minutes: 30

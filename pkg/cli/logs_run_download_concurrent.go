@@ -64,6 +64,7 @@ type runArtifactsConcurrentOptions struct {
 }
 
 var processConcurrentRunDownload = processSingleRunDownload
+var errRunDownloadPanicked = errors.New("run download panicked")
 
 // buildConcurrentDownloadParams constructs download parameters by parsing the optional
 // repoOverride ("owner/repo" or "HOST/owner/repo") once for the whole batch.
@@ -178,6 +179,7 @@ func runConcurrentArtifactDownloads(
 	}
 	for i, run := range runs {
 		if cachedResult, ok := cachedJSONDownloadResult(run, opts.cachedRuns, opts.filters); ok {
+			emitLogsDownloadProgress(ctx, cachedResult)
 			recordConcurrentDownloadResult(i, cachedResult, results, completed, opts.onResult)
 			completedCount.Add(1)
 			continue
@@ -225,6 +227,7 @@ func runArtifactDownloadWorker(
 			if result.Error == nil {
 				result = executeConcurrentRunDownload(ctx, job.run, params, completedCount, progressBar)
 			}
+			emitLogsDownloadProgress(ctx, result)
 			recordConcurrentDownloadResult(job.index, result, results, completed, opts.onResult)
 			if result.Error != nil && errors.Is(result.Error, context.Canceled) {
 				return
@@ -245,7 +248,7 @@ func executeConcurrentRunDownload(
 			result = DownloadResult{
 				RunAnalysis: RunAnalysis{Run: run},
 				Skipped:     true,
-				Error:       fmt.Errorf("run download panicked: %v", recovered),
+				Error:       fmt.Errorf("%w: %v", errRunDownloadPanicked, recovered),
 			}
 		}
 	}()

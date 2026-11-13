@@ -1543,7 +1543,8 @@
                       "typed",
                       "untyped",
                       "field_added",
-                      "field_removed"
+                      "field_removed",
+                      "status_changed"
                     ]
                   }
                 },
@@ -6139,9 +6140,13 @@
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
         "ledger": {
-          "description": "Standalone Git-backed ledger configuration. Declare type: log, set, map, table, counter, or notes for trusted built-in replay. Custom replay and compaction scripts are not supported. Tables require key (the string primary-key field). Built-ins accept typed operations via the configured ledger safe-output tools. Each ledger may set compaction; compaction is lossless and preserves all source transactions.",
+          "description": "Standalone ledger configuration. Storage defaults to git; storage: comment-memory uses the configured tools.comment-memory target without Git branches or compaction. Declare type: log, set, map, table, counter, or notes for trusted built-in replay. Tables require key (the string primary-key field). Custom replay and compaction scripts are not supported.",
           "type": "object",
           "properties": {
+            "storage": {
+              "oneOf": [{ "type": "string", "enum": ["git", "comment-memory"] }, { "type": "object" }],
+              "description": "Persistence backend, or a named object-valued ledger. Comment storage requires tools.comment-memory."
+            },
             "type": {
               "oneOf": [{ "type": "string", "enum": ["log", "set", "map", "table", "counter", "notes"] }, { "type": "object" }],
               "description": "Built-in ledger reducer type, or a named object-valued ledger."
@@ -6161,6 +6166,7 @@
                   { "required": ["max-patch-kb"] },
                   { "required": ["type"], "properties": { "type": { "type": "string" } } },
                   { "required": ["key"], "properties": { "key": { "type": "string" } } },
+                  { "required": ["storage"], "properties": { "storage": { "type": "string" } } },
                   {
                     "required": ["compaction"],
                     "properties": {
@@ -8733,9 +8739,14 @@
                       "type": "string",
                       "pattern": "^[0-9]+[hHdDwWmMyY]$",
                       "description": "Relative time (e.g., '2h', '7d', '2w', '1m', '1y'); minimum 2h for hour values"
+                    },
+                    {
+                      "type": "boolean",
+                      "enum": [false],
+                      "description": "Set to false to explicitly disable expiration"
                     }
                   ],
-                  "description": "Time until the pull request expires and should be automatically closed (only for same-repo PRs without target-repo). Supports integer (days) or relative time format. Minimum duration: 2 hours."
+                  "description": "Time until the pull request expires and should be automatically closed (only for same-repo PRs without target-repo). Supports integer (days), relative time format, or false to disable expiration. Minimum duration: 2 hours."
                 },
                 "auto-merge": {
                   "description": "Enable auto-merge for the pull request. Accepts true/false, an explicit merge method (squash, merge, rebase), or a GitHub Actions expression resolving to any of those values. When enabled, the PR will be automatically merged once all required checks pass and required approvals are met. Auto-merge is withheld and independent review is required when protected-file changes trigger the request-review policy, detection produces a caution (including detection engine errors), or a required review fails (including when the bot authored the PR). Configured reviewers or a successful REQUEST_CHANGES review do not bypass these gates. Defaults to false.",
@@ -10886,13 +10897,21 @@
         "merge-pull-request": {
           "oneOf": [
             {
-              "type": "null",
-              "description": "Enable pull request merge with default policy configuration"
-            },
-            {
               "type": "object",
               "description": "Experimental configuration for controlled pull request merges. The merge is blocked unless all configured gates pass.",
+              "required": ["allowed-base-branches"],
               "properties": {
+                "allowed-base-branches": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[^\\s!+?\\[\\]{}()\\\\]+$",
+                    "not": { "pattern": "^[*/]+$" }
+                  },
+                  "description": "Required static scoped patterns for destination (base) branches declared by the owner as non-consequential automated integration targets. Only * and ** glob operators are supported; expressions, negation, character classes, braces, extglobs, and escapes are forbidden. Patterns consisting only of * and /, such as *, **, */*, and **/*, are forbidden. Default and protected branches remain blocked. This declaration is not proof of harmless downstream effects."
+                },
                 "protected-files": {
                   "oneOf": [
                     {
@@ -11937,6 +11956,10 @@
                   "description": "Whether to create or update GitHub issues when tools are missing (default: true). Supports literal boolean or GitHub Actions expression (e.g. '${{ inputs.create-issue }}').",
                   "default": true
                 },
+                "report-as-failure": {
+                  "$ref": "#/$defs/templatable_boolean",
+                  "description": "Whether to surface missing tools as agent failures (default: true). Supports literal boolean or GitHub Actions expression."
+                },
                 "title-prefix": {
                   "type": "string",
                   "description": "Prefix for issue titles when creating issues for missing tools (default: '[missing tool]')",
@@ -12025,6 +12048,10 @@
                   "$ref": "#/$defs/templatable_boolean",
                   "description": "Whether to create or update GitHub issues when data is missing (default: true). Supports literal boolean or GitHub Actions expression (e.g. '${{ inputs.create-missing-data-issue }}').",
                   "default": true
+                },
+                "report-as-failure": {
+                  "$ref": "#/$defs/templatable_boolean",
+                  "description": "Whether to surface missing data as agent failures (default: true). Supports literal boolean or GitHub Actions expression."
                 },
                 "title-prefix": {
                   "type": "string",
@@ -15043,6 +15070,10 @@
     "ledgerScriptRestrictions": {
       "type": "object",
       "properties": {
+        "storage": {
+          "type": "string",
+          "enum": ["git", "comment-memory"]
+        },
         "replay": {
           "not": {},
           "description": "Removed. Use a built-in ledger type instead of custom replay."
@@ -15059,7 +15090,7 @@
     },
     "repoMemoryLedger": {
       "type": ["object", "null"],
-      "description": "Experimental. Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation. Using this field emits a compile-time warning.",
+      "description": "Enable the ledger projection, optionally validated against a repository-relative JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation.",
       "properties": {
         "schema": {
           "type": "string",

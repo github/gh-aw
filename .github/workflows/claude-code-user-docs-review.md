@@ -47,6 +47,7 @@ tools:
     - "cat *"
     - "ls *"
     - "grep *"
+    - "safeoutputs *"
 
 timeout-minutes: 30
 

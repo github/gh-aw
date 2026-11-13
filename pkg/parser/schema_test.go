@@ -109,7 +109,7 @@ func TestValidateMainWorkflowFrontmatter_IssueFieldActivityTypes(t *testing.T) {
 	frontmatter := map[string]any{
 		"on": map[string]any{
 			"issues": map[string]any{
-				"types": []any{"typed", "untyped", "field_added", "field_removed"},
+				"types": []any{"typed", "untyped", "field_added", "field_removed", "status_changed"},
 			},
 		},
 		"engine": "copilot",
@@ -119,6 +119,17 @@ func TestValidateMainWorkflowFrontmatter_IssueFieldActivityTypes(t *testing.T) {
 		t.Fatalf("expected issue field activity types to validate: %v", err)
 	}
 
+	invalidFrontmatter := map[string]any{
+		"on": map[string]any{
+			"issues": map[string]any{
+				"types": []any{"status_change"},
+			},
+		},
+		"engine": "copilot",
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(invalidFrontmatter, "workflow.md"); err == nil {
+		t.Fatal("expected misspelled issue activity type to fail validation")
+	}
 }
 
 func TestValidateMainWorkflowFrontmatter_MaxToolCalls(t *testing.T) {
@@ -2693,6 +2704,9 @@ func TestProtectedFilesExclusionsRequireScope(t *testing.T) {
 				}
 				if handler == "approve-workflow-run" {
 					config["allowed-workflows"] = []any{"ci.yml"}
+				}
+				if handler == "merge-pull-request" {
+					config["allowed-base-branches"] = []any{"agent-work/*"}
 				}
 				frontmatter := map[string]any{
 					"on":           map[string]any{"workflow_dispatch": nil},

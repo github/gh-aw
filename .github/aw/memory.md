@@ -20,7 +20,7 @@ For workflows that **persist state across runs** — deduplication, incremental 
 | Track a numeric metric and compare current vs. baseline (runs at least every 7 days) | `cache-memory` ✅ first choice |
 | Long-lived knowledge base visible in PRs and code reviews | `repo-memory` |
 | Baselines that must survive cache expiry (e.g. security findings, dedup lists) | `repo-memory` |
-| Bounded append-only structured event history and built-in current-state projections | Experimental `tools.ledger` — see [ledger.md](ledger.md) |
+| Bounded append-only structured event history and built-in current-state projections | `tools.ledger` — see [ledger.md](ledger.md) |
 | Reusable lessons need semantic consolidation beyond deterministic cleanup | [Scheduled dreaming](#scheduled-dreaming) only when cheaper options cannot meet the need |
 | Human-readable wiki pages for knowledge accumulation | `repo-memory` with `wiki: true` |
 | Persist notes/state inline on the triggering issue or PR | `comment-memory` |
@@ -222,10 +222,10 @@ Compiler creates a separate `push_repo_memory` job with `contents: write`; main 
 
 To push to ruleset-protected memory branches, add `github-app: {client-id, private-key}` (app needs **Contents: read and write**). Use `github-app-read` / `github-app-write` to split read and write apps; only the write app needs the ruleset bypass. Without an app, `github.token` is used.
 
-### Structured event history: standalone ledger (experimental)
+### Structured event history: standalone ledger
 
 For immutable, structured events where each run appends records and later runs
-query them by a stable key, use experimental `tools.ledger` instead — configured
+query them by a stable key, use `tools.ledger` instead — configured
 independently of repo-memory. See [ledger.md](ledger.md) for configuration,
 state-model types, limits, and compaction.
 
@@ -247,7 +247,7 @@ Dreaming is a separate, scheduled workflow that turns accumulated observations
 into a small, evidence-backed knowledge view for later runs. It is not a new
 frontmatter field, ledger compaction, or permission to rewrite task state.
 Use existing `tools.repo-memory` and, when immutable lessons and corrections
-are useful, experimental `tools.ledger` with `type: notes`.
+are useful, `tools.ledger` with `type: notes`.
 
 Use the cheapest sufficient option, in this order:
 
@@ -393,7 +393,7 @@ Multiple memory IDs in one comment are supported; each maps to a separate `*.md`
 
 Persist a baseline JSON file between runs to alert only on *new* findings — vulnerability scans, dependency audits, licence checks. Unlike `cache-memory`, the baseline survives cache expiry, so a missed cycle won't flood the repo with duplicate issues. Store only stable identifiers (advisory IDs), cap output with `max:`, treat missing baseline as `[]`.
 
-Keep this as a replaceable repo-memory snapshot by default. Use the experimental
+Keep this as a replaceable repo-memory snapshot by default. Use the
 ledger only when the audit needs an append-only record of each scan or finding
 and its expected writer count fits the default 1024-shard limit; it does not replace,
 prune, or compact an existing baseline.

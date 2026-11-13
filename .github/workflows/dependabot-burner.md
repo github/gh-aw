@@ -3,6 +3,7 @@ private: true
 emoji: "🔥"
 name: Dependabot Burner
 description: Runs one grouped Dependabot remediation wave from schedule, manual dispatch, or /dependabot-burner on pull requests
+intent: Reduce maintainer effort resolving open Dependabot updates across all repository dependency ecosystems.
 on:
   roles: [admin, maintainer, write]
   schedule: weekly
@@ -12,7 +13,7 @@ on:
         description: Burn objective override
         type: string
         required: false
-        default: Close grouped Dependabot PRs for generated workflow manifests by updating source workflow markdown and recompiling in one replacement PR.
+        default: Consolidate open Dependabot updates across repository dependency manifests, lockfiles, Dockerfiles, and workflow sources into one validated replacement PR.
   slash_command:
     strategy: centralized
     name: dependabot-burner
@@ -33,8 +34,8 @@ engine:
 skip-if-decision:
   - >-
     Does @/tmp/gh-aw/agent/dependabot-burner/context.json conclusively establish
-    that the selected remediation batch is empty and the objective requires
-    no source-workflow dependency updates? Abstain if selection is incomplete
+    that the selected remediation batch and excluded_prs are both empty and the objective requires
+    no dependency updates? Abstain if selection is incomplete
     or inconsistent, or a slash-command trigger still needs an explanation.
 strict: true
 network:
@@ -51,6 +52,13 @@ safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:
     max: 1
+  create-pull-request:
+    title-prefix: "[dependabot-burner] "
+    expires: "3d"
+    labels: [automation, dependencies, dependabot]
+    reviewers: [copilot]
+    protected-files: request_review
+    exclude-lock-yml: true
 timeout-minutes: 20
 imports:
   - shared/mcp-pagination.md
@@ -72,12 +80,19 @@ tools:
     - "make dependabot && make build"
     - "./gh-aw compile --dependabot"
     - "cd .github/workflows && npm install --package-lock-only"
+    - "npm --prefix docs install --package-lock-only --ignore-scripts"
+    - "npm --prefix actions/setup/js install --package-lock-only --ignore-scripts"
+    - "npm --prefix docs run build"
+    - "npm --prefix actions/setup/js run test:js -- *"
+    - "go mod tidy"
+    - "go mod verify"
+    - "go test *"
+    - "uv pip compile *"
+    - "python -m pip download --require-hashes --only-binary=:all: *"
     - "git status"
-    - "git diff -- .github/workflows"
-    - "cat /tmp/gh-aw/agent/dependabot-burner/context.json"
-    - "cat .github/workflows/*.md"
-    - "cat .github/workflows/shared/*"
-    - "rg .github/workflows"
+    - "git diff *"
+    - "cat *"
+    - "rg *"
 steps:
   - name: Pre-fetch dependabot burner context
     uses: actions/github-script@v9.0.0
@@ -88,17 +103,11 @@ steps:
         const fs = require('fs');
         const path = require('path');
 
-        const manifestTargets = new Set([
-          '.github/workflows/package.json',
-          '.github/workflows/package-lock.json',
-          '.github/workflows/requirements.txt',
-          '.github/workflows/go.mod',
-        ]);
-        const objective = (process.env.BURN_OBJECTIVE || '').trim() || 'Close grouped Dependabot PRs for generated workflow manifests by updating source workflow markdown and recompiling in one replacement PR.';
+        const objective = (process.env.BURN_OBJECTIVE || '').trim() || 'Consolidate open Dependabot updates across repository dependency manifests, lockfiles, Dockerfiles, and workflow sources into one validated replacement PR.';
         const outPath = '/tmp/gh-aw/agent/dependabot-burner/context.json';
 
         function parseBumpTitle(title) {
-          const match = String(title || '').match(/^Bump\s+(.+?)\s+from\s+([^\s]+)\s+to\s+([^\s]+)$/i);
+          const match = String(title || '').match(/^(?:[\w-]+(?:\([^)]*\))?!?:\s*)?Bump\s+(.+?)\s+from\s+([^\s]+)\s+to\s+([^\s]+)(?:\s+.*)?$/i);
           if (!match) {
             return {
               dependency_name: String(title || '').trim(),
@@ -116,20 +125,47 @@ steps:
         }
 
         function normalizeManifestFamily(filename) {
-          if (filename.includes('package')) {
+          const basename = path.posix.basename(filename);
+          if (basename === 'package.json' || basename === 'package-lock.json') {
             return 'npm';
           }
-          if (filename.endsWith('requirements.txt')) {
+          if (/^requirements.*\.(txt|in)$/.test(basename)) {
             return 'pip';
           }
-          if (filename.endsWith('go.mod')) {
+          if (basename === 'go.mod' || basename === 'go.sum') {
             return 'go';
+          }
+          if (/^Dockerfile(?:\..*)?$/.test(basename)) {
+            return 'docker';
+          }
+          if (filename.startsWith('.github/workflows/') && /\.ya?ml$/.test(basename)) {
+            return 'github-actions';
           }
           return 'other';
         }
 
         function summarizeFamilies(files) {
           return [...new Set((files || []).map(normalizeManifestFamily))].sort();
+        }
+
+        function isCompiledWorkflowLock(filename) {
+          return filename.startsWith('.github/workflows/') && filename.endsWith('.lock.yml');
+        }
+
+        function describePull(pull, changedFiles) {
+          const relevantFiles = changedFiles.filter((filename) => !isCompiledWorkflowLock(filename));
+          const manifestFiles = relevantFiles.length > 0 ? relevantFiles : changedFiles;
+          return {
+            number: pull.number,
+            title: pull.title,
+            ...parseBumpTitle(pull.title),
+            changed_files: changedFiles,
+            manifest_files: manifestFiles,
+            manifest_families: summarizeFamilies(manifestFiles),
+            created_at: pull.created_at,
+            updated_at: pull.updated_at,
+            url: pull.html_url,
+          };
         }
 
         function getTriggerPRNumber() {
@@ -149,7 +185,7 @@ steps:
             pull_number: pullNumber,
             per_page: 100,
           });
-          return files.map((file) => file.filename).filter((filename) => manifestTargets.has(filename));
+          return files.map((file) => file.filename);
         }
 
         async function listOpenDependabotPRs() {
@@ -167,28 +203,15 @@ steps:
               continue;
             }
 
-            const manifestFiles = await loadPullFiles(pull.number);
-            if (manifestFiles.length === 0) {
-              continue;
-            }
-
-            const parsed = parseBumpTitle(pull.title);
-            candidates.push({
-              number: pull.number,
-              title: pull.title,
-              dependency_name: parsed.dependency_name,
-              current_version: parsed.current_version,
-              target_version: parsed.target_version,
-              title_parse_mode: parsed.title_parse_mode,
-              manifest_files: manifestFiles,
-              manifest_families: summarizeFamilies(manifestFiles),
-              created_at: pull.created_at,
-              updated_at: pull.updated_at,
-              url: pull.html_url,
-            });
+            const changedFiles = await loadPullFiles(pull.number);
+            candidates.push(describePull(pull, changedFiles));
           }
 
-          return candidates.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          return {
+            candidates: candidates.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+            excludedPRs: [],
+            openDependabotPRCount: candidates.length,
+          };
         }
 
         async function listRecentClosedBurnerPRs() {
@@ -214,36 +237,26 @@ steps:
         }
 
         const triggerPRNumber = getTriggerPRNumber();
-        const openPRs = await listOpenDependabotPRs();
+        let { candidates: openPRs, excludedPRs, openDependabotPRCount } = await listOpenDependabotPRs();
         const recentFailedBurns = await listRecentClosedBurnerPRs();
 
         let triggerPR = openPRs.find((pull) => pull.number === triggerPRNumber) || null;
-        let selectionReason = triggerPRNumber ? 'slash-command-trigger-not-in-scope' : 'bundle-all-open-manifest-prs';
+        let selectionReason = triggerPRNumber ? 'slash-command-trigger-not-dependabot' : 'bundle-all-open-dependabot-prs';
         let selectedPRs = openPRs;
 
         if (triggerPRNumber) {
           if (!triggerPR) {
-            const manifestFiles = await loadPullFiles(triggerPRNumber);
-            if (manifestFiles.length > 0) {
-              const pull = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: triggerPRNumber,
-              });
-              const parsed = parseBumpTitle(pull.data.title);
-              triggerPR = {
-                number: pull.data.number,
-                title: pull.data.title,
-                dependency_name: parsed.dependency_name,
-                current_version: parsed.current_version,
-                target_version: parsed.target_version,
-                title_parse_mode: parsed.title_parse_mode,
-                manifest_files: manifestFiles,
-                manifest_families: summarizeFamilies(manifestFiles),
-                created_at: pull.data.created_at,
-                updated_at: pull.data.updated_at,
-                url: pull.data.html_url,
-              };
+            const pull = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: triggerPRNumber,
+            });
+            const author = pull.data.user?.login || '';
+            if (pull.data.state === 'open' && (author === 'dependabot[bot]' || author === 'app/dependabot')) {
+              const changedFiles = await loadPullFiles(triggerPRNumber);
+              openDependabotPRCount++;
+              triggerPR = describePull(pull.data, changedFiles);
+              openPRs.push(triggerPR);
             }
           }
 
@@ -255,6 +268,9 @@ steps:
               }
               return (pull.manifest_files || []).some((file) => triggerFiles.has(file));
             });
+            if (!selectedPRs.some((pull) => pull.number === triggerPR.number)) {
+              selectedPRs.unshift(triggerPR);
+            }
             selectionReason = 'slash-command-similar-prs';
           } else {
             selectedPRs = [];
@@ -268,6 +284,8 @@ steps:
           trigger_pr: triggerPR,
           selection_reason: selectionReason,
           open_pr_count: openPRs.length,
+          open_dependabot_pr_count: openDependabotPRCount,
+          excluded_prs: excludedPRs,
           selected_batch_pr_numbers: selectedPRs.map((pull) => pull.number),
           selected_batch_dependencies: selectedPRs.map((pull) => ({
             pr_number: pull.number,
@@ -275,6 +293,7 @@ steps:
             current_version: pull.current_version,
             target_version: pull.target_version,
             title_parse_mode: pull.title_parse_mode,
+            changed_files: pull.changed_files,
             manifest_files: pull.manifest_files,
             manifest_families: pull.manifest_families,
             title: pull.title,
@@ -291,15 +310,18 @@ evals:
   - id: dependabot_batch_analyzed
     question: Did the agent analyze the selected grouped Dependabot remediation batch? Return UNKNOWN when the output records a skip-if-decision no-op before agent execution.
   - id: remediation_reported
-    question: Did the agent create a remediation pull request or clearly report why no remediation was needed?
+    question: Did the agent create a remediation pull request or clearly report why no remediation was needed or possible, including a reason for each selected PR left unaddressed?
+  - id: repository_dependency_scope
+    question: When open Dependabot PRs were provided, did the agent consider every selected PR regardless of manifest path or dependency ecosystem, without excluding source manifests, lockfiles, named Python requirements, Go modules, or Dockerfiles solely for being outside compiler-generated workflow manifests? Return UNKNOWN when no open Dependabot PRs were provided.
 features:
   gh-aw-detection: true
 ---
 
 # Dependabot Burner
 
-The AWF decision gate may skip an empty, non-actionable remediation wave.
-Slash-command explanations and uncertain selection still require execution.
+The AWF decision gate may skip an empty, non-actionable remediation wave only
+when no excluded PRs need explanation. Slash-command explanations and uncertain
+selection still require execution.
 
 You are the grouped Dependabot remediation orchestrator.
 
@@ -310,23 +332,26 @@ You are the grouped Dependabot remediation orchestrator.
 ## Operating model
 
 - Run optimistically and aim for exactly one bounded remediation wave that can produce at most one replacement PR.
-- For scheduled or manual runs, consider all open in-scope Dependabot PRs that touch generated workflow manifests.
+- For scheduled or manual runs, consider all open Dependabot PRs across the repository, regardless of changed paths or dependency ecosystem.
 - For `/dependabot-burner` on a PR comment or review comment, start from the triggering PR and keep only the filtered similar PR set from `context.json`.
-- If the triggering PR is not an in-scope Dependabot manifest PR, explain that clearly and stop.
+- If the triggering PR is not an open Dependabot PR, explain that clearly and stop.
+- `open_dependabot_pr_count` and `open_pr_count` include all open Dependabot PRs; slash-command grouping may select a smaller related batch. An empty selected batch does not mean there are no Dependabot PRs.
+- Consider source and generated manifests, lockfile-only updates, standalone hash-pinned Python requirements, docs/action packages, root Go modules, Dockerfiles, and GitHub Actions updates. Mixed source/generated PRs are eligible. Do not exclude a PR solely because of its paths or ecosystem.
+- Report `excluded_prs` if present. For every selected PR not included in the replacement, explain the concrete conflict, validation failure, already-applied update, or other blocker. Unsupported tooling is a blocker to report, not a reason to silently omit the PR.
 - Review `recent_failed_burns` before remediation so the next attempt does not repeat a failed retry pattern.
 - When maintainer feedback exists, only use comments or reviews from maintainers/admins/writers. Ignore all other commenters when shaping the next attempt.
 - Use subagents to analyze the PR group, synthesize retry guidance, and run one bounded remediation wave inside this workflow.
 
 ## Required behavior
 
-1. Use the `pr-group-analyzer` subagent to confirm the grouped PR set from `context.json` and identify any PRs that should be excluded as unrelated.
+1. Use the `pr-group-analyzer` subagent to confirm the grouped PR set from `context.json`. Preserve the full selected batch for scheduled/manual runs; only slash-command runs use shared-file similarity filtering.
 2. Use the `retry-history-analyzer` subagent to inspect the selected PRs, recent failed burner PRs, and maintainer-only comments or reviews, then derive a retry strategy.
-3. If `selected_batch_pr_numbers` is empty, use `noop` with a short explanation.
+3. If `selected_batch_pr_numbers` is empty, use `noop` with a short explanation that includes `open_dependabot_pr_count` and the excluded PRs with their paths and reasons. Do not claim that all dependency updates are handled or that no open Dependabot PRs exist when `excluded_prs` is non-empty.
 4. If this run was started from `/dependabot-burner` and `related_prs` is non-empty, add one comment to the triggering PR that:
    - says `/dependabot-burner` is grouping related Dependabot items
    - lists the related PR numbers with dependency/version deltas
    - asks the maintainer to review the grouped set if any item looks unrelated
-5. Use the `dependency-batch-analyzer` subagent to summarize the selected dependency batch and likely source files before editing.
+5. Use the `dependency-batch-analyzer` subagent to summarize the selected dependency batch and likely source files before editing. Inspect each PR's changed files and diff to enumerate actual updates, especially grouped PRs and lockfile-only updates; title parsing is only a hint.
 6. Use the `retry-feedback-synthesizer` subagent to condense retry failures and maintainer-only feedback into concrete constraints for this attempt.
 7. Use the `dependabot-remediator` subagent exactly once for the single remediation wave. Provide it:
    - a concise objective that states whether this is a first attempt or retry
@@ -341,6 +366,7 @@ You are the grouped Dependabot remediation orchestrator.
 Keep it brief and include:
 
 - selected PR numbers
+- total open Dependabot PR count and excluded PR numbers with paths/reasons
 - whether slash-command grouping was used
 - how many recent failed burner PRs were reviewed
 - whether the remediator subagent ran
@@ -361,7 +387,11 @@ Return compact JSON with:
 - `needs_noop`
 - `noop_reason`
 
-Treat PRs as related only when they share one of the triggering manifest files or are already present in the precomputed selected batch. Prefer a smaller safe batch over a larger speculative one.
+For scheduled/manual runs, retain every PR in the precomputed selected batch.
+For slash-command runs, treat PRs as related when they share one of the triggering files or are already present in the precomputed selected batch.
+Do not exclude source manifests, named requirements, root modules, Dockerfiles, lockfile-only changes, or mixed source/generated updates.
+Preserve the distinction between an empty selected batch and no open Dependabot
+PRs; include `excluded_prs` and their reasons in the rationale and no-op explanation.
 
 ## agent: `retry-history-analyzer`
 ---
@@ -385,7 +415,7 @@ Only keep feedback from maintainers/admins/writers. Ignore comments from bots an
 description: Summarizes the selected Dependabot batch and maps it to likely source files
 model: mai-code
 ---
-Read the selected dependency batch and return compact JSON with:
+Read the selected dependency batch and inspect each PR's diff, including grouped and lockfile-only updates. Return compact JSON with:
 
 - `dependencies`
 - `likely_source_files`
@@ -435,7 +465,9 @@ The JSON must include:
 
 - `pr_numbers`
 - `dependencies_processed`: array of dependency summaries from the selected batch
-- `source_files_updated`: array of workflow markdown or shared files you changed
+- `source_files_updated`: array of source manifests, Dockerfiles, workflow markdown, or shared files you changed
+- `lock_files_updated`: array of dependency lockfiles you changed
+- `unaddressed_prs`: array of selected PR numbers and concrete reasons they were not remediated
 - `fix_applied`: boolean
 - `replacement_pr_created`: boolean
 - `retry_strategy`: concise retry mode used for this wave
@@ -446,38 +478,34 @@ The JSON must include:
 
 Mark `status` as:
 
-- `improved` when you safely updated source files and regenerated the manifests
-- `unchanged` when no matching source change was needed or possible but nothing was wrong locally
-- `blocked` when the PR requires risky changes, cannot be traced back to source workflow markdown, or validation fails
+- `improved` when you safely applied selected dependency updates and passed the relevant validation
+- `unchanged` when the selected dependency updates are already present and no further change is needed
+- `blocked` when no safe bounded update can pass validation
 
 ## Required approach
 
 1. Inspect the selected Dependabot PRs using GitHub tools and confirm each one is authored by `dependabot[bot]` or `app/dependabot`.
-2. Confirm every selected PR touches only compiler-generated workflow manifests such as `.github/workflows/package.json`, `.github/workflows/package-lock.json`, `.github/workflows/requirements.txt`, or `.github/workflows/go.mod`.
-3. Treat the dependency batch JSON as the selected dependency payload and use it to enumerate the dependencies to update.
+2. Consider every selected PR regardless of paths or ecosystem. Read its diff to distinguish compiler-generated workflow manifests from source manifests, standalone requirements, dependency locks, Dockerfiles, and action version pins.
+3. Use the dependency batch JSON to identify the selected PRs, then enumerate all actual dependency/version changes from their diffs. Grouped PR titles and fallback-parsed titles are not individual dependency specifications. Compare against the current checkout; do not downgrade dependencies or reapply already-present updates.
 4. Respect the retry-history summary. If it says to stop for human review, do not force another attempt.
 5. Honor only the maintainer guidance in the provided maintainer-only feedback summary.
-6. For each selected dependency, find the source workflow markdown or shared config files that reference the outdated dependency.
-7. Apply all safe version updates to source `.md` files in one pass and do not edit the generated manifest files directly.
-8. Regenerate the manifests once with `make dependabot && make build`.
-9. If `.github/workflows/package-lock.json` needs refresh after compilation, run `cd .github/workflows && npm install --package-lock-only`.
+6. For compiler-generated `.github/workflows/package.json`, `package-lock.json`, `requirements.txt`, and `go.mod`, update the originating workflow markdown or shared configuration, not the generated declarations. Likewise, trace compiled `.lock.yml` action updates back to their workflow source. For other files, update their actual source manifest or Dockerfile and matching lockfiles directly; use companion `.in` files when a named requirements lock declares one.
+7. Apply compatible selected updates in one pass. Lockfile-only security updates are valid changes even when no source manifest edit is needed. Preserve existing digest/hash pinning, Python wheel/platform constraints, and dependency integrity checks; never fabricate hashes or remove pins to make validation pass.
+8. Regenerate compiler-generated manifests with `make dependabot && make build` only when their workflow sources changed. Do not run that generator as a substitute for updating docs/action packages, root Go modules, or named requirements.
+9. Refresh only affected dependency locks using the repository's existing package-manager commands and lockfile header instructions. Use `--ignore-scripts` for npm lock refreshes. If `.github/workflows/package-lock.json` needs refresh after compilation, run `cd .github/workflows && npm install --package-lock-only`.
 10. Keep the change bounded to the selected dependency updates plus the smallest number of related source files needed.
 
 ## Required validation
 
-After your first substantial edit, immediately run:
+Validate the touched ecosystems, not unrelated manifests:
 
-```bash
-make dependabot && make build
-```
+- Workflow source updates: `make dependabot && make build`; refresh the generated npm lock only if needed.
+- Docs/action npm updates: refresh the affected lock with `npm --prefix <directory> install --package-lock-only --ignore-scripts`, then run the relevant existing build or focused tests.
+- Root Go updates: `go mod tidy`, `go mod verify`, and focused tests covering the changed dependency.
+- Named Python requirements: follow the lock header's generator/platform constraints and verify the resulting hashes with a wheel-only `python -m pip download --require-hashes --only-binary=:all:` command into a disposable directory; do not install or execute downloaded packages for this check.
+- Docker/action pins: verify the exact upstream version/digest and inspect the bounded diff; run existing relevant static checks, without pushing images or starting containers.
 
-If the generated npm manifest changed, also run:
-
-```bash
-cd .github/workflows && npm install --package-lock-only
-```
-
-If validation fails, fix only the touched slice and rerun the same focused validation.
+If a needed tool or check is unavailable, report the affected PR as blocked rather than claiming validation passed. If validation fails, fix only the touched slice and rerun the same focused validation. A blocked item need not prevent one replacement PR for the successfully validated subset; list every unaddressed selected PR and its reason.
 
 ## Pull request rule
 
@@ -485,7 +513,7 @@ Create a PR only if:
 
 - the fix is real and bounded
 - validation passed
-- `git diff --stat` shows an actual code change
+- `git diff --stat` shows an actual dependency update, including valid lockfile-only changes
 - the result JSON would report `status: improved`
 
 The PR body must include:
@@ -495,8 +523,8 @@ The PR body must include:
 3. objective
 4. retry context used
 5. maintainer feedback applied
-6. which source workflow files were updated
-7. which manifest files were regenerated
+6. which source manifests, Dockerfiles, or workflow files were updated
+7. which dependency locks or generated manifests were updated, plus every selected PR left unaddressed and why
 8. validation commands you ran
 
 Prefer an ordered list in that exact sequence so burner replacement PRs stay consistent across retries.

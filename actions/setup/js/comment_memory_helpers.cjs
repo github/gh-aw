@@ -23,8 +23,8 @@ const ESCAPED_COMMENT_MEMORY_CODE_FENCE = COMMENT_MEMORY_CODE_FENCE.replace(/[.*
  * @param {string} memoryId
  * @returns {string}
  */
-function buildCodeFenceOpener(memoryId) {
-  return `${COMMENT_MEMORY_CODE_FENCE}${COMMENT_MEMORY_TAG}:${memoryId}`;
+function buildCodeFenceOpener(memoryId, tag = COMMENT_MEMORY_TAG) {
+  return `${COMMENT_MEMORY_CODE_FENCE}${tag}:${memoryId}`;
 }
 
 function stripCommentMemoryCodeFence(content) {
@@ -52,12 +52,22 @@ function isSafeMemoryId(memoryId) {
   return /^[A-Za-z0-9_-]+$/.test(memoryId);
 }
 
+function commentMemoryCodeFencePattern(tag = COMMENT_MEMORY_TAG) {
+  const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|\\n)(\`{6,})${escapedTag}:([^\\n]{1,${MAX_MEMORY_ID_LENGTH}})\\n([\\s\\S]*?)\\n\\1(?=\\n|$)`, "g");
+}
+
+/** @param {string} commentBody @returns {string} */
+function stripCommentMemoryPayloads(commentBody) {
+  return commentBody.replace(commentMemoryCodeFencePattern(), "\n").replace(new RegExp(`<${COMMENT_MEMORY_TAG} id="[^"]*">[\\s\\S]*?(?:</${COMMENT_MEMORY_TAG}>|$)`, "g"), "\n");
+}
+
 /**
  * @param {string} commentBody
  * @param {(message: string) => void} [warn]
  * @returns {Array<{memoryId: string, content: string}>}
  */
-function extractCommentMemoryEntries(commentBody, warn = () => {}) {
+function extractCommentMemoryEntries(commentBody, warn = () => {}, tag = COMMENT_MEMORY_TAG) {
   if (!commentBody || typeof commentBody !== "string") {
     return [];
   }
@@ -67,7 +77,7 @@ function extractCommentMemoryEntries(commentBody, warn = () => {}) {
 
   // New format: ``````gh-aw-comment-memory:<id>\ncontent\n``````
   // Use a broad character class and then validate with isSafeMemoryId() to keep validation in one place.
-  const codeFenceOpenerPattern = new RegExp(`(?:^|\\n)(\`{6,})${COMMENT_MEMORY_TAG}:([^\\n]{1,${MAX_MEMORY_ID_LENGTH}})\\n([\\s\\S]*?)\\n\\1(?=\\n|$)`, "g");
+  const codeFenceOpenerPattern = commentMemoryCodeFencePattern(tag);
   let match;
   while ((match = codeFenceOpenerPattern.exec(commentBody)) !== null) {
     const memoryId = match[2];
@@ -81,15 +91,15 @@ function extractCommentMemoryEntries(commentBody, warn = () => {}) {
   }
 
   // Legacy format (backward compat): <gh-aw-comment-memory id="...">...</gh-aw-comment-memory>
-  const closeTag = `</${COMMENT_MEMORY_TAG}>`;
+  const closeTag = `</${tag}>`;
   let cursor = 0;
   while (cursor < commentBody.length) {
-    const openStart = commentBody.indexOf(`<${COMMENT_MEMORY_TAG} id="`, cursor);
+    const openStart = commentBody.indexOf(`<${tag} id="`, cursor);
     if (openStart < 0) {
       break;
     }
 
-    const idStart = openStart + `<${COMMENT_MEMORY_TAG} id="`.length;
+    const idStart = openStart + `<${tag} id="`.length;
     const idEnd = commentBody.indexOf('">', idStart);
     if (idEnd < 0) {
       break;
@@ -158,6 +168,7 @@ module.exports = {
   buildCodeFenceOpener,
   stripCommentMemoryCodeFence,
   extractCommentMemoryEntries,
+  stripCommentMemoryPayloads,
   listCommentMemoryFiles,
   resolveCommentMemoryConfig,
 };

@@ -425,6 +425,7 @@ func TestSafeOutputsImportMergePullRequestType(t *testing.T) {
 	sharedWorkflow := `---
 safe-outputs:
   merge-pull-request:
+    allowed-base-branches: [agent-work/*]
     required-labels:
       - ready-to-merge
 ---
@@ -537,7 +538,7 @@ func TestMergeSafeOutputsUnit(t *testing.T) {
 			name:      "import merge-pull-request to empty config",
 			topConfig: nil,
 			importedJSON: []string{
-				`{"merge-pull-request":{"required-labels":["ready-to-merge"]}}`,
+				`{"merge-pull-request":{"allowed-base-branches":["agent-work/*"],"required-labels":["ready-to-merge"]}}`,
 			},
 			expectError:   false,
 			expectedTypes: []string{"merge-pull-request"},
@@ -671,6 +672,85 @@ func TestMergeSafeOutputsSteer(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.False(t, result.Steer)
+	})
+}
+
+func TestMergeSafeOutputsCreatePullRequestDefaults(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+	imported := []string{`{"create-pull-request":{"expires":"2d","draft":false,"title-prefix":"[imported] "}}`}
+
+	t.Run("fills omitted defaults without replacing local options", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{TitlePrefix: "[local] "},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": map[string]any{"title-prefix": "[local] "},
+		}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, imported, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Equal(t, 48, result.CreatePullRequests.Expires)
+		assert.Equal(t, strPtr("false"), result.CreatePullRequests.Draft)
+		assert.Equal(t, "[local] ", result.CreatePullRequests.TitlePrefix)
+	})
+
+	t.Run("shorthand config inherits omitted defaults", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": nil,
+		}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, imported, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Equal(t, 48, result.CreatePullRequests.Expires)
+		assert.Equal(t, strPtr("false"), result.CreatePullRequests.Draft)
+	})
+
+	t.Run("local defaults take precedence", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{
+				TitlePrefix: "[local] ",
+				Expires:     72,
+				Draft:       strPtr("true"),
+			},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": map[string]any{
+				"title-prefix": "[local] ",
+				"expires":      "3d",
+				"draft":        true,
+			},
+		}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, imported, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Equal(t, 72, result.CreatePullRequests.Expires)
+		assert.Equal(t, strPtr("true"), result.CreatePullRequests.Draft)
+		assert.Equal(t, "[local] ", result.CreatePullRequests.TitlePrefix)
+	})
+
+	t.Run("does not add an omitted draft without an imported default", func(t *testing.T) {
+		topConfig := &SafeOutputsConfig{
+			CreatePullRequests: &CreatePullRequestsConfig{TitlePrefix: "[local] "},
+		}
+		topRawSafeOutputs := map[string]any{
+			"create-pull-request": map[string]any{"title-prefix": "[local] "},
+		}
+		importedWithoutDraft := []string{`{"create-pull-request":{"title-prefix":"[imported] "}}`}
+
+		result, err := compiler.MergeSafeOutputs(topConfig, importedWithoutDraft, topRawSafeOutputs)
+
+		require.NoError(t, err)
+		require.NotNil(t, result.CreatePullRequests)
+		assert.Nil(t, result.CreatePullRequests.Draft)
 	})
 }
 

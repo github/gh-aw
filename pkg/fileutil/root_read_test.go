@@ -68,6 +68,47 @@ func TestReadFileWithinBaseRelativePaths(t *testing.T) {
 	require.Equal(t, "safe", string(content))
 }
 
+func TestResolvePathWithinBaseSymlinks(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "base")
+	outside := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(base, "shared"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(outside, "shared"), 0755))
+	internalTarget := filepath.Join(base, "shared", "safe.md")
+	outsideTarget := filepath.Join(outside, "shared", "secret.md")
+	require.NoError(t, os.WriteFile(internalTarget, []byte("safe"), 0644))
+	require.NoError(t, os.WriteFile(outsideTarget, []byte("secret"), 0644))
+	require.NoError(t, os.Symlink(internalTarget, filepath.Join(base, "absolute.md")))
+	require.NoError(t, os.Symlink(filepath.Join(base, "shared"), filepath.Join(base, "shared-link")))
+	require.NoError(t, os.Symlink(outsideTarget, filepath.Join(base, "escape.md")))
+
+	for _, test := range []struct {
+		candidate string
+		want      string
+		wantErr   bool
+	}{
+		{candidate: filepath.Join(base, "absolute.md"), want: internalTarget},
+		{candidate: filepath.Join(base, "shared-link", "new.md"), want: filepath.Join(base, "shared", "new.md")},
+		{candidate: filepath.Join(base, "escape.md"), wantErr: true},
+		{candidate: filepath.Join(base, "..", "outside.md"), wantErr: true},
+	} {
+		t.Run(test.candidate, func(t *testing.T) {
+			resolved, err := ResolvePathWithinBase(base, test.candidate)
+			if test.wantErr {
+				require.Error(t, err)
+				require.Empty(t, resolved)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.want, resolved)
+		})
+	}
+
+	t.Chdir(filepath.Dir(base))
+	resolved, err := ResolvePathWithinBase("base", filepath.Join("base", "absolute.md"))
+	require.NoError(t, err)
+	require.Equal(t, internalTarget, resolved)
+}
+
 func TestReadFileWithinBaseConcurrentParentReplacement(t *testing.T) {
 	base := t.TempDir()
 	outside := t.TempDir()

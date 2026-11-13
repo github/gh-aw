@@ -5,6 +5,9 @@ package cli
 import (
 	"context"
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -237,8 +240,7 @@ func TestBuildAgenticAssessmentsFlagsPartiallyReducible(t *testing.T) {
 	assert.True(t, found, "partially_reducible assessment should be present for low agentic fraction moderate run")
 }
 
-func TestBuildAgenticAssessmentsFlagsModelDowngrade(t *testing.T) {
-	t.Parallel()
+func modelDowngradeTriageInputs() (ProcessedRun, MetricsData, []ToolUsageInfo, *TaskDomainInfo) {
 	processedRun := ProcessedRun{
 		Run: WorkflowRun{
 			WorkflowName:   "Issue Triage Moderate",
@@ -254,19 +256,199 @@ func TestBuildAgenticAssessmentsFlagsModelDowngrade(t *testing.T) {
 		{Name: "grep", CallCount: 1},
 		{Name: "jq", CallCount: 1},
 	}
-	domain := &TaskDomainInfo{Name: "triage", Label: "Triage"}
+	return processedRun, metrics, toolUsage, &TaskDomainInfo{Name: "triage", Label: "Triage"}
+}
+
+func modelDowngradeAssessments(t *testing.T, routing *ModelRoutingSummary) []AgenticAssessment {
+	t.Helper()
+	processedRun, metrics, toolUsage, domain := modelDowngradeTriageInputs()
+	processedRun.ModelRouting = routing
 	fingerprint := buildBehaviorFingerprint(processedRun, metrics, toolUsage, nil, nil)
-
-	assessments := buildAgenticAssessments(processedRun, metrics, toolUsage, nil, domain, fingerprint, nil)
-
-	var found bool
-	for _, a := range assessments {
+	require.NotEqual(t, "lean", fingerprint.ResourceProfile, "fixture must use a non-lean resource profile")
+	require.NotEqual(t, "write_heavy", fingerprint.ActuationStyle, "fixture must not be write_heavy")
+	var downgrades []AgenticAssessment
+	for _, a := range buildAgenticAssessments(processedRun, metrics, toolUsage, nil, domain, fingerprint, nil) {
 		if a.Kind == "model_downgrade_available" {
-			found = true
-			assert.Contains(t, a.Recommendation, "gpt-4.1-mini", "should suggest a cheaper model")
+			downgrades = append(downgrades, a)
 		}
 	}
-	assert.True(t, found, "model_downgrade_available assessment should be present for moderate triage run")
+	return downgrades
+}
+
+const routedGPTResponsesRoutingFixture = "testdata/model_routing_golden/copilot-routed-gpt-responses/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl"
+
+// parseDerivedModelRoutingFixture parses a temporary copy of the checked-in
+// routed fixture after applying string replacements to its existing fields.
+func parseDerivedModelRoutingFixture(t *testing.T, replacements ...string) *ModelRoutingSummary {
+	t.Helper()
+	data, err := os.ReadFile(routedGPTResponsesRoutingFixture)
+	require.NoError(t, err)
+	content := string(data)
+	for i := 0; i+1 < len(replacements); i += 2 {
+		require.Contains(t, content, replacements[i], "fixture must contain the replaced field")
+		content = strings.ReplaceAll(content, replacements[i], replacements[i+1])
+	}
+	path := filepath.Join(t.TempDir(), "model-routing.jsonl")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+	return parseModelRoutingFile(path, nil)
+}
+
+func assertNeutralModelDowngrade(t *testing.T, assessment AgenticAssessment) {
+	t.Helper()
+	assert.Equal(t, "low", assessment.Severity)
+	assertPerTaskRoutingChange(t, assessment)
+	assert.Contains(t, assessment.Recommendation, "https://github.github.com/gh-aw/reference/model-routing/")
+	assert.Contains(t, assessment.Recommendation, "eligible for default routing", "omission alternative must be eligibility-qualified")
+	assertNoModelPinAdvice(t, assessment)
+	for _, text := range []string{assessment.Summary, assessment.Recommendation} {
+		assert.NotContains(t, text, "already routed")
+		assert.NotContains(t, text, "not routed")
+		assert.NotContains(t, text, "routing is off")
+		assert.NotContains(t, text, "routing was off")
+	}
+}
+
+func assertPerTaskRoutingChange(t *testing.T, assessment AgenticAssessment) {
+	t.Helper()
+	assert.Contains(t, assessment.Recommendation, "change engine.model (if set) or the top-level model to router;", "should replace the existing model setting, which takes precedence")
+	assert.Contains(t, assessment.Recommendation, "engine.model-routing block, set its mode: auto", "router values are rejected alongside a model-routing block")
+	assert.Contains(t, assessment.Recommendation, "cap routing at the lowest level, use router/economy", "router/economy should be offered only as an explicit cap")
+}
+
+func assertNoModelPinAdvice(t *testing.T, assessment AgenticAssessment) {
+	t.Helper()
+	for _, text := range []string{assessment.Summary, assessment.Recommendation} {
+		for _, forbidden := range []string{"gpt-", "claude-", "haiku", "gemini", "pin"} {
+			assert.NotContains(t, text, forbidden)
+		}
+	}
+}
+
+func TestBuildAgenticAssessmentsFlagsModelDowngrade(t *testing.T) {
+	t.Parallel()
+	downgrades := modelDowngradeAssessments(t, nil)
+	require.Len(t, downgrades, 1, "model_downgrade_available assessment should be present for moderate triage run")
+	assertPerTaskRoutingChange(t, downgrades[0])
+	assertNoModelPinAdvice(t, downgrades[0])
+}
+
+func TestModelDowngradeAssessmentIsRoutingAware(t *testing.T) {
+	t.Parallel()
+
+	neutral := modelDowngradeAssessments(t, nil)
+	require.Len(t, neutral, 1)
+
+	tests := []struct {
+		name    string
+		routing func(t *testing.T) *ModelRoutingSummary
+		// expect is "neutral", "routed", or "none".
+		expect string
+		level  string
+	}{
+		{name: "A unrouted known not_routed", routing: func(t *testing.T) *ModelRoutingSummary { return &ModelRoutingSummary{Status: "not_routed"} }, expect: "neutral"},
+		{name: "A unrouted classification only", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"stage":"selection"`, `"stage":"ignored"`)
+		}, expect: "neutral"},
+		{name: "B routed fixed balanced objective", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"balanced"`, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost","mode":"balanced"}`)
+		}, expect: "routed", level: "balanced"},
+		{name: "B routed fixed robust objective", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"robust"`, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost","mode":"robust"}`)
+		}, expect: "routed", level: "robust"},
+		{name: "B2 auto objective resolved balanced", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"balanced"`)
+		}, expect: "none"},
+		{name: "B2 auto objective resolved robust", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"robust"`)
+		}, expect: "none"},
+		{name: "C fixture auto objective resolved economy", routing: func(t *testing.T) *ModelRoutingSummary {
+			return analyzeModelRouting(filepath.Join("testdata", "model_routing_golden", "copilot-routed-gpt-responses"))
+		}, expect: "none"},
+		{name: "C explicit economy objective", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost","mode":"economy"}`)
+		}, expect: "none"},
+		{name: "D selected level without objective mode", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"balanced"`, `"objective":{"goal":"cost","mode":"auto"}`, `"objective":{"goal":"cost"}`)
+		}, expect: "neutral"},
+		{name: "D missing evidence", routing: func(t *testing.T) *ModelRoutingSummary { return analyzeModelRouting(t.TempDir()) }, expect: "neutral"},
+		{name: "D unreadable evidence", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseModelRoutingFile(filepath.Join(t.TempDir(), "missing.jsonl"), nil)
+		}, expect: "neutral"},
+		{name: "D malformed evidence", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"_schema":"model-routing/`, `"_schema":"unknown/`)
+		}, expect: "neutral"},
+		{name: "D selection without mode", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy",`, ``)
+		}, expect: "neutral"},
+		{name: "D unknown selection mode", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"turbo"`)
+		}, expect: "neutral"},
+		{name: "D unresolved auto selection mode", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"mode":"economy"`, `"mode":"auto"`)
+		}, expect: "neutral"},
+		{name: "D selection without selected model", routing: func(t *testing.T) *ModelRoutingSummary {
+			return parseDerivedModelRoutingFixture(t, `"selected_id":"choice-0017","selected_model":"github-copilot/gpt-5.6-luna",`, ``)
+		}, expect: "neutral"},
+		{name: "D failed routing with economy mode", routing: func(t *testing.T) *ModelRoutingSummary {
+			summary := parseDerivedModelRoutingFixture(t)
+			summary.Status = "failed"
+			summary.Failure = &ModelRoutingFailure{Code: "router_unavailable"}
+			return summary
+		}, expect: "neutral"},
+		{name: "D outcome-only session", routing: func(t *testing.T) *ModelRoutingSummary {
+			runDir := t.TempDir()
+			require.NoError(t, os.MkdirAll(filepath.Join(runDir, "usage"), 0700))
+			session := `{"type":"model_routing.outcome","data":{"status":"selected","wireModel":"gpt-5.6-luna"},"provenance":{"component":"agent","phase":"agent","path":"agent/awf-routing-outcome.json","index":0}}` + "\n"
+			require.NoError(t, os.WriteFile(filepath.Join(runDir, "usage", "aw_session.jsonl"), []byte(session), 0600))
+			return analyzeModelRouting(runDir)
+		}, expect: "neutral"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			downgrades := modelDowngradeAssessments(t, tt.routing(t))
+			switch tt.expect {
+			case "none":
+				assert.Empty(t, downgrades, "economy or classifier-chosen route must not emit model_downgrade_available")
+			case "neutral":
+				require.Len(t, downgrades, 1)
+				assertNeutralModelDowngrade(t, downgrades[0])
+				assert.Equal(t, neutral[0].Summary, downgrades[0].Summary)
+				assert.Equal(t, neutral[0].Recommendation, downgrades[0].Recommendation)
+			case "routed":
+				require.Len(t, downgrades, 1)
+				assert.Equal(t, "low", downgrades[0].Severity)
+				assert.Contains(t, downgrades[0].Summary, "fixed "+tt.level+" level")
+				assert.Contains(t, downgrades[0].Evidence, "routing_objective_mode="+tt.level)
+				assert.Contains(t, downgrades[0].Recommendation, "Let the router pick the level for each task")
+				assertPerTaskRoutingChange(t, downgrades[0])
+				assertNoModelPinAdvice(t, downgrades[0])
+			}
+		})
+	}
+}
+
+func TestModelDowngradeEconomyRouteSuppressesFinding(t *testing.T) {
+	t.Parallel()
+	processedRun, metrics, toolUsage, domain := modelDowngradeTriageInputs()
+	processedRun.ModelRouting = analyzeModelRouting(filepath.Join("testdata", "model_routing_golden", "copilot-routed-gpt-responses"))
+	require.NotNil(t, processedRun.ModelRouting)
+	require.Equal(t, "selected", processedRun.ModelRouting.Status)
+	require.Equal(t, "auto", processedRun.ModelRouting.ObjectiveMode)
+	require.Equal(t, "economy", processedRun.ModelRouting.Mode)
+
+	fingerprint := buildBehaviorFingerprint(processedRun, metrics, toolUsage, nil, nil)
+	assessments := buildAgenticAssessments(processedRun, metrics, toolUsage, nil, domain, fingerprint, nil)
+	for _, assessment := range assessments {
+		assert.NotEqual(t, "model_downgrade_available", assessment.Kind)
+	}
+	for _, finding := range generateAgenticAssessmentFindings(assessments) {
+		assert.NotEqual(t, AuditFindingAgenticModelDowngrade, finding.Code)
+	}
+	for _, recommendation := range generateAgenticAssessmentRecommendations(assessments) {
+		assert.NotContains(t, recommendation.Action, "router/economy")
+	}
 }
 
 func TestActionMinutesComputedFromDuration(t *testing.T) {

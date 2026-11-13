@@ -140,9 +140,10 @@ function isConfirmedDependencySuccess(record) {
  * @param {number} index
  * @param {Array<any>} results
  * @param {boolean} allowWaiting
+ * @param {Set<number>} [reviewComments] Buffered comments included in this review
  * @returns {{state: "ready"|"waiting"|"failed", errorCode?: string, error?: string}}
  */
-function checkSafeOutputDependencies(plan, index, results, allowWaiting) {
+function checkSafeOutputDependencies(plan, index, results, allowWaiting, reviewComments = new Set()) {
   if (plan.invalid.has(index)) return { state: "failed", errorCode: "safe_output_dependency_invalid", error: plan.invalid.get(index) };
   let waiting = false;
   for (const prerequisite of plan.prerequisites[index]) {
@@ -150,6 +151,22 @@ function checkSafeOutputDependencies(plan, index, results, allowWaiting) {
     if (records.length > 1) return { state: "failed", errorCode: "safe_output_dependency_failed", error: "Ambiguous safe-output prerequisite result" };
     const record = records[0];
     if (isConfirmedDependencySuccess(record)) continue;
+    if (
+      reviewComments.has(prerequisite) &&
+      process.env.GH_AW_SAFE_OUTPUTS_STAGED !== "true" &&
+      record?.type === "create_pull_request_review_comment" &&
+      record?.success === true &&
+      !record.skipped &&
+      !record.cancelled &&
+      !record.staged &&
+      record.result?.success === true &&
+      record.result?.buffered === true &&
+      record.result?.deferred_manifest === true &&
+      !record.result.staged &&
+      !record.result.queued &&
+      !record.result.error
+    )
+      continue;
     if (allowWaiting && (!record || classifySafeOutputResult(record) === "deferred")) {
       waiting = true;
       continue;

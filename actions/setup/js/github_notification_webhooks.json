@@ -27,7 +27,8 @@
         "typed",
         "untyped",
         "field_added",
-        "field_removed"
+        "field_removed",
+        "status_changed"
       ],
       "description": "Issue lifecycle and metadata notifications, excluding pull requests.",
       "path": "issues",

@@ -26,6 +26,7 @@ on: workflow_dispatch
 engine: copilot
 safe-outputs:
   merge-pull-request:
+    allowed-base-branches: [agent-work/*]
 ---
 
 # Test Workflow

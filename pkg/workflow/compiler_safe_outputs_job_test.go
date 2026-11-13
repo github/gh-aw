@@ -209,6 +209,10 @@ func TestBuildConsolidatedSafeOutputsJobConcurrencyGroup(t *testing.T) {
 		name              string
 		concurrencyGroup  string
 		expectConcurrency bool
+		commentMemory     *CommentMemoryConfig
+		features          map[string]any
+		expectQueue       bool
+		expectError       bool
 	}{
 		{
 			name:              "no concurrency group",
@@ -225,6 +229,41 @@ func TestBuildConsolidatedSafeOutputsJobConcurrencyGroup(t *testing.T) {
 			concurrencyGroup:  "safe-outputs-${{ github.repository }}",
 			expectConcurrency: true,
 		},
+		{
+			name:              "comment memory uses shared writer group",
+			commentMemory:     &CommentMemoryConfig{MemoryID: "default"},
+			expectConcurrency: true,
+			expectQueue:       true,
+		},
+		{
+			name: "dynamic comment memory targets use the same writer group",
+			commentMemory: &CommentMemoryConfig{
+				MemoryID:       "other",
+				Target:         "*",
+				TargetRepoSlug: "other/repo",
+			},
+			expectConcurrency: true,
+			expectQueue:       true,
+		},
+		{
+			name:              "comment memory respects queue feature opt out",
+			commentMemory:     &CommentMemoryConfig{},
+			features:          map[string]any{"group-concurrency-queue": false},
+			expectConcurrency: true,
+		},
+		{
+			name:             "comment memory rejects a conflicting user group",
+			commentMemory:    &CommentMemoryConfig{},
+			concurrencyGroup: "workflow-specific-group",
+			expectError:      true,
+		},
+		{
+			name:              "comment memory accepts an explicit shared writer group",
+			commentMemory:     &CommentMemoryConfig{},
+			concurrencyGroup:  "gh-aw-comment-memory",
+			expectConcurrency: true,
+			expectQueue:       true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -233,7 +272,9 @@ func TestBuildConsolidatedSafeOutputsJobConcurrencyGroup(t *testing.T) {
 			compiler.jobManager = NewJobManager()
 
 			workflowData := &WorkflowData{
-				Name: "Test Workflow",
+				Name:                tt.name,
+				CommentMemoryConfig: tt.commentMemory,
+				Features:            tt.features,
 				SafeOutputs: &SafeOutputsConfig{
 					CreateIssues:     &CreateIssuesConfig{TitlePrefix: "[Test] "},
 					ConcurrencyGroup: tt.concurrencyGroup,
@@ -241,6 +282,11 @@ func TestBuildConsolidatedSafeOutputsJobConcurrencyGroup(t *testing.T) {
 			}
 
 			job, _, err := compiler.buildConsolidatedSafeOutputsJob(workflowData, string(constants.AgentJobName), "test-workflow.md")
+			if tt.expectError {
+				require.ErrorContains(t, err, "remove concurrency-group")
+				assert.Nil(t, job)
+				return
+			}
 			require.NoError(t, err, "Should build job without error")
 			require.NotNil(t, job, "Job should not be nil")
 
@@ -248,9 +294,13 @@ func TestBuildConsolidatedSafeOutputsJobConcurrencyGroup(t *testing.T) {
 				assert.NotEmpty(t, job.Concurrency, "Job should have concurrency set")
 				assert.Contains(t, job.Concurrency, tt.concurrencyGroup, "Concurrency should contain the group value")
 				assert.Contains(t, job.Concurrency, "cancel-in-progress: false", "Concurrency should have cancel-in-progress: false")
+				if tt.commentMemory != nil {
+					assert.Contains(t, job.Concurrency, `group: "gh-aw-comment-memory"`)
+				}
 			} else {
 				assert.Empty(t, job.Concurrency, "Job should have no concurrency set")
 			}
+			assert.Equal(t, tt.expectQueue, strings.Contains(job.Concurrency, "queue: max"))
 		})
 	}
 }

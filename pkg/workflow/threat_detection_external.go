@@ -126,7 +126,6 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 		Permissions:          data.Permissions,
 		ParsedFrontmatter:    data.ParsedFrontmatter,
 		CachedPermissions:    data.CachedPermissions,
-		ModelCosts:           data.ModelCosts,
 		IsDetectionRun:       true,
 		AdmissionEnabled:     admissionBudgetOutputsEnabled(data),
 		RunnerConfig:         data.RunnerConfig,
@@ -171,6 +170,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	if len(detectionData.SandboxConfig.Agent.Images) == 0 {
 		detectionData.SandboxConfig.Agent.Images = buildThreatDetectionContainerImages(detectionData)
 	}
+	detectionData.ModelCosts, detectionData.ModelCostOverrides = data.ModelCosts, data.ModelCostOverrides
 	return detectionData
 }
 
