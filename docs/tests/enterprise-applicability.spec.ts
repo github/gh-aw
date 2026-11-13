@@ -79,4 +79,11 @@ test("GHES troubleshooting distinguishes inference availability from repository 
   const errorTable = content.locator("table").filter({ hasText: "Resource not accessible by personal access token" });
   await expect(errorTable).toContainText("classic PATs are rejected");
   await expect(errorTable).not.toContainText("or classic PAT with");
+  const diagnosis = "Possible endpoint, account, model, or policy mismatch; this error alone does not prove a GitHub Connect issue";
+  await expect(content.locator("tr").filter({ hasText: "Error loading models: 400 Bad Request" })).toContainText(diagnosis);
+
+  await page.goto("/gh-aw/reference/auth/");
+  const authEntry = page.locator(".sl-markdown-content p").filter({ hasText: "Error loading models: 400 Bad Request" });
+  await expect(authEntry).toContainText(diagnosis);
+  await expect(authEntry.getByRole("link", { name: "Copilot Engine Prerequisites on GHES" })).toHaveAttribute("href", "/gh-aw/troubleshooting/common-issues/#copilot-engine-prerequisites-on-ghes");
 });

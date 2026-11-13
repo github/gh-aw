@@ -290,7 +290,7 @@ See [Enterprise API Endpoint](/gh-aw/reference/engines/#enterprise-api-endpoint-
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `Error loading models: 400 Bad Request` | Possible endpoint, account, model, or policy mismatch | Verify product availability, endpoint selection, and account policy with the enterprise administrator; this error alone does not prove a GitHub Connect issue |
+| `Error loading models: 400 Bad Request` | Possible endpoint, account, model, or policy mismatch; this error alone does not prove a GitHub Connect issue | Verify product availability, endpoint selection, and account policy with the enterprise administrator |
 | `403 "unauthorized: not licensed to use Copilot"` | Inference identity lacks an applicable Copilot entitlement | Enterprise or org administrator verifies licensing, assigns the required entitlement, and checks policy |
 | `403 "Resource not accessible by personal access token"` | Wrong token type or missing permissions | Use a fine-grained PAT with **Copilot Requests: Read**; classic PATs are rejected — see [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) |
 | `Could not resolve to a Repository` | `GH_HOST` not set in custom jobs | Recompile (`gh aw compile`), or set `GH_HOST=github.company.com` explicitly for local CLI commands |
