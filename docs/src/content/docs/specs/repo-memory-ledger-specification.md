@@ -145,6 +145,47 @@ MUST NOT execute custom replay code.
 
 ## 5. Lifecycle
 
+### Comment-backed storage
+
+Git remains the default backend. A ledger MAY declare `storage: comment-memory`
+to persist on the issue or PR selected by `tools.comment-memory` instead of a
+Git branch:
+
+```aw
+tools:
+  comment-memory:
+    target: triggering
+  ledger:
+    history:
+      storage: comment-memory
+      type: notes
+```
+
+Both backends use the same ledger operations, transaction validation,
+deterministic IDs, canonical record DAG, and read-only SQLite projections.
+Comment-backed persistence MUST run only in the trusted persistence job, using
+the configured comment-memory token, target repository, and repository allowlist.
+The target MUST be `triggering`, `*`, or a literal positive issue/PR number;
+`target-repo` MUST be literal. Staged runs MUST NOT publish ledger comments.
+
+Each accepted batch creates a new managed comment containing a base64-encoded
+canonical shard under a `gh-aw-comment-ledger:<ledger-name>` code fence.
+The separate marker prevents ordinary editable comment-memory files from
+overwriting ledger history. Persistence MUST NOT update or delete prior ledger
+comments. Retrying an already persisted transaction MUST NOT duplicate records.
+Within a workflow repository, the compiler serializes persistence jobs by target
+repository and issue/PR. Writers in different repositories sharing a target
+MUST coordinate externally.
+GitHub Actions concurrency may replace pending jobs; workloads requiring every
+queued run to persist SHOULD serialize the entire workflow upstream.
+
+The existing comment-memory limits apply to encoded shards: 16 KiB per batch
+and 48 KiB total per ledger. Readers MUST fail on malformed shards or incomplete
+history, including the 50-page comment scan limit. Comment storage does not
+support compaction; explicit enabled compaction MUST be rejected. Larger or
+long-lived histories SHOULD use Git storage. Existing comment limits and
+repository permissions still apply, and records remain untrusted data.
+
 ### 5.1 Restore and reconstruct
 
 Trusted preparation fetches each `ledgers/<name>` branch and reconstructs the

@@ -5555,14 +5555,25 @@ tools:
   # (optional)
   cli-proxy: true
 
-  # Standalone Git-backed ledger configuration. Declare type: log, set, map, table,
-  # counter, or notes for trusted built-in replay. Custom replay and compaction
-  # scripts are not supported. Tables require key (the string primary-key field).
-  # Built-ins accept typed operations via the configured ledger safe-output tools.
-  # Each ledger may set compaction; compaction is lossless and preserves all source
-  # transactions.
+  # Standalone ledger configuration. Storage defaults to git; storage:
+  # comment-memory uses the configured tools.comment-memory target without Git
+  # branches or compaction. Declare type: log, set, map, table, counter, or notes
+  # for trusted built-in replay. Tables require key (the string primary-key field).
+  # Custom replay and compaction scripts are not supported.
   # (optional)
   ledger:
+    # Persistence backend, or a named object-valued ledger. Comment storage requires
+    # tools.comment-memory.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: string
+    storage: "git"
+
+    # Format 2: object
+    storage:
+      {}
+
     # Built-in ledger reducer type, or a named object-valued ledger.
     # (optional)
     # Accepted formats:

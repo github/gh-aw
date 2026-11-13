@@ -38,9 +38,10 @@ var ledgerCompactionSchedules = []string{"daily", "weekly", "manual"}
 var ledgerNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 var ledgerKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,63}$`)
 
-// LedgerConfig describes one standalone, Git-backed ledger.
+// LedgerConfig describes one standalone ledger.
 type LedgerConfig struct {
 	Name         string         `json:"name"`
+	Storage      string         `json:"storage,omitempty"`
 	Type         string         `json:"type,omitempty"`
 	Key          string         `json:"key,omitempty"`
 	Schema       map[string]any `json:"schema,omitempty"`
@@ -108,7 +109,7 @@ func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {
 		switch key {
 		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
 			single = true
-		case "type", "key":
+		case "type", "key", "storage":
 			_, scalar := root[key].(string)
 			single = single || scalar
 		case "compaction":
@@ -157,6 +158,12 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 	cfg := LedgerConfig{Name: name, BranchName: ledgerBranchName(name), MaxRecordKB: defaultLedgerRecordKB, MaxSegmentKB: defaultLedgerSegmentKB, MaxPatchKB: defaultLedgerPatchKB, Compaction: defaultLedgerCompactionConfig()}
 	for key, value := range raw {
 		switch key {
+		case "storage":
+			storage, ok := value.(string)
+			if !ok || (storage != "git" && storage != "comment-memory") {
+				return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.storage must be git or comment-memory", name)
+			}
+			cfg.Storage = storage
 		case "type", "key":
 			if err := setLedgerTypeField(&cfg, key, value); err != nil {
 				return LedgerConfig{}, err
@@ -193,7 +200,20 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 			return LedgerConfig{}, fmt.Errorf("tools.ledger.%s has unsupported property %q", name, key)
 		}
 	}
+	if cfg.Storage == "comment-memory" {
+		if _, explicit := raw["compaction"]; explicit && cfg.Compaction != nil {
+			return LedgerConfig{}, fmt.Errorf("tools.ledger.%s: comment-memory storage does not support compaction; omit compaction or set it to false", name)
+		}
+		cfg.Compaction = nil
+		cfg.BranchName = ""
+	}
 	return finishLedgerConfig(cfg)
+}
+
+func (c *LedgerToolConfig) hasCommentStorage() bool {
+	return c != nil && slices.ContainsFunc(c.Ledgers, func(ledger LedgerConfig) bool {
+		return ledger.Storage == "comment-memory"
+	})
 }
 
 func setLedgerSchema(cfg *LedgerConfig, value any) error {

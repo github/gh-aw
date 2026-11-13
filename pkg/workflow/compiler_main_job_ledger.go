@@ -13,13 +13,19 @@ func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *Wor
 	if err != nil {
 		return fmt.Errorf("failed to encode ledger projection configuration: %w", err)
 	}
+	if data.LedgerConfig.hasCommentStorage() {
+		c.generateCommentMemoryEarlyConfigStep(yaml, data)
+	}
 	yaml.WriteString("      - name: Create read-only ledger projections\n")
 	yaml.WriteString("        id: ledger_projections\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script"))
+	yaml.WriteString(fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")))
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-	fmt.Fprintf(yaml, "          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig)
+	yaml.WriteString(fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig))
 	yaml.WriteString("        with:\n")
+	if data.LedgerConfig.hasCommentStorage() {
+		yaml.WriteString(fmt.Sprintf("          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken)))
+	}
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")

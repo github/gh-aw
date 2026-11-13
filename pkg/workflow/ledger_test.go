@@ -35,6 +35,74 @@ func TestParseStandaloneLedgerForms(t *testing.T) {
 	require.Equal(t, "replay", namedReplay.Ledgers[0].Name)
 }
 
+func TestCommentBackedLedgerConfiguration(t *testing.T) {
+	config, err := parseLedgerToolConfig(map[string]any{"storage": "comment-memory", "type": "map"})
+	require.NoError(t, err)
+	require.True(t, config.hasCommentStorage())
+	require.Empty(t, config.Ledgers[0].BranchName)
+	require.Empty(t, config.compactionEnabledLedgers())
+	require.Nil(t, config.Ledgers[0].Compaction)
+	for _, invalid := range []map[string]any{
+		{"storage": "unknown"},
+		{"storage": "comment-memory", "compaction": true},
+		{"storage": "comment-memory", "compaction": map[string]any{"schedule": "manual"}},
+	} {
+		_, err := parseLedgerToolConfig(invalid)
+		require.Error(t, err)
+	}
+	_, err = parseLedgerToolConfig(map[string]any{"storage": "comment-memory", "compaction": false})
+	require.NoError(t, err)
+
+	root := t.TempDir()
+	path := filepath.Join(root, "comment-ledger.md")
+	source := "---\non:\n  issues:\n    types: [opened]\ntools:\n  comment-memory:\n    target: 42\n    github-token: ${{ secrets.MEMORY_TOKEN }}\n  ledger:\n    storage: comment-memory\n    type: map\n---\nRemember findings.\n"
+	require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowFile(path)
+	require.NoError(t, err)
+	require.True(t, data.LedgerConfig.hasCommentStorage())
+	require.NoError(t, compiler.CompileWorkflow(path))
+	lock, err := os.ReadFile(filepath.Join(root, "comment-ledger.lock.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(lock), "ledger_map_put")
+	require.Contains(t, string(lock), "github-token: ${{ secrets.MEMORY_TOKEN }}")
+	job, err := compiler.buildPushLedgerChangesJob(data, false)
+	require.NoError(t, err)
+	require.Contains(t, job.Permissions, "contents: read")
+	require.Contains(t, job.Permissions, "issues: write")
+	require.NotContains(t, job.Permissions, "contents: write")
+	require.Contains(t, job.Concurrency, "'42'")
+	require.Contains(t, strings.Join(job.Steps, ""), "Write comment-memory configuration")
+
+	for _, replacement := range []string{
+		"",
+		"  comment-memory: false\n",
+		"  comment-memory:\n    target: invalid\n",
+		"  comment-memory:\n    target: ${{ inputs.number }}\n",
+	} {
+		invalid := strings.Replace(source, "  comment-memory:\n    target: 42\n    github-token: ${{ secrets.MEMORY_TOKEN }}\n", replacement, 1)
+		require.NoError(t, os.WriteFile(path, []byte(invalid), 0o600))
+		_, err := NewCompiler().ParseWorkflowFile(path)
+		require.Error(t, err)
+	}
+}
+
+func TestMixedLedgerStoragePreservesGitCompactionAndPermissions(t *testing.T) {
+	config, err := parseLedgerToolConfig(map[string]any{
+		"local":  map[string]any{"storage": "comment-memory", "type": "notes"},
+		"global": map[string]any{"type": "log"},
+	})
+	require.NoError(t, err)
+	require.Len(t, config.compactionEnabledLedgers(), 1)
+	require.Equal(t, "global", config.compactionEnabledLedgers()[0].Name)
+	job, err := NewCompiler().buildPushLedgerChangesJob(&WorkflowData{
+		LedgerConfig: config, CommentMemoryConfig: &CommentMemoryConfig{},
+	}, false)
+	require.NoError(t, err)
+	require.Contains(t, job.Permissions, "contents: write")
+	require.Contains(t, job.Permissions, "issues: write")
+}
+
 func TestBuiltinLedgerDeclarations(t *testing.T) {
 	named, err := parseLedgerToolConfig(map[string]any{
 		"type": map[string]any{},

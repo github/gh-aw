@@ -180,7 +180,7 @@ func isSingleLedgerMap(config map[string]any) bool {
 		switch key {
 		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
 			return true
-		case "type", "key":
+		case "type", "key", "storage":
 			if _, scalar := value.(string); scalar {
 				return true
 			}

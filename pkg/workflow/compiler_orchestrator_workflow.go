@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/jsonutil"
@@ -616,6 +617,22 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 
 	// comment-memory belongs under tools: next to cache-memory and repo-memory.
 	workflowData.CommentMemoryConfig = c.extractCommentMemoryConfig(toolsConfig)
+	if workflowData.LedgerConfig.hasCommentStorage() {
+		if workflowData.CommentMemoryConfig == nil {
+			return errors.New("tools.ledger storage: comment-memory requires tools.comment-memory")
+		}
+		target := workflowData.CommentMemoryConfig.Target
+		if target != "" && target != "triggering" && target != "*" {
+			number, err := strconv.Atoi(target)
+			if err != nil || number <= 0 {
+				return errors.New("comment-backed ledgers require a triggering target or a literal positive issue/PR number")
+			}
+			workflowData.CommentMemoryConfig.Target = strconv.Itoa(number)
+		}
+		if strings.Contains(workflowData.CommentMemoryConfig.TargetRepoSlug, "${{") {
+			return errors.New("comment-backed ledgers require a literal target-repo")
+		}
+	}
 
 	// Extract mcp-scripts configuration
 	workflowData.MCPScripts = c.extractMCPScriptsConfig(frontmatter)

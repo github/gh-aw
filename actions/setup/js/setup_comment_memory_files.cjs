@@ -65,17 +65,15 @@ function resolveTargetRepo(commentMemoryConfig) {
   return { owner, repo, slug: `${owner}/${repo}` };
 }
 
-async function collectCommentMemoryFiles(githubClient, commentMemoryConfig) {
+function resolveCommentMemoryTarget(commentMemoryConfig) {
   const targetNumber = resolveTargetNumber(commentMemoryConfig);
   if (!targetNumber) {
-    core.info("comment_memory setup: no resolvable target issue/PR number, skipping");
-    return [];
+    return null;
   }
 
   const targetRepo = resolveTargetRepo(commentMemoryConfig);
   if (!targetRepo) {
-    core.warning("comment_memory setup: invalid target repo configuration");
-    return [];
+    throw new Error(`${ERR_VALIDATION}: invalid comment-memory target repo configuration`);
   }
 
   const contextRepoSlug = `${context.repo.owner}/${context.repo.repo}`;
@@ -94,6 +92,16 @@ async function collectCommentMemoryFiles(githubClient, commentMemoryConfig) {
     }
     core.info(`comment_memory setup: cross-repo allowlist check passed for ${targetRepo.slug}`);
   }
+  return { ...targetRepo, number: targetNumber };
+}
+
+async function collectCommentMemoryFiles(githubClient, commentMemoryConfig) {
+  const targetRepo = resolveCommentMemoryTarget(commentMemoryConfig);
+  if (!targetRepo) {
+    core.info("comment_memory setup: no resolvable target issue/PR number, skipping");
+    return [];
+  }
+  const targetNumber = targetRepo.number;
 
   core.info(`comment_memory setup: loading managed comment memory from ${targetRepo.slug}#${targetNumber}`);
   const memoryMap = new Map();
@@ -233,4 +241,6 @@ module.exports = {
   main,
   extractCommentMemoryEntries,
   resolveTargetNumber,
+  resolveCommentMemoryTarget,
+  loadSafeOutputsConfig,
 };
