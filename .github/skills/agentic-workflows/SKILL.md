@@ -153,7 +153,6 @@ Use the task routes above first. This inventory is not required startup context.
 - `.github/aw/pr-reviewer.md`
 - `.github/aw/release-workflow.md`
 - `.github/aw/report.md`
-- `.github/aw/responsible-ai.md`
 - `.github/aw/reuse.md`
 - `.github/aw/safe-outputs-automation.md`
 - `.github/aw/safe-outputs-content.md`
