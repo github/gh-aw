@@ -7,7 +7,7 @@ sidebar:
 
 # Copilot SDK Driver Specification
 
-**Version**: 1.0.2  
+**Version**: 1.0.3  
 **Status**: Draft Specification  
 **Latest Version**: [copilot-sdk-driver-specification](/gh-aw/specs/copilot-sdk-driver-specification/)  
 **Editor**: GitHub Agentic Workflows Team
@@ -423,9 +423,17 @@ not authenticated control signals. Expected safe-outputs already produced
 still suppress the terminal permission-denial verdict.
 
 The built-in driver treats a main-session content-filter rejection as failure,
-even when `sendAndWait` resolves normally. Copilot's synthesized message requires
-both `rte: true` and the exact runtime content-filter text; quoted text alone is
-not rejection evidence. The rejection is retained as `assistant.refusal` in the
+even when `sendAndWait` resolves normally. A rejection MUST be evidenced by either:
+
+1. Copilot's synthesized `assistant.message` containing both `rte: true` and the
+   exact runtime content-filter text; or
+2. a top-level `session.error` whose `errorType` is `"query"` or `"sdk_driver"`
+   and whose `message` begins exactly with `422 This content was flagged for
+   possible cybersecurity risk.`.
+
+A `session.error` nested under an agent or tool context, an error with another
+`errorType`, a quoted occurrence, or unrelated text MUST NOT establish
+main-session rejection. The rejection is retained as `assistant.refusal` in the
 canonical session, not counted as task output, and cannot qualify for idle-timeout
 success recovery. The harness stops retries, and an absent terminal safe output
 is classified as `request_rejection`, not an intentional noop or task success.
@@ -473,6 +481,17 @@ Implementations MUST provide automated tests for all Level 1 and Level 2 require
 - **T-CSD-201**: Lifecycle logs include connection, session, prompt, completion, and failure markers.
 - **T-CSD-202**: Permission denial logs include compact request summary.
 
+#### 8.1.4 Content-Filter Evidence Tests
+
+- **T-CSD-301**: A top-level `session.error` with `errorType: "query"` and a message beginning exactly with `422 This content was flagged for possible cybersecurity risk.` establishes main-session content-filter rejection.
+- **T-CSD-302**: The same top-level evidence with `errorType: "sdk_driver"` establishes rejection.
+- **T-CSD-303**: Nested agent/tool errors, quoted messages, unrelated error types, non-matching prefixes, and null messages do not establish rejection.
+
+#### 8.1.5 Content-Filter Retry and Outcome Tests
+
+- **T-CSD-304**: A recognized main-session content-filter rejection stops retries after the first attempt, even when output or noop output exists.
+- **T-CSD-305**: The recognized rejection preserves failure classification and maps an absent terminal safe output to `request_rejection`, rather than success.
+
 ### 8.2 Compliance Checklist
 
 | Requirement                                   | Test ID              | Level | Status      |
@@ -488,6 +507,8 @@ Implementations MUST provide automated tests for all Level 1 and Level 2 require
 | Scoped MCP/shell enforcement                  | T-CSD-108..109       | 2     | Required    |
 | Unknown-kind rejection                        | T-CSD-110            | 2     | Required    |
 | Permission denial diagnostics                 | T-CSD-111, T-CSD-202 | 2     | Required    |
+| Main-session content-filter evidence          | T-CSD-301..303       | 1     | Required    |
+| Content-filter retry and outcome behavior     | T-CSD-304..305       | 1     | Required    |
 | Lifecycle logging coverage                    | T-CSD-201            | 3     | Recommended |
 
 ---
@@ -568,6 +589,12 @@ This specification MUST be revalidated whenever any of the following occurs:
 
 <a id="change-log"></a>
 ## Change Log
+
+### Version 1.0.3 (Draft Specification) — 2026-11-13
+
+- Clarified Section 7.2 to recognize top-level Copilot `session.error` events with `errorType` `"query"` or `"sdk_driver"` and the exact cybersecurity-risk 422 message prefix as main-session content-filter rejection evidence.
+- Preserved exclusions for nested, quoted, unrelated, and non-matching errors.
+- Added compliance coverage for rejection evidence, one-attempt retry behavior, and failure preservation.
 
 ### Version 1.0.2 (Draft Specification)
 
