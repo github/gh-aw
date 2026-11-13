@@ -9,6 +9,18 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 # shellcheck source=actions/setup/sh/release_integrity.sh
 source "$SCRIPT_DIR/release_integrity.sh"
 
+attestation_status=0
+(
+  PATH="$TEMP_DIR/no-gh"
+  verify_release_attestation "$TEMP_DIR/checksums.txt" github/gh-aw-firewall
+) >"$TEMP_DIR/attestation-stdout" 2>"$TEMP_DIR/attestation-stderr" || attestation_status=$?
+test "$attestation_status" = 1
+test ! -s "$TEMP_DIR/attestation-stdout"
+grep -qF 'GitHub CLI (gh) is required for release attestation verification' "$TEMP_DIR/attestation-stderr"
+grep -qF 'Install gh with attestation support on the runner and ensure it is on PATH' "$TEMP_DIR/attestation-stderr"
+grep -qF 'Verification cannot be skipped' "$TEMP_DIR/attestation-stderr"
+echo "PASS: missing gh fails closed with an actionable prerequisite diagnostic"
+
 mkdir -p "$TEMP_DIR/bin" "$TEMP_DIR/home" "$TEMP_DIR/scripts" "$TEMP_DIR/copilot-fixture" "$TEMP_DIR/runner"
 cp "$SCRIPT_DIR/install_awf_binary.sh" "$TEMP_DIR/scripts/"
 cp "$SCRIPT_DIR/install_copilot_cli.sh" "$TEMP_DIR/scripts/"
