@@ -3,6 +3,7 @@ package lint
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -152,9 +153,18 @@ func TestLintPerformanceBudget(t *testing.T) {
 				} else {
 					require.Zero(t, findings, "the safe fixture must not introduce findings")
 				}
-				started := time.Now()
-				allocations[index] = testing.AllocsPerRun(3, run)
-				durations[index] = time.Since(started) / 4 // AllocsPerRun includes one warm-up.
+				// Time only rule execution, not AllocsPerRun's GC/accounting.
+				var samples [4]time.Duration
+				sample := 0
+				allocations[index] = testing.AllocsPerRun(3, func() {
+					started := time.Now()
+					run()
+					samples[sample] = time.Since(started)
+					sample++
+				})
+				measured := samples[1:] // Discard the allocation warm-up.
+				slices.Sort(measured)
+				durations[index] = measured[len(measured)/2]
 				require.NoError(t, runErr)
 				t.Logf("jobs=%d duration=%s allocs/op=%.0f", jobs, durations[index], allocations[index])
 				require.Less(t, durations[index], 250*time.Millisecond, "AST-only checks must stay below the generous loaded-CI budget; profile with BenchmarkLintRules")
