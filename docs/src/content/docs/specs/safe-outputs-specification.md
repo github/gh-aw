@@ -2511,9 +2511,9 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 
 **Requirement DSB1 (Eligible Review Prerequisites):** Implementations MUST permit `submit_pull_request_review` and `create_pull_request_review_comment` outputs to serve as `depends-on` prerequisites.
 
-**Requirement DSB2 (Review Buffer Drain):** Implementations MUST drain and finalize the applicable buffered review batch before releasing outputs that depend on it.
+**Requirement DSB2 (Review Buffer Drain):** Implementations MUST drain and finalize the applicable buffered review batch before releasing outputs that depend on it, except for the review submission that publishes its own buffered comments.
 
-**Requirement DSB3 (Publication-Based Success):** Buffering MUST NOT establish prerequisite success; success requires confirmed publication. Failed, skipped, staged, queued, or otherwise unconfirmed outputs MUST NOT establish prerequisite success. Unsupported or delegated outputs, including custom jobs and standalone steps, MUST NOT establish prerequisite success.
+**Requirement DSB3 (Publication-Based Success):** Buffering MUST NOT establish prerequisite success; success requires confirmed publication. A review submission MAY include its own buffered comment prerequisites in the same publication, but MUST NOT treat them as published before that publication succeeds. Failed, skipped, staged, queued, or otherwise unconfirmed outputs MUST NOT establish prerequisite success. Unsupported or delegated outputs, including custom jobs and standalone steps, MUST NOT establish prerequisite success.
 
 **Requirement DSB4 (Deferred-Dependent Retry):** Newly eligible deferred dependents MUST be retried without replaying completed handlers. Implementations MUST finalize newly buffered batches, including batches created by in-place retries, before releasing their dependents. Retries MUST be bounded and contingent on resolution progress; unresolved prerequisites MUST fail closed.
 
