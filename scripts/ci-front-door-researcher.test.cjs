@@ -36,7 +36,7 @@ test("compiled researcher cannot use GitHub MCP tools or publish failure issues"
   assert.ok(manifest.mcp_servers?.find(server => server.name === "safeoutputs")?.tools.includes("report_missing_data"));
   assert.match(lock, /GH_AW_FAILURE_REPORT_AS_ISSUE: "false"/);
   assert.match(lock, /GH_AW_MISSING_DATA_REPORT_AS_FAILURE: "false"/);
-  assert.match(lock, /create_report_incomplete_issue.*create_issue.*false/);
+  assert.match(lock, /GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE: "false"/);
   assert.match(frontmatter, /report-failure-as-issue: false/);
   assert.match(frontmatter, /report-failed-jobs: false/);
   assert.match(frontmatter, /report-missing-data:\s*\n\s+report-as-failure: false/);
