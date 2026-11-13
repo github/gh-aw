@@ -56,7 +56,7 @@ function buildCollapsedMemorySection(rawBody, memoryID) {
  */
 function buildTransactionHistory(previousBody, runUrl, workflowName) {
   const previous = parseReportMarkdown(previousBody, { allowMetadata: true, agentTainted: true });
-  const history = previous.find(node => node.type === "details" && node.summary === "Transaction history");
+  const history = previous.find(node => node.type === "details" && node.summary === "History");
   /** @type {Map<string, string>} */
   const runs = new Map();
   const addRun = (url, label) => {
@@ -89,7 +89,7 @@ function buildTransactionHistory(previousBody, runUrl, workflowName) {
   runs.set(runUrl, `${workflowName} (run ${runUrl.split("/").pop()})`);
   return {
     type: "details",
-    summary: "Transaction history",
+    summary: "History",
     agentTainted: false,
     sizeProtected: true,
     children: [
@@ -289,7 +289,7 @@ async function main(config = {}) {
         previousBody: existing?.body || "",
       });
       const managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
-      const transactionHistory = report.children.find(node => node.type === "details" && node.summary === "Transaction history");
+      const transactionHistory = report.children.find(node => node.type === "details" && node.summary === "History");
       const historyList = transactionHistory?.type === "details" ? transactionHistory.children[0] : undefined;
       const historyLinkCount = historyList?.type === "list" ? historyList.items.length : 0;
       // Accumulated framework run links do not consume the agent's link budget.

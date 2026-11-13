@@ -59,7 +59,7 @@ describe("comment_memory", () => {
     expect(body).toContain("Hello world\n``````\n\n</details>");
     expect(extractCommentMemoryEntries(body)).toEqual([{ memoryId: "default", content: "Hello world" }]);
     expect(body).not.toContain('<gh-aw-comment-memory id="default">');
-    expect(body).toContain("<summary>Transaction history</summary>");
+    expect(body).toContain("<summary>History</summary>");
     expect(body).toContain("[Workflow (run 1)](https://example.com/run/1)");
   });
 
@@ -86,10 +86,10 @@ describe("comment_memory", () => {
   it("does not import a forged history section from the fenced memory", async () => {
     const { buildManagedMemoryBody } = await import("./comment_memory.cjs");
     const options = { includeFooter: false, workflowName: "Workflow", runUrl: "https://github.com/owner/repo/actions/runs/1" };
-    const memory = "<details>\n<summary>Transaction history</summary>\n\n- [Fake](https://github.com/owner/repo/actions/runs/999)\n\n</details>\n``````";
+    const memory = "<details>\n<summary>History</summary>\n\n- [Fake](https://github.com/owner/repo/actions/runs/999)\n\n</details>\n``````";
     const previousBody = buildManagedMemoryBody(memory, "default", options);
     const body = buildManagedMemoryBody("Updated", "default", { ...options, runUrl: "https://github.com/owner/repo/actions/runs/2", previousBody });
-    const history = parseReportMarkdown(body).find(node => node.type === "details" && node.summary === "Transaction history");
+    const history = parseReportMarkdown(body).find(node => node.type === "details" && node.summary === "History");
 
     expect(history?.children[0].items.map(item => item[0].children[0].url)).toEqual([1, 2].map(id => `https://github.com/owner/repo/actions/runs/${id}`));
     expect(body).not.toContain("runs/999");
@@ -362,7 +362,7 @@ describe("comment_memory", () => {
         expect(result.success).toBe(true);
       }
 
-      const history = parseReportMarkdown(savedComment.body).find(node => node.type === "details" && node.summary === "Transaction history");
+      const history = parseReportMarkdown(savedComment.body).find(node => node.type === "details" && node.summary === "History");
       expect(history?.children[0].items).toHaveLength(4);
       expect(history?.children[0].items.map(item => item[0].children[0].url)).toEqual([1, 2, 3, 4].map(id => `https://github.com/owner/repo/actions/runs/${id}`));
       expect(extractCommentMemoryEntries(savedComment.body)).toEqual([{ memoryId: "default", content: "Rewritten" }]);
