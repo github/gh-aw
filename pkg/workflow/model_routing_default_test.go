@@ -59,6 +59,7 @@ func TestCompileDefaultModelRouting_RuntimeIncompatibleUnchanged(t *testing.T) {
 		"unmasked socket bind":  "sandbox:\n  agent:\n    mounts: [\"/var/run/docker.sock:/docker.sock:rw\"]\n",
 		"parent directory bind": "sandbox:\n  agent:\n    mounts: [\"/var/run:/docker-run:ro\"]\n",
 		"native windows host":   "runs-on: [self-hosted, windows, x64]\n",
+		"object-form windows":   "runs-on:\n  labels: [self-hosted, windows, x64]\n",
 		"old cloud-hypervisor":  "sandbox:\n  agent:\n    runtime: cloud-hypervisor\n    version: v0.29.11\n",
 	} {
 		for _, routing := range []string{"none", "off"} {
@@ -73,6 +74,7 @@ func TestCompileDefaultModelRouting_RuntimeIncompatibleUnchanged(t *testing.T) {
 	for name, extra := range map[string]string{
 		"masked socket bind":  "sandbox:\n  agent:\n    mounts: [\"/var/run/docker.sock:/var/run/docker.sock:rw\"]\n",
 		"safe unrelated bind": "sandbox:\n  agent:\n    mounts: [\"/opt/tools:/opt/tools:ro\"]\n",
+		"object-form group":   "runs-on:\n  group: windows-runners\n",
 	} {
 		t.Run(name+" keeps the default", func(t *testing.T) {
 			compiled := compileDefaultRoutingSource(t, routingRuntimeFixture("none", extra))
@@ -141,14 +143,17 @@ func TestNativeNonLinuxRunsOnLabels(t *testing.T) {
 		"runs-on: windows-2022":      true,
 		"runs-on: macos-14":          true,
 		"runs-on:\n- windows-latest": true,
-		"runs-on:\n- self-hosted\n- windows\n- x64":   true,
-		"runs-on:\n- self-hosted\n- macOS":            true,
-		"runs-on:\n- self-hosted\n- linux\n- windows": false,
-		"runs-on:\n- self-hosted\n- win-builders":     false,
-		"runs-on:\n- self-hosted\n- windows-2022":     false,
-		"runs-on:\n  group: windows":                  false,
-		"runs-on: ${{ vars.RUNNER }}":                 false,
-		"runs-on: windows-builders":                   false,
+		"runs-on:\n- self-hosted\n- windows\n- x64":                      true,
+		"runs-on:\n- self-hosted\n- macOS":                               true,
+		"runs-on:\n- self-hosted\n- linux\n- windows":                    false,
+		"runs-on:\n- self-hosted\n- win-builders":                        false,
+		"runs-on:\n- self-hosted\n- windows-2022":                        false,
+		"runs-on:\n  group: windows":                                     false,
+		"runs-on:\n  labels: [self-hosted, windows, x64]":                true,
+		"runs-on:\n  group: builders\n  labels: [self-hosted, linux]":    false,
+		"runs-on:\n  group: windows\n  labels: [\"${{ vars.RUNNER }}\"]": false,
+		"runs-on: ${{ vars.RUNNER }}":                                    false,
+		"runs-on: windows-builders":                                      false,
 	} {
 		t.Run(runsOn, func(t *testing.T) {
 			_, got := nativeNonLinuxRunsOnLabels(runsOn)

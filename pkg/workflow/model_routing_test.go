@@ -1509,6 +1509,10 @@ func TestCompileModelRoutingRuntimeCompatibility(t *testing.T) {
 		{name: "native hosted windows label", extra: "runs-on: windows-2022\n", field: "runs-on", value: "windows-2022", reason: "Linux AWF execution host"},
 		{name: "self-hosted linux", extra: "runs-on: [self-hosted, linux, x64]\n"},
 		{name: "arbitrary self-hosted label", extra: "runs-on: [self-hosted, windows-builders]\n"},
+		{name: "object-form native windows labels", extra: "runs-on:\n  labels: [self-hosted, windows, x64]\n",
+			field: "runs-on", value: "self-hosted, windows, x64", reason: "Linux AWF execution host"},
+		{name: "object-form group with native windows labels", extra: "runs-on:\n  group: builders\n  labels: [self-hosted, windows]\n",
+			field: "runs-on", value: "self-hosted, windows", reason: "Linux AWF execution host"},
 		{name: "runner group", extra: "runs-on:\n  group: windows-runners\n"},
 		{name: "expression", extra: "runs-on: ${{ vars.RUNNER }}\n"},
 	} {

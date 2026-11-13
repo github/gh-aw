@@ -195,21 +195,8 @@ func nativeNonLinuxRunsOnLabels(runsOn string) ([]string, bool) {
 	if err := yaml.Unmarshal([]byte(runsOn), &parsed); err != nil {
 		return nil, false
 	}
-	var labels []string
-	switch value := parsed["runs-on"].(type) {
-	case string:
-		labels = []string{value}
-	case []any:
-		for _, item := range value {
-			label, ok := item.(string)
-			if !ok {
-				return nil, false
-			}
-			labels = append(labels, label)
-		}
-	default:
-		return nil, false
-	}
+	// The object form's group name is opaque; only its labels identify an OS.
+	labels := extractRunnerLabels(parsed["runs-on"])
 	lower := make([]string, 0, len(labels))
 	for _, label := range labels {
 		if strings.Contains(label, "${{") {
