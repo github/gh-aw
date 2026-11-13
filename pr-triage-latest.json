@@ -1,41 +1,57 @@
 {
-  "run_date": "2026-11-13T06:32:07Z",
-  "run_id": "pr-triage-20261113T062705Z",
-  "eligible_total": 3,
-  "cooldown_skipped": 0,
+  "run_id": "pr-triage-20261113T122400Z",
+  "run_date": "2026-11-13T12:24:00Z",
+  "source": "pr-triage",
+  "eligible_total": 5,
+  "open_copilot_prs": 26,
+  "cooldown_skipped": 21,
   "category_counts": {
-    "bug": 2,
+    "bug": 4,
     "chore": 1
   },
   "risk_counts": {
-    "high": 1,
-    "medium": 2
+    "medium": 5
   },
   "priority_counts": {
-    "medium": 3
+    "medium": 5
   },
   "action_counts": {
-    "fast_track": 1,
-    "batch_review": 2,
-    "defer": 0,
     "auto_merge": 0,
+    "fast_track": 1,
+    "batch_review": 4,
+    "defer": 0,
     "close": 0
   },
   "selected_candidates": [
     {
-      "number": 77088,
-      "title": "Read AWF per-conversation steering deliveries from the unified session",
+      "number": 77185,
+      "title": "Accept `-1` for runtime `GH_AW_DEFAULT_*MAX_AI_CREDITS`, and warn on values that fall back",
       "category": "bug",
-      "risk": "high",
+      "risk": "medium",
       "priority": "medium",
       "action": "fast_track",
-      "score": 65,
+      "score": 70,
       "score_breakdown": {
-        "impact": 34,
+        "impact": 38,
         "urgency": 18,
+        "quality": 14
+      },
+      "reason": "Correctness fix for runtime validation and fallback semantics; it addresses a user-visible budgeting bug with a clear fix and passing validation."
+    },
+    {
+      "number": 77326,
+      "title": "Separate authored pricing overrides from reporting costs",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 62,
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 17,
         "quality": 13
       },
-      "reason": "Correctness fix for AWF steering notices; it addresses a user-visible billing/audit issue with clear test coverage and a bounded patch."
+      "reason": "Fixes a pricing override bug in a critical workflow path and is a contained change set."
     },
     {
       "number": 77212,
@@ -44,13 +60,28 @@
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 62,
+      "score": 61,
       "score_breakdown": {
-        "impact": 32,
+        "impact": 31,
         "urgency": 18,
         "quality": 12
       },
-      "reason": "Compatibility fix for runtime model routing; targeted but still user-visible and worth a focused review alongside adjacent automation."
+      "reason": "Compatibility fix in model routing has clear scope and direct user impact across runtime topology checks."
+    },
+    {
+      "number": 77088,
+      "title": "Read AWF per-conversation steering deliveries from the unified session",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 64,
+      "score_breakdown": {
+        "impact": 34,
+        "urgency": 18,
+        "quality": 12
+      },
+      "reason": "Audit and billing correctness fix with strong coverage and direct value for run-level observability."
     },
     {
       "number": 77338,
@@ -59,23 +90,24 @@
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 50,
+      "score": 52,
       "score_breakdown": {
-        "impact": 24,
+        "impact": 26,
         "urgency": 12,
         "quality": 14
       },
-      "reason": "Dependency bump with image pinning and compiled lock updates; low feature risk but high operational blast radius for infra defaults."
+      "reason": "Dependency bump with operational blast radius but low feature risk and green CI."
     }
   ],
   "batches": [
     {
-      "id": "pr-batch:awf-runtime-compat",
+      "id": "pr-batch:model-routing-and-audit",
       "prs": [
+        77088,
         77212,
-        77338
+        77326
       ]
     }
   ],
-  "summary": "Three eligible Copilot PRs are older than the one-hour cooldown. The highest-value item is the AWF steering-delivery fix; routing compatibility and dependency pinning are a coherent batch review pair. No PRs are auto-merge ready."
+  "summary": "Five eligible Copilot-authored PRs are outside the one-hour cooldown. The highest-value work is the runtime credit fallback fix; model-routing compatibility, pricing override correctness, and per-conversation steering delivery handling form one focused batch cluster, while the firewall bump is a lower-risk dependency update."
 }
