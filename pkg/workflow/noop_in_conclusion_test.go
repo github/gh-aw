@@ -5,10 +5,13 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/goccy/go-yaml"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNoopCommentBodyOutputRequiresNoopStep(t *testing.T) {
@@ -53,41 +56,85 @@ func TestCompletionCommentFooterMetadataUsesMainJobName(t *testing.T) {
 		name         string
 		engineConfig *EngineConfig
 		model        string
-		expected     []string
+		expected     map[string]string
 	}{
+		{
+			name:         "explicit model",
+			engineConfig: &EngineConfig{ID: "copilot", Version: "1.0.0"},
+			model:        "gpt-5.6-luna",
+			expected: map[string]string{
+				"GH_AW_ENGINE_ID":      "copilot",
+				"GH_AW_ENGINE_VERSION": "1.0.0",
+				"GH_AW_ENGINE_MODEL":   "gpt-5.6-luna",
+			},
+		},
 		{
 			name:         "model routing",
 			engineConfig: &EngineConfig{ID: "copilot", ModelRouting: &CopilotModelRoutingConfig{}},
-			expected: []string{
-				`GH_AW_ENGINE_MODEL: ${{ needs.custom-agent.outputs.model }}`,
-				`GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.custom-agent.outputs.model_effort }}`,
-				`GH_AW_MODEL_ROUTING_STATUS: ${{ needs.custom-agent.outputs.model_routing_status }}`,
+			model:        "must-not-be-baked-in",
+			expected: map[string]string{
+				"GH_AW_ENGINE_ID":            "copilot",
+				"GH_AW_ENGINE_MODEL":         "${{ needs.custom-agent.outputs.model }}",
+				"GH_AW_ENGINE_MODEL_EFFORT":  "${{ needs.custom-agent.outputs.model_effort }}",
+				"GH_AW_MODEL_ROUTING_STATUS": "${{ needs.custom-agent.outputs.model_routing_status }}",
 			},
 		},
 		{
 			name:         "empty model",
 			engineConfig: &EngineConfig{ID: "copilot"},
-			expected: []string{
-				`GH_AW_ENGINE_MODEL: ${{ needs.custom-agent.outputs.model }}`,
+			expected: map[string]string{
+				"GH_AW_ENGINE_ID":    "copilot",
+				"GH_AW_ENGINE_MODEL": "${{ needs.custom-agent.outputs.model }}",
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			statusComment := true
 			data := &WorkflowData{
-				EngineConfig: tt.engineConfig,
-				Model:        tt.model,
-				SafeOutputs:  &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+				EngineConfig:  tt.engineConfig,
+				Model:         tt.model,
+				StatusComment: &statusComment,
+				SafeOutputs: &SafeOutputsConfig{
+					NoOp:             &NoOpConfig{},
+					MissingTool:      &MissingToolConfig{},
+					ReportIncomplete: &ReportIncompleteConfig{},
+				},
 			}
-			env := strings.Join(NewCompiler().buildConclusionScriptEnvVars(data, "custom-agent", nil, ""), "")
-			for _, expected := range tt.expected {
-				if !strings.Contains(env, expected) {
-					t.Errorf("Completion comment footer is missing %s", expected)
+			job, err := NewCompiler().buildConclusionJob(data, "custom-agent", nil)
+			require.NoError(t, err)
+			require.NotNil(t, job)
+			require.Contains(t, job.Needs, "custom-agent")
+			require.NotContains(t, job.Needs, "agent")
+
+			steps := strings.Join(job.Steps, "")
+			for _, match := range regexp.MustCompile(`needs\.([a-zA-Z0-9_-]+)\.`).FindAllStringSubmatch(job.If+steps, -1) {
+				require.Contains(t, job.Needs, match[1], "Conclusion references an undeclared job")
+			}
+			var compiled struct {
+				Steps []struct {
+					ID  string            `yaml:"id"`
+					Env map[string]string `yaml:"env"`
+				} `yaml:"steps"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte("steps:\n"+steps), &compiled))
+			metadataSteps := map[string]bool{"conclusion": false, "noop": false, "missing_tool": false, "report_incomplete": false}
+			for _, step := range compiled.Steps {
+				if _, ok := metadataSteps[step.ID]; !ok {
+					continue
 				}
+				metadataSteps[step.ID] = true
+				metadata := make(map[string]string)
+				for key, value := range step.Env {
+					if strings.HasPrefix(key, "GH_AW_ENGINE_") || key == "GH_AW_MODEL_ROUTING_STATUS" {
+						metadata[key] = value
+					}
+				}
+				require.Equal(t, tt.expected, metadata, "Incorrect footer metadata in step %s", step.ID)
 			}
-			if strings.Contains(env, "needs.agent.outputs.") {
-				t.Error("Completion comment footer must use the caller-selected main job")
+			for id, found := range metadataSteps {
+				require.True(t, found, "Missing footer step %s", id)
 			}
 		})
 	}
