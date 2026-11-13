@@ -53,6 +53,8 @@ Vendor aliases map a short name to one or more provider-scoped glob patterns. Th
 | `image-generation` | `copilot/gpt-image*`, `openai/gpt-image*`, `openai/chatgpt-image*`, `copilot/gemini-*image*`, `google/gemini-*image*`, `gemini/gemini-*image*`, `google/imagen*` |
 | `gemma` | `copilot/gemma*`, `google/gemma*`, `gemini/gemma*` |
 | `deep-research` | `copilot/deep-research*`, `copilot/o3-deep-research*`, `copilot/o4-mini-deep-research*`, `google/deep-research*`, `gemini/deep-research*`, `openai/o3-deep-research*`, `openai/o4-mini-deep-research*` |
+| `detection` | `small`, `copilot/gpt-*-luna`, `openai/gpt-*-luna`, `small-agent`, `agent` |
+| `evals` | `copilot/gpt-6-luna-decisions` |
 | `fable` | `copilot/*fable*`, `anthropic/*fable*` |
 | `auto` | `copilot/auto`, `large` |
 | `any` | `copilot/*`, `anthropic/*`, `openai/*`, `google/*`, `gemini/*` |
@@ -80,8 +82,6 @@ Meta-aliases reference other aliases by name. They are resolved recursively unti
 |------------|------------|
 | `opusplan` | `opus?effort=high` |
 | `small` | `mini` |
-| `detection` | `small` → `copilot/gpt-*-luna` → `openai/gpt-*-luna` → `small-agent` → `agent` |
-| `evals` | `small` |
 | `mini` | `haiku` → `gpt-5-mini` → `gpt-5-nano` → `gemini-flash-lite` |
 | `large` | `sonnet` → `gpt-6` → `gpt-5-pro` → `gpt-5` → `gemini-pro` |
 | `agent` | `sonnet-6x` → `gpt-6` → `gpt-5.4` → `gpt-5.5` → `gpt-5.6` → `gpt-5.3` → `gemini-pro` → `any` |
