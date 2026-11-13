@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-13",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/guides/sharing-workflows.md",
+      "docs/src/content/docs/blog/2026-10-26-weekly-update.md"
+    ],
+    "cli": [
+      "gh aw (root help, cmd/gh-aw/main.go)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/smoke-crush.md",
+      ".github/workflows/smoke-temporary-id.md"
+    ],
+    "validation": [
+      "pkg/workflow/on_needs_validation.go",
+      "pkg/workflow/mcp_scripts_dependencies_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "sharing-workflows.md: accurate and well-structured guide",
+    "run help: realistic Examples block",
+    "smoke-crush.md run-failure message: states the outcome and the next step; {status} matches the documented variable list"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
+      "priority": "high",
+      "issue": "newInvalidDependencyNameError (lines 152-157) always suggests 'Example: dependencies: [requests]' and 'inferred package manager' for npm, go, and shell tools. Pass manager and example per call site, matching newUnpinnedDependencyError."
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "high",
+      "issue": "Root 'Common Tasks' rows (lines 94-102) still pad with tab characters, so the '#' comments start at different columns. Carried over from 2026-11-11."
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-10-26-weekly-update.md",
+      "priority": "medium",
+      "issue": "Line 3 description says 'Five releases (v0.93.0-v0.93.5)'; line 11 body says six releases for the same range. Change description to 'Six releases'."
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "medium",
+      "issue": "Compile help line 265 'Unlike gh aw upgrade...' sentence sits inside the action-mode section. Carried over from 2026-11-12."
+    }
+  ]
+}

@@ -1,6 +1,12 @@
 {
-  "last_updated": "2026-11-12",
+  "last_updated": "2026-11-13",
   "pending_tasks": [
+    {
+      "file": "docs/src/content/docs/blog/2026-10-26-weekly-update.md",
+      "created": "2026-11-13",
+      "status": "pending",
+      "issue": "Line 3 description says 'Five releases (v0.93.0-v0.93.5)' but line 11 body says six releases; change description to 'Six releases'"
+    },
     {
       "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
       "created": "2026-11-12",
