@@ -50,7 +50,8 @@ function resolvePiExecutable(command = process.env.GH_AW_PI_COMMAND || "pi") {
       fs.accessSync(candidate, fs.constants.X_OK);
       return fs.realpathSync(candidate);
     } catch (error) {
-      if (!["EACCES", "ELOOP", "ENOENT", "ENOTDIR", "EPERM"].includes(getErrorCode(error))) throw error;
+      const code = error instanceof Error && "code" in error ? String(error.code) : "";
+      if (!["EACCES", "ELOOP", "ENOENT", "ENOTDIR", "EPERM"].includes(code)) throw error;
     }
   }
   throw new Error(`Cannot resolve Pi executable "${command}"`);
