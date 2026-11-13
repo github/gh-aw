@@ -407,7 +407,7 @@ fi
 `
 	}
 	return fmt.Sprintf(`%s
-if [[ ! "$%s" =~ ^[0-9]+$ ]]; then
+if [[ ! "$%s" =~ ^(-1|[0-9]+)$ ]]; then
   %s="%s"
 fi
 %s

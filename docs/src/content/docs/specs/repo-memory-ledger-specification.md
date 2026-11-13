@@ -77,6 +77,10 @@ safe-outputs job MUST NOT mutate ledger storage. An immediate safe-output respon
 MUST NOT imply durability: an accepted request becomes durable only after the
 persistence job succeeds. The persistence job MUST treat transaction artifacts
 and restored ledger files as untrusted input and revalidate both.
+The persistence job MUST run only after the safe-outputs job succeeds. Skipped,
+failed, or cancelled safe outputs MUST NOT trigger persistence. If downloading
+validated transactions fails, reconciliation MUST NOT run and the persistence
+job MUST fail rather than treating missing transactions as an empty batch.
 
 ## 4. Built-in behavior and script restrictions
 

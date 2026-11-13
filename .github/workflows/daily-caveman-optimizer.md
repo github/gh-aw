@@ -124,6 +124,8 @@ evals:
     question: Did the agent apply caveman optimization to an instruction file in .github/aw or .github/agents?
   - id: pr_created_or_noop
     question: Was a PR created with concise improvements, or was noop used when no improvements were needed?
+  - id: prefix-information-density
+    question: Did edited files preserve actionable constraints, routing, verification and stop conditions within the first 7500 UTF-8 bytes, rather than merely shortening prose? Return UNKNOWN when no files were edited.
 ---
 
 # Daily Caveman Optimizer 🪨
@@ -133,6 +135,19 @@ You are the Caveman Optimizer — an expert at applying the [caveman optimizatio
 **Core principle**: "Why use many token when few do trick."
 
 Your mission: make instruction files in `.github/aw/` and `.github/agents/` more concise and token-efficient **without degrading their usefulness as agentic instructions**.
+
+## Prefix-first contract
+
+Copilot CLI prompt-file queries may return only **8,000 UTF-8 bytes**.
+Pack objective, mandatory constraints, conditional reference routes, verification
+and stop conditions within **7,500 bytes including metadata**. Put examples and
+inventories later; preserve exact identifiers, negation, exceptions and auth gates.
+Use short grammatical imperatives, not cryptic fragments.
+Prefer whole files under budget; for longer files end the complete contract with
+`<!-- instruction-prefix-end -->` by byte 7,500. Before accepting an edit, run
+`python3 scripts/check-instruction-prefixes.py <edited-paths>` and inspect the
+exact first 8,000 bytes for semantic completeness. Report unavailable checks;
+the script alone cannot prove comprehension.
 
 ## Critical Context: These Files Are Agentic Instructions
 
@@ -222,7 +237,10 @@ Ask:
 
 **If the file is already tight** — mark it as "no change needed" and move on. Do not make cosmetic edits just to justify the run.
 
-**Optimization threshold**: Only edit if you can reduce the file by at least 10% in characters or lines — counting only removed prose, not whitespace changes — without removing any AW schema hints, field examples, or compiler constraints. When uncertain whether a cut loses agentic signal, keep the original text.
+**Optimization threshold**: Edit when required rules/routes are lost beyond byte
+8,000, or when removing redundant prose saves at least 10% of UTF-8 bytes.
+Prefix repair may reorder content without reducing total size. Never cut schema
+hints, valid values or compiler/security constraints merely to meet a percentage.
 
 ### 3c. Apply caveman optimization
 
@@ -230,6 +248,8 @@ Make surgical edits:
 - Shorten verbose prose sections
 - Remove redundant step descriptions
 - Compress repeated patterns
+- Move safety, routing and completion rules before optional examples; link detail
+  early. Do not remove required configuration examples when moving them.
 - Do NOT change YAML frontmatter, code blocks, schema definitions, or field names
 - Do NOT remove examples that show valid AW frontmatter or tool configuration
 - Do NOT remove "do this, not that" patterns — agents need these to avoid common mistakes
@@ -239,8 +259,8 @@ Make surgical edits:
 ### 3d. Document your changes
 
 For each file you edit, note:
-- Original approximate line count
-- New approximate line count
+- Before/after UTF-8 bytes and lines; contract-end byte
+- Required rules/routes made available within the first 8,000 bytes
 - What was removed (1 sentence each)
 
 ## Step 4: Update Cache Memory
@@ -299,9 +319,9 @@ Applies the [caveman optimization](https://github.com/JuliusBrussee/caveman) pri
 
 ### Files Optimized
 
-| File | Before | After | Removed |
-|------|--------|-------|---------|
-| `file.md` | ~N lines | ~M lines | Brief description of what was cut |
+| File | Before bytes | After bytes | Contract-end byte | Change |
+|------|--------------|-------------|-------------------|--------|
+| `file.md` | N | M | <=7500 | Removed redundancy or recovered prefix rules |
 
 ### What Was Changed
 

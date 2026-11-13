@@ -741,7 +741,7 @@ func TestModelRoutingModelAttributionOutputs(t *testing.T) {
 			require.Equal(t, "${{ needs.agent.outputs.model }}", jobEnv["GH_AW_ENGINE_MODEL"])
 			require.Equal(t, "${{ needs.agent.outputs.model_effort }}", jobEnv["GH_AW_ENGINE_MODEL_EFFORT"])
 			require.Equal(t, "${{ needs.agent.outputs.model_routing_status }}", jobEnv["GH_AW_MODEL_ROUTING_STATUS"])
-			env := buildEngineMetadataEnvVars(data.EngineConfig, data.Model)
+			env := buildEngineMetadataEnvVars(data.EngineConfig, data.Model, "agent")
 			require.NotContains(t, strings.Join(env, ""), "must-not-be-baked-in")
 			require.Contains(t, strings.Join(env, ""), "GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}")
 			require.Contains(t, strings.Join(env, ""), "GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}")

@@ -50,6 +50,8 @@ evals:
     question: Did the workflow create or refine exactly one focused skill without changing files outside .github/skills?
   - id: evidence_based_selection
     question: Was the candidate accepted only when its validation score exceeded the baseline without a regression?
+  - id: prefix-contract
+    question: Did the candidate preserve triggers, procedure, safety, verification and stop conditions within the first 7500 UTF-8 bytes of SKILL.md, including metadata, with no held-out regression under an 8000-byte read?
 imports:
   - shared/pr-safe-output-defaults.md
   - shared/reporting.md
@@ -67,6 +69,12 @@ Apply the EvoSkill method from [Alzubi et al., 2026](https://arxiv.org/abs/2603.
 - Never copy answers, secrets, repository-specific task data, or validation examples into a skill.
 - Treat workflow conclusions and eval results as signals, not proof of root cause.
 - Prefer a focused edit to an existing skill over creating an overlapping skill.
+- Copilot CLI prompt-file queries may expose only 8,000 UTF-8 bytes. Pack the
+  skill's activation, objective, constraints, reference routes, procedure,
+  verification and stop conditions within 7,500 bytes including frontmatter.
+  Use short grammatical imperatives and exact terms; defer examples, not safety.
+  For longer skills mark the complete contract with
+  `<!-- instruction-prefix-end -->` by byte 7,500 and link required detail early.
 
 ## EvoSkill Loop
 
@@ -110,11 +118,14 @@ Give only the accepted proposal, its cited training evidence, and the target ski
 The builder must:
 
 1. create or edit exactly one `.github/skills/<skill-name>/` folder;
-2. produce a concise `SKILL.md` with valid name and description metadata, clear triggers, a procedural workflow, verification checks, and failure/stop conditions;
+2. produce a concise `SKILL.md` with valid metadata and the prefix contract above;
 3. add helper scripts or references only when essential;
 4. avoid benchmark-specific answers and overfitting to named training samples.
 
 Inspect `git status --short` and `git diff -- .github/skills`. Stop with `noop` if files outside the allowed folder changed, more than five files changed, or the candidate is empty.
+Run `python3 scripts/check-instruction-prefixes.py .github/skills/<skill-name>/SKILL.md`
+and repair violations before validation. Do not edit the checker or weaken safety
+to pass; report tool/read failures explicitly.
 
 ### 5. Score on held-out validation
 
@@ -125,6 +136,15 @@ Only now give the `validator` agent the held-out validation set, the original ta
 - trigger precision and risk of harmful over-activation;
 - generality beyond the training examples;
 - procedural correctness and verifiability.
+- retention of activation, constraints, procedure, verification and stop behavior
+  when reading only the first 8,000 UTF-8 bytes; compare baseline and candidate
+  on the same held-out samples without exposing them to the builder.
+
+Use a fresh isolated validator invocation for prefix-only scoring. Supply only
+the raw first 8,000 bytes of each baseline/candidate skill, never hidden tails,
+the full diff or full-view rationales. The main agent combines full/prefix
+results; if isolation or required evidence is unavailable, do not accept the
+candidate as prefix-validated.
 
 Require compact JSON containing `baseline_score`, `candidate_score`, `regressions`, per-sample rationales, and confidence. Accept the mutation only when:
 
@@ -146,6 +166,7 @@ For an accepted candidate, create one pull request with:
 - baseline and candidate validation scores;
 - held-out run URLs and regression result;
 - whether the mutation creates or refines a skill;
+- before/after byte counts, contract-end byte, and full-versus-prefix regressions;
 - a note that the underlying model and non-skill repository files were unchanged.
 
 If no candidate is accepted, use `noop` with the rejection reason and score delta.
@@ -184,7 +205,7 @@ description: Materializes one approved proposal as a portable repository skill
 model: large
 ---
 
-Implement only the supplied proposal in its single target folder under `.github/skills/`. Follow the Agent Skills folder format and repository conventions. Keep the skill general, trigger-specific, evidence-driven, and independent of named training examples. Do not inspect or request validation data. Return a short list of changed files and design decisions after editing.
+Implement only the supplied proposal in its single target folder under `.github/skills/`. Follow the Agent Skills format. Pack activation, objective, constraints, routes, procedure, verification and stop conditions into the first 7,500 UTF-8 bytes including metadata; defer examples, preserve safety and use explicit imperatives. Run the repository prefix checker on the candidate. Keep guidance general and independent of named training examples. Do not inspect or request validation data. Return changed files, byte counts and design decisions.
 
 ## agent: `validator`
 ---
@@ -192,7 +213,12 @@ description: Compares an evolved skill candidate with its baseline on held-out e
 model: large
 ---
 
-Evaluate the original skill and candidate diff independently against only the supplied held-out samples. Penalize over-broad triggers, memorized examples, unverifiable procedures, and regressions on successful cases. Do not edit files.
+Evaluate only the supplied baseline/candidate views against the held-out samples.
+In prefix mode, do not fetch full skills, hidden tails, full diffs or full-view
+rationales. Include lost constraints/routes in regressions and per-sample
+rationales. Penalize over-broad triggers, memorized examples, unverifiable
+procedures and successful-case regressions. Byte compliance alone is not evidence
+of equivalent behavior. Do not edit files.
 
 Return only compact JSON:
 
