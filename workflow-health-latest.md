@@ -1,8 +1,11 @@
-# Workflow Health — 2026-11-12T04:30Z
-- Compile: 365/365 executable `.md` workflows have `.lock.yml` (compile-validate.txt holds only an install line, so no compile result was available).
-- Metrics: `metrics/latest.json` is partial (4.7h, 100 log runs). `failing-workflows.json` is `[]`. Reliability scores not computable.
-- Live run sample: 1000 most recent runs, 2026-11-11T22:38Z to 2026-11-12T04:29Z (about 6h, not 7 days). 89 workflows, 34 with >=1 failure, 62 action_required.
-- Material delta: NEW P1 tracker for Auditor (`Collect failure evidence` fails hourly; 5/5 recent main runs). Annotation: health discovery `time_budget`, checkpoint unchanged. Logs blocked (HTTP 403 DIFC).
-- Still open, already tracked: CI spec-pin/release-alignment #76787 (P1); CGO govulncheck #76789 (P2); Matt Pocock Skills Reviewer #77009, #76949, #76912.
-- CodeQL - Code Quality: 10 failures 2026-11-11T23:35Z to 23:56Z; success since 04:28Z (recovered, no action).
-- Actions: created Auditor P1 tracker and the 2026-11-12 dashboard issue.
+# Workflow Health — 2026-11-13T04:40Z
+- Compile: 365/365 executable `.md` workflows have `.lock.yml` (compile-validate.txt holds only an install line).
+- Metrics: `metrics/latest.json` complete 24h snapshot (2026-11-13T02:48Z): 509 runs, 501 executed, 277 succeeded, 224 failed (55.3%).
+- Health (executed >=2 rule): Healthy 121, Warning 6, Critical 84, Inactive 150.
+- Critical: pr-sous-chef 60/102 failed (recovered, 8 consecutive successes since 02:56Z); auditor 21/21 failed (still failing 04:27Z, run 43365685489); daily-go-test-parallelizer 11/11 failed (conclusion job "Handle agent failure"; agent/detection/safe_outputs succeed); pr-specification-reviewer 9/22; ai-moderator 7/16; ponytail-reviewer, mattpocock-skills-reviewer, avenger, auto-triage-issues, test-quality-sentinel, design-decision-gate, code-scanning-fixer lower.
+- Startup-failure cluster (`Install AWF binary`, `agent_startup_failure`, ~30 issues 2026-11-12 14:00–23:30Z): no new occurrences after 23:30Z. Tracked partly by #77100.
+- New 2026-11-13 smoke failures in agent job (not a startup failure): smoke-copilot "Assert unified-session contract" (43336833403, 00:24Z), smoke-codex-routed-openai "Execute Codex CLI"/"Assert model-routing evidence" (43334689396), smoke-atomic "Install Atomic CLI" (43335595948). Smoke issue groups exist (#77295, #77296, #77281, #77255 aoai-model incident, #77208 model-routing alignment).
+- Open trackers: Auditor P1 #77062; DGTP parent #77069 (new incomplete-result issues #77299, #77312, #77339); CI spec-pin #76787; CGO govulncheck #76789.
+- Stale notes pruned from shared-alerts: #61952, #60563, #62104 (all closed).
+- Actions this run: dashboard issue for 2026-11-13 created (create_issue, so_pjuXPpJIQySb). Status comment on #77062 was refused (add_comment needs configured target for schedule runs), so the Auditor update is in the dashboard only.
+- Smoke coverage mapping for 43336833403 (unified-session) was inferred from titles, not verified. Smoke Atomic (43335595948) has no open tracker.
