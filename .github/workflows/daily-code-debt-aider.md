@@ -30,15 +30,13 @@ tools:
   bash:
     - "*"
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[aider] "
     labels: [automation, cleanup]
-    draft: false
   missing-tool:
 timeout-minutes: 30
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/aider.md
   - shared/otlp.md
   - shared/reporting.md

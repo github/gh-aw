@@ -30,6 +30,7 @@ network:
   allowed: ["defaults", "go"]
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
   - shared/reporting.md
 tools:
@@ -41,13 +42,10 @@ tools:
   bash: ["make:*", "git restore:*", "git status"]
 
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
     title-prefix: "[tidy] "
     labels: [automation, maintenance]
     reviewers: copilot
-    draft: false
   push-to-pull-request-branch:
   missing-tool:
 steps:

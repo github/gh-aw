@@ -12,6 +12,7 @@ on:
   skip-if-match: 'is:open in:title "[trajectory-grader]"'
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/graders/state-revisit-probability-rep.md
 
 tracker-id: daily-trajectory-grader-implementer
@@ -52,7 +53,6 @@ tools:
   edit:
 
 safe-outputs:
-  steer: true
   create-pull-request:
     draft: true
     expires: 14d

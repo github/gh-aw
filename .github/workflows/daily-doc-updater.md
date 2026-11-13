@@ -14,15 +14,14 @@ network:
   - defaults
   - github
 imports:
+- shared/pr-safe-output-defaults.md
 - shared/github-guard-policy.md
 - shared/ai-coding-dictionary.md
 - shared/pageindex.md
 - shared/otlp.md
 safe-outputs:
-  steer: true
   create-pull-request:
     auto-merge: true
-    draft: false
     expires: 1d
     labels:
     - documentation

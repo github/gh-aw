@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/fileutil"
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/setutil"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -276,7 +277,7 @@ func fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx context.Context, conten
 
 	// workflowBaseDir is the directory of the top-level workflow in the source repo
 	// (e.g. ".github/workflows"). It serves as both the starting point for resolving
-	// relative imports and as the prefix to strip when computing local target paths.
+	// relative imports and as the base when computing local target paths.
 	workflowBaseDir := getParentDir(spec.WorkflowPath)
 
 	// seen is keyed by fully-resolved remote file path. It is shared across all recursion
@@ -369,7 +370,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 
 	remoteWorkflowLog.Printf("Processing %d frontmatter imports recursively: owner=%s, repo=%s, ref=%s", len(importPaths), opts.owner, opts.repo, opts.ref)
 
-	// Pre-compute the absolute target directory once for path-traversal boundary checks.
+	// Imports may leave the workflows directory, but must stay inside the repository.
 	absTargetDir, err := filepath.Abs(opts.targetDir)
 	if err != nil {
 		if opts.strict {
@@ -377,6 +378,31 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		return nil
 	}
+	repoRoot, err := gitutil.FindGitRootFrom(absTargetDir)
+	var importBoundary string
+	if err != nil {
+		// Without repository context, do not allow imports to leave targetDir.
+		repoRoot = absTargetDir
+		importBoundary = repoRoot
+	} else {
+		importBoundary = importBoundaryForTarget(repoRoot, absTargetDir)
+	}
+	root, err := os.OpenRoot(repoRoot)
+	if err != nil {
+		if opts.strict {
+			return fmt.Errorf("failed to open import destination root: %w", err)
+		}
+		remoteWorkflowLog.Printf("Failed to open import destination root: %v", err)
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to open import destination root: %v", err)))
+		}
+		return nil
+	}
+	defer func() {
+		if err := root.Close(); err != nil {
+			remoteWorkflowLog.Printf("Failed to close import destination root: %v", err)
+		}
+	}()
 
 	for _, importPath := range importPaths {
 		// Skip workflowspec-format imports (already pinned to a remote ref)
@@ -455,49 +481,51 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		opts.seen[remoteFilePath] = struct{}{}
 
-		// Derive the local path relative to targetDir by stripping the original base-dir
-		// prefix from the remote path. This ensures that imports in nested files resolve
-		// to the correct location regardless of how many levels deep the recursion goes.
+		// Preserve the path relative to the original workflow directory, including
+		// parent components for imports outside that directory.
 		//
 		// Example: originalBaseDir=".github/workflows"
 		//   remoteFilePath=".github/workflows/shared/analysis.md" → localRelPath="shared/analysis.md"
-		//   (nested) remoteFilePath=".github/workflows/other.md"  → localRelPath="other.md"
-		var localRelPath string
-		if opts.originalBaseDir != "" && strings.HasPrefix(remoteFilePath, opts.originalBaseDir+"/") {
-			localRelPath = remoteFilePath[len(opts.originalBaseDir)+1:]
-		} else {
-			// Workflow at repo root, or import outside the original base dir:
-			// use the full remote path relative to targetDir.
-			localRelPath = remoteFilePath
+		//   remoteFilePath=".github/prompts/review.md" → localRelPath="../prompts/review.md"
+		localRelPath, err := filepath.Rel(filepath.FromSlash(opts.originalBaseDir), filepath.FromSlash(remoteFilePath))
+		if err != nil {
+			if opts.strict {
+				return fmt.Errorf("failed to resolve import path %q: %w", importPath, err)
+			}
+			continue
 		}
-		localRelPath = filepath.Clean(filepath.FromSlash(localRelPath))
-		// Strip any leading separator produced by Clean on root-relative paths.
-		localRelPath = strings.TrimLeft(localRelPath, string(filepath.Separator))
-		// Reject empty or "." paths (would point to targetDir itself) as a safety guard.
-		// ".." cannot appear here because remoteFilePath was already rejected above if it
-		// started with "..", and path.Clean cannot introduce new ".." components.
-		if localRelPath == "" || localRelPath == "." {
+		if remoteFilePath == "." || localRelPath == "." {
 			if opts.strict {
 				return fmt.Errorf("invalid import path %q", importPath)
 			}
 			continue
 		}
-		targetPath := filepath.Join(opts.targetDir, localRelPath)
+		targetPath := filepath.Join(absTargetDir, localRelPath)
 
-		// Belt-and-suspenders: verify the resolved path is inside targetDir
-		absTargetPath, absErr := filepath.Abs(targetPath)
-		if absErr != nil {
+		resolvedTargetPath, err := fileutil.ResolvePathWithinBase(repoRoot, targetPath)
+		if err != nil {
 			if opts.strict {
-				return fmt.Errorf("failed to resolve import target path %q: %w", importPath, absErr)
+				return fmt.Errorf("refusing to write import outside repository root: %q: %w", importPath, err)
+			}
+			if opts.verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside repository root: %q", importPath)))
 			}
 			continue
 		}
-		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
+		resolvedTargetPath, err = fileutil.ResolvePathWithinBase(importBoundary, resolvedTargetPath)
+		if err != nil {
 			if opts.strict {
-				return fmt.Errorf("refusing to write import outside target directory: %q", importPath)
+				return fmt.Errorf("refusing to write import outside import destination boundary: %q: %w", importPath, err)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside target directory: %q", importPath)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside import destination boundary: %q", importPath)))
+			}
+			continue
+		}
+		repoRelPath, err := filepath.Rel(repoRoot, resolvedTargetPath)
+		if err != nil {
+			if opts.strict {
+				return fmt.Errorf("failed to resolve import destination %q: %w", importPath, err)
 			}
 			continue
 		}
@@ -507,7 +535,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		// recurse into the existing file's imports so that any transitive dependencies
 		// it references are fetched even when the parent file was already present.
 		fileExists := false
-		if fileutil.FileExists(targetPath) {
+		if fileutil.FileExists(resolvedTargetPath) {
 			fileExists = true
 			if !opts.force {
 				if opts.verbose {
@@ -516,7 +544,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 				// Read the existing file so we can recurse into its own imports.
 				// If the read fails, log it and skip — the compiler will report
 				// any missing transitive dependencies.
-				if existingContent, readErr := os.ReadFile(targetPath); readErr == nil {
+				if existingContent, readErr := root.ReadFile(repoRelPath); readErr == nil {
 					importedBaseDir := path.Dir(remoteFilePath)
 					if err := fetchFrontmatterImportsRecursive(ctx, string(existingContent), importedBaseDir, opts); err != nil && opts.strict {
 						return err
@@ -549,7 +577,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 
 		// Create the parent directory if needed
-		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
+		if err := root.MkdirAll(filepath.Dir(repoRelPath), constants.DirPermPublic); err != nil {
 			if opts.strict {
 				return fmt.Errorf("failed to create directory for import %s: %w", remoteFilePath, err)
 			}
@@ -560,7 +588,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 
 		// Write the file
-		if err := os.WriteFile(targetPath, importContent, constants.FilePermSensitive); err != nil {
+		if err := root.WriteFile(repoRelPath, importContent, constants.FilePermSensitive); err != nil {
 			if opts.strict {
 				return fmt.Errorf("failed to write import %s: %w", remoteFilePath, err)
 			}
@@ -577,9 +605,9 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		// Track the file for git staging and potential rollback
 		if opts.tracker != nil {
 			if fileExists {
-				opts.tracker.TrackModified(targetPath)
+				opts.tracker.TrackModified(resolvedTargetPath)
 			} else {
-				opts.tracker.TrackCreated(targetPath)
+				opts.tracker.TrackCreated(resolvedTargetPath)
 			}
 		}
 
@@ -591,6 +619,21 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 	}
 	return nil
+}
+
+func importBoundaryForTarget(repoRoot, targetDir string) string {
+	rel, err := filepath.Rel(repoRoot, targetDir)
+	if err != nil || !filepath.IsLocal(rel) {
+		return targetDir
+	}
+	for dir := targetDir; ; dir = filepath.Dir(dir) {
+		if filepath.Base(dir) == ".github" {
+			return dir
+		}
+		if dir == repoRoot {
+			return targetDir
+		}
+	}
 }
 
 // includesFetchOptions holds the constant parameters for fetchAndSaveRemoteIncludesWithOptions.

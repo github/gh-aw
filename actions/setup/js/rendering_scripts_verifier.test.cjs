@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const parsers = {
   agy: content => require("./parse_agy_log.cjs").parseAgyLog(content),
+  atomic: content => require("./parse_pi_log.cjs").parseAtomicLog(content),
   claude: content => require("./parse_claude_log.cjs").parseClaudeLog(content),
   codex: content => require("./parse_codex_log.cjs").parseCodexLog(content),
   copilot: content => require("./parse_copilot_log.cjs").parseCopilotLog(content),

@@ -46,7 +46,7 @@ tools:
       restore-only: true
 ```
 
-Atomic workflows (`imports: [shared/atomic.md]`) keep their sessions (`sessions/`) and, with Atomic 0.9.83 or newer, their workflow runs (`workflows/`) only through a drive entry with `id: atomic` declared in the workflow's own frontmatter. Add it when the workflow should resume earlier Atomic sessions or interrupted Atomic workflow runs; the shared engine definition never adds it. See [Atomic sessions on drive memory](https://github.github.com/gh-aw/reference/third-party-agent/#atomic-sessions-on-drive-memory) for the recommended entry.
+Atomic workflows (`imports: [shared/atomic.md]`) keep their sessions (`sessions/`) and, with Atomic 0.9.84 or newer, their workflow runs (`workflows/`) only through a drive entry with `id: atomic` declared in the workflow's own frontmatter. Add it when the workflow should resume earlier Atomic sessions or interrupted Atomic workflow runs; the shared engine definition never adds it. See [Atomic sessions on drive memory](https://github.github.com/gh-aw/reference/third-party-agent/#atomic-sessions-on-drive-memory) for the recommended entry.
 
 ## Compiler effects
 

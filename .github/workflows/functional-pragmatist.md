@@ -24,12 +24,13 @@ network:
     - node
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/reporting.md
 
   - shared/otlp.md
 safe-outputs:
-  steer: true
   create-pull-request:
+    draft: true
     title-prefix: "[fp-enhancer] "
     labels: [refactoring, functional, immutability, code-quality]
     reviewers: [copilot]

@@ -43,7 +43,6 @@ tools:
   bash:
     - "*"
 safe-outputs:
-  steer: true
   create-pull-request:
     title-prefix: "[test-parallel] "
     labels: [automation, testing]
@@ -62,6 +61,7 @@ evals:
   - id: pr_created_or_noop
     question: Did the agent create a pull request for a safe test change, or use noop when no safe change was available?
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/reporting.md
 features:
   gh-aw-detection: true

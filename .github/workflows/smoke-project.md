@@ -31,12 +31,12 @@ tools:
   bash:
     - "*"
 safe-outputs:
-    steer: true
     allowed-domains: [default-safe-outputs]
     add-comment:
       hide-older-comments: true
       max: 2
     create-pull-request:
+      draft: true
       title-prefix: "[smoke-project] "
       if-no-changes: "warn"
       labels: [ai-generated]
@@ -90,6 +90,7 @@ experiments:
     notify:
       issue: 37302
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
   - shared/token-telemetry-check.md
   - shared/reporting.md
