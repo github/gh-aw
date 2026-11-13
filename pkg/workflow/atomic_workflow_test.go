@@ -225,9 +225,9 @@ func TestAtomicHarnessFailures(t *testing.T) {
 }
 
 // atomicDriveHarnessCommand points the harness at a test drive instead of /tmp/gh-aw/drive-memory-atomic.
-func atomicDriveHarnessCommand(t *testing.T, dir, drive string, args ...string) *exec.Cmd {
+func atomicDriveHarnessCommand(t *testing.T, dir, drive, command string, args ...string) *exec.Cmd {
 	t.Helper()
-	cmd := atomicHarnessCommand(t, dir, "node", args...)
+	cmd := atomicHarnessCommand(t, dir, command, args...)
 	harness := filepath.Join(dir, "atomic_harness.cjs")
 	script := loadAtomicSample(t).Behaviors.HarnessScript
 	require.Contains(t, script, `"/tmp/gh-aw/drive-memory-atomic"`)
@@ -262,7 +262,7 @@ console.log(JSON.stringify({args, restored}));`
 		dir := t.TempDir()
 		probePath := filepath.Join(dir, "probe.cjs")
 		require.NoError(t, os.WriteFile(probePath, []byte(probe), 0o600))
-		cmd := atomicDriveHarnessCommand(t, dir, drive, append([]string{probePath, "--no-session", "--approve"}, probeArgs...)...)
+		cmd := atomicDriveHarnessCommand(t, dir, drive, "node", append([]string{probePath, "--no-session", "--approve"}, probeArgs...)...)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), []byte(
 			`{"mcpServers":{"github":{"type":"http","url":"http://localhost/mcp","headers":{"Authorization":"sentinel-mcp-value"}}}}`), 0o600))
 		var stderr strings.Builder
@@ -326,6 +326,209 @@ console.log(JSON.stringify({args, restored}));`
 		require.NoError(t, os.WriteFile(filepath.Join(drive, "sessions", "2026-11-01_old.jsonl"), []byte(`{"type":"session"}`+"\n"), 0o600))
 		run(t, drive, "budget")
 		assert.Equal(t, []string{"2026-11-03_newer.jsonl"}, saved(t, drive))
+	})
+}
+
+// fakeAtomicRunsCLI stands in for Atomic: storage export/import copy JSONL runs to and from a journal directory
+// next to ATOMIC_WORKFLOW_JOURNAL_PATH, and the agent run adds runs to it. Calls are recorded in calls.jsonl.
+const fakeAtomicRunsCLI = `#!/usr/bin/env node
+const fs = require("fs"), path = require("path");
+const modePath = path.join(__dirname, "mode");
+const mode = fs.existsSync(modePath) ? fs.readFileSync(modePath, "utf8").trim() : "";
+const args = process.argv.slice(2);
+const journal = process.env.ATOMIC_WORKFLOW_JOURNAL_PATH || "";
+const store = journal && journal + ".d";
+const record = entry => fs.appendFileSync(path.join(__dirname, "calls.jsonl"), JSON.stringify(entry) + "\n");
+const runs = dir => fs.existsSync(dir) ? fs.readdirSync(dir).filter(name => name.endsWith(".jsonl")).sort() : [];
+if (args[0] === "storage") {
+  const [, command, dir] = args;
+  if (command === "--help") {
+    console.log(mode === "old" ? "Usage:\n  atomic storage status" : "Usage:\n  atomic storage export <dir>\n  atomic storage import <dir>");
+    process.exit(0);
+  }
+  record({command, journal, files: runs(dir)});
+  if (command === "import") {
+    if (runs(dir).some(name => fs.readFileSync(path.join(dir, name), "utf8").includes("diverged"))) {
+      console.error("a run continued differently here");
+      process.exit(1);
+    }
+    fs.mkdirSync(store, {recursive: true});
+    for (const name of runs(dir)) fs.copyFileSync(path.join(dir, name), path.join(store, name));
+  } else if (command === "export") {
+    if (mode === "fail-export") process.exit(1);
+    for (const name of runs(store)) fs.copyFileSync(path.join(store, name), path.join(dir, name));
+  }
+  process.exit(0);
+}
+const index = args.indexOf("--session-dir");
+const sessionDir = index >= 0 ? args[index + 1] : "";
+record({command: "run", journal, imported: runs(store)});
+if (sessionDir) fs.writeFileSync(path.join(sessionDir, "2026-11-13_new.jsonl"), JSON.stringify({type: "session"}) + "\n");
+const run = (id, status, createdAt, note = "", cwd = "/repo") => fs.writeFileSync(path.join(store, id + ".jsonl"), [
+  {type: "atomic.workflow-run", version: 1, runId: id, name: "deploy", cwd, createdAt, status, events: 2,
+    header: {runId: id, inputs: {note}}},
+  {type: "StatusChanged", seq: 1, epoch: 0, key: null, at: createdAt, payload: {status}},
+  {type: "CheckpointRecorded", seq: 2, epoch: 1, key: JSON.stringify(["tool", id]), at: createdAt + 1, payload: {output: note}},
+].map(line => JSON.stringify(line)).join("\n") + "\n");
+if (store) {
+  fs.mkdirSync(store, {recursive: true});
+  if (mode === "budget") {
+    const pad = "x".repeat(6 * 1024 * 1024); // twice per run: in the header and in the checkpoint
+    run("old-unfinished", "running", 1, pad);
+    run("middle-done", "completed", 2, pad);
+    run("newest-done", "failed", 3, pad);
+  } else {
+    run("run-new", "running", 300, "token ghp_" + "a".repeat(36) + " header sentinel-mcp-value");
+    run("run-done", "completed", 200);
+    run("run-leak", "completed", 250, "", "/repo/sentinel-mcp-value");
+  }
+}
+console.log(JSON.stringify({args}));`
+
+func atomicRunExport(id, status string, createdAt int) string {
+	lines := []string{
+		fmt.Sprintf(`{"type":"atomic.workflow-run","version":1,"runId":%q,"name":"deploy","cwd":"/repo","createdAt":%d,"status":%q,"events":1,"header":{"runId":%q}}`, id, createdAt, status, id),
+		fmt.Sprintf(`{"type":"StatusChanged","seq":1,"epoch":0,"key":null,"at":%d,"payload":{"status":%q}}`, createdAt, status),
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func TestAtomicHarnessDriveWorkflowRuns(t *testing.T) {
+	type call struct {
+		Command  string   `json:"command"`
+		Journal  string   `json:"journal"`
+		Files    []string `json:"files"`
+		Imported []string `json:"imported"`
+	}
+	run := func(t *testing.T, drive, mode string) []call {
+		t.Helper()
+		dir := t.TempDir()
+		cli := filepath.Join(dir, "atomic")
+		require.NoError(t, os.WriteFile(cli, []byte(fakeAtomicRunsCLI), 0o700))
+		if mode != "" {
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "mode"), []byte(mode), 0o600))
+		}
+		cmd := atomicDriveHarnessCommand(t, dir, drive, cli, "--no-session", "--approve")
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), []byte(
+			`{"mcpServers":{"github":{"type":"http","url":"http://localhost/mcp","headers":{"Authorization":"sentinel-mcp-value"}}}}`), 0o600))
+		var stderr strings.Builder
+		cmd.Stderr = &stderr
+		require.NoError(t, cmd.Run(), "persistence problems must not fail the agent step: %s", stderr.String())
+		content, err := os.ReadFile(filepath.Join(dir, "calls.jsonl"))
+		require.NoError(t, err)
+		var calls []call
+		for line := range strings.SplitSeq(strings.TrimSpace(string(content)), "\n") {
+			var entry call
+			require.NoError(t, json.Unmarshal([]byte(line), &entry))
+			calls = append(calls, entry)
+		}
+		return calls
+	}
+	commands := func(calls []call) []string {
+		names := make([]string, 0, len(calls))
+		for _, entry := range calls {
+			names = append(names, entry.Command)
+		}
+		return names
+	}
+	list := func(t *testing.T, dir string) []string {
+		t.Helper()
+		entries, err := os.ReadDir(dir)
+		require.NoError(t, err)
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		return names
+	}
+	saveRun := func(t *testing.T, drive, name, content string) {
+		t.Helper()
+		require.NoError(t, os.MkdirAll(filepath.Join(drive, "workflows"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(drive, "workflows", name), []byte(content), 0o600))
+	}
+
+	t.Run("without the atomic drive nothing is imported or exported", func(t *testing.T) {
+		drive := filepath.Join(t.TempDir(), "missing")
+		calls := run(t, drive, "")
+		assert.Equal(t, []string{"run"}, commands(calls))
+		assert.Empty(t, calls[0].Journal)
+		assert.NoDirExists(t, drive)
+	})
+
+	t.Run("imports valid saved runs and saves redacted exports", func(t *testing.T) {
+		drive := t.TempDir()
+		saveRun(t, drive, "run-old.jsonl", atomicRunExport("run-old", "completed", 100))
+		saveRun(t, drive, "bad.jsonl", "not json\n")
+		saveRun(t, drive, "session.jsonl", `{"type":"session"}`+"\n")
+		saveRun(t, drive, "future.jsonl", strings.Replace(atomicRunExport("future", "completed", 1), `"version":1`, `"version":2`, 1))
+		saveRun(t, drive, "notes.txt", "planted\n")
+
+		calls := run(t, drive, "")
+		require.Equal(t, []string{"import", "run", "export"}, commands(calls))
+		assert.Equal(t, []string{"run-old.jsonl"}, calls[0].Files, "invalid files are dropped before import")
+		assert.Equal(t, []string{"run-old.jsonl"}, calls[1].Imported)
+		assert.True(t, strings.HasPrefix(calls[1].Journal, "/tmp/gh-aw/agent/atomic-"), "journal %q must be private", calls[1].Journal)
+		assert.Equal(t, calls[1].Journal, calls[0].Journal)
+		assert.Equal(t, calls[1].Journal, calls[2].Journal)
+		assert.NoFileExists(t, calls[1].Journal, "the private journal is removed with the agent directory")
+
+		assert.Equal(t, []string{"run-done.jsonl", "run-new.jsonl", "run-old.jsonl"}, list(t, filepath.Join(drive, "workflows")),
+			"a run with a secret in an exactly checked field is dropped, invalid and planted files are replaced")
+		assert.Equal(t, []string{"2026-11-13_new.jsonl"}, list(t, filepath.Join(drive, "sessions")))
+		saved, err := os.ReadFile(filepath.Join(drive, "workflows", "run-new.jsonl"))
+		require.NoError(t, err)
+		assert.NotContains(t, string(saved), "ghp_")
+		assert.NotContains(t, string(saved), "sentinel-mcp-value")
+		assert.Contains(t, string(saved), "REDACTED")
+		lines := strings.Split(strings.TrimSpace(string(saved)), "\n")
+		require.Len(t, lines, 3)
+		var header map[string]any
+		require.NoError(t, json.Unmarshal([]byte(lines[0]), &header))
+		assert.Equal(t, map[string]any{
+			"type": "atomic.workflow-run", "version": float64(1), "runId": "run-new", "name": "deploy", "cwd": "/repo",
+			"createdAt": float64(300), "status": "running", "events": float64(2),
+			"header": map[string]any{"runId": "run-new", "inputs": map[string]any{"note": "token ***REDACTED*** header ***REDACTED***"}},
+		}, header)
+		assert.JSONEq(t, `{"type":"CheckpointRecorded","seq":2,"epoch":1,"key":"[\"tool\",\"run-new\"]","at":301,"payload":{"output":"token ***REDACTED*** header ***REDACTED***"}}`, lines[2])
+	})
+
+	t.Run("keeps unfinished runs first, then the newest, within the size budget", func(t *testing.T) {
+		drive := t.TempDir()
+		run(t, drive, "budget")
+		assert.Equal(t, []string{"newest-done.jsonl", "old-unfinished.jsonl"}, list(t, filepath.Join(drive, "workflows")))
+	})
+
+	t.Run("a run import refuses does not block the others", func(t *testing.T) {
+		drive := t.TempDir()
+		saveRun(t, drive, "run-a.jsonl", atomicRunExport("run-a", "running", 10))
+		saveRun(t, drive, "run-b.jsonl", atomicRunExport("run-b", "diverged", 20))
+		calls := run(t, drive, "")
+		require.Equal(t, []string{"import", "import", "import", "run", "export"}, commands(calls))
+		assert.Equal(t, []string{"run-a.jsonl", "run-b.jsonl"}, calls[0].Files)
+		assert.Equal(t, []string{"run-a.jsonl"}, calls[1].Files)
+		assert.Equal(t, []string{"run-b.jsonl"}, calls[2].Files)
+		assert.Equal(t, []string{"run-a.jsonl"}, calls[3].Imported)
+		assert.Contains(t, list(t, filepath.Join(drive, "workflows")), "run-a.jsonl")
+		assert.NotContains(t, list(t, filepath.Join(drive, "workflows")), "run-b.jsonl")
+	})
+
+	t.Run("a failed export leaves saved runs alone", func(t *testing.T) {
+		drive := t.TempDir()
+		saveRun(t, drive, "run-old.jsonl", atomicRunExport("run-old", "completed", 100))
+		calls := run(t, drive, "fail-export")
+		assert.Equal(t, []string{"import", "run", "export"}, commands(calls))
+		assert.Equal(t, []string{"run-old.jsonl"}, list(t, filepath.Join(drive, "workflows")))
+		assert.Equal(t, []string{"2026-11-13_new.jsonl"}, list(t, filepath.Join(drive, "sessions")))
+	})
+
+	t.Run("an Atomic without export keeps sessions and leaves saved runs alone", func(t *testing.T) {
+		drive := t.TempDir()
+		saveRun(t, drive, "run-old.jsonl", atomicRunExport("run-old", "completed", 100))
+		calls := run(t, drive, "old")
+		require.Equal(t, []string{"run"}, commands(calls))
+		assert.Empty(t, calls[0].Journal)
+		assert.Equal(t, []string{"run-old.jsonl"}, list(t, filepath.Join(drive, "workflows")))
+		assert.Equal(t, []string{"2026-11-13_new.jsonl"}, list(t, filepath.Join(drive, "sessions")))
 	})
 }
 

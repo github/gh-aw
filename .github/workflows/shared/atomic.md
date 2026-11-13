@@ -95,6 +95,7 @@ engine:
       // A workflow opts in by declaring tools.drive-memory with id: atomic.
       const sessionDrive = "/tmp/gh-aw/drive-memory-atomic";
       const sessionBudgetBytes = 32 * 1024 * 1024;
+      const workflowBudgetBytes = 32 * 1024 * 1024;
       const listSessions = dir => {
         try {
           return readdirSync(dir, { withFileTypes: true })
@@ -117,6 +118,18 @@ engine:
           }
         });
       };
+      // Workflow runs travel as `atomic storage export` files (Atomic 0.9.83+): a header line, then one line per event.
+      const parseRun = content => {
+        if (!isSession(content)) return undefined;
+        const lines = content.split("\n");
+        if (lines.at(-1) === "") lines.pop();
+        const records = lines.map(line => JSON.parse(line));
+        return records[0].type === "atomic.workflow-run" && records[0].version === 1 ? records : undefined;
+      };
+      // Import checks these fields exactly (and resume relies on name, cwd and status); only string content may change.
+      const exactRunFields = ({ header, payload, ...exact }) =>
+        JSON.stringify([exact, header?.runId, exact.type === "StatusChanged" ? payload?.status : undefined]);
+      const isFinishedRun = status => ["completed", "failed", "cancelled"].includes(status);
       const restoreSessions = sessionDir => {
         const saved = join(sessionDrive, "sessions");
         if (!existsSync(saved) || !lstatSync(saved).isDirectory()) return;
@@ -124,6 +137,81 @@ engine:
           const content = readFileSync(join(sessionDrive, "sessions", name), "utf8");
           if (isSession(content)) writeFileSync(join(sessionDir, name), content, { mode: 0o600 });
           else log(`Skipping malformed saved session ${name}`);
+        }
+      };
+      const runStorage = (spawn, storageArgs) => {
+        const result = spawn(["storage", ...storageArgs]);
+        if (result.status === 0) return true;
+        log(`Warning: atomic storage ${storageArgs[0]} failed (${result.error?.message || `exit code ${result.status ?? result.signal}`}): ${sanitize(result.stderr).trim().slice(-2000)}`);
+        return false;
+      };
+      const supportsRunTransfer = spawn => {
+        const help = spawn(["storage", "--help"]);
+        const usage = help.status === 0 ? help.stdout?.toString("utf8") || "" : "";
+        return /\bstorage export\b/.test(usage) && /\bstorage import\b/.test(usage);
+      };
+      // Restored files passed threat detection when they were saved; import refuses anything else, all or nothing.
+      const restoreRuns = (spawn, runsDir) => {
+        const saved = join(sessionDrive, "workflows");
+        if (!existsSync(saved) || !lstatSync(saved).isDirectory()) return;
+        const names = listSessions(saved).filter(name => {
+          const content = readFileSync(join(saved, name), "utf8");
+          if (parseRun(content)) {
+            writeFileSync(join(runsDir, name), content, { mode: 0o600 });
+            return true;
+          }
+          log(`Skipping malformed saved workflow run ${name}`);
+          return false;
+        });
+        if (names.length === 0 || runStorage(spawn, ["import", runsDir])) return;
+        for (const name of names) {
+          const single = mkdtempSync(join(runsDir, ".import-"));
+          renameSync(join(runsDir, name), join(single, name));
+          if (!runStorage(spawn, ["import", single])) log(`Not restoring workflow run ${name}`);
+        }
+      };
+      // Only redacted exports whose exact fields survived redaction reach the drive; unfinished runs, then newest, win the budget.
+      const persistRuns = (spawn, exportDir) => {
+        const { redactArtifactContent } = require("./redact_secrets.cjs");
+        if (!runStorage(spawn, ["export", exportDir])) return;
+        const runs = [];
+        for (const name of listSessions(exportDir)) {
+          const original = readFileSync(join(exportDir, name), "utf8");
+          const content = redactArtifactContent(original, [...sensitiveValues], []).content;
+          const before = parseRun(original);
+          const after = parseRun(content);
+          if (!before || !after || after.length !== before.length ||
+              after.some((record, index) => exactRunFields(record) !== exactRunFields(before[index]))) {
+            log(`Not saving workflow run ${name}: it is malformed or a secret appears in a field import checks exactly`);
+            continue;
+          }
+          runs.push({ name, content, header: after[0] });
+        }
+        runs.sort((a, b) => Number(isFinishedRun(a.header.status)) - Number(isFinishedRun(b.header.status)) ||
+          b.header.createdAt - a.header.createdAt || a.name.localeCompare(b.name));
+        const staging = mkdtempSync(join(sessionDrive, ".workflows-"));
+        try {
+          let bytes = 0;
+          for (const { name, content } of runs) {
+            bytes += Buffer.byteLength(content);
+            if (bytes > workflowBudgetBytes) {
+              log(`Not saving workflow run ${name} or older finished runs: saved workflow runs are limited to ${workflowBudgetBytes} bytes`);
+              break;
+            }
+            writeFileSync(join(staging, name), content, { mode: 0o600 });
+          }
+          rmSync(join(sessionDrive, "workflows"), { recursive: true, force: true });
+          renameSync(staging, join(sessionDrive, "workflows"));
+        } finally {
+          rmSync(staging, { recursive: true, force: true });
+        }
+      };
+      // Persistence problems are reported, never turned into agent failures.
+      const tryPersist = (what, action) => {
+        try {
+          action();
+        } catch (error) {
+          log(`Warning: keeping Atomic ${what} on the drive failed: ${error instanceof Error ? error.message : String(error)}`);
         }
       };
       // Only redacted, well-formed transcripts reach the drive; newest names win the size budget.
@@ -208,11 +296,12 @@ engine:
         mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         const agentDir = mkdtempSync("/tmp/gh-aw/agent/atomic-");
         let sessionDir;
+        let persistWorkflowRuns;
         try {
           if (existsSync(sessionDrive) && statSync(sessionDrive).isDirectory()) {
             sessionDir = join(agentDir, "sessions");
             mkdirSync(sessionDir, { mode: 0o700 });
-            restoreSessions(sessionDir);
+            tryPersist("sessions", () => restoreSessions(sessionDir));
           }
           const runArgs = sessionDir ? [...args.filter(arg => arg !== "--no-session"), "--session-dir", sessionDir] : args;
           const writeConfig = (name, value) => writeFileSync(join(agentDir, name), JSON.stringify(value), { mode: 0o600 });
@@ -258,8 +347,30 @@ engine:
             }
             env[name] = value;
           }
+          const cwd = process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE;
+          if (sessionDir) {
+            const spawn = storageArgs => spawnSync(command, storageArgs, {
+              cwd, env, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024, timeout: 5 * 60 * 1000,
+            });
+            tryPersist("workflow runs", () => {
+              if (!supportsRunTransfer(spawn)) {
+                log("This Atomic cannot export workflow runs (0.9.83 or newer can); saving sessions only");
+                return;
+              }
+              // A private journal file, so import, the run and export all use the same journal.
+              env.ATOMIC_WORKFLOW_JOURNAL_PATH = join(agentDir, "workflows", "journal.sqlite");
+              const runsDir = join(agentDir, "workflow-runs");
+              mkdirSync(runsDir, { mode: 0o700 });
+              restoreRuns(spawn, runsDir);
+              persistWorkflowRuns = () => {
+                const exportDir = join(agentDir, "workflow-export");
+                mkdirSync(exportDir, { mode: 0o700 });
+                persistRuns(spawn, exportDir);
+              };
+            });
+          }
           const result = spawnSync(command, [...runArgs, "--provider", "awf-proxy", "--model", model], {
-            cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
+            cwd,
             env,
             input: prompt,
             stdio: ["pipe", "pipe", "pipe"],
@@ -280,7 +391,8 @@ engine:
           }
         } finally {
           try {
-            if (sessionDir) persistSessions(sessionDir);
+            if (sessionDir) tryPersist("sessions", () => persistSessions(sessionDir));
+            if (persistWorkflowRuns) tryPersist("workflow runs", persistWorkflowRuns);
           } finally {
             rmSync(agentDir, { recursive: true, force: true });
           }
@@ -353,9 +465,18 @@ well-formed `sessions/*.jsonl` transcripts from the drive into a private
 JSONL session directory, runs Atomic with `--session-dir`, and afterwards
 replaces `sessions/` with redacted transcripts (configured MCP header values
 and built-in token patterns) whose every line is a JSON object with a string
-`type`, newest first, up to 32 MiB. Workflow-stage transcripts are included;
-the SQLite workflow journal is not saved. Drive memory stages these files and
-publishes them only after threat detection accepts the run.
+`type`, newest first, up to 32 MiB. Workflow-stage transcripts are included.
+With Atomic 0.9.83 or newer (detected from `atomic storage --help`), workflow
+runs are kept too: valid `workflows/*.jsonl` exports (a version 1
+`atomic.workflow-run` header, then JSON object lines) are imported into a
+private journal (`ATOMIC_WORKFLOW_JOURNAL_PATH`) with `atomic storage import`,
+and afterwards `atomic storage export` output is redacted the same way,
+dropped when redaction would change a field import checks exactly, and
+written to `workflows/`, unfinished runs first and then newest, up to another
+32 MiB. Older Atomic versions save sessions only and leave `workflows/` alone.
+Persistence problems are logged as warnings and never fail the agent step.
+Drive memory stages these files and publishes them only after threat
+detection accepts the run.
 Everything else in Atomic is on, minus its one interactive tool. `--approve`
 loads the repository's `.atomic/` extensions, workflows, skills, prompt
 templates, and settings, so a repository can add custom tools, workflows, and
