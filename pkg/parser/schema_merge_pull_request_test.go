@@ -127,7 +127,19 @@ func TestMainWorkflowSchema_MergePullRequestAllowedBaseBranches(t *testing.T) {
 		{"blank", map[string]any{"allowed-base-branches": []any{" "}}, false},
 		{"not array", map[string]any{"allowed-base-branches": "agent-work/*"}, false},
 		{"not string", map[string]any{"allowed-base-branches": []any{true}}, false},
+		{"expression string", map[string]any{"allowed-base-branches": "${{inputs.base}}"}, false},
+		{"expression entry", map[string]any{"allowed-base-branches": []any{"${{ inputs.base }}"}}, false},
+		{"compact expression", map[string]any{"allowed-base-branches": []any{"${{inputs.base}}"}}, false},
+		{"embedded expression", map[string]any{"allowed-base-branches": []any{"agent-work/${{inputs.base}}"}}, false},
+		{"negation", map[string]any{"allowed-base-branches": []any{"agent-work/**", "!agent-work/prod"}}, false},
+		{"character class", map[string]any{"allowed-base-branches": []any{"agent-work/[ab]"}}, false},
+		{"optional character", map[string]any{"allowed-base-branches": []any{"agent-work/next?"}}, false},
+		{"repetition", map[string]any{"allowed-base-branches": []any{"agent-work/next+"}}, false},
+		{"brace expansion", map[string]any{"allowed-base-branches": []any{"agent-work/{next,prod}"}}, false},
+		{"extglob", map[string]any{"allowed-base-branches": []any{"agent-work/@(next|prod)"}}, false},
+		{"escape", map[string]any{"allowed-base-branches": []any{`agent-work/\*`}}, false},
 		{"scoped", map[string]any{"allowed-base-branches": []any{"integration", "agent-work/*"}}, true},
+		{"nested scope", map[string]any{"allowed-base-branches": []any{"agent-work/**"}}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			frontmatter := map[string]any{"on": "push", "safe-outputs": map[string]any{"merge-pull-request": tc.config}}

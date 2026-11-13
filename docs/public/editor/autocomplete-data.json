@@ -3056,7 +3056,7 @@
           "children": {
             "allowed-base-branches": {
               "type": "array",
-              "desc": "Required scoped glob patterns for destination (base) branches declared by the owner as non-consequential automated in...",
+              "desc": "Required static scoped patterns for destination (base) branches declared by the owner as non-consequential automated ...",
               "array": true
             },
             "protected-files": {

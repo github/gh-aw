@@ -235,13 +235,15 @@ for (const [key, propSchema] of Object.entries(schema.properties)) {
   root[key] = buildEntry(propSchema, effectiveDepth);
 }
 
-const output = {
+export const autocompleteData = {
   root,
   sortOrder: ROOT_SORT_ORDER,
 };
 
-fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2));
-const stats = fs.statSync(OUTPUT_PATH);
-console.log(`Generated ${OUTPUT_PATH}`);
-console.log(`  Size: ${(stats.size / 1024).toFixed(1)} KB`);
-console.log(`  Root keys: ${Object.keys(root).length}`);
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(autocompleteData, null, 2));
+  const stats = fs.statSync(OUTPUT_PATH);
+  console.log(`Generated ${OUTPUT_PATH}`);
+  console.log(`  Size: ${(stats.size / 1024).toFixed(1)} KB`);
+  console.log(`  Root keys: ${Object.keys(root).length}`);
+}

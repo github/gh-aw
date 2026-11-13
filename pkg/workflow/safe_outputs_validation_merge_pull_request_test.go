@@ -3,6 +3,10 @@
 package workflow
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -287,7 +291,18 @@ func TestMergePullRequestAllowedBaseBranches(t *testing.T) {
 		{"slash globstar", []string{"**/**"}, "unrestricted wildcard"},
 		{"mixed wildcard", []string{"agent-work/*", "*"}, "allowed-base-branches[1]"},
 		{"invalid ref", []string{"agent work/*"}, "invalid glob pattern"},
+		{"expression", []string{"${{ inputs.base }}"}, "static branch pattern"},
+		{"compact expression", []string{"${{inputs.base}}"}, "static branch pattern"},
+		{"embedded expression", []string{"agent-work/${{inputs.base}}"}, "static branch pattern"},
+		{"negation", []string{"agent-work/**", "!agent-work/prod"}, "allowed-base-branches[1]"},
+		{"character class", []string{"agent-work/[ab]"}, "static branch pattern"},
+		{"optional character", []string{"agent-work/next?"}, "static branch pattern"},
+		{"repetition", []string{"agent-work/next+"}, "static branch pattern"},
+		{"brace expansion", []string{"agent-work/{next,prod}"}, "static branch pattern"},
+		{"extglob", []string{"agent-work/@(next|prod)"}, "static branch pattern"},
+		{"escape", []string{`agent-work/\*`}, "static branch pattern"},
 		{"scoped", []string{"integration", "agent-work/*"}, ""},
+		{"nested scope", []string{"agent-work/**"}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateMergePullRequestPolicies(&SafeOutputsConfig{
@@ -303,4 +318,50 @@ func TestMergePullRequestAllowedBaseBranches(t *testing.T) {
 	}
 	cfg := NewCompiler().parseMergePullRequestConfig(map[string]any{"merge-pull-request": nil})
 	require.ErrorContains(t, validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: cfg}, "Test"), "allowed-base-branches is required")
+}
+
+func TestMergePullRequestAllowedBaseBranchesCompilation(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		patterns any
+		valid    bool
+	}{
+		{"scoped", []string{"integration", "agent-work/*", "agent-work/**"}, true},
+		{"expression string", "${{inputs.base}}", false},
+		{"expression entry", []string{"${{inputs.base}}"}, false},
+		{"embedded expression", []string{"agent-work/${{inputs.base}}"}, false},
+		{"negation", []string{"agent-work/**", "!agent-work/prod"}, false},
+		{"character class", []string{"agent-work/[ab]"}, false},
+		{"unrestricted", []string{"**/**"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			patterns, err := json.Marshal(tc.patterns)
+			require.NoError(t, err)
+			path := filepath.Join(t.TempDir(), "merge-policy.md")
+			content := fmt.Sprintf(`---
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  merge-pull-request:
+    allowed-base-branches: %s
+---
+# Merge policy
+Evaluate the pull request.
+`, patterns)
+			require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+			compiler := NewCompiler()
+			compiler.SetStrictMode(false)
+			err = compiler.CompileWorkflow(path)
+			if !tc.valid {
+				require.ErrorContains(t, err, "allowed-base-branches")
+				_, err = os.Stat(filepath.Join(filepath.Dir(path), "merge-policy.lock.yml"))
+				require.True(t, os.IsNotExist(err), "invalid policy must not produce an executable workflow")
+				return
+			}
+			require.NoError(t, err)
+			compiled, err := os.ReadFile(filepath.Join(filepath.Dir(path), "merge-policy.lock.yml"))
+			require.NoError(t, err)
+			assert.Contains(t, string(compiled), `\"allowed_base_branches\":[\"integration\",\"agent-work/*\",\"agent-work/**\"]`)
+		})
+	}
 }

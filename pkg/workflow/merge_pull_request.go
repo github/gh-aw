@@ -147,6 +147,9 @@ func validateMergePullRequestBaseBranches(patterns []string) error {
 		if strings.Trim(pattern, "*/") == "" {
 			return fmt.Errorf("safe-outputs.merge-pull-request.allowed-base-branches[%d] cannot be an unrestricted wildcard. Expected a scoped base branch pattern such as \"agent-work/*\"", i)
 		}
+		if strings.ContainsAny(pattern, "!+?[]{}()\\") {
+			return fmt.Errorf("invalid glob pattern %q in safe-outputs.merge-pull-request.allowed-base-branches[%d]: expected a static branch pattern with only * and ** glob operators. Expressions, negation, character classes, braces, extglobs, and escapes are unsupported. Use a scoped pattern such as \"agent-work/*\"", pattern, i)
+		}
 	}
 	return validateGlobPatternList(patterns, validateRefGlob, func(i int, pattern string, messages []string) error {
 		return fmt.Errorf("invalid glob pattern %q in safe-outputs.merge-pull-request.allowed-base-branches[%d]: %s. Expected a scoped base branch pattern such as \"agent-work/*\"", pattern, i, strings.Join(messages, "; "))

@@ -607,8 +607,10 @@ function resolvePullRequestNumber(message, resolvedTemporaryIds) {
  */
 async function main(config = {}) {
   const allowedBaseBranches = config.allowed_base_branches;
-  if (!Array.isArray(allowedBaseBranches) || allowedBaseBranches.length === 0 || allowedBaseBranches.some(pattern => typeof pattern !== "string" || !pattern || /\s/.test(pattern) || /^[*/]+$/.test(pattern))) {
-    throw new Error(`${SAFE_OUTPUT_E001}: merge-pull-request.allowed-base-branches requires a non-empty list of scoped base branch patterns, not unrestricted wildcards. Declare owner-authorized destinations such as "agent-work/*"`);
+  if (!Array.isArray(allowedBaseBranches) || allowedBaseBranches.length === 0 || allowedBaseBranches.some(pattern => typeof pattern !== "string" || !pattern || /[\s!+?[\]{}()\\]/.test(pattern) || /^[*/]+$/.test(pattern))) {
+    throw new Error(
+      `${SAFE_OUTPUT_E001}: merge-pull-request.allowed-base-branches requires a non-empty list of static scoped branch patterns using only * and ** glob operators, not expressions or unrestricted wildcards. Declare owner-authorized destinations such as "agent-work/*"`
+    );
   }
   const allowedBaseBranchPatterns = compilePathGlobs(allowedBaseBranches);
   const githubClient = await createAuthenticatedGitHubClient(config);

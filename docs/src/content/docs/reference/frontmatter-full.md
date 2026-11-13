@@ -16993,11 +16993,12 @@ safe-outputs:
   # blocked unless all configured gates pass.
   # (optional)
   merge-pull-request:
-    # Required scoped glob patterns for destination (base) branches declared by the
-    # owner as non-consequential automated integration targets. Patterns consisting
-    # only of * and /, such as *, **, */*, and **/*, are forbidden. Default and
-    # protected branches remain blocked. This declaration is not proof of harmless
-    # downstream effects.
+    # Required static scoped patterns for destination (base) branches declared by the
+    # owner as non-consequential automated integration targets. Only * and ** glob
+    # operators are supported; expressions, negation, character classes, braces,
+    # extglobs, and escapes are forbidden. Patterns consisting only of * and /, such
+    # as *, **, */*, and **/*, are forbidden. Default and protected branches remain
+    # blocked. This declaration is not proof of harmless downstream effects.
     allowed-base-branches: []
       # Array of strings
 

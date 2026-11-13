@@ -348,14 +348,40 @@ describe("merge_pull_request policy hardening", () => {
     return handler(message, {});
   }
 
-  it.each([undefined, null, [], "*", ["*"], ["**"], ["***"], ["*/*"], ["**/*"], ["*/**"], ["**/**"], ["integration", "*"], [""], [" "], ["integration branch"], [42], ["${{ inputs.branch }}"]])(
-    "rejects invalid destination policy %j before fetching or merging",
-    async allowed_base_branches => {
-      await expect(run({ allowed_base_branches })).rejects.toThrow("allowed-base-branches requires");
-      expect(client.rest.pulls.get).not.toHaveBeenCalled();
-      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
-    }
-  );
+  it.each(
+    [
+      undefined,
+      null,
+      [],
+      "*",
+      ["*"],
+      ["**"],
+      ["***"],
+      ["*/*"],
+      ["**/*"],
+      ["*/**"],
+      ["**/**"],
+      ["integration", "*"],
+      [""],
+      [" "],
+      ["integration branch"],
+      [42],
+      ["${{ inputs.branch }}"],
+      ["${{inputs.branch}}"],
+      ["agent-work/${{inputs.branch}}"],
+      ["agent-work/**", "!agent-work/prod"],
+      ["agent-work/[ab]"],
+      ["agent-work/next?"],
+      ["agent-work/next+"],
+      ["agent-work/{next,prod}"],
+      ["agent-work/@(next|prod)"],
+      ["agent-work/\\*"],
+    ].map(allowed_base_branches => ({ allowed_base_branches }))
+  )("rejects invalid destination policy $allowed_base_branches before fetching or merging", async ({ allowed_base_branches }) => {
+    await expect(run({ allowed_base_branches })).rejects.toThrow("allowed-base-branches requires");
+    expect(client.rest.pulls.get).not.toHaveBeenCalled();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
 
   it.each([false, true].flatMap(staged => [false, true].map(crossRepository => ({ staged, crossRepository }))))(
     "blocks a disallowed destination despite an allowed source (staged=$staged, crossRepository=$crossRepository)",
@@ -391,13 +417,16 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])("blocks destination retargeting at final revalidation (staged=%s)", async staged => {
-    client.rest.pulls.get.mockResolvedValueOnce({ data: structuredClone(pr) }).mockResolvedValueOnce({ data: { ...structuredClone(pr), base: { ...pr.base, ref: "other/next" } } });
-    const result = await run({ staged, allowed_base_branches: ["integration"] });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("policy state changed");
-    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
-  });
+  it.each([false, true].flatMap(staged => [false, true].map(allowRetargetedBase => ({ staged, allowRetargetedBase }))))(
+    "blocks destination retargeting at final revalidation (staged=$staged, allowRetargetedBase=$allowRetargetedBase)",
+    async ({ staged, allowRetargetedBase }) => {
+      client.rest.pulls.get.mockResolvedValueOnce({ data: structuredClone(pr) }).mockResolvedValueOnce({ data: { ...structuredClone(pr), base: { ...pr.base, ref: "other/next" } } });
+      const result = await run({ staged, allowed_base_branches: allowRetargetedBase ? ["integration", "other/next"] : ["integration"] });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("policy state changed");
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(["protected", "default"])("keeps matched %s destinations blocked", async policy => {
     if (policy === "protected") client.rest.repos.getBranch.mockResolvedValue({ data: { protected: true } });
