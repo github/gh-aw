@@ -29,10 +29,12 @@ func runTemplateInjection(t *testing.T, workflow *actions.Workflow) []Diagnostic
 
 func TestTemplateInjectionSources(t *testing.T) {
 	for _, expr := range []string{
-		"github.event.issue.title", "github.event.issue.body",
-		"github.event.pull_request.title", "github.event.pull_request.body",
-		"github.event.comment.body", "github.event.review.body", "github.event.review_comment.body",
-		"github.head_ref", "github.ref", "github.ref_name",
+		"github.event.issue.title", "github.event.issue.body", "github.event.issue.user.login",
+		"github.event.pull_request.title", "github.event.pull_request.body", "github.event.pull_request.user.login",
+		"github.event.comment.body", "github.event.comment.user.login",
+		"github.event.review.body", "github.event.review.user.login",
+		"github.event.review_comment.body", "github.event.review_comment.user.login",
+		"github.actor", "github.triggering_actor", "github.head_ref", "github.ref", "github.ref_name",
 		"github.event.pull_request.head.ref", "github.event.pull_request.head.label",
 		"github.event.pull_request.head.repo.default_branch",
 		"github.event.label.name", "github.event.issue.labels[0].name",
@@ -77,7 +79,7 @@ func TestTemplateInjectionSafeExpressions(t *testing.T) {
 		"github.event.issue.number", "github.event.issue.id",
 		"github.event.pull_request.number", "github.event.pull_request.head.sha",
 		"github.event.comment.id", "github.event.repository.full_name",
-		"github.repository", "github.actor", "github.sha",
+		"github.repository", "github.sha",
 		"github.run_id", "github.run_number", "github.event_name",
 		"github.event.workflow_run.id", "github.event.workflow_run.head_sha",
 		"steps.compiler.outputs.validated", "needs.activation.outputs.ref",

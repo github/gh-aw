@@ -24,10 +24,12 @@ var renderLog = logger.New("console:render")
 // - Rendering maps as markdown headers
 //
 // Struct tags:
-// - `console:"title:My Title"` - Sets the title for a section
-// - `console:"header:Column Name"` - Sets the column header name for table columns
-// - `console:"omitempty"` - Skips zero values
-// - `console:"-"` - Skips the field entirely
+//   - `console:"title:My Title"` - Sets the title for a section
+//   - `console:"header:Column Name"` - Sets the column header name for table columns
+//   - `console:"omitempty"` - Skips zero values; zero struct and array fields
+//     are retained in single-struct rendering and omitted from tables only when
+//     every row has a zero value
+//   - `console:"-"` - Skips the field entirely
 func RenderStruct(v any) string {
 	return renderStructWithRenderer(v, RenderTable)
 }
@@ -105,7 +107,7 @@ func renderInlineEmbeddedFields(val reflect.Value, maxFieldLen int, output *stri
 		if tag.skip {
 			return
 		}
-		if tag.omitempty && isZeroValue(field) {
+		if tag.omitempty && isZeroStructFieldValue(field) {
 			return
 		}
 
@@ -125,7 +127,7 @@ func computeMaxFieldLen(val reflect.Value) int {
 	walkInlineFields(val, func(field reflect.Value, fieldType reflect.StructField) {
 		tag := parseConsoleTag(fieldType.Tag.Get("console"))
 
-		if tag.skip || (tag.omitempty && isZeroValue(field)) {
+		if tag.skip || (tag.omitempty && isZeroStructFieldValue(field)) {
 			return
 		}
 
@@ -280,29 +282,46 @@ func buildTableConfig(val reflect.Value, title string) TableConfig {
 		elemType = elemType.Elem()
 	}
 
-	// Build headers from struct fields
-	headers, fieldPaths, fieldTags := buildTableHeaders(elemType)
-	config.Headers = headers
+	fields := omitEmptyColumns(val, collectTableFields(elemType, nil))
+	for _, field := range fields {
+		config.Headers = append(config.Headers, field.header)
+	}
 
 	// Build rows
-	config.Rows = buildTableRows(val, fieldPaths, fieldTags)
+	config.Rows = buildTableRows(val, fields)
 
 	return config
 }
 
-// buildTableHeaders extracts column headers, field index paths, and tags from a struct type,
-// flattening anonymous embedded struct fields into the top-level column list.
-func buildTableHeaders(elemType reflect.Type) (headers []string, fieldPaths [][]int, fieldTags []consoleTag) {
-	fields := collectTableFields(elemType, nil)
-	headers = make([]string, 0, len(fields))
-	fieldPaths = make([][]int, 0, len(fields))
-	fieldTags = make([]consoleTag, 0, len(fields))
+func omitEmptyColumns(val reflect.Value, fields []tableField) []tableField {
+	filtered := make([]tableField, 0, len(fields))
 	for _, field := range fields {
-		headers = append(headers, field.header)
-		fieldPaths = append(fieldPaths, field.path)
-		fieldTags = append(fieldTags, field.tag)
+		if field.tag.omitempty && !tableFieldHasValue(val, field.path) {
+			continue
+		}
+		filtered = append(filtered, field)
 	}
-	return headers, fieldPaths, fieldTags
+	return filtered
+}
+
+func tableFieldHasValue(rows reflect.Value, fieldPath []int) bool {
+	for i := range rows.Len() {
+		row := rows.Index(i)
+		for row.Kind() == reflect.Pointer {
+			if row.IsNil() {
+				break
+			}
+			row = row.Elem()
+		}
+		if row.Kind() != reflect.Struct {
+			continue
+		}
+		field, ok := fieldByIndexSafe(row, fieldPath)
+		if ok && !isZeroTableColumnValue(field) {
+			return true
+		}
+	}
+	return false
 }
 
 // collectTableFields recursively walks a struct type, inlining the fields of any
@@ -311,9 +330,7 @@ func collectTableFields(t reflect.Type, prefix []int) []tableField {
 	fields := make([]tableField, 0, t.NumField())
 	for i := range t.NumField() {
 		field := t.Field(i)
-		fieldPath := make([]int, len(prefix)+1)
-		copy(fieldPath, prefix)
-		fieldPath[len(prefix)] = i
+		fieldPath := append(append([]int(nil), prefix...), i)
 
 		if field.Anonymous {
 			if parseConsoleTag(field.Tag.Get("console")).skip {
@@ -346,7 +363,7 @@ func collectTableFields(t reflect.Type, prefix []int) []tableField {
 }
 
 // buildTableRows builds the row data for a slice of struct elements.
-func buildTableRows(val reflect.Value, fieldPaths [][]int, fieldTags []consoleTag) [][]string {
+func buildTableRows(val reflect.Value, fields []tableField) [][]string {
 	var rows [][]string
 	for i := range val.Len() {
 		elem := val.Index(i)
@@ -363,13 +380,13 @@ func buildTableRows(val reflect.Value, fieldPaths [][]int, fieldTags []consoleTa
 		}
 
 		var row []string
-		for j, fieldPath := range fieldPaths {
-			field, ok := fieldByIndexSafe(elem, fieldPath)
+		for _, column := range fields {
+			field, ok := fieldByIndexSafe(elem, column.path)
 			if !ok {
 				row = append(row, "")
 				continue
 			}
-			row = append(row, formatFieldValueWithTag(field, fieldTags[j]))
+			row = append(row, formatFieldValueWithTag(field, column.tag))
 		}
 		rows = append(rows, row)
 	}
@@ -450,6 +467,20 @@ func parseConsoleTag(tag string) consoleTag {
 	return result
 }
 
+func isZeroStructFieldValue(val reflect.Value) bool {
+	if val.IsValid() && (val.Kind() == reflect.Array || (val.Kind() == reflect.Struct && val.Type().String() != "time.Time")) {
+		return false
+	}
+	return isZeroValue(val)
+}
+
+func isZeroTableColumnValue(val reflect.Value) bool {
+	if val.IsValid() && (val.Kind() == reflect.Array || (val.Kind() == reflect.Struct && val.Type().String() != "time.Time")) {
+		return val.IsZero()
+	}
+	return isZeroValue(val)
+}
+
 // isZeroValue checks if a reflect.Value is the zero value for its type
 func isZeroValue(val reflect.Value) bool {
 	if !val.IsValid() {
@@ -468,7 +499,9 @@ func isZeroValue(val reflect.Value) bool {
 	}
 
 	switch val.Kind() {
-	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
+	case reflect.Array, reflect.Struct:
+		return val.IsZero()
+	case reflect.Map, reflect.Slice, reflect.String:
 		return val.Len() == 0
 	case reflect.Bool:
 		return !val.Bool()
