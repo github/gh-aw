@@ -444,7 +444,7 @@ func TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSec
 	config.AutoMerge = true
 	confirmationRan = false
 	_, _, secretName, secretValue, createPR, err = config.prepareAndConfirmAddInteractive()
-	require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+	require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 	assert.True(t, confirmationRan, "auto-merge must validate the selected delivery mode")
 	assert.False(t, createPR)
 	assert.Empty(t, secretName)

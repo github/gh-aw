@@ -46,6 +46,9 @@ func TestPullRequestAutoMergeHelpUsesVisibleFlag(t *testing.T) {
 	for _, tc := range commands {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := tc.new()
+			prFlag := cmd.Flags().Lookup("pr")
+			require.NotNil(t, prFlag)
+			assert.True(t, prFlag.Hidden, "--pr must stay a hidden compatibility alias")
 			flag := cmd.Flags().Lookup("auto-merge")
 			require.NotNil(t, flag)
 			assert.Contains(t, flag.Usage, "requires --create-pull-request")
@@ -81,7 +84,7 @@ func TestUpdateUpgradeAutoMergeRequiresPREarly(t *testing.T) {
 						return assert.AnError
 					})
 					cmd.SetArgs(args)
-					require.EqualError(t, cmd.Execute(), "--auto-merge requires --pr or --create-pull-request")
+					require.EqualError(t, cmd.Execute(), "--auto-merge requires --create-pull-request")
 					assert.False(t, validated, "invalid auto-merge usage must fail before engine validation or any dispatch")
 				})
 			}

@@ -25,8 +25,8 @@ func TestInitAutoMergeRequiresPR(t *testing.T) {
 	assert.Equal(t, "false", flag.DefValue)
 	assert.Contains(t, flag.Usage, "requires --create-pull-request")
 	require.NoError(t, cmd.Flags().Set("auto-merge", "true"))
-	require.ErrorContains(t, cmd.RunE(cmd, nil), "--auto-merge requires --pr or --create-pull-request")
-	require.ErrorContains(t, InitRepository(InitOptions{AutoMerge: true}), "--auto-merge requires --pr or --create-pull-request")
+	require.ErrorContains(t, cmd.RunE(cmd, nil), "--auto-merge requires --create-pull-request")
+	require.ErrorContains(t, InitRepository(InitOptions{AutoMerge: true}), "--auto-merge requires --create-pull-request")
 }
 
 func TestInitCommandAutoMergePropagation(t *testing.T) {

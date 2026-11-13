@@ -91,7 +91,7 @@ func TestAddWizardCommandAutoMergeRequiresPR(t *testing.T) {
 			}
 			err := cmd.RunE(cmd, []string{"owner/repo/workflow"})
 			if prFlag == "" {
-				require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+				require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 			} else {
 				require.ErrorIs(t, err, engineErr)
 			}

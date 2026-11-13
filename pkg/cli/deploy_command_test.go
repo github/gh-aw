@@ -146,7 +146,7 @@ func TestRunDeployCommandAutoMergeRequiresPR(t *testing.T) {
 	cmd := NewDeployCommand(validateEngineStub)
 	require.NoError(t, cmd.Flags().Set("auto-merge", "true"))
 	err := cmd.RunE(cmd, []string{"owner/source/workflow"})
-	require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+	require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 }
 
 func TestRunDeployCommandAutoMergePropagation(t *testing.T) {
