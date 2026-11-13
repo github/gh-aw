@@ -168,6 +168,16 @@ func TestSpec_PublicAPI_Sort(t *testing.T) {
 		{File: "a.yml", Line: 2, Column: 1, Severity: scanfindings.SeverityLow},
 		{File: "b.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh},
 	}, findings)
+
+	tied := []scanfindings.Finding{
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "first"},
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "second"},
+	}
+	scanfindings.Sort(tied)
+	assert.Equal(t, []scanfindings.Finding{
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "first"},
+		{File: "same.yml", Line: 1, Column: 1, Severity: scanfindings.SeverityHigh, RuleID: "same", Message: "second"},
+	}, tied, "findings with equal sort keys should retain their input order")
 }
 
 // TestSpec_PublicAPI_CountAtLeast validates the documented severity threshold count.

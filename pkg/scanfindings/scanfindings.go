@@ -212,7 +212,7 @@ func Render(w io.Writer, findings []Finding) {
 
 // Sort orders findings by file, line, column, descending severity, and rule ID.
 func Sort(findings []Finding) {
-	slices.SortFunc(findings, func(a, b Finding) int {
+	slices.SortStableFunc(findings, func(a, b Finding) int {
 		if order := strings.Compare(a.File, b.File); order != 0 {
 			return order
 		}

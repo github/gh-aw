@@ -26,6 +26,8 @@ func TestSpec_PublicAPI_ResolveRisk(t *testing.T) {
 		{name: "infrastructure is medium", rec: intent.IntentRecord{Domains: []string{"infrastructure"}}, want: "medium"},
 		{name: "documentation is low", rec: intent.IntentRecord{Domains: []string{"documentation"}}, want: "low"},
 		{name: "other domains are unknown", rec: intent.IntentRecord{Domains: []string{"security"}, Priority: "high"}, want: "unknown"},
+		{name: "empty input is unknown", rec: intent.IntentRecord{}, want: "unknown"},
+		{name: "non-security critical priority keeps domain risk", rec: intent.IntentRecord{Domains: []string{"infrastructure"}, Priority: "critical"}, want: "medium"},
 	}
 
 	for _, tt := range tests {

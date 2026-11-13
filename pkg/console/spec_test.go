@@ -96,6 +96,19 @@ func TestSpec_DesignDecision_RenderStructTags(t *testing.T) {
 	assert.Contains(t, mixed, "visible", "retained omitempty columns should render non-zero values")
 }
 
+func TestSpec_DesignDecision_RenderStructZeroNestedStruct(t *testing.T) {
+	type Inner struct {
+		Value int `console:"header:Value"`
+	}
+	type Row struct {
+		Inner Inner `console:"title:Inner Section,omitempty"`
+	}
+
+	got := console.RenderStruct(Row{})
+	assert.Contains(t, got, "Inner Section", "omitempty should retain zero-valued nested structs outside slice tables")
+	assert.Contains(t, got, "Value", "zero-valued nested struct fields should still render")
+}
+
 func TestSpec_PublicAPI_RenderTableOptionalSections(t *testing.T) {
 	got := console.RenderTable(console.TableConfig{
 		Headers:   []string{"Name", "Status"},

@@ -24,10 +24,12 @@ var renderLog = logger.New("console:render")
 // - Rendering maps as markdown headers
 //
 // Struct tags:
-// - `console:"title:My Title"` - Sets the title for a section
-// - `console:"header:Column Name"` - Sets the column header name for table columns
-// - `console:"omitempty"` - Skips zero values
-// - `console:"-"` - Skips the field entirely
+//   - `console:"title:My Title"` - Sets the title for a section
+//   - `console:"header:Column Name"` - Sets the column header name for table columns
+//   - `console:"omitempty"` - Skips zero values; zero struct and array fields
+//     are retained in single-struct rendering and omitted from tables only when
+//     every row has a zero value
+//   - `console:"-"` - Skips the field entirely
 func RenderStruct(v any) string {
 	return renderStructWithRenderer(v, RenderTable)
 }
@@ -105,7 +107,7 @@ func renderInlineEmbeddedFields(val reflect.Value, maxFieldLen int, output *stri
 		if tag.skip {
 			return
 		}
-		if tag.omitempty && isZeroValue(field) {
+		if tag.omitempty && isZeroStructFieldValue(field) {
 			return
 		}
 
@@ -125,7 +127,7 @@ func computeMaxFieldLen(val reflect.Value) int {
 	walkInlineFields(val, func(field reflect.Value, fieldType reflect.StructField) {
 		tag := parseConsoleTag(fieldType.Tag.Get("console"))
 
-		if tag.skip || (tag.omitempty && isZeroValue(field)) {
+		if tag.skip || (tag.omitempty && isZeroStructFieldValue(field)) {
 			return
 		}
 
@@ -315,7 +317,7 @@ func tableFieldHasValue(rows reflect.Value, fieldPath []int) bool {
 			continue
 		}
 		field, ok := fieldByIndexSafe(row, fieldPath)
-		if ok && !isZeroValue(field) {
+		if ok && !isZeroTableColumnValue(field) {
 			return true
 		}
 	}
@@ -463,6 +465,20 @@ func parseConsoleTag(tag string) consoleTag {
 	}
 
 	return result
+}
+
+func isZeroStructFieldValue(val reflect.Value) bool {
+	if val.IsValid() && (val.Kind() == reflect.Array || (val.Kind() == reflect.Struct && val.Type().String() != "time.Time")) {
+		return false
+	}
+	return isZeroValue(val)
+}
+
+func isZeroTableColumnValue(val reflect.Value) bool {
+	if val.IsValid() && (val.Kind() == reflect.Array || (val.Kind() == reflect.Struct && val.Type().String() != "time.Time")) {
+		return val.IsZero()
+	}
+	return isZeroValue(val)
 }
 
 // isZeroValue checks if a reflect.Value is the zero value for its type

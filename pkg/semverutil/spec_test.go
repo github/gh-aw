@@ -259,9 +259,9 @@ func TestSpec_PublicAPI_NormalizeGitDescribeSemver(t *testing.T) {
 			expected: "v1.2.3",
 		},
 		{
-			name:     "adds prefix to invalid input",
-			input:    "not-a-version",
-			expected: "vnot-a-version",
+			name:     "returns trimmed invalid input unchanged",
+			input:    " not-a-version ",
+			expected: "not-a-version",
 		},
 	}
 

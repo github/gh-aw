@@ -133,10 +133,12 @@ func Compare(v1, v2 string) int {
 //   - v1.2.3-dirty            -> v1.2.3
 //   - v1.2.3-beta.1           -> v1.2.3-beta.1
 func NormalizeGitDescribeSemver(v string) string {
-	v = EnsureVPrefix(strings.TrimSpace(v))
-	if !semver.IsValid(v) {
+	v = strings.TrimSpace(v)
+	prefixed := EnsureVPrefix(v)
+	if !semver.IsValid(prefixed) {
 		return v
 	}
+	v = prefixed
 
 	canonical := semver.Canonical(v)
 	prerelease := strings.TrimPrefix(semver.Prerelease(canonical), "-")
