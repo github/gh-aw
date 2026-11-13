@@ -194,7 +194,7 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
+| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed`, `base_branch_not_allowed` | Head/base. | Fix target/config. |
 | `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR. | Use allowed PRs; retain protections. |
 | `pr_is_draft`, `pr_not_open` | Draft/open. | Honor author readiness; stop closed/merged PRs. |
 | `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
