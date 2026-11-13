@@ -496,7 +496,7 @@ func buildLedgerPromptSection(config *LedgerToolConfig) *PromptSection {
 		projectionPath := filepath.Join(ledgerProjectionRoot, ledger.Name, "ledger.db")
 		if ledger.Type != "" {
 			operations := map[string]string{"log": "append(value)", "set": "add(value), remove(value)", "map": "put(key, value), delete(key)", "table": "insert(value), update(key, patch), upsert(value), delete(key)", "counter": "increment(name, amount), decrement(name, amount)", "notes": "note(subject, note, reason, citations), vote(note_id, vote, optional reason)"}
-			fmt.Fprintf(&b, "- %s (%s): %s; operations: %s", ledger.Name, ledger.Type, projectionPath, operations[ledger.Type])
+			b.WriteString("- " + ledger.Name + " (" + ledger.Type + "): " + projectionPath + "; operations: " + operations[ledger.Type])
 			tables := map[string]string{
 				"log":     "state(position: integer, value: text)",
 				"set":     "state(identity: text, value: text)",
@@ -505,19 +505,23 @@ func buildLedgerPromptSection(config *LedgerToolConfig) *PromptSection {
 				"counter": "state(name: text, value: integer)",
 				"notes":   "notes(id: text, subject: text, note: text, reason: text, created_at: text, record_sha: text); note_citations(note_id: text, ordinal: integer, citation_type: text, path: text, start_line: integer, end_line: integer); note_votes(record_id: text, note_id: text, vote: text, reason: text, created_at: text); note_state(note_id: text, upvotes: integer, downvotes: integer, net_votes: integer, last_vote_at: text, last_positive_vote_at: text)",
 			}
-			fmt.Fprintf(&b, "; read-only projection tables: %s", tables[ledger.Type])
+			b.WriteString("; read-only projection tables: " + tables[ledger.Type])
 			if ledger.Key != "" {
-				fmt.Fprintf(&b, "; primary key: %s", ledger.Key)
+				b.WriteString("; primary key: " + ledger.Key)
 			}
 			if ledger.Schema != nil {
 				schema, err := json.Marshal(ledger.Schema)
 				if err == nil {
-					b.WriteString(fmt.Sprintf("; value schema: %.1024s", schema))
+					schemaText := string(schema)
+					if len(schemaText) > 1024 {
+						schemaText = schemaText[:1024]
+					}
+					b.WriteString("; value schema: " + schemaText)
 				}
 			}
 			b.WriteByte('\n')
 		} else {
-			b.WriteString(fmt.Sprintf("- %s: %s\n", ledger.Name, projectionPath))
+			b.WriteString("- " + ledger.Name + ": " + projectionPath + "\n")
 		}
 	}
 	b.WriteString("Query the SQLite projection to inspect prior records. ")
