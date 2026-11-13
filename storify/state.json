@@ -1,27 +1,29 @@
 {
-  "last_run_date": "2026-11-12",
+  "last_run_date": "2026-11-13",
   "last_window": {
-    "start": "2026-11-11T07:56:07Z",
-    "end": "2026-11-12T07:56:07Z"
+    "start": "2026-11-12T07:55:53Z",
+    "end": "2026-11-13T07:55:53Z"
   },
   "observed_window": {
-    "coverage": "Partial: 263 cached runs created 2026-11-11T21:40:33Z through 2026-11-12T07:53:07Z; count-limit continuation identifies uncollected period 2026-11-11T07:56:07Z through 2026-11-11T21:37:29Z. No fleet refetch.",
+    "coverage": "Partial: 265 cached runs created 2026-11-13T00:05:36Z through 07:52:54Z. Count-limit continuation identifies uncollected window 2026-11-12T07:55:53Z through 2026-11-13T00:05:03Z; no fleet refetch.",
     "representative_audits": [
-      43175451229,
-      43155049221,
-      43161542498,
-      43117054112,
-      43123725900,
-      43147956335
+      43385967406,
+      43372175805,
+      43373463533,
+      43378720530,
+      43378720525,
+      43358513161,
+      43334642380
     ]
   },
   "key_themes": [
-    "Auditor collection failed in 10 cached runs; optimizer replaced issue #76773 with #77084, subsequent failures persisted",
-    "PR #76980 review fan-out and Sous Chef follow-up met failed checks; maintainer merged with no demonstrated reviewer recovery"
+    "Eight Auditor collection failures continued after optimizer replaced issue #77084 with #77364 focused on AWF installation.",
+    "Conformance PR #77365 merged as reviews began; reviewer, ESLint Refiner and Smoke Project had separate safe-output processing failures."
   ],
   "carry_forward_questions": [
-    "Did Auditor partial time-budget handling change and do subsequent scheduled runs reach agent and safe outputs?",
-    "Did the failed reviewer and detection checks on PR #76980 recover in subsequent runs?",
-    "What happened in the uncollected earlier part of the window?"
+    "Did Auditor collection recover, and was its previous partial time-budget diagnosis confirmed?",
+    "Did the safe-output processing failures recur or recover, and what caused each?",
+    "Did conformance changes pass subsequent tests and review after the merge?",
+    "What happened in the uncollected earlier window?"
   ]
 }
