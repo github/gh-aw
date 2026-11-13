@@ -2,10 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"github.com/github/gh-aw/pkg/console"
 	"os"
 	"sync/atomic"
 	"time"
+
+	"github.com/github/gh-aw/pkg/console"
 )
 
 type logsCollectionStats struct {
