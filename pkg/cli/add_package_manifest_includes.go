@@ -84,7 +84,11 @@ func extractManifestIncludes(value any, manifestPath string) ([]repositoryPackag
 			}
 		}
 	case []string:
-		rawIncludes = append(rawIncludes, manifestIncludesFromPaths(includes)...)
+		for _, include := range includes {
+			if err := appendRawEntry(include); err != nil {
+				return nil, nil, err
+			}
+		}
 	default:
 		return nil, []string{fmt.Sprintf("Ignoring includes entry in %s because it is not a list", manifestPath)}, nil
 	}
