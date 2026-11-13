@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="732" viewBox="0 0 1080 732" role="img" aria-labelledby="title description">
+  <title id="title">An illustrative agentic workflow</title>
+  <desc id="description">Markdown compiles into a GitHub Actions workflow. An isolated agent proposes changes, and a separate safe-output job applies approved results. This is a synthetic diagram, not a real workflow run.</desc>
+  <rect width="1080" height="732" fill="#0d1117"/>
+  <g font-family="system-ui, sans-serif">
+    <text x="64" y="100" fill="#9198a1" font-size="24">ILLUSTRATIVE EXAMPLE</text>
+    <text x="64" y="168" fill="#f0f6fc" font-size="42" font-weight="700">Markdown to GitHub Actions</text>
+    <g fill="#151b23" stroke="#3d444d" stroke-width="2">
+      <rect x="64" y="224" width="280" height="100" rx="14"/>
+      <rect x="400" y="224" width="280" height="100" rx="14"/>
+      <rect x="736" y="224" width="280" height="100" rx="14"/>
+    </g>
+    <g fill="#f0f6fc" font-size="26" text-anchor="middle">
+      <text x="204" y="284">Write Markdown</text>
+      <text x="540" y="284">Compile</text>
+      <text x="876" y="284">Run in Actions</text>
+    </g>
+    <g fill="none" stroke="#3fb950" stroke-width="3">
+      <path d="M344 274h56m-12-10 12 10-12 10"/>
+      <path d="M680 274h56m-12-10 12 10-12 10"/>
+    </g>
+    <g fill="#151b23" stroke-width="2">
+      <rect x="64" y="388" width="448" height="196" rx="18" stroke="#3fb950"/>
+      <rect x="568" y="388" width="448" height="196" rx="18" stroke="#4493f8"/>
+    </g>
+    <g font-size="30" font-weight="600">
+      <text x="96" y="444" fill="#3fb950">Isolated agent</text>
+      <text x="600" y="444" fill="#4493f8">Safe outputs</text>
+    </g>
+    <g fill="#f0f6fc" font-size="24">
+      <text x="96" y="500">Read and analyze</text>
+      <text x="96" y="540">Propose bounded changes</text>
+      <text x="600" y="500">Separate write permissions</text>
+      <text x="600" y="540">Declared, guarded actions</text>
+    </g>
+    <text x="64" y="660" fill="#9198a1" font-size="24">No real accounts, repository data, or run identifiers</text>
+  </g>
+</svg>

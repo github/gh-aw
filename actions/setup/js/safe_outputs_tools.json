@@ -85,13 +85,13 @@
   },
   {
     "name": "ledger_append",
-    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Supported built-in types: counter, log, set, table. For map ledgers, use ledger_map_put or ledger_map_delete instead. Persistence follows trusted validation.",
+    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Supported built-in types: counter, log, set, table. For map ledgers, use ledger_map_put or ledger_map_delete instead. Use `record` only for custom ledgers; for counter, log, set, and table ledgers send `operation` plus `value` (or `key`/`patch`/`name`/`amount`) and no `record`. `record` and `value` must be real JSON objects, never JSON-encoded strings. Persistence follows trusted validation.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "ledger": { "type": "string", "description": "Configured custom, counter, log, set, or table ledger name. For map ledgers, use ledger_map_put or ledger_map_delete instead." },
         "temp_id": { "type": "string", "description": "Optional temporary ID for same-batch references." },
-        "record": { "type": "object", "description": "Custom ledger record payload." },
+        "record": { "type": "object", "description": "Custom ledger record payload, only for custom ledgers. Pass a JSON object (not a JSON-encoded string). Built-in ledger types use `operation` and `value` instead." },
         "operation": {
           "type": "string",
           "enum": ["append", "add", "remove", "put", "delete", "insert", "update", "upsert", "increment", "decrement"],
@@ -854,7 +854,7 @@
   },
   {
     "name": "add_labels",
-    "description": "Add labels to an existing GitHub issue or pull request for categorization and filtering. Labels must already exist in the repository. For creating new issues with labels, use create_issue with the labels property instead.",
+    "description": "Add labels to an existing GitHub issue or pull request for categorization and filtering. Labels must already exist in the repository. When a label object includes `rationale`, keep it at or under 280 characters; longer values are rejected. For creating new issues with labels, use create_issue with the labels property instead.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -879,7 +879,7 @@
                   "rationale": {
                     "type": "string",
                     "maxLength": 280,
-                    "description": "Optional rationale for the change (max 280 characters)."
+                    "description": "Optional rationale for the change. Hard limit: 280 characters \u2014 longer values are rejected, so keep it to one or two short sentences."
                   },
                   "confidence": {
                     "type": "string",
@@ -942,7 +942,7 @@
                   "rationale": {
                     "type": "string",
                     "maxLength": 280,
-                    "description": "Optional rationale for the change (max 280 characters)."
+                    "description": "Optional rationale for the change. Hard limit: 280 characters \u2014 longer values are rejected, so keep it to one or two short sentences."
                   },
                   "confidence": {
                     "type": "string",
@@ -1307,7 +1307,7 @@
                   "rationale": {
                     "type": "string",
                     "maxLength": 280,
-                    "description": "Optional rationale for the change (max 280 characters)."
+                    "description": "Optional rationale for the change. Hard limit: 280 characters \u2014 longer values are rejected, so keep it to one or two short sentences."
                   },
                   "confidence": {
                     "type": "string",
@@ -1775,7 +1775,7 @@
         "rationale": {
           "type": "string",
           "maxLength": 280,
-          "description": "Optional rationale for the change (max 280 characters)."
+          "description": "Optional rationale for the change. Hard limit: 280 characters \u2014 longer values are rejected, so keep it to one or two short sentences."
         },
         "confidence": {
           "type": "string",
@@ -1827,7 +1827,7 @@
         "rationale": {
           "type": "string",
           "maxLength": 280,
-          "description": "Optional rationale for the change (max 280 characters)."
+          "description": "Optional rationale for the change. Hard limit: 280 characters \u2014 longer values are rejected, so keep it to one or two short sentences."
         },
         "confidence": {
           "type": "string",
