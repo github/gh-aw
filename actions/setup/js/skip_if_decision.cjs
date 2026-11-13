@@ -1,6 +1,8 @@
 // @ts-check
 "use strict";
 
+// @safe-outputs-exempt USE-001 — thrown values are stable machine-readable reason tokens (for example context_limit) consumed by the decision-skip recorder, not user-facing messages.
+
 const path = require("node:path");
 const { invokeDecisions } = require("./decisions_client.cjs");
 const { resolveIssueArtifactPath, readGuardedFile } = require("./symlink_guard.cjs");
