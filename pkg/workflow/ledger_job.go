@@ -115,6 +115,9 @@ func ledgerPersistencePolicy(data *WorkflowData) (string, string) {
 			repoExpression = "'" + strings.ReplaceAll(strings.ToLower(repo), "'", "''") + "'"
 		}
 		concurrency = fmt.Sprintf("concurrency:\n      group: ${{ format('gh-aw-comment-ledger-{0}-{1}', %s, %s) }}\n      cancel-in-progress: false", repoExpression, targetExpression)
+		if isGroupConcurrencyQueueEnabled(data) {
+			concurrency += "\n      queue: max"
+		}
 	}
 	return permissions.RenderToYAML(), concurrency
 }

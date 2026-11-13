@@ -71,12 +71,14 @@ func TestCommentBackedLedgerConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(lock), "ledger_map_put")
 	require.Contains(t, string(lock), "github-token: ${{ secrets.MEMORY_TOKEN }}")
+	require.Contains(t, extractJobSection(string(lock), pushLedgerChangesJobName), "queue: max")
 	job, err := compiler.buildPushLedgerChangesJob(data, false)
 	require.NoError(t, err)
 	require.Contains(t, job.Permissions, "contents: read")
 	require.Contains(t, job.Permissions, "issues: write")
 	require.NotContains(t, job.Permissions, "contents: write")
 	require.Contains(t, job.Concurrency, "'42'")
+	require.Contains(t, job.Concurrency, "queue: max")
 	require.Contains(t, strings.Join(job.Steps, ""), "Write comment-memory configuration")
 	require.Contains(t, strings.Join(job.Steps, ""), "GH_AW_COMMENT_MEMORY_TOKEN: ${{ secrets.MEMORY_TOKEN }}")
 	require.Contains(t, strings.Join(job.Steps, ""), `GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: "unknown"`)
@@ -87,16 +89,75 @@ func TestCommentBackedLedgerConfiguration(t *testing.T) {
 	require.Contains(t, projectionStep.String(), `GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: "unknown"`)
 	require.NotContains(t, projectionStep.String(), "github-token: ${{ secrets.MEMORY_TOKEN }}")
 
-	for _, replacement := range []string{
-		"",
-		"  comment-memory: false\n",
-		"  comment-memory:\n    target: invalid\n",
-		"  comment-memory:\n    target: ${{ inputs.number }}\n",
+	for _, tc := range []struct {
+		replacement string
+		field       string
+		value       string
+		example     string
+	}{
+		{replacement: ""},
+		{replacement: "  comment-memory: false\n"},
+		{replacement: "  comment-memory:\n    target: invalid\n", field: "tools.comment-memory.target", value: `"invalid"`, example: "target: 42"},
+		{replacement: "  comment-memory:\n    target: ${{ inputs.number }}\n", field: "tools.comment-memory.target", value: `"${{ inputs.number }}"`, example: "target: 42"},
+		{replacement: "  comment-memory:\n    target: 0\n", field: "tools.comment-memory.target", value: `"0"`, example: "target: 42"},
+		{replacement: "  comment-memory:\n    target: -1\n", field: "tools.comment-memory.target", value: `"-1"`, example: "target: 42"},
+		{replacement: "  comment-memory:\n    target-repo: ${{ inputs.repo }}\n", field: "tools.comment-memory.target-repo", value: `"${{ inputs.repo }}"`, example: "target-repo: github/gh-aw"},
 	} {
-		invalid := strings.Replace(source, "  comment-memory:\n    target: 42\n    github-token: ${{ secrets.MEMORY_TOKEN }}\n", replacement, 1)
+		invalid := strings.Replace(source, "  comment-memory:\n    target: 42\n    github-token: ${{ secrets.MEMORY_TOKEN }}\n", tc.replacement, 1)
 		require.NoError(t, os.WriteFile(path, []byte(invalid), 0o600))
 		_, err := NewCompiler().ParseWorkflowFile(path)
 		require.Error(t, err)
+		if tc.field != "" {
+			require.Contains(t, err.Error(), tc.field)
+			require.Contains(t, err.Error(), tc.value)
+			require.Contains(t, err.Error(), "Expected")
+			require.Contains(t, err.Error(), "Example:\ntools:\n  comment-memory:\n    "+tc.example)
+		}
+	}
+}
+
+func TestLedgerPersistenceConcurrencyQueue(t *testing.T) {
+	for _, storage := range []struct {
+		name        string
+		declaration map[string]any
+		hasComments bool
+	}{
+		{name: "git", declaration: map[string]any{}},
+		{name: "comment", declaration: map[string]any{"storage": "comment-memory"}, hasComments: true},
+		{name: "mixed", declaration: map[string]any{
+			"local": map[string]any{"storage": "comment-memory"}, "global": map[string]any{},
+		}, hasComments: true},
+	} {
+		for _, queue := range []struct {
+			name     string
+			features map[string]any
+			enabled  bool
+		}{
+			{name: "default", enabled: true},
+			{name: "enabled", features: map[string]any{"group-concurrency-queue": true}, enabled: true},
+			{name: "disabled", features: map[string]any{"group-concurrency-queue": false}},
+		} {
+			t.Run(storage.name+"/"+queue.name, func(t *testing.T) {
+				config, err := parseLedgerToolConfig(storage.declaration)
+				require.NoError(t, err)
+				job, err := NewCompiler().buildPushLedgerChangesJob(&WorkflowData{
+					LedgerConfig: config, CommentMemoryConfig: &CommentMemoryConfig{},
+					Features: queue.features,
+				}, false)
+				require.NoError(t, err)
+				if !storage.hasComments {
+					require.Empty(t, job.Concurrency)
+					return
+				}
+				require.Contains(t, job.Concurrency, "gh-aw-comment-ledger-")
+				require.Contains(t, job.Concurrency, "cancel-in-progress: false")
+				if queue.enabled {
+					require.Contains(t, job.Concurrency, "\n      queue: max")
+				} else {
+					require.NotContains(t, job.Concurrency, "queue:")
+				}
+			})
+		}
 	}
 }
 
@@ -108,12 +169,24 @@ func TestMixedLedgerStoragePreservesGitCompactionAndPermissions(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, config.compactionEnabledLedgers(), 1)
 	require.Equal(t, "global", config.compactionEnabledLedgers()[0].Name)
-	job, err := NewCompiler().buildPushLedgerChangesJob(&WorkflowData{
-		LedgerConfig: config, CommentMemoryConfig: &CommentMemoryConfig{},
-	}, false)
+	data := &WorkflowData{
+		LedgerConfig: config, CommentMemoryConfig: &CommentMemoryConfig{
+			BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: "${{ secrets.MEMORY_TOKEN }}"},
+		},
+	}
+	compiler := NewCompiler()
+	job, err := compiler.buildPushLedgerChangesJob(data, false)
 	require.NoError(t, err)
 	require.Contains(t, job.Permissions, "contents: write")
 	require.Contains(t, job.Permissions, "issues: write")
+	var projection strings.Builder
+	require.NoError(t, compiler.generateLedgerProjectionStep(&projection, data))
+	for _, step := range []string{projection.String(), strings.Join(job.Steps, "")} {
+		require.Contains(t, step, "GH_TOKEN: ${{ github.token }}")
+		require.Contains(t, step, "GH_AW_COMMENT_MEMORY_TOKEN: ${{ secrets.MEMORY_TOKEN }}")
+		require.Contains(t, step, `GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: "unknown"`)
+		require.NotContains(t, step, "github-token: ${{ secrets.MEMORY_TOKEN }}")
+	}
 }
 
 func TestCommentMemoryLedgerTokenSource(t *testing.T) {

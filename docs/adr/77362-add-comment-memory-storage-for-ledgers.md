@@ -35,9 +35,9 @@ Keeping one managed comment and rewriting its JSONL state would reuse ordinary c
 - Immutable JSONL comments keep history inspectable on the issue or PR. Retries reuse deterministic record identities rather than duplicating logical records.
 
 #### Negative
-- Each ledger is capped at 48 KiB total, and each JSONL shard at 16 KiB, with no compaction. Larger or long-lived histories should use Git storage.
+- Each ledger is capped at 48 KiB total, and each JSONL batch at 16 KiB, with no compaction. Larger or long-lived histories should use Git storage.
 - Reads scan at most 50 comment pages and fail closed on incomplete or malformed history, so long-lived ledgers can hit a hard ceiling.
-- GitHub Actions concurrency can replace pending persistence jobs, and writers in different repositories sharing a target must coordinate externally. Workloads that need every run persisted must serialize the workflow upstream.
+- Persistence jobs use `queue: max` by default to retain pending jobs up to GitHub Actions queue limits. Disabling `features.group-concurrency-queue` restores pending-job replacement; workloads that need every run persisted must account for queue limits and workflow cancellation. Writers in different repositories sharing a target must coordinate externally.
 - Shards are plain JSONL, not encrypted, so ledger contents are readable by anyone who can read the target issue or PR.
 
 #### Neutral
@@ -45,3 +45,4 @@ Keeping one managed comment and rewriting its JSONL state would reuse ordinary c
 - In staged mode, comment-backed ledgers publish nothing and report `staged: true`.
 - Cross-repository targets require allowlisted access and a token with permissions on the target repository.
 - Authenticating source comments does not establish the truth of ledger payloads. Records remain untrusted data, and existing comment-memory limits and repository permissions still apply.
+- The verified publishing identity is the trust anchor, as with Git writer credentials. Holders of that credential are authorized writers; ordinary agent publication cannot emit reserved ledger blocks, and no separate signing key is required.

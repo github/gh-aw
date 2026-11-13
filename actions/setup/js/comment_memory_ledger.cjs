@@ -8,7 +8,7 @@ const { Ledger, buildSegment, configuredLedgerLimits } = require("./ledger_store
 const { iterateJsonl } = require("./jsonl_helpers.cjs");
 const { appendLedgerRecords } = require("./push_ledger_changes.cjs");
 const { loadSafeOutputsConfig, resolveCommentMemoryTarget } = require("./setup_comment_memory_files.cjs");
-const { resolveCommentMemoryConfig, extractCommentMemoryEntries, COMMENT_MEMORY_MAX_SCAN_PAGES, COMMENT_MEMORY_MAX_FILE_BYTES, COMMENT_MEMORY_MAX_TOTAL_BYTES } = require("./comment_memory_helpers.cjs");
+const { resolveCommentMemoryConfig, COMMENT_MEMORY_MAX_SCAN_PAGES, COMMENT_MEMORY_MAX_FILE_BYTES, COMMENT_MEMORY_MAX_TOTAL_BYTES } = require("./comment_memory_helpers.cjs");
 const { buildManagedMemoryBody } = require("./comment_memory.cjs");
 const { enforceCommentLimits } = require("./comment_limit_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
@@ -17,6 +17,43 @@ const { resolveDispatchCredentialPrincipal } = require("./work_queue_dispatch_cr
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 
 const LEDGER_TAG = "gh-aw-comment-ledger";
+
+/**
+ * Ledger history must not silently lose an unterminated shard or interpret a
+ * nested example inside editable memory as a persistence-authored shard.
+ * @param {string} body
+ * @param {string} ledgerName
+ * @returns {Array<{memoryId: string, content: string}>}
+ */
+function extractCommentLedgerEntries(body, ledgerName) {
+  const entries = [];
+  const language = `${LEDGER_TAG}:${ledgerName}`;
+  let open;
+  for (const line of body.split(/\r?\n/)) {
+    if (!open) {
+      const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+      if (!match) continue;
+      const info = match[2].trim();
+      const selected = info === language || info.startsWith(`${language} `) || info.startsWith(`${language}\t`);
+      if (selected && (info !== language || match[1][0] !== "`" || match[1].length < 6)) throw new TypeError("Malformed comment-backed ledger fence");
+      open = { fence: match[1], selected, lines: [] };
+      continue;
+    }
+    const closing = /^ {0,3}(`+|~+)[ \t]*$/.exec(line);
+    if (closing && closing[1][0] === open.fence[0] && closing[1].length >= open.fence.length) {
+      if (open.selected) {
+        if (closing[1] !== open.fence) throw new TypeError("Malformed comment-backed ledger fence");
+        entries.push({ memoryId: ledgerName, content: open.lines.join("\n").trim() });
+      }
+      open = undefined;
+    } else if (open.selected) {
+      if (/^ {0,3}(`{3,}|~{3,})/.test(line)) throw new TypeError("Malformed comment-backed ledger fence");
+      open.lines.push(line);
+    }
+  }
+  if (open?.selected) throw new TypeError("Malformed comment-backed ledger fence");
+  return entries;
+}
 
 function commentConfig() {
   const config = resolveCommentMemoryConfig(loadSafeOutputsConfig());
@@ -50,7 +87,7 @@ async function materializeCommentLedger({ githubClient, config, sourceDir, comme
     for (const comment of data) {
       if (String(comment.user?.id) !== authorId) continue;
       if (typeof comment.body !== "string" || !comment.body.includes("<!-- gh-aw-agentic-workflow:")) continue;
-      const entries = extractCommentMemoryEntries(comment.body, message => core.warning(message), LEDGER_TAG);
+      const entries = extractCommentLedgerEntries(comment.body, config.name);
       let batchBytes = 0;
       for (const entry of entries) {
         if (entry.memoryId !== config.name) continue;
@@ -107,7 +144,7 @@ async function persistCommentLedgerAppends({ appends, config, githubClient, comm
       memoryTag: LEDGER_TAG,
       memoryBlock: blocks.length === 1 ? blocks[0] : { type: "details", summary: "JSONL shards", agentTainted: false, children: blocks },
     });
-    const published = extractCommentMemoryEntries(body, undefined, LEDGER_TAG);
+    const published = extractCommentLedgerEntries(body, config.name);
     if (published.length !== contents.length || published.some((entry, index) => entry.memoryId !== config.name || entry.content !== contents[index].trimEnd()))
       throw new TypeError("Comment-backed ledger JSONL was changed by publication sanitization; refusing to publish altered records");
     enforceCommentLimits(body);

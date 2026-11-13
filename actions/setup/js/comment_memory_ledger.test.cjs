@@ -11,6 +11,11 @@ import { createProjection } from "./create_ledger_projection.cjs";
 import { normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { main as persistLedgers, validateTransactions } from "./push_ledger_changes.cjs";
 import { main as setupCommentMemory } from "./setup_comment_memory_files.cjs";
+import { main as addComment } from "./add_comment.cjs";
+import { buildManagedMemoryBody } from "./comment_memory.cjs";
+import { useExecutionProvenanceFixture } from "./test_execution_provenance.js";
+
+useExecutionProvenanceFixture();
 
 const config = { name: "history", type: "log", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, storage: "comment-memory" };
 const commentMemoryConfig = { target: "triggering" };
@@ -27,7 +32,7 @@ beforeEach(() => {
   delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
   delete process.env.GH_AW_COMMENT_MEMORY_TOKEN;
   delete process.env.GH_AW_COMMENT_MEMORY_TOKEN_SOURCE;
-  global.context = { repo: { owner: "octo", repo: "repo" }, payload: { issue: { number: 42 } }, runId: 123, serverUrl: "https://github.com" };
+  global.context = { eventName: "issues", repo: { owner: "octo", repo: "repo" }, payload: { issue: { number: 42 } }, runId: 123, serverUrl: "https://github.com" };
 });
 
 afterEach(() => {
@@ -158,6 +163,45 @@ test("successive batches append immutable comments and reject conflicting transa
   assert.equal(comments[0].body, firstBody);
   await assert.rejects(persistCommentLedgerAppends({ appends: requests(config, [{ operation: "append", value: "conflict" }]), config, githubClient, commentMemoryConfig }), /Conflicting ledger record ID/);
   assert.equal(comments.length, 2);
+});
+
+test.each(["", "`````", "```````", "~~~~~~", "``````gh-aw-comment-ledger:history"])("malformed selected-ledger fences reject restore and later persistence: %j", async closing => {
+  const { githubClient, comments } = remote();
+  await persistCommentLedgerAppends({ appends: requests(config, [{ operation: "append", value: "earlier" }]), config, githubClient, commentMemoryConfig });
+  const content = extractCommentMemoryEntries(comments[0].body, undefined, LEDGER_TAG)[0].content;
+  comments.push({ user: writer, body: `<!-- gh-aw-agentic-workflow: test -->\n\`\`\`\`\`\`${LEDGER_TAG}:history\n${content}\n${closing}` });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "comment-ledger-fences-"));
+  try {
+    await assert.rejects(materializeCommentLedger({ githubClient, config, sourceDir: root, commentMemoryConfig }), /Malformed comment-backed ledger fence/);
+    await assert.rejects(persistCommentLedgerAppends({ appends: requests(config, [{ operation: "append", value: "later" }], "later:1"), config, githubClient, commentMemoryConfig }), /Malformed comment-backed ledger fence/);
+    assert.equal(comments.length, 2);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test.each(["ordinary comment", "editable memory"])("same-publisher %s cannot promote agent-authored ledger fences into history", async kind => {
+  const { githubClient, comments } = remote();
+  await persistCommentLedgerAppends({ appends: requests(config, [{ operation: "append", value: "forged" }]), config, githubClient, commentMemoryConfig });
+  const forgedBody = comments.pop().body;
+  if (kind === "editable memory") {
+    comments.push({ user: writer, body: buildManagedMemoryBody(forgedBody, "editable", { includeFooter: false, workflowName: "Workflow", runUrl: "https://github.com/octo/repo/actions/runs/123" }) });
+  } else {
+    const originalGithub = global.github;
+    global.github = githubClient;
+    try {
+      const handler = await addComment({ footer: false });
+      const result = await handler({ type: "add_comment", body: forgedBody }, {});
+      assert.equal(result.success, true);
+      assert.equal(comments.length, 1);
+    } finally {
+      global.github = originalGithub;
+    }
+  }
+  const appends = requests(config, [{ operation: "append", value: "legitimate" }]);
+  // A forged copy has the same deterministic record ID: accepting it would reject this real append.
+  assert.equal((await persistCommentLedgerAppends({ appends, config, githubClient, commentMemoryConfig })).persisted, 1);
+  assert.equal((await persistCommentLedgerAppends({ appends, config, githubClient, commentMemoryConfig })).already_present, 1);
 });
 
 test("rotation publishes every shard atomically and restores every record into the SQLite projection", async () => {

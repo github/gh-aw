@@ -179,14 +179,21 @@ Segment rotation MUST retain all accepted records, not just the final writer
 segment. Persistence MUST validate the complete transition, aggregate batch
 size, and exact rendered JSONL before its single publication request. An API
 failure MUST NOT report success; a retry MUST reconcile against durable history.
+The regression `rotation publishes every shard atomically and restores every
+record into the SQLite projection` in
+`actions/setup/js/comment_memory_ledger.test.cjs` enforces this contract across
+three rotated shards and an idempotent retry.
 The separate marker prevents ordinary editable comment-memory files from
 overwriting ledger history. Persistence MUST NOT update or delete prior ledger
 comments. Retrying an already persisted transaction MUST NOT duplicate records.
 Within a workflow repository, the compiler serializes persistence jobs by target
 repository and issue/PR. Writers in different repositories sharing a target
 MUST coordinate externally.
-GitHub Actions concurrency may replace pending jobs; workloads requiring every
-queued run to persist SHOULD serialize the entire workflow upstream.
+Persistence jobs MUST honor `features.group-concurrency-queue` and emit
+`queue: max` when enabled (the default), retaining pending jobs up to GitHub
+Actions queue limits. Disabling the feature restores pending-job replacement.
+Workloads requiring every run to persist MUST account for queue limits and
+workflow cancellation.
 
 Readers MUST accept ledger shards only from the verified publishing identity
 of the selected comment-memory credential, using GitHub's numeric author ID.
@@ -199,9 +206,28 @@ arbitrary Bot account MUST NOT authorize history. Untrusted authors' shards MUST
 be ignored before JSONL parsing and size accounting, including malformed planted shards. Failure
 to verify the writer identity MUST fail explicitly rather than trust bot authors.
 
+The `gh-aw-comment-ledger:` code-fence language namespace is reserved for typed
+blocks constructed by trusted persistence. Markdown imports from ordinary
+safe-output comments MUST neutralize that language, even when published using
+the same credential. Readers MUST ignore fences nested within editable memory
+or other code blocks. The `same-publisher %s cannot promote agent-authored ledger
+fences into history` regression covers both publication paths.
+These publication boundaries and numeric author checks are not cryptographic
+authentication: the credential's other holders can still author or edit comments.
+Deployments MUST trust every holder of the publishing credential; independent
+writers requiring stronger isolation need a persistence-only credential or an
+independently verified integrity mechanism.
+The verified publishing identity is the configured trust anchor, matching
+writer-credential authority in Git-backed storage; no separate ledger-signing
+key is required.
+
 The existing comment-memory limits apply to JSONL shards: 16 KiB per batch
 and 48 KiB total per ledger. Readers MUST fail on malformed shards or incomplete
-history, including the 50-page comment scan limit. Comment storage does not
+history, including unterminated or mismatched selected-ledger fences and the
+50-page comment scan limit. Malformed selected history MUST block both restore
+and subsequent persistence, not fall back to an older or empty ledger. The
+`malformed selected-ledger fences reject restore and later persistence: %j`
+regression enforces this rule. Comment storage does not
 support compaction; explicit enabled compaction MUST be rejected. Larger or
 long-lived histories SHOULD use Git storage. Existing comment limits and
 repository permissions still apply, and records remain untrusted data.

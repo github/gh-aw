@@ -625,12 +625,12 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		if target != "" && target != "triggering" && target != "*" {
 			number, err := strconv.Atoi(target)
 			if err != nil || number <= 0 {
-				return errors.New("comment-backed ledgers require a triggering target or a literal positive issue/PR number")
+				return fmt.Errorf("tools.comment-memory.target value %q is not supported for comment-backed ledgers. Expected triggering, '*', or a literal positive issue/PR number. Example:\ntools:\n  comment-memory:\n    target: 42", target)
 			}
 			workflowData.CommentMemoryConfig.Target = strconv.Itoa(number)
 		}
 		if strings.Contains(workflowData.CommentMemoryConfig.TargetRepoSlug, "${{") {
-			return errors.New("comment-backed ledgers require a literal target-repo")
+			return fmt.Errorf("tools.comment-memory.target-repo value %q uses an expression. Expected a literal owner/repo for comment-backed ledgers. Example:\ntools:\n  comment-memory:\n    target-repo: github/gh-aw", workflowData.CommentMemoryConfig.TargetRepoSlug)
 		}
 	}
 
