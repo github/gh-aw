@@ -14,15 +14,24 @@ const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { enforceCommentLimits, MAX_LINKS } = require("./comment_limit_helpers.cjs");
-const { COMMENT_MEMORY_TAG, COMMENT_MEMORY_MAX_SCAN_PAGES, buildCodeFenceOpener } = require("./comment_memory_helpers.cjs");
+const { COMMENT_MEMORY_TAG, COMMENT_MEMORY_MAX_SCAN_PAGES, buildCodeFenceOpener, stripCommentMemoryPayloads } = require("./comment_memory_helpers.cjs");
 const { getBodyFooterBlocks } = require("./messages_footer.cjs");
 const { appendReportExecutionProvenance } = require("./execution_provenance.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
+const { applyToNonCodeRegions } = require("./sanitize_content_core.cjs");
 // Require provenance marker to avoid accidentally updating user-authored comments
 // that happen to contain a matching comment-memory tag.
 const MANAGED_COMMENT_PROVENANCE_MARKER = "<!-- gh-aw-agentic-workflow:";
-const MAX_HISTORY_RUNS = 100;
+
+function getFrameworkMetadataBody(body) {
+  // Neither fenced memory nor legacy XML payloads are framework metadata.
+  return applyToNonCodeRegions(
+    stripCommentMemoryPayloads(body),
+    value => value,
+    () => "\n"
+  );
+}
 
 function renderManagedCommentDisclosureNote() {
   const promptsDir = process.env.GH_AW_PROMPTS_DIR || `${process.env.RUNNER_TEMP}/gh-aw/prompts`;
@@ -56,7 +65,7 @@ function buildCollapsedMemorySection(rawBody, memoryID) {
  * @returns {import("./report_ast.cjs").ReportBlock}
  */
 function buildTransactionHistory(previousBody, runUrl, workflowName) {
-  const previous = parseReportMarkdown(previousBody, { allowMetadata: true, agentTainted: true });
+  const previous = parseReportMarkdown(getFrameworkMetadataBody(previousBody), { allowMetadata: true, agentTainted: true });
   const history = previous.find(node => node.type === "details" && node.summary === "History");
   const trustedRun = /^(https:\/\/[\w.-]+(?::\d+)?\/[\w.-]+\/[\w.-]+\/actions\/runs\/)[1-9]\d*$/.exec(runUrl);
   /** @type {Map<string, string>} */
@@ -101,7 +110,7 @@ function buildTransactionHistory(previousBody, runUrl, workflowName) {
         type: "list",
         ordered: false,
         agentTainted: false,
-        items: [...runs].slice(-MAX_HISTORY_RUNS).map(([url, label]) => [
+        items: [...runs].map(([url, label]) => [
           {
             type: "paragraph",
             agentTainted: false,
@@ -166,6 +175,21 @@ function buildManagedMemoryBody(rawBody, memoryID, options) {
 async function findManagedComment(github, owner, repo, itemNumber, memoryID) {
   const newFormatMarker = buildCodeFenceOpener(memoryID);
   const legacyMarker = `<${COMMENT_MEMORY_TAG} id="${memoryID}">`;
+  /** @type {Promise<string | null> | undefined} */
+  let authenticatedLoginPromise;
+  const getAuthenticatedLogin = () => {
+    if (!authenticatedLoginPromise) {
+      authenticatedLoginPromise = Promise.resolve()
+        .then(() => github.rest.users.getAuthenticated())
+        .then(({ data }) => data.login || null)
+        .catch(() => {
+          // Installation tokens cannot call /user; match add_comment's bot fallback.
+          core.info("comment_memory: could not resolve the authenticated comment author; considering bot-authored comments only");
+          return null;
+        });
+    }
+    return authenticatedLoginPromise;
+  };
   core.info(`comment_memory: scanning comments for memory_id='${memoryID}' on #${itemNumber} in ${owner}/${repo}`);
   let page = 1;
   const perPage = 100;
@@ -182,7 +206,7 @@ async function findManagedComment(github, owner, repo, itemNumber, memoryID) {
       core.info(`comment_memory: no comments found on page ${page}`);
       return null;
     }
-    const match = data.find(comment => {
+    const candidates = data.filter(comment => {
       const body = comment.body;
       if (typeof body !== "string") {
         return false;
@@ -190,7 +214,12 @@ async function findManagedComment(github, owner, repo, itemNumber, memoryID) {
       if (!body.includes(newFormatMarker) && !body.includes(legacyMarker)) {
         return false;
       }
-      return body.includes(MANAGED_COMMENT_PROVENANCE_MARKER);
+      return getFrameworkMetadataBody(body).includes(MANAGED_COMMENT_PROVENANCE_MARKER);
+    });
+    const authenticatedLogin = candidates.length > 0 ? await getAuthenticatedLogin() : null;
+    const match = candidates.find(comment => {
+      if (!comment.user?.login) return false;
+      return authenticatedLogin ? comment.user.login === authenticatedLogin : comment.user.type === "Bot";
     });
     if (match) {
       core.info(`comment_memory: found existing managed comment id=${match.id} on page ${page}`);
@@ -341,8 +370,10 @@ async function main(config = {}) {
         managedBody,
       };
     } catch (error) {
-      core.warning(`comment_memory: upsert failed: ${getErrorMessage(error)}`);
-      return { success: false, error: getErrorMessage(error) };
+      const reason = getErrorMessage(error);
+      const errorMessage = reason.includes("exceeds maximum length") ? `${reason} No comment was changed. Reduce the saved memory size or use a new memory_id; existing History entries cannot be dropped.` : reason;
+      core.warning(`comment_memory: upsert failed: ${errorMessage}`);
+      return { success: false, error: errorMessage };
     }
   };
 }
