@@ -167,6 +167,11 @@ fi
 EOF
   cat > "${test_dir}/bin/gh" <<'EOF'
 #!/usr/bin/env bash
+if [ "${AWF_TEST_ATTESTATION_FAILURE:-}" = unsupported-cli ]; then
+  echo 'unknown command "attestation" for "gh"' >&2
+  exit 1
+fi
+if [ "$*" = "attestation verify --help" ]; then exit 0; fi
 printf '%s\n' "$*" >> "$AWF_TEST_ATTESTATION_LOG"
 test "$1" = attestation && test "$2" = verify || exit 91
 test "$4" = --hostname && test "$5" = github.com || exit 92
@@ -233,11 +238,22 @@ EOF
       rm -rf "$test_dir"
       return 1
     fi
-    if { [ "$attestation_failure" = checksums.txt ] || [ "$attestation_failure" = release-identity.txt ] || [ "$identity_version" != "$release_version" ]; } &&
+    if { [ "$attestation_failure" = unsupported-cli ] || [ "$attestation_failure" = checksums.txt ] || [ "$attestation_failure" = release-identity.txt ] || [ "$identity_version" != "$release_version" ]; } &&
       grep -qE '/awf-(bundle|linux|darwin)' "${test_dir}"/curl-args.[0-9]*; then
       TEST_FAILURE_REASON="payload was downloaded before authenticating release metadata"
       rm -rf "$test_dir"
       return 1
+    fi
+    if [ "$attestation_failure" = unsupported-cli ]; then
+      if ! grep -qF "requires GitHub CLI (gh) >= 2.49.0" "${test_dir}/output" ||
+        ! grep -qF "Install or upgrade gh on the runner" "${test_dir}/output" ||
+        ! grep -qF "Attestation verification cannot be skipped" "${test_dir}/output" ||
+        [ -e "${test_dir}/attestations" ]; then
+        TEST_FAILURE_REASON="unsupported gh did not fail with actionable prerequisite diagnostics before verification"
+        cat "${test_dir}/output"
+        rm -rf "$test_dir"
+        return 1
+      fi
     fi
     rm -rf "$test_dir"
     return 0
@@ -364,7 +380,7 @@ for node_version in v24.0.0 v18.0.0; do
     fail "default release verification failed" "$TEST_FAILURE_REASON"
   fi
 done
-for rejected_asset in checksums.txt release-identity.txt awf-bundle.js awf-linux-x64; do
+for rejected_asset in unsupported-cli checksums.txt release-identity.txt awf-bundle.js awf-linux-x64; do
   node_version=v24.0.0
   if [ "$rejected_asset" = awf-linux-x64 ]; then node_version=v18.0.0; fi
   if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.5 "$rejected_asset"; then
@@ -427,6 +443,7 @@ fi
 EOF
   cat > "${test_dir}/bin/gh" <<'EOF'
 #!/usr/bin/env bash
+if [ "$*" = "attestation verify --help" ]; then exit 0; fi
 if [ "$1" = api ]; then
   if [ "$AWF_TEST_SCENARIO" = transient ] && [ ! -e "${AWF_TEST_DIR}/probes" ]; then
     printf '%s\n' "$*" >> "${AWF_TEST_DIR}/probes"

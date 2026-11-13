@@ -85,6 +85,7 @@ EOF
 cat >"$TEMP_DIR/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [ "$*" = "attestation verify --help" ]; then exit 0; fi
 test "$1" = attestation
 test "$2" = verify
 test "$4" = --hostname

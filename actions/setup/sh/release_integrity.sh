@@ -268,6 +268,10 @@ report_release_quota_blocked() {
 verify_release_attestation() {
   local file="$1" repository="$2" output status now deadline delay reason max_wait
   local transient_retries=0 waited=0
+  if ! command -v gh >/dev/null 2>&1 || ! gh attestation verify --help >/dev/null 2>&1; then
+    echo "ERROR: Release attestation verification requires GitHub CLI (gh) >= 2.49.0 with 'gh attestation verify' support. Install or upgrade gh on the runner and ensure it is on PATH before 'Install AWF binary' runs. Attestation verification cannot be skipped." >&2
+    return 1
+  fi
   max_wait="${GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS:-300}"
   [[ "$max_wait" =~ ^[0-9]{1,6}$ ]] || max_wait=300
   # Bounded: at most two transient retries and one quota wait, and every
