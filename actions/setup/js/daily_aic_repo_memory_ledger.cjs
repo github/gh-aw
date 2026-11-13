@@ -127,7 +127,16 @@ function appendCurrentRunLedgerEntry({ repoMemoryDir, usageRoot = USAGE_STAGING_
     return;
   }
   const usageFiles = findJSONLFiles(usageRoot).filter(isDailyAICUsageJSONLFile);
-  const aic = sumAICFromUsageJSONLFiles(usageFiles);
+  let aic;
+  try {
+    aic = sumAICFromUsageJSONLFiles(usageFiles);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "AIC_USAGE_UNPRICED") {
+      core.warning("[daily-workflow-aic] Skipping repo-memory ledger write: usage is unpriced.");
+      return;
+    }
+    throw error;
+  }
   if (!Number.isFinite(aic) || aic < 0) {
     core.warning(`[daily-workflow-aic] Skipping repo-memory ledger write: computed AIC is ${aic}.`);
     return;

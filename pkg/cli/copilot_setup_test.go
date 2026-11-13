@@ -516,9 +516,9 @@ func TestEnsureCopilotSetupSteps_ReleaseMode(t *testing.T) {
 
 	contentStr := string(content)
 
-	// Verify it uses actions/setup-cli with the correct version tag
-	if !strings.Contains(contentStr, "actions/setup-cli@v1.2.3") {
-		t.Errorf("Expected copilot-setup-steps.yml to use actions/setup-cli@v1.2.3 in release mode, got:\n%s", contentStr)
+	// Verify it uses the release setup-cli action; the action ref may be SHA-pinned.
+	if !strings.Contains(contentStr, "github/gh-aw-actions/setup-cli@") {
+		t.Errorf("Expected copilot-setup-steps.yml to use github/gh-aw-actions/setup-cli in release mode, got:\n%s", contentStr)
 	}
 
 	// Verify it uses the correct version in the with parameter
