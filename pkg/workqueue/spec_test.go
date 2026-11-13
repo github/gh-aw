@@ -189,9 +189,19 @@ func TestSpec_Types_PublicContracts(t *testing.T) {
 		{name: "Selection", value: workqueue.Selection{}},
 		{name: "Decision", value: workqueue.Decision{}},
 		{name: "Settings", value: workqueue.Settings{}},
+		{name: "SettingsRetry", value: workqueue.SettingsRetry{}},
+		{name: "PoolSettings", value: workqueue.PoolSettings{}},
 		{name: "Branch", value: workqueue.Branch{}},
 		{name: "NativeDeliveryHost", value: workqueue.NativeDeliveryHost{}},
 		{name: "LedgerSession", value: workqueue.LedgerSession{}},
+		{name: "TraceOptions", value: workqueue.TraceOptions{}},
+		{name: "TraceEvent", value: workqueue.TraceEvent{}},
+		{name: "TraceEvidence", value: workqueue.TraceEvidence{}},
+		{name: "TracePage", value: workqueue.TracePage{}},
+		{name: "NativeDeliveryScope", value: workqueue.NativeDeliveryScope{}},
+		{name: "NativeDeliveryOutput", value: workqueue.NativeDeliveryOutput{}},
+		{name: "NativeDeliveryInventory", value: workqueue.NativeDeliveryInventory{}},
+		{name: "NativeOutputVerifier", value: new(workqueue.NativeOutputVerifier)},
 	}
 
 	for _, tt := range tests {
@@ -222,6 +232,71 @@ func TestSpec_PublicAPI_ProtocolErrorFormatting(t *testing.T) {
 			t.Parallel()
 			err := &workqueue.ProtocolError{Code: tt.code, Message: tt.message}
 			assert.Equal(t, tt.expected, err.Error(), "ProtocolError should format the documented stable code and message")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_Op checks README.md / Functions: typed operations use the
+// queue's canonical JSON representation, including its integer-only profile.
+func TestSpec_PublicAPI_Op(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		value   any
+		json    string
+		wantErr bool
+	}{
+		{
+			name: "typed integer operation",
+			value: struct {
+				Count int `json:"count"`
+			}{Count: 42},
+			json: `{"count":42}`,
+		},
+		{
+			name:  "nested operation values",
+			value: map[string]any{"detail": map[string]any{"count": 3}, "ready": true},
+			json:  `{"detail":{"count":3},"ready":true}`,
+		},
+		{
+			name:    "fractional operation value",
+			value:   map[string]any{"count": 1.5},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			operation, err := workqueue.Op(tt.value)
+			if tt.wantErr {
+				require.Error(t, err, "canonical operations should reject fractional values")
+				return
+			}
+			require.NoError(t, err, "integer-valued typed operations should encode")
+			assert.JSONEq(t, tt.json, string(operation), "encoding should preserve operation values")
+			canonical, err := workqueue.Canonical([]byte(tt.json))
+			require.NoError(t, err, "the expected operation should have a canonical representation")
+			assert.Equal(t, canonical, []byte(operation), "operations should use the queue canonical representation")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_DispatchPrincipal checks README.md / Functions: the launch
+// principal is frozen in the dispatch rather than taken from a request sender.
+func TestSpec_PublicAPI_DispatchPrincipal(t *testing.T) {
+	t.Parallel()
+
+	for _, sender := range []string{"spec-requester", "another-spec-requester"} {
+		t.Run(sender, func(t *testing.T) {
+			t.Parallel()
+			dispatch := &workqueue.DispatchState{
+				CredentialPrincipal: "spec-worker",
+				Sender:              &workqueue.Actor{Principal: sender},
+			}
+			assert.Equal(t, "spec-worker", workqueue.DispatchPrincipal(dispatch),
+				"the principal frozen at launch should remain independent of the request sender")
 		})
 	}
 }
