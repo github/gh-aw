@@ -85,9 +85,28 @@ func TestSpec_DesignDecision_RenderStructTags(t *testing.T) {
 	assert.Contains(t, got, "Workflow", "header tag should choose the documented heading")
 	assert.Contains(t, got, "Token Count", "header tag should support multi-word headings")
 	assert.Contains(t, got, "agentic-token-audit", "rendered struct should include field values")
+	assert.NotContains(t, got, "Optional", "omitempty should omit a table column when every value is zero")
 	assert.NotContains(t, got, "hidden", "dash tag should omit a field")
-	// SPEC_MISMATCH: The README says omitempty omits a zero-valued field, but
-	// RenderStruct currently retains the Optional column and renders a dash.
+
+	mixed := console.RenderStruct([]Overview{
+		{Name: "first", Optional: "visible"},
+		{Name: "second"},
+	})
+	assert.Contains(t, mixed, "Optional", "omitempty should retain a table column when any row has a value")
+	assert.Contains(t, mixed, "visible", "retained omitempty columns should render non-zero values")
+}
+
+func TestSpec_DesignDecision_RenderStructZeroNestedStruct(t *testing.T) {
+	type Inner struct {
+		Value int `console:"header:Value"`
+	}
+	type Row struct {
+		Inner Inner `console:"title:Inner Section,omitempty"`
+	}
+
+	got := console.RenderStruct(Row{})
+	assert.Contains(t, got, "Inner Section", "omitempty should retain zero-valued nested structs outside slice tables")
+	assert.Contains(t, got, "Value", "zero-valued nested struct fields should still render")
 }
 
 func TestSpec_PublicAPI_RenderTableOptionalSections(t *testing.T) {

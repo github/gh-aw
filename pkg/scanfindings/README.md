@@ -28,7 +28,7 @@ Each scanner speaks its own native JSON dialect, with severities spelled in a di
 | `Finding.CompilerError` | `func (f Finding) CompilerError() console.CompilerError` | Converts a finding to the console error format |
 | `FormatMessage` | `func FormatMessage(severityLabel, ruleID, description string) string` | Builds the `[severity] rule: description` message |
 | `Render` | `func Render(w io.Writer, findings []Finding)` | Writes findings with stderr-aware diagnostic styling |
-| `Sort` | `func Sort(findings []Finding)` | Orders findings by file, line, column, severity, rule |
+| `Sort` | `func Sort(findings []Finding)` | Orders findings by file, line, column, descending severity, and rule ID |
 | `CountAtLeast` | `func CountAtLeast(findings []Finding, min SeverityLevel) int` | Counts findings at or above a severity |
 | `ContextLines` | `func ContextLines(fileLines []string, line int) []string` | Returns the source lines surrounding a finding |
 
