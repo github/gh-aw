@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -47,20 +46,12 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 	toolCacheMountProbe, toolCacheMountRef := buildToolCacheMountSettings(isCloudHypervisor || isNVXRuntime(config.WorkflowData))
 	var expandableArgs string
 	expandableArgs, arcDindDockerHostProbe = buildExpandableAWFArgs(config, isCloudHypervisor, isArcDind, arcDindDockerHostProbe)
-	var configFileSetup string
-	awfConfigJSON, err := BuildAWFConfigJSON(config)
+	configFileSetup, expandableArgs, err := buildAWFCommandConfigFileSetup(config, expandableArgs)
 	if err != nil {
 		if enclavesEnabled(config.WorkflowData) {
 			return "echo " + shellEscapeArg(err.Error()) + " >&2; exit 1"
 		}
 		awfHelpersLog.Printf("Warning: failed to build AWF config JSON: %v", err)
-	} else {
-		configFileSetup = buildAWFConfigFileSetup(config, awfConfigJSON)
-		if isModelRoutingRuntimeGuarded(config.WorkflowData) {
-			configFileSetup = buildGuardedAWFConfigFileSetup(config, awfConfigJSON)
-		}
-		expandableArgs = fmt.Sprintf("--config %q ", awfConfigRuntimePathExpr) + expandableArgs
-		awfHelpersLog.Print("Using AWF config file (--config flag)")
 	}
 	modelsJSONPathExport := buildModelsJSONPathExportScript(isArcDind)
 	engineCommand := rewriteEngineCommandForRuntime(config.EngineCommand, isArcDind)
@@ -97,6 +88,20 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 
 	awfHelpersLog.Print("Successfully built AWF command")
 	return prependHostGitHubTokenCheck(command, config.WorkflowData)
+}
+
+func buildAWFCommandConfigFileSetup(config AWFCommandConfig, expandableArgs string) (string, string, error) {
+	awfConfigJSON, err := BuildAWFConfigJSON(config)
+	if err != nil {
+		return "", expandableArgs, err
+	}
+	configFileSetup := buildAWFConfigFileSetup(config, awfConfigJSON)
+	if isModelRoutingRuntimeGuarded(config.WorkflowData) {
+		configFileSetup = buildGuardedAWFConfigFileSetup(config, awfConfigJSON)
+	}
+	expandableArgs = fmt.Sprintf("--config %q ", awfConfigRuntimePathExpr) + expandableArgs
+	awfHelpersLog.Print("Using AWF config file (--config flag)")
+	return configFileSetup, expandableArgs, nil
 }
 
 func validateAWFCommandConfig(config AWFCommandConfig) error {
@@ -344,7 +349,7 @@ func buildCloudHypervisorFilesystemMkdirScript(workflowData *WorkflowData) strin
 	if len(targets) == 0 {
 		return ""
 	}
-	sort.Strings(targets)
+	slices.Sort(targets)
 	quoted := make([]string, 0, len(targets))
 	for _, target := range targets {
 		quoted = append(quoted, shellEscapeArgWithVarsPreserved(target, "GITHUB_WORKSPACE"))
@@ -658,7 +663,7 @@ func appendEnvAndMountArgs(config AWFCommandConfig, firewallConfig *FirewallConf
 				}
 			}
 		}
-		sort.Strings(sortedExclude)
+		slices.Sort(sortedExclude)
 		for _, excludedVar := range sortedExclude {
 			awfArgs = append(awfArgs, "--exclude-env", excludedVar)
 		}
@@ -677,7 +682,7 @@ func appendCustomMountArgs(workflowData *WorkflowData, agentConfig *AgentSandbox
 	}
 	sortedMounts := make([]string, len(agentConfig.Mounts))
 	copy(sortedMounts, agentConfig.Mounts)
-	sort.Strings(sortedMounts)
+	slices.Sort(sortedMounts)
 	for _, mount := range sortedMounts {
 		if usesArcDindDetectionMount(workflowData) && mount == threatDetectionRWMount {
 			continue // Emitted with shell expansion by buildExpandableAWFArgs.
@@ -819,7 +824,7 @@ func collectAllowedHostPorts(workflowData *WorkflowData, agentConfig *AgentSandb
 	for port := range ports {
 		result = append(result, port)
 	}
-	sort.Ints(result)
+	slices.Sort(result)
 	return result
 }
 
