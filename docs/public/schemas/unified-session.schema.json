@@ -1258,7 +1258,7 @@
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
-        "merge_outcome": { "type": "string", "const": "indeterminate" }
+        "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." }
       },
       "additionalProperties": false
     },
@@ -1276,7 +1276,7 @@
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
-        "merge_outcome": { "type": "string", "const": "indeterminate" },
+        "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },
       "additionalProperties": false

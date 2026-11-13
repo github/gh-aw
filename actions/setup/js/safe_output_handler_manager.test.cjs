@@ -220,13 +220,13 @@ describe("Safe Output Handler Manager", () => {
         const handler = vi.fn().mockResolvedValue({
           success: false,
           merged: null,
-          merge_outcome: "indeterminate",
+          operation_outcome: "indeterminate",
           error: "private raw transport details",
           failure_reasons: [{ code: "merge_outcome_indeterminate" }],
         });
         if (deferred) handler.mockResolvedValueOnce({ deferred: true });
         const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
-        expect(result.results[0].result).toMatchObject({ merged: null, merge_outcome: "indeterminate", audit_recorded: true });
+        expect(result.results[0].result).toMatchObject({ merged: null, operation_outcome: "indeterminate", audit_recorded: true });
         expect(result.results[0].error).toContain("indeterminate");
         expect(JSON.stringify(result)).not.toContain("private raw");
         expect(computeSafeOutputsStatus(result.results)).toMatchObject({ status: "failure", itemsApplied: 0 });

@@ -1097,7 +1097,7 @@ async function main(config = {}) {
           success: false,
           data_trust: "untrusted",
           merged: null,
-          merge_outcome: "indeterminate",
+          operation_outcome: "indeterminate",
           error: "Merge outcome is indeterminate; inspect the live pull request before any further action. The merge was not retried.",
           failure_reasons: [{ code: "merge_outcome_indeterminate", message: "Merge outcome could not be confirmed by read-only reconciliation" }],
           decision_evidence: evidence,

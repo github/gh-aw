@@ -959,7 +959,7 @@ function recordMergeDecision(type, result, messageIndex) {
 
 /** @param {any} [result] */
 function mergeProcessingError(result) {
-  return result?.merge_outcome === "indeterminate" ? "Merge outcome is indeterminate; inspect the live pull request before any further action. The merge was not retried." : "merge_pull_request gate checks failed";
+  return result?.operation_outcome === "indeterminate" ? "Merge outcome is indeterminate; inspect the live pull request before any further action. The merge was not retried." : "merge_pull_request gate checks failed";
 }
 
 /** @param {any} result */
@@ -969,7 +969,7 @@ function projectMergeFailure(result) {
     ...(result.audit_recorded ? { audit_recorded: true } : {}),
     ...(result.audit_failed ? { audit_failed: true, audit_error: result.audit_error } : {}),
     ...(typeof result.staged === "boolean" ? { staged: result.staged } : {}),
-    ...(result.merge_outcome === "indeterminate" ? { merge_outcome: "indeterminate", merged: null, data_trust: "untrusted" } : {}),
+    ...(result.operation_outcome === "indeterminate" ? { operation_outcome: "indeterminate", merged: null, data_trust: "untrusted" } : {}),
   };
 }
 

@@ -110,11 +110,14 @@ interface HandlerErrorResult {
   [key: string]: any;
 }
 
-interface MergePullRequestIndeterminateResult extends HandlerErrorResult {
-  /** Processing failed to confirm the outcome; the merge may already have applied. */
+interface HandlerIndeterminateResult extends HandlerErrorResult {
+  /** Processing failed to confirm the outcome; the operation may already have applied. */
   success: false;
-  /** A merge response was lost and read-only reconciliation could not confirm the outcome. Never retry the mutation automatically. */
-  merge_outcome: "indeterminate";
+  /** The mutation outcome is unknown. Verify live state before retrying. */
+  operation_outcome: "indeterminate";
+}
+
+interface MergePullRequestIndeterminateResult extends HandlerIndeterminateResult {
   merged: null;
 }
 
@@ -143,4 +146,4 @@ type MessageHandlerFunction = (message: any, resolvedTemporaryIds: ResolvedTempo
  */
 type HandlerFactoryFunction = (config?: HandlerConfig) => Promise<MessageHandlerFunction>;
 
-export { HandlerConfig, ResolvedTemporaryIds, HandlerSuccessResult, HandlerErrorResult, MergePullRequestIndeterminateResult, HandlerResult, MessageHandlerFunction, HandlerFactoryFunction };
+export { HandlerConfig, ResolvedTemporaryIds, HandlerSuccessResult, HandlerErrorResult, HandlerIndeterminateResult, MergePullRequestIndeterminateResult, HandlerResult, MessageHandlerFunction, HandlerFactoryFunction };

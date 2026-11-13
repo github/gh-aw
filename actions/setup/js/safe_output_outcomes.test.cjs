@@ -47,12 +47,17 @@ describe("safe-output application outcomes", () => {
     expect(buildSafeOutputOutcomes([{ success: true }], true)[0]).toMatchObject({ status: "staged", staged: true });
   });
 
-  it("retains indeterminate merge outcomes while failing processing and withholding success URLs", () => {
-    const [outcome] = buildSafeOutputOutcomes([{ type: "merge_pull_request", messageIndex: 0, success: false, result: { merged: null, merge_outcome: "indeterminate", pull_request_url: "https://github.com/org/repo/pull/1" } }]);
-    expect(outcome).toMatchObject({ status: "failed", merge_outcome: "indeterminate" });
+  it.each(["merge_pull_request", "add_comment", "create_issue"])("retains indeterminate %s outcomes while failing processing and withholding success URLs", type => {
+    const [outcome] = buildSafeOutputOutcomes([{ type, messageIndex: 0, success: false, result: { operation_outcome: "indeterminate", url: "https://github.com/org/repo/issues/1" } }]);
+    expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
     expect(outcome).not.toHaveProperty("url");
-    expect(projectSafeOutputData(outcome).merge_outcome).toBe("indeterminate");
-    expect(projectSafeOutputData({ type: "merge_pull_request", merge_outcome: "private-value" })).not.toHaveProperty("merge_outcome");
+    expect(projectSafeOutputData(outcome).operation_outcome).toBe("indeterminate");
+    expect(projectSafeOutputData({ type, operation_outcome: "private-value" })).not.toHaveProperty("operation_outcome");
+  });
+
+  it("retains operation uncertainty from top-level processing results", () => {
+    const [outcome] = buildSafeOutputOutcomes([{ type: "custom_output", success: false, operation_outcome: "indeterminate" }]);
+    expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
   });
 
   it("records queued ledger appends as delegated until persistence", () => {
@@ -498,12 +503,12 @@ describe("safe-output application outcomes", () => {
         ["add_labels", async () => ({ skipped: true, reason: "PRIVATE_REASON" })],
       ]);
       const processing = await processMessages(handlers, messages);
-      writeSafeOutputOutcomes([...processing.results, { type: "merge_pull_request", messageIndex: 3, success: false, result: { merged: null, merge_outcome: "indeterminate" } }], false, path.join(root, "safe-output-outcomes.jsonl"));
+      writeSafeOutputOutcomes([...processing.results, { type: "add_comment", messageIndex: 3, success: false, result: { operation_outcome: "indeterminate" } }], false, path.join(root, "safe-output-outcomes.jsonl"));
       writeSafeOutputOutcomes([{ type: "add_comment", messageIndex: 0, delegated: true }], false, path.join(root, "claims/claim-1/safe-output-outcomes.jsonl"));
       const events = writeUnifiedSession({ rootDir: root, graders: [], jobResults: JSON.stringify({ external_job: { result: "failure", outputs: { body: "PRIVATE_OUTPUT" } } }) });
       const outcomes = events.filter(event => event.type === "safe_output.outcome");
       expect(outcomes.map(event => event.data.status)).toEqual(["success", "failed", "skipped", "failed", "delegated"]);
-      expect(outcomes[3].data.merge_outcome).toBe("indeterminate");
+      expect(outcomes[3].data.operation_outcome).toBe("indeterminate");
       expect(outcomes[0].data.url).toBe("https://github.com/org/repo/issues/1");
       expect(outcomes.every(event => event.provenance.phase === "safe_outputs")).toBe(true);
       expect(events.find(event => event.type === "workflow.job_result").data).toEqual({ jobId: "external_job", result: "failure" });

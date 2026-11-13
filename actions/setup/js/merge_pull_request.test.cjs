@@ -665,7 +665,7 @@ describe("merge_pull_request policy hardening", () => {
       success: false,
       data_trust: "untrusted",
       merged: null,
-      merge_outcome: "indeterminate",
+      operation_outcome: "indeterminate",
       failure_reasons: [{ code: "merge_outcome_indeterminate", message: "Merge outcome could not be confirmed by read-only reconciliation" }],
       decision_evidence: { data_trust: "untrusted" },
     });
@@ -849,7 +849,7 @@ describe("merge_pull_request policy hardening", () => {
     client.rest.pulls.merge.mockRejectedValue(new Error(secret));
     const result = await run();
     expect(result.success).toBe(false);
-    expect(result.merge_outcome).toBe("indeterminate");
+    expect(result.operation_outcome).toBe("indeterminate");
     expect(result.error).not.toContain(secret);
     expect(debugRecords()).toContainEqual({ event: "merge_response_unconfirmed" });
     expect(debugRecords()).toContainEqual({ event: "merge_reconciliation", confirmed: false });
@@ -1039,11 +1039,11 @@ describe("merge_pull_request policy hardening", () => {
       throw new Error("private response loss");
     });
     const result = await run();
-    expect(result).toMatchObject({ success: false, merged: null, merge_outcome: "indeterminate" });
+    expect(result).toMatchObject({ success: false, merged: null, operation_outcome: "indeterminate" });
     expect(result.error).toContain("not retried");
     expect(client.rest.pulls.merge).toHaveBeenCalledTimes(1);
     const entry = persistDecision(result);
-    expect(entry).toMatchObject({ merged: null, merge_outcome: "indeterminate", failure_codes: ["merge_outcome_indeterminate"] });
+    expect(entry).toMatchObject({ merged: null, operation_outcome: "indeterminate", failure_codes: ["merge_outcome_indeterminate"] });
     expect(entry.decision_evidence.reconciled_at).toBeDefined();
     expect(JSON.stringify(result)).not.toContain("private");
     expect(debugRecords()).not.toContainEqual({ event: "merge_completed", merged: false });

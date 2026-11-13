@@ -895,12 +895,20 @@ describe("safe_output_summary", () => {
       type: "merge_pull_request",
       messageIndex: 1,
       success: false,
-      result: { merged: null, merge_outcome: "indeterminate", failure_reasons: [{ code: "merge_outcome_indeterminate" }] },
+      result: { merged: null, operation_outcome: "indeterminate", failure_reasons: [{ code: "merge_outcome_indeterminate" }] },
     });
     expect(summary).toContain("Merge Pull Request - Indeterminate");
     expect(summary).toContain("GitHub may have applied the merge");
     expect(summary).toContain("The merge was not retried");
     expect(summary).not.toContain("Blocked Gates");
+  });
+
+  it("renders operation uncertainty for non-merge safe outputs", () => {
+    const summary = generateSafeOutputSummary({ type: "add_comment", messageIndex: 1, success: false, result: { operation_outcome: "indeterminate" } });
+    expect(summary).toContain("Add Comment - Indeterminate");
+    expect(summary).toContain("The operation may have been applied");
+    expect(summary).toContain("Inspect the target system before retrying");
+    expect(summary).not.toContain("Merge outcome");
   });
 
   it("describes reconciled success without attributing the merge to this run", () => {
