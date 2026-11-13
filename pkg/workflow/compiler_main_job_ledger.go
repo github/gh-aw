@@ -22,10 +22,10 @@ func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *Wor
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: ${{ github.token }}\n")
 	yaml.WriteString(fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig))
-	yaml.WriteString("        with:\n")
-	if data.LedgerConfig.hasCommentStorage() {
-		yaml.WriteString(fmt.Sprintf("          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken)))
+	for _, line := range ledgerCommentMemoryCredentialEnv(data) {
+		yaml.WriteString(line)
 	}
+	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")

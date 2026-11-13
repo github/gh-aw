@@ -173,8 +173,12 @@ the configured comment-memory token, target repository, and repository allowlist
 The target MUST be `triggering`, `*`, or a literal positive issue/PR number;
 `target-repo` MUST be literal. Staged runs MUST NOT publish ledger comments.
 
-Each accepted batch creates a new managed comment containing a plain JSONL
-canonical shard under a `gh-aw-comment-ledger:<ledger-name>` code fence.
+Each accepted batch creates one new managed comment containing every new plain
+JSONL shard under separate `gh-aw-comment-ledger:<ledger-name>` code fences.
+Segment rotation MUST retain all accepted records, not just the final writer
+segment. Persistence MUST validate the complete transition, aggregate batch
+size, and exact rendered JSONL before its single publication request. An API
+failure MUST NOT report success; a retry MUST reconcile against durable history.
 The separate marker prevents ordinary editable comment-memory files from
 overwriting ledger history. Persistence MUST NOT update or delete prior ledger
 comments. Retrying an already persisted transaction MUST NOT duplicate records.
@@ -183,6 +187,17 @@ repository and issue/PR. Writers in different repositories sharing a target
 MUST coordinate externally.
 GitHub Actions concurrency may replace pending jobs; workloads requiring every
 queued run to persist SHOULD serialize the entire workflow upstream.
+
+Readers MUST accept ledger shards only from the verified publishing identity
+of the selected comment-memory credential, using GitHub's numeric author ID.
+PATs use the authenticated user; the built-in installation token requires
+protected compiler metadata identifying GitHub Actions, bound to the selected
+client token. Opaque configured tokens, including authored App installation-token
+expressions, MUST fail if the authenticated-user lookup cannot verify their
+identity; implementations MUST NOT guess App metadata. A provenance marker or an
+arbitrary Bot account MUST NOT authorize history. Untrusted authors' shards MUST
+be ignored before JSONL parsing and size accounting, including malformed planted shards. Failure
+to verify the writer identity MUST fail explicitly rather than trust bot authors.
 
 The existing comment-memory limits apply to JSONL shards: 16 KiB per batch
 and 48 KiB total per ledger. Readers MUST fail on malformed shards or incomplete

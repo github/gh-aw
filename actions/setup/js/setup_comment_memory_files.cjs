@@ -96,6 +96,10 @@ function resolveCommentMemoryTarget(commentMemoryConfig) {
 }
 
 async function collectCommentMemoryFiles(githubClient, commentMemoryConfig) {
+  if (!resolveTargetRepo(commentMemoryConfig)) {
+    core.warning("comment_memory setup: invalid comment-memory target repo configuration, skipping restore");
+    return [];
+  }
   const targetRepo = resolveCommentMemoryTarget(commentMemoryConfig);
   if (!targetRepo) {
     core.info("comment_memory setup: no resolvable target issue/PR number, skipping");

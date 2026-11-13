@@ -13,6 +13,8 @@ const { buildManagedMemoryBody } = require("./comment_memory.cjs");
 const { enforceCommentLimits } = require("./comment_limit_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
+const { resolveDispatchCredentialPrincipal } = require("./work_queue_dispatch_credential.cjs");
+const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 
 const LEDGER_TAG = "gh-aw-comment-ledger";
 
@@ -25,6 +27,20 @@ function commentConfig() {
 async function materializeCommentLedger({ githubClient, config, sourceDir, commentMemoryConfig = commentConfig() }) {
   const target = resolveCommentMemoryTarget(commentMemoryConfig);
   if (!target) throw new TypeError("Comment-backed ledger has no target issue/PR");
+  let authorId;
+  try {
+    const credential = { kind: process.env.GH_AW_COMMENT_MEMORY_TOKEN_SOURCE === "github_actions" ? "github_token" : "authenticated" };
+    const selectedToken = process.env.GH_AW_COMMENT_MEMORY_TOKEN;
+    if (credential.kind !== "authenticated" && !selectedToken) throw new Error("Comment-backed ledger installation identity requires a bound token");
+    if (selectedToken) {
+      githubClient = await createAuthenticatedGitHubClient({ "github-token": selectedToken });
+      const authentication = await githubClient.auth({ type: "token" });
+      if (authentication?.type !== "token" || authentication.token !== selectedToken) throw new Error("Comment-backed ledger credential does not match the selected client");
+    }
+    authorId = await resolveDispatchCredentialPrincipal(githubClient, credential);
+  } catch (error) {
+    throw new Error("Cannot verify the authenticated comment-backed ledger writer", { cause: error });
+  }
   const shardDir = path.join(sourceDir, "ledger", "shards");
   fs.mkdirSync(shardDir, { recursive: true });
   let totalBytes = 0;
@@ -32,13 +48,16 @@ async function materializeCommentLedger({ githubClient, config, sourceDir, comme
     const { data } = await githubClient.rest.issues.listComments({ owner: target.owner, repo: target.repo, issue_number: target.number, per_page: 100, page });
     if (!Array.isArray(data)) throw new TypeError("Invalid comment-backed ledger response");
     for (const comment of data) {
+      if (String(comment.user?.id) !== authorId) continue;
       if (typeof comment.body !== "string" || !comment.body.includes("<!-- gh-aw-agentic-workflow:")) continue;
       const entries = extractCommentMemoryEntries(comment.body, message => core.warning(message), LEDGER_TAG);
+      let batchBytes = 0;
       for (const entry of entries) {
         if (entry.memoryId !== config.name) continue;
-        const bytes = Buffer.byteLength(entry.content);
+        const bytes = Buffer.byteLength(entry.content) + 1;
+        batchBytes += bytes;
         totalBytes += bytes;
-        if (bytes > COMMENT_MEMORY_MAX_FILE_BYTES || totalBytes > COMMENT_MEMORY_MAX_TOTAL_BYTES) throw new RangeError("Comment-backed ledger exceeds comment-memory size limits; use git storage for larger ledgers");
+        if (batchBytes > COMMENT_MEMORY_MAX_FILE_BYTES || totalBytes > COMMENT_MEMORY_MAX_TOTAL_BYTES) throw new RangeError("Comment-backed ledger exceeds comment-memory size limits; use git storage for larger ledgers");
         let segment;
         try {
           segment = buildSegment([...iterateJsonl(entry.content, { strict: true })], { maxSegmentBytes: config.max_segment_kb * 1024 });
@@ -53,7 +72,7 @@ async function materializeCommentLedger({ githubClient, config, sourceDir, comme
         }
       }
     }
-    if (data.length < 100) return { target, totalBytes };
+    if (data.length < 100) return { target, totalBytes, githubClient };
   }
   throw new RangeError("Comment-backed ledger scan limit reached; refusing incomplete history");
 }
@@ -63,27 +82,36 @@ async function persistCommentLedgerAppends({ appends, config, githubClient, comm
   const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), "comment-ledger-"));
   let ledger;
   try {
-    const { target, totalBytes } = await materializeCommentLedger({ githubClient, config, sourceDir, commentMemoryConfig });
+    const { target, totalBytes, githubClient: commentClient } = await materializeCommentLedger({ githubClient, config, sourceDir, commentMemoryConfig });
+    const shardDir = path.join(sourceDir, "ledger", "shards");
+    const previousFiles = new Set(fs.readdirSync(shardDir));
     const limits = configuredLedgerLimits(config, appends.length);
     ledger = new Ledger({ memoryDir: sourceDir, maxRecordBytes: limits.maxRecordBytes, maxSegmentBytes: config.max_segment_kb * 1024, maxPatchBytes: limits.maxPatchBytes });
     const result = appendLedgerRecords(ledger, appends, config);
     ledger.close();
     if (!result.persisted) return result;
     // Each batch creates an immutable comment, so independent appends never overwrite history.
-    const content = fs.readFileSync(ledger.writerPath, "utf8");
-    const bytes = Buffer.byteLength(content);
+    const contents = fs
+      .readdirSync(shardDir)
+      .filter(file => !previousFiles.has(file) && file.endsWith(".jsonl"))
+      .sort()
+      .map(file => fs.readFileSync(path.join(shardDir, file), "utf8"));
+    const bytes = contents.reduce((total, content) => total + Buffer.byteLength(content), 0);
     if (bytes > COMMENT_MEMORY_MAX_FILE_BYTES || totalBytes + bytes > COMMENT_MEMORY_MAX_TOTAL_BYTES) throw new RangeError("Comment-backed ledger exceeds comment-memory size limits; use git storage for larger ledgers");
-    const body = buildManagedMemoryBody(content, config.name, {
+    /** @type {import("./report_ast.cjs").ReportBlock[]} */
+    const blocks = contents.map(content => ({ type: "code_block", language: `${LEDGER_TAG}:${config.name}`, fenceLength: 6, value: content, agentTainted: true, sizeProtected: true }));
+    const body = buildManagedMemoryBody("", config.name, {
       includeFooter: false,
       runUrl: buildWorkflowRunUrl(context, context.repo),
       workflowName: process.env.GH_AW_WORKFLOW_NAME || "Workflow",
       memoryTag: LEDGER_TAG,
-      memoryBlock: { type: "code_block", language: `${LEDGER_TAG}:${config.name}`, fenceLength: 6, value: content, agentTainted: true, sizeProtected: true },
+      memoryBlock: blocks.length === 1 ? blocks[0] : { type: "details", summary: "JSONL shards", agentTainted: false, children: blocks },
     });
-    const [published] = extractCommentMemoryEntries(body, undefined, LEDGER_TAG);
-    if (published?.content !== content.trimEnd()) throw new TypeError("Comment-backed ledger JSONL was changed by publication sanitization; refusing to publish altered records");
+    const published = extractCommentMemoryEntries(body, undefined, LEDGER_TAG);
+    if (published.length !== contents.length || published.some((entry, index) => entry.memoryId !== config.name || entry.content !== contents[index].trimEnd()))
+      throw new TypeError("Comment-backed ledger JSONL was changed by publication sanitization; refusing to publish altered records");
     enforceCommentLimits(body);
-    const { data } = await githubClient.rest.issues.createComment({ owner: target.owner, repo: target.repo, issue_number: target.number, body });
+    const { data } = await commentClient.rest.issues.createComment({ owner: target.owner, repo: target.repo, issue_number: target.number, body });
     return { ...result, url: data.html_url };
   } finally {
     ledger?.close();

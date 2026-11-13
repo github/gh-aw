@@ -45,11 +45,9 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		"          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json\n",
 		fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig),
 	)
+	steps = append(steps, ledgerCommentMemoryCredentialEnv(data)...)
 	steps = append(steps, c.ledgerPersistenceStagedEnv(data)...)
 	steps = append(steps, "        with:\n")
-	if data.LedgerConfig.hasCommentStorage() {
-		steps = append(steps, fmt.Sprintf("          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken)))
-	}
 	steps = append(steps,
 		"          script: |\n",
 		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
@@ -69,6 +67,17 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 	}, nil
 }
 
+func ledgerCommentMemoryCredentialEnv(data *WorkflowData) []string {
+	if !data.LedgerConfig.hasCommentStorage() {
+		return nil
+	}
+	token := data.CommentMemoryConfig.GitHubToken
+	return []string{
+		fmt.Sprintf("          GH_AW_COMMENT_MEMORY_TOKEN: %s\n", resolveSafeOutputGitHubToken(token)),
+		fmt.Sprintf("          GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: %s\n", safeOutputGitHubTokenSourceForToken(token)),
+	}
+}
+
 func (c *Compiler) ledgerPersistenceStagedEnv(data *WorkflowData) []string {
 	if !data.LedgerConfig.hasCommentStorage() {
 		return nil
@@ -83,13 +92,16 @@ func (c *Compiler) ledgerPersistenceStagedEnv(data *WorkflowData) []string {
 	return nil
 }
 
-func ledgerPersistencePolicy(data *WorkflowData) (permissions, concurrency string) {
-	permissions = "permissions:\n      contents: write"
+func ledgerPersistencePolicy(data *WorkflowData) (string, string) {
+	permissions := NewPermissionsContentsWrite()
+	concurrency := ""
 	if data.LedgerConfig.hasCommentStorage() {
-		permissions = "permissions:\n      contents: read\n      issues: write\n      pull-requests: write"
+		permissions.Set(PermissionContents, PermissionRead)
+		permissions.Set(PermissionIssues, PermissionWrite)
+		permissions.Set(PermissionPullRequests, PermissionWrite)
 		for _, ledger := range data.LedgerConfig.Ledgers {
 			if ledger.Storage != "comment-memory" {
-				permissions = strings.Replace(permissions, "contents: read", "contents: write", 1)
+				permissions.Set(PermissionContents, PermissionWrite)
 				break
 			}
 		}
@@ -104,5 +116,5 @@ func ledgerPersistencePolicy(data *WorkflowData) (permissions, concurrency strin
 		}
 		concurrency = fmt.Sprintf("concurrency:\n      group: ${{ format('gh-aw-comment-ledger-{0}-{1}', %s, %s) }}\n      cancel-in-progress: false", repoExpression, targetExpression)
 	}
-	return permissions, concurrency
+	return permissions.RenderToYAML(), concurrency
 }

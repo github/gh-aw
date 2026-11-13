@@ -78,6 +78,14 @@ func TestCommentBackedLedgerConfiguration(t *testing.T) {
 	require.NotContains(t, job.Permissions, "contents: write")
 	require.Contains(t, job.Concurrency, "'42'")
 	require.Contains(t, strings.Join(job.Steps, ""), "Write comment-memory configuration")
+	require.Contains(t, strings.Join(job.Steps, ""), "GH_AW_COMMENT_MEMORY_TOKEN: ${{ secrets.MEMORY_TOKEN }}")
+	require.Contains(t, strings.Join(job.Steps, ""), `GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: "unknown"`)
+	require.NotContains(t, strings.Join(job.Steps, ""), "github-token: ${{ secrets.MEMORY_TOKEN }}")
+	var projectionStep strings.Builder
+	require.NoError(t, compiler.generateLedgerProjectionStep(&projectionStep, data))
+	require.Contains(t, projectionStep.String(), "GH_AW_COMMENT_MEMORY_TOKEN: ${{ secrets.MEMORY_TOKEN }}")
+	require.Contains(t, projectionStep.String(), `GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: "unknown"`)
+	require.NotContains(t, projectionStep.String(), "github-token: ${{ secrets.MEMORY_TOKEN }}")
 
 	for _, replacement := range []string{
 		"",
@@ -106,6 +114,100 @@ func TestMixedLedgerStoragePreservesGitCompactionAndPermissions(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, job.Permissions, "contents: write")
 	require.Contains(t, job.Permissions, "issues: write")
+}
+
+func TestCommentMemoryLedgerTokenSource(t *testing.T) {
+	config, err := parseLedgerToolConfig(map[string]any{"storage": "comment-memory"})
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		token  string
+		source string
+	}{
+		{token: "${{github.token}}", source: "github_actions"},
+		{token: "${{  github.token  }}", source: "github_actions"},
+		{token: "${{ SECRETS.GITHUB_TOKEN }}", source: "github_actions"},
+		{token: "${{ github.token || secrets.CUSTOM_TOKEN }}", source: "unknown"},
+		{token: "${{ secrets.MEMORY_TOKEN }}", source: "unknown"},
+	} {
+		t.Run(tc.token, func(t *testing.T) {
+			data := &WorkflowData{LedgerConfig: config, CommentMemoryConfig: &CommentMemoryConfig{
+				BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: tc.token},
+			}}
+			var step strings.Builder
+			require.NoError(t, NewCompiler().generateLedgerProjectionStep(&step, data))
+			require.Contains(t, step.String(), "GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: "+strconv.Quote(tc.source))
+		})
+	}
+}
+
+func TestCommentMemoryConfigWrittenOncePerJob(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		ledger string
+	}{
+		{name: "without ledger"},
+		{name: "git ledger", ledger: "  ledger: {}\n"},
+		{name: "comment ledger", ledger: "  ledger:\n    storage: comment-memory\n"},
+		{name: "mixed ledgers", ledger: "  ledger:\n    local:\n      storage: comment-memory\n    global: {}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			path := filepath.Join(root, "memory.md")
+			source := `---
+on:
+  workflow_dispatch:
+  restore-memory: true
+  steps:
+    - name: Gate check
+      run: echo gate
+engine: copilot
+strict: false
+tools:
+  comment-memory:
+    target: 42
+` + tc.ledger + `steps:
+  - name: Agent custom step
+    run: echo agent
+jobs:
+  reader:
+    runs-on: ubuntu-latest
+    restore-memory: true
+    steps:
+      - name: Read memory
+        run: echo reader
+---
+Read prior memory.
+`
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			require.NoError(t, NewCompiler().CompileWorkflow(path))
+			lock, err := os.ReadFile(filepath.Join(root, "memory.lock.yml"))
+			require.NoError(t, err)
+			for _, job := range []struct {
+				name       string
+				customStep string
+			}{
+				{name: "agent", customStep: "Agent custom step"},
+				{name: "pre_activation", customStep: "Gate check"},
+				{name: "reader", customStep: "Read memory"},
+			} {
+				section := extractJobSection(string(lock), job.name)
+				require.NotEmpty(t, section, job.name)
+				require.Equal(t, 1, strings.Count(section, "- name: Write comment-memory configuration"), job.name)
+				assertStepOrderInSection(t, section,
+					"- name: Write comment-memory configuration",
+					"- name: Prepare comment memory files",
+					"- name: "+job.customStep,
+				)
+				if job.name == "agent" && strings.Contains(tc.ledger, "storage: comment-memory") {
+					assertStepOrderInSection(t, section,
+						"- name: Write comment-memory configuration",
+						"- name: Create read-only ledger projections",
+						"- name: Prepare comment memory files",
+					)
+				}
+			}
+		})
+	}
 }
 
 func TestBuiltinLedgerDeclarations(t *testing.T) {
