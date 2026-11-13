@@ -5,6 +5,10 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -2417,13 +2421,55 @@ func TestBuildAWFCommand_ResolvesMaxAICreditsFromEnv(t *testing.T) {
 
 			command := BuildAWFCommand(config)
 			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-%d}"`, tt.defaultBudget))
-			assert.Contains(t, command, `if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then`)
+			assert.Contains(t, command, `if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^(-1|[0-9]+)$ ]]; then`)
 			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="%d"`, tt.defaultBudget))
 			assert.Contains(t, command, `\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS}`)
 			assert.NotContains(t, command, "vars.GH_AW_DEFAULT_MAX_AI_CREDITS")
 			assert.NotContains(t, command, "vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS")
 			assert.NotContains(t, command, "${{")
 		})
+	}
+}
+
+// T-AIC-PR-003 exercises the generated runtime setup, not just the vars expression.
+func TestBuildAWFCommand_RuntimeMaxAICredits(t *testing.T) {
+	for _, component := range []struct {
+		name             string
+		detection, evals bool
+		fallback         int
+	}{
+		{"agent", false, false, 1000},
+		{"detection", true, false, 400},
+		{"evals", false, true, 400},
+	} {
+		for _, tc := range []struct {
+			value    string
+			expected string
+		}{
+			{"-1", "-1"},
+			{"0", "0"},
+			{"750", "750"},
+			{"", strconv.Itoa(component.fallback)},
+			{"-2", strconv.Itoa(component.fallback)},
+			{"100M", strconv.Itoa(component.fallback)},
+		} {
+			t.Run(component.name+"/"+tc.value, func(t *testing.T) {
+				runnerTemp := t.TempDir()
+				require.NoError(t, os.MkdirAll(filepath.Join(runnerTemp, "gh-aw"), 0o755))
+				script := buildAWFConfigFileSetup(AWFCommandConfig{
+					WorkflowData: &WorkflowData{IsDetectionRun: component.detection, IsEvalsRun: component.evals},
+				}, `{"apiProxy":{"maxRuns":1}}`)
+				script, _, found := strings.Cut(script, "\ncp ")
+				require.True(t, found, "omit the shared artifact copy from the runtime fixture")
+				cmd := exec.Command("bash", "-eu", "-c", script)
+				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RUNNER_TEMP=" + runnerTemp, "GH_AW_MAX_AI_CREDITS=" + tc.value}
+				output, err := cmd.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+				configJSON, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw", "awf-config.json"))
+				require.NoError(t, err)
+				assert.JSONEq(t, `{"apiProxy":{"maxRuns":1,"maxAiCredits":`+tc.expected+`}}`, string(configJSON))
+			})
+		}
 	}
 }
 
