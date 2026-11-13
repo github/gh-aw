@@ -56,6 +56,16 @@ const kinds = {
 };
 const validTime = value => Number.isFinite(Date.parse(value));
 const after = (at, since) => validTime(at) && validTime(since) && Date.parse(at) > Date.parse(since);
+function linkedRepository(raw) {
+  if (typeof raw !== "string" || raw !== raw.trim()) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || !url.host || url.username || url.password) return null;
+    return url.pathname.match(/\/repos\/([^/]+\/[^/]+)\/?$/)?.[1] || null;
+  } catch {
+    return null;
+  }
+}
 function actor(user) {
   const login = typeof user?.login === "string" ? user.login.toLowerCase() : "";
   if (!login) return "unknown";
@@ -230,11 +240,11 @@ function project(fixture) {
     facts.afterAction = Boolean(linked) && after(linked.created_at, item.timestamp);
     if (errors[`issues/${number}/timeline`] || !Array.isArray(timeline)) facts.primary = "error";
     if (linked) {
-      const linkedRepository = typeof linked.source.issue.repository_url === "string" ? linked.source.issue.repository_url.match(/\/repos\/([^/]+\/[^/]+)\/?$/)?.[1] : null;
-      if (!linkedRepository) {
+      const repository = linkedRepository(linked.source.issue.repository_url);
+      if (!repository) {
         facts.execution = "missing";
       } else {
-        const linkedEndpoint = linkedRepository.toLowerCase() !== "acme/repo" ? `repos/${linkedRepository}/pulls/${linked.source.issue.number}` : `pulls/${linked.source.issue.number}`;
+        const linkedEndpoint = `repos/${repository}/pulls/${linked.source.issue.number}`;
         const pr = responses[linkedEndpoint];
         if (errors[linkedEndpoint] || !pr) facts.primary = "error";
         facts.state = pr?.merged ? "merged" : pr?.state || "open";

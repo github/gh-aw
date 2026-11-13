@@ -55,15 +55,35 @@ Follow these operations in order:
    The checker rejects any other SHA-256:
    `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`.
    It does not download tools or install dependencies.
-2. From the repository root, run the checker and retain its output:
+2. From the repository root, download the pinned JAR, verify its checksum, and
+   run the checker. The output directory is retained as run-level evidence:
 
    ```sh
-   JAVA_BIN=/path/to/java TLA2TOOLS_JAR=/path/to/tla2tools.jar \
-     node specs/outcomes/check.mjs /path/to/verification-output
+   mkdir -p "$HOME/.cache/gh-aw"
+   curl --fail --location \
+     https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar \
+     --output "$HOME/.cache/gh-aw/tla2tools-1.7.4.jar"
+   printf '%s  %s\n' \
+     '936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88' \
+     "$HOME/.cache/gh-aw/tla2tools-1.7.4.jar" | sha256sum --check
+   JAVA_BIN="$(command -v java)" \
+     TLA2TOOLS_JAR="$HOME/.cache/gh-aw/tla2tools-1.7.4.jar" \
+     node specs/outcomes/check.mjs /tmp/gh-aw-outcome-verification
    ```
 
-3. Confirm the baseline and fixture verdicts and all named negative controls
-   against the bounds below. Keep the report directory as run-level evidence.
+3. Expect output like this; each deliberate defect should also report its named
+   invariant violation from the table below:
+
+   ```text
+   baseline: 18984 states generated, 16272 distinct states found, 0 states left on queue.
+   fixtures: 455 states generated, 390 distinct states found, 0 states left on queue.
+   Verified 96/96 fixture projections. Report: /tmp/gh-aw-outcome-verification/report.json
+   ```
+
+   The command exits zero only when both exhaustive runs succeed and all ten
+   deliberate defects exit 12 with the required violation. Keep
+   `/tmp/gh-aw-outcome-verification` for the generated configs, logs, projections,
+   and `report.json`.
 
 Omit the output argument to use a new temporary directory. Each TLC process is
 limited to two workers, 1 GiB heap, seed 1, and 60 seconds. Successful positive
@@ -80,20 +100,20 @@ run-level evidence; generated artifacts are not source files.
 
 Verified on 2026-11-13 with TLC 2.19 from the official v1.7.4 distribution
 (JAR SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`)
-and Java 17.0.21. The Go `TestOutcomeConformance` test passed for all 95 corpus
-cases; `check.mjs` projected all 95 cases and the fixture model agreed with
+and Java 17.0.21. The Go `TestOutcomeConformance` test passed for all 96 corpus
+cases; `check.mjs` projected all 96 cases and the fixture model agreed with
 their expected typed results. Each deliberate mutation below exited 12 with
 its required invariant violation.
 
 | Model | Exhaustive bound | Controls |
 |---|---|---|
 | Baseline | 18,984 generated states, 16,272 distinct states, zero queued states | Ten deliberate defects below check acceptance evidence, delivery/deletion, attribution, publication, and summary invariants. |
-| Shared fixtures | 95 cases projected; 455 generated states, 390 distinct states, zero queued states | `FixtureAgreement` checks each case's expected typed result. Equal projected records collapse into the same initial state. |
+| Shared fixtures | 96 cases projected; 455 generated states, 390 distinct states, zero queued states | `FixtureAgreement` checks each case's expected typed result. Equal projected records collapse into the same initial state. |
 
 These are reproducible finite bounds, not a proof over arbitrary inputs.
 
 | Deliberate defect | Exit | Required invariant violation |
-|---|---|
+|---|---|---|
 | Target existence accepted | 12 | `AcceptanceEvidence` |
 | Open issue bot activity accepted | 12 | `OpenCreationsPending` |
 | Merged push without execution identity accepted | 12 | `AcceptanceEvidence` |
@@ -108,9 +128,13 @@ These are reproducible finite bounds, not a proof over arbitrary inputs.
 ## Connection to runtime behavior and limits
 
 `check.mjs` independently projects raw inputs from
-`pkg/cli/testdata/outcome_conformance.json` into model facts. It never derives
-facts from expected results and rejects unmapped fixture types. Expectations are
-checked by TLC, including status, evidence strength, signal, and zero-touch.
+`pkg/cli/testdata/outcome_conformance.json` into model facts. For assignment
+cross-references, it requires a valid HTTPS repository URL with an owner and
+repository path; missing or malformed URLs produce no attributed execution and
+remain `unknown` with `missing_execution_state`, matching the Go evaluator. The
+checker never derives facts from expected results and rejects unmapped fixture
+types. Expectations are checked by TLC, including status, evidence strength,
+signal, and zero-touch.
 The Go CLI executes the current corpus through its conformance test:
 
 ```sh

@@ -26,6 +26,7 @@ func TestOutcomeConformance(t *testing.T) {
 	content, err := os.ReadFile("testdata/outcome_conformance.json")
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(content, &cases))
+	const fixtureRepo = "acme/repo"
 	oldGet, oldArray := outcomeEvidenceGHAPIGet, outcomeEvidenceGHAPIGetArray
 	oldPR, oldPRArray := outcomeEvalPRGHAPIGet, outcomeEvalPRGHAPIGetArray
 	oldClose, oldCloseArray := closeStickyGHAPIGet, closeStickyGHAPIGetArray
@@ -51,8 +52,9 @@ func TestOutcomeConformance(t *testing.T) {
 				return json.Unmarshal(raw, target)
 			}
 			get := func(_ context.Context, endpoint, repo string) (map[string]any, error) {
-				if repo != "acme/repo" {
-					endpoint = "repos/" + repo + "/" + endpoint
+				qualifiedEndpoint := "repos/" + repo + "/" + endpoint
+				if repo != fixtureRepo || tc.Responses[qualifiedEndpoint] != nil || tc.Errors[qualifiedEndpoint] != 0 {
+					endpoint = qualifiedEndpoint
 				}
 				var value map[string]any
 				err := read(endpoint, &value)
@@ -72,7 +74,7 @@ func TestOutcomeConformance(t *testing.T) {
 			if evaluator == nil {
 				evaluator = evalGenericSticky
 			}
-			report := evaluator(context.Background(), tc.Item, "acme/repo")
+			report := evaluator(context.Background(), tc.Item, fixtureRepo)
 			require.Equal(t, tc.Expected, normalizeOutcomeEvaluation(report))
 			if tc.ZeroTouch != nil {
 				require.Equal(t, *tc.ZeroTouch, report.ZeroTouch)

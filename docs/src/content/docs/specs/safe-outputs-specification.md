@@ -6089,7 +6089,7 @@ Operations execute in:
 <a id="355-invalidated-pr-merge-ref-checkout"></a>
 #### Invalidated PR Merge-Ref Checkout
 
-The conclusion handler classifies a failed default checkout as an invalidated pull-request merge ref only when compiler metadata confirms the generated default checkout uses the trigger ref, the event is a `pull_request` merge ref, the pull request is closed, and the failed checkout completed at or after its closure. The handler also requires job-log evidence that the merge ref is missing. If metadata or evidence is unavailable, the failure remains unclassified and normal failure reporting is preserved. See [`handle_agent_failure.cjs`](../../../../../actions/setup/js/handle_agent_failure.cjs) and its [tests](../../../../../actions/setup/js/handle_agent_failure.test.cjs).
+The conclusion handler classifies a failed default checkout as an invalidated pull-request merge ref only when compiler metadata confirms the generated default checkout uses the trigger ref, the event is a `pull_request` merge ref, the pull request is closed, and the failed checkout completed at or after its closure. The handler also requires job-log evidence that the merge ref is missing. If metadata or evidence is unavailable, the failure remains unclassified and normal failure reporting is preserved. See [`handle_agent_failure.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/handle_agent_failure.cjs) and its [tests](https://github.com/github/gh-aw/blob/main/actions/setup/js/handle_agent_failure.test.cjs).
 
 ### 10.5 Warn-Mode Threat Detection Failure Policy
 

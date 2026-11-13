@@ -154,7 +154,7 @@
       "issues/1/timeline": [
         { "event": "cross-referenced", "created_at": "2026-01-02T00:00:00Z", "source": { "issue": { "number": 2, "repository_url": "https://api.github.com/repos/acme/repo", "pull_request": {}, "user": { "login": "copilot-swe-agent" } } } }
       ],
-      "pulls/2": { "merged": true }
+      "repos/acme/repo/pulls/2": { "merged": true }
     },
     "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" }
   },
@@ -190,6 +190,18 @@
     "responses": {
       "issues/1": { "state": "open" },
       "issues/1/timeline": [{ "event": "cross-referenced", "created_at": "2026-01-02T00:00:00Z", "source": { "issue": { "number": 2, "pull_request": {}, "user": { "login": "copilot-swe-agent" } } } }],
+      "pulls/2": { "merged": true }
+    },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
+  },
+  {
+    "name": "agent PR with malformed repository URL is unattributed",
+    "item": { "type": "assign_to_agent", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": {
+      "issues/1": { "state": "open" },
+      "issues/1/timeline": [
+        { "event": "cross-referenced", "created_at": "2026-01-02T00:00:00Z", "source": { "issue": { "number": 2, "repository_url": "not-a-repository-url", "pull_request": {}, "user": { "login": "copilot-swe-agent" } } } }
+      ],
       "pulls/2": { "merged": true }
     },
     "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
