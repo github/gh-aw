@@ -24,6 +24,20 @@ network:
     - defaults
     - github
     - go
+tools:
+  # Opt in to Atomic sessions persisted by shared/atomic.md; the drive stays empty without it.
+  drive-memory:
+    - id: atomic
+      drive-name: smoke-atomic
+      disk-size: 100M
+      allowed-extensions: [".jsonl"]
+      validation:
+        json-schemas:
+          - schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string }
 runtimes:
   go:
     version: "1.27.4"
@@ -77,6 +91,10 @@ headers, configuration contents, or the prompt.
 5. Verify the agent environment does not contain `COPILOT_GITHUB_TOKEN`,
    `OPENAI_API_KEY`, `CODEX_API_KEY`, or `ANTHROPIC_API_KEY`.
    Report only PASS or FAIL, never values.
+6. Verify `/tmp/gh-aw/drive-memory-atomic` is a readable directory and report
+   how many `.jsonl` files `/tmp/gh-aw/drive-memory-atomic/sessions` contains
+   (0 when the folder is missing, for example on the first run). Do not write
+   to the drive; a missing directory means FAIL.
 
 Always use the `create_issue` safe-output tool to publish a concise report titled
 "Smoke Test: Atomic - ${{ github.run_id }}" with each result, overall PASS or

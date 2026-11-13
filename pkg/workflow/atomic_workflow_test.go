@@ -424,6 +424,21 @@ func TestAtomicSmokeContract(t *testing.T) {
 	assert.Equal(t, "build_report_completeness", smoke.Evals[1].ID)
 	assert.Equal(t, "Does the report explicitly state PASS or FAIL for make build?", smoke.Evals[1].Question)
 	assert.Contains(t, string(source), "The evals assess report completeness, not independent verification of execution.")
+	var drive struct {
+		Tools struct {
+			DriveMemory []struct {
+				ID                string   `yaml:"id"`
+				DriveName         string   `yaml:"drive-name"`
+				AllowedExtensions []string `yaml:"allowed-extensions"`
+			} `yaml:"drive-memory"`
+		} `yaml:"tools"`
+	}
+	readConformanceFrontmatter(t, "../../.github/workflows/smoke-atomic.md", &drive)
+	require.Len(t, drive.Tools.DriveMemory, 1, "the smoke workflow opts into Atomic sessions in its own frontmatter")
+	assert.Equal(t, "atomic", drive.Tools.DriveMemory[0].ID)
+	assert.Equal(t, "smoke-atomic", drive.Tools.DriveMemory[0].DriveName)
+	assert.Equal(t, []string{".jsonl"}, drive.Tools.DriveMemory[0].AllowedExtensions)
+	assert.Contains(t, strings.Join(strings.Fields(string(source)), " "), "(0 when the folder is missing, for example on the first run). Do not write to the drive")
 	lock, err := os.ReadFile("../../.github/workflows/smoke-atomic.lock.yml")
 	require.NoError(t, err)
 	assert.Contains(t, string(lock), `- cron: "0 0 */2 * *"`)
@@ -437,6 +452,8 @@ func TestAtomicSmokeContract(t *testing.T) {
 		"ATOMIC_MODEL: copilot/gpt-5.3-codex",
 		"atomic_mcp_config_adapter.cjs", "--exclude-env OPENAI_API_KEY",
 		"proxy.golang.org", `"GITHUB_READ_ONLY": "1"`,
+		`ln -s "$GITHUB_WORKSPACE/.gh-aw-drive-memory-atomic" "/tmp/gh-aw/drive-memory-atomic"`,
+		"update_drive_memory:", "name: drive-memory-atomic",
 		smoke.Evals[0].Question, smoke.Evals[1].Question,
 	} {
 		assert.Contains(t, string(lock), expected)
