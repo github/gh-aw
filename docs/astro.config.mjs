@@ -194,6 +194,8 @@ export default defineConfig({
     "/guides/telemetry/": "/gh-aw/reference/open-telemetry/",
     "/guides/opentelemetry/": "/gh-aw/reference/open-telemetry/",
     "/experimental/opentelemetry/": "/gh-aw/reference/open-telemetry/",
+    "/experimental/ledger-replay/": "/gh-aw/reference/ledger-replay/",
+    "/experimental/ledger-compaction/": "/gh-aw/reference/ledger-compaction/",
     "/patterns/opentelemetry/": "/gh-aw/reference/open-telemetry/",
     "/guides/getting-started-mcp/": "/gh-aw/guides/mcps/",
     "/patterns/data-ops/": "/gh-aw/patterns/deterministic-ops/",
