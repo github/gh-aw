@@ -239,6 +239,9 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	targets []logsWorkflowTarget,
 	initialErrors []error,
 ) (err error) {
+	ctx, stream, finish := startLogsJSONL(ctx, opts.Format, opts.Verbose)
+	defer finish(&err)
+	opts.jsonlStream = stream
 	opts = normalizeLogsDownloadOptions(opts)
 	if len(targets) == 0 {
 		return errors.Join(initialErrors...)
@@ -275,6 +278,7 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	defer func() { err = errors.Join(err, errors.Join(atifErrors...)) }()
 	renderLogsCollectionStats(opts.collectionStats)
 	for _, err := range allErrors {
+		stream.emit(logsJSONLEvent{Type: "warning", Message: err.Error()})
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping workflow target: "+err.Error()))
 	}
 	if ctx.Err() != nil {

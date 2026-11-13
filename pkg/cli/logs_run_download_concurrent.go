@@ -178,6 +178,7 @@ func runConcurrentArtifactDownloads(
 	}
 	for i, run := range runs {
 		if cachedResult, ok := cachedJSONDownloadResult(run, opts.cachedRuns, opts.filters); ok {
+			emitLogsDownloadProgress(ctx, cachedResult)
 			recordConcurrentDownloadResult(i, cachedResult, results, completed, opts.onResult)
 			completedCount.Add(1)
 			continue
@@ -225,6 +226,7 @@ func runArtifactDownloadWorker(
 			if result.Error == nil {
 				result = executeConcurrentRunDownload(ctx, job.run, params, completedCount, progressBar)
 			}
+			emitLogsDownloadProgress(ctx, result)
 			recordConcurrentDownloadResult(job.index, result, results, completed, opts.onResult)
 			if result.Error != nil && errors.Is(result.Error, context.Canceled) {
 				return

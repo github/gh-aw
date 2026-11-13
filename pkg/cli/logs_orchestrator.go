@@ -304,6 +304,9 @@ var logsExportHarborJob = exportHarborJob
 
 // DownloadWorkflowLogs downloads and analyzes workflow logs with metrics
 func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err error) {
+	ctx, stream, finish := startLogsJSONL(ctx, opts.Format, opts.Verbose)
+	defer finish(&err)
+	opts.jsonlStream = stream
 	opts = normalizeLogsDownloadOptions(opts)
 	logsOrchestratorLog.Printf("Downloading workflow logs: workflow=%q, count=%d, outputDir=%q", opts.WorkflowName, opts.Count, opts.OutputDir)
 	if err := prepareCachedLogsJSONL(&opts); err != nil {
