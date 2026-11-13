@@ -91,10 +91,10 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 	}
 	values := []struct {
 		value string
-		want  string // "" means maxAiCredits is omitted; "default" means the built-in default
+		want  string // "default" means the built-in default
 	}{
-		{"-1", ""},
-		{" -1 ", ""},
+		{"-1", "-1"},
+		{" -1 ", "-1"},
 		{"0", "default"},
 		{"1500", "1500"},
 		{"5K", "5000"},
@@ -131,23 +131,14 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 				parsed, ok := parseMaxAICLimitValue(tc.value)
 				if ok {
 					expected := strconv.FormatInt(parsed, 10)
-					if parsed == -1 {
-						expected = ""
-					}
 					assert.Equal(t, expected, want, "runtime value must expand like the frontmatter value")
 				} else {
 					assert.Equal(t, "default", tc.want, "values the compiler rejects must fall back to the default")
 				}
 
 				credits, present := result.apiProxy["maxAiCredits"]
-				if want == "" {
-					assert.False(t, present, "-1 must omit maxAiCredits from the AWF config")
-					assert.Contains(t, result.output, "budget disabled at runtime")
-				} else {
-					assert.NotContains(t, result.output, "budget disabled at runtime")
-					require.True(t, present, "maxAiCredits must be present")
-					assert.Equal(t, json.Number(want), credits)
-				}
+				require.True(t, present, "maxAiCredits must be present")
+				assert.Equal(t, json.Number(want), credits)
 
 				if tc.want == "default" {
 					assert.Contains(t, result.output, "::warning::Ignoring invalid "+run.source+" (value withheld)")
@@ -172,7 +163,7 @@ func TestRuntimeMaxAICreditsVariableValues(t *testing.T) {
 		result := runRuntimeMaxAICreditsScript(t, runtimeMaxAICreditsConfigScript(t, data),
 			awfMaxAICreditsVarName+"=-1", "GH_AW_ADMISSION_RESULT=admitted", "GH_AW_ADMISSION_MAX_AI_CREDITS=111")
 		assert.Equal(t, json.Number("111"), result.apiProxy["maxAiCredits"])
-		assert.NotContains(t, result.output, "budget disabled at runtime", "the omit message must not appear when an admission allowance replaces -1")
+		assert.Contains(t, result.output, "Admission allowance applied")
 	})
 
 	t.Run("frontmatter -1 keeps the compiled literal", func(t *testing.T) {

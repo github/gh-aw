@@ -297,9 +297,6 @@ func buildGuardedAWFConfigFileSetup(config AWFCommandConfig, routedJSON string) 
 func finishAWFConfigFileSetup(config AWFCommandConfig, maxAICreditsExportLine, configFileSetup string) string {
 	if maxAICreditsExportLine != "" {
 		configFileSetup = maxAICreditsExportLine + "\n" + configFileSetup
-		if omitScript := buildRuntimeMaxAICreditsOmitScript(config.WorkflowData); omitScript != "" {
-			configFileSetup += "\n" + omitScript
-		}
 	}
 	if shouldUseWorkflowCallNetworkAllowedInput(config.WorkflowData) {
 		updateScript, updateErr := buildWorkflowCallNetworkAllowedUpdateScript()
@@ -476,26 +473,6 @@ func buildRuntimeMaxAICreditsNormalization(data *WorkflowData, defaultMaxAICredi
 		"__SOURCE__", runtimeMaxAICreditsSourceName(data),
 		"__DEFAULT__", defaultMaxAICredits,
 	).Replace(runtimeMaxAICreditsNormalizationTemplate)
-}
-
-// buildRuntimeMaxAICreditsOmitScript removes maxAiCredits from the written AWF config
-// when the runtime value is the -1 disable sentinel (AI credits specification §10.5),
-// and reports the removal only when the key was actually present.
-// Compile-time max-ai-credits values keep their existing handling.
-func buildRuntimeMaxAICreditsOmitScript(data *WorkflowData) string {
-	if hasCompileTimeMaxAICredits(data) {
-		return ""
-	}
-	return fmt.Sprintf(`if [[ "$GH_AW_MAX_AI_CREDITS" == "-1" ]]; then
-  GH_AW_AWF_CONFIG_JSON="$(<%[1]q)"
-  GH_AW_AWF_CONFIG_JSON_OMITTED="${GH_AW_AWF_CONFIG_JSON/,\"maxAiCredits\":-1/}"
-  GH_AW_AWF_CONFIG_JSON_OMITTED="${GH_AW_AWF_CONFIG_JSON_OMITTED/\"maxAiCredits\":-1,/}"
-  if [[ "$GH_AW_AWF_CONFIG_JSON_OMITTED" != "$GH_AW_AWF_CONFIG_JSON" ]]; then
-    printf '%%s\n' "$GH_AW_AWF_CONFIG_JSON_OMITTED" > %[1]q
-    echo "Per-run AI credits budget disabled at runtime; maxAiCredits omitted from the AWF config."
-  fi
-  unset GH_AW_AWF_CONFIG_JSON GH_AW_AWF_CONFIG_JSON_OMITTED
-fi`, awfConfigRuntimePathExpr)
 }
 
 func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) string {
