@@ -1266,3 +1266,220 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 
 	assert.Contains(t, stderr, "Runs: 2 discovered; reports: 0 downloaded, 2 skipped because cached analyses were reused")
 }
+
+func TestLogsDownloadSetupHelpers(t *testing.T) {
+	outputDir := t.TempDir()
+	opts := LogsDownloadOptions{
+		Count:               1,
+		OutputDir:           outputDir,
+		skipEnsureGitignore: true,
+		Verbose:             true,
+	}
+
+	runtime, err := prepareLogsDownload(context.Background(), opts)
+	require.NoError(t, err)
+	assert.Equal(t, outputDir, runtime.storageLimit.outputDir)
+	cancelLogsDownload(runtime.timeoutCancel)
+
+	assert.NoError(t, prepareLogsDownloadOutput(context.Background(), opts))
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	assert.ErrorIs(t, prepareLogsDownloadOutput(cancelled, opts), context.Canceled)
+
+	assert.Error(t, cleanupLogsOutputDir(LogsDownloadOptions{After: "not-a-date"}))
+	assert.NoError(t, cleanupLogsOutputDir(opts))
+	opts.After = "-1d"
+	assert.NoError(t, cleanupLogsOutputDir(opts))
+
+	_, err = resolveLogsArtifactFilter([]string{"not-an-artifact"}, false)
+	assert.Error(t, err)
+}
+
+func TestLogsCollectionErrorHelpers(t *testing.T) {
+	t.Run("rate limit wait errors", func(t *testing.T) {
+		state := logsCollectionState{iteration: 2}
+		stop, err := handleLogsRateLimitWaitError(&state, true, LogsDownloadOptions{}, context.DeadlineExceeded)
+		assert.True(t, stop)
+		assert.NoError(t, err)
+		assert.True(t, state.timeoutReached)
+
+		countLimit := newLogsCountLimit(1)
+		require.True(t, countLimit.tryAdd())
+		state = logsCollectionState{}
+		stop, err = handleLogsRateLimitWaitError(&state, true, LogsDownloadOptions{countLimit: countLimit}, context.Canceled)
+		assert.True(t, stop)
+		assert.NoError(t, err)
+		assert.True(t, state.countLimitReached)
+
+		rateLimitState := newLogsRateLimitState(nil)
+		rateLimitState.reached.Store(true)
+		stop, err = handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{rateLimitState: rateLimitState}, context.Canceled)
+		assert.True(t, stop)
+		assert.ErrorIs(t, err, errLogsAPIRateLimitReached)
+
+		state = logsCollectionState{iteration: 3}
+		stop, err = handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, context.Canceled)
+		assert.True(t, stop)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Zero(t, state)
+
+		state = logsCollectionState{iteration: 3}
+		stop, err = handleLogsRateLimitWaitError(&state, false, LogsDownloadOptions{}, fmt.Errorf("temporary"))
+		assert.False(t, stop)
+		assert.NoError(t, err)
+		assert.Equal(t, 4, state.iteration)
+	})
+
+	t.Run("batch errors", func(t *testing.T) {
+		state := logsCollectionState{}
+		stop, err := handleLogsBatchError(&state, false, nil, nil, context.DeadlineExceeded)
+		assert.True(t, stop)
+		assert.NoError(t, err)
+		assert.True(t, state.timeoutReached)
+
+		countLimit := newLogsCountLimit(1)
+		require.True(t, countLimit.tryAdd())
+		state = logsCollectionState{}
+		stop, err = handleLogsBatchError(&state, true, countLimit, nil, context.Canceled)
+		assert.True(t, stop)
+		assert.NoError(t, err)
+		assert.True(t, state.countLimitReached)
+
+		rateLimitState := newLogsRateLimitState(nil)
+		rateLimitState.reached.Store(true)
+		stop, err = handleLogsBatchError(&state, false, nil, rateLimitState, context.Canceled)
+		assert.True(t, stop)
+		assert.ErrorIs(t, err, errLogsAPIRateLimitReached)
+
+		stop, err = handleLogsBatchError(&state, false, nil, nil, context.Canceled)
+		assert.True(t, stop)
+		assert.ErrorIs(t, err, context.Canceled)
+		stop, err = handleLogsBatchError(&state, false, nil, nil, fmt.Errorf("batch failed"))
+		assert.False(t, stop)
+		assert.Error(t, err)
+	})
+
+	t.Run("iteration stop conditions", func(t *testing.T) {
+		opts := LogsDownloadOptions{}
+		stop, timedOut, err := shouldStopLogsIteration(logsDownloadRuntime{activeCtx: context.Background()}, opts)
+		assert.False(t, stop)
+		assert.False(t, timedOut)
+		assert.NoError(t, err)
+
+		deadlineCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		defer cancel()
+		stop, timedOut, err = shouldStopLogsIteration(logsDownloadRuntime{activeCtx: deadlineCtx}, opts)
+		assert.True(t, stop)
+		assert.True(t, timedOut)
+		assert.NoError(t, err)
+
+		cancelled, cancelShared := context.WithCancel(context.Background())
+		cancelShared()
+		countLimit := newLogsCountLimit(1)
+		require.True(t, countLimit.tryAdd())
+		stop, timedOut, err = shouldStopLogsIteration(logsDownloadRuntime{activeCtx: cancelled}, LogsDownloadOptions{countLimit: countLimit})
+		assert.False(t, stop)
+		assert.False(t, timedOut)
+		assert.NoError(t, err)
+
+		rateLimitState := newLogsRateLimitState(nil)
+		rateLimitState.reached.Store(true)
+		stop, timedOut, err = shouldStopLogsIteration(logsDownloadRuntime{activeCtx: cancelled}, LogsDownloadOptions{rateLimitState: rateLimitState})
+		assert.True(t, stop)
+		assert.False(t, timedOut)
+		assert.ErrorIs(t, err, errLogsAPIRateLimitReached)
+
+		stop, timedOut, err = shouldStopLogsIteration(logsDownloadRuntime{
+			activeCtx:       context.Background(),
+			startTime:       time.Now().Add(-time.Minute),
+			timeoutDuration: time.Second,
+		}, opts)
+		assert.True(t, stop)
+		assert.True(t, timedOut)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ATIF errors and iteration logging", func(t *testing.T) {
+		state := logsCollectionState{atifError: fmt.Errorf("export failed")}
+		err := handleLogsATIFBatchError(&state, false, LogsDownloadOptions{}, false)
+		assert.Error(t, err)
+
+		_, stderr := captureOutput(t, func() error {
+			logLogsIterationFetch(LogsDownloadOptions{Verbose: true, Count: 3}, false, 2, 1)
+			logLogsIterationFetch(LogsDownloadOptions{Verbose: true}, true, 2, 1)
+			return nil
+		})
+		assert.Contains(t, stderr, "Need 2 more runs")
+		assert.Contains(t, stderr, "date range")
+	})
+}
+
+func TestLogsDownloadBatchResultHelpers(t *testing.T) {
+	assert.False(t, shouldSkipProcessedWorkflowRun(DownloadResult{}, false))
+	assert.True(t, shouldSkipProcessedWorkflowRun(DownloadResult{Skipped: true}, false))
+	assert.True(t, shouldSkipProcessedWorkflowRun(DownloadResult{Error: fmt.Errorf("download failed")}, false))
+
+	_, shouldContinue, shouldStop := handleEmptyWorkflowRunBatch(workflowRunBatch{runs: []WorkflowRun{{DatabaseID: 1}}}, false)
+	assert.False(t, shouldContinue)
+	assert.False(t, shouldStop)
+	_, shouldContinue, shouldStop = handleEmptyWorkflowRunBatch(workflowRunBatch{
+		totalFetched: BatchSize,
+		batchSize:    BatchSize,
+	}, true)
+	assert.False(t, shouldContinue)
+	assert.True(t, shouldStop)
+
+	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 1}}
+	limited := limitProcessedRuns([]ProcessedRun{run, run}, 1, true)
+	require.Len(t, limited, 1)
+	assert.Len(t, limitProcessedRuns([]ProcessedRun{run}, 1, false), 1)
+
+	_, stderr := captureOutput(t, func() error {
+		logProcessedWorkflowRunBatch(LogsDownloadOptions{Verbose: true, Count: 2}, false, 2, 1, 1, true)
+		logLogsIterationLimit(true, MaxIterations, 1, 2)
+		logLogsTimeoutResult(true, 1)
+		logLogsStorageLimitResult(true, 1)
+		return nil
+	})
+	assert.Contains(t, stderr, "1/2")
+	assert.Contains(t, stderr, "maximum iterations")
+	assert.Contains(t, stderr, "Timeout reached")
+	assert.Contains(t, stderr, "Storage limit reached")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	stop, timedOut := batchContextDone(ctx)
+	assert.True(t, stop)
+	assert.False(t, timedOut)
+
+	emptyHandled, err := handleEmptyProcessedRuns(nil, LogsDownloadOptions{}, false, false, nil, nil, nil, nil)
+	assert.True(t, emptyHandled)
+	assert.NoError(t, err)
+	assert.False(t, shouldStopAfterWorkflowRunBatch(workflowRunBatch{totalFetched: 2, batchSize: 2}, false))
+	assert.True(t, shouldStopAfterWorkflowRunBatch(workflowRunBatch{totalFetched: 1, batchSize: 2}, false))
+
+	storageLimit := newLogsStorageLimit(t.TempDir(), 1, false)
+	finalizeLogsRunDownload(storageLimit, DownloadResult{})
+	finalizeLogsRunDownload(storageLimit, DownloadResult{storageReserved: true, LogsPath: t.TempDir()})
+
+	parseWorkflowRunArtifacts(DownloadResult{LogsPath: t.TempDir()}, run, true, false)
+
+	collector := newOrderedLogsRunCollector(context.Background(), 0, 1, processWorkflowRunBatchOptions{count: 1})
+	collector.recordResult(1, DownloadResult{})
+
+	cachedCollector := newOrderedLogsRunCollector(context.Background(), 0, 1, processWorkflowRunBatchOptions{
+		count:           1,
+		countLimit:      newLogsCountLimit(1),
+		collectionStats: &logsCollectionStats{},
+	})
+	cachedCollector.recordResult(0, DownloadResult{CachedRun: &RunData{RunID: 42}})
+
+	reachedCount := newLogsCountLimit(1)
+	require.True(t, reachedCount.tryAdd())
+	reachedCollector := newOrderedLogsRunCollector(context.Background(), 0, 1, processWorkflowRunBatchOptions{
+		count:        1,
+		countLimit:   reachedCount,
+		storageLimit: storageLimit,
+	})
+	reachedCollector.recordResult(0, DownloadResult{storageReserved: true, LogsPath: t.TempDir()})
+}
