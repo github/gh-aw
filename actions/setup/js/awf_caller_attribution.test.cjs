@@ -190,7 +190,7 @@ describe("AWF x-awf-caller attribution", () => {
 
     // Child Pi process: launched by the sub-agent extension with its own
     // environment; a real process loads pi_provider.cjs and fires the hook.
-    const executable = path.join(dir, "fake-pi");
+    const executable = path.join(dir, "pi");
     fs.writeFileSync(
       executable,
       `#!/usr/bin/env node
@@ -207,7 +207,8 @@ process.stdin.on("end", () => {
 `,
       { mode: 0o700 }
     );
-    vi.stubEnv("GH_AW_PI_COMMAND", executable);
+    vi.stubEnv("PATH", `${dir}${path.delimiter}${process.env.PATH || ""}`);
+    vi.stubEnv("GH_AW_PI_COMMAND", "");
     vi.stubEnv("RUNNER_TEMP", "");
     vi.stubEnv("PI_CODING_AGENT_DIR", dir);
     const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);

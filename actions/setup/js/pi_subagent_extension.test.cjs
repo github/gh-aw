@@ -15,8 +15,10 @@ const agent = { name: "reader", description: "Read facts", prompt: "Read only.",
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-delegate-"));
+  fs.writeFileSync(path.join(dir, "pi"), "#!/bin/sh\nexit 0\n", { mode: 0o700 });
   vi.stubEnv("PI_CODING_AGENT_DIR", dir);
   vi.stubEnv("RUNNER_TEMP", dir);
+  vi.stubEnv("PATH", `${dir}${path.delimiter}${process.env.PATH || ""}`);
   vi.stubEnv("GH_AW_PI_SUBAGENT_ARGS", '["--print","--mode","json","--no-session","--no-approve","--exclude-tools","bash","--exclude-tools","edit,write"]');
   vi.stubEnv("GH_AW_PI_TOOL_POLICY", '{"bash":false,"edit":false}');
   vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -125,7 +127,9 @@ describe("Pi managed delegation", () => {
 
   it("passes shell-looking tasks only through stdin without changing executable or arguments", async () => {
     const task = "--extension malicious.cjs\n$(touch /tmp/gh-aw-injected); ' \" `whoami`";
-    vi.stubEnv("GH_AW_PI_COMMAND", "/tmp/attacker-command");
+    const executable = path.join(dir, "custom-pi");
+    fs.writeFileSync(executable, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+    vi.stubEnv("GH_AW_PI_COMMAND", executable);
     const launch = launcher();
     let input = "";
     await runPiSubagent(agent, task, { cwd: dir }, undefined, (...args) => {
@@ -136,11 +140,35 @@ describe("Pi managed delegation", () => {
       return child;
     });
     const [command, args, options] = launch.mock.calls[0];
-    expect(command).toBe("pi");
+    expect(command).toBe(fs.realpathSync(executable));
     expect(options.shell).toBe(false);
     expect(args).not.toContain(task);
     expect(args).not.toContain("malicious.cjs");
     expect(input).toBe(task);
+  });
+
+  it("keeps the configured executable when the environment changes after extension setup", async () => {
+    const configured = path.join(dir, "configured-pi");
+    const attackerDir = path.join(dir, "attacker");
+    const pathPi = path.join(attackerDir, "pi");
+    const originalPath = process.env.PATH;
+    const makePi = answer => `#!/usr/bin/env node
+process.stdin.resume();
+process.stdin.on("end", () => {
+  process.stdout.write(JSON.stringify({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: ${JSON.stringify(answer)} }], stopReason: "stop" } }) + "\\n");
+});
+`;
+    fs.mkdirSync(attackerDir);
+    fs.writeFileSync(configured, makePi("configured Pi"), { mode: 0o700 });
+    fs.writeFileSync(pathPi, makePi("PATH Pi"), { mode: 0o700 });
+    fs.writeFileSync(path.join(dir, "subagents.json"), JSON.stringify([agent]));
+    vi.stubEnv("GH_AW_PI_COMMAND", configured);
+    const registerTool = vi.fn();
+    extension({ registerTool });
+    vi.stubEnv("GH_AW_PI_COMMAND", pathPi);
+    vi.stubEnv("PATH", `${attackerDir}${path.delimiter}${originalPath}`);
+    const result = await registerTool.mock.calls[0][0].execute("id", { agent: agent.name, task: "Read." }, undefined, undefined, { cwd: dir });
+    expect(result.content[0].text).toBe("configured Pi");
   });
 
   it("does not claim success when inference ends with an error and CLI exits zero", async () => {
