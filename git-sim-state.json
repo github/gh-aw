@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "last_run": "2026-11-08",
-  "tested_count": 216,
+  "last_run": "2026-11-13",
+  "tested_count": 220,
   "total_cells": 3600,
   "tested": {
     "tiny-shallow-single-small-diverged-multi": {
@@ -28,6 +28,26 @@
       "outcome": "error",
       "timestamp": "2026-08-13",
       "issue_url": null
+    },
+    "tiny-shallow-single-xlarge-clean-single": {
+      "outcome": "error",
+      "timestamp": "2026-11-13",
+      "issue_url": null
+    },
+    "tiny-shallow-single-xlarge-clean-multi": {
+      "outcome": "error",
+      "timestamp": "2026-11-13",
+      "issue_url": null
+    },
+    "tiny-shallow-single-xlarge-clean-merge_msg": {
+      "outcome": "error",
+      "timestamp": "2026-11-13",
+      "issue_url": null
+    },
+    "tiny-shallow-single-xlarge-ahead-single": {
+      "outcome": "error",
+      "timestamp": "2026-11-13",
+      "issue_url": null
     }
   },
   "strategies": [
@@ -44,5 +64,5 @@
       }
     }
   ],
-  "next_index": 216
+  "next_index": 220
 }

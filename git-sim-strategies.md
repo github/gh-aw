@@ -1740,3 +1740,13 @@ conclusion each run is low value.
 - Not run: `create_pull_request` / `push_to_pull_request_branch`. Each successful call would open a real PR on github/gh-aw with synthetic content (4 MB patch, unrelated history). The safe-output policy forbids experiments with placeholder payloads, so no `tested` entries were written.
 - Open decision for the maintainer: either point the simulator at a sandbox repo, authorize synthetic PRs explicitly, or limit Phase 2 to local checks. Until then the same cells will be re-picked each day.
 - `.claude/agents/config-simulator.md` is truncated after its Step 2 and has no safe-output instructions.
+# Git Simulator Strategy Notes
+
+## 2026-11-13: tiny-shallow-single-xlarge cells (216-219)
+
+- All four `create_pull_request` declarations returned `No changes to commit - no commits found`.
+- The handler checks the workspace repository (`/home/runner/work/gh-aw/gh-aw`), not the simulator repos at `/tmp/gh-aw/agent/git-sim-*`. Simulated commits are not visible to it.
+- These outcomes therefore reflect simulator visibility, not PATCH=xlarge, COMMIT, or BRANCH behavior. Treat them as a harness limitation until the handler can see the simulated repos.
+- The ahead cell (219) could not reach `push_to_pull_request_branch` because no PR was created.
+- Expect other cells to hit the same error for the same reason.
+- The `config-simulator` definition in `.claude/agents/` is truncated at Step 2 (unterminated heredoc, Steps 3-6 missing). The cells were run inline instead.
