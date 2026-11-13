@@ -127,6 +127,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 		ParsedFrontmatter:    data.ParsedFrontmatter,
 		CachedPermissions:    data.CachedPermissions,
 		ModelCosts:           data.ModelCosts,
+		ModelCostOverrides:   data.ModelCostOverrides,
 		IsDetectionRun:       true,
 		AdmissionEnabled:     admissionBudgetOutputsEnabled(data),
 		RunnerConfig:         data.RunnerConfig,

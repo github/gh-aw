@@ -669,12 +669,12 @@ func extractDefaultAiCreditsPricing(workflowData *WorkflowData) *AiCreditsPricin
 }
 
 func extractModelCostProviders(workflowData *WorkflowData) map[string]any {
-	if workflowData == nil || len(workflowData.ModelCosts) == 0 {
+	if workflowData == nil || len(workflowData.ModelCostOverrides) == 0 {
 		return nil
 	}
-	providers, ok := workflowData.ModelCosts["providers"].(map[string]any)
+	providers, ok := workflowData.ModelCostOverrides["providers"].(map[string]any)
 	if !ok {
-		awfConfigLog.Printf("API proxy: models.providers has unexpected type %T; skipping provider overlay", workflowData.ModelCosts["providers"])
+		awfConfigLog.Printf("API proxy: authored models.providers has unexpected type %T; skipping provider overlay", workflowData.ModelCostOverrides["providers"])
 		return nil
 	}
 	if len(providers) == 0 {

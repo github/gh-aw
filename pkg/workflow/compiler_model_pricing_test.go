@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"testing"
 
+	parserpkg "github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -164,6 +165,39 @@ func TestResolveModelPricingIfMissing_NilResolver(t *testing.T) {
 	// No resolver registered — should be a no-op.
 	result := c.resolveModelPricingIfMissing(nil, &WorkflowData{Model: "gpt-99", EngineConfig: &EngineConfig{ID: "codex"}})
 	assert.Nil(t, result)
+}
+
+func TestBuildInitialWorkflowData_KeepsResolvedPricingOutOfOverrides(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.SetModelPricingResolver(func(_ context.Context, provider, model string) (map[string]float64, bool) {
+		require.Equal(t, "openai", provider)
+		require.Equal(t, "gpt-report-only", model)
+		return map[string]float64{"input": 1e-06}, true
+	})
+
+	authoredCosts := map[string]any{
+		"providers": map[string]any{
+			"openai": map[string]any{
+				"models": map[string]any{
+					"authored-free-model": map[string]any{
+						"cost": map[string]any{"input": "0"},
+					},
+				},
+			},
+		},
+	}
+	workflowData, err := compiler.buildInitialWorkflowData(
+		&parserpkg.FrontmatterResult{Frontmatter: map[string]any{}, Markdown: ""},
+		&toolsProcessingResult{parsedFrontmatter: &FrontmatterConfig{ModelCosts: authoredCosts}},
+		&engineSetupResult{model: "gpt-report-only", engineConfig: &EngineConfig{ID: "codex"}},
+		&parserpkg.ImportsResult{},
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, map[string]any{"providers": authoredCosts["providers"]}, workflowData.ModelCostOverrides)
+	require.True(t, modelCostsHasPricingFor(workflowData.ModelCosts, "openai", "gpt-report-only"))
+	assert.False(t, modelCostsHasPricingFor(workflowData.ModelCostOverrides, "openai", "gpt-report-only"))
+	assert.True(t, modelCostsHasPricingFor(workflowData.ModelCostOverrides, "openai", "authored-free-model"))
 }
 
 func TestResolveModelPricingIfMissing_AlreadyPresent(t *testing.T) {

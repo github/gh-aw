@@ -13,11 +13,11 @@ var compilerModelPricingLog = logger.New("workflow:compiler_model_pricing")
 
 // resolveModelPricingIfMissing checks whether the workflow's configured model has pricing
 // in the frontmatter ModelCosts overlay. When pricing is absent it calls
-// c.modelPricingResolver (injected by the cli package) to look up pricing and merges
-// the result into ModelCosts for both GH_AW_INFO_MODEL_COSTS and apiProxy.providers.
+// c.modelPricingResolver (injected by the cli package) to look up reporting-only pricing
+// and merges the result into ModelCosts for GH_AW_INFO_MODEL_COSTS.
 //
-// Frontmatter-provided pricing always takes precedence. Local catalog entries must
-// also be supplied to AWF, whose built-in pricing table can lag behind gh-aw's.
+// Frontmatter-provided pricing always takes precedence. Automatically resolved catalog
+// entries are reporting metadata and are not supplied as AWF operator overrides.
 func (c *Compiler) resolveModelPricingIfMissing(modelCosts map[string]any, workflowData *WorkflowData) map[string]any {
 	if c.modelPricingResolver == nil {
 		return modelCosts

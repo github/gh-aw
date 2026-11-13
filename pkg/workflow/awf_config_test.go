@@ -1639,6 +1639,17 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 					"providers": map[string]any{
 						"anthropic": map[string]any{
 							"models": map[string]any{
+								"compiler-default": map[string]any{
+									"cost": map[string]any{"input": "0.000001"},
+								},
+							},
+						},
+					},
+				},
+				ModelCostOverrides: map[string]any{
+					"providers": map[string]any{
+						"anthropic": map[string]any{
+							"models": map[string]any{
 								"accounts/fireworks/models/minimax-m3": map[string]any{
 									"cost": map[string]any{
 										"input":       "3e-07",
@@ -1646,6 +1657,9 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 										"cache_read":  "3e-08",
 										"cache_write": "3.75e-07",
 									},
+								},
+								"authored-free-model": map[string]any{
+									"cost": map[string]any{"input": "0"},
 								},
 							},
 						},
@@ -1675,6 +1689,9 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 		cost, ok := model["cost"].(map[string]any)
 		require.True(t, ok, "expected model cost object")
 		assert.Equal(t, "3e-08", cost["cache_read"], "apiProxy.providers should preserve custom cache_read pricing")
+		assert.NotContains(t, models, "compiler-default", "reporting-only defaults must not become apiProxy overrides")
+		freeModel := models["authored-free-model"].(map[string]any)
+		assert.Equal(t, "0", freeModel["cost"].(map[string]any)["input"], "explicit zero rates must remain operator overrides")
 	})
 
 	t.Run("models.providers is not emitted when AWF version does not support apiProxy.providers", func(t *testing.T) {
@@ -1685,7 +1702,7 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 				EngineConfig: &EngineConfig{
 					ID: "claude",
 				},
-				ModelCosts: map[string]any{
+				ModelCostOverrides: map[string]any{
 					"providers": map[string]any{
 						"anthropic": map[string]any{
 							"models": map[string]any{
@@ -1793,7 +1810,7 @@ func TestBuildAWFConfigJSON_APIProxyCACert(t *testing.T) {
 func TestExtractModelCostProviders(t *testing.T) {
 	t.Run("returns a cloned providers map", func(t *testing.T) {
 		workflowData := &WorkflowData{
-			ModelCosts: map[string]any{
+			ModelCostOverrides: map[string]any{
 				"providers": map[string]any{
 					"anthropic": map[string]any{"models": map[string]any{}},
 				},
@@ -1804,18 +1821,49 @@ func TestExtractModelCostProviders(t *testing.T) {
 		require.NotNil(t, got)
 		got["openai"] = map[string]any{}
 
-		origProviders := workflowData.ModelCosts["providers"].(map[string]any)
+		origProviders := workflowData.ModelCostOverrides["providers"].(map[string]any)
 		_, mutatedOriginal := origProviders["openai"]
-		assert.False(t, mutatedOriginal, "returned providers map should not alias ModelCosts.providers")
+		assert.False(t, mutatedOriginal, "returned providers map should not alias ModelCostOverrides.providers")
 	})
 
 	t.Run("returns nil when providers has unexpected type", func(t *testing.T) {
 		workflowData := &WorkflowData{
-			ModelCosts: map[string]any{
+			ModelCostOverrides: map[string]any{
 				"providers": map[string]string{"anthropic": "invalid"},
 			},
 		}
 		assert.Nil(t, extractModelCostProviders(workflowData))
+	})
+
+	t.Run("ignores reporting-only model costs and preserves explicit zero rates", func(t *testing.T) {
+		workflowData := &WorkflowData{
+			ModelCosts: map[string]any{
+				"providers": map[string]any{
+					"openai": map[string]any{
+						"models": map[string]any{
+							"compiler-default": map[string]any{"cost": map[string]any{"input": "0.000001"}},
+						},
+					},
+				},
+			},
+			ModelCostOverrides: map[string]any{
+				"providers": map[string]any{
+					"openai": map[string]any{
+						"models": map[string]any{
+							"authored-free-model": map[string]any{"cost": map[string]any{"input": "0"}},
+						},
+					},
+				},
+			},
+		}
+
+		providers := extractModelCostProviders(workflowData)
+		require.NotNil(t, providers)
+		models := providers["openai"].(map[string]any)["models"].(map[string]any)
+		require.Contains(t, models, "authored-free-model")
+		assert.NotContains(t, models, "compiler-default")
+		cost := models["authored-free-model"].(map[string]any)["cost"].(map[string]any)
+		assert.Equal(t, "0", cost["input"])
 	})
 }
 
