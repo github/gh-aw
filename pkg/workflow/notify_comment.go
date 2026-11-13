@@ -70,6 +70,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 // failed-jobs reporting, the optional status-comment update, and the steering-issue step.
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
+	steps = append(steps, c.buildReactionCleanupSteps(data)...)
 	steps = append(steps, c.buildWorkQueueTerminationStep(data)...)
 	steps = append(steps, c.buildWorkQueueIssuesStep(data)...)
 	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)
@@ -166,6 +167,7 @@ func configuredUsageSafeJobNames(data *WorkflowData) []string {
 // session job-duration collection, and any issue-creating conclusion mechanism.
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
+	addReactionCleanupJobPermissions(data, conclusionPerms)
 	// Session job-duration collection is always enabled, independently of failure
 	// reporting, and reads the current run attempt's Actions jobs.
 	if level, ok := conclusionPerms.Get(PermissionActions); !ok || level == PermissionNone {
@@ -188,6 +190,7 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 			conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 		}
+		addReactionCleanupJobPermissions(data, conclusionPerms)
 		return conclusionPerms
 	}
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {

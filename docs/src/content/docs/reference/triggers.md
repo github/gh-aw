@@ -615,6 +615,19 @@ The reaction is added to the triggering item. Use `none` to disable reactions en
 
 **Available reactions:** `+1` 👍, `-1` 👎, `laugh` 😄, `confused` 😕, `heart` ❤️, `hooray` 🎉, `rocket` 🚀, `eyes` 👀
 
+Object form supports `remove-on-complete` (default: `false`) to remove the trigger reaction when the conclusion job runs, including after failure or an agent skip:
+
+```aw wrap
+on:
+  slash_command: review
+  reaction:
+    type: eyes
+    remove-on-complete: true
+  status-comment: false
+```
+
+Cleanup uses the same authentication configuration as activation (`on.github-token` or `on.github-app`) and works independently of status comments. It only runs if activation recorded a reaction ID. Cancellation that prevents conclusion from running cannot guarantee cleanup. Dry-run mode does not modify reactions.
+
 ### Status Comments (`status-comment:`)
 
 Post a started/completed comment on the triggering item with a link to the workflow run:
@@ -706,7 +719,7 @@ on:
 ```
 
 > [!NOTE]
-> `github-token` and `github-app` affect only the activation job (reactions, status comments, and skip-if searches). For the agent job, configure tokens via `tools.github.github-token`/`tools.github.github-app` or `safe-outputs.github-token`/`safe-outputs.github-app`. See [Authentication](/gh-aw/reference/auth/) for a full overview.
+> `github-token` and `github-app` affect the activation job (reactions, status comments, and skip-if searches) and optional trigger-reaction cleanup in conclusion. For the agent job, configure tokens via `tools.github.github-token`/`tools.github.github-app` or `safe-outputs.github-token`/`safe-outputs.github-app`. See [Authentication](/gh-aw/reference/auth/) for a full overview.
 
 ### Stop After Configuration (`stop-after:`)
 

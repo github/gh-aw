@@ -43,6 +43,7 @@ describe("add_reaction", () => {
 
     // Reset environment variables
     delete process.env.GH_AW_REACTION;
+    delete process.env.GH_AW_REMOVE_REACTION_ID;
 
     // Reset context to default
     global.context = {
@@ -83,6 +84,212 @@ describe("add_reaction", () => {
   async function importHelpers() {
     return import("./add_reaction.cjs?" + Date.now());
   }
+
+  describe("reaction cleanup", () => {
+    beforeEach(() => {
+      process.env.GH_AW_REMOVE_REACTION_ID = "98765";
+      process.env.GH_AW_REACTION = "rocket";
+      // DELETE returns no reaction body; cleanup must not read it or publish a new ID.
+      mockGithub.request.mockResolvedValue({ status: 204 });
+      mockGithub.graphql.mockResolvedValue({ removeReaction: { clientMutationId: null } });
+    });
+
+    const restTargets = [
+      { eventName: "issues", payload: { issue: { number: 123 } }, path: "issues/{issue_number}", params: { issue_number: 123 }, itemType: "issue" },
+      { eventName: "pull_request", payload: { pull_request: { number: 123 } }, path: "issues/{issue_number}", params: { issue_number: 123 }, itemType: "pull_request" },
+      { eventName: "issue_comment", payload: { comment: { id: 456 } }, path: "issues/comments/{comment_id}", params: { comment_id: 456 }, itemType: "issue" },
+      { eventName: "pull_request_review_comment", payload: { comment: { id: 456 } }, path: "pulls/comments/{comment_id}", params: { comment_id: 456 }, itemType: "pull_request" },
+    ];
+
+    it.each(restTargets)("removes only the original reaction for $eventName", async ({ eventName, payload, path, params }) => {
+      global.context = {
+        eventName,
+        repo: { owner: "testowner", repo: "testrepo" },
+        payload,
+      };
+
+      await runScript();
+
+      expect(mockGithub.request).toHaveBeenCalledExactlyOnceWith(`DELETE /repos/{owner}/{repo}/${path}/reactions/{reaction_id}`, {
+        owner: "testowner",
+        repo: "testrepo",
+        ...params,
+        reaction_id: "98765",
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(restTargets)("resolves dispatched $eventName cleanup to the original target", async ({ eventName, path, params, itemType }) => {
+      global.context = {
+        eventName: "workflow_dispatch",
+        repo: { owner: "workflow-owner", repo: "workflow-repo" },
+        payload: {
+          inputs: {
+            aw_context: JSON.stringify({
+              event_type: eventName,
+              item_type: itemType,
+              item_number: "123",
+              comment_id: "456",
+              repo: "target-owner/target-repo",
+            }),
+          },
+        },
+      };
+
+      await runScript();
+
+      expect(mockGithub.request).toHaveBeenCalledExactlyOnceWith(`DELETE /repos/{owner}/{repo}/${path}/reactions/{reaction_id}`, {
+        owner: "target-owner",
+        repo: "target-repo",
+        ...params,
+        reaction_id: "98765",
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it.each(["discussion", "discussion_comment"])("removes the authenticated user's original content for %s", async eventName => {
+      process.env.GH_AW_REMOVE_REACTION_ID = "R_original";
+      global.context = {
+        eventName,
+        repo: { owner: "testowner", repo: "testrepo" },
+        payload: { discussion: { number: 123 }, comment: { node_id: "DC_original" } },
+      };
+      if (eventName === "discussion") {
+        mockGithub.graphql.mockResolvedValueOnce({ repository: { discussion: { id: "D_original" } } });
+      }
+
+      await runScript();
+
+      expect(mockGithub.graphql).toHaveBeenLastCalledWith(expect.stringContaining("removeReaction(input:"), {
+        subjectId: eventName === "discussion" ? "D_original" : "DC_original",
+        content: "ROCKET",
+      });
+      expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("addReaction"))).toBe(false);
+      expect(mockGithub.request).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it.each(["discussion", "discussion_comment"])("resolves dispatched %s cleanup to the original subject", async eventName => {
+      global.context = {
+        eventName: "workflow_dispatch",
+        repo: { owner: "workflow-owner", repo: "workflow-repo" },
+        payload: {
+          inputs: {
+            aw_context: JSON.stringify({
+              event_type: eventName,
+              item_type: "discussion",
+              item_number: "123",
+              comment_node_id: "DC_original",
+              repo: "target-owner/target-repo",
+            }),
+          },
+        },
+      };
+      if (eventName === "discussion") {
+        mockGithub.graphql.mockResolvedValueOnce({ repository: { discussion: { id: "D_original" } } });
+      }
+
+      await runScript();
+
+      if (eventName === "discussion") {
+        expect(mockGithub.graphql).toHaveBeenNthCalledWith(1, expect.stringContaining("discussion(number:"), {
+          owner: "target-owner",
+          repo: "target-repo",
+          num: 123,
+        });
+      }
+      expect(mockGithub.graphql).toHaveBeenLastCalledWith(expect.stringContaining("removeReaction(input:"), {
+        subjectId: eventName === "discussion" ? "D_original" : "DC_original",
+        content: "ROCKET",
+      });
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it.each(["", "   "])("does not accidentally add when cleanup ID is %j", async id => {
+      process.env.GH_AW_REMOVE_REACTION_ID = id;
+
+      await runScript();
+
+      expect(mockGithub.request).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["REST", "GraphQL"])("ignores already removed, locked and rate limited %s reactions", async api => {
+      if (api === "GraphQL") {
+        global.context = {
+          eventName: "discussion_comment",
+          repo: { owner: "testowner", repo: "testrepo" },
+          payload: { comment: { node_id: "DC_original" } },
+        };
+      }
+      const request = api === "REST" ? mockGithub.request : mockGithub.graphql;
+      const errors = [
+        Object.assign(new Error("Not Found"), { status: 404 }),
+        Object.assign(new Error("Issue is locked"), { status: 403 }),
+        Object.assign(new Error("API rate limit exceeded"), { status: 403 }),
+        Object.assign(new Error("Too many requests"), { status: 429 }),
+      ];
+      for (const error of errors) {
+        vi.clearAllMocks();
+        request.mockRejectedValueOnce(error);
+
+        await runScript();
+
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+        expect(mockCore.setOutput).not.toHaveBeenCalled();
+        if (error.status === 404) {
+          expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("already removed"));
+        }
+      }
+    });
+
+    it("continues to fail on 404 when adding a reaction", async () => {
+      delete process.env.GH_AW_REMOVE_REACTION_ID;
+      mockGithub.request.mockRejectedValueOnce(Object.assign(new Error("Not Found"), { status: 404 }));
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(`${ERR_API}: Failed to add reaction: Not Found`);
+    });
+
+    it("preserves cleanup API failures for unexpected errors", async () => {
+      mockGithub.request.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), { status: 403 }));
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(`${ERR_API}: Failed to remove reaction: Forbidden`);
+    });
+
+    it("retains bounded connection retry behavior for cleanup", async () => {
+      const { main } = await importHelpers();
+      mockGithub.request.mockRejectedValueOnce(Object.assign(new Error("Connection failed"), { code: "UND_ERR_CONNECT_TIMEOUT" }));
+
+      vi.useFakeTimers();
+      try {
+        const operation = main();
+        await vi.runAllTimersAsync();
+        await operation;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(mockGithub.request).toHaveBeenCalledTimes(2);
+      for (const [route, params] of mockGithub.request.mock.calls) {
+        expect(route).toMatch(/^DELETE /);
+        expect(params.reaction_id).toBe("98765");
+        expect(params).not.toHaveProperty("content");
+      }
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+  });
 
   describe("reaction validation", () => {
     it("should use 'eyes' as default reaction when GH_AW_REACTION is not set", async () => {
