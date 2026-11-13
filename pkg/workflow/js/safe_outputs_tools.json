@@ -1285,7 +1285,7 @@
         "operation": {
           "type": "string",
           "enum": ["replace", "append", "prepend", "replace-island"],
-          "description": "How to update the issue body: 'append' (default - add to end with separator), 'prepend' (add to start with separator), 'replace' (overwrite entire body), or 'replace-island' (update a run-specific section)."
+          "description": "How to update the issue body: 'append' (add to end with separator), 'prepend' (add to start with separator), 'replace' (overwrite entire body), or 'replace-island' (update a workflow-specific section). If omitted, uses the workflow's configured update-issue operation, or 'append' if none is configured. An explicit operation overrides the workflow default."
         },
         "labels": {
           "type": "array",

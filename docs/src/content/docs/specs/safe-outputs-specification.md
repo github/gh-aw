@@ -3379,7 +3379,7 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
       "operation": {
         "type": "string",
         "enum": ["replace", "append", "prepend", "replace-island"],
-        "description": "Body update mode (default: append)"
+        "description": "Body update mode (defaults to the workflow-configured operation, or append)"
       },
       "labels": {"type": "array", "items": {"type": "string"}, "description": "Replacement label list"},
       "assignees": {"type": "array", "items": {"type": "string"}, "description": "Replacement assignee list"},
