@@ -1,58 +1,27 @@
 {
-  "run_id": "pr-triage-20261113T122400Z",
-  "run_date": "2026-11-13T12:24:00Z",
+  "run_id": "pr-triage-20261113T180000Z",
+  "run_date": "2026-11-13T18:21:44Z",
   "source": "pr-triage",
-  "eligible_total": 5,
-  "open_copilot_prs": 26,
-  "cooldown_skipped": 21,
+  "eligible_total": 2,
+  "open_copilot_prs": 7,
+  "cooldown_skipped": 5,
   "category_counts": {
-    "bug": 4,
-    "chore": 1
+    "bug": 2
   },
   "risk_counts": {
-    "medium": 5
+    "medium": 2
   },
   "priority_counts": {
-    "medium": 5
+    "medium": 2
   },
   "action_counts": {
     "auto_merge": 0,
-    "fast_track": 1,
-    "batch_review": 4,
+    "fast_track": 0,
+    "batch_review": 2,
     "defer": 0,
     "close": 0
   },
   "selected_candidates": [
-    {
-      "number": 77185,
-      "title": "Accept `-1` for runtime `GH_AW_DEFAULT_*MAX_AI_CREDITS`, and warn on values that fall back",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "fast_track",
-      "score": 70,
-      "score_breakdown": {
-        "impact": 38,
-        "urgency": 18,
-        "quality": 14
-      },
-      "reason": "Correctness fix for runtime validation and fallback semantics; it addresses a user-visible budgeting bug with a clear fix and passing validation."
-    },
-    {
-      "number": 77326,
-      "title": "Separate authored pricing overrides from reporting costs",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 62,
-      "score_breakdown": {
-        "impact": 32,
-        "urgency": 17,
-        "quality": 13
-      },
-      "reason": "Fixes a pricing override bug in a critical workflow path and is a contained change set."
-    },
     {
       "number": 77212,
       "title": "Align model routing with AWF runtime, topology, and host support",
@@ -60,54 +29,30 @@
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 61,
+      "score": 63,
       "score_breakdown": {
-        "impact": 31,
+        "impact": 33,
         "urgency": 18,
         "quality": 12
       },
-      "reason": "Compatibility fix in model routing has clear scope and direct user impact across runtime topology checks."
+      "reason": "Runtime compatibility fix with direct user impact and a contained change set; CI checks pass and the scope is well defined."
     },
     {
-      "number": 77088,
-      "title": "Read AWF per-conversation steering deliveries from the unified session",
+      "number": 77455,
+      "title": "Resolve package specification audit findings",
       "category": "bug",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 64,
+      "score": 55,
       "score_breakdown": {
-        "impact": 34,
-        "urgency": 18,
-        "quality": 12
-      },
-      "reason": "Audit and billing correctness fix with strong coverage and direct value for run-level observability."
-    },
-    {
-      "number": 77338,
-      "title": "Bump firewall to v0.29.13 and MCP gateway to v0.5.9",
-      "category": "chore",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 52,
-      "score_breakdown": {
-        "impact": 26,
-        "urgency": 12,
+        "impact": 27,
+        "urgency": 14,
         "quality": 14
       },
-      "reason": "Dependency bump with operational blast radius but low feature risk and green CI."
+      "reason": "Package-spec remediation with strong validation and low regression risk, though it affects broader API contracts than a minimal fix."
     }
   ],
-  "batches": [
-    {
-      "id": "pr-batch:model-routing-and-audit",
-      "prs": [
-        77088,
-        77212,
-        77326
-      ]
-    }
-  ],
-  "summary": "Five eligible Copilot-authored PRs are outside the one-hour cooldown. The highest-value work is the runtime credit fallback fix; model-routing compatibility, pricing override correctness, and per-conversation steering delivery handling form one focused batch cluster, while the firewall bump is a lower-risk dependency update."
+  "batches": [],
+  "summary": "Two eligible Copilot-authored PRs remain outside the one-hour cooldown. Both are medium-risk bug fixes with green CI; the model-routing compatibility issue is the higher-impact item, and no 3+ review cluster is large enough to justify a shared batch."
 }
