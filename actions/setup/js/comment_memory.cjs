@@ -13,7 +13,7 @@ const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
-const { enforceCommentLimits } = require("./comment_limit_helpers.cjs");
+const { enforceCommentLimits, MAX_LINKS } = require("./comment_limit_helpers.cjs");
 const { COMMENT_MEMORY_TAG, COMMENT_MEMORY_MAX_SCAN_PAGES, buildCodeFenceOpener } = require("./comment_memory_helpers.cjs");
 const { getBodyFooterBlocks } = require("./messages_footer.cjs");
 const { appendReportExecutionProvenance } = require("./execution_provenance.cjs");
@@ -48,9 +48,70 @@ function buildCollapsedMemorySection(rawBody, memoryID) {
   };
 }
 
+/**
+ * @param {string} previousBody
+ * @param {string} runUrl
+ * @param {string} workflowName
+ * @returns {import("./report_ast.cjs").ReportBlock}
+ */
+function buildTransactionHistory(previousBody, runUrl, workflowName) {
+  const previous = parseReportMarkdown(previousBody, { allowMetadata: true, agentTainted: true });
+  const history = previous.find(node => node.type === "details" && node.summary === "Transaction history");
+  /** @type {Map<string, string>} */
+  const runs = new Map();
+  const addRun = (url, label) => {
+    if (/^https:\/\/[\w.-]+(?::\d+)?\/[\w.-]+\/[\w.-]+\/actions\/runs\/[1-9]\d*$/.test(url)) {
+      runs.set(url, label);
+    }
+  };
+  if (history?.type === "details") {
+    for (const list of history.children) {
+      if (list.type !== "list") continue;
+      for (const item of list.items) {
+        for (const block of item) {
+          if (block.type !== "paragraph") continue;
+          for (const link of block.children) {
+            if (link.type === "link") {
+              addRun(link.url, link.children.map(node => (node.type === "text" ? node.value : "")).join(""));
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // Older comments only retain their most recent writer in the attribution.
+    for (const node of previous) {
+      if (node.type !== "xml_marker" || node.name !== "gh-aw-agentic-workflow") continue;
+      const url = node.fields?.find(field => field.key === "run")?.value;
+      if (url) addRun(url, `${node.value || "Workflow"} (run ${url.split("/").pop()})`);
+    }
+  }
+  runs.set(runUrl, `${workflowName} (run ${runUrl.split("/").pop()})`);
+  return {
+    type: "details",
+    summary: "Transaction history",
+    agentTainted: false,
+    sizeProtected: true,
+    children: [
+      {
+        type: "list",
+        ordered: false,
+        agentTainted: false,
+        items: [...runs].map(([url, label]) => [
+          {
+            type: "paragraph",
+            agentTainted: false,
+            children: [{ type: "link", url, agentTainted: false, children: [{ type: "text", value: label, agentTainted: false }] }],
+          },
+        ]),
+      },
+    ],
+  };
+}
+
 /** @returns {import("./report_ast.cjs").Report} */
 function buildManagedMemoryReport(rawBody, memoryID, options) {
-  const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber } = options;
+  const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber, previousBody = "" } = options;
   if (!/^[a-zA-Z0-9_-]+$/.test(memoryID)) {
     throw new Error(`${SAFE_OUTPUT_E001}: memory_id must contain only alphanumeric characters, hyphens, and underscores`);
   }
@@ -69,7 +130,12 @@ function buildManagedMemoryReport(rawBody, memoryID, options) {
   });
 
   /** @type {import("./report_ast.cjs").ReportBlock[]} */
-  const children = [...markdownParts.detectionCaution, { type: "heading", level: 3, agentTainted: false, children: [{ type: "text", value: "Comment Memory", agentTainted: false }] }, buildCollapsedMemorySection(rawBody, memoryID)];
+  const children = [
+    ...markdownParts.detectionCaution,
+    { type: "heading", level: 3, agentTainted: false, children: [{ type: "text", value: "Comment Memory", agentTainted: false }] },
+    buildCollapsedMemorySection(rawBody, memoryID),
+    buildTransactionHistory(previousBody, runUrl, workflowName),
+  ];
 
   const tracker = getTrackerID("markdown");
   if (tracker) {
@@ -208,34 +274,33 @@ async function main(config = {}) {
         serverUrl: context.serverUrl,
       }) || undefined;
 
-    const report = buildManagedMemoryReport(message.body || "", memoryID, {
-      includeFooter,
-      runUrl,
-      workflowName,
-      workflowSource,
-      workflowSourceURL,
-      historyUrl,
-      triggeringIssueNumber,
-      triggeringPRNumber,
-      bodyFooter: config.body_footer,
-    });
-    let managedBody;
     try {
-      managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
-      enforceCommentLimits(managedBody);
-    } catch (error) {
-      core.warning(`comment_memory: body validation failed: ${getErrorMessage(error)}`);
-      return { success: false, error: getErrorMessage(error) };
-    }
-    core.info(`comment_memory: body validation passed for memory_id='${memoryID}'`);
+      const existing = staged ? null : await findManagedComment(githubClient, repoResolution.repoParts.owner, repoResolution.repoParts.repo, targetResult.number, memoryID);
+      const report = buildManagedMemoryReport(message.body || "", memoryID, {
+        includeFooter,
+        runUrl,
+        workflowName,
+        workflowSource,
+        workflowSourceURL,
+        historyUrl,
+        triggeringIssueNumber,
+        triggeringPRNumber,
+        bodyFooter: config.body_footer,
+        previousBody: existing?.body || "",
+      });
+      const managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
+      const transactionHistory = report.children.find(node => node.type === "details" && node.summary === "Transaction history");
+      const historyList = transactionHistory?.type === "details" ? transactionHistory.children[0] : undefined;
+      const historyLinkCount = historyList?.type === "list" ? historyList.items.length : 0;
+      // Accumulated framework run links do not consume the agent's link budget.
+      enforceCommentLimits(managedBody, { maxLinks: MAX_LINKS + historyLinkCount });
+      core.info(`comment_memory: body validation passed for memory_id='${memoryID}'`);
 
-    if (staged) {
-      core.info(`🎭 Staged Mode: would upsert comment-memory '${memoryID}' on #${targetResult.number} in ${repoResolution.repo}`);
-      return { success: true, staged: true };
-    }
+      if (staged) {
+        core.info(`🎭 Staged Mode: would upsert comment-memory '${memoryID}' on #${targetResult.number} in ${repoResolution.repo}`);
+        return { success: true, staged: true };
+      }
 
-    try {
-      const existing = await findManagedComment(githubClient, repoResolution.repoParts.owner, repoResolution.repoParts.repo, targetResult.number, memoryID);
       if (existing) {
         core.info(`comment_memory: updating existing managed comment id=${existing.id}`);
         const { data } = await githubClient.rest.issues.updateComment({
