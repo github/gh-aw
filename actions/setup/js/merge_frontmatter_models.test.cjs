@@ -237,11 +237,12 @@ describe("merge_frontmatter_models.cjs", () => {
       const base = { providers: {} };
       const dir = makeTempModelsDir(base);
       process.env.GH_AW_MODELS_JSON_SRC_PATH = path.join(dir, "models.json");
-      process.env.GH_AW_INFO_MODEL_COSTS = "not-json";
+      process.env.GH_AW_INFO_MODEL_COSTS = "sensitive-model-pricing-payload";
 
       writeMergedModelsJSON(mockCore);
 
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to parse GH_AW_INFO_MODEL_COSTS"));
+      expect(mockCore.warning).toHaveBeenCalledWith("Failed to parse GH_AW_INFO_MODEL_COSTS, ignoring");
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining(process.env.GH_AW_INFO_MODEL_COSTS));
     });
 
     it("frontier overlay overrides an existing model's cost", () => {

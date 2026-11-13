@@ -108,7 +108,7 @@ function writeMergedModelsJSON(core, outputPath = MERGED_MODELS_JSON_PATH) {
         core.warning("GH_AW_INFO_MODEL_COSTS must be a JSON object, ignoring");
       }
     } catch {
-      core.warning(`Failed to parse GH_AW_INFO_MODEL_COSTS: ${modelCostsEnv}`);
+      core.warning("Failed to parse GH_AW_INFO_MODEL_COSTS, ignoring");
     }
   }
 

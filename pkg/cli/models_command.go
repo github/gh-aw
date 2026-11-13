@@ -395,10 +395,11 @@ func collectObservedFromAWFReflect(logsDir string, addObserved func(provider, mo
 			for _, model := range endpoint.Models {
 				addObserved(endpoint.Provider, model, "awf-reflect", 1)
 				provider := modelsdev.NormalizeProvider(endpoint.Provider)
-				normalizedModel := strings.ToLower(strings.TrimSpace(model))
-				if normalizedModel == "" {
+				trimmedModel := strings.TrimSpace(model)
+				if trimmedModel == "" {
 					continue
 				}
+				normalizedModel := strings.ToLower(trimmedModel)
 				key := path.Join(provider, normalizedModel)
 				catalog[key] = modelCatalogRow{Provider: provider, Model: normalizedModel}
 			}
