@@ -146,6 +146,7 @@ func TestLedgerPersistenceConcurrencyQueue(t *testing.T) {
 					Features: queue.features,
 				}, false)
 				require.NoError(t, err)
+				require.Equal(t, "always() && needs.safe_outputs.result == 'success'", job.If)
 				if !storage.hasComments {
 					require.Empty(t, job.Concurrency)
 					return
