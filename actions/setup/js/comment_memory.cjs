@@ -22,6 +22,7 @@ const { renderSizedReport } = require("./report_size.cjs");
 // Require provenance marker to avoid accidentally updating user-authored comments
 // that happen to contain a matching comment-memory tag.
 const MANAGED_COMMENT_PROVENANCE_MARKER = "<!-- gh-aw-agentic-workflow:";
+const MAX_HISTORY_RUNS = 100;
 
 function renderManagedCommentDisclosureNote() {
   const promptsDir = process.env.GH_AW_PROMPTS_DIR || `${process.env.RUNNER_TEMP}/gh-aw/prompts`;
@@ -57,11 +58,13 @@ function buildCollapsedMemorySection(rawBody, memoryID) {
 function buildTransactionHistory(previousBody, runUrl, workflowName) {
   const previous = parseReportMarkdown(previousBody, { allowMetadata: true, agentTainted: true });
   const history = previous.find(node => node.type === "details" && node.summary === "History");
+  const trustedRun = /^(https:\/\/[\w.-]+(?::\d+)?\/[\w.-]+\/[\w.-]+\/actions\/runs\/)[1-9]\d*$/.exec(runUrl);
   /** @type {Map<string, string>} */
   const runs = new Map();
-  const addRun = (url, label) => {
-    if (/^https:\/\/[\w.-]+(?::\d+)?\/[\w.-]+\/[\w.-]+\/actions\/runs\/[1-9]\d*$/.test(url)) {
-      runs.set(url, label);
+  const addRun = url => {
+    const match = /^(https:\/\/[\w.-]+(?::\d+)?\/[\w.-]+\/[\w.-]+\/actions\/runs\/)([1-9]\d*)$/.exec(url);
+    if (match && trustedRun && match[1] === trustedRun[1]) {
+      runs.set(url, `Workflow (run ${match[2]})`);
     }
   };
   if (history?.type === "details") {
@@ -72,7 +75,7 @@ function buildTransactionHistory(previousBody, runUrl, workflowName) {
           if (block.type !== "paragraph") continue;
           for (const link of block.children) {
             if (link.type === "link") {
-              addRun(link.url, link.children.map(node => (node.type === "text" ? node.value : "")).join(""));
+              addRun(link.url);
             }
           }
         }
@@ -83,9 +86,10 @@ function buildTransactionHistory(previousBody, runUrl, workflowName) {
     for (const node of previous) {
       if (node.type !== "xml_marker" || node.name !== "gh-aw-agentic-workflow") continue;
       const url = node.fields?.find(field => field.key === "run")?.value;
-      if (url) addRun(url, `${node.value || "Workflow"} (run ${url.split("/").pop()})`);
+      if (url) addRun(url);
     }
   }
+  runs.delete(runUrl);
   runs.set(runUrl, `${workflowName} (run ${runUrl.split("/").pop()})`);
   return {
     type: "details",
@@ -97,7 +101,7 @@ function buildTransactionHistory(previousBody, runUrl, workflowName) {
         type: "list",
         ordered: false,
         agentTainted: false,
-        items: [...runs].map(([url, label]) => [
+        items: [...runs].slice(-MAX_HISTORY_RUNS).map(([url, label]) => [
           {
             type: "paragraph",
             agentTainted: false,

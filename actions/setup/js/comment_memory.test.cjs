@@ -95,6 +95,50 @@ describe("comment_memory", () => {
     expect(body).not.toContain("runs/999");
   });
 
+  it("rebuilds imported history labels and rejects links outside the execution repository", async () => {
+    const { buildManagedMemoryBody } = await import("./comment_memory.cjs");
+    const options = { includeFooter: false, workflowName: "Workflow", runUrl: "https://github.com/owner/repo/actions/runs/1" };
+    const previousBody = buildManagedMemoryBody("Old", "default", options).replace(
+      "[Workflow (run 1)](https://github.com/owner/repo/actions/runs/1)",
+      "[Hello @victim https://evil.example](https://github.com/owner/repo/actions/runs/1)\n- [Other](https://evil.example/owner/repo/actions/runs/99)\n- [Other](https://github.com/other/repo/actions/runs/98)"
+    );
+    expect(previousBody).toContain("@victim https://evil.example");
+    expect(previousBody).toContain("other/repo/actions/runs/98");
+    const body = buildManagedMemoryBody("Updated", "default", { ...options, runUrl: "https://github.com/owner/repo/actions/runs/2", previousBody });
+
+    expect(body).toContain("[Workflow (run 1)](https://github.com/owner/repo/actions/runs/1)");
+    expect(body).not.toContain("@victim");
+    expect(body).not.toContain("evil.example");
+    expect(body).not.toContain("other/repo/actions/runs/98");
+  });
+
+  it("retains only the 100 most recent distinct writing runs", async () => {
+    const { buildManagedMemoryBody } = await import("./comment_memory.cjs");
+    let previousBody = "";
+    for (let id = 1; id <= 101; id++) {
+      previousBody = buildManagedMemoryBody("Memory", "default", {
+        includeFooter: false,
+        workflowName: "Workflow",
+        runUrl: `https://github.com/owner/repo/actions/runs/${id}`,
+        previousBody,
+      });
+    }
+    const body = buildManagedMemoryBody("Updated", "default", {
+      includeFooter: false,
+      workflowName: "Workflow",
+      runUrl: "https://github.com/owner/repo/actions/runs/2",
+      previousBody,
+    });
+    const history = parseReportMarkdown(body).find(node => node.type === "details" && node.summary === "History");
+    const urls = history?.children[0].items.map(item => item[0].children[0].url);
+
+    expect(urls).toHaveLength(100);
+    expect(urls[0]).toBe("https://github.com/owner/repo/actions/runs/3");
+    expect(urls[99]).toBe("https://github.com/owner/repo/actions/runs/2");
+    expect(body).not.toContain("/actions/runs/1)");
+    expect(extractCommentMemoryEntries(body)).toEqual([{ memoryId: "default", content: "Updated" }]);
+  });
+
   it.each(["", " \n ", "<!-- clear memory -->"])("retains an extractable tagged memory block when %j sanitizes to empty", async memory => {
     const module = await import("./comment_memory.cjs");
     const body = module.buildManagedMemoryBody(memory, "default", {
@@ -385,7 +429,7 @@ describe("comment_memory", () => {
 
       expect(result.success).toBe(true);
       const body = mockGithub.rest.issues.updateComment.mock.calls[0][0].body;
-      expect(body).toContain("[Previous workflow (run 123)](https://github.com/owner/repo/actions/runs/123)");
+      expect(body).toContain("[Workflow (run 123)](https://github.com/owner/repo/actions/runs/123)");
       expect(body).toContain("(https://github.com/owner/repo/actions/runs/1)");
       expect(body).not.toContain("runs/999");
       expect(body).not.toContain("other/target/actions");
