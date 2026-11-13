@@ -87,6 +87,7 @@ type LogsDownloadOptions struct {
 	cachedJSONLSourcePaths []string
 	cachedJSONLWildcard    bool
 	collectionStats        *logsCollectionStats
+	jsonlStream            *logsJSONLStream
 }
 
 type workflowLogsResult struct {
@@ -176,6 +177,7 @@ type continuationOptions struct {
 
 // renderLogsOutputOptions holds configuration for renderLogsOutput.
 type renderLogsOutputOptions struct {
+	jsonlStream      *logsJSONLStream
 	outputDir        string
 	summaryFile      string
 	format           string
@@ -222,6 +224,7 @@ type renderLogsOutputOptions struct {
 // date range, etc.) on the returned value.
 func newRenderLogsOutputOptions(opts LogsDownloadOptions, artifactFilter []string) renderLogsOutputOptions {
 	return renderLogsOutputOptions{
+		jsonlStream:      opts.jsonlStream,
 		outputDir:        opts.OutputDir,
 		summaryFile:      opts.SummaryFile,
 		format:           opts.Format,

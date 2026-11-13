@@ -652,9 +652,17 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         echo "Testing update command to ensure it runs successfully..."
-        # Refresh the disposable CI checkout without merging downstream customizations.
-        # Merge behavior is covered by the update tests, not floating upstream changes.
-        ./gh-aw update --verbose --no-merge
+        # Exercise a real upstream update without unrelated installed packages or
+        # repository-local imports. Merge behavior is covered by the update tests.
+        GH_AW_BINARY="$PWD/gh-aw"
+        TEST_WORKSPACE="$(mktemp -d "$RUNNER_TEMP/gh-aw-update.XXXXXX")"
+        trap 'rm -rf "$TEST_WORKSPACE"' EXIT
+        mkdir -p "$TEST_WORKSPACE/.github/workflows"
+        cp .github/workflows/daily-team-status.md "$TEST_WORKSPACE/.github/workflows/"
+        cd "$TEST_WORKSPACE"
+        git init -q
+        "$GH_AW_BINARY" update --verbose --no-merge --force
+        test -s .github/workflows/daily-team-status.lock.yml
         echo "✅ Update command executed successfully" >> $GITHUB_STEP_SUMMARY
 
   compile-cli-workflows:

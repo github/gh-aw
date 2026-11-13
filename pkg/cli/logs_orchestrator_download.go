@@ -521,12 +521,14 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 	// discarded after the artifacts have already been downloaded.
 	opts.Count = effectiveLogsBatchCount(opts.Count, len(state.processedRuns), opts.countLimit)
 	logLogsIterationFetch(opts, runtime.fetchAllInRange, state.iteration, len(state.processedRuns))
+	logsJSONLFromContext(runtime.activeCtx).emit(logsJSONLEvent{Type: "progress", Stage: "fetching", Workflow: opts.WorkflowName, Repository: opts.RepoOverride})
 	opts.cachedJSONLCache = runtime.cachedJSONLCache
 	batch, err := logsFetchWorkflowRunBatch(runtime.activeCtx, opts, state.beforeDate, len(state.processedRuns), runtime.fetchAllInRange)
 	if err != nil {
 		return handleLogsBatchError(state, runtime.fetchAllInRange, opts.countLimit, opts.rateLimitState, err)
 	}
 	opts.collectionStats.recordDiscovered(len(batch.runs))
+	logsJSONLFromContext(runtime.activeCtx).emit(logsJSONLEvent{Type: "progress", Stage: "discovered", Workflow: opts.WorkflowName, Repository: opts.RepoOverride, Count: len(batch.runs)})
 	if len(batch.runs) == 0 {
 		cursor, shouldContinue, shouldStop := handleEmptyWorkflowRunBatch(batch, opts.Verbose)
 		if shouldStop {
@@ -955,6 +957,7 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 			c.candidates[index] = processedRun //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches candidates length.
 			c.accepted[index] = true           //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches accepted length.
 			c.acceptedCount++
+			logsJSONLFromContext(c.ctx).run(processedRun)
 		}
 		return
 	}
@@ -976,13 +979,14 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 		c.candidates[index] = processedRun //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches candidates length.
 		c.accepted[index] = true           //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches accepted length.
 		c.acceptedCount++
+		logsJSONLFromContext(c.ctx).run(processedRun)
 	}
 }
 
 func (c *orderedLogsRunCollector) exportATIF(run WorkflowRun, reserved bool) bool {
 	if err := exportLogsATIF(c.ctx, run, c.opts.outputDir, c.opts.storageLimit, reserved); err != nil {
 		*c.opts.atifError = errors.Join(*c.opts.atifError, fmt.Errorf("ATIF export for run %d: %w", run.DatabaseID, err))
-		stop, _ := splitLogsATIFError(err)
+		stop, _ := splitLogsATIFError(err) //nolint:ignoredlocalerror // The complete error is retained above; only its stop classification is needed here.
 		return stop == nil
 	}
 	return true
@@ -1130,13 +1134,17 @@ func handleEmptyProcessedRuns(
 	if len(processedRuns) > 0 {
 		return false, nil
 	}
-	if opts.JSONOutput {
+	if opts.JSONOutput || opts.Format == "jsonl" {
 		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, continuation)
 		logsData.Continuations = continuations
 		logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
 		logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 		logsData.Message = noRunsMessage(opts.StartDate, timeoutReached, storageLimitReached)
-		if opts.JSONOutput {
+		if opts.Format == "jsonl" {
+			if err := opts.jsonlStream.summary(logsData); err != nil {
+				return true, err
+			}
+		} else if opts.JSONOutput {
 			if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
 				return true, fmt.Errorf("failed to render JSON output: %w", err)
 			}

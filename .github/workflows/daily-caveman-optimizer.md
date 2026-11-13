@@ -43,12 +43,10 @@ network:
     - github
 
 safe-outputs:
-  steer: true
   create-pull-request:
     expires: 3d
     title-prefix: "[caveman] "
     labels: [documentation, automation, prompt-quality]
-    draft: false
     protected-files: allowed
     allowed-files:
       - .github/aw/**
@@ -103,6 +101,7 @@ tools:
 timeout-minutes: 30
 
 imports:
+  - shared/pr-safe-output-defaults.md
   - shared/otlp.md
 mcp-scripts:
   caveman-run-state:
