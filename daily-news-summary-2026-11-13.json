@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-13",
+  "headline": "v1.2.3 shipped at 03:30 UTC with cost/auto routing, connectors, and Go 1.27.4.",
+  "highlights": [
+    "Ledger promoted out of experimental (#77331)",
+    "Connectors documented as the integration point (#77333)",
+    "Streaming gh aw logs JSONL (#77304)",
+    "14 Dependabot PRs still open",
+    "Community upgrade bugs: dispatcher tracks main, ruleset regression, pnpm catalog"
+  ],
+  "open_prs": 25,
+  "commits_30d": 1277,
+  "human_commits_30d": 482
+}
