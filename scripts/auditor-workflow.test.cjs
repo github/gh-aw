@@ -108,6 +108,7 @@ async function fixture(t, options = {}) {
           assert.equal(Date.parse(start), Date.parse(clock.time) - 86400000);
           assert.equal(end, clock.time);
           const recent = runs.filter(r => Date.parse(r.created_at) >= Date.parse(start) && Date.parse(r.created_at) <= Date.parse(end) && r.path.endsWith(".lock.yml"));
+          clock.time = new Date(Date.parse(clock.time) + (options.healthElapsedMs || 0)).toISOString();
           return JSON.stringify({
             collection: {
               partial: false,
@@ -130,6 +131,7 @@ async function fixture(t, options = {}) {
           });
         }
         if (args[1] === "logs") {
+          clock.time = new Date(Date.parse(clock.time) + (options.logElapsedMs || 0)).toISOString();
           used += options.logCost || 0;
           const id = Number(args[args.indexOf("--after-run-id") + 1]) + 1;
           const selected = runs.find(item => item.id === id);
@@ -297,7 +299,6 @@ test("PR pagination includes human and draft PRs on subsequent pages", async t =
 
 for (const [name, options] of [
   ["health API error", { healthCollection: { partial: true, reason: "api_error" } }],
-  ["health time budget", { healthCollection: { partial: true, reason: "time_budget" } }],
   ["missing health completeness", { healthCollection: { partial: undefined } }],
   ["incomplete PR pagination", { prOverflow: true }],
   ["PR access denied", { prError: true }],
@@ -612,6 +613,146 @@ test("bounded health inventory keeps verified failures actionable and reports pa
   const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
   assert.equal(manifest.discovery.partial, true);
   assert.equal(manifest.discovery.reason, "failure_listing_limit");
+});
+
+test("success sampling timeout does not block a verified failure inventory", async t => {
+  const f = await fixture(t, {
+    runs: [run(42)],
+    healthCollection: { partial: true, reason: "time_budget" },
+  });
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "true");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).evidence_complete, true);
+  assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
+});
+
+for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) {
+  test(`timed-out ${incomplete} defers and retries without losing checkpoint state`, async t => {
+    const options = { runs: [run(42)] };
+    const f = await fixture(t, options);
+    await f.execute();
+    const checkpoint = fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8");
+    const previous = JSON.parse(checkpoint);
+    const reportFile = path.join(f.cache, previous.backlog[0].report_file);
+    const report = fs.readFileSync(reportFile, "utf8");
+    options.healthCollection = { partial: true, reason: "time_budget", [incomplete]: false };
+    f.calls.length = 0;
+    for (const [timeout, nextTimeout] of [
+      [300, 600],
+      [600, 900],
+      [900, 900],
+    ]) {
+      await f.execute();
+      assert.equal(f.outputs.has_new_failures, "false");
+      assert.equal(fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8"), checkpoint);
+      assert.equal(fs.readFileSync(reportFile, "utf8"), report);
+      const call = f.calls.filter(call => call[1] === "health").at(-1);
+      assert.equal(call[call.indexOf("--timeout") + 1], `${timeout}s`);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(f.cache, "health-retry.json"))).timeout_seconds, nextTimeout);
+      const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+      assert.equal(manifest.complete, false);
+      assert.equal(manifest.evidence_complete, false);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "health.json"))).collection[incomplete], false);
+    }
+    assert.equal(f.calls.filter(call => call[1] === "logs" || call[0] === "tracked" || call[0] === "prs").length, 0);
+    assert.match(f.warnings.at(-1), /maximum was reached.*unverified/);
+    options.healthCollection = undefined;
+    await f.execute();
+    assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))).seen, previous.seen);
+    f.calls.length = 0;
+    await f.execute();
+    const call = f.calls.find(call => call[1] === "health");
+    assert.equal(call[call.indexOf("--timeout") + 1], "300s");
+  });
+}
+
+test("deferred bootstrap resumes validated initial state without fabricating a successful checkpoint", async t => {
+  const options = {
+    runs: [run(42)],
+    healthCollection: { partial: true, reason: "time_budget", failure_pass_complete: false },
+  };
+  const f = await fixture(t, options);
+  await f.execute();
+  assert.equal(fs.existsSync(path.join(f.cache, "checkpoint.json")), false);
+  const retry = JSON.parse(fs.readFileSync(path.join(f.cache, "health-retry.json")));
+  assert.equal(retry.initial_state.checkpoint, new Date(Date.parse(now) - 3600000).toISOString());
+  options.previousRun = "success";
+  options.healthCollection = undefined;
+  f.calls.length = 0;
+  await f.execute();
+  assert.equal(f.calls.filter(call => call[0] === "prior-history").length, 0);
+  assert.equal(f.outputs.has_new_failures, "true");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))).checkpoint, now);
+  assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
+});
+
+test("retry cannot conceal a later API error or advance its saved checkpoint", async t => {
+  const options = { healthCollection: { partial: true, reason: "time_budget", failure_pass_complete: false } };
+  const f = await fixture(t, options);
+  await f.execute();
+  const retry = fs.readFileSync(path.join(f.cache, "health-retry.json"), "utf8");
+  options.healthCollection = { partial: true, reason: "api_error" };
+  await assert.rejects(f.execute(), /Incomplete or invalid health discovery/);
+  assert.equal(fs.readFileSync(path.join(f.cache, "health-retry.json"), "utf8"), retry);
+  assert.equal(fs.existsSync(path.join(f.cache, "checkpoint.json")), false);
+  assert.equal(f.outputs.has_new_failures, "false");
+});
+
+test("invalid retry budget fails before discovery", async t => {
+  const f = await fixture(t, {
+    state: { version: 1, repository: "example/repo", checkpoint: now, seen: [], backlog: [], pending: [] },
+  });
+  fs.writeFileSync(
+    path.join(f.cache, "health-retry.json"),
+    JSON.stringify({
+      version: 1,
+      repository: "example/repo",
+      checkpoint: now,
+      timeout_seconds: 3600,
+    })
+  );
+  await assert.rejects(f.execute(), /Invalid health retry state/);
+  assert.deepEqual(f.calls, []);
+});
+
+test("slow discovery and logs defer audits durably and reuse reports next hour", async t => {
+  const options = { runs: [run(42)], healthElapsedMs: 900000, logElapsedMs: 120000 };
+  const f = await fixture(t, options);
+  await f.execute();
+  let state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.deepEqual(state.seen, []);
+  assert.deepEqual(state.pending, [42]);
+  assert.equal(state.backlog.length, 1);
+  assert.equal(f.calls.filter(call => call.includes("--audit")).length, 0);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).evidence_complete, false);
+  options.healthElapsedMs = 0;
+  options.logElapsedMs = 0;
+  await f.execute();
+  state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.equal(f.outputs.has_new_failures, "true");
+  assert.equal(state.backlog.length, 1);
+  assert.deepEqual(state.pending, []);
+  assert.deepEqual(state.seen, [`42-1-${now}`]);
+  assert.equal(f.calls.filter(call => call[1] === "logs" && !call.includes("--audit")).length, 1);
+  assert.equal(f.calls.filter(call => call.includes("--audit")).length, 1);
+});
+
+test("evidence deadline leaves unqueried failures pending rather than overrunning the job", async t => {
+  const options = { runs: [run(42), run(43)], healthElapsedMs: 900000, logElapsedMs: 120000 };
+  const f = await fixture(t, options);
+  await f.execute();
+  const state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+  assert.deepEqual(state.seen, [`42-1-${now}`]);
+  assert.deepEqual(state.pending, [43]);
+  assert.equal(f.calls.filter(call => call[1] === "logs").length, 1);
+  assert.equal(f.outputs.has_new_failures, "false");
+  options.healthElapsedMs = 0;
+  options.logElapsedMs = 0;
+  await f.execute();
+  assert.equal(f.outputs.has_new_failures, "true");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).clusters[0].count, 2);
 });
 
 test("health removes previously collected superseded failures from the backlog", async t => {
