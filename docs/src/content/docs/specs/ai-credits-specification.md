@@ -7,9 +7,9 @@ sidebar:
 
 # AI Credits Specification
 
-**Version**: 1.5.3<br />
+**Version**: 1.5.4<br />
 **Status**: Draft  
-**Publication Date**: 2026-11-05<br />
+**Publication Date**: 2026-11-13<br />
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [ai-credits-specification](/gh-aw/specs/ai-credits-specification/)  
 **Latest Published Version**: This document
@@ -651,7 +651,7 @@ This expression MUST be embedded in the compiled YAML (not pre-evaluated at comp
 
 ### 10.5 Disable Sentinel
 
-A `max-ai-credits` frontmatter value of `-1` MUST disable the per-run budget. When this sentinel is present at runtime (via the organization variable resolving to `-1`), a conforming implementation MUST disable the configured AWF budget. It MAY pass `maxAiCredits: -1` directly to AWF, which treats it as an omitted budget ([AWF configuration specification §10.3](https://github.com/github/gh-aw-firewall/blob/main/docs/awf-config-spec.md#103-max-ai-credits-configuration)). AWF's operator-controlled hard cap still applies. Budget notices are controlled separately by `sandbox.agent.token-steering`; with AWF releases after v0.29.11 they remain on by default when the budget is disabled.
+A `max-ai-credits` frontmatter value of `-1` MUST disable the per-run budget. When this sentinel is present at runtime (via the organization variable resolving to `-1`), a conforming implementation MUST disable the configured AWF budget. It MAY pass `maxAiCredits: -1` directly to AWF, which treats it as an omitted budget ([AWF configuration specification §10.3](https://github.com/github/gh-aw-firewall/blob/main/docs/awf-config-spec.md#103-max-ai-credits-configuration)). AWF's operator-controlled hard cap still applies. With supported AWF versions, frontmatter `-1` disables token steering by default unless `sandbox.agent.token-steering` explicitly overrides it. Runtime `-1` leaves token steering enabled by default; `sandbox.agent.token-steering` controls it separately.
 
 ### 10.6 Value Validation
 
@@ -767,6 +767,10 @@ This specification MUST be revalidated when any of the following occurs:
 
 <a id="change-log"></a>
 ## Change Log
+
+### Version 1.5.4 (2026-11-13)
+
+- **Updated**: §10.5 and T-AIC-PR-003 specify preservation of the runtime disable sentinel and clarify the token-steering difference between frontmatter and runtime values.
 
 ### Version 1.5.3 (2026-11-10)
 

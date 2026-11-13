@@ -2564,7 +2564,7 @@ jobs:
       - agent
       - detection
       - safe_outputs
-    if: always()
+    if: always() && needs.safe_outputs.result != 'skipped'
     runs-on: ubuntu-slim
     # Permissions for the push_ledger_changes job (workflow permissions default to none).
     permissions:
