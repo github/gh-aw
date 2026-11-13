@@ -114,10 +114,10 @@ function buildBranchInstruction(effectiveBaseBranch, resolvedDefaultBranch) {
  * @param {string} owner
  * @param {string} repo
  * @param {string} branch
- * @param {{signedCommits?: boolean}} options
+ * @param {{signedCommits?: boolean}} [options]
  * @returns {Promise<boolean>}
  */
-async function hasOnlyNonBlockingRules(githubClient, owner, repo, branch, { signedCommits }) {
+async function hasOnlyNonBlockingRules(githubClient, owner, repo, branch, { signedCommits } = {}) {
   const allowedRuleTypes = new Set([
     "copilot_code_review",
     "branch_name_pattern",

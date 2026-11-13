@@ -1705,6 +1705,61 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       }
     });
 
+    it("should not create an unsigned fallback PR branch after a ruleset-admitted signed push fails", async () => {
+      const branch = "signed-ruleset-push-no-unsigned-fallback";
+      createPatchFile(branch);
+      mockGitForPrimaryPush();
+      mockGithub.rest.repos.getBranch.mockResolvedValue({
+        data: { protected: true, protection: { enabled: false } },
+      });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
+      mockGithub.graphql.mockResolvedValue({ repository: { ref: { refUpdateRule: null } } });
+
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockRejectedValue(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
+
+      try {
+        const module = await loadModule();
+        const handler = await module.main({ signed_commits: true });
+        const result = await handler({ branch }, {});
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("non-fast-forward");
+        expect(pushSignedSpy).toHaveBeenCalledWith(expect.objectContaining({ signedCommits: true, allowGitPushFallback: false }));
+        expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+        expect(mockExec.exec.mock.calls.some(([, args]) => args[0] === "checkout" && args[1] === "-b")).toBe(false);
+        expect(mockExec.getExecOutput.mock.calls.some(([, args]) => args[0] === "push")).toBe(false);
+      } finally {
+        pushSignedSpy.mockRestore();
+      }
+    });
+
+    it("should preserve fallback PRs for a ruleset exception when signed commits are disabled", async () => {
+      const branch = "unsigned-ruleset-push-fallback";
+      createPatchFile(branch);
+      mockGitForPrimaryPush();
+      mockGithub.rest.repos.getBranch.mockResolvedValue({
+        data: { protected: true, protection: { enabled: false } },
+      });
+      mockGithub.rest.repos.getBranchRules = vi.fn().mockResolvedValue({ data: [{ type: "copilot_code_review" }] });
+      mockGithub.graphql.mockResolvedValue({ repository: { ref: { refUpdateRule: null } } });
+
+      const pushSignedSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockRejectedValue(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
+
+      try {
+        const module = await loadModule();
+        const handler = await module.main({ signed_commits: false });
+        const result = await handler({ branch }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.fallback_used).toBe(true);
+        expect(result.fallback_type).toBe("pull_request");
+        expect(pushSignedSpy).toHaveBeenCalledWith(expect.objectContaining({ signedCommits: false, allowGitPushFallback: true }));
+        expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
+      } finally {
+        pushSignedSpy.mockRestore();
+      }
+    });
+
     it("should create a fallback pull request after a persistent timeout when allow_workflows is true", async () => {
       vi.useFakeTimers();
       const pushSignedCommitsModule = require("./push_signed_commits.cjs");

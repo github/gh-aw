@@ -1027,7 +1027,7 @@ async function main(config = {}) {
         signedCommits,
         onProtectionException: () => {
           // A ruleset exception must not turn a signed push into an unsigned fallback.
-          allowGitPushFallback = false;
+          if (signedCommits) allowGitPushFallback = false;
         },
       });
       if (blockReason) {
@@ -1784,7 +1784,7 @@ async function main(config = {}) {
 
         // Fallback path for diverged branches: create a new pull request so changes
         // can still be reviewed and merged into the original PR branch.
-        if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest) {
+        if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest && allowGitPushFallback) {
           const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
           if (staleReason) {
             if (isNonFastForward) {
