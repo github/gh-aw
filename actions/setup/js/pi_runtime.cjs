@@ -15,9 +15,10 @@ const DEFAULT_SESSION_DIR = "/tmp/gh-aw/agent/pi-sessions";
 
 /** @param {string} [command] @param {typeof execFileSync} [execute] @param {string} [minimumVersion] */
 function verifyPiVersion(command = process.env.GH_AW_PI_COMMAND || "pi", execute = execFileSync, minimumVersion = "1.0.0") {
+  const executable = resolvePiExecutable(command);
   let version;
   try {
-    version = execute(command, ["--version"], { encoding: "utf8", timeout: 10000, maxBuffer: 4096 }).trim();
+    version = execute(executable, ["--version"], { encoding: "utf8", timeout: 10000, maxBuffer: 4096 }).trim();
   } catch (error) {
     throw new Error(`Cannot verify installed Pi version: ${getErrorMessage(error)}`, { cause: error });
   }
@@ -27,11 +28,33 @@ function verifyPiVersion(command = process.env.GH_AW_PI_COMMAND || "pi", execute
   if (!match || comparison < 0 || (comparison === 0 && match[4])) {
     throw new Error(`Pi v${minimumVersion} or newer is required${minimumVersion === "1.3.0" ? " for effort=max" : ""}; installed version is ${version}`);
   }
+  return executable;
 }
 
 /** @param {string|null|undefined} effort */
 function verifyPiThinkingEffort(effort) {
   if (effort === "max") verifyPiVersion(undefined, undefined, "1.3.0");
+}
+
+/** @param {string} [command] */
+function resolvePiExecutable(command = process.env.GH_AW_PI_COMMAND || "pi") {
+  const candidates =
+    path.isAbsolute(command) || command.includes(path.sep)
+      ? [path.resolve(command)]
+      : (process.env.PATH || "")
+          .split(path.delimiter)
+          .filter(Boolean)
+          .map(directory => path.join(directory, command));
+  for (const candidate of candidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return fs.realpathSync(candidate);
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? String(error.code) : "";
+      if (!["EACCES", "ELOOP", "ENOENT", "ENOTDIR", "EPERM"].includes(code)) throw error;
+    }
+  }
+  throw new Error(`Cannot resolve Pi executable "${command}"`);
 }
 
 /** @param {string} [raw] @returns {Record<string, any>} */
@@ -264,6 +287,7 @@ module.exports = {
   parsePiConfig,
   loadPiSDK,
   resolvePiModelWithoutAWF,
+  resolvePiExecutable,
   resolvePiPackageFile,
   nativePiProvider,
   preparePiRuntime,
