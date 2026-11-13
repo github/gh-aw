@@ -62,17 +62,17 @@ Prose != native error.
 | `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy/guards. | Fix access/config; budget/policy denial != credential rotation. |
 | `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change != availability. |
-| `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone != model removal. |
+| `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 != model removal. |
 | `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch` | Selection vs harness model/API/metadata. | Align selection/API; never invent evidence. |
 | `unsupported_effort` | Effort vs engine/model support. | Use supported effort/mapping; no silent discard. |
 | `missing_model_pricing_error`, `unknown_model_ai_credits` | Proxy pricing/`missing_model_pricing_model_name`. | Fix pricing/version/config; retain accounting. |
-| `invocation_cap_exceeded`, `max_runs_exceeded` | Used/max pooled inference calls. | Narrow work; exhausted run cannot recover via identical retries. |
+| `invocation_cap_exceeded`, `max_runs_exceeded` | Used/max pooled inference calls. | Narrow work; exhausted run cannot recover via retry. |
 | `max_ai_credits_exceeded`, `ai_credits_rate_limit_error`, `ai_credits_limit_exceeded` | Used/max credits; cap. | Stop; reduce work or authorize future budget. |
 | `max_cache_misses_exceeded` | Miss counters; prompt/cache changes. | Stabilize context/cache; no exhausted-guard retry. |
 | `effective_tokens_limit_exceeded` | Effective tokens; prompt/turn growth. | Reduce context/iterations; retain guard. |
-| `permission_denied_limit_exceeded` | Denied calls; allowed tools. | Stop denied calls; use allowed tools, not larger denial budget. |
+| `permission_denied_limit_exceeded` | Denied calls; allowed tools. | Stop denied calls; use allowed tools. |
 | `model_policy_violation`, `content_filter` | Provider/proxy reason; endpoint mismatch separately. | Correct request within policy; no credential swap/bypass. |
-| `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone != authentication failure. |
+| `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking != authentication failure. |
 | `capi_quota_exceeded_error` | Native 429; exhausted retries. | Respect quota/reset; no retry storm. |
 | `rate_limit_wait_exceeded`, `rate_limit_error` | 429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout. | GitHub models (Copilot/Claude/Codex): wait within both bounds or defer. Preserve other providers' policy and terminal quota/proxy guards. No unauthorized redispatch. |
 | `capi_server_error`, `engine_outage`, `infrastructure_error` | Exhausted native 5xx/infrastructure timeline. | Report cause; bounded backoff, no unapproved redispatch. |
@@ -194,16 +194,16 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
+| `source_branch_invalid`, `target_base_branch_invalid`, `base_branch_not_allowed`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
 | `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR. | Use allowed PRs; retain protections. |
 | `pr_is_draft`, `pr_not_open` | Draft/open. | Honor author readiness; stop closed/merged PRs. |
 | `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
 | `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
 | `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete/unambiguous current-head configured-producer checks; no bypass. |
 | `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Reviews/vetoes/threads; current-head allowlisted human approval. | Address feedback; retain reviewer independence. |
-| `protected_files_modified` | All live PR files: deletions/both rename sides; shared rules/exclusions. | Independent manual review/merge or trusted authorized scoped exclusions + recompile. `protected-files: allowed` disables only this gate, not caution/other guards. |
+| `protected_files_modified` | All live PR files: deletions/both rename sides; shared rules/exclusions. | Independent manual review/merge or trusted authorized scoped exclusions + recompile. `protected-files: allowed` disables only this gate. |
 | `manual_review_caution` | PR/review/protected-files/caution. | Independent manual review/merge; approvals/dismissals/labels/green checks cannot clear guard. |
-| `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
+| `merge_not_completed`, `merge_operation_error`, `merge_outcome_indeterminate` | API/live state. | Reconcile possibly-merged state before retry. |
 
 ## Parser and ledger diagnostics
 
