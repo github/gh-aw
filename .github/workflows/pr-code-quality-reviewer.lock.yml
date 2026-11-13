@@ -3032,6 +3032,7 @@ jobs:
     concurrency:
       group: ${{ format('gh-aw-comment-ledger-{0}-{1}', github.repository, (github.event.issue != null && github.event.issue.number) || (github.event.pull_request != null && github.event.pull_request.number)) }}
       cancel-in-progress: false
+      queue: max
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     steps:
