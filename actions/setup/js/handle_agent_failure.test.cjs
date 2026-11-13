@@ -889,13 +889,14 @@ describe("handle_agent_failure", () => {
     });
 
     it("redacts and bounds the failed startup step output without including adjacent steps or runner inputs", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
       vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
       vi.stubEnv("SECRET_STARTUP_TEST", "configured-value-for-test");
       const log = [
         "2026-10-10T10:00:02.010Z ##[group]Run previous step",
         "2026-10-10T10:00:02.020Z ##[endgroup]",
         "2026-10-10T10:00:02.030Z previous step output",
-        "2026-10-10T10:00:02.040Z ##[group]Run install",
+        '2026-10-10T10:00:02.040Z ##[group]Run bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v1 --rootless',
         "2026-10-10T10:00:02.050Z env: private-runner-input",
         "2026-10-10T10:00:02.060Z ##[endgroup]",
         "2026-10-10T10:00:02.070Z ::add-mask::masked-value-for-test",
@@ -914,8 +915,10 @@ describe("handle_agent_failure", () => {
             name: "agent",
             conclusion: "failure",
             steps: [
+              { name: "Previous step", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
               { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
               { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+              { name: "Cleanup", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
             ],
           },
         ]),
@@ -941,6 +944,7 @@ describe("handle_agent_failure", () => {
     });
 
     it("does not expose startup logs when retrieval fails or redaction failed", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
       const download = vi.fn().mockRejectedValue(new Error("private response"));
       const steps = [
         { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
@@ -955,9 +959,11 @@ describe("handle_agent_failure", () => {
       steps.push({ name: "Redact secrets in logs", conclusion: "failure" });
       expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
       expect(download).toHaveBeenCalledOnce();
+      vi.unstubAllEnvs();
     });
 
     it("withholds startup output when runner boundaries cannot be established", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
       const download = vi.fn().mockResolvedValue({ data: "2026-10-10T10:00:02.500Z unbounded output" });
       global.github = {
         paginate: vi.fn().mockResolvedValue([
@@ -975,6 +981,62 @@ describe("handle_agent_failure", () => {
       };
       expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
       expect(download).toHaveBeenCalledOnce();
+      vi.unstubAllEnvs();
+    });
+
+    it("withholds raw logs when custom masking is configured or its configuration is unavailable", async () => {
+      const download = vi.fn();
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+      for (const value of ["false", ""]) {
+        vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", value);
+        expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      }
+      expect(download).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it.each(["previous", "cleanup"])("withholds an ambiguous %s failure in the same second", async position => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              ...(position === "previous" ? [{ name: "Previous step", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" }] : []),
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+              ...(position === "cleanup" ? [{ name: "Cleanup", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" }] : []),
+            ],
+          },
+        ]),
+        rest: {
+          actions: {
+            listJobsForWorkflowRun: vi.fn(),
+            downloadJobLogsForWorkflowRun: vi.fn().mockResolvedValue({
+              data: ["2026-10-10T10:00:02.100Z ##[group]Run previous step", "2026-10-10T10:00:02.200Z ##[endgroup]", "2026-10-10T10:00:02.300Z unrelated output", "2026-10-10T10:00:02.400Z ##[error]Process completed with exit code 1."].join(
+                "\n"
+              ),
+            }),
+          },
+        },
+      };
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      vi.unstubAllEnvs();
     });
 
     it("uses dependency results as the job fallback when the jobs API returns nothing", async () => {
@@ -7700,6 +7762,7 @@ describe("handle_agent_failure", () => {
     });
 
     it("publishes a redacted Install AWF binary log tail as a startup failure, not an agent failure", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
       syncRuntimePromptTemplates(import.meta.url);
       fs.writeFileSync(path.join(tmpDir, "agent_execution.json"), JSON.stringify({ version: 1, component: "agent", run_id: 12345, run_attempt: 1, state: "not_started" }));
       fs.writeFileSync(

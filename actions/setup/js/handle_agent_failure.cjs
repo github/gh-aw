@@ -2018,10 +2018,11 @@ async function getSecretRedactionError(jobId, step) {
  * The runner's exit marker and group boundaries disambiguate steps that share
  * the same second in the Actions metadata.
  * @param {number} jobId
- * @param {{started_at?: string, completed_at?: string}} step
+ * @param {{name?: string, started_at?: string, completed_at?: string}} step
+ * @param {boolean} overlappingStep
  * @returns {Promise<string>}
  */
-async function getStartupStepLogTail(jobId, step) {
+async function getStartupStepLogTail(jobId, step, overlappingStep) {
   const start = Date.parse(step.started_at || "");
   const end = Date.parse(step.completed_at || "");
   if (!Number.isSafeInteger(jobId) || jobId <= 0) return "";
@@ -2039,10 +2040,12 @@ async function getStartupStepLogTail(jobId, step) {
       if (!Number.isFinite(timestamp)) return [];
       return timestamp >= start && timestamp < end + 1000 ? [match[2]] : [];
     });
-    const exit = records.findIndex(line => /^##\[error\]Process completed with exit code \d+\./.test(line));
-    if (exit < 0) return "";
+    const exits = records.flatMap((line, index) => (/^##\[error\]Process completed with exit code \d+\./.test(line) ? [index] : []));
+    if (exits.length !== 1) return "";
+    const exit = exits[0];
     let group = exit - 1;
     while (group >= 0 && !records[group].startsWith("##[group]Run ")) group--;
+    if (overlappingStep && (step.name !== "Install AWF binary" || !/^##\[group\]Run bash "\$\{RUNNER_TEMP\}\/gh-aw\/actions\/install_awf_binary\.sh"(?: |$)/.test(records[group] || ""))) return "";
     const output = records.findIndex((line, index) => index > group && line === "##[endgroup]");
     if (group < 0 || output < 0 || output >= exit) return "";
     const maskedValues = collectAddMaskedValues(log);
@@ -2146,7 +2149,26 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
     return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no valid failed step name." };
   }
   const executionIndex = steps.findIndex(isExecuteAgentStep);
-  const startupLogTail = startupFailure && !redactionStep && executionIndex >= 0 && steps.indexOf(failedStep) < executionIndex && isFailedStep(failedStep) ? await getStartupStepLogTail(agentJob.id, failedStep) : "";
+  const failedIndex = steps.indexOf(failedStep);
+  const start = Date.parse(failedStep.started_at || "");
+  const end = Date.parse(failedStep.completed_at || "");
+  const overlappingStep =
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    steps.some((step, index) => {
+      if (index === failedIndex || step.conclusion === "skipped") return false;
+      const started = Date.parse(step.started_at || "");
+      const completed = Date.parse(step.completed_at || "");
+      if (!Number.isFinite(started)) return true;
+      if (!Number.isFinite(completed)) return true;
+      if (!Number.isFinite(start)) return true;
+      if (!Number.isFinite(end)) return true;
+      return started < end + 1000 && completed + 1000 > start;
+    });
+  const startupLogTail =
+    startupFailure && process.env.GH_AW_STARTUP_LOG_EXCERPT_ALLOWED === "true" && !redactionStep && executionIndex >= 0 && failedIndex < executionIndex && isFailedStep(failedStep)
+      ? await getStartupStepLogTail(agentJob.id, failedStep, overlappingStep)
+      : "";
   return {
     failingStep,
     agentConclusion,
