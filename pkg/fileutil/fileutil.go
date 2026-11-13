@@ -74,27 +74,41 @@ func ValidateAbsolutePath(path string) (string, error) {
 //   - Either path cannot be resolved to an absolute form.
 //   - The resolved candidate path starts outside the resolved base directory.
 func ValidatePathWithinBase(base, candidate string) error {
-	fileutilLog.Printf("ValidatePathWithinBase: checking candidate=%q within base=%q", candidate, base)
-	// EvalSymlinks resolves both symlinks and ".." components.
-	// Fall back to Abs when a path does not exist on disk yet.
+	_, err := ResolvePathWithinBase(base, candidate)
+	return err
+}
+
+// ResolvePathWithinBase resolves candidate to its absolute real form when it is
+// within base. Nonexistent path suffixes are preserved after resolving existing
+// ancestors, including absolute symlinks to targets inside base.
+func ResolvePathWithinBase(base, candidate string) (string, error) {
+	fileutilLog.Printf("ResolvePathWithinBase: checking candidate=%q within base=%q", candidate, base)
 	absBase, err := filepath.EvalSymlinks(base)
 	if err != nil {
 		absBase, err = filepath.Abs(base)
 		if err != nil {
-			return fmt.Errorf("failed to resolve base path %q: %w", base, err)
+			return "", fmt.Errorf("failed to resolve base path %q: %w", base, err)
 		}
 	}
-	absCand, err := resolvePathWithExistingAncestorSymlinks(candidate)
+	absBase, err = filepath.Abs(absBase)
 	if err != nil {
-		return fmt.Errorf("failed to resolve candidate path %q: %w", candidate, err)
+		return "", fmt.Errorf("failed to resolve absolute base path %q: %w", base, err)
 	}
-	rel, err := filepath.Rel(absBase, absCand)
+	absCandidate, err := resolvePathWithExistingAncestorSymlinks(candidate)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve candidate path %q: %w", candidate, err)
+	}
+	absCandidate, err = filepath.Abs(absCandidate)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute candidate path %q: %w", candidate, err)
+	}
+	rel, err := filepath.Rel(absBase, absCandidate)
 	if err != nil || !filepath.IsLocal(rel) {
-		fileutilLog.Printf("ValidatePathWithinBase: path escape detected: candidate=%q base=%q", candidate, base)
-		return fmt.Errorf("path %q escapes base directory %q", candidate, base)
+		fileutilLog.Printf("ResolvePathWithinBase: path escape detected: candidate=%q base=%q", candidate, base)
+		return "", fmt.Errorf("path %q escapes base directory %q", candidate, base)
 	}
-	fileutilLog.Printf("ValidatePathWithinBase: path is safe: candidate=%q (rel=%s) within base=%q", candidate, rel, base)
-	return nil
+	fileutilLog.Printf("ResolvePathWithinBase: path is safe: candidate=%q (rel=%s) within base=%q", candidate, rel, base)
+	return absCandidate, nil
 }
 
 // resolvePathWithExistingAncestorSymlinks resolves a path to its absolute real form, following

@@ -379,18 +379,22 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		return nil
 	}
 	repoRoot, err := gitutil.FindGitRootFrom(absTargetDir)
-	var importRoot string
+	var importBoundary string
 	if err != nil {
 		// Without repository context, do not allow imports to leave targetDir.
 		repoRoot = absTargetDir
-		importRoot = repoRoot
+		importBoundary = repoRoot
 	} else {
-		importRoot = filepath.Join(repoRoot, ".github")
+		importBoundary = importBoundaryForTarget(repoRoot, absTargetDir)
 	}
 	root, err := os.OpenRoot(repoRoot)
 	if err != nil {
 		if opts.strict {
 			return fmt.Errorf("failed to open import destination root: %w", err)
+		}
+		remoteWorkflowLog.Printf("Failed to open import destination root: %v", err)
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to open import destination root: %v", err)))
 		}
 		return nil
 	}
@@ -498,7 +502,8 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 		targetPath := filepath.Join(absTargetDir, localRelPath)
 
-		if err := fileutil.ValidatePathWithinBase(repoRoot, targetPath); err != nil {
+		resolvedTargetPath, err := fileutil.ResolvePathWithinBase(repoRoot, targetPath)
+		if err != nil {
 			if opts.strict {
 				return fmt.Errorf("refusing to write import outside repository root: %q: %w", importPath, err)
 			}
@@ -507,16 +512,17 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 			}
 			continue
 		}
-		if err := fileutil.ValidatePathWithinBase(importRoot, targetPath); err != nil {
+		resolvedTargetPath, err = fileutil.ResolvePathWithinBase(importBoundary, resolvedTargetPath)
+		if err != nil {
 			if opts.strict {
-				return fmt.Errorf("refusing to write import outside .github: %q: %w", importPath, err)
+				return fmt.Errorf("refusing to write import outside import destination boundary: %q: %w", importPath, err)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside .github: %q", importPath)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside import destination boundary: %q", importPath)))
 			}
 			continue
 		}
-		repoRelPath, err := filepath.Rel(repoRoot, targetPath)
+		repoRelPath, err := filepath.Rel(repoRoot, resolvedTargetPath)
 		if err != nil {
 			if opts.strict {
 				return fmt.Errorf("failed to resolve import destination %q: %w", importPath, err)
@@ -529,7 +535,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		// recurse into the existing file's imports so that any transitive dependencies
 		// it references are fetched even when the parent file was already present.
 		fileExists := false
-		if fileutil.FileExists(targetPath) {
+		if fileutil.FileExists(resolvedTargetPath) {
 			fileExists = true
 			if !opts.force {
 				if opts.verbose {
@@ -599,9 +605,9 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		// Track the file for git staging and potential rollback
 		if opts.tracker != nil {
 			if fileExists {
-				opts.tracker.TrackModified(targetPath)
+				opts.tracker.TrackModified(resolvedTargetPath)
 			} else {
-				opts.tracker.TrackCreated(targetPath)
+				opts.tracker.TrackCreated(resolvedTargetPath)
 			}
 		}
 
@@ -613,6 +619,21 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		}
 	}
 	return nil
+}
+
+func importBoundaryForTarget(repoRoot, targetDir string) string {
+	rel, err := filepath.Rel(repoRoot, targetDir)
+	if err != nil || !filepath.IsLocal(rel) {
+		return targetDir
+	}
+	for dir := targetDir; ; dir = filepath.Dir(dir) {
+		if filepath.Base(dir) == ".github" {
+			return dir
+		}
+		if dir == repoRoot {
+			return targetDir
+		}
+	}
 }
 
 // includesFetchOptions holds the constant parameters for fetchAndSaveRemoteIncludesWithOptions.

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -977,6 +978,8 @@ func TestFetchFrontmatterImportsRecursive_RejectsUnsafeDestinations(t *testing.T
 			{".github/workflows", "../../../outside.md"},
 			{".github/workflows", "/../outside.md"},
 			{".github/workflows", "/"},
+			{".github/workflows", "/scripts/helper.md"},
+			{".github/workflows", "/.agents/agent.md"},
 			{".github/workflows", "../../README.md"},
 			{".github/workflows/nested", "../../../outside.md"},
 		} {
@@ -1047,12 +1050,114 @@ func TestFetchFrontmatterImportsRecursive_CustomDestinationBoundary(t *testing.T
 	require.ErrorContains(t, err, "outside repository root")
 }
 
-func TestFetchFrontmatterImportsRecursive_CustomDestinationOutsideGitHub(t *testing.T) {
+func TestFetchFrontmatterImportsRecursive_CustomDestinationInDirectory(t *testing.T) {
+	repoRoot := t.TempDir()
+	require.NoError(t, initTestGitRepo(repoRoot))
+	targetDir := filepath.Join(repoRoot, "workflows")
+	require.NoError(t, os.MkdirAll(targetDir, 0755))
+	var downloaded []string
+	opts := frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       targetDir,
+		strict:          true,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(_ context.Context, _, _, remotePath, _ string) ([]byte, error) {
+			downloaded = append(downloaded, remotePath)
+			return []byte("# Shared\n"), nil
+		},
+	}
+	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - shared/review.md\n---\n", ".github/workflows", opts)
+	require.NoError(t, err)
+	require.Equal(t, []string{".github/workflows/shared/review.md"}, downloaded)
+	assert.FileExists(t, filepath.Join(targetDir, "shared", "review.md"))
+}
+
+func TestFetchFrontmatterImportsRecursive_CustomDestinationRejectsEscapingImport(t *testing.T) {
+	repoRoot := t.TempDir()
+	require.NoError(t, initTestGitRepo(repoRoot))
+	targetDir := filepath.Join(repoRoot, "workflows")
+	require.NoError(t, os.MkdirAll(targetDir, 0755))
+	opts := frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       targetDir,
+		strict:          true,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
+			t.Fatal("imports outside the custom destination must be rejected before downloading")
+			return nil, nil
+		},
+	}
+	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - ../prompts/review.md\n---\n", ".github/workflows", opts)
+	require.ErrorContains(t, err, "outside import destination boundary")
+}
+
+func TestFetchFrontmatterImportsRecursive_AbsoluteInRootSymlinks(t *testing.T) {
+	repoRoot := t.TempDir()
+	require.NoError(t, initTestGitRepo(repoRoot))
+	promptsDir := filepath.Join(repoRoot, ".github", "prompts")
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+	target := filepath.Join(promptsDir, "installed.md")
+	require.NoError(t, os.WriteFile(target, []byte("---\nimports:\n  - nested.md\n---\n# Installed\n"), 0600))
+	link := filepath.Join(promptsDir, "review.md")
+	require.NoError(t, os.Symlink(target, link))
+
+	opts := frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       filepath.Join(repoRoot, ".github", "workflows"),
+		strict:          true,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(_ context.Context, _, _, remotePath, _ string) ([]byte, error) {
+			require.Equal(t, ".github/prompts/nested.md", remotePath)
+			return []byte("# Nested\n"), nil
+		},
+	}
+	content := "---\nimports:\n  - ../prompts/review.md\n---\n"
+	require.NoError(t, fetchFrontmatterImportsRecursive(t.Context(), content, ".github/workflows", opts))
+	assert.FileExists(t, filepath.Join(promptsDir, "nested.md"))
+
+	opts.force = true
+	clear(opts.seen)
+	opts.downloadFn = func(_ context.Context, _, _, remotePath, _ string) ([]byte, error) {
+		require.Equal(t, ".github/prompts/review.md", remotePath)
+		return []byte("# Updated\n"), nil
+	}
+	require.NoError(t, fetchFrontmatterImportsRecursive(t.Context(), content, ".github/workflows", opts))
+	updated, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "# Updated\n", string(updated))
+	linkTarget, err := os.Readlink(link)
+	require.NoError(t, err)
+	assert.Equal(t, target, linkTarget)
+}
+
+func TestFetchFrontmatterImportsRecursive_AbsoluteInRootSymlinkParent(t *testing.T) {
+	repoRoot := t.TempDir()
+	require.NoError(t, initTestGitRepo(repoRoot))
+	targetDir := filepath.Join(repoRoot, ".github", "shared-prompts")
+	require.NoError(t, os.MkdirAll(targetDir, 0755))
+	linkDir := filepath.Join(repoRoot, ".github", "prompts")
+	require.NoError(t, os.Symlink(targetDir, linkDir))
+
+	opts := frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       filepath.Join(repoRoot, ".github", "workflows"),
+		strict:          true,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
+			return []byte("# Review\n"), nil
+		},
+	}
+	content := "---\nimports:\n  - ../prompts/nested/review.md\n---\n"
+	require.NoError(t, fetchFrontmatterImportsRecursive(t.Context(), content, ".github/workflows", opts))
+	assert.FileExists(t, filepath.Join(targetDir, "nested", "review.md"))
+}
+
+func TestFetchFrontmatterImportsRecursive_RejectsImportOutsideGitHubBoundary(t *testing.T) {
 	repoRoot := t.TempDir()
 	require.NoError(t, initTestGitRepo(repoRoot))
 	opts := frontmatterImportsOpts{
 		originalBaseDir: ".github/workflows",
-		targetDir:       filepath.Join(repoRoot, "workflows"),
+		targetDir:       filepath.Join(repoRoot, ".github", "workflows"),
 		strict:          true,
 		seen:            make(map[string]struct{}),
 		downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
@@ -1060,8 +1165,29 @@ func TestFetchFrontmatterImportsRecursive_CustomDestinationOutsideGitHub(t *test
 			return nil, nil
 		},
 	}
-	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - ../prompts/review.md\n---\n", ".github/workflows", opts)
-	require.ErrorContains(t, err, "outside .github")
+	err := fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - /scripts/helper.md\n---\n", ".github/workflows", opts)
+	require.ErrorContains(t, err, "outside import destination boundary")
+}
+
+func TestFetchFrontmatterImportsRecursive_WarnsWhenDestinationRootCannotOpen(t *testing.T) {
+	targetDir := filepath.Join(t.TempDir(), "missing")
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	originalStderr := os.Stderr
+	os.Stderr = writer
+	err = fetchFrontmatterImportsRecursive(t.Context(), "---\nimports:\n  - shared/review.md\n---\n", ".github/workflows", frontmatterImportsOpts{
+		originalBaseDir: ".github/workflows",
+		targetDir:       targetDir,
+		verbose:         true,
+		seen:            make(map[string]struct{}),
+	})
+	os.Stderr = originalStderr
+	require.NoError(t, writer.Close())
+	output, readErr := io.ReadAll(reader)
+	require.NoError(t, reader.Close())
+	require.NoError(t, readErr)
+	require.NoError(t, err)
+	assert.Contains(t, string(output), "Failed to open import destination root")
 }
 
 func TestFetchFrontmatterImportsRecursive_RejectsDanglingSymlinkEscape(t *testing.T) {
