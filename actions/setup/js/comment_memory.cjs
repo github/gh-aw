@@ -7,7 +7,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const { resolveTarget, isStagedMode } = require("./safe_output_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
-const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
+const { createAuthenticatedGitHubClient, createAuthenticatedLoginResolver } = require("./handler_auth.cjs");
 const { renderTemplateFromFile } = require("./messages_core.cjs");
 const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
@@ -175,21 +175,7 @@ function buildManagedMemoryBody(rawBody, memoryID, options) {
 async function findManagedComment(github, owner, repo, itemNumber, memoryID) {
   const newFormatMarker = buildCodeFenceOpener(memoryID);
   const legacyMarker = `<${COMMENT_MEMORY_TAG} id="${memoryID}">`;
-  /** @type {Promise<string | null> | undefined} */
-  let authenticatedLoginPromise;
-  const getAuthenticatedLogin = () => {
-    if (!authenticatedLoginPromise) {
-      authenticatedLoginPromise = Promise.resolve()
-        .then(() => github.rest.users.getAuthenticated())
-        .then(({ data }) => data.login || null)
-        .catch(() => {
-          // Installation tokens cannot call /user; match add_comment's bot fallback.
-          core.info("comment_memory: could not resolve the authenticated comment author; considering bot-authored comments only");
-          return null;
-        });
-    }
-    return authenticatedLoginPromise;
-  };
+  const getAuthenticatedLogin = createAuthenticatedLoginResolver(github, core);
   core.info(`comment_memory: scanning comments for memory_id='${memoryID}' on #${itemNumber} in ${owner}/${repo}`);
   let page = 1;
   const perPage = 100;
