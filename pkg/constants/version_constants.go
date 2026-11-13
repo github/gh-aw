@@ -315,7 +315,7 @@ const MCPGDynamicRepositoryDelegationMinVersion Version = "v0.4.19"
 // Used when tools.playwright is enabled.
 // Keep this version outside the default 3-day npm release-age cooldown window enforced by
 // generated Playwright CLI install steps. See TestDefaultPlaywrightCLIVersionOutsideCooldownWindow.
-const DefaultPlaywrightCLIVersion Version = "0.1.23"
+const DefaultPlaywrightCLIVersion Version = "0.1.24"
 
 // DefaultMCPSDKVersion is the default version of the @modelcontextprotocol/sdk package
 const DefaultMCPSDKVersion Version = "1.30.0"
