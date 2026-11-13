@@ -78,12 +78,14 @@ func atomicHarnessCommand(t *testing.T, dir, command string, args ...string) *ex
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "awf_reflect.cjs"), []byte(
 		"module.exports = { ...require("+string(encodedPath)+`),
 fetchAWFReflect: async () => JSON.parse(process.env.ATOMIC_TEST_REFLECT) };`), 0o600))
-	redactionPath, err := filepath.Abs("../../actions/setup/js/add_mask_redaction.cjs")
-	require.NoError(t, err)
-	encodedRedactionPath, err := json.Marshal(redactionPath)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "add_mask_redaction.cjs"), []byte(
-		"module.exports = require("+string(encodedRedactionPath)+");"), 0o600))
+	for _, module := range []string{"add_mask_redaction.cjs", "redact_secrets.cjs"} {
+		modulePath, err := filepath.Abs("../../actions/setup/js/" + module)
+		require.NoError(t, err)
+		encodedModulePath, err := json.Marshal(modulePath)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, module), []byte(
+			"module.exports = require("+string(encodedModulePath)+");"), 0o600))
+	}
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("--help $(not-a-command)\nAtomic fixture prompt"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), []byte(`{"autoEnableCodemode":false,"mcpServers":{}}`), 0o600))
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
@@ -219,6 +221,111 @@ func TestAtomicHarnessFailures(t *testing.T) {
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err)
 		assert.Contains(t, string(output), "Atomic MCP configuration must contain an mcpServers object")
+	})
+}
+
+// atomicDriveHarnessCommand points the harness at a test drive instead of /tmp/gh-aw/drive-memory-atomic.
+func atomicDriveHarnessCommand(t *testing.T, dir, drive string, args ...string) *exec.Cmd {
+	t.Helper()
+	cmd := atomicHarnessCommand(t, dir, "node", args...)
+	harness := filepath.Join(dir, "atomic_harness.cjs")
+	script := loadAtomicSample(t).Behaviors.HarnessScript
+	require.Contains(t, script, `"/tmp/gh-aw/drive-memory-atomic"`)
+	encodedDrive, err := json.Marshal(drive)
+	require.NoError(t, err)
+	script = strings.Replace(script, `"/tmp/gh-aw/drive-memory-atomic"`, string(encodedDrive), 1)
+	require.NoError(t, os.WriteFile(harness, []byte(script), 0o600))
+	return cmd
+}
+
+func TestAtomicHarnessDriveSessions(t *testing.T) {
+	// The probe records its arguments and restored sessions, then writes new transcripts.
+	probe := `
+const fs = require("fs"), path = require("path");
+const args = process.argv.slice(2);
+const index = args.indexOf("--session-dir");
+const dir = index >= 0 ? args[index + 1] : "";
+const restored = dir ? fs.readdirSync(dir).sort() : [];
+const write = (name, ...records) => fs.writeFileSync(path.join(dir, name), records.join("\n") + "\n");
+if (dir && args.includes("budget")) {
+  const big = JSON.stringify({type: "message", text: "x".repeat(20 * 1024 * 1024)});
+  write("2026-11-02_new.jsonl", big);
+  write("2026-11-03_newer.jsonl", big);
+} else if (dir) {
+  write("2026-11-13_new.jsonl", JSON.stringify({type: "session", id: "new"}),
+    JSON.stringify({type: "message", text: "token ghp_` + strings.Repeat("a", 36) + ` header sentinel-mcp-value"}));
+  write("2026-11-14_torn.jsonl", JSON.stringify({type: "session"}), "{\"type\":");
+}
+console.log(JSON.stringify({args, restored}));`
+	run := func(t *testing.T, drive string, probeArgs ...string) (args, restored []string) {
+		t.Helper()
+		dir := t.TempDir()
+		probePath := filepath.Join(dir, "probe.cjs")
+		require.NoError(t, os.WriteFile(probePath, []byte(probe), 0o600))
+		cmd := atomicDriveHarnessCommand(t, dir, drive, append([]string{probePath, "--no-session", "--approve"}, probeArgs...)...)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "mcp.json"), []byte(
+			`{"mcpServers":{"github":{"type":"http","url":"http://localhost/mcp","headers":{"Authorization":"sentinel-mcp-value"}}}}`), 0o600))
+		var stderr strings.Builder
+		cmd.Stderr = &stderr
+		output, err := cmd.Output()
+		require.NoError(t, err, "%s", stderr.String())
+		var captured struct {
+			Args     []string `json:"args"`
+			Restored []string `json:"restored"`
+		}
+		require.NoError(t, json.Unmarshal(output, &captured))
+		return captured.Args, captured.Restored
+	}
+	saved := func(t *testing.T, drive string) []string {
+		t.Helper()
+		entries, err := os.ReadDir(filepath.Join(drive, "sessions"))
+		require.NoError(t, err)
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		return names
+	}
+
+	t.Run("without the atomic drive sessions stay off", func(t *testing.T) {
+		drive := filepath.Join(t.TempDir(), "missing")
+		args, _ := run(t, drive)
+		assert.Contains(t, args, "--no-session")
+		assert.NotContains(t, args, "--session-dir")
+		assert.NoDirExists(t, drive)
+	})
+
+	t.Run("restores, redacts, and keeps only well-formed transcripts", func(t *testing.T) {
+		drive := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(drive, "sessions"), 0o700))
+		writeSaved := func(name, content string) {
+			require.NoError(t, os.WriteFile(filepath.Join(drive, "sessions", name), []byte(content), 0o600))
+		}
+		writeSaved("2026-11-01_old.jsonl", `{"type":"session","id":"old"}`+"\n")
+		writeSaved("2026-11-02_bad.jsonl", "not json\n")
+		writeSaved("2026-11-03_array.jsonl", `[{"type":"session"}]`+"\n")
+		writeSaved("notes.txt", "planted\n")
+		require.NoError(t, os.WriteFile(filepath.Join(drive, "keep.txt"), []byte("other drive data\n"), 0o600))
+
+		args, restored := run(t, drive)
+		assert.NotContains(t, args, "--no-session")
+		assert.Contains(t, args, "--approve")
+		assert.Equal(t, []string{"2026-11-01_old.jsonl"}, restored)
+		assert.Equal(t, []string{"2026-11-01_old.jsonl", "2026-11-13_new.jsonl"}, saved(t, drive))
+		newSession, err := os.ReadFile(filepath.Join(drive, "sessions", "2026-11-13_new.jsonl"))
+		require.NoError(t, err)
+		assert.NotContains(t, string(newSession), "ghp_")
+		assert.NotContains(t, string(newSession), "sentinel-mcp-value")
+		assert.Contains(t, string(newSession), "REDACTED")
+		assert.FileExists(t, filepath.Join(drive, "keep.txt"), "files outside sessions/ belong to the workflow")
+	})
+
+	t.Run("keeps the newest transcripts within the size budget", func(t *testing.T) {
+		drive := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(drive, "sessions"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(drive, "sessions", "2026-11-01_old.jsonl"), []byte(`{"type":"session"}`+"\n"), 0o600))
+		run(t, drive, "budget")
+		assert.Equal(t, []string{"2026-11-03_newer.jsonl"}, saved(t, drive))
 	})
 }
 

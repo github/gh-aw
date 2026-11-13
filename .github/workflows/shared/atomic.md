@@ -80,7 +80,7 @@ engine:
         });
         writeSecureOutput("/tmp/gh-aw/atomic-mcp.json", JSON.stringify({ autoEnableCodemode: false, mcpServers: servers }, null, 2));
     harness-script: |
-      const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
+      const { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } = require("fs");
       const { join } = require("path");
       const { spawnSync } = require("child_process");
       const { redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
@@ -92,6 +92,65 @@ engine:
         output?.toString("utf8") || "", [...sensitiveValues], undefined, () => "[REDACTED]", { textMode: true }
       );
       const log = message => process.stderr.write(sanitize(`[atomic-harness] ${message}\n`));
+      // A workflow opts in by declaring tools.drive-memory with id: atomic.
+      const sessionDrive = "/tmp/gh-aw/drive-memory-atomic";
+      const sessionBudgetBytes = 32 * 1024 * 1024;
+      const listSessions = dir => {
+        try {
+          return readdirSync(dir, { withFileTypes: true })
+            .filter(entry => entry.isFile() && /^[A-Za-z0-9][A-Za-z0-9._-]*\.jsonl$/.test(entry.name))
+            .map(entry => entry.name).sort();
+        } catch (error) {
+          if (error.code === "ENOENT") return [];
+          throw error;
+        }
+      };
+      const isSession = content => {
+        const lines = content.split("\n");
+        if (lines.at(-1) === "") lines.pop();
+        return lines.length > 0 && lines.every(line => {
+          try {
+            const record = JSON.parse(line);
+            return !!record && typeof record === "object" && !Array.isArray(record) && typeof record.type === "string";
+          } catch {
+            return false;
+          }
+        });
+      };
+      const restoreSessions = sessionDir => {
+        const saved = join(sessionDrive, "sessions");
+        if (!existsSync(saved) || !lstatSync(saved).isDirectory()) return;
+        for (const name of listSessions(saved)) {
+          const content = readFileSync(join(sessionDrive, "sessions", name), "utf8");
+          if (isSession(content)) writeFileSync(join(sessionDir, name), content, { mode: 0o600 });
+          else log(`Skipping malformed saved session ${name}`);
+        }
+      };
+      // Only redacted, well-formed transcripts reach the drive; newest names win the size budget.
+      const persistSessions = sessionDir => {
+        const { redactArtifactContent } = require("./redact_secrets.cjs");
+        const staging = mkdtempSync(join(sessionDrive, ".sessions-"));
+        try {
+          let bytes = 0;
+          for (const name of listSessions(sessionDir).reverse()) {
+            const content = redactArtifactContent(readFileSync(join(sessionDir, name), "utf8"), [...sensitiveValues], []).content;
+            if (!isSession(content)) {
+              log(`Not saving malformed session ${name}`);
+              continue;
+            }
+            bytes += Buffer.byteLength(content);
+            if (bytes > sessionBudgetBytes) {
+              log(`Not saving ${name} or older sessions: saved sessions are limited to ${sessionBudgetBytes} bytes`);
+              break;
+            }
+            writeFileSync(join(staging, name), content, { mode: 0o600 });
+          }
+          rmSync(join(sessionDrive, "sessions"), { recursive: true, force: true });
+          renameSync(staging, join(sessionDrive, "sessions"));
+        } finally {
+          rmSync(staging, { recursive: true, force: true });
+        }
+      };
       const main = async () => {
         if (!command) throw new Error("Atomic command is required");
         if (process.env.AWF_REFLECT_ENABLED !== "1") {
@@ -148,7 +207,14 @@ engine:
         }
         mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         const agentDir = mkdtempSync("/tmp/gh-aw/agent/atomic-");
+        let sessionDir;
         try {
+          if (existsSync(sessionDrive) && statSync(sessionDrive).isDirectory()) {
+            sessionDir = join(agentDir, "sessions");
+            mkdirSync(sessionDir, { mode: 0o700 });
+            restoreSessions(sessionDir);
+          }
+          const runArgs = sessionDir ? [...args.filter(arg => arg !== "--no-session"), "--session-dir", sessionDir] : args;
           const writeConfig = (name, value) => writeFileSync(join(agentDir, name), JSON.stringify(value), { mode: 0o600 });
           writeConfig("models.json", {
             providers: {
@@ -192,7 +258,7 @@ engine:
             }
             env[name] = value;
           }
-          const result = spawnSync(command, [...args, "--provider", "awf-proxy", "--model", model], {
+          const result = spawnSync(command, [...runArgs, "--provider", "awf-proxy", "--model", model], {
             cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
             env,
             input: prompt,
@@ -213,7 +279,11 @@ engine:
             process.exitCode = result.status || 1;
           }
         } finally {
-          rmSync(agentDir, { recursive: true, force: true });
+          try {
+            if (sessionDir) persistSessions(sessionDir);
+          } finally {
+            rmSync(agentDir, { recursive: true, force: true });
+          }
         }
       };
       main().catch(error => {
@@ -276,7 +346,16 @@ incomplete output. Logs appear after the process exits rather than streaming.
 This known-value masking does not contain the agent or cover arbitrary encodings,
 partial credentials, other secrets, or files the agent writes.
 
-Startup network checks, telemetry, saved sessions, and themes are disabled.
+Startup network checks, telemetry, and themes are disabled. Sessions are not
+saved unless the workflow declares a drive-memory entry with `id: atomic`
+(mounted at `/tmp/gh-aw/drive-memory-atomic/`). Then the harness restores
+well-formed `sessions/*.jsonl` transcripts from the drive into a private
+JSONL session directory, runs Atomic with `--session-dir`, and afterwards
+replaces `sessions/` with redacted transcripts (configured MCP header values
+and built-in token patterns) whose every line is a JSON object with a string
+`type`, newest first, up to 32 MiB. Workflow-stage transcripts are included;
+the SQLite workflow journal is not saved. Drive memory stages these files and
+publishes them only after threat detection accepts the run.
 Everything else in Atomic is on, minus its one interactive tool. `--approve`
 loads the repository's `.atomic/` extensions, workflows, skills, prompt
 templates, and settings, so a repository can add custom tools, workflows, and

@@ -54,7 +54,7 @@ These definitions are examples for integration authors, **not supported gh-aw en
 
 | Sample | Runtime and limitations |
 | --- | --- |
-| Atomic | Pins `@bastani/atomic` 0.9.79 with npm lifecycle scripts disabled. Uses AWF-only Copilot, Anthropic, or OpenAI/Codex inference, stdin prompts, private temporary configuration, and native authenticated HTTP MCP with direct tool exposure. The child environment allowlists runtime bindings and credential-free proxy addresses; arbitrary workflow secrets and execution hooks are not inherited. Startup network checks, telemetry, saved sessions, and project-local configuration are disabled; the isolated agent directory excludes user-installed extensions. Gateway MCP policies, including GitHub integrity and repository restrictions, remain enforced. Native bash restrictions and `edit: false` fail compilation. No native gh-aw tool allowlists, iteration limits, Agent Plugins, custom Atomic process workflows, or structured session parsing. |
+| Atomic | Pins `@bastani/atomic` 0.9.79 with npm lifecycle scripts disabled. Uses AWF-only Copilot, Anthropic, or OpenAI/Codex inference, stdin prompts, private temporary configuration, and native authenticated HTTP MCP with direct tool exposure. The child environment allowlists runtime bindings and credential-free proxy addresses; arbitrary workflow secrets and execution hooks are not inherited. Startup network checks, telemetry, and project-local configuration are disabled, and sessions are saved only when the workflow opts in with [drive memory](#atomic-sessions-on-drive-memory); the isolated agent directory excludes user-installed extensions. Gateway MCP policies, including GitHub integrity and repository restrictions, remain enforced. Native bash restrictions and `edit: false` fail compilation. No native gh-aw tool allowlists, iteration limits, Agent Plugins, custom Atomic process workflows, or structured session parsing. |
 | OpenCode | Installs OpenCode 2 from `@opencode/cli`, uses `--standalone`, native MCP with Code Mode disabled, and JSONL events. Copilot requires AWF; direct Anthropic/OpenAI BYOK is supported without it. Repository JSON/JSONC settings are overlaid; updates/sharing are disabled. V2 has no language servers, and V1 plugins require porting. Native npm plugins are not gh-aw Agent Plugins. |
 | DeepSeek Harness | Pins `dsh` v0.2.0-rc.2. Uses headless stdin prompts, a private per-run configuration patch, and CLI-proxy tools rather than native MCP. Copilot requires AWF; direct Anthropic/OpenAI credentials apply only without AWF. Per-command native bash restrictions are rejected. No native reasoning, tool, refusal, or token-accounting observations are inferred from stdout. |
 | Factory Droid | Pins `@factory/cli` 0.248.0 with lifecycle scripts disabled. Uses custom models through the AWF API proxy with placeholder credentials; real provider and Factory keys are excluded from the agent. Supports Copilot, Anthropic, and OpenAI inference, file-based prompts, high autonomy inside the sandbox, and native HTTP MCP. Native MCP retains the gateway session authorization in agent-readable `.factory/mcp.json`; this is not an upstream provider credential or a security boundary against the agent (see [gateway authentication](/gh-aw/reference/mcp-gateway/#71-authorization-header-format)). Removing it prevents authenticated MCP calls. No Factory API key is required. Factory-managed inference, direct-key execution, structured session parsing, gh-aw tool allowlists, max-turn enforcement, and Agent Plugins are unsupported. |
@@ -76,6 +76,39 @@ Engine defaults do not grant this access. For registry-free execution, vendor
 the definition without `runtimes`, retain its bootstrap steps, and provide Python
 3.12 on a Linux x86-64 runner independently. Callers can opt back in with
 `network.allowed: [python]` or `runtimes.python`.
+
+### Atomic sessions on drive memory
+
+The Atomic sample saves nothing between runs by default. A workflow keeps Atomic
+sessions by declaring a [drive memory](/gh-aw/experimental/drive-memory/) entry
+with `id: atomic` in its own frontmatter; the engine definition never turns this
+on itself:
+
+```yaml wrap
+tools:
+  drive-memory:
+    id: atomic
+    drive-name: my-workflow-atomic
+    disk-size: 100M
+    allowed-extensions: [".jsonl"]
+    validation:
+      json-schemas:
+        - schema:
+            type: object
+            required: [type]
+            properties:
+              type: { type: string }
+```
+
+When `/tmp/gh-aw/drive-memory-atomic/` is mounted, the harness:
+
+- copies `sessions/*.jsonl` from the drive into a private session directory, skipping files whose lines are not JSON objects with a string `type`;
+- runs Atomic with `--session-dir` instead of `--no-session`, so the agent can read earlier sessions through `history://`, and workflow-stage transcripts are saved too;
+- after the run, redacts configured MCP header values and built-in token patterns, drops malformed transcripts, keeps the newest sessions up to 32 MiB, and replaces the drive's `sessions/` folder with the result.
+
+Drive memory stages the folder and publishes it only after threat detection accepts the run, so content from a rejected or failed run never reaches the drive. Acceptance does not authenticate the transcripts: later runs still treat restored sessions as untrusted history, and redaction covers only known values and token patterns. Atomic's SQLite workflow journal is not saved, because it cannot be redacted or validated before publication; interrupted workflow runs cannot be resumed in a later run.
+
+Drive memory is a private preview: it requires an enrolled repository and `ubuntu-latest` without a job container. Drive names are branch-aware, and a drive allows one writer at a time, so give each workflow its own `drive-name`. Do not store secrets in the drive.
 
 ## Defining an engine
 
