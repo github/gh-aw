@@ -25,7 +25,7 @@ func PreflightCheckForCreatePR(verbose bool) error {
 
 func requireAutoMergePR(autoMerge, createPR bool) error {
 	if autoMerge && !createPR {
-		return errors.New("--auto-merge requires --pr or --create-pull-request")
+		return errors.New("--auto-merge requires --create-pull-request")
 	}
 	return nil
 }

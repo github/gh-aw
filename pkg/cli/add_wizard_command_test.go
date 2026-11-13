@@ -70,7 +70,7 @@ func TestAddWizardCommandAutoMergeFlag(t *testing.T) {
 	require.NotNil(t, flag)
 	assert.Equal(t, "false", flag.DefValue)
 	assert.False(t, flag.Hidden)
-	assert.Contains(t, flag.Usage, "requires --pr or --create-pull-request")
+	assert.Contains(t, flag.Usage, "requires --create-pull-request")
 	for _, prFlag := range []string{"pr", "create-pull-request"} {
 		flag := cmd.Flags().Lookup(prFlag)
 		require.NotNil(t, flag)
@@ -91,7 +91,7 @@ func TestAddWizardCommandAutoMergeRequiresPR(t *testing.T) {
 			}
 			err := cmd.RunE(cmd, []string{"owner/repo/workflow"})
 			if prFlag == "" {
-				require.ErrorContains(t, err, "--auto-merge requires --pr or --create-pull-request")
+				require.ErrorContains(t, err, "--auto-merge requires --create-pull-request")
 			} else {
 				require.ErrorIs(t, err, engineErr)
 			}
