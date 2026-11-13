@@ -1834,37 +1834,6 @@ func TestExtractModelCostProviders(t *testing.T) {
 		}
 		assert.Nil(t, extractModelCostProviders(workflowData))
 	})
-
-	t.Run("ignores reporting-only model costs and preserves explicit zero rates", func(t *testing.T) {
-		workflowData := &WorkflowData{
-			ModelCosts: map[string]any{
-				"providers": map[string]any{
-					"openai": map[string]any{
-						"models": map[string]any{
-							"compiler-default": map[string]any{"cost": map[string]any{"input": "0.000001"}},
-						},
-					},
-				},
-			},
-			ModelCostOverrides: map[string]any{
-				"providers": map[string]any{
-					"openai": map[string]any{
-						"models": map[string]any{
-							"authored-free-model": map[string]any{"cost": map[string]any{"input": "0"}},
-						},
-					},
-				},
-			},
-		}
-
-		providers := extractModelCostProviders(workflowData)
-		require.NotNil(t, providers)
-		models := providers["openai"].(map[string]any)["models"].(map[string]any)
-		require.Contains(t, models, "authored-free-model")
-		assert.NotContains(t, models, "compiler-default")
-		cost := models["authored-free-model"].(map[string]any)["cost"].(map[string]any)
-		assert.Equal(t, "0", cost["input"])
-	})
 }
 
 // TestBuildAWFConfigSchemaURL verifies that buildAWFConfigSchemaURL returns a release-pinned

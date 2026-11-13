@@ -198,6 +198,15 @@ func TestBuildInitialWorkflowData_KeepsResolvedPricingOutOfOverrides(t *testing.
 	require.True(t, modelCostsHasPricingFor(workflowData.ModelCosts, "openai", "gpt-report-only"))
 	assert.False(t, modelCostsHasPricingFor(workflowData.ModelCostOverrides, "openai", "gpt-report-only"))
 	assert.True(t, modelCostsHasPricingFor(workflowData.ModelCostOverrides, "openai", "authored-free-model"))
+
+	reportingProviders := workflowData.ModelCosts["providers"].(map[string]any)
+	reportingProviders["reporting-only-provider"] = map[string]any{}
+	reportingModels := reportingProviders["openai"].(map[string]any)["models"].(map[string]any)
+	reportingModels["reporting-only-model"] = map[string]any{}
+	overrideProviders := workflowData.ModelCostOverrides["providers"].(map[string]any)
+	assert.NotContains(t, overrideProviders, "reporting-only-provider")
+	overrideModels := overrideProviders["openai"].(map[string]any)["models"].(map[string]any)
+	assert.NotContains(t, overrideModels, "reporting-only-model")
 }
 
 func TestResolveModelPricingIfMissing_AlreadyPresent(t *testing.T) {

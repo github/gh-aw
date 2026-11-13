@@ -253,7 +253,7 @@ func (c *Compiler) buildInitialWorkflowData(
 	mergedModelCosts := mergeModelCostOverlays(importsResult.MergedModelCosts, mainModelCosts)
 	if len(mergedModelCosts) > 0 {
 		workflowData.ModelCostOverrides = mergedModelCosts
-		workflowData.ModelCosts = mergedModelCosts
+		workflowData.ModelCosts = cloneModelCosts(mergedModelCosts)
 	}
 	// Attempt to resolve reporting pricing for the workflow model when it is absent
 	// from the frontmatter overlay and embedded catalog. These resolved defaults go

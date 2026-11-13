@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/ctxutil"
@@ -10,6 +11,33 @@ import (
 )
 
 var compilerModelPricingLog = logger.New("workflow:compiler_model_pricing")
+
+func cloneModelCosts(modelCosts map[string]any) map[string]any {
+	return cloneModelCostsValue(modelCosts).(map[string]any)
+}
+
+func cloneModelCostsValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		cloned := maps.Clone(typed)
+		for key, item := range cloned {
+			cloned[key] = cloneModelCostsValue(item)
+		}
+		return cloned
+	case map[string]string:
+		return maps.Clone(typed)
+	case []any:
+		cloned := slices.Clone(typed)
+		for index, item := range cloned {
+			cloned[index] = cloneModelCostsValue(item)
+		}
+		return cloned
+	case []string:
+		return slices.Clone(typed)
+	default:
+		return value
+	}
+}
 
 // resolveModelPricingIfMissing checks whether the workflow's configured model has pricing
 // in the frontmatter ModelCosts overlay. When pricing is absent it calls
