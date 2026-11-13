@@ -174,6 +174,7 @@
   .fm-out.on rect { stroke: var(--c); filter: drop-shadow(0 0 14px var(--c)); }
   .mra-svg { left: 60px; top: 290px; width: 1800px; height: 566px; }
   .mra-svg .fm-pill text { font-size: 26px; }
+  .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .mra-repo { fill: #0d111799; stroke: #3d444d; stroke-width: 2; }
   .mra-repo-t { fill: #9198a1; font: 600 20px var(--mono); }
   .mra-row { transition: transform .6s cubic-bezier(.2,.9,.2,1); }
@@ -948,6 +949,17 @@
       "M13.405 1.72a.75.75 0 0 1 0 1.06L12.185 4h4.065A3.75 3.75 0 0 1 20 7.75v8.75a.75.75 0 0 1-1.5 0V7.75a2.25 2.25 0 0 0-2.25-2.25h-4.064l1.22 1.22a.75.75 0 0 1-1.061 1.06l-2.5-2.5a.75.75 0 0 1 0-1.06l2.5-2.5a.75.75 0 0 1 1.06 0ZM4.75 7.25A.75.75 0 0 1 5.5 8v8A.75.75 0 0 1 4 16V8a.75.75 0 0 1 .75-.75Z",
     ],
     issue: ["M12 1c6.075 0 11 4.925 11 11s-4.925 11-11 11S1 18.075 1 12 5.925 1 12 1ZM2.5 12a9.5 9.5 0 0 0 9.5 9.5 9.5 9.5 0 0 0 9.5-9.5A9.5 9.5 0 0 0 12 2.5 9.5 9.5 0 0 0 2.5 12Zm9.5 2a2 2 0 1 1-.001-3.999A2 2 0 0 1 12 14Z"],
+    repo: [
+      "M3 2.75A2.75 2.75 0 0 1 5.75 0h14.5a.75.75 0 0 1 .75.75v20.5a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h5.25v-4H6A1.5 1.5 0 0 0 4.5 18v.75c0 .716.43 1.334 1.05 1.605a.75.75 0 0 1-.6 1.374A3.251 3.251 0 0 1 3 18.75ZM19.5 1.5H5.75c-.69 0-1.25.56-1.25 1.25v12.651A2.989 2.989 0 0 1 6 15h13.5Z",
+      "M7 18.25a.25.25 0 0 1 .25-.25h5a.25.25 0 0 1 .25.25v5.01a.25.25 0 0 1-.397.201l-2.206-1.604a.25.25 0 0 0-.294 0L7.397 23.46a.25.25 0 0 1-.397-.2v-5.01Z",
+    ],
+    discussion: [
+      "M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v9.5A1.75 1.75 0 0 1 14.25 14H8.061l-2.574 2.573A1.458 1.458 0 0 1 3 15.543V14H1.75A1.75 1.75 0 0 1 0 12.25v-9.5C0 1.784.784 1 1.75 1ZM1.5 2.75v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Z",
+      "M22.5 8.75a.25.25 0 0 0-.25-.25h-3.5a.75.75 0 0 1 0-1.5h3.5c.966 0 1.75.784 1.75 1.75v9.5A1.75 1.75 0 0 1 22.25 20H21v1.543a1.457 1.457 0 0 1-2.487 1.03L15.939 20H10.75A1.75 1.75 0 0 1 9 18.25v-1.465a.75.75 0 0 1 1.5 0v1.465c0 .138.112.25.25.25h5.5a.75.75 0 0 1 .53.22l2.72 2.72v-2.19a.75.75 0 0 1 .75-.75h2a.25.25 0 0 0 .25-.25v-9.5Z",
+    ],
+    tasklist: [
+      "M3 6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Zm1.5 4.5h4v-4h-4Zm8.25-5a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Zm0 6a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Zm0 6a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Zm-2.97-2.53a.75.75 0 0 1 0 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-2-2a.75.75 0 1 1 1.06-1.06l1.47 1.47 2.97-2.97a.75.75 0 0 1 1.06 0Z",
+    ],
     stopwatch: [
       "M10.25 0h3.5a.75.75 0 0 1 0 1.5h-1v1.278a9.954 9.954 0 0 1 5.636 2.276L19.72 3.72a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.315 1.316A9.959 9.959 0 0 1 22 12.75c0 5.523-4.477 10-10 10s-10-4.477-10-10a9.959 9.959 0 0 1 2.535-6.654L3.22 4.78a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l1.335 1.334a9.958 9.958 0 0 1 5.635-2.276V1.5h-1a.75.75 0 0 1 0-1.5ZM12 21.25a8.5 8.5 0 1 0-.001-17.001A8.5 8.5 0 0 0 12 21.25Z",
     ],
@@ -1143,6 +1155,136 @@
         cap,
         svg
       ),
+    });
+  }
+
+  // Research → Plan → Assign: deep research becomes a plan, the plan becomes assigned tasks
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#rpaAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["e0", "M200 168 V292", "p", ["researches", "the repository"], 222, 222, "start"],
+      ["e1", "M200 372 V500", "p", ["creates", "artifact"], 222, 430, "start"],
+      ["e2", "M238 540 H636", "p", ["discussion"], 400, 524, "middle"],
+      ["e3", "M680 506 V376", "b", ["runs /plan", "on discussion"], 702, 436, "start"],
+      ["e4", "M718 338 H882", "p", ["sub-issues"], 800, 322, "middle"],
+      ["e5", "M920 300 V168", "p", ["picked", "up by"], 942, 222, "start"],
+      ["e6", "M1068 140 H1258", "p", ["dispatches", "tasks to"], 1163, 92, "middle"],
+      ["e7", "M1300 168 V292", "p", ["works on task,", "opens pull request"], 1322, 222, "start"],
+      ["e8", "M1300 372 V500", "b", ["assigns"], 1322, 442, "start"],
+      ["e9", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
+      ["e10", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+    ];
+    // the token's journey: [edge, node lit on arrival]
+    const SEQ = [
+      ["e0", "nRepo"],
+      ["e1", "nDisc"],
+      ["e2", "nDev1"],
+      ["e3", "nIssue"],
+      ["e4", "nTasks"],
+      ["e5", "nMonster"],
+      ["e6", "nCopilot"],
+      ["e7", "nPR"],
+      ["e8", "nDev2"],
+      ["e10", "nCopilot"],
+      ["e9", "nMerge"],
+    ];
+    const LANE = { nRepo: 0, nDisc: 0, nDev1: 1, nIssue: 1, nTasks: 1, nMonster: 1, nCopilot: 2, nPR: 2, nDev2: 2, nMerge: 2 };
+    let g = `<defs><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="rpaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="rpaB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "RESEARCH"],
+      [520, 1140, "PLAN"],
+      [1140, VW, "ASSIGN"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="rpaLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rpa${c === "p" ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += agent("nResearch", 120, 140, 250, "Deep Research") + agent("nMonster", 800, 140, 250, "Issue Monster") + agent("nCopilot", 1300, 140, 236, "Copilot");
+    g += box("nRepo", 200, 332, "repo") + box("nDisc", 200, 540, "discussion") + box("nIssue", 680, 338, "issue") + box("nTasks", 920, 338, "tasklist") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
+    g += dev("nDev1", 680, 540) + dev("nDev2", 1300, 540);
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg rpa-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 2600,
+      CYC = START + SEQ.length * STEP + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("rpaLane" + LANE[nid]).classList.add("on");
+    };
+    slides.push({
+      sound: "loop",
+      palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
+      notes:
+        "Research, plan, assign: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow. A deep research agent studies the repository and writes its findings to a discussion. A developer runs /plan on that discussion to turn it into an issue with sub-issues. Issue Monster picks up the tasks and dispatches them to Copilot, which works on each task and opens a pull request. The pull request is assigned back to the developer, who iterates with Copilot, then reviews and merges. Humans stay in the loop at the plan and at the merge.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          $("nResearch").classList.add("on");
+          $("rpaLane0").classList.add("on");
+          popK = -1;
+        }
+        const k = Math.floor((u - START) / STEP),
+          f = ((u - START) % STEP) / STEP;
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || k >= SEQ.length) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const [eid, nid] = SEQ[k],
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Plan · "), letters("Assign", "l-grad"))), svg),
     });
   }
 
