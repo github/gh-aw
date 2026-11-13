@@ -198,6 +198,10 @@
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
   @keyframes fm-pop { from { transform: scale(.4); } }
+  .ra-flow { left: 60px; top: 340px; width: 880px; height: 512px; }
+  .ra-chart { left: 990px; top: 340px; width: 880px; height: 512px; }
+  .ra-cap-flow { left: 62px; top: 282px; }
+  .ra-cap-chart { left: 992px; top: 282px; }
   .bd-grid { stroke: #ffffff12; stroke-width: 1; }
   .bd-yl { fill: #9198a1; font: 500 18px var(--mono); text-anchor: end; }
   .bd-xl { fill: #9198a1; font: 500 18px var(--mono); text-anchor: middle; }
@@ -1055,7 +1059,7 @@
     };
     // Repo Assist backlog burndown: an approximate, illustrative redraw of open issues
     // (% of the count on adoption day) across F# open-source repositories.
-    const BD = (() => {
+    const makeBurndown = svg => {
       let s = 7;
       const rnd = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
       const D0 = -90,
@@ -1150,106 +1154,118 @@
         if (v >= 8800 && !fx[1]) ((fx[1] = 1), sfx.review());
       };
       return { svgFor, tick, reset: () => (fx = []) };
-    })();
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    const capB = h("b", {}, ""),
-      capS = h("span", {}, "");
-    const cap = h("div", { class: "fm-cap" }, capB, capS);
-    let mode = -1,
-      cyc = -1,
-      picks = [],
-      t0 = 0,
-      lastPh = [];
-    // modes: 0 Repo Assist loop, 1 Repo Assist backlog burndown, 2 Unslopper loop
-    const setMode = m => {
-      mode = m;
-      const L = m === 1 ? { key: "Repo Assist", sub: "backlog burndown", c: LOOPS[0].c } : LOOPS[m ? 1 : 0];
-      if (m === 1) BD.reset();
-      svg.innerHTML = m === 1 ? BD.svgFor() : svgFor(L);
-      svg.style.setProperty("--c", L.c);
-      capB.textContent = L.key;
-      capB.style.color = L.c;
-      capS.textContent = " · " + L.sub;
-      cap.classList.remove("swap");
-      void cap.offsetWidth;
-      cap.classList.add("swap");
     };
-    const at = (id, u) => {
-      const p = svg.querySelector("#" + id),
-        n = p.getTotalLength(),
-        q = p.getPointAtLength(n * Math.min(1, Math.max(0, u)));
-      return q;
+    const newSvg = cls => {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      el.setAttribute("class", cls);
+      el.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      return el;
     };
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const CYCLE = 6200;
-    const step = t => {
-      if (!t0) t0 = t;
-      const e = t - t0,
-        c = Math.floor(e / CYCLE),
-        u = e % CYCLE;
-      const m = Math.floor(c / 2) % 3;
-      if (m !== mode) setMode(m);
-      if (m === 1) return BD.tick((c % 2) * CYCLE + u);
-      if (c !== cyc) {
-        cyc = c;
+    // An animated SCHEDULE → ACT → REVIEW swimlane cycling through the given LOOPS, two cycles each.
+    const makeFlow = (svg, cap, loops) => {
+      const capB = h("b", {}, ""),
+        capS = h("span", {}, "");
+      cap.append(capB, capS);
+      let mode = -1,
+        cyc = -1,
+        picks = [],
+        t0 = 0,
         lastPh = [];
-        const all = [0, 1, 2, 3, 4].sort(() => Math.random() - 0.5);
-        picks = all.slice(0, 2).sort();
-        svg.querySelectorAll(".on").forEach(x => x.classList.remove("on"));
-      }
-      const hand = svg.querySelector("#fmHand"),
-        ang = ((e / 1000) * 120 * Math.PI) / 180;
-      hand.setAttribute("x2", 150 + 20 * Math.sin(ang));
-      hand.setAttribute("y2", 532 - 20 * Math.cos(ang));
-      const dots = svg.querySelectorAll(".fm-dot");
-      svg.querySelector(".fm-sched").classList.toggle("on", u < 1700);
-      picks.forEach((i, k) => {
-        const d = dots[k];
-        let pt = null,
-          blue = false;
-        if (u > 500 && u < 1700) {
-          pt = at(`fmIn${i}`, ease((u - 500) / 1200));
-          svg.querySelector(`#fmIn${i}`).style.opacity = 1;
-        } else if (u >= 1700 && u < 2900) {
-          svg.querySelector(`#fmTask${i}`).classList.add("on");
-          pt = at(`fmOut${i}`, ease((u - 1700) / 1200));
-        } else if (u >= 2900 && u < 4100) {
-          svg.querySelector(`#fmOutI${i}`).classList.add("on");
-          pt = at(`fmRev${i}`, ease((u - 2900) / 1200));
-          blue = true;
-        } else if (u >= 4100 && u < 5600 && k === 0) {
-          svg.querySelector(".fm-maint").classList.add("on");
-          pt = at("fmLoop", ease((u - 4100) / 1500));
-          blue = true;
+      const setMode = m => {
+        mode = m;
+        const L = LOOPS[loops[m]];
+        svg.innerHTML = svgFor(L);
+        svg.style.setProperty("--c", L.c);
+        capB.textContent = L.key;
+        capB.style.color = L.c;
+        capS.textContent = " · " + L.sub;
+        cap.classList.remove("swap");
+        void cap.offsetWidth;
+        cap.classList.add("swap");
+      };
+      const at = (id, u) => {
+        const p = svg.querySelector("#" + id),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * Math.min(1, Math.max(0, u)));
+        return q;
+      };
+      const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+      const CYCLE = 6200;
+      const step = t => {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYCLE),
+          u = e % CYCLE;
+        const m = Math.floor(c / 2) % loops.length;
+        if (m !== mode) setMode(m);
+        if (c !== cyc) {
+          cyc = c;
+          lastPh = [];
+          const all = [0, 1, 2, 3, 4].sort(() => Math.random() - 0.5);
+          picks = all.slice(0, 2).sort();
+          svg.querySelectorAll(".on").forEach(x => x.classList.remove("on"));
         }
-        if (u >= 4100) svg.querySelector(".fm-maint").classList.add("on");
-        if (pt && d.style.opacity !== "1") sfx.pop(i + 2 * k);
-        // a blip each time the dot reaches a box: task, output, maintainer, back to schedule
-        const ph = u < 1700 ? 0 : u < 2900 ? 1 : u < 4100 ? 2 : u < 5600 ? 3 : 4;
-        if (ph > (lastPh[k] ?? ph) && (k === 0 || ph < 3)) ph === 3 ? sfx.review() : sfx.pop(ph * 2 + k + 1);
-        lastPh[k] = ph;
-        d.style.opacity = pt ? 1 : 0;
-        if (pt) {
-          d.setAttribute("cx", pt.x);
-          d.setAttribute("cy", pt.y);
-          d.setAttribute("fill", blue ? "#4493f8" : "#ab7df8");
-        }
-      });
+        const hand = svg.querySelector("#fmHand"),
+          ang = ((e / 1000) * 120 * Math.PI) / 180;
+        hand.setAttribute("x2", 150 + 20 * Math.sin(ang));
+        hand.setAttribute("y2", 532 - 20 * Math.cos(ang));
+        const dots = svg.querySelectorAll(".fm-dot");
+        svg.querySelector(".fm-sched").classList.toggle("on", u < 1700);
+        picks.forEach((i, k) => {
+          const d = dots[k];
+          let pt = null,
+            blue = false;
+          if (u > 500 && u < 1700) {
+            pt = at(`fmIn${i}`, ease((u - 500) / 1200));
+            svg.querySelector(`#fmIn${i}`).style.opacity = 1;
+          } else if (u >= 1700 && u < 2900) {
+            svg.querySelector(`#fmTask${i}`).classList.add("on");
+            pt = at(`fmOut${i}`, ease((u - 1700) / 1200));
+          } else if (u >= 2900 && u < 4100) {
+            svg.querySelector(`#fmOutI${i}`).classList.add("on");
+            pt = at(`fmRev${i}`, ease((u - 2900) / 1200));
+            blue = true;
+          } else if (u >= 4100 && u < 5600 && k === 0) {
+            svg.querySelector(".fm-maint").classList.add("on");
+            pt = at("fmLoop", ease((u - 4100) / 1500));
+            blue = true;
+          }
+          if (u >= 4100) svg.querySelector(".fm-maint").classList.add("on");
+          if (pt && d.style.opacity !== "1") sfx.pop(i + 2 * k);
+          // a blip each time the dot reaches a box: task, output, maintainer, back to schedule
+          const ph = u < 1700 ? 0 : u < 2900 ? 1 : u < 4100 ? 2 : u < 5600 ? 3 : 4;
+          if (ph > (lastPh[k] ?? ph) && (k === 0 || ph < 3)) ph === 3 ? sfx.review() : sfx.pop(ph * 2 + k + 1);
+          lastPh[k] = ph;
+          d.style.opacity = pt ? 1 : 0;
+          if (pt) {
+            d.setAttribute("cx", pt.x);
+            d.setAttribute("cy", pt.y);
+            d.setAttribute("fill", blue ? "#4493f8" : "#ab7df8");
+          }
+        });
+      };
+      return {
+        reset() {
+          t0 = 0;
+          mode = cyc = -1;
+        },
+        step,
+      };
     };
+    const hapCap = h("div", { class: "fm-cap" });
+    const hapSvg = newSvg("fm-svg");
+    const hapFlow = makeFlow(hapSvg, hapCap, [0, 1]);
     slides.push({
       sound: "loop",
       trans: "down",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
-        "Human Agent Processes. Replace recurring manual fixes with reviewed processes. Repo Assist illustrates repository maintenance; the unslopper illustrates continuous cleanup. Each loop is scheduled, the agent picks tasks and proposes labels, comments or pull requests, and a maintainer reviews the result: SCHEDULE → ACT → REVIEW. The Repo Assist backlog burndown chart is an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day: flat before Repo Assist, then burning down after adoption. These are illustrative workflows, not activity attributed to particular people or teams.",
+        "Human Agent Processes. Replace recurring manual fixes with reviewed processes. Repo Assist illustrates repository maintenance; the unslopper illustrates continuous cleanup. Each loop is scheduled, the agent picks tasks and proposes labels, comments or pull requests, and a maintainer reviews the result: SCHEDULE → ACT → REVIEW. These are illustrative workflows, not activity attributed to particular people or teams.",
       enter() {
-        t0 = 0;
-        mode = cyc = -1;
+        hapFlow.reset();
       },
       tick(t) {
-        step(t);
+        hapFlow.step(t);
       },
       el: h(
         "section",
@@ -1261,8 +1277,51 @@
           { class: "fm-shifts" },
           shifts.map(([ic, b, sp, c], i) => h("div", { class: "fm-shift", "--i": i, "--c": c }, h("i", {}, ic), h("b", {}, b), h("span", {}, sp)))
         ),
-        cap,
-        svg
+        hapCap,
+        hapSvg
+      ),
+    });
+
+    // Repo Assist: the maintenance loop next to its backlog burndown
+    resetIndex();
+    const raCap = h("div", { class: "fm-cap ra-cap-flow" });
+    const raSvg = newSvg("fm-svg ra-flow");
+    const raFlow = makeFlow(raSvg, raCap, [0]);
+    const bdSvg = newSvg("fm-svg ra-chart");
+    const bd = makeBurndown(bdSvg);
+    const BD_PERIOD = 15000;
+    let bdT0 = 0,
+      bdRun = -1;
+    slides.push({
+      sound: "loop",
+      trans: "down",
+      palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
+      notes:
+        "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
+      enter() {
+        raFlow.reset();
+        bdT0 = 0;
+        bdRun = -1;
+      },
+      tick(t) {
+        raFlow.step(t);
+        if (!bdT0) bdT0 = t;
+        const run = Math.floor((t - bdT0) / BD_PERIOD);
+        if (run !== bdRun) {
+          bdRun = run;
+          bdSvg.innerHTML = bd.svgFor();
+          bd.reset();
+        }
+        bd.tick((t - bdT0) % BD_PERIOD);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A teammate on every repo"), h("h2", {}, letters("Repo "), letters("Assist", "l-grad"))),
+        raCap,
+        raSvg,
+        h("div", { class: "fm-cap ra-cap-chart" }, h("b", { style: "color:#3fb950" }, "Backlog burndown"), h("span", {}, " · open issues after adoption")),
+        bdSvg
       ),
     });
   }
