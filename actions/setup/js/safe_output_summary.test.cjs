@@ -890,6 +890,25 @@ describe("safe_output_summary", () => {
     expect(summary).toContain("merge-pull-request-decisions.jsonl");
   });
 
+  it("distinguishes an indeterminate merge from a blocked or completed mutation", () => {
+    const summary = generateSafeOutputSummary({
+      type: "merge_pull_request",
+      messageIndex: 1,
+      success: false,
+      result: { merged: null, merge_outcome: "indeterminate", failure_reasons: [{ code: "merge_outcome_indeterminate" }] },
+    });
+    expect(summary).toContain("Merge Pull Request - Indeterminate");
+    expect(summary).toContain("GitHub may have applied the merge");
+    expect(summary).toContain("The merge was not retried");
+    expect(summary).not.toContain("Blocked Gates");
+  });
+
+  it("describes reconciled success without attributing the merge to this run", () => {
+    const summary = generateSafeOutputSummary({ type: "merge_pull_request", messageIndex: 1, success: true, result: { merged: true, reconciled: true } });
+    expect(summary).toContain("Read-only reconciliation confirmed");
+    expect(summary).toContain("does not establish which actor completed it");
+  });
+
   it("renders fixed actionable caution guidance without copying review text", () => {
     const summary = generateSafeOutputSummary({
       type: "merge_pull_request",

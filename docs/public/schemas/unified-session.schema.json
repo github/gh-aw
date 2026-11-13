@@ -1257,7 +1257,8 @@
         "errorCode": { "$ref": "#/definitions/JsonValue" },
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
-        "staged": { "type": "boolean" }
+        "staged": { "type": "boolean" },
+        "merge_outcome": { "type": "string", "const": "indeterminate" }
       },
       "additionalProperties": false
     },
@@ -1275,6 +1276,7 @@
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
+        "merge_outcome": { "type": "string", "const": "indeterminate" },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },
       "additionalProperties": false

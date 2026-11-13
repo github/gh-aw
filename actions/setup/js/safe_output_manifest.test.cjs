@@ -111,6 +111,33 @@ describe("safe_output_manifest", () => {
         expect(JSON.parse(content)).not.toHaveProperty("evidence_truncated");
       });
 
+      it("persists only versioned authorization fingerprints and fixed gate outcomes", () => {
+        const authorization = {
+          policy_version: 1,
+          policy_sha256: "d".repeat(64),
+          required_checks: "passed",
+          independent_approval: "not_required",
+          protected_files: "failed",
+          final_revalidation: "not_evaluated",
+        };
+        writeMergePullRequestDecision({ decision_evidence: { ...identity, authorization: { ...authorization, reviewers: ["private-login"], policy: "private-config" } } }, 0, testManifestFile);
+        const content = fs.readFileSync(testManifestFile, "utf8");
+        expect(JSON.parse(content).decision_evidence.authorization).toEqual(authorization);
+        expect(content).not.toContain("private");
+      });
+
+      it.each([
+        null,
+        [],
+        { policy_version: 2 },
+        { policy_version: 1, policy_sha256: "private-config" },
+        { policy_version: 1, policy_sha256: "d".repeat(64), required_checks: "private-check" },
+        { policy_version: 1, policy_sha256: "d".repeat(64), required_checks: "passed", independent_approval: "passed", protected_files: "passed", final_revalidation: "private-context" },
+      ])("rejects malformed authorization evidence without publishing context: %j", authorization => {
+        expect(() => writeMergePullRequestDecision({ decision_evidence: { authorization } }, 0, testManifestFile)).toThrow("Failed to persist merge pull request decision");
+        expect(fs.existsSync(testManifestFile)).toBe(false);
+      });
+
       it("redacts configured secrets even within valid projected identity", () => {
         process.env.GH_AW_SECRET_NAMES = "AUDIT_TEST";
         process.env.SECRET_AUDIT_TEST = headSHA;

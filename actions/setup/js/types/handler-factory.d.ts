@@ -88,8 +88,10 @@ interface HandlerSuccessResult {
  * Result object returned by message handler function when failed
  */
 interface HandlerErrorResult {
-  /** Indicates the operation failed */
+  /** Indicates processing failed; an indeterminate merge may already have applied. */
   success: false;
+  /** A merge response was lost and read-only reconciliation could not confirm the outcome. Never retry the mutation automatically. */
+  merge_outcome?: "indeterminate";
   /** Error message describing what went wrong */
   error?: string;
   /** True when the handler intentionally skipped/no-oped without applying a mutation */

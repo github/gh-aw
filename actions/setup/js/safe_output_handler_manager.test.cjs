@@ -203,6 +203,36 @@ describe("Safe Output Handler Manager", () => {
     });
 
     describe("merge decision audit", () => {
+      it.each([false, true].flatMap(deferred => [false, true].map(throws => ({ deferred, throws }))))("minimizes raw merge errors (deferred=$deferred, throws=$throws)", async ({ deferred, throws }) => {
+        const privateError = "private-repository-context\n::error::forged-log credential=opaque-value";
+        const handler = vi.fn();
+        if (throws) handler.mockRejectedValue(new Error(privateError));
+        else handler.mockResolvedValue({ success: false, error: privateError, failure_reasons: [{ code: "merge_operation_error", message: privateError }], decision_evidence: { privateError } });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0]).toMatchObject({ success: false, error: "merge_pull_request gate checks failed" });
+        expect(JSON.stringify(result)).not.toContain(privateError);
+        for (const log of [global.core.info, global.core.error, global.core.warning, global.core.debug]) expect(JSON.stringify(log.mock.calls)).not.toContain("private-repository-context");
+        expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
+      it.each([false, true])("preserves indeterminate merge outcomes without leaking error text (deferred=%s)", async deferred => {
+        const handler = vi.fn().mockResolvedValue({
+          success: false,
+          merged: null,
+          merge_outcome: "indeterminate",
+          error: "private raw transport details",
+          failure_reasons: [{ code: "merge_outcome_indeterminate" }],
+        });
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0].result).toMatchObject({ merged: null, merge_outcome: "indeterminate", audit_recorded: true });
+        expect(result.results[0].error).toContain("indeterminate");
+        expect(JSON.stringify(result)).not.toContain("private raw");
+        expect(computeSafeOutputsStatus(result.results)).toMatchObject({ status: "failure", itemsApplied: 0 });
+        expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
       it.each([false, true])("surfaces audit write failures without retrying an executed merge (deferred: %s)", async deferred => {
         const decision = {
           success: true,
@@ -794,6 +824,19 @@ describe("Safe Output Handler Manager", () => {
   });
 
   describe("loadHandlers", () => {
+    it("does not publish raw merge authentication failures during initialization", async () => {
+      const original = global.getOctokit;
+      global.getOctokit = vi.fn().mockRejectedValue(new Error("private-auth-context credential=opaque-value"));
+      try {
+        await loadHandlers({ merge_pull_request: { allowed_base_branches: ["integration"], "github-token": "opaque-value" } });
+        expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("merge_pull_request handler initialization failed"));
+        expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("private-auth-context");
+        expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("opaque-value");
+      } finally {
+        global.getOctokit = original;
+      }
+    });
+
     // These tests are skipped because they require actual handler modules to exist
     // In a real environment, handlers are loaded dynamically via require()
     it.skip("should load handlers for enabled safe output types", async () => {

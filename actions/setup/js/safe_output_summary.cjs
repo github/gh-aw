@@ -319,7 +319,16 @@ function generateSafeOutputSummary(options) {
 
   // Choose emoji and status based on normalized outcome and fallback
   const emoji = isDuplicateDrop ? "⚠️" : isFallback ? "⚠️" : outcomeDisplay.emoji;
-  const status = isDuplicateDrop ? "Duplicate Dropped" : isFallback ? (fallbackType === "pull_request" ? "Fallback Pull Request Created" : "Fallback Issue Created") : outcomeDisplay.status;
+  const status =
+    type === "merge_pull_request" && result?.merge_outcome === "indeterminate"
+      ? "Indeterminate"
+      : isDuplicateDrop
+        ? "Duplicate Dropped"
+        : isFallback
+          ? fallbackType === "pull_request"
+            ? "Fallback Pull Request Created"
+            : "Fallback Issue Created"
+          : outcomeDisplay.status;
 
   // Start building the summary
   let summary = `<details>\n<summary>${emoji} ${displayType} - ${status} (Message ${messageIndex})</summary>\n\n`;
@@ -388,9 +397,14 @@ function generateSafeOutputSummary(options) {
   }
 
   if (type === "merge_pull_request" && result) {
+    if (result.merge_outcome === "indeterminate") {
+      summary += "**Merge outcome: indeterminate.** GitHub may have applied the merge. Read-only reconciliation could not confirm the outcome; inspect the live pull request before any further action. The merge was not retried.\n\n";
+    } else if (result.reconciled === true) {
+      summary += "Read-only reconciliation confirmed that the evaluated head is merged; this does not establish which actor completed it.\n\n";
+    }
     const codes = (result.failure_reasons || []).map(reason => reason.code).filter(code => typeof code === "string" && /^[a-z_]{1,80}$/.test(code));
     if (codes.length > 0) {
-      summary += `**Blocked Gates:** ${codes.map(code => `\`${code}\``).join(", ")}\n\n`;
+      summary += `**${result.merge_outcome === "indeterminate" ? "Outcome Diagnostics" : "Blocked Gates"}:** ${codes.map(code => `\`${code}\``).join(", ")}\n\n`;
     }
     if (codes.includes("manual_review_caution")) {
       summary += "Independently review the detection or protected-files caution and merge through the repository's normal manual process. Approvals or dismissed reviews do not clear this automated-merge veto.\n\n";

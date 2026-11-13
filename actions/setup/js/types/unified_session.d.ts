@@ -414,6 +414,7 @@ export interface SafeOutputData {
   output_id?: string;
   messageIndex?: number;
   staged?: boolean;
+  merge_outcome?: "indeterminate";
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {

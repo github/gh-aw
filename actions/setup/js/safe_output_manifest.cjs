@@ -44,6 +44,7 @@ const MERGE_FAILURE_CODES = new Set([
   "unresolved_review_threads",
   "merge_not_completed",
   "merge_operation_error",
+  "merge_outcome_indeterminate",
 ]);
 
 /** @param {unknown} value @param {(value: any) => boolean} valid @param {string} field */
@@ -56,6 +57,20 @@ function mergeAuditIdentity(value, valid, field) {
 /** @param {unknown} value */
 function isAuditTimestamp(value) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+}
+
+/** @param {any} value */
+function projectMergeAuthorization(value) {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value) || value.policy_version !== 1 || typeof value.policy_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.policy_sha256)) {
+    throw new Error(`${ERR_SYSTEM}: Invalid merge authorization evidence`);
+  }
+  const result = { policy_version: 1, policy_sha256: value.policy_sha256 };
+  for (const gate of ["required_checks", "independent_approval", "protected_files", "final_revalidation"]) {
+    if (!["passed", "failed", "not_required", "not_evaluated"].includes(value[gate])) throw new Error(`${ERR_SYSTEM}: Invalid merge authorization gate`);
+    result[gate] = value[gate];
+  }
+  return result;
 }
 
 /**
@@ -105,7 +120,9 @@ function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath
       run_attempt: mergeAuditIdentity(process.env.GITHUB_RUN_ATTEMPT, isRunIdentity, "run_attempt"),
       messageIndex: mergeAuditIdentity(messageIndex, value => Number.isSafeInteger(value) && value >= 0, "messageIndex"),
       success: result.success === true,
-      merged: result.merged === true,
+      merged: result.merge_outcome === "indeterminate" ? null : result.merged === true,
+      ...(result.merge_outcome === "indeterminate" ? { merge_outcome: "indeterminate" } : {}),
+      ...(result.reconciled === true ? { reconciled: true } : {}),
       staged: result.staged === true,
       already_merged: result.alreadyMerged === true,
       failure_codes: failureReasons.map(reason => reason.code),
@@ -116,6 +133,8 @@ function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath
         base_sha: mergeAuditIdentity(evidence.base_sha, isCommitSHA, "base_sha"),
         evaluated_at: mergeAuditIdentity(evidence.evaluated_at, isAuditTimestamp, "evaluated_at"),
         revalidated_at: mergeAuditIdentity(evidence.revalidated_at, isAuditTimestamp, "revalidated_at"),
+        reconciled_at: mergeAuditIdentity(evidence.reconciled_at, isAuditTimestamp, "reconciled_at"),
+        authorization: projectMergeAuthorization(evidence.authorization),
         check_producer_rejections: producerRejections.length > 0 ? producerRejections : undefined,
       },
     };
