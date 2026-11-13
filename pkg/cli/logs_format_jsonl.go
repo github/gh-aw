@@ -122,12 +122,14 @@ func emitLogsDownloadProgress(ctx context.Context, result DownloadResult) {
 		Type: "progress", Stage: "downloaded", RunID: result.Run.DatabaseID,
 		Repository: result.Run.Repository, Cached: result.Cached,
 	}
-	if result.Skipped {
+	switch {
+	case result.Skipped && (errors.Is(result.Error, context.Canceled) || errors.Is(result.Error, context.DeadlineExceeded)):
 		event.Stage = "skipped"
-	}
-	if result.Error != nil {
+	case result.Error != nil:
 		event.Stage = "failed"
 		event.Message = result.Error.Error()
+	case result.Skipped:
+		event.Stage = "skipped"
 	}
 	logsJSONLFromContext(ctx).emit(event)
 }

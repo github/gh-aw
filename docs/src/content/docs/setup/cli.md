@@ -832,7 +832,7 @@ with workflow-call-prefixed and historical agent artifacts supported.
 | `complete` | Collection and finalization succeeded. The summary can still describe partial collection due to count, timeout, or resource limits. |
 | `error` | `message`: collection or finalization failed; the command exits unsuccessfully. |
 
-Events are written without output buffering. Concurrent targets can interleave events; within each target, accepted runs preserve discovery order. Human diagnostics remain on stderr, so consumers should parse stdout without merging streams. Empty results still emit a summary and terminal event. Use `-v` for full run/report fields, as with `--json`. `--format jsonl` cannot be combined with `--json` or `--report-file`. Argument-validation errors occur before streaming starts; interrupted processes or broken output pipes may not emit a terminal event.
+Events are written without output buffering. Concurrent targets can interleave events; within each target, accepted runs preserve discovery order. Human diagnostics remain on stderr, so consumers should parse stdout without merging streams. Successful collections with empty results still emit a summary and `complete` event. Failed collections emit an `error` event and may omit the summary, including when every workflow target fails. Use `-v` for full run/report fields, as with `--json`. `--format jsonl` cannot be combined with `--json` or `--report-file`. Argument-validation errors occur before streaming starts; interrupted processes or broken output pipes may not emit a terminal event.
 
 ```bash
 gh aw logs --format jsonl | jq --unbuffered 'select(.type == "run") | .run'

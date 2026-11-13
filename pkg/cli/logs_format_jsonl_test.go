@@ -203,6 +203,53 @@ func TestLogsJSONLConcurrentProgressAndCachedRun(t *testing.T) {
 	assert.Equal(t, int64(42), events[20].Run.RunID)
 }
 
+func TestLogsJSONLDownloadProgressStages(t *testing.T) {
+	originalProcess := processConcurrentRunDownload
+	t.Cleanup(func() { processConcurrentRunDownload = originalProcess })
+	processConcurrentRunDownload = func(context.Context, WorkflowRun, concurrentRunDownloadParams, *atomic.Int64, *console.ProgressBar) (DownloadResult, error) {
+		panic("download failed")
+	}
+	run := WorkflowRun{DatabaseID: 42, Repository: "owner/repo"}
+	panicked := executeConcurrentRunDownload(context.Background(), run, concurrentRunDownloadParams{}, nil, nil)
+	require.True(t, panicked.Skipped)
+	require.ErrorContains(t, panicked.Error, "run download panicked")
+
+	for _, tt := range []struct {
+		name    string
+		result  DownloadResult
+		stage   string
+		message string
+	}{
+		{name: "canceled", result: canceledDownloadResult(run, context.Canceled), stage: "skipped"},
+		{name: "deadline exceeded", result: canceledDownloadResult(run, context.DeadlineExceeded), stage: "skipped"},
+		{name: "wrapped cancellation", result: canceledDownloadResult(run, errors.Join(errors.New("download interrupted"), context.Canceled)), stage: "skipped"},
+		{name: "panicked", result: panicked, stage: "failed", message: panicked.Error.Error()},
+		{name: "skipped", result: DownloadResult{RunAnalysis: RunAnalysis{Run: run}, Skipped: true}, stage: "skipped"},
+		{
+			name: "error without skipped flag",
+			result: DownloadResult{
+				RunAnalysis: RunAnalysis{Run: run},
+				Error:       context.Canceled,
+			},
+			stage: "failed", message: context.Canceled.Error(),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			stream := newLogsJSONLStream(&output, false)
+			ctx := context.WithValue(context.Background(), logsJSONLContextKey{}, stream)
+			emitLogsDownloadProgress(ctx, tt.result)
+			events := decodeLogsJSONLEvents(t, output.String())
+			require.Len(t, events, 1)
+			assert.Equal(t, "progress", events[0].Type)
+			assert.Equal(t, tt.stage, events[0].Stage)
+			assert.Equal(t, tt.message, events[0].Message)
+			assert.Equal(t, run.DatabaseID, events[0].RunID)
+			assert.Equal(t, run.Repository, events[0].Repository)
+		})
+	}
+}
+
 func TestLogsJSONLSummaryAndTerminalEvents(t *testing.T) {
 	t.Parallel()
 	for _, verbose := range []bool{false, true} {
