@@ -2,7 +2,9 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"regexp"
@@ -26,6 +28,21 @@ type CopilotModelRoutingConfig struct {
 	// requested is the router value (for example router/economy) that selected
 	// routing through the main agent's model, or "" for engine.model-routing.
 	requested string
+}
+
+func decodeModelRoutingJSONDocument(raw string, value any) error {
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return errors.New("unexpected trailing JSON value")
+		}
+		return err
+	}
+	return nil
 }
 
 func isModelRoutingEnabled(data *WorkflowData) bool {
@@ -205,7 +222,7 @@ func modelRoutingOverrideWarning(data *WorkflowData) string {
 					DefaultThinkingLevel string `json:"defaultThinkingLevel"`
 				} `json:"settings"`
 			}
-			if json.Unmarshal([]byte(data.EngineConfig.Config), &config) == nil && config.Settings.DefaultThinkingLevel != "" {
+			if decodeModelRoutingJSONDocument(data.EngineConfig.Config, &config) == nil && config.Settings.DefaultThinkingLevel != "" {
 				warnings = append(warnings, "engine.config.settings.defaultThinkingLevel")
 			}
 		}

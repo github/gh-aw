@@ -15,7 +15,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -182,7 +181,7 @@ func declaresModelOrRoutingChoice(frontmatter map[string]any, model string, engi
 	}
 	for _, spec := range engineSpecs {
 		var engine any
-		if err := json.Unmarshal([]byte(spec), &engine); err != nil {
+		if err := decodeModelRoutingJSONDocument(spec, &engine); err != nil {
 			return true
 		}
 		if engineObj, ok := engine.(map[string]any); ok && engineObjectDeclaresModelChoice(engineObj) {
@@ -319,6 +318,13 @@ func defaultModelRoutingIneligibility(data *WorkflowData) string {
 	if envMayChooseModel(config.Env) {
 		return "engine.env may choose a model or inference target"
 	}
+	if reason := defaultModelRoutingExecutionIneligibility(data); reason != "" {
+		return reason
+	}
+	return ""
+}
+
+func defaultModelRoutingExecutionIneligibility(data *WorkflowData) string {
 	if data.TokenBrokerCopilotRequest || data.TokenBrokerEnabled || enclavesEnabled(data) {
 		return "custom inference credentials or enclaves"
 	}
@@ -382,8 +388,9 @@ func jobEnvironmentName(section string) string {
 	case string:
 		return environment
 	case map[string]any:
-		name, _ := environment["name"].(string)
-		return name
+		if name, ok := environment["name"].(string); ok {
+			return name
+		}
 	}
 	return ""
 }

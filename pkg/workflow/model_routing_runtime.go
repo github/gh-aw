@@ -26,9 +26,14 @@ import (
 // modelRoutingBackendParityURL tracks AWF model-routing support for other runtimes.
 const modelRoutingBackendParityURL = "https://github.com/github/gh-aw-firewall/issues/10335"
 
+const (
+	modelRoutingDockerVarRunSocketPath = "/var/run/docker.sock"
+	modelRoutingDockerRunSocketPath    = "/run/docker.sock"
+)
+
 // modelRoutingDockerSocketPaths are the host Docker socket paths AWF checks for
 // agent exposure.
-var modelRoutingDockerSocketPaths = []string{"/var/run/docker.sock", "/run/docker.sock"}
+var modelRoutingDockerSocketPaths = []string{modelRoutingDockerVarRunSocketPath, modelRoutingDockerRunSocketPath}
 
 // githubHostedMacOSLabelPattern matches GitHub-hosted macOS runner labels.
 var githubHostedMacOSLabelPattern = regexp.MustCompile(`^macos-(latest|\d+)(-(large|xlarge|intel|arm64))?$`)
@@ -144,12 +149,12 @@ func modelRoutingDockerSocketExposingMount(data *WorkflowData, agentConfig *Agen
 		return ""
 	}
 	for _, mount := range agentConfig.Mounts {
-		parts := strings.Split(mount, ":")
-		if len(parts) < 2 || strings.Contains(mount, "${") || !path.IsAbs(parts[0]) || !path.IsAbs(parts[1]) {
+		source, remainder, hasTarget := strings.Cut(mount, ":")
+		target, _, _ := strings.Cut(remainder, ":")
+		if !hasTarget || strings.Contains(mount, "${") || !path.IsAbs(source) || !path.IsAbs(target) {
 			continue
 		}
-		source := path.Clean(parts[0])
-		target := parts[1]
+		source = path.Clean(source)
 		for _, socket := range modelRoutingDockerSocketPaths {
 			if mountPathsOverlap(source, socket) && !isMaskedDockerSocketMount(source, target, socket) {
 				return mount
