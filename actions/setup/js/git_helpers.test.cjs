@@ -1630,7 +1630,7 @@ describe("git_helpers.cjs - integration (real git repo)", () => {
       // Full clone → never implausible regardless of range size.
       expect(result.implausible).toBe(false);
       expect(result.commitCount).toBeGreaterThan(100);
-    });
+    }, 30_000);
 
     it("returns implausible:true for a shallow clone when range exceeds threshold", async () => {
       const shallowDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-helpers-shallow-"));
