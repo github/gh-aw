@@ -309,7 +309,7 @@ func getMCPCLIExcludeFromAgentConfig(data *WorkflowData) []string {
 	return getMCPCLIServerNames(data)
 }
 
-// generateMCPCLIMountStep generates the "Mount MCP servers as CLIs" workflow step.
+// generateMCPCLIMountStep generates the "Mount MCP Servers as CLIs" workflow step.
 // This step runs after the MCP gateway is started and creates executable CLI wrapper
 // scripts for each MCP server in a read-only directory on $PATH.
 func (c *Compiler) generateMCPCLIMountStep(yaml *strings.Builder, data *WorkflowData) {
@@ -319,7 +319,7 @@ func (c *Compiler) generateMCPCLIMountStep(yaml *strings.Builder, data *Workflow
 	}
 	mcpCLIMountLog.Printf("Generating MCP CLI mount step for %d servers: %v", len(servers), servers)
 
-	yaml.WriteString("      - name: Mount MCP servers as CLIs\n")
+	yaml.WriteString("      - name: Mount MCP Servers as CLIs\n")
 	yaml.WriteString("        id: mount-mcp-clis\n")
 	yaml.WriteString("        continue-on-error: true\n")
 	yaml.WriteString("        env:\n")

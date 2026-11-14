@@ -343,9 +343,9 @@ This workflow tests the agentic output collection functionality.
 		t.Error("Upload sanitized agent output should be removed (merged into unified agent artifact)")
 	}
 
-	// Instead, verify that the Copy Safe Outputs step is present
-	if !strings.Contains(lockContent, "- name: Copy Safe Outputs") {
-		t.Error("Expected 'Copy Safe Outputs' step to be in generated workflow")
+	// Instead, verify that the raw safe-output NDJSON is copied to the agent artifact.
+	if !strings.Contains(lockContent, "- name: Copy raw safe-output NDJSON to /tmp/gh-aw") {
+		t.Error("Expected raw safe-output NDJSON collection step in generated workflow")
 	}
 
 	// Verify job output declaration for GH_AW_SAFE_OUTPUTS
@@ -473,9 +473,9 @@ This workflow tests that Codex engine gets GH_AW_SAFE_OUTPUTS but not engine out
 		t.Error("Upload sanitized agent output should be removed (merged into unified agent artifact)")
 	}
 
-	// The Copy Safe Outputs step should be present instead
-	if !strings.Contains(lockContent, "- name: Copy Safe Outputs") {
-		t.Error("Codex workflow should have 'Copy Safe Outputs' step (GH_AW_SAFE_OUTPUTS functionality)")
+	// The raw safe-output NDJSON collection step should be present instead
+	if !strings.Contains(lockContent, "- name: Copy raw safe-output NDJSON to /tmp/gh-aw") {
+		t.Error("Codex workflow should have the raw safe-output NDJSON collection step (GH_AW_SAFE_OUTPUTS functionality)")
 	}
 
 	if !strings.Contains(lockContent, "GH_AW_SAFE_OUTPUTS") {

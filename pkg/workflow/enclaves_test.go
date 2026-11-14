@@ -798,7 +798,7 @@ Use the enclave script executor.
 	assert.Contains(t, lock, `"awf-enclave"`)
 	assert.NotContains(t, lock, `"required": false`)
 	assert.Contains(t, lock, "--exclude-env MCP_GATEWAY_AGENT_ID")
-	if mountStart := strings.Index(lock, "- name: Mount MCP servers as CLIs"); mountStart >= 0 {
+	if mountStart := strings.Index(lock, "- name: Mount MCP Servers as CLIs"); mountStart >= 0 {
 		mountEnd := strings.Index(lock[mountStart:], "\n      - name:")
 		require.Positive(t, mountEnd)
 		assert.NotContains(t, lock[mountStart:mountStart+mountEnd], "steps.start-mcp-gateway.outputs.gateway-agent-id")

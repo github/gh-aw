@@ -1044,7 +1044,7 @@ jobs:
             }
           }
           GH_AW_MCP_CONFIG_e9f853f8279889ed_EOF
-      - name: Mount MCP servers as CLIs
+      - name: Mount MCP Servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true
         env:
@@ -1295,7 +1295,7 @@ jobs:
       - name: Append agent step summary
         if: always() && steps.redact_secrets.outcome == 'success'
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
-      - name: Copy Safe Outputs
+      - name: Copy raw safe-output NDJSON to /tmp/gh-aw
         if: always()
         env:
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
@@ -2083,7 +2083,7 @@ jobs:
         continue-on-error: true
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh" v0.5.3 --artifact-base-url https://github.com/github/gh-aw-threat-detection/releases/download --sha256-amd64 7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009 --sha256-arm64 6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6
-      - name: Execute threat detection with AWF
+      - name: Execute Threat Detection with AWF
         id: detection_agentic_execution
         if: always() && steps.detection_guard.outputs.run_detection == 'true' && steps.detection_setup.outcome == 'success' && steps.detection_setup.outputs.ready == 'true' && steps.threat_detect_install.outcome == 'success' && steps.detection_awf_install.outcome == 'success'
         continue-on-error: true
