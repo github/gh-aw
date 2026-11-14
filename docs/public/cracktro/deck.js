@@ -1291,7 +1291,6 @@
   .dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
     transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
   .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
-  .dots button.kept { background: #ffffff90; }
   .dots button.on { width: 24px; background: #f0f6fc; box-shadow: none; }
   /* --- band header --- */
   .bh-head { position: absolute; left: 140px; top: 170px; width: 960px; }
@@ -12311,7 +12310,9 @@
 
   // ---------- navigation ----------
   let cur = -1,
-    redT = null;
+    redT = null,
+    goal = 0,
+    vertical = false;
   // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
   function go(n) {
     n = Math.max(0, Math.min(slides.length - 1, n));
@@ -12359,11 +12360,11 @@
     void el.offsetWidth; // restart CSS animations on re-entry
     el.classList.add("active");
     cur = n;
-    kept[slides[n].band] = n;
+    if (!vertical) goal = n - rows[slides[n].band].start;
+    vertical = false;
     slides[n].enter?.(dir);
     progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
     dotBtns.forEach((d, i) => d.classList.toggle("on", i === n));
-    dotBtns.forEach((d, i) => d.classList.toggle("kept", kept.includes(i) && !slides[i].header));
     [...dots.children].forEach((r, i) => r.classList.toggle("on", i === slides[n].band));
     prevBtn.disabled = n === 0;
     nextBtn.disabled = n === slides.length - 1;
@@ -12371,11 +12372,15 @@
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
   }
-  // up/down jump to the neighbouring band, landing on the slide last shown there (its header the first time)
-  const kept = rows.map(r => r.start);
+  // The grid behaves like a text file: bands are lines and slides are characters.
+  // Left/right move one slide and wrap across lines; up/down keep a sticky goal column, clamped to the line's length.
   const band = d => {
     const b = slides[cur].band + d;
-    if (b >= 0 && b < rows.length) go(kept[b]);
+    if (b < 0 || b >= rows.length) return;
+    const end = (rows[b + 1]?.start ?? slides.length) - 1;
+    vertical = true;
+    go(Math.min(rows[b].start + goal, end));
+    vertical = false;
   };
   const next = () => {
       if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
@@ -12431,8 +12436,15 @@
   // ---------- animated background ----------
   const ctx = canvas.getContext("2d");
   const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
-  const BLUEPRINT = ["#0b3d91", "#123a73", "#06204a", "#1a4f9c"];
-  let bp = 0;
+  // Per-band backgrounds: base fill, glow palette, grid rgb + minor/major alpha, grid angle.
+  const INK = { base: [13, 17, 23], grid: [240, 246, 252, 0.028, 0.07], ang: 0 };
+  const BG = {
+    // Human agent processes: dark blueprint blue, straight grid.
+    process: { base: [6, 19, 40], pal: ["#0b3d91", "#123a73", "#06204a", "#1a4f9c"], grid: [150, 205, 255, 0.05, 0.12], ang: 0 },
+    // Cost & context: the usual gray, gold grid lines turned 45° to the left (the inverse of the security wash).
+    cost: { base: INK.base, grid: [227, 179, 65, 0.05, 0.13], ang: -Math.PI / 4 },
+  };
+  let bgv = [...INK.base, ...INK.grid];
   let colors = slides[0].palette.map(hex),
     gAng = 0;
   const blobs = [0, 1, 2, 3].map(i => ({ a: Math.random() * 6.28, b: Math.random() * 6.28, s: 0.00007 + i * 0.00003 }));
@@ -12455,14 +12467,14 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const cs = slides[cur] || slides[0],
-      isBp = cs.group === "process",
-      target = (isBp ? BLUEPRINT : cs.palette).map(hex);
-    bp = REDUCED ? +isBp : bp + (+isBp - bp) * 0.04;
+      th = BG[cs.group] || INK,
+      target = (th.pal || cs.palette).map(hex),
+      bgt = [...th.base, ...th.grid];
+    bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * 0.04);
     colors = REDUCED ? target : colors.map((c, i) => c.map((v, k) => v + (target[i][k] - v) * 0.03));
 
     ctx.globalCompositeOperation = "source-over";
-    // Blueprint band (Human agent processes): the base eases from ink to blueprint blue.
-    ctx.fillStyle = `rgb(${13 + (6 - 13) * bp | 0},${17 + (19 - 17) * bp | 0},${23 + (40 - 23) * bp | 0})`;
+    ctx.fillStyle = `rgb(${bgv[0] | 0},${bgv[1] | 0},${bgv[2] | 0})`;
     ctx.fillRect(0, 0, cw, ch);
     ctx.globalCompositeOperation = "lighter";
     const R = Math.max(cw, ch) * 0.55,
@@ -12479,7 +12491,7 @@
     });
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red security wash is up.
+    // It turns to 45° (around the screen centre) while the red security wash is up, or on a band whose theme sets `ang`.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -12487,7 +12499,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") && !isBp ? Math.PI / 4 : 0;
+    const gTarget = BG[cs.group] ? th.ang : wash.classList.contains("on") ? Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),
@@ -12495,11 +12507,9 @@
       D = Math.hypot(cw, ch) / 2 + minor;
     g.translate(cw / 2, ch / 2);
     g.rotate(gAng);
-    const gr = 240 + (150 - 240) * bp | 0,
-      gg = 246 + (205 - 246) * bp | 0,
-      gb = 252 + (255 - 252) * bp | 0,
-      lmin = `rgba(${gr},${gg},${gb},${0.028 + 0.022 * bp})`,
-      lmaj = `rgba(${gr},${gg},${gb},${0.07 + 0.05 * bp})`;
+    const gc = `${bgv[3] | 0},${bgv[4] | 0},${bgv[5] | 0}`,
+      lmin = `rgba(${gc},${bgv[6]})`,
+      lmaj = `rgba(${gc},${bgv[7]})`;
     const line = i => (((i % 5) + 5) % 5 ? lmin : lmaj);
     const snap = gAng ? v => v : v => Math.round(v);
     for (let i = -Math.ceil(D / minor); i * minor <= D; i++) {
