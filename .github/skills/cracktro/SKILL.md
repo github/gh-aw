@@ -5,7 +5,7 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 # Cracktro talk deck
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a nineteen-slide deck with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a twenty-slide deck with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
@@ -13,7 +13,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a ni
 - `docs/public/cracktro/deck.js`: about 200 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of nineteen slide headings, so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of twenty slide headings, so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -24,7 +24,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a ni
 | `---------- helpers ----------` | `h(tag, attrs, ...kids)` creates DOM; `letters(text, cls)` builds per-letter headings with classes like `l-grad` and `l-out`; `resetIndex()`. |
 | `---------- slides ----------` | One `{ ... slides.push({...}) }` block per slide, each preceded by a `// Title: summary` comment. |
 | `const OCTI` | Octicon path map (calendar, issue, pr, merge, person, copilot, ...) used by `ico(name,x,y,size,fill)`. |
-| `---------- sound:` | WebAudio synth `sfx`: `slide, step, cut, techno, pop, key, compile, review, notify, omen, route, toggle, unlock`. `THEMES` holds the per-slide melodies. |
+| `---------- sound:` | WebAudio synth `sfx`: `slide, step, cut, techno, pop, key, compile, review, notify, omen, route, mr, toggle, unlock`. `THEMES` holds the per-slide melodies. |
 | `---------- navigation ----------` | `go()`, `show(n, horiz)`, keys, dots, notes, hash. |
 | `---------- animated background ----------` | Canvas background tinted by the slide's `palette`. |
 
@@ -65,8 +65,9 @@ slides.push({
 
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
+- Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 2, 3, 5, 7, 8, and 10–19 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 2, 3, 5, 7, 8, and 10–20 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop
