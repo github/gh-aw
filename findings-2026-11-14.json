@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-14",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/fork-support.md",
+      "docs/src/content/docs/blog/2026-11-06-agent-of-the-day.md",
+      "docs/src/content/docs/blog/2026-10-26-weekly-update.md"
+    ],
+    "cli": [
+      "gh aw (root help, cmd/gh-aw/main.go)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/smoke-agent-public-none.md",
+      ".github/workflows/smoke-copilot-aoai-entra.md"
+    ],
+    "validation": [
+      "pkg/workflow/memory_validation_config_test.go",
+      "pkg/workflow/mcp_scripts_dependencies_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "fork-support.md: forks author-association values match the main_workflow_schema.json enum",
+    "gh aw run help: realistic Examples block covering --ref, --repeat, --raw-field",
+    "memory_validation_config.go: error messages consistently include an Example hint",
+    "agent-of-the-day blog: run table and audit findings are concrete and linked"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
+      "priority": "high",
+      "issue": "newInvalidDependencyNameError (lines 152-157) hardcodes 'Example: dependencies: [requests]' and 'inferred package manager' for npm, go, and shell tools. Six call sites (lines 77, 82, 94, 111, 121, 128). Pass manager and example per call site, matching newUnpinnedDependencyError."
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-10-26-weekly-update.md",
+      "priority": "medium",
+      "issue": "Line 3 description says 'Five releases (v0.93.0-v0.93.5)'; body line 11 says six for the same range (v0.93.0 through v0.93.5 inclusive is six). Change description to 'Six releases'."
+    },
+    {
+      "file": "docs/src/content/docs/reference/fork-support.md",
+      "priority": "medium",
+      "issue": "'Running workflows in a fork' says all jobs skip via a compile-injected !github.event.repository.fork guard. In source that guard is applied only to maintenance jobs (maintenance_conditions.go) and absent from the smoke-copilot golden. Needs maintainer confirmation before editing."
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "high",
+      "issue": "Root 'Common Tasks' rows (lines 94-102) pad with tabs; the doctor row's '#' lands at column 48 while others land at column 40. Carried over from 2026-11-11."
+    },
+    {
+      "file": "cmd/gh-aw/main.go",
+      "priority": "medium",
+      "issue": "Compile help 'Unlike gh aw upgrade...' sentence (line 265) sits inside the action-mode section. Carried over from 2026-11-12."
+    }
+  ]
+}

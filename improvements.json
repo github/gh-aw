@@ -1,6 +1,12 @@
 {
-  "last_updated": "2026-11-13",
+  "last_updated": "2026-11-14",
   "pending_tasks": [
+    {
+      "file": "docs/src/content/docs/reference/fork-support.md",
+      "created": "2026-11-14",
+      "status": "pending",
+      "issue": "'Running workflows in a fork' claims all jobs skip via a compile-injected !github.event.repository.fork guard; source applies that guard only to maintenance jobs (maintenance_conditions.go). Confirm with maintainers before editing."
+    },
     {
       "file": "docs/src/content/docs/blog/2026-10-26-weekly-update.md",
       "created": "2026-11-13",
