@@ -388,7 +388,7 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 	// Merge each imported config
 	for _, config := range importedConfigs {
 		var err error
-		result, err = mergeSafeOutputConfig(result, config, explicitSafeOutputs, c)
+		result, err = mergeSafeOutputConfig(result, config, explicitSafeOutputs, topRawSafeOutputs, c)
 		if err != nil {
 			return nil, err
 		}
@@ -505,7 +505,7 @@ func preserveImportedSystemHandlers(config map[string]any) map[string]any {
 // mergeSafeOutputConfig merges a single imported config map into the result SafeOutputsConfig
 //
 //nolint:largefunc // Existing meta-field merge flow remains centralized for consistent import semantics.
-func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutputs map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
+func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutputs, topRawSafeOutputs map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
 	config = normalizeMissingReportKeys(config)
 	config = preserveImportedSystemHandlers(config)
 	explicitSafeOutputs = normalizeMissingReportKeys(explicitSafeOutputs)
