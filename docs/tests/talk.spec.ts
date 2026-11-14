@@ -29,6 +29,7 @@ test("presents the twenty-three slides without the removed sections", async ({ p
     "Research · Assign · Observe",
     "Mine · Refine · Apply",
     "Scan · Fix · Learn",
+    "Audit & Optimize",
     "Cost management",
     "Model routing",
     "Any agent, any provider",
