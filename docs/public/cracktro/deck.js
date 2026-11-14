@@ -460,6 +460,65 @@
   .notes { position: fixed; left: 24px; right: 24px; bottom: 50px; max-width: 900px; margin: 0 auto; padding: 18px 22px;
     background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
   .notes.on { display: block; }
+
+  /* --- any engine --- */
+  .ae .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--ec, #3fb950), #f0f6fc, var(--ec, #3fb950)); }
+  .ae-ed { position: absolute; left: 110px; top: 330px; width: 760px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .ae-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .ae-tab { display: flex; align-items: center; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; }
+  .ae-tab span { margin-left: auto; color: #656c76; font-size: 16px; letter-spacing: .1em; }
+  .ae-code { padding: 14px 0 18px; font: 500 24px/36px var(--mono); }
+  .ae-row { display: flex; white-space: pre; }
+  .ae-row .no { width: 74px; padding-right: 26px; text-align: right; color: #656c76; flex: none; }
+  .ae-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--ec) 22%, transparent), transparent 80%); }
+  .ae-val { color: var(--ec); text-shadow: 0 0 18px var(--ec); }
+  .ae-caret { display: inline-block; width: 3px; height: 28px; margin-left: 2px; vertical-align: -5px; background: #f0f6fc; animation: ae-blink 1s steps(1) infinite; }
+  @keyframes ae-blink { 50% { opacity: 0; } }
+  .ae-arrow { position: absolute; left: 892px; top: 560px; width: 150px; text-align: center; font: 500 17px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .ae-arrow svg { display: block; width: 150px; height: 40px; margin-top: 12px; overflow: visible; }
+  .ae-arrow path { fill: none; stroke: #9198a1; stroke-width: 3; stroke-dasharray: 10 8; animation: ae-flow 0.8s linear infinite; }
+  @keyframes ae-flow { to { stroke-dashoffset: -18; } }
+  .active .ae-arrow { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .7s; }
+  .ae-provs { position: absolute; left: 1066px; top: 290px; width: 744px; display: flex; justify-content: space-between; opacity: 0; }
+  .active .ae-provs { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
+  .ae-prov { display: flex; align-items: center; gap: 14px; width: 228px; height: 80px; padding: 14px 18px; border-radius: 16px; background: #161b22; border: 2px solid #3d444d; opacity: .5; transition: all .4s; }
+  .ae-prov b { display: block; font: 700 25px/1 "Mona Sans"; color: #f0f6fc; }
+  .ae-prov span { display: block; white-space: nowrap; margin-top: 8px; font: 500 15px/1 var(--mono); color: #9198a1; }
+  .ae-prov.on { opacity: 1; border-color: var(--c); box-shadow: 0 0 44px -6px var(--c), inset 0 0 30px -14px var(--c); }
+  .ae-prov.on b { color: var(--c); }
+  .ae-logo { display: grid; place-items: center; flex: none; }
+  .ae-logo svg { width: 100%; height: 100%; }
+  .ae-prov .ae-logo { width: 40px; height: 40px; color: #f0f6fc; }
+  .ae-prov.on .ae-logo { color: var(--c); }
+  .ae-mono .ae-logo { width: 54px; height: 54px; }
+  .ae-pick b .ae-logo { width: 22px; height: 22px; }
+  .ae-toks { position: absolute; left: 1066px; top: 290px; width: 744px; height: 640px; pointer-events: none; }
+  .ae-tokn { display: block; margin-top: 8px; font: normal 600 15px/1 var(--mono); color: var(--ec); white-space: nowrap; }
+  .ae-run { position: absolute; left: 1066px; top: 410px; width: 744px; height: 490px; opacity: 0; }
+  .active .ae-run { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .ae-ring { position: absolute; border-radius: 26px; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 7%, transparent); }
+  .ae-ring > b { position: absolute; left: 22px; top: 14px; font: 600 17px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
+  .ae-ring > i { position: absolute; right: 22px; top: 12px; font: normal 600 15px/1 var(--mono); color: #3fb950; letter-spacing: .08em; }
+  .ae-core { position: absolute; left: 50%; top: 50%; width: 320px; height: 150px; margin: -50px 0 0 -160px; border-radius: 22px; background: #0d1117; border: 3px solid var(--ec);
+    box-shadow: 0 0 var(--gl, 60px) -6px var(--ec), inset 0 0 40px -18px var(--ec); display: grid; grid-template-columns: 88px 1fr; align-items: center; gap: 20px; padding: 0 28px;
+    transition: border-color .4s, box-shadow .4s; }
+  .ae-core.swap { animation: ae-swap .55s cubic-bezier(.3,1.5,.4,1); }
+  @keyframes ae-swap { 0% { transform: rotateX(0); } 45% { transform: rotateX(90deg) scale(.92); } 100% { transform: none; } }
+  .ae-mono { display: grid; place-items: center; width: 88px; height: 88px; border-radius: 22px; background: var(--ec); color: #0d1117; font: 800 50px/1 "Mona Sans"; transition: background .4s; }
+  .ae-core small { display: block; font: 500 16px/1 var(--mono); color: #9198a1; letter-spacing: .12em; text-transform: uppercase; }
+  .ae-core strong { display: block; margin-top: 8px; font: 700 40px/1 "Mona Sans"; color: #f0f6fc; }
+  .ae-picks { position: absolute; left: 110px; top: 930px; display: flex; gap: 18px; opacity: 0; }
+  .active .ae-picks { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .9s; }
+  .ae-pick { display: flex; align-items: center; gap: 12px; height: 54px; padding: 0 24px 0 8px; border-radius: 99px; border: 2px solid #3d444d; background: #161b22;
+    font: 600 22px/1 var(--mono); color: #9198a1; transition: all .4s; }
+  .ae-pick b { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 99px; background: #3d444d; color: #0d1117; font: 800 20px/1 "Mona Sans"; transition: background .4s; }
+  .ae-pick.on { color: #f0f6fc; border-color: var(--ec); box-shadow: 0 0 30px -6px var(--ec); }
+  .ae-pick b { color: #9198a1; }
+  .ae-pick.on b { background: var(--ec); color: #0d1117; }
+  .ae-tag { position: absolute; left: 1000px; top: 944px; width: 880px; text-align: center; font: 600 30px/1 "Mona Sans"; color: #f0f6fc; opacity: 0; }
+  .ae-tag em { font-style: normal; color: var(--ec); }
+  .active .ae-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.1s; }
+
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -2756,6 +2815,212 @@
     });
   }
 
+  // Any agent: one Markdown workflow retargets engine + model provider; tokens stream from the provider through the same guardrails
+  {
+    resetIndex();
+    const PROV = {
+      github: { name: "GitHub", sub: "Copilot models", c: "#a371f7" },
+      anthropic: { name: "Anthropic", sub: "Claude models", c: "#e3845f" },
+      openai: { name: "OpenAI", sub: "GPT models", c: "#56d4bc" },
+    };
+    const PIDS = Object.keys(PROV);
+    const COMBOS = [
+      ["copilot", "github"],
+      ["claude", "anthropic"],
+      ["codex", "openai"],
+      ["claude", "github"],
+      ["pi", "github"],
+      ["codex", "github"],
+    ];
+    const ENG = { copilot: "Copilot", claude: "Claude", codex: "Codex", pi: "Pi" };
+    // Monochrome marks (currentColor): Copilot, Claude, OpenAI from Simple Icons (CC0), GitHub from Octicons (MIT),
+    // Pi from pi.dev, Anthropic from Simple Icons (CC0). Trademarks belong to their respective owners.
+    const LOGO = {"copilot": ["0 0 24 24", ["M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"]], "claude": ["0 0 24 24", ["m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"]], "codex": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "pi": ["0 0 560 560", ["M420 280H280V140H0V0H420V280Z", "M560 560H420V280H560V560Z", "M140 560H0V140H140V280H280V420H140V560Z"]], "openai": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "github": ["0 0 16 16", ["M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"]], "anthropic": ["0 0 24 24", ["M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"]]};
+    const logo = id => {
+      const s = h("span", { class: "ae-logo" });
+      s.innerHTML = `<svg viewBox="${LOGO[id][0]}" aria-hidden="true" fill="currentColor">${LOGO[id][1].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+      return s;
+    };
+    const K = "#ff7b72",
+      G = "#7ee787",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff";
+    const vId = h("span", { class: "ae-val" });
+    const vPv = h("span", { class: "ae-val" });
+    const caret = h("i", { class: "ae-caret" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["daily", V],
+      ],
+      [["engine:", K]],
+      [["  id: ", K], vId],
+      [["  model-provider: ", K], vPv],
+      [["tools:", K]],
+      [
+        ["  github: ", K],
+        ["issues", G],
+      ],
+      [["safe-outputs:", K]],
+      [["  add-labels:", K]],
+      [["---", D]],
+      [["# Daily issue triage", T]],
+      [["Label new issues and suggest an owner.", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 3 || i === 4 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "ae-ed" }, h("div", { class: "ae-tab" }, "daily-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "ae-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg>';
+    const provEls = PIDS.map(id => h("div", { class: "ae-prov", "--c": PROV[id].c }, logo(id), h("div", {}, h("b", {}, PROV[id].name), h("span", {}, PROV[id].sub))));
+    const mono = h("div", { class: "ae-mono" });
+    const nm = h("strong");
+    const tokN = h("em", { class: "ae-tokn" }, "0");
+    const core = h("div", { class: "ae-core" }, mono, h("div", {}, h("small", {}, "agent engine"), nm, tokN));
+    const ring = (label, c, inset) => h("div", { class: "ae-ring", "--c": c, style: { inset: `${inset}px` } }, h("b", {}, label), h("i", {}, "✓ same"));
+    const run = h("div", { class: "ae-run" }, ring("Actions runner · lock file", "#4493f8", 0), ring("Network firewall", "#d29922", 44), ring("Sandboxed container", "#f85149", 88), core);
+    const TW = 744,
+      TH = 640;
+    const tc = h("canvas", { class: "ae-toks", width: TW, height: TH });
+    const tx = tc.getContext("2d");
+    const picks = Object.keys(ENG).map(id => h("div", { class: "ae-pick", "data-e": id }, h("b", {}, logo(id)), id));
+    const tag = h("div", { class: "ae-tag" }, "Swap the ", h("em", {}, "engine"), ". Pick the ", h("em", {}, "provider"), ". Keep the guardrails.");
+    const el = h(
+      "section",
+      { class: "slide ae" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Any engine · any model provider"), h("h2", {}, letters("Any "), letters("agent", "l-grad"))),
+      ed,
+      arrow,
+      h("div", { class: "ae-provs" }, provEls),
+      run,
+      tc,
+      h("div", { class: "ae-picks" }, picks),
+      tag
+    );
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      tId = "",
+      tPv = "",
+      toks = [],
+      spawnAt = 0,
+      tokens = 0,
+      shown = 0,
+      gulp = 0,
+      last = 0;
+    const setCombo = i => {
+      cur = i;
+      const [eid, pid] = COMBOS[i];
+      const c = PROV[pid].c;
+      el.style.setProperty("--ec", c);
+      mono.replaceChildren(logo(eid));
+      nm.textContent = ENG[eid];
+      provEls.forEach((p, j) => p.classList.toggle("on", PIDS[j] === pid));
+      picks.forEach(p => p.classList.toggle("on", p.dataset.e === eid));
+      core.classList.remove("swap");
+      void core.offsetWidth;
+      core.classList.add("swap");
+    };
+    // token stream: from the active provider card (top) down into the agent core
+    const CORE = { x: TW / 2, y: 120 + 270 };
+    const drawToks = (t, dt) => {
+      tx.clearRect(0, 0, TW, TH);
+      const pid = COMBOS[cur][1],
+        j = PIDS.indexOf(pid),
+        sx = 124 + j * 248,
+        sy = 70,
+        c = PROV[pid].c;
+      if (phase === "hold" && t > spawnAt) {
+        spawnAt = t + 8 + Math.random() * 18;
+        toks.push({ p: 0, v: 0.0011 + Math.random() * 0.0009, o: (Math.random() - 0.5) * 200, sx: sx + (Math.random() - 0.5) * 120, sy, c, w: 2 + Math.random() * 3 });
+      }
+      const at = (q, u) => {
+        const a = 1 - u,
+          cx1 = q.sx + q.o,
+          cy1 = q.sy + 200,
+          cx2 = CORE.x + q.o * 0.5,
+          cy2 = CORE.y - 190;
+        return [a ** 3 * q.sx + 3 * a * a * u * cx1 + 3 * a * u * u * cx2 + u ** 3 * CORE.x, a ** 3 * q.sy + 3 * a * a * u * cy1 + 3 * a * u * u * cy2 + u ** 3 * CORE.y];
+      };
+      tx.lineCap = "round";
+      tx.shadowBlur = 14;
+      for (const q of toks) {
+        q.p += q.v * dt * (1 + q.p * 1.5);
+        const u = Math.min(1, q.p),
+          [x, y] = at(q, u),
+          [x0, y0] = at(q, Math.max(0, u - 0.09));
+        tx.globalAlpha = u > 0.9 ? (1 - u) / 0.1 : Math.min(1, u * 8);
+        tx.strokeStyle = tx.shadowColor = q.c;
+        tx.lineWidth = q.w;
+        tx.beginPath();
+        tx.moveTo(x0, y0);
+        tx.lineTo(x, y);
+        tx.stroke();
+        if (q.p >= 1) {
+          tokens += 40 + ((Math.random() * 260) | 0);
+          gulp = Math.min(1, gulp + 0.06);
+        }
+      }
+      tx.globalAlpha = 1;
+      tx.shadowBlur = 0;
+      toks = toks.filter(q => q.p < 1);
+      gulp *= 0.94 ** (dt / 16);
+      core.style.setProperty("--gl", `${40 + gulp * 90}px`);
+      shown += (tokens - shown) * Math.min(1, dt / 160);
+      tokN.textContent = "↓ " + Math.round(shown).toLocaleString("en-US") + " tokens";
+    };
+    slides.push({
+      sound: "engine",
+      palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
+      notes:
+        "Any agent: any engine, any provider. The same Markdown workflow can target different coding agents and model providers by changing two frontmatter lines: engine id copilot, claude, codex or pi, and model-provider github, anthropic or openai. Claude can run on Anthropic or on GitHub Copilot inference; Codex on OpenAI or GitHub. The agent pulls tokens from whichever provider you pick, but the compiler keeps the same guardrails around it: the Actions runner and lock file, the network firewall, and the sandboxed container. Token counts are simulated and the workflow is a synthetic example; see the engines and model routing reference for setup and availability.",
+      enter() {
+        tId = COMBOS[0][0];
+        tPv = COMBOS[0][1];
+        vId.textContent = tId;
+        vPv.textContent = tPv;
+        phase = "hold";
+        since = last = spawnAt = 0;
+        toks = [];
+        tokens = shown = 0;
+        setCombo(0);
+      },
+      tick(t) {
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (!since) since = t;
+        const el2 = t - since;
+        const [nId, nPv] = COMBOS[(cur + 1) % COMBOS.length];
+        if (phase === "hold" && el2 > 3000) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 30) {
+          since = t;
+          if (tPv) tPv = tPv.slice(0, -1);
+          else if (tId !== nId) tId = tId.slice(0, -1);
+          vId.textContent = tId;
+          vPv.textContent = tPv;
+          if (!tPv && (tId === nId || !tId)) phase = "type";
+        } else if (phase === "type" && el2 > 75) {
+          since = t;
+          if (tId !== nId) tId = nId.slice(0, tId.length + 1);
+          else tPv = nPv.slice(0, tPv.length + 1);
+          vId.textContent = tId;
+          vPv.textContent = tPv;
+          sfx.key(0.7);
+          if (tId === nId && tPv === nPv) {
+            setCombo((cur + 1) % COMBOS.length);
+            sfx.pop(cur * 2);
+            phase = "hold";
+          }
+        }
+        drawToks(t, dt);
+      },
+      el,
+    });
+  }
+
   // Illustrative centralized campaigns
   {
     resetIndex();
@@ -3635,6 +3900,13 @@
         }
         bell(91, t + 1.2, 0.06, 1.6);
         bell(96, t + 1.32, 0.04, 1.4);
+      },
+      // any engine: an ignition rev climbing into a bright two-note chime
+      engine: t => {
+        [43, 48, 55, 60].forEach((m, i) => tone(m, t + 0.1 + i * 0.14, { type: "sawtooth", dur: 0.22, vol: 0.07, cutoff: 1200 + i * 700 }));
+        tone(36, t + 0.1, { type: "sine", dur: 0.9, vol: 0.18, cutoff: 500 });
+        bell(84, t + 0.75, 0.06);
+        bell(91, t + 0.9, 0.05, 1.8);
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
