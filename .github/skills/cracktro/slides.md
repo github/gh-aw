@@ -59,9 +59,14 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | OpenTelemetry | illustrative |
 | GitHub-native governance | illustrative |
 | Operator-owned infrastructure | illustrative |
-| Centralized campaigns | illustrative |
 | Push SDLC | illustrative |
 | Connectors | illustrative |
+| Central Agentic Ops |  |
+| Hyperscale Agentics | illustrative |
+| Centralized campaigns | illustrative |
+| AW maintenance | illustrative |
+| Session data lake | illustrative |
+| Ops data for Agents | illustrative |
 | AW factory |  |
 | First commit to GA |  |
 | How PRs land |  |

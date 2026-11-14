@@ -911,6 +911,142 @@
   .rollout em { font-style: normal; padding: 10px 18px; border: 1px solid #3d444d; border-radius: 999px; color: #9198a1; transition: all .4s; }
   .rollout em.on { color: #0d1117; background: #3fb950; border-color: #3fb950; }
   .rollout s { text-decoration: none; color: #3d444d; }
+  /* research prototype badge on every gh cao slide (top right, clear of the chrome) */
+  .proto { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 14px; padding: 12px 22px; border: 2px dashed #e3b341; border-radius: 999px; background: #0d1117cc; font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #e3b341; z-index: 5; }
+  .proto i { width: 12px; height: 12px; border-radius: 50%; background: #e3b341; box-shadow: 0 0 12px #e3b341; animation: proto-blink 1.6s ease-in-out infinite; }
+  .proto span { color: #56d4dd; letter-spacing: .04em; text-transform: none; padding-left: 14px; border-left: 1px solid #3d444d; }
+  @keyframes proto-blink { 50% { opacity: .25; } }
+  .bh .proto { top: 96px; right: 140px; }
+  /* --- gh cao: hyperscale agentics --- */
+  .hyp-scale, .hyp-cv, .hyp-sinks, .hyp-outs { position: absolute; opacity: 0; }
+  .active .hyp-scale, .active .hyp-cv, .active .hyp-sinks, .active .hyp-outs { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .hyp-scale { left: 110px; top: 300px; width: 760px; display: flex; align-items: baseline; gap: 18px; }
+  .hyp-scale b { font: 700 64px/1 var(--mono); color: #56d4dd; min-width: 380px; }
+  .hyp-scale span { font: 600 20px/1.1 var(--mono); color: #c9d1d9; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+  .hyp-ruler { position: absolute; left: 110px; top: 384px; width: 740px; height: 26px; }
+  .hyp-ruler i { position: absolute; top: 0; height: 4px; left: 0; right: 0; background: #30363d; border-radius: 2px; }
+  .hyp-ruler i + i { right: auto; width: 0; background: linear-gradient(90deg, #1b9aaa, #56d4dd); }
+  .hyp-ruler em { position: absolute; top: 12px; font: 600 16px/1 var(--mono); font-style: normal; color: #6e7681; transform: translateX(-50%); transition: color .3s; }
+  .hyp-ruler em.on { color: #56d4dd; }
+  .hyp-ruler em:first-of-type { transform: none; }
+  .hyp-ruler em:last-of-type { transform: translateX(-100%); }
+  .hyp-cv { left: 110px; top: 300px; width: 1700px; height: 740px; pointer-events: none; }
+  .hyp-per { position: absolute; left: 110px; top: 972px; font: 500 17px/1 var(--mono); color: #9198a1; }
+  .hyp-sinks { left: 1010px; top: 440px; width: 300px; display: flex; flex-direction: column; gap: 35px; }
+  .hyp-sink { position: relative; height: 150px; box-sizing: border-box; padding: 18px 22px; border: 2px solid var(--c); border-radius: 14px; background: #0d1117e6; display: flex; flex-direction: column; gap: 8px; transition: box-shadow .2s; }
+  .hyp-sink.hot { box-shadow: 0 0 26px color-mix(in srgb, var(--c) 45%, transparent); }
+  .hyp-sink b { font-size: 28px; }
+  .hyp-sink span { font: 500 16px/1.2 var(--mono); color: #9198a1; }
+  .hyp-sink strong { font: 700 24px/1 var(--mono); color: var(--c); margin-top: auto; }
+  .hyp-sink em { position: absolute; top: -13px; right: 14px; padding: 5px 10px; border-radius: 999px; background: #0d1117; border: 1px solid var(--c); font: 700 13px/1 var(--mono); font-style: normal; color: var(--c); letter-spacing: .08em; text-transform: uppercase; }
+  .hyp-outs { left: 1380px; top: 300px; width: 430px; display: flex; flex-direction: column; gap: 16px; }
+  .hyp-outs > i { font: 600 17px/1 var(--mono); letter-spacing: .12em; color: #56d4dd; font-style: normal; text-transform: uppercase; }
+  .hyp-out { padding: 16px 22px; border: 1px solid #30363d; border-left: 4px solid var(--c); border-radius: 12px; background: #0d1117e6; display: flex; flex-direction: column; gap: 8px; }
+  .hyp-out header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .hyp-out b { font-size: 28px; }
+  .hyp-out strong { font: 700 22px/1 var(--mono); color: var(--c); white-space: nowrap; }
+  .hyp-out span { font: 500 16px/1.3 var(--mono); color: #9198a1; }
+  .hyp-spark { position: relative; height: 54px; display: flex; align-items: flex-end; gap: 6px; border-bottom: 1px solid #30363d; }
+  .hyp-spark::before { content: "budget"; position: absolute; left: 0; right: 0; top: 0; border-top: 2px dashed #e3b341; font: 600 12px/1 var(--mono); color: #e3b341; text-align: right; padding-top: 3px; }
+  .hyp-spark i { flex: 0 0 34px; background: linear-gradient(180deg, #56d4dd, #1b9aaa); border-radius: 3px 3px 0 0; transition: height .4s; }
+  .hyp-val { padding: 18px 22px; border: 2px solid #3fb950; border-radius: 14px; background: color-mix(in srgb, #3fb950 10%, #0d1117); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 0 30px #3fb95022; }
+  .hyp-val > b { font-size: 34px; color: #3fb950; }
+  .hyp-val div { display: flex; justify-content: space-between; font: 500 18px/1 var(--mono); color: #c9d1d9; }
+  .hyp-val strong { font: 700 22px/1 var(--mono); color: #f0f6fc; }
+  /* --- gh cao: AW maintenance --- */
+  .mnt-loops { position: absolute; left: 110px; top: 300px; width: 700px; display: flex; flex-direction: column; gap: 22px; }
+  .mnt-loop { display: grid; grid-template-columns: 64px 1fr; column-gap: 18px; padding: 16px 20px; border-left: 4px solid #30363d; border-radius: 6px; opacity: 0; transition: background .4s, border-color .4s; }
+  .active .mnt-loop { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 400ms); }
+  .mnt-loop i { grid-row: span 2; font: 600 22px/1 var(--mono); color: var(--c); padding-top: 8px; font-style: normal; }
+  .mnt-loop b { font-size: 36px; font-variation-settings: "wght" 700, "wdth" 100; }
+  .mnt-loop span { font-size: 21px; color: #9198a1; line-height: 1.35; }
+  .mnt-loop.on { border-color: var(--c); background: #ffffff0d; }
+  .mnt-loop.done b::after { content: " ✓"; color: #3fb950; }
+  .mnt-fleet { position: absolute; left: 880px; top: 290px; width: 930px; opacity: 0; }
+  .active .mnt-fleet { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 300ms; }
+  .mnt-top { font: 500 22px/1 var(--mono); color: #9198a1; margin-bottom: 26px; }
+  .mnt-top b { color: #f0f6fc; transition: color .4s; }
+  .mnt-top b.on { color: #3fb950; }
+  .mnt-sep { margin: 0 14px; color: #3d444d; }
+  .mnt-grid { display: flex; flex-direction: column; gap: 12px; }
+  .mnt-row { display: grid; grid-template-columns: 130px repeat(8, 88px); gap: 12px; align-items: center; }
+  .mnt-org { font: 500 18px/1 var(--mono); color: #9198a1; }
+  .mnt-tile { --tc: #3fb950; position: relative; height: 84px; border: 2px solid var(--tc); border-radius: 10px; background: color-mix(in srgb, var(--tc) 14%, #0d1117); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; transition: border-color .35s, background .35s; }
+  .mnt-tile b { font: 600 19px/1 var(--mono); color: #f0f6fc; }
+  .mnt-tile em { font: 600 14px/1 var(--mono); font-style: normal; color: var(--tc); text-transform: uppercase; letter-spacing: .06em; min-height: 14px; }
+  .mnt-tile.fix { animation: mnt-fix .6s ease-out; }
+  @keyframes mnt-fix { 40% { transform: scale(1.12); box-shadow: 0 0 22px #3fb950; } }
+  /* --- gh cao: session data lake --- */
+  .lake-wrap { position: absolute; left: 110px; top: 300px; width: 1700px; height: 660px; opacity: 0; }
+  .active .lake-wrap { animation: rise .9s cubic-bezier(.2,.9,.2,1) both 300ms; }
+  .lake-svg { width: 100%; height: 100%; overflow: visible; }
+  .lake-svg text { text-anchor: middle; fill: #f0f6fc; font-family: "Mona Sans", sans-serif; }
+  .lake-rail { stroke: #30363d; stroke-width: 4; stroke-dasharray: 2 10; stroke-linecap: round; }
+  .lake-stage rect { fill: #0d1117e6; stroke: var(--c); stroke-width: 2.5; transition: fill .25s; }
+  .lake-stage.hot rect { fill: color-mix(in srgb, var(--c) 22%, #0d1117); }
+  .lake-t { font-size: 34px; font-weight: 700; }
+  .lake-t.sm { font-size: 28px; }
+  .lake-s { font-family: var(--mono); font-size: 19px; fill: #9198a1 !important; }
+  .lake-n { font-family: var(--mono); font-size: 22px; fill: #c9d1d9 !important; }
+  .lake-l { font-family: var(--mono); font-size: 18px; fill: #79c0ff !important; }
+  .lake-l.red { fill: #56d4dd !important; }
+  .lake-l.no { fill: #ff7b72 !important; }
+  .lake-gen { font-family: var(--mono); font-size: 19px; font-weight: 600; fill: #3fb950 !important; }
+  .lake-part { fill: #161b22; stroke: #3fb95066; stroke-width: 1.5; transition: fill .3s; }
+  .lake-part.on { fill: #2ea04366; }
+  .lake-part.new { fill: #3fb950; }
+  .lake-q { font-family: var(--mono); font-size: 20px; font-weight: 600; fill: #d2a8ff !important; }
+  .lake-r { font-family: var(--mono); font-size: 19px; fill: #9198a1 !important; }
+  .lake-dot { fill: #79c0ff; filter: drop-shadow(0 0 6px #79c0ff); }
+  .lake-dot.red { fill: #56d4dd; }
+  .lake-dot.drop { fill: #ff7b72; }
+  .lake-store rect { fill: #0d1117e6; stroke: #9198a1; stroke-width: 2; stroke-dasharray: 8 6; }
+  .lake-wall { fill: none; stroke: #ff7b72; stroke-width: 2.5; stroke-dasharray: 6 8; }
+  .lake-x { font-family: var(--mono); font-size: 21px; font-weight: 600; fill: #ff7b72 !important; }
+  .lake-foot { position: absolute; left: 110px; bottom: 76px; display: flex; gap: 14px; }
+  .lake-foot span { padding: 10px 20px; border: 1px solid #3d444d; border-radius: 999px; font: 600 19px/1 var(--mono); color: #c9d1d9; background: #0d1117cc; }
+  /* --- gh cao: ops data for agents --- */
+  .oql-card, .oql-mcp, .oql-bars { position: absolute; top: 300px; opacity: 0; }
+  .active .oql-card, .active .oql-mcp, .active .oql-bars { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .oql-card > i, .oql-bars > i { display: block; font: 600 17px/1 var(--mono); letter-spacing: .12em; color: #56d4dd; font-style: normal; margin-bottom: 18px; }
+  .oql-card { left: 110px; width: 590px; }
+  .oql-card pre { margin: 0; padding: 22px 24px; border: 1px solid #30363d; border-radius: 12px; background: #0d1117e6; font: 500 17px/1.65 var(--mono); }
+  .oql-ln { opacity: .12; transition: opacity .25s; white-space: pre; }
+  .oql-ln.on { opacity: 1; }
+  .oql-ln span { color: #79c0ff; }
+  .oql-ln b { color: #f0f6fc; font-weight: 500; }
+  .oql-rules { display: flex; gap: 12px; margin-top: 20px; }
+  .oql-rules span { padding: 8px 16px; border: 1px solid #3d444d; border-radius: 999px; font: 600 17px/1 var(--mono); color: #c9d1d9; }
+  .oql-mcp { left: 740px; width: 420px; display: flex; flex-direction: column; gap: 16px; }
+  .oql-client, .oql-srv { padding: 18px 22px; border: 2px solid #30363d; border-radius: 12px; background: #0d1117e6; display: flex; flex-direction: column; gap: 8px; transition: border-color .3s, box-shadow .3s; }
+  .oql-client b, .oql-srv b { font-size: 30px; }
+  .oql-client span, .oql-srv span { font: 500 18px/1 var(--mono); color: #9198a1; }
+  .oql-srv.on { border-color: #56d4dd; box-shadow: 0 0 28px #56d4dd44; }
+  .oql-tools { display: flex; gap: 10px; margin-top: 4px; }
+  .oql-tools em { font: 600 17px/1 var(--mono); font-style: normal; padding: 7px 12px; border-radius: 6px; background: #56d4dd22; color: #56d4dd; }
+  .oql-arrow { font: 600 17px/1.3 var(--mono); color: #3d444d; padding-left: 20px; white-space: nowrap; transition: color .3s; }
+  .oql-arrow.on { color: #e3b341; }
+  .oql-arrow.back.on { color: #3fb950; }
+  .oql-metas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .oql-meta { padding: 10px 14px; border: 1px solid #30363d; border-radius: 8px; opacity: .15; transition: opacity .3s; display: flex; flex-direction: column; gap: 6px; }
+  .oql-meta.on { opacity: 1; }
+  .oql-meta span { font: 500 15px/1 var(--mono); color: #9198a1; }
+  .oql-meta b { font: 600 19px/1 var(--mono); color: #3fb950; }
+  .oql-bars { left: 1210px; width: 620px; }
+  .oql-row { display: grid; grid-template-columns: 190px 330px 80px; align-items: center; height: 66px; }
+  .oql-name span { display: block; font: 500 15px/1.2 var(--mono); color: #9198a1; }
+  .oql-name b { font: 600 20px/1.3 var(--mono); }
+  .oql-track { position: relative; height: 56px; }
+  .oql-track i { position: absolute; left: 0; top: 6px; height: 22px; width: 0; border-radius: 4px; background: linear-gradient(90deg, #1b9aaa, #56d4dd); transition: width .25s linear; }
+  .oql-row.hit .oql-track i { background: linear-gradient(90deg, #bb800966, #e3b341); }
+  .oql-track em { position: absolute; left: 0; top: 34px; font: 600 14px/1 var(--mono); font-style: normal; color: #e3b341; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  .oql-track em.on { opacity: 1; }
+  .oql-row > b { font: 600 19px/1 var(--mono); text-align: right; color: #c9d1d9; }
+  .oql-disp { margin-top: 14px; padding: 12px 18px; border: 1px dashed #3d444d; border-radius: 10px; font: 600 19px/1 var(--mono); color: #6e7681; transition: all .4s; }
+  .oql-disp.on { color: #0d1117; background: #3fb950; border-color: #3fb950; }
+  .oql-save { margin-top: 16px; font: 500 22px/1 var(--mono); color: #9198a1; }
+  .oql-save b { font-size: 34px; color: #3fb950; }
+  .oql-pct { color: #3fb950; }
   .finale-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
 
   /* --- security architecture --- */
@@ -10818,6 +10954,318 @@
     slides.push({ group: "enterprise", notes: s.notes, el });
   }
 
+  // Hyperscale Agentics: 1K → 1M repositories running agents report into OTEL and an on-prem ops database and session lake;
+  // gh cao answers with campaigns that ripple across the fleet, drift reappears, and each next ripple clears it within budget and cheaper
+  {
+    resetIndex();
+    const CW = 1700, CH = 740, GW = 740, GH = 520, GY = 140, LANE = 718, LX = 1240, GX = 370, DPR = 1.25, SPEED = 0.08, RING = 400, MAXC = 64;
+    const SINKS = [
+      { name: "OpenTelemetry", sub: "traces · metrics · logs", unit: "spans", c: "#79c0ff", k: 42 },
+      { name: "Ops database", sub: "runs · campaigns · budgets", unit: "runs", c: "#e3b341", k: 1, prem: 1 },
+      { name: "Session data lake", sub: "aw_session.jsonl → Parquet", unit: "events", c: "#3fb950", k: 180, prem: 1 },
+    ];
+    const CAMP = [
+      { name: "cost", c: "#56d4dd" },
+      { name: "upgrade", c: "#d2a8ff" },
+      { name: "fix", c: "#ff7b72" },
+    ];
+    const ORDER = [0, 1, 0, 2];
+    const cv = h("canvas", { class: "hyp-cv", width: CW * DPR, height: CH * DPR, style: "--i:1" });
+    const ctx = cv.getContext("2d");
+    const num = h("b", {}, "1,000");
+    const fill = h("i", {});
+    const ticks = ["1K", "10K", "100K", "1M"].map((l, i) => h("em", { style: `left:${(i / 3) * 100}%` }, l));
+    const per = h("div", { class: "hyp-per" }, "");
+    const sinkEls = SINKS.map(k => {
+      const v = h("strong", {}, "0");
+      const e = h("div", { class: "hyp-sink", style: `--c:${k.c}` }, k.prem ? h("em", {}, "on prem") : "", h("b", {}, k.name), h("span", {}, k.sub), v);
+      return { e, v };
+    });
+    const card = (name, c, sub, ...extra) => {
+      const v = h("strong", {}, "");
+      const e = h("div", { class: "hyp-out", style: `--c:${c}` }, h("header", {}, h("b", {}, name), v), h("span", {}, sub), ...extra);
+      return { e, v };
+    };
+    const spark = h("div", { class: "hyp-spark" });
+    const outEls = [
+      card("Cost control", "#56d4dd", "each campaign capped · optimize as you go", spark),
+      card("Evolution", "#d2a8ff", "upgrade campaigns recompile the fleet"),
+      card("Monitoring", "#ff7b72", "drift detected → next campaign"),
+    ];
+    const vals = [0, 1, 2].map(() => h("strong", {}, ""));
+    const valBox = h(
+      "div",
+      { class: "hyp-val" },
+      h("b", {}, "Value"),
+      h("div", {}, "healthy repositories", vals[0]),
+      h("div", {}, "changes landed", vals[1]),
+      h("div", {}, "cost per fix", vals[2])
+    );
+    const el = h(
+      "section",
+      { class: "slide hyp" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · agentic workflows at enterprise scale"), h("h2", {}, letters("Hyperscale "), letters("Agentics", "l-grad"))),
+      h("div", { class: "hyp-scale", style: "--i:0" }, num, h("span", {}, "repositories running agents")),
+      h("div", { class: "hyp-ruler" }, h("i", {}), fill, ...ticks),
+      cv,
+      per,
+      h("div", { class: "hyp-sinks", style: "--i:2" }, ...sinkEls.map(s => s.e)),
+      h("div", { class: "hyp-outs", style: "--i:3" }, h("i", {}, "gh cao closes the loop"), ...outEls.map(o => o.e), valBox)
+    );
+    const fmt = n => (n >= 1e9 ? (n / 1e9).toFixed(1) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e4 ? Math.round(n / 1e3) + "K" : Math.round(n).toLocaleString("en-US"));
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const hash = (i, j) => {
+      const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    const mono = () => getComputedStyle(document.documentElement).getPropertyValue("--mono") || "monospace";
+    const CYCLE = 22000, GROW = 13000;
+    let t0 = 0, cyc = -1, decade = 3, parts = [], ups = [], backs = [], waves = [], costs = [], tot = [0, 0, 0], hot = [0, 0, 0];
+    let nextUp = 0, nextBack = 0, nWave = 0, landed = 0, outY = [], sinkY = [];
+    // per-cell state, keyed i * MAXC + j: drifted, seen, upgraded, last fix time, last flash
+    const bad = new Uint8Array(MAXC * MAXC), seen = new Uint8Array(MAXC * MAXC), upg = new Uint8Array(MAXC * MAXC);
+    const fixT = new Float64Array(MAXC * MAXC), flashT = new Float64Array(MAXC * MAXC);
+    let lastT = 0, work = [];
+    const reset = () => {
+      [bad, seen, upg, fixT, flashT].forEach(a => a.fill(0));
+      work = [];
+      lastT = 0;
+      parts = [];
+      ups = [];
+      backs = [];
+      waves = [];
+      costs = [];
+      tot = [0, 0, 0];
+      nWave = landed = 0;
+      decade = 3;
+      spark.replaceChildren();
+      ticks.forEach((e, i) => e.classList.toggle("on", i === 0));
+    };
+    slides.push({
+      group: "cao",
+      notes:
+        "Hyperscale Agentics, an illustrative and simulated view: the repository counts, telemetry totals, costs and percentages are synthetic, and the grid is drawn at full size from the start, so each square stands for more repositories as the fleet grows. gh cao is a research prototype. An enterprise can grow from a thousand to a million repositories running agents, and at that scale nobody reads individual runs. Every square where an agent works reports its run into OpenTelemetry, and into an operations database and a session data lake that both run on premises, inside the enterprise's own boundary. Central Agentic Ops reads that data back and closes the loop with campaigns: they flow back to the CAO repository, and cost, upgrade and fix campaigns ripple slowly across the fleet like waves and turn every repository they touch healthy. Drift never stops: repositories keep slipping back to amber, and the next wave from the CAO control repository in the middle of the fleet sweeps them healthy again. The point is cost control, not a one-off optimization: every campaign runs within its budget, and because each wave learns from the last, the cost per repository falls with every pass. The value box sums it up: healthy repositories, changes landed, and a falling cost per fix.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+        outY = [];
+        reset();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const a = t - t0, c = Math.floor(a / CYCLE), r = a % CYCLE;
+        if (c !== cyc) (cyc = c), reset();
+        if (!outY.length) {
+          outY = outEls.map(o => o.e.offsetTop + o.e.offsetHeight / 2);
+          sinkY = sinkEls.map(s => GY + s.e.offsetTop + s.e.offsetHeight / 2);
+        }
+        const u = ease(Math.min(1, Math.max(0, (r - 500) / GROW)));
+        const lg = 3 + 3 * u, N = 10 ** lg;
+        num.textContent = Math.round(N).toLocaleString("en-US");
+        fill.style.width = `${(u * 100).toFixed(1)}%`;
+        if (Math.floor(lg + 1e-6) > decade && decade < 6) {
+          decade = Math.floor(lg + 1e-6);
+          ticks.forEach((e, i) => e.classList.toggle("on", i <= decade - 3));
+          sfx.step(1);
+        }
+        // the fleet grid is drawn at full scale from the start; each square stands for more repositories as the fleet grows
+        const cell = 16;
+        const cols = Math.floor(GW / cell), rows = Math.floor(GH / cell), sq = cols * rows, perSq = N / sq;
+        per.textContent = `1 square ≈ ${fmt(perSq)} repositories`;
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        ctx.clearRect(0, 0, CW, CH);
+        const sz = Math.max(2, cell - (cell > 8 ? 4 : 1.5)), off = (cell - sz) / 2;
+        // the CAO control repository sits in the middle of the fleet
+        // the CAO control repository fills a 2x2 block in the middle of the fleet
+        const caoI = cols >> 1, caoJ = rows >> 1, caoX = caoI * cell, caoY = GY + caoJ * cell;
+        const isCao = (i, j) => i >= caoI - 1 && i < caoI + 1 && j >= caoJ - 1 && j < caoJ + 1;
+        const live = r > 600 && r < CYCLE - 1500;
+        let dirty = 0, upd = 0;
+        for (let i = 0; i < cols; i++)
+          for (let j = 0; j < rows; j++) {
+            if (isCao(i, j)) continue;
+            const idx = i * MAXC + j, cx = i * cell + cell / 2, cy = GY + j * cell + cell / 2;
+            if (!seen[idx]) (seen[idx] = 1), (bad[idx] = hash(i, j) < 0.55 ? 1 : 0);
+            let front = -1;
+            for (const w of waves) {
+              const pt = w.s + Math.hypot(cx - w.x, cy - w.y) / SPEED;
+              if (pt > t) continue;
+              if (pt > fixT[idx]) {
+                fixT[idx] = pt;
+                work.push({ x: cx, y: cy });
+                if (bad[idx]) (bad[idx] = 0), (landed += perSq);
+                if (w.k === 1) upg[idx] = 1;
+              }
+              if (t - pt < RING) front = w.k;
+            }
+            if (bad[idx]) dirty++;
+            if (upg[idx]) upd++;
+            ctx.fillStyle = front >= 0 ? CAMP[front].c : t - flashT[idx] < 350 ? "#f0f6fc" : bad[idx] ? "#bb8009" : fixT[idx] ? "#1d5560" : "#16303a";
+            ctx.fillRect(i * cell + off, GY + j * cell + off, sz, sz);
+          }
+        // drift never stops: healthy repositories keep slipping back to amber
+        const dt = lastT ? Math.min(100, t - lastT) : 0;
+        lastT = t;
+        if (live && r > 2500)
+          for (let n = ((2 + 6 * u) * dt) / 1000; n > 0; n--) {
+            if (Math.random() >= n) continue;
+            const i = (Math.random() * cols) | 0, j = (Math.random() * rows) | 0, idx = i * MAXC + j;
+            if (!isCao(i, j) && seen[idx] && !bad[idx]) bad[idx] = 1;
+          }
+        // the CAO block flashes and throws a launch ring in the colour of each campaign it starts
+        const cs = 2 * cell - 6, pr = (t / 20) % 24, lw = waves[waves.length - 1], la = lw ? t - lw.s : 1e9;
+        ctx.strokeStyle = "#d2a8ff";
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.7 * (1 - pr / 24);
+        ctx.strokeRect(caoX - cs / 2 - pr / 2, caoY - cs / 2 - pr / 2, cs + pr, cs + pr);
+        if (la < 900) {
+          const g = (la / 900) * 70;
+          ctx.strokeStyle = CAMP[lw.k].c;
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = 1 - la / 900;
+          ctx.strokeRect(caoX - cs / 2 - g / 2, caoY - cs / 2 - g / 2, cs + g, cs + g);
+        }
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = la < 700 ? CAMP[lw.k].c : "#d2a8ff";
+        ctx.shadowColor = la < 900 ? CAMP[lw.k].c : "#d2a8ff";
+        ctx.shadowBlur = la < 900 ? 18 : 10;
+        ctx.beginPath();
+        ctx.roundRect(caoX - cs / 2, caoY - cs / 2, cs, cs, 4);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.font = `700 13px ${mono()}`;
+        const ct = "cao", ctw = ctx.measureText(ct).width;
+        ctx.fillStyle = "#0d1117cc";
+        ctx.fillRect(caoX - ctw / 2 - 4, caoY - cs / 2 - 24, ctw + 8, 17);
+        ctx.fillStyle = "#d2a8ff";
+        ctx.fillText(ct, caoX - ctw / 2, caoY - cs / 2 - 11);
+        // telemetry: only squares where an agent just worked (a campaign wave) report into the three sinks
+        if (work.length > 300) work.splice(0, work.length - 300);
+        if (live)
+          for (let q = 0, rate = 1 + Math.floor(u * 4); q < rate && work.length && parts.length < 220; q++) {
+            const w = work.splice((Math.random() * work.length) | 0, 1)[0];
+            const k = Math.random() < 0.4 ? 0 : Math.random() < 0.5 ? 1 : 2;
+            parts.push({ x: w.x, y: w.y, k, s: t, d: 900 + Math.random() * 600 });
+          }
+        parts = parts.filter(p => {
+          const v = (t - p.s) / p.d;
+          if (v >= 1) return (tot[p.k] += SINKS[p.k].k * perSq * (2 + Math.random() * 4)), (hot[p.k] = t), false;
+          const x = p.x + (896 - p.x) * v * v, y = p.y + (sinkY[p.k] - p.y) * (1 - (1 - v) ** 2);
+          ctx.fillStyle = SINKS[p.k].c;
+          ctx.globalAlpha = 0.35 + 0.65 * v;
+          ctx.beginPath();
+          ctx.arc(x, y, 2.5 + v * 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          return true;
+        });
+        // sinks → outcome cards
+        ctx.setLineDash([3, 7]);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#3d444d";
+        sinkY.forEach(y => outY.forEach(oy => (ctx.beginPath(), ctx.moveTo(1200, y), ctx.lineTo(1270, oy), ctx.stroke())));
+        if (live && t >= nextUp) {
+          nextUp = t + 160;
+          ups.push({ k: (Math.random() * 3) | 0, o: (Math.random() * 3) | 0, s: t });
+        }
+        ups = ups.filter(p => {
+          const v = (t - p.s) / 500;
+          if (v >= 1) return false;
+          ctx.fillStyle = SINKS[p.k].c;
+          ctx.beginPath();
+          ctx.arc(1200 + 70 * v, sinkY[p.k] + (outY[p.o] - sinkY[p.k]) * v, 3, 0, Math.PI * 2);
+          ctx.fill();
+          return true;
+        });
+        // the feedback lane: outcome cards ↓ lane ← fleet ↑
+        ctx.strokeStyle = "#56d4dd88";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 10]);
+        ctx.lineDashOffset = (t / 30) % 20;
+        ctx.beginPath();
+        ctx.moveTo(1270, outY[0]);
+        ctx.lineTo(LX, outY[0]);
+        ctx.lineTo(LX, LANE);
+        ctx.lineTo(GX, LANE);
+        ctx.lineTo(GX, GY + GH + 6);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+        ctx.fillStyle = "#56d4dd";
+        ctx.beginPath();
+        ctx.moveTo(GX, GY + GH + 2), ctx.lineTo(GX - 9, GY + GH + 16), ctx.lineTo(GX + 9, GY + GH + 16);
+        ctx.fill();
+        ctx.font = `600 16px ${mono()}`;
+        ctx.fillText("↺ feedback loop · campaigns ripple back into the fleet", GX + 24, LANE - 14);
+        if (live && r > 1400 && t >= nextBack) {
+          nextBack = t + 5000;
+          const k = ORDER[nWave % ORDER.length];
+          const pts = [[1270, outY[k]], [LX, outY[k]], [LX, LANE], [GX, LANE], [GX, GY + GH], [caoX, caoY]];
+          let L = 0;
+          const seg = pts.slice(1).map((q, i) => ((L += Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1])), L));
+          backs.push({ k, pts, seg, L, s: t, d: 1500 });
+          nWave++;
+        }
+        backs = backs.filter(p => {
+          const v = Math.min(1, (t - p.s) / p.d), at = v * p.L;
+          let i = p.seg.findIndex(x => x >= at);
+          if (i < 0) i = p.seg.length - 1;
+          const s0 = i ? p.seg[i - 1] : 0, w = (at - s0) / (p.seg[i] - s0 || 1);
+          const [ax, ay] = p.pts[i], [bx, by] = p.pts[i + 1];
+          const x = ax + (bx - ax) * w, y = ay + (by - ay) * w;
+          if (v >= 1) {
+            // a campaign reaches the CAO repository and ripples out from it; each wave costs less per repository than the last
+            const cost = 0.92 * 0.8 ** costs.length;
+            costs.push(cost);
+            waves.push({ x, y, k: p.k, s: t, cost });
+            if (waves.length > 10) waves.shift();
+            const bar = h("i", { style: "height:0" });
+            spark.append(bar);
+            if (spark.children.length > 9) spark.firstChild.remove();
+            requestAnimationFrame(() => (bar.style.height = `${(cost * 100).toFixed(0)}%`));
+            sfx.pop(p.k);
+            return false;
+          }
+          ctx.fillStyle = CAMP[p.k].c;
+          ctx.shadowColor = CAMP[p.k].c;
+          ctx.shadowBlur = 12;
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          return true;
+        });
+        // label each fresh wave at its origin with its per-repository cost
+        ctx.font = `700 15px ${mono()}`;
+        for (const w of waves) {
+          const age = t - w.s;
+          if (age > 2600) continue;
+          ctx.globalAlpha = 1 - age / 2600;
+          ctx.fillStyle = "#0d1117cc";
+          const txt = `${CAMP[w.k].name} campaign · ${w.cost.toFixed(2)} AIC/repo`;
+          const tw = ctx.measureText(txt).width;
+          const lx = Math.min(GW - tw - 12, Math.max(4, w.x - tw / 2));
+          ctx.fillRect(lx - 6, w.y + 24, tw + 12, 24);
+          ctx.fillStyle = CAMP[w.k].c;
+          ctx.fillText(txt, lx, w.y + 42);
+          ctx.globalAlpha = 1;
+        }
+        sinkEls.forEach((s, i) => {
+          s.v.textContent = `${fmt(tot[i])} ${SINKS[i].unit}`;
+          s.e.classList.toggle("hot", t - hot[i] < 160);
+        });
+        const cost = costs.length ? costs[costs.length - 1] : 0;
+        outEls[0].v.textContent = costs.length ? "✓ within budget" : "budget set";
+        outEls[1].v.textContent = `${Math.round((upd / sq) * 100)}% current`;
+        outEls[2].v.textContent = `${fmt(dirty * perSq)} drifted`;
+        vals[0].textContent = `${Math.round((1 - dirty / sq) * 100)}%`;
+        vals[1].textContent = fmt(landed);
+        vals[2].textContent = costs.length > 1 ? `−${Math.round((1 - cost / costs[0]) * 100)}%` : "—";
+      },
+      el,
+    });
+  }
+
   // 11. Central Agentic Ops: a control repo lists its registered campaigns, which dispatch
   // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
   {
@@ -11033,8 +11481,8 @@
       ctx.font = "800 40px 'Mona Sans'"; ctx.fillText(recent.length ? `${rate}%` : "—", C.x, sy + 40);
     };
     slides.push({
-      group: "enterprise",
-      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
+      group: "cao",
+      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. gh cao, Central Agentic Ops, is a research prototype CLI extension from GitHub Next; features and interfaces may change. It is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
       enter() {
         repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
         campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
@@ -11086,10 +11534,456 @@
         draw(t);
       },
       el: h("section", { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Central Agentic Ops · campaigns"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · campaigns"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
         h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
         cv,
         h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),
+    });
+  }
+
+  // AW maintenance: gh cao keeps a fleet of agentic workflows healthy; maintenance loops (update, integrity drift, failure clustering, token optimization) sweep a grid of repos back to green, one loop at a time
+  {
+    resetIndex();
+    const ORGS = ["@platform", "@payments", "@mobile", "@data", "@infra"];
+    const NAMES = ["web", "api", "docs", "cli", "sdk", "ops", "auth", "ui"];
+    const KIND = { old: "#e3b341", drift: "#f778ba", fail: "#ff7b72", heavy: "#d2a8ff" };
+    const TAG = { old: "v1.8", drift: "drift", fail: "fail", heavy: "heavy" };
+    const LOOPS = [
+      ["old", "gh cao update", "Bump gh-aw-version in cao.json · recompile every lock · ship one atomic revision"],
+      ["drift", "Integrity drift", "Compare each lock file with its source · report what drifted"],
+      ["fail", "Failure investigator", "Cluster failed runs by signature · one issue per root cause"],
+      ["heavy", "Token optimizer", "Audit spend · propose a smaller model or fewer turns"],
+    ];
+    const loops = LOOPS.map(([k, b, s], i) => h("div", { class: "mnt-loop", "--i": i, "--c": KIND[k] }, h("i", {}, String(i + 1).padStart(2, "0")), h("b", {}, b), h("span", {}, s)));
+    const tiles = [];
+    const grid = h(
+      "div",
+      { class: "mnt-grid" },
+      ORGS.map((o, r) =>
+        h(
+          "div",
+          { class: "mnt-row", "--i": r },
+          h("span", { class: "mnt-org" }, o),
+          NAMES.map(n => {
+            const tag = h("em", {}, "");
+            const el = h("div", { class: "mnt-tile" }, h("b", {}, n), tag);
+            tiles.push({ el, tag, kind: "ok" });
+            return el;
+          })
+        )
+      )
+    );
+    const ver = h("b", {}, "v1.8");
+    const healthy = h("b", {}, "0");
+    const fleet = h(
+      "div",
+      { class: "mnt-fleet" },
+      h("div", { class: "mnt-top" }, h("span", {}, "cao.json · gh-aw-version "), ver, h("span", { class: "mnt-sep" }, "·"), h("span", {}, "healthy "), healthy, h("span", {}, " / 40")),
+      grid
+    );
+    const el = h(
+      "section",
+      { class: "slide mnt" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · keep the fleet current"), h("h2", {}, letters("AW "), letters("maintenance", "l-grad"))),
+      h("div", { class: "mnt-loops" }, loops),
+      fleet
+    );
+    const CYC = 16000,
+      START = 1600,
+      PHASE = 2600;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      plan = [];
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const paint = p => {
+      p.el.className = `mnt-tile${p.kind === "ok" ? "" : " bad"}`;
+      p.el.style.setProperty("--tc", KIND[p.kind] || "#3fb950");
+      p.tag.textContent = TAG[p.kind] || "";
+    };
+    const seed = () => {
+      const bag = [...Array(10).fill("old"), ...Array(4).fill("drift"), ...Array(4).fill("fail"), ...Array(5).fill("heavy")];
+      const idx = tiles.map((_, i) => i).sort(() => Math.random() - 0.5);
+      tiles.forEach(p => (p.kind = "ok"));
+      bag.forEach((k, i) => (tiles[idx[i]].kind = k));
+      tiles.forEach(paint);
+      plan = LOOPS.map(([k], i) => tiles.filter(p => p.kind === k).map((p, j) => ({ p, at: START + i * PHASE + 350 + j * (1800 / Math.max(4, tiles.filter(q => q.kind === k).length)) })));
+      ver.textContent = "v1.8";
+      ver.classList.remove("on");
+      loops.forEach(l => l.classList.remove("on", "done"));
+    };
+    const count = () => (healthy.textContent = String(tiles.filter(p => p.kind === "ok").length));
+    slides.push({
+      group: "cao",
+      notes:
+        "AW maintenance, an illustrative, simulated fleet: the org names, repository names, version numbers and failure counts are synthetic. gh cao is a research prototype, and keeping dozens of agentic workflows healthy is its day-to-day job. Every tile is a repository running agentic workflows; amber ones are still on an old gh-aw version, pink ones have a lock file that drifted from its markdown source, red ones have failing runs and violet ones spend far more tokens than they need to. Four maintenance loops sweep the fleet. gh cao update bumps the gh-aw-version pinned in cao.json, recompiles every lock file and ships it as one atomic revision, so nobody hand-edits a lock file. The integrity drift check compares each lock with its source and reports what changed. The failure investigator clusters failed runs by error signature and files one issue per root cause instead of one per run. The token optimizer audits spend and proposes a smaller model or fewer turns. Then time passes, new problems appear, and the loops run again: maintenance is a loop, not a project.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          seed();
+          count();
+        }
+        LOOPS.forEach((_, i) => {
+          const at = START + i * PHASE;
+          if (u >= at)
+            fire("l" + i, () => {
+              loops.forEach((l, j) => l.classList.toggle("on", j === i));
+              if (i) loops[i - 1].classList.add("done");
+              if (i === 0) (ver.textContent = "v1.9"), ver.classList.add("on");
+              sfx.step(1);
+            });
+          plan[i].forEach(({ p, at: a }, j) => {
+            if (u >= a)
+              fire(`f${i}.${j}`, () => {
+                p.kind = "ok";
+                paint(p);
+                p.el.classList.add("fix");
+                count();
+                sfx.pop(i * 2 + j);
+              });
+          });
+        });
+        if (u >= START + LOOPS.length * PHASE)
+          fire("done", () => {
+            loops.forEach(l => (l.classList.remove("on"), l.classList.add("done")));
+            sfx.compile();
+          });
+      },
+      el,
+    });
+  }
+
+  // Session data lake: with explicit opt-in, each run's unified session (aw_session.jsonl) passes a redaction gate, is projected into typed events and lands in immutable Parquet partitions behind a generation pointer, queryable with DuckDB or ADX; the dashboard store stays separate
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    const s = (tag, attrs = {}, text) => {
+      const e = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      if (text != null) e.textContent = text;
+      return e;
+    };
+    const svg = s("svg", { class: "lake-svg", viewBox: "0 0 1700 660" });
+    const Y = 210,
+      X = [130, 480, 830, 1180, 1540];
+    const STAGES = [
+      ["Runs", "aw_session.jsonl", "#79c0ff"],
+      ["Gate", "opt-in · redact · scope", "#e3b341"],
+      ["Project", "typed events · trace.tsp", "#56d4dd"],
+      ["Parquet", "immutable · Zstandard", "#3fb950"],
+      ["Query", "DuckDB · ADX tables", "#d2a8ff"],
+    ];
+    svg.append(s("line", { x1: X[0], y1: Y, x2: X[4], y2: Y, class: "lake-rail" }));
+    const boxes = STAGES.map(([t, sub, c], i) => {
+      const g = s("g", { class: "lake-stage", style: `--c:${c};--i:${i}` });
+      g.append(s("rect", { x: X[i] - 130, y: Y - 120, width: 260, height: 240, rx: 18 }), s("text", { x: X[i], y: Y - 70, class: "lake-t" }, t), s("text", { x: X[i], y: Y - 38, class: "lake-s" }, sub));
+      svg.append(g);
+      return g;
+    });
+    const stat = X.map(x => {
+      const e = s("text", { x, y: Y + 160, class: "lake-n" }, "");
+      svg.append(e);
+      return e;
+    });
+    // live detail lines inside the Runs, Gate and Project boxes
+    const live = [0, 1, 2].map(i => {
+      const e = s("text", { x: X[i], y: Y + 62, class: "lake-l" }, "");
+      svg.append(e);
+      return e;
+    });
+    const RUNS = ["issue-triage", "ci-doctor", "daily-report", "repo-assist", "docs-sync", "pr-review"];
+    const EVENTS = ["turn · tool_call · tokens", "tool_call · denial · turn", "turn · tokens · model"];
+    // Parquet partitions: a 4x2 shelf of blocks inside the Parquet box
+    const parts = [];
+    for (let r = 0; r < 2; r++)
+      for (let c = 0; c < 4; c++) {
+        const b = s("rect", { x: X[3] - 96 + c * 50, y: Y + 6 + r * 34, width: 42, height: 26, rx: 4, class: "lake-part" });
+        svg.append(b);
+        parts.push(b);
+      }
+    const gen = s("text", { x: X[3], y: Y + 98, class: "lake-gen" }, "");
+    svg.append(gen);
+    const QUERIES = ["p95 tokens by engine", "tool calls per run", "denied tools by repo", "turns by workflow"];
+    const qline = s("text", { x: X[4], y: Y + 30, class: "lake-q" }, "");
+    const qres = s("text", { x: X[4], y: Y + 66, class: "lake-r" }, "");
+    svg.append(qline, qres);
+    // The dashboard store: a separate, minimized operational database with no automatic join to the lake
+    const store = s("g", { class: "lake-store" });
+    store.append(
+      s("rect", { x: 580, y: 500, width: 500, height: 120, rx: 18 }),
+      s("text", { x: 830, y: 548, class: "lake-t sm" }, "Dashboard store · PostgreSQL"),
+      s("text", { x: 830, y: 584, class: "lake-s" }, "minimized campaign and run records"),
+      s("path", { d: `M1080 560 H${X[4]} V${Y + 120}`, class: "lake-wall" }),
+      s("text", { x: 1320, y: 546, class: "lake-x" }, "✕ no automatic join")
+    );
+    svg.append(store);
+    const dots = s("g", {});
+    svg.append(dots);
+    const el = h(
+      "section",
+      { class: "slide lake" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · every run, one queryable history"), h("h2", {}, letters("Session "), letters("data lake", "l-grad"))),
+      h("div", { class: "lake-wrap" }, svg),
+      h("div", { class: "lake-foot" }, h("span", {}, "private"), h("span", {}, "default off"), h("span", {}, "separately approved"), h("span", {}, "atomic generation pointer"))
+    );
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const lerp = (a, b, u) => a + (b - a) * ease(Math.min(1, Math.max(0, u)));
+    let t0 = 0,
+      last = 0,
+      next = 0,
+      packs = [],
+      n = { runs: 0, red: 0, drop: 0, ev: 0, ses: 0, part: 0, g: 41, q: 0 },
+      nextQ = 0,
+      flash = {};
+    const glow = (i, t) => (flash[i] = t);
+    const write = () => {
+      stat[0].textContent = `${n.runs} sessions`;
+      stat[1].textContent = `${n.red} redacted · ${n.drop} out of scope`;
+      stat[2].textContent = `${n.ev.toLocaleString("en-US")} events`;
+      stat[3].textContent = `${n.part} partition${n.part === 1 ? "" : "s"}`;
+      gen.textContent = `generation → ${n.g}`;
+    };
+    slides.push({
+      group: "cao",
+      notes:
+        "The agentic session data lake, an illustrative and simulated flow; the counts, queries and generation numbers are synthetic. gh cao is a research prototype. Every gh-aw run writes one unified session file, aw_session.jsonl, with the prompts, tool calls, turns and tokens of that run. Capture is private, off by default and separately approved, so nothing leaves a repository unless an operator opted it in. At the gate, sessions from repositories outside the approved scope are dropped and sensitive fields are redacted. The rest is projected into typed events described by one schema, then written as immutable Zstandard-compressed Parquet partitions. A new generation pointer flips atomically when a batch lands, so readers always see a complete snapshot. Locally the lake is just files queried with DuckDB; hosted, the partitions sit in Azure Blob Storage behind Azure Data Explorer external tables. The dashboard's PostgreSQL store is separate on purpose: it keeps minimized campaign and run records, and there is no automatic join between the two.",
+      enter() {
+        t0 = 0;
+        packs.forEach(p => p.els.forEach(e => e.remove()));
+        packs = [];
+        n = { runs: 0, red: 0, drop: 0, ev: 0, ses: 0, part: 0, g: 41, q: 0 };
+        parts.forEach(b => b.classList.remove("on", "new"));
+        qline.textContent = qres.textContent = "";
+        live.forEach(l => (l.textContent = ""));
+        flash = {};
+        write();
+      },
+      tick(t) {
+        if (!t0) (t0 = last = t), (next = t + 400), (nextQ = t + 4200);
+        last = t;
+        if (t >= next) {
+          next = t + 520 + Math.random() * 260;
+          const red = Math.random() < 0.35,
+            drop = !red && Math.random() < 0.14;
+          const els = [0, 1, 2].map(k => {
+            const c = s("circle", { r: k ? 7 : 11, class: "lake-dot", style: k ? "opacity:0" : "" });
+            dots.append(c);
+            return c;
+          });
+          packs.push({ t0: t, red, drop, els, done: false, y: Y + (Math.random() * 30 - 15) });
+          n.runs++;
+          live[0].textContent = `${RUNS[n.runs % RUNS.length]} · run ${1200 + n.runs}`;
+          glow(0, t);
+          sfx.key(0.5);
+        }
+        for (const p of packs) {
+          const a = t - p.t0;
+          const [d0, d1, d2] = p.els;
+          let x;
+          if (a < 900) x = lerp(X[0], X[1], a / 900);
+          else if (a < 1300) {
+            x = X[1];
+            if (!p.gated && a >= 1050) {
+              p.gated = true;
+              glow(1, t);
+              if (p.red) (n.red++, d0.classList.add("red"));
+              if (p.drop) (n.drop++, d0.classList.add("drop"));
+              live[1].textContent = p.drop ? "✕ repo not opted in" : p.red ? "▒ secrets redacted" : "✓ in scope";
+              live[1].setAttribute("class", `lake-l${p.drop ? " no" : p.red ? " red" : ""}`);
+            }
+          } else if (p.drop) {
+            x = X[1];
+            d0.style.opacity = String(Math.max(0, 1 - (a - 1300) / 400));
+            if (a > 1700) p.done = true;
+          } else if (a < 2100) x = lerp(X[1], X[2], (a - 1300) / 800);
+          else if (a < 2400) {
+            x = X[2];
+            if (!p.split && a >= 2250) {
+              p.split = true;
+              glow(2, t);
+              n.ev += 40 + ((Math.random() * 80) | 0);
+              live[2].textContent = EVENTS[n.ev % EVENTS.length];
+              [d1, d2].forEach(d => (d.style.opacity = "1"));
+              d0.setAttribute("r", 7);
+            }
+          } else if (a < 3200) x = lerp(X[2], X[3], (a - 2400) / 800);
+          else {
+            x = X[3];
+            p.done = true;
+            n.ses++;
+            glow(3, t);
+            if (n.ses % 3 === 0) {
+              const b = parts[n.part % parts.length];
+              if (n.part && n.part % parts.length === 0) parts.forEach(q => q.classList.remove("on"));
+              parts.forEach(q => q.classList.remove("new"));
+              b.classList.add("on", "new");
+              n.part++;
+              n.g++;
+              sfx.pop(n.part);
+            }
+          }
+          const spread = p.split ? Math.min(1, (a - 2250) / 300) * 26 : 0;
+          [d0, d1, d2].forEach((d, k) => {
+            d.setAttribute("cx", x - (k ? 14 * k : 0) * (p.split ? 1 : 0));
+            d.setAttribute("cy", p.y + (k === 1 ? -spread : k === 2 ? spread : 0));
+          });
+        }
+        packs = packs.filter(p => {
+          if (p.done) p.els.forEach(e => e.remove());
+          return !p.done;
+        });
+        if (t >= nextQ && n.part) {
+          nextQ = t + 3400;
+          qline.textContent = QUERIES[n.q++ % QUERIES.length];
+          qres.textContent = `→ ${(n.ses * 37 + 214).toLocaleString("en-US")} rows · gen ${n.g}`;
+          glow(4, t);
+          sfx.notify(false);
+        }
+        boxes.forEach((b, i) => b.classList.toggle("hot", t - (flash[i] || -1e9) < 260));
+        write();
+      },
+      el,
+    });
+  }
+
+  // Ops data for Agents: a constrained Dashboard Language query (no SQL, no scripts) runs through the gh cao MCP server (cao_catalog, cao_query); rows return with availability and freshness metadata, the heaviest workflows across the enterprise are tagged with smells, and an optimization campaign cuts their spend
+  {
+    resetIndex();
+    const YAML = [
+      ["- name: ", "highest-aic-workflows"],
+      ["  from: ", "usage"],
+      ["  aggregate:", ""],
+      ["    by: ", "[organization, repository, workflow]"],
+      ["    values:", ""],
+      ["      - { field: ", "aic, as: total-aic, reducer: sum }"],
+      ["  order-by: ", "[{ field: total-aic, direction: desc }]"],
+      ["  limit: ", "10"],
+    ];
+    const qLines = YAML.map(([k, v]) => h("div", { class: "oql-ln" }, h("span", {}, k), h("b", {}, v)));
+    const query = h(
+      "div",
+      { class: "oql-card", "--i": 0 },
+      h("i", {}, "DASHBOARD LANGUAGE · queries"),
+      h("pre", {}, qLines),
+      h("div", { class: "oql-rules" }, h("span", {}, "no SQL"), h("span", {}, "no scripts"), h("span", {}, "deterministic"))
+    );
+    const call = h("div", { class: "oql-arrow" }, "cao_query(highest-aic-workflows) →");
+    const srv = h("div", { class: "oql-srv" }, h("b", {}, "gh cao mcp"), h("span", {}, "read-only · loopback"), h("div", { class: "oql-tools" }, h("em", {}, "cao_catalog"), h("em", {}, "cao_query")));
+    const back = h("div", { class: "oql-arrow back" }, "← rows + metadata");
+    const META = [
+      ["availability", "available"],
+      ["completeness", "complete"],
+      ["freshness", "6 min"],
+      ["as-of", "09:40 UTC"],
+    ];
+    const metas = META.map(([k, v]) => h("div", { class: "oql-meta" }, h("span", {}, k), h("b", {}, v)));
+    const mcp = h("div", { class: "oql-mcp", "--i": 1 }, h("div", { class: "oql-client" }, h("b", {}, "Any MCP client"), h("span", {}, "an agent, an IDE, a chat")), call, srv, back, h("div", { class: "oql-metas" }, metas));
+    const ROWS = [
+      ["@payments/api", "issue-triage", 4820, "Model downgrade available", 0.45],
+      ["@platform/web", "ci-doctor", 4110, "Agentic overkill", 0.6],
+      ["@mobile/app", "repo-assist", 3560, null, 0],
+      ["@data/etl", "daily-report", 3240, "Partially reducible", 0.35],
+      ["@infra/tf", "plan-review", 2710, null, 0],
+      ["@platform/docs", "docs-sync", 2290, "Resource heavy", 0.3],
+      ["@payments/web", "pr-review", 1980, null, 0],
+    ];
+    const MAX = ROWS[0][2];
+    const TOTAL = ROWS.reduce((a, r) => a + r[2], 0);
+    const SAVE = ROWS.reduce((a, r) => a + Math.round(r[2] * r[4]), 0);
+    const bars = ROWS.map(([o, w, v, smell]) => {
+      const bar = h("i", {}),
+        val = h("b", {}, ""),
+        tag = smell ? h("em", {}, smell) : null;
+      const row = h("div", { class: "oql-row" }, h("div", { class: "oql-name" }, h("span", {}, o), h("b", {}, w)), h("div", { class: "oql-track" }, bar, tag), val);
+      return { row, bar, val, tag, v, cut: 1 };
+    });
+    const saved = h("b", {}, "0");
+    const pct = h("span", { class: "oql-pct" }, "");
+    const disp = h("div", { class: "oql-disp" }, "Optimization campaign → 4 pull requests");
+    const right = h(
+      "div",
+      { class: "oql-bars", "--i": 2 },
+      h("i", {}, "TOP AI CREDITS · ACROSS THE ENTERPRISE · 7 DAYS"),
+      bars.map(b => b.row),
+      disp,
+      h("div", { class: "oql-save" }, h("span", {}, "saved "), saved, h("span", {}, " AIC / week"), pct)
+    );
+    const el = h(
+      "section",
+      { class: "slide oql" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "gh cao · query the fleet, optimize the enterprise"), h("h2", {}, letters("Ops data "), letters("for Agents", "l-grad"))),
+      query,
+      mcp,
+      right
+    );
+    const CYC = 16500;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      cur = 0;
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const render = (grow, cutU) => {
+      bars.forEach((b, i) => {
+        const g = Math.min(1, Math.max(0, grow - i * 0.12));
+        const c = 1 - ROWS[i][4] * cutU;
+        const v = Math.round(b.v * g * c);
+        b.bar.style.width = `${(300 * v) / MAX}px`;
+        b.val.textContent = g ? v.toLocaleString("en-US") : "";
+      });
+      cur = Math.round(SAVE * cutU);
+      saved.textContent = cur.toLocaleString("en-US");
+      pct.textContent = cutU ? `  −${Math.round((100 * cur) / TOTAL)}%` : "";
+    };
+    slides.push({
+      group: "cao",
+      notes:
+        "Ops data for Agents, an illustrative, simulated query: the org, repository and workflow names and the AI Credit numbers are synthetic. gh cao is a research prototype. Operations data is only useful if you can ask it questions, so gh cao queries are written in the Dashboard Language, a small YAML language with from, filter, aggregate, joins, compute, order-by and limit. It deliberately cannot run SQL, scripts or network requests, which keeps every answer deterministic and reviewable. The same named queries power the dashboard and an MCP server: gh cao mcp is read-only, listens on loopback, and exposes exactly two tools, cao_catalog to discover queries and cao_query to run one. Any MCP client, an agent, an IDE or a chat, gets rows back with metadata on availability, completeness, freshness and as-of time, so it knows how much to trust the answer. Here the query ranks the workflows with the highest AI Credit spend across every enrolled org. Audit smells such as model downgrade available, agentic overkill, partially reducible and resource heavy point at what to fix, and an optimization campaign opens pull requests across the enterprise to cut the spend.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          qLines.forEach(l => l.classList.remove("on"));
+          [call, srv, back, disp, ...metas].forEach(x => x.classList.remove("on"));
+          bars.forEach(b => (b.tag && b.tag.classList.remove("on"), b.row.classList.remove("hit")));
+        }
+        qLines.forEach((l, i) => u >= 400 + i * 260 && fire("q" + i, () => (l.classList.add("on"), sfx.key(0.8))));
+        if (u >= 3000) fire("call", () => (call.classList.add("on"), sfx.pop(2)));
+        if (u >= 3600) fire("srv", () => (srv.classList.add("on"), sfx.pop(4)));
+        if (u >= 4300) fire("back", () => (back.classList.add("on"), sfx.pop(6)));
+        metas.forEach((m, i) => u >= 4600 + i * 220 && fire("m" + i, () => (m.classList.add("on"), sfx.key(0.6))));
+        bars.forEach((b, i) => b.tag && u >= 7400 + i * 260 && fire("s" + i, () => (b.tag.classList.add("on"), b.row.classList.add("hit"), sfx.pop(i))));
+        if (u >= 9600) fire("disp", () => (disp.classList.add("on"), sfx.compile()));
+        const grow = u < 5200 ? 0 : Math.min(1.8, (u - 5200) / 900);
+        const cutU = u < 10400 ? 0 : Math.min(1, (u - 10400) / 1800);
+        render(grow, cutU < 1 ? cutU * cutU * (3 - 2 * cutU) : 1);
+        if (cutU >= 1) fire("saved", () => sfx.notify(false));
+      },
+      el,
     });
   }
 
@@ -12626,6 +13520,8 @@
     engineering: { base: [14, 8, 27], pal: ["#6e40c9", "#3c1e70", "#8957e5", "#1f0f3d"], grid: [210, 168, 255, 0.028, 0.07], ang: Math.PI / 6, cell: 32, accent: ["#d2a8ff", "#8957e5", "#eddeff", "#a371f7"], music: "engineering", prog: [0, 3, 5, -2, 7, -4] },
     // Enterprise: metallic grey with silver accents, wide grid tilted -30°, a broad chord fanning across runners.
     enterprise: { base: [17, 19, 23], pal: ["#30363d", "#1b2638", "#3d444d", "#262c36"], grid: [209, 215, 224, 0.03, 0.075], ang: -Math.PI / 6, cell: 48, accent: ["#d1d7e0", "#4493f8", "#9198a1", "#f0f6fc"], music: "enterprise", prog: [0, 5, -5, 2, -3] },
+    // gh cao (research prototype): deep teal control room, wide grid tilted 60°, a hub ping fanning out to repos.
+    cao: { base: [4, 20, 24], pal: ["#0b5560", "#073b44", "#12707a", "#04242b"], grid: [120, 220, 230, 0.03, 0.075], ang: Math.PI / 3, cell: 40, accent: ["#56d4dd", "#1b9aaa", "#b3f0f5", "#39c5cf"], music: "cao", prog: [0, 3, -2, 5, -4] },
     // AW factory (measured data): violet graph paper, a fine straight grid, a rising arpeggio.
     data: { base: [11, 7, 26], pal: ["#3d1a7a", "#1f1650", "#5a32a3", "#0d2a5c"], grid: [171, 125, 248, 0.035, 0.09], ang: 0, cell: 20, accent: ["#bc8cff", "#8957e5", "#e2c5ff", "#79c0ff"], music: "data", prog: [0, 4, 7, 2] },
     finale: { base: [13, 17, 23], pal: ["#0a8a2e", "#0d419d", "#5a32a3", "#196c2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "finale", prog: [0] },
@@ -12641,10 +13537,13 @@
     cost: ["Cost & context", "Debug, spend less, route smarter"],
     engineering: ["Agentic Engineering", "Remember, expire, search, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
+    cao: ["Central Agentic Ops", "CAO · gh cao · research prototype"],
     data: ["AW factory", "Measured on gh-aw's own history"],
   };
   // Header-less rows of a single slide.
   const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
+  // Bands that are not shipped product: every slide (header included) carries a corner badge.
+  const PROTO = { cao: "gh cao" };
   // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
   const rows = [];
   for (const s of slides) {
@@ -12717,6 +13616,7 @@
         s.band = ri;
         s.step = i;
         s.red = !!THEME[s.group].red;
+        if (PROTO[s.group]) s.el.append(h("div", { class: "proto", "aria-label": `Research prototype: ${PROTO[s.group]}` }, h("i"), h("b", {}, "Research prototype"), h("span", {}, PROTO[s.group])));
         slides.push(s);
       });
     });
@@ -13093,6 +13993,20 @@
         ].forEach(([m, p], i) => bell(m, t + 0.3 + i * 0.1, 0.03, 1.2, panTo(p)));
         pad([48, 55, 60, 64, 67], t + 0.3, 2.4, 0.025, "triangle", 1800);
         bell(91, t + 0.9, 0.04, 1.6);
+      },
+      // gh cao: a suspended low drone under a hub ping that radiates out to repos and comes back as a soft echo
+      cao: t => {
+        tone(38, t + 0.12, { type: "sine", dur: 1.4, vol: 0.16, cutoff: 500 });
+        bell(86, t + 0.2, 0.04, 1.4);
+        [
+          [74, -0.9],
+          [79, -0.45],
+          [81, 0],
+          [86, 0.45],
+          [88, 0.9],
+        ].forEach(([m, p], i) => bell(m, t + 0.45 + i * 0.07, 0.022, 1, panTo(p)));
+        pad([50, 57, 62, 64, 69], t + 0.3, 2.6, 0.022, "triangle", 1500);
+        bell(93, t + 1.15, 0.025, 1.8);
       },
       // AW factory: a climbing arpeggio that keeps rising, landing on a bright major chord
       data: t => {
