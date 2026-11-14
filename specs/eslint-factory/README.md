@@ -12,6 +12,7 @@ This directory models the factory's queue-worker lifecycle and compares its assu
 | `compare.mjs`      | Parsed YAML/TypeScript extraction, actual library build/scan commands and native CJS/AsyncLocalStorage probes                          |
 | `trace.mjs`        | Strict finite-value trace parser, independent abstraction replay and readable trace rendering                                          |
 | `compare.test.mjs` | Comparison sensitivity, mutated executable fixture and generated trace validation tests                                                |
+| `trace.test.mjs`   | Trace parsing, transition replay, and readable trace rendering tests                                                                   |
 
 The universe contains two externally admitted root Works. `queueBranch` starts absent; the first authorized producer submit atomically creates it with the compiler-approved Policy and Work. `Installed` models availability of that compiled Policy proposal, not an administrator-seeded ledger. Dispatch requires the created branch and Policy. Each Work has a provisioned worker profile; equal priority, dependency readiness, capacity, run binding and resource authorization are simplified assumptions. `Dispatch` projects the first compatible worker assignment from one protected prefix request, not the complete native dispatch set. Homogeneous batching is permitted only when `Batch` is true; otherwise the assignment is a singleton. Different profiles cannot share an assignment. Actual mixed-profile probes produce two separate dispatches; leaving the other modeled Work queued is projection, not a claim about scheduler selection. This two-Work projection does not exercise all three dispatch slots, profile trust-domain/share-key restrictions, assignment byte bounds or queue fairness/recovery algorithms.
 
@@ -102,13 +103,13 @@ npm ci --prefix eslint-factory
 npm ci --prefix actions/setup/js
 ```
 
-`eslint-factory` provides TypeScript, ESLint, and Vitest; `actions/setup/js` provides the YAML parser used by the comparison. Then run `node specs/eslint-factory/check.mjs` and `node --test specs/eslint-factory/compare.test.mjs`. The test verifies that missing rows and broken targets are detected. Run both after adding, removing, or renaming a registered rule, editing the rule-link table, or changing the comparison logic. This checks link coverage, not rule-description semantics.
+`eslint-factory` provides TypeScript, ESLint, and Vitest; `actions/setup/js` provides the YAML parser used by the comparison. Then run `node specs/eslint-factory/check.mjs`, `node --test specs/eslint-factory/compare.test.mjs`, and `node --test specs/eslint-factory/trace.test.mjs`. The comparison test verifies that missing rows and broken targets are detected; the trace test validates trace parsing, replay, and rendering. Run both test commands after changing comparison or trace logic. Run the checker and comparison test after adding, removing, or renaming a registered rule or editing the rule-link table. This checks link coverage, not rule-description semantics.
 
-The model checker also requires Java and the existing official TLC jar; see the environment setup under [Reproduce](#reproduce).
+The model checker also requires Java and the existing official TLC jar. The checker defaults `JAVA` to a macOS Homebrew path, so non-macOS hosts must set `JAVA` to their Java executable; see [Reproduce](#reproduce).
 
 ## Reproduce
 
-Use existing Node dependencies in `eslint-factory/node_modules` and `actions/setup/js/node_modules`, an existing Java runtime and the official TLC jar. The driver refuses any jar except SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`. It uses at most two TLC workers, a 1 GiB Java heap, a 60-second per-case timeout (overridable up to 120 seconds) and a ten-minute total budget. JVM extracted modules, compiler outputs and all fixture files stay inside the artifact path.
+Use existing Node dependencies in `eslint-factory/node_modules` and `actions/setup/js/node_modules`, an existing Java runtime, and the official TLC jar. On non-macOS hosts, set `JAVA` to the Java executable because the checker default is a macOS Homebrew path. The driver refuses any jar except SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`. It uses at most two TLC workers, a 1 GiB Java heap, a 60-second per-case timeout (overridable up to 120 seconds) and a ten-minute total budget. JVM extracted modules, compiler outputs and all fixture files stay inside the artifact path.
 
 ```bash
 export TLA2TOOLS_JAR=/absolute/path/to/existing/tla2tools.jar
@@ -118,6 +119,7 @@ node specs/eslint-factory/check.mjs --artifacts="$ARTIFACTS/run"
 FACTORY_ARTIFACTS="$ARTIFACTS/tests" \
 FACTORY_MODEL_ARTIFACTS="$ARTIFACTS/run" \
   node --test specs/eslint-factory/compare.test.mjs
+node --test specs/eslint-factory/trace.test.mjs
 node actions/setup/js/node_modules/prettier/bin/prettier.cjs \
   --check 'specs/eslint-factory/*.mjs'
 ```

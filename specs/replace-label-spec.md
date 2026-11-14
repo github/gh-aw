@@ -550,13 +550,14 @@ For outcome evaluation compliance (verifying that the `replace_label` outcome ev
 - **T-RL-004**: Verify that a message with `label_to_add` exceeding 128 characters is rejected.
 - **T-RL-005**: Verify that a message with `repo` exceeding 256 characters is rejected.
 - **T-RL-006**: Verify that a valid message passes schema validation without error.
+- **T-RL-009**: Verify that the common validation-config generator includes the `replace_label` default and field rules.
 
 #### 9.2.2 Count Gate Tests
 
 - **T-RL-010**: Verify that the operation succeeds when count < max.
 - **T-RL-011**: Verify that the operation is rejected when count = max (gate is exclusive: count must be strictly less than max).
 - **T-RL-012**: Verify that the default max of 5 is enforced when `max` is absent from configuration.
-- **T-RL-013**: Verify that a GHA expression in `max` is resolved at runtime.
+- **T-RL-013**: Verify that a GHA expression in `max` passes compile-time validation unchanged for runtime resolution.
 
 #### 9.2.3 Target Authorization Tests
 
@@ -628,6 +629,7 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 - **T-RL-070**: Verify that a message with a `repo` in `allowed-repos` is accepted.
 - **T-RL-071**: Verify that a message with a `repo` not in `allowed-repos` is rejected.
 - **T-RL-072**: Verify that `target-repo` is used as the default when `repo` is absent from the message.
+- **T-RL-073**: Verify that a resolved repository must contain exactly one slash with non-empty owner and repository components.
 
 #### 9.2.10 Partial-Success Response Tests
 
@@ -660,6 +662,7 @@ Error-category fixture: `specs/replace-label-compliance/rl-004-error-categories.
 | RL-034 Missing label_to_remove proceeds | T-RL-044 | 1 | Required |
 | RL-036 Single REST setLabels call | T-RL-050 | 1 | Required |
 | RL-037 Rate-limit retry on REST call | T-RL-054 | 1 | Required |
+| RL-014 Repository identifier format | T-RL-073 | 1 | Required |
 | RL-041 label_to_add in labels array | T-RL-053 | 1 | Required |
 | RL-043 Atomic REST operation | T-RL-050 | 1 | Required |
 | RL-057 Verify returned labels | T-RL-057 | 1 | Required |
@@ -681,12 +684,12 @@ records the implementation test or remaining gap.
 |---|---|
 | §5 ordered processing pipeline | `replace_label.test.cjs`: “executes the label pipeline in order and stops before writes on a gate skip.” |
 | RL-008 | T-RL-001–006; `TestFormalSchemaRequiredFields` |
-| RL-009 | `TestFormalReplaceLabelP3_ValidationConfigFields`; **gap:** common-pipeline invocation is not directly tested. |
+| RL-009 | T-RL-009; `TestFormalReplaceLabelRL009_CommonValidationConfig` verifies that the shared validation-config generator emits the `replace_label` entry. |
 | RL-010 | T-RL-010–011; `TestFormalCountGate` |
-| RL-011 | **Gap:** expression resolution for `max` is not directly tested. |
+| RL-011 | T-RL-013; `TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime` verifies compile-time acceptance and preservation; GitHub Actions resolves the expression at execution time. |
 | RL-012 | T-RL-012; `TestFormalReplaceLabelP3_DefaultMaxFive` |
 | RL-013 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
-| RL-014 | **Gap:** malformed `owner/repo` rejection is not directly tested. |
+| RL-014 | T-RL-073; `TestFormalReplaceLabelRL014_RepositoryFormat`; `repo_helpers.test.cjs` verifies malformed repository rejection in the runtime helper. |
 | RL-015 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
 | RL-016 | T-RL-014–018; `TestFormalReplaceLabelP15_TargetModeEnforcement` |
 | RL-017 | T-RL-019 |
@@ -725,11 +728,11 @@ records the implementation test or remaining gap.
 | RL-049 | T-RL-020–025; `TestFormalBlocklistOrdering` |
 | RL-049a | `TestFormalBlockedLabelAddedViaReplaceLabelMidBlocklistChange_NoWriteAPI` |
 | RL-050 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
-| RL-051 | **Gap:** cross-repository token permission is not checked by a focused conformance test. |
+| RL-051 | **Accepted gap:** target-repository token grants are enforced by GitHub when `issues.setLabels` runs; the offline suite cannot verify an issued token's target-repository grant. A denied API call is a hard error, but there is no preflight permission check. |
 | RL-052 | T-RL-041; handler test for nonexistent `label_to_add` |
 | RL-053 | T-RL-030–031; **gap:** no test substitutes agent-provided label state for the REST response. |
-| RL-054 | **Gap:** the minimum `issues: write` token scope is not covered by a focused conformance test. |
-| RL-055 | **Gap:** dedicated per-type token use for narrower permissions is not covered by a conformance test. |
+| RL-054 | `TestFormalSec_P8_TokenScopeMinimum` verifies the `issues:write` minimum as a formal predicate; it does not inspect a live workflow token. |
+| RL-055 | **Accepted gap:** the SHOULD is conditional on the workflow token carrying broader grants; verifying token selection and relative scope requires workflow-level credential integration, not the offline handler suite. |
 | RL-056 | T-RL-060; `replace_label.test.cjs` asserts staged mode never calls `setLabels`. |
 
 ---
@@ -912,7 +915,7 @@ The message is skipped. The workflow run is not marked as failed.
 - Initial publication of the `replace-label` safe-output type specification.
 - Covers configuration schema, message schema, eight-stage processing model, GraphQL mutation, error-handling categories, security considerations, and compliance test suite.
 - Normative requirement codes RL-001 through RL-056 established.
-- Test IDs T-RL-001 through T-RL-072 defined.
+- Test IDs T-RL-001 through T-RL-073 defined.
 
 ---
 
