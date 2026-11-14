@@ -14,15 +14,15 @@ test("presents the sixteen slides without the removed sections", async ({ page }
 
   const headings = [
     "GitHubAgenticWorkflows",
-    "Built onGitHubActions.",
+    "AI-poweredworkflowsfor GitHub",
     "Spec Driven Automation",
     "Safety and control",
     "Automation hardening",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
+    "Pull Request Review²",
     "Repo Assist",
     "Research · Assign · Refine",
-    "Pull Request Review²",
     "Research · Assign · Observe",
     "Mine · Refine · Apply",
     "Cost management",
@@ -44,7 +44,7 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await expect(page.locator(".count")).toHaveText("07 / 16");
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
-  await expect(page.locator(".notes")).toContainText("Repo Assist");
+  await expect(page.locator(".notes")).toContainText("LabelOps");
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeHidden();
 
