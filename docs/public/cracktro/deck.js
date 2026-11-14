@@ -285,6 +285,7 @@
   .ao-stat { font: 600 18px var(--mono); fill: #9198a1; } .ao-stat.ko { fill: #ff7b72; } .ao-stat.ok { fill: #3fb950; }
   .ao-k { fill: #9198a1; font: 500 16px var(--mono); }
   .ao-sc { font: 600 16px var(--mono); text-anchor: end; } .ao-sc.ok { fill: #3fb950; } .ao-sc.ko { fill: #ff7b72; }
+  .ao-hr { opacity: .15; transition: opacity .3s; } .ao-hr.seen { opacity: 1; }
   .ao-hrow rect { fill: transparent; stroke: transparent; transition: fill .3s, stroke .3s; } .ao-pick.on rect { fill: #f8514922; stroke: #f85149; } .ao-pick.on .ao-k { fill: #f0f6fc; }
   .ao-v { fill: #e6edf3; font: 600 18px var(--mono); text-anchor: end; }
   .ao-run.good .ao-v { fill: #3fb950; }
@@ -4002,7 +4003,7 @@
     });
   }
 
-  // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
+  // Audit & Optimize: a scheduled agent uses health to pick a workflow; a second agent audits it through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
   {
     resetIndex();
     const VW = 1700,
@@ -4031,11 +4032,11 @@
     let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="298" rx="12"/><text class="sfl-title" x="40" y="116">HEALTH · ${HEALTH.length} WORKFLOWS</text>`;
     HEALTH.forEach(([n, sc, ok], i) => {
       const y = 146 + i * 26;
-      run += `<g class="ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
+      run += `<g class="ao-hr ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
     });
-    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
+    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><g class="ao-hr"><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
     MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${292 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${292 + i * 26}"></text>`));
-    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
+    run += `</g></g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
     // what the audit downloads, typed into the terminal
     const TERM = [
       ["cmd", "$ gh aw audit 1842"],
@@ -4093,18 +4094,21 @@
     diff += `</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
-      ["aoE0", "M90 400 V542", "p", ["on schedule · gh aw health", "picks issue-triage"], 112, 446, "start"],
-      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 522, "middle"],
+      ["aoES", "M92 580 H132", "p", [], 0, 0, "start"],
+      ["aoE0", "M170 544 V394", "p", ["gh aw health"], 192, 476, "start"],
+      ["aoE1", "M314 580 H410", "p", ["✕ issue-triage", "audit & optimize"], 348, 522, "middle"],
       ["aoE2", "M450 544 V396", "p", ["audit"], 472, 478, "start"],
       ["aoE3", "M804 240 H834", "p", [], 0, 0, "start"],
       ["aoE4", "M1260 240 H1284", "p", [], 0, 0, "start"],
       ["aoE5", "M1330 424 V542", "p", ["opens PR"], 1352, 490, "start"],
       ["aoE7", "M1368 580 H1402", "b", ["✓ approves"], 1500, 534, "middle"],
-      ["aoE6", "M1440 616 V652 H8 V200 H20", "b day", ["merged · health keeps watching the next runs"], 760, 640, "middle"],
+      ["aoE6", "M1440 616 V652 H8 V200 H20", "b day", ["merged · the next scheduled health check confirms it"], 760, 640, "middle"],
     ];
-    // the token's journey: [edge, node lit on arrival, duration]; TYPE, SCAN, DIFF and RERUN are in-place steps
+    // the token's journey: [edge, node lit on arrival, duration]; PICK, TYPE, SCAN, DIFF and RERUN are in-place steps
     const SEQ = [
-      ["aoE0", "aoHealth"],
+      ["aoES", "aoHealth", 700],
+      ["aoE0", "aoRun"],
+      ["PICK", "aoRun", 1800],
       ["aoE1", "aoCop"],
       ["aoE2", "aoTerm"],
       ["TYPE", "aoTerm", 2200],
@@ -4117,7 +4121,7 @@
       ["aoE6", "aoRun", 1800],
       ["RERUN", "aoRun", 2200],
     ];
-    const LANE = { aoRun: 0, aoHealth: 0, aoCop: 1, aoTerm: 1, aoSess: 2, aoDiff: 3, aoPR: 3, aoDev: 3 };
+    const LANE = { aoSched: 0, aoRun: 0, aoHealth: 0, aoCop: 1, aoTerm: 1, aoSess: 2, aoDiff: 3, aoPR: 3, aoDev: 3 };
     let g = `<defs><clipPath id="aoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="aoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="aoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="aoBeamG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
@@ -4140,8 +4144,7 @@
     const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 20)}</g>`;
     g += badge(1232, 444) + badge(1666, 394);
 
-    g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
-    g += `<g class="ao-badge"><circle cx="62" cy="548" r="17" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("calendar", 62, 548, 18, "#ab7df8")}</g>`;
+    g += box("aoSched", 56, 580, "calendar") + `<text class="mra-l p" x="72" y="530" text-anchor="middle">schedule</text>` + agent("aoHealth", 170, 580, 140, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg ao-svg");
@@ -4171,7 +4174,6 @@
     const light = nid => {
       $(nid).classList.add("on");
       $("aoLane" + LANE[nid]).classList.add("on");
-      if (nid === "aoHealth") $("aoPick").classList.add("on");
     };
     const setRun = (f, state) => {
       const r = $("aoRun");
@@ -4208,7 +4210,7 @@
       sound: "audit",
       palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
       notes:
-        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
+        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it. A schedule wakes a first agent, which runs gh aw health over every workflow and decides which one needs attention: here issue-triage, the regressed one. It hands that workflow to a second agent, Copilot with the agentic-workflows skill, which calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, the next scheduled health check confirms the improvement.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -4224,7 +4226,8 @@
           FIND.forEach((_, i) => ($("aoF" + i).textContent = ""));
           $("aoBeam").style.opacity = 0;
           setRun(0, "bad");
-          light("aoRun");
+          $("aoRun").classList.remove("bad");
+          light("aoSched");
           popK = -1;
           typed = 0;
           done = 0;
@@ -4238,10 +4241,17 @@
         while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
         const [eid, nid, dur = STEP] = SEQ[k],
           f = (u - T[k]) / dur;
-        if (["TYPE", "SCAN", "DIFF", "RERUN"].includes(eid)) {
+        if (["PICK", "TYPE", "SCAN", "DIFF", "RERUN"].includes(eid)) {
           dot.style.opacity = 0;
           for (let j = 0; j <= k; j++) light(SEQ[j][1]);
-          if (eid === "TYPE") reveal([...svg.querySelectorAll(".ao-term")], f / 0.9);
+          if (eid === "PICK") {
+            reveal([...svg.querySelectorAll(".ao-hr")], f / 0.7);
+            if (f >= 0.75 && !$("aoPick").classList.contains("on")) {
+              $("aoPick").classList.add("on");
+              $("aoRun").classList.add("bad");
+              sfx.pop(3);
+            }
+          } else if (eid === "TYPE") reveal([...svg.querySelectorAll(".ao-term")], f / 0.9);
           else if (eid === "SCAN") scan(f);
           else if (eid === "DIFF") reveal([...svg.querySelectorAll(".ao-dl")], f / 0.9);
           else {
@@ -4253,7 +4263,7 @@
               sfx.pop(9);
             }
           }
-          const rows = eid === "TYPE" ? ".ao-term.seen" : eid === "DIFF" ? ".ao-dl.seen" : null;
+          const rows = eid === "PICK" ? ".ao-hr.seen" : eid === "TYPE" ? ".ao-term.seen" : eid === "DIFF" ? ".ao-dl.seen" : null;
           if (rows) {
             const n = svg.querySelectorAll(rows).length;
             if (n !== typed) {
@@ -4281,7 +4291,7 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A schedule wakes one agent · another fixes · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
     });
   }
 
