@@ -52,6 +52,13 @@ describe("report AST", () => {
     expect(renderReport(report(children)).body).toBe("<!-- gh-aw-work-issue:work_123 -->\n");
   });
 
+  it("treats null template values as scalar text", () => {
+    const options = { context: { value: null } };
+    expect(renderReport(report(parseReportMarkdown("Value: {value}", options))).body).toBe("Value: null\n");
+    expect(renderReport(report(parseReportMarkdown("{value}", options))).body).toBe("null\n");
+    expect(parseReportMarkdown("<!-- gh-aw-work-issue:{value} -->", { ...options, allowMetadata: true })).toEqual([{ type: "xml_marker", name: "gh-aw-work-issue", value: "null", compact: true }]);
+  });
+
   it("imports a durable review marker as its own block and retains its encoded identity", () => {
     const source = 'Review summary\n[gh-aw-workflow-call-id]: # "owner%2Frepo%2FWorkflow%20name"';
     const children = parseReportMarkdown(source, { allowMetadata: true, agentTainted: false });
