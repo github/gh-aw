@@ -927,14 +927,14 @@
   .ge-mark.g text { fill: #3fb950; } .ge-mark.g path { stroke: #3fb950; filter: drop-shadow(0 0 8px #3fb950); }
   .ge-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
   .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
-  .zs-svg { position: absolute; left: 60px; top: 300px; width: 1800px; height: 660px; overflow: visible; font-family: "Mona Sans"; }
+  .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
   .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
   .zs-vm { fill: #8957e51f; stroke: #a371f7; stroke-width: 2.5; }
   .zs-host { fill: #3fb95012; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
   .zs-kern.g { fill: #8957e526; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #3fb9501f; stroke: #2ea043; stroke-width: 2; }
   .zs-kern.r { fill: #3fb95014; stroke: #3fb95088; stroke-width: 2; }
   .zs-kt { font: 700 26px "Mona Sans"; text-anchor: middle; } .zs-kt.g { fill: #d2a8ff; } .zs-kt.h, .zs-kt.r { fill: #7ee787; }
-  .zs-at { font: 600 16px var(--mono); letter-spacing: .14em; text-anchor: middle; } .zs-at.g { fill: #d2a8ff; } .zs-at.h { fill: #7ee787; }
+  .zs-at { font: 600 15px var(--mono); letter-spacing: .1em; text-anchor: middle; } .zs-at.g { fill: #d2a8ff; } .zs-at.h { fill: #7ee787; text-anchor: start; }
   .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; transition: opacity .3s, stroke .3s; }
   .zs-wire.hot { opacity: 1; stroke: #7ee787; filter: drop-shadow(0 0 6px #3fb950); }
   .zs-l { fill: #7ee787; font: 600 17px var(--mono); }
@@ -951,14 +951,16 @@
   .zs-ft { fill: #f0f6fc; font: 700 19px "Mona Sans"; text-anchor: middle; }
   .zs-eng rect { fill: #0d1117cc; stroke: #a371f7; stroke-width: 1.5; } .zs-eng text { fill: #e2c5ff; font: 600 17px var(--mono); text-anchor: middle; }
   .zs-none { fill: #f778ba; font: 700 17px var(--mono); letter-spacing: .08em; text-anchor: middle; }
+  .zs-nokey { fill: none; stroke: #f778ba99; stroke-width: 3; stroke-linecap: round; } .zs-nokey .x { stroke: #f778ba; stroke-width: 4; }
   .zs-dest { fill: none; stroke-width: 3; } .zs-dest.gh { stroke: #4493f8; } .zs-dest.net { stroke: #4493f8; }
   .zs-dl { fill: #79c0ff; font: 600 17px var(--mono); text-anchor: middle; }
   .zs-dest-g.hot .zs-dest { filter: drop-shadow(0 0 12px #4493f8); stroke: #79c0ff; }
-  .zs-cyl { fill: #0d1117; stroke: #3fb950; stroke-width: 2; }
+  .zs-cyl { fill: #3fb95033; stroke: #3fb950; stroke-width: 2; transition: filter .3s, stroke .3s; } .zs-cyl.top { fill: #3fb9505c; }
+  .zs-node.hot .zs-cyl { stroke: #7ee787; filter: drop-shadow(0 0 14px #3fb950); }
   .zs-cut { opacity: 0; } .zs-cut circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; filter: drop-shadow(0 0 10px #f85149); }
   .zs-cut path { stroke: #f85149; stroke-width: 5; stroke-linecap: round; } .zs-cut text { fill: #ff7b72; font: 600 17px var(--mono); text-anchor: middle; }
   .zs-cut.on { opacity: 1; }
-  .zs-phase { fill: #f0f6fc; font: 600 22px var(--mono); text-anchor: end; }
+  .zs-phase { fill: #f0f6fc; font: 600 18px var(--mono); text-anchor: end; }
   .zs-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
   .zs-pr { position: absolute; left: 0; right: 0; top: 986px; display: flex; justify-content: center; gap: 110px; font: 700 30px "Mona Sans"; color: #6e7681; }
   .zs-pr span { display: flex; align-items: center; gap: 14px; opacity: .7; }
@@ -3077,26 +3079,27 @@
     resetIndex();
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "zs-svg");
-    svg.setAttribute("viewBox", "0 0 1800 660");
+    svg.setAttribute("viewBox", "0 0 1800 600");
     svg.setAttribute("role", "img");
     svg.setAttribute(
       "aria-label",
       "Zero-secret agents: the agent and its runtime run in a micro-VM with no credentials on a guest kernel; on the host, a virtiofs mount shares the workspace, an MCP gateway routes to safe outputs or a GitHub MCP server that holds the token, an API proxy holds the model key, and all traffic leaves through a Squid firewall that allows or denies hosts and ports; safe outputs become action artifacts whose GitHub updates are allowed or denied; both kernels run inside the GitHub Actions runner VM"
     );
+    // rows: workspace/safe outputs/artifacts 95, gateway/GitHub MCP/Squid 240, API proxy 345, internet 420
     // [id, path, node lit on arrival]
     const EDGES = [
-      ["zsVm", "M330 260 H430", ""],
-      ["zsFs", "M430 260 V105 H548", "zsNFs"],
-      ["zsMcp", "M430 260 V215 H518", "zsNGw"],
-      ["zsLlm", "M430 260 V345 H518", "zsNProxy"],
-      ["zsNet", "M430 260 V450 H1250 V298", "zsNSquid"],
-      ["zsSo", "M705 198 L790 120", "zsNSo"],
-      ["zsGh", "M705 232 L790 245", "zsNGhMcp"],
-      ["zsGhSq", "M965 245 H1056", "zsNSquid"],
-      ["zsSoArt", "M965 105 H1146", "zsNArt"],
-      ["zsArtGh", "M1242 105 H1556", "zsDGh"],
-      ["zsLlmSq", "M705 345 H1250 V298", "zsNSquid"],
-      ["zsSqNet", "M1400 245 H1556", "zsDNet"],
+      ["zsVm", "M300 240 H380", ""],
+      ["zsFs", "M380 240 V95 H482", "zsNFs"],
+      ["zsMcp", "M380 240 H482", "zsNGw"],
+      ["zsLlm", "M380 240 V345 H482", "zsNProxy"],
+      ["zsNet", "M380 240 V420 H1340 V288", "zsNSquid"],
+      ["zsSo", "M680 222 L782 112", "zsNSo"],
+      ["zsGh", "M680 240 H782", "zsNGhMcp"],
+      ["zsGhSq", "M990 240 H1082", "zsNSquid"],
+      ["zsSoArt", "M990 95 H1185", "zsNArt"],
+      ["zsArtGh", "M1295 95 H1604", "zsDGh"],
+      ["zsLlmSq", "M680 345 H1220 V288", "zsNSquid"],
+      ["zsSqNet", "M1420 240 H1604", "zsDNet"],
     ];
     const TARGET = Object.fromEntries(EDGES.map(([id, , n]) => [id, n]));
     // [phase, edges, deny?]
@@ -3131,43 +3134,43 @@
       let g = `<defs><marker id="zsM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>`;
       g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient></defs>`;
       // runner VM, kernels and the two areas
-      g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="20" y="590" width="1440" height="62" rx="14"/><text class="zs-kt r" x="740" y="630">GitHub Actions Runner VM</text></g>`;
-      g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="20" y="510" width="310" height="62" rx="14"/><text class="zs-kt g" x="175" y="550">Guest Kernel</text>`;
-      g += `<rect class="zs-kern h" x="370" y="510" width="1090" height="62" rx="14"/><text class="zs-kt h" x="915" y="550">Host Kernel</text></g>`;
-      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-vm" x="20" y="20" width="310" height="470" rx="18"/><text class="zs-at g" x="175" y="52">AGENT MICRO-VM · NO AUTH</text>`;
-      g += `${folder(85, 72, 180, 92)}<text class="zs-ft" x="175" y="118">workspace</text><text class="zs-ft" x="175" y="142">tool cache</text>`;
-      g += `<circle cx="175" cy="222" r="40" fill="url(#zsAgentG)"/>${ico("copilot", 175, 224, 46)}<text class="zs-s" x="175" y="288">CODING AGENT RUNTIME</text>`;
+      g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
+      g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
+      g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
+      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/><text class="zs-at g" x="150" y="34">AGENT MICRO-VM · NO AUTH</text>`;
+      g += `<circle cx="150" cy="130" r="54" fill="url(#zsAgentG)"/>${ico("copilot", 150, 132, 62)}<text class="zs-s" x="150" y="218">CODING AGENT RUNTIME</text>`;
       [
-        ["copilot", 35],
-        ["claude", 130],
-        ["codex", 225],
-      ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="304" width="90" height="34" rx="17"/><text x="${x + 45}" y="327">${n}</text></g>`));
-      g += `<text class="zs-none" x="175" y="404">0 SECRETS</text><text class="zs-s" x="175" y="434">no tokens · no keys</text></g>`;
-      g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="370" y="20" width="1090" height="470" rx="18"/><text class="zs-at h" x="585" y="50">HOST · HOLDS THE KEYS</text></g>`;
+        ["copilot", 14],
+        ["claude", 107],
+        ["codex", 200],
+      ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="238" width="86" height="38" rx="19"/><text x="${x + 43}" y="263">${n}</text></g>`));
+      g += `<g class="zs-nokey" transform="translate(138,336)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
+      g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text></g>`;
+      g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
       // wires and labels
       g += `<g class="zs-area" style="--i:4">`;
       for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" marker-end="url(#zsM)"/>`;
-      g += `<text class="zs-l" x="444" y="94">virtiofs</text><text class="zs-l" x="444" y="204">MCP</text><text class="zs-l" x="444" y="334">LLM API</text><text class="zs-l m" x="840" y="440">internet traffic</text>`;
+      g += `<text class="zs-l" x="392" y="85">virtiofs</text><text class="zs-l" x="392" y="230">MCP</text><text class="zs-l" x="392" y="335">LLM API</text><text class="zs-l m" x="860" y="410">internet traffic</text>`;
       g += `</g>`;
       // host services
       g += `<g class="zs-area" style="--i:5">`;
-      g += `<g class="zs-node" id="zsNFs">${folder(555, 62, 140, 84, "h")}<text class="zs-ft" x="625" y="116">workspace</text></g>`;
-      g += box("zsNGw", 525, 170, 180, 90, "MCP gateway", "routes tools");
-      g += box("zsNProxy", 525, 300, 180, 90, "API proxy", "", true);
-      g += box("zsNSo", 795, 60, 170, 90, "Safe outputs", "proposals");
-      g += box("zsNGhMcp", 795, 200, 170, 90, "GitHub MCP", "", true);
-      g += box("zsNSquid", 1060, 200, 340, 90, "Squid firewall", "egress allowlist");
-      g += `<g class="zs-node" id="zsNArt"><path class="zs-cyl" d="M1150 70 V140 A45 12 0 0 0 1240 140 V70"/><ellipse class="zs-cyl" cx="1195" cy="70" rx="45" ry="12"/><text class="zs-s" x="1195" y="46">ACTION ARTIFACTS</text></g>`;
-      g += `<g class="zs-cut" id="zsCut"><circle cx="1478" cy="245" r="20"/><path d="M1469 236 L1487 254 M1487 236 L1469 254"/><text x="1470" y="292">not allowed</text></g>`;
+      g += `<g class="zs-node" id="zsNFs">${folder(500, 56, 170, 80, "h")}<text class="zs-ft" x="585" y="98">workspace</text><text class="zs-ft" x="585" y="121">tool cache</text></g>`;
+      g += box("zsNGw", 490, 200, 190, 80, "MCP gateway", "routes tools");
+      g += box("zsNProxy", 490, 305, 190, 84, "API proxy", "", true);
+      g += box("zsNSo", 790, 55, 200, 80, "Safe outputs", "proposals");
+      g += box("zsNGhMcp", 790, 198, 200, 84, "GitHub MCP", "", true);
+      g += box("zsNSquid", 1090, 200, 330, 80, "Squid firewall", "egress allowlist");
+      g += `<g class="zs-node" id="zsNArt"><path class="zs-cyl" d="M1195 66 V124 A45 12 0 0 0 1285 124 V66"/><ellipse class="zs-cyl top" cx="1240" cy="66" rx="45" ry="12"/><text class="zs-s" x="1240" y="164">ACTION ARTIFACTS</text></g>`;
+      g += `<g class="zs-cut" id="zsCut"><circle cx="1512" cy="240" r="20"/><path d="M1503 231 L1521 249 M1521 231 L1503 249"/><text x="1512" y="290">not allowed</text></g>`;
       g += `</g>`;
       // destinations outside the runner
       g += `<g class="zs-area" style="--i:6">`;
-      g += `<g class="zs-dest-g" id="zsDGh" transform="translate(1600,105)"><path class="zs-dest gh" d="M0 -34 L28 -23 V2 C28 20 13 30 0 36 C-13 30 -28 20 -28 2 V-23 Z"/><path class="zs-dest gh" d="M-11 0 L-3 9 L12 -8"/></g>`;
-      g += `<text class="zs-dl" x="1600" y="170">allow/deny</text><text class="zs-dl" x="1600" y="192">GitHub updates</text>`;
-      g += `<g class="zs-dest-g" id="zsDNet" transform="translate(1600,245)"><path class="zs-dest net" d="M-34 16 H32 A16 16 0 0 0 28 -14 A22 22 0 0 0 -12 -20 A18 18 0 0 0 -34 16 Z"/></g>`;
-      g += `<text class="zs-dl" x="1600" y="296">allow/deny</text><text class="zs-dl" x="1600" y="318">hosts/ports</text>`;
+      g += `<g class="zs-dest-g" id="zsDGh" transform="translate(1650,95)"><path class="zs-dest gh" d="M0 -34 L28 -23 V2 C28 20 13 30 0 36 C-13 30 -28 20 -28 2 V-23 Z"/><path class="zs-dest gh" d="M-11 0 L-3 9 L12 -8"/></g>`;
+      g += `<text class="zs-dl" x="1650" y="158">allow/deny</text><text class="zs-dl" x="1650" y="180">GitHub updates</text>`;
+      g += `<g class="zs-dest-g" id="zsDNet" transform="translate(1650,240)"><path class="zs-dest net" d="M-34 16 H32 A16 16 0 0 0 28 -14 A22 22 0 0 0 -12 -20 A18 18 0 0 0 -34 16 Z"/></g>`;
+      g += `<text class="zs-dl" x="1650" y="294">allow/deny</text><text class="zs-dl" x="1650" y="316">hosts/ports</text>`;
       g += `</g>`;
-      g += `<text class="zs-phase" id="zsPhase" x="1780" y="-14"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
+      g += `<text class="zs-phase" id="zsPhase" x="1476" y="34"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
       svg.innerHTML = g;
     };
     const pi = (d, ...kids) => h("span", { class: d ? "on" : "" }, ...kids);
