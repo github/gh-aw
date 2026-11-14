@@ -14,7 +14,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a de
 - `docs/public/cracktro/index.html`: loads `deck.js` and holds the SEO/Open Graph/Twitter meta (absolute `https://github.github.com/gh-aw/cracktro/` URLs).
 - `docs/public/cracktro/og-image.png`: 1200x630 social card rendered from slide 1 with the dots/count/sound/progress UI hidden. Keep it outside `assets/` (the asset test only allows avatars there).
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
-- `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg`: the fake users Mona and Ducky (GitHub's mascots), the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
+- `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg`: the fake users Mona and Ducky (GitHub's mascots), plus `mona-full.png` (transparent full-body Mona for the Trust the process slide); the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
 - `docs/tests/talk.spec.ts`: Playwright tests. They read `.github/skills/cracktro/slides.md`.
 - `.github/skills/cracktro/slides.md`: the single ordered slide list (headings, band headers included, and which notes must say illustrative). A slide's number is its row; never write slide numbers or counts anywhere else. Edit one row per slide in the same change as `deck.js`.

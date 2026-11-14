@@ -259,6 +259,14 @@
   .fmm-cell.flip { transform: rotateY(90deg); }
   .fmm-cell.flop { transform: rotateY(0); transition: transform .26s cubic-bezier(.3,1.6,.4,1); }
   @keyframes fmm-in { from { transform: scale(0) rotate(-20deg); } }
+  /* factory mindset: copy slides in from the left, the grid from the right; both leave the way they came */
+  .slide.fmm.active .fmm-copy > * { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .slide.fmm.active .fmm-copy > :nth-child(2) { animation-delay: .12s; } .slide.fmm.active .fmm-copy > :nth-child(3) { animation-delay: .24s; }
+  .slide.fmm.active .fmm-grid { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both .1s; }
+  .slide.fmm.up-in, .slide.fmm.down-in, .slide.fmm.leaving { animation: none; }
+  .slide.fmm.fadeout { opacity: 1; }
+  .slide.fmm:is(.fadeout, .leaving) .fmm-copy > * { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .slide.fmm:is(.fadeout, .leaving) .fmm-grid { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
   .tp { display: grid; place-items: center; }
   .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
   .tp-copy h2 { margin: 0; font-variation-settings: "wght" 520, "wdth" 100; letter-spacing: -.02em; }
@@ -280,7 +288,6 @@
   body.light .fmm-go, body.light .tp-go { color: #116329; }
   body.light .fmm-grid { box-shadow: 0 30px 90px #1f232826, 0 0 0 1px #1f23281f; }
   body.light .fmm-cell, body.light .fmm-cell.g { background: #f6f8fa; }
-  body.light .fm-marquee span { border-color: #9ea7b3; background: #f6f8facc; color: #393f46; }
   body.light .tp-vs > b { color: #424a53; }
   body.light .tp-blue { --c: #0550ae; } body.light .tp-green { --c: #116329; }
   body.light .tp-pill i { opacity: .14; }
@@ -290,11 +297,33 @@
   body.light .count { color: #424a53; }
   body.light .snd, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
   body.light .snd:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
-  .active .tp-copy > * { animation: tp-up .7s cubic-bezier(.2,.8,.2,1) both; }
-  .active .tp-copy > :nth-child(2) { animation-delay: .1s; } .active .tp-copy > :nth-child(3) { animation-delay: .35s; }
-  .active .tp-copy > :nth-child(4) { animation-delay: .6s; } .active .tp-copy > :nth-child(5) { animation-delay: .8s; }
-  @keyframes tp-up { from { opacity: 0; transform: translateY(30px); } }
+  .active .tp-copy > :nth-child(odd):not(.tp-vs), .active .tp-vs > :first-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .active .tp-copy > :nth-child(even):not(.tp-vs), .active .tp-vs > :last-child { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both; }
+  .active .tp-copy > :nth-child(2) { animation-delay: .15s !important; }
+  .active .tp-vs > * { animation-delay: .45s !important; }
+  .active .tp-vs > b { animation: tp-vs .5s cubic-bezier(.3,1.6,.4,1) both 1.05s !important; }
+  .active .tp-copy > :nth-child(4) { animation-delay: .8s !important; } .active .tp-copy > :nth-child(5) { animation-delay: .95s !important; }
+  @keyframes tp-l { from { opacity: 0; transform: translateX(-1500px); } }
+  @keyframes tp-r { from { opacity: 0; transform: translateX(1500px); } }
+  @keyframes tp-vs { from { opacity: 0; transform: scale(0); } }
+  /* enter and exit horizontally only: no vertical band push or fade for the slide itself; its text splits back out to the sides */
+  .slide.tp.up-in, .slide.tp.down-in, .slide.tp.leaving { animation: none; }
+  .slide.tp.fadeout { opacity: 1; }
+  .tp:is(.fadeout, .leaving) .tp-copy > :nth-child(odd):not(.tp-vs), .tp:is(.fadeout, .leaving) .tp-vs > :first-child {
+    animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .tp:is(.fadeout, .leaving) .tp-copy > :nth-child(even):not(.tp-vs), .tp:is(.fadeout, .leaving) .tp-vs > :last-child {
+    animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .tp:is(.fadeout, .leaving) .tp-vs > b { animation: tp-vso .25s ease-in both !important; }
+  @keyframes tp-lo { to { opacity: 0; transform: translateX(-1500px); } }
+  @keyframes tp-ro { to { opacity: 0; transform: translateX(1500px); } }
+  @keyframes tp-vso { to { opacity: 0; transform: scale(0); } }
   @keyframes tp-pop { from { transform: scale(0); } }
+  /* Mona leans in from the left edge to watch the race; she slides in and out with the copy */
+  .tp-mona { position: absolute; left: 0; bottom: 0; width: 440px; height: 900px; overflow: hidden; pointer-events: none; }
+  .tp-mona svg { position: absolute; left: -240px; bottom: -80px; width: 480px; height: 660px; overflow: visible; }
+  .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
+  .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  @keyframes tp-bob { 50% { transform: translateY(-14px); } }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
   .fm-cap b { font-weight: 700; font-stretch: 100%; }
@@ -900,11 +929,6 @@
   .bd-bot { opacity: 0; transition: opacity .4s; } .bd-bot.on { opacity: 1; }
   .bd-res { opacity: 0; transition: opacity .6s; } .bd-res.on { opacity: 1; }
   .bd-res text { fill: #3fb950; font: 800 34px "Mona Sans"; } .bd-res text.s { font: 600 18px var(--mono); fill: #9198a1; }
-  .fm-marquee { position: absolute; left: 0; right: 0; bottom: 92px; overflow: hidden; white-space: nowrap;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
-  .fm-marquee div { display: inline-flex; gap: 14px; animation: fm-scroll 60s linear infinite; }
-  .fm-marquee span { padding: 8px 18px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 19px/1 var(--mono); color: #c9d1d9; }
-  @keyframes fm-scroll { to { transform: translateX(-50%); } }
   .cao-tag { position: absolute; font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
   /* centred under the CAO diagram (canvas left 700px + its centre 590px), right below its success rate */
   .rollout { position: absolute; left: 1290px; bottom: 70px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; font: 600 20px/1 var(--mono); }
@@ -3844,28 +3868,6 @@
   // The factory mindset: engineer processes, not code
   {
     resetIndex();
-    const flows = [
-      "repo-assist",
-      "issue-triage-agent",
-      "code-simplifier",
-      "dead-code-remover",
-      "duplicate-code-detector",
-      "semantic-function-refactor",
-      "daily-file-diet",
-      "unbloat-docs",
-      "daily-doc-healer",
-      "ci-coach",
-      "hourly-ci-cleaner",
-      "grumpy-reviewer",
-      "pr-sous-chef",
-      "mergefest",
-      "security-review",
-      "agentic-token-optimizer",
-      "issue-monster",
-      "necromancer",
-      "daily-team-status",
-      "poem-bot 🎭",
-    ];
     const PAL = ["#ff80ea", "#ff80ea", "#b0520f", "#0a8a2e", "#76f794", "#76f794", "#b9a00a", "#ab7df8", "#0d1117"];
     const GLY = ["=", "(", ")", "<", "{", "}", "/>", "pr", "branch", "check"];
     const SVGI = {
@@ -3918,7 +3920,7 @@
       },
       el: h(
         "section",
-        { class: "slide" },
+        { class: "slide fmm" },
         h(
           "div",
           { class: "fmm-copy" },
@@ -3926,16 +3928,7 @@
           h("h2", { class: "fmm-stop" }, "Stop manually translating intent into code."),
           h("h2", { class: "fmm-go" }, "Engineer processes that create trusted features.")
         ),
-        grid,
-        h(
-          "div",
-          { class: "fm-marquee" },
-          h(
-            "div",
-            {},
-            [...flows, ...flows].map(f => h("span", {}, f))
-          )
-        )
+        grid
       ),
     });
   }
@@ -7885,7 +7878,12 @@
           h("div", { class: "tp-vs" }, slow.el, h("b", {}, "VS"), fast.el),
           h("h2", { class: "tp-go" }, "Improve your process."),
           h("h2", { class: "tp-go" }, "Accelerate your factory.")
-        )
+        ),
+        (() => {
+          const m = h("div", { class: "tp-mona", "aria-hidden": "true" });
+          m.innerHTML = '<svg viewBox="0 0 411 565"><image href="assets/avatars/mona-full.png" width="411" height="565" transform="rotate(14 120 565)"/></svg>';
+          return m;
+        })()
       ),
     });
   }
