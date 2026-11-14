@@ -44,7 +44,7 @@
   .wash::after { content: ""; position: absolute; inset: 0;
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #1c0204b0 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
-  .wash.cover { z-index: 4; }
+  .wash.cover { z-index: 4; transition-duration: .3s; }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
@@ -10489,7 +10489,7 @@
       el: h(
         "section",
         { class: "slide ge" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A red-team agent that tries a new escape every day"), h("h2", {}, letters("Continuous "), letters("Security", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A red-team agent that tries a new escape every day"), h("h2", {}, letters("Continuous "), letters("Red Teaming", "l-grad"))),
         svg,
         stats,
         h("div", { class: "ct-src" }, "measured from The Great Escapi's repo memory · Feb–Sep 2026 · fixed in the AWF firewall")
@@ -13459,7 +13459,7 @@
       redT = setTimeout(() => {
         redT = null;
         show(n, true);
-      }, 1000);
+      }, 320);
       return;
     }
     show(n);
