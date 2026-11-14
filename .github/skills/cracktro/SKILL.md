@@ -5,7 +5,7 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 # Cracktro talk deck
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a thirty-nine-slide deck with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a forty-one-slide deck with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
@@ -14,7 +14,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a th
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of thirty-nine slide headings, so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of forty-one slide headings, so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -67,16 +67,16 @@ slides.push({
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
-- Exception: the Issues as intent slide (12) shows real counts for gh-aw issues labelled `community` and the merged PRs that closed them (November 2026 snapshot); its notes and caption say so.
-- Exception: the Query · Ask · Grow slide (17, `otg-` classes) has a bottom timeline of gh-aw's measured `[otel-advisor]`/`[grafana-otel-advisor]` issues (5 Apr to 9 Jun 2026, day offsets in `DAYS`); the loop above it is illustrative and its notes say so.
-- Exception: the Mine · Refine · Apply slide (18, `mra-` classes) shows real gh-aw data, 15 May to 11 Nov 2026: a dated feed of merged `[linter-miner]` analyzers (with their ordinal of 65), `[lint-monster]` issues and Copilot cleanup PRs, plus counts (73 analyzer PRs, 65 merged, 376 reviews, 235 LintMonster issues, 92 merged cleanup PRs, 54,128 lines). The loop is illustrative; notes and caption say so. Feed authors are agents only (`linter miner`, `lintmonster`, `copilot`).
-- Exception: the Go Fan slide (20, `gf-` classes) shows real counts of gh-aw `[go-fan]` review issues, the merged PRs that closed them, and shortened PR titles (February to November 2026); its notes and caption say so.
-- Exception: the Spec-driven testing slide (21) shows an illustrative excerpt of gh-aw's `pkg/ctxutil` change, README spec and spec tests, and names gh-aw's own spec workflows; its notes say so.
-- Exception: the Docs that heal slide (22, `dh-` classes) names gh-aw's own docs workflows; the workflow, page and noob tester report shown are illustrative and its notes say so.
-- Exception: the Speak · Map · Grep slide (23, `dg-` classes) shows spoken forms from gh-aw's real `DICTATION.md` and names its dictation and function-namer workflows; grep counts and renames are synthetic, the maintainer is the pelikhan avatar, and its notes say so.
-- Exception: the data slides after the finale. Slide 38, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 39, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record.
+- Exception: the Issues as intent slide (13) shows real counts for gh-aw issues labelled `community` and the merged PRs that closed them (November 2026 snapshot); its notes and caption say so.
+- Exception: the Query · Ask · Grow slide (18, `otg-` classes) has a bottom timeline of gh-aw's measured `[otel-advisor]`/`[grafana-otel-advisor]` issues (5 Apr to 9 Jun 2026, day offsets in `DAYS`); the loop above it is illustrative and its notes say so.
+- Exception: the Mine · Refine · Apply slide (19, `mra-` classes) shows real gh-aw data, 15 May to 11 Nov 2026: a dated feed of merged `[linter-miner]` analyzers (with their ordinal of 65), `[lint-monster]` issues and Copilot cleanup PRs, plus counts (73 analyzer PRs, 65 merged, 376 reviews, 235 LintMonster issues, 92 merged cleanup PRs, 54,128 lines). The loop is illustrative; notes and caption say so. Feed authors are agents only (`linter miner`, `lintmonster`, `copilot`).
+- Exception: the Go Fan slide (21, `gf-` classes) shows real counts of gh-aw `[go-fan]` review issues, the merged PRs that closed them, and shortened PR titles (February to November 2026); its notes and caption say so.
+- Exception: the Spec-driven testing slide (22) shows an illustrative excerpt of gh-aw's `pkg/ctxutil` change, README spec and spec tests, and names gh-aw's own spec workflows; its notes say so.
+- Exception: the Docs that heal slide (23, `dh-` classes) names gh-aw's own docs workflows; the workflow, page and noob tester report shown are illustrative and its notes say so.
+- Exception: the Speak · Map · Grep slide (24, `dg-` classes) shows spoken forms from gh-aw's real `DICTATION.md` and names its dictation and function-namer workflows; grep counts and renames are synthetic, the maintainer is the pelikhan avatar, and its notes say so.
+- Exception: the data slides after the finale. Slide 39, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 40, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record. Slide 41, "How workflows evolve" (`evo-` classes), shows measured first-parent commits on main that changed `.github/workflows/**/*.md` (monthly by author type, live workflow count, lines-changed histogram and statistical tests: Spearman, Mann–Whitney, Gini), 12 Aug 2025 to GA; its notes give the method.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 2, 3, 5, 7, 8, and 10–37 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 2, 3, 5, 7, 8, 9, and 11–38 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop
