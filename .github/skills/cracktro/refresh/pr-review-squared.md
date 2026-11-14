@@ -3,7 +3,7 @@ name: cracktro-refresh-pr-review-squared
 description: Recompute the measured data on the cracktro "PR Review²" slide and update deck.js.
 ---
 
-# Refresh "PR Review²" (slide 17)
+# Refresh "PR Review²"
 
 Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/deck.js` whole; `grep -n`, then `view_range`.
 
@@ -29,7 +29,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
      - Comment above it: `// measured on gh-aw merged PRs, 15 Oct to 13 Nov 2026; ...`
   2. Caption `<text class="prq-cap" ...>MEASURED · only PRs merged 15 Oct – 13 Nov 2026 (30 days), snapshot 14 Nov · flow above is illustrative</text>`.
   3. `notes:` string starting `"Pull Request Review squared.`: repeats every number plus `660 of the 682 reviewed pull requests` (single round) and the window/snapshot dates.
-- Elsewhere: `.github/skills/cracktro/content-rules.md` Exception bullet "the Pull Request Review² slide (17, `prq-` classes)". `1,263` also appears on slide 21 (`mfu-big`); keep both consistent if the windows match.
+- Elsewhere: `.github/skills/cracktro/content-rules.md` Exception bullet "the Pull Request Review² slide (`prq-` classes)". `1,263` also appears on the "Merge fast, unslop daily" slide (`mfu-big`); keep both consistent if the windows match.
 - The open-thread counter in the flow is synthetic; do not touch it.
 
 ## 2. Window & snapshot
@@ -81,15 +81,15 @@ Output shape → slide field:
 2. Edit `STATS` values and label numbers (`of N PRs merged`, `on N PRs`). Format: thousands comma (`1,337`), hours one decimal + ` h`.
 3. Edit the `STATS` comment dates and the `prq-cap` caption: `MEASURED · only PRs merged D Mon – D Mon YYYY (30 days), snapshot D Mon · flow above is illustrative`. Keep it on one line; it must fit the 1700-wide card.
 4. Rewrite every number and date in `notes`. Keep the words "illustrative" and "synthetic" (must match `/illustrative|synthetic|simulated/i`). Keep the method sentence (footers, workflow marker).
-5. Update the content-rules.md Exception bullet for slide 17 (window and all six counts).
-6. If slide 21 uses the same window, sync its `1,263` / per-day figures or note the mismatch.
+5. Update the content-rules.md Exception bullet for this slide (window and all six counts).
+6. If the "Merge fast, unslop daily" slide uses the same window, sync its `1,263` / per-day figures or note the mismatch.
 
 ## 6. Validation
 
 ```bash
 node --check docs/public/cracktro/deck.js
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # async + detached
-# browser canvas: http://127.0.0.1:4329/cracktro/#17 → step to the end, screenshot the strip
+# browser canvas: http://127.0.0.1:4329/cracktro/#N (N = row in slides.md) → step to the end, screenshot the strip
 grep -nE '\b[0-9a-f]{40}\b|https?://' docs/public/cracktro/deck.js | grep -v 'introduction/overview'   # must be empty
 cd docs && npx playwright test tests/talk.spec.ts                       # if node_modules exists
 ```
@@ -107,4 +107,4 @@ cd docs && npx playwright test tests/talk.spec.ts                       # if nod
 - Footers can change: re-read each workflow's `footer:` before running; update `REVIEWERS` in the script if it changed.
 - `truncated` PRs may undercount; spot-check them if the list grows.
 - GraphQL rate limits: the script retries 3 times with backoff; rerun if it still fails.
-- Slide numbers shift when slides are added; find the slide by its marker, not by `#17`.
+- Slide numbers shift when slides are added; find the slide by its marker, and its `#N` by its row in `slides.md`.
