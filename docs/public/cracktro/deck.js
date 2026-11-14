@@ -8430,7 +8430,7 @@
     };
     const setNotes = n => (ledgerD.textContent = `${n} notes · queried read-only in SQLite`);
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "memory",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#0a3069"],
       notes:
@@ -8606,7 +8606,7 @@
       while (log.children.length > 5) log.lastChild.remove();
     };
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "ephemeral",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#9a6700"],
       notes:
@@ -8746,7 +8746,7 @@
       fn();
     };
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "index",
       palette: ["#2da44e", "#1f6feb", "#8957e5", "#0a3069"],
       notes:
@@ -8999,7 +8999,7 @@
     };
 
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "lab",
       palette: ["#1f6feb", "#8957e5", "#238636", "#0d419d"],
       notes:
@@ -9204,7 +9204,7 @@
       tokN.textContent = "↓ " + Math.round(shown).toLocaleString("en-US") + " tokens";
     };
     slides.push({
-      group: "enterprise",
+      group: "engineering",
       sound: "engine",
       palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
       notes:
@@ -9441,7 +9441,7 @@
       script();
     };
     slides.push({
-      group: "enterprise",
+      group: "security",
       sound: "vault",
       palette: ["#8957e5", "#1f6feb", "#238636", "#1b7c83"],
       notes:
@@ -9867,7 +9867,7 @@
       cap.classList.add("swap");
     };
     slides.push({
-      group: "enterprise",
+      group: "data",
       sound: "patch",
       palette: ["#1f6feb", "#8957e5", "#238636", "#9e6a03"],
       notes:
@@ -11178,7 +11178,8 @@
     platform: ["Workflows", "Markdown in, GitHub Actions out"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
-    cost: ["Cost & context", "Debug, spend less, remember more, measure everything"],
+    cost: ["Cost & context", "Debug, spend less, route smarter"],
+    engineering: ["Agentic Engineering", "Remember, expire, search, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     data: ["AW factory", "Measured on gh-aw's own history"],
   };
