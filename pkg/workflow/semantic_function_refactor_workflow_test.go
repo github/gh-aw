@@ -71,7 +71,6 @@ func TestSemanticFunctionRefactorWorkflowCostGuardrails(t *testing.T) {
 		`GH_AW_MAX_DAILY_AI_CREDITS: "300"`,
 		`GH_AW_MAX_AI_CREDITS: "300"`,
 		`\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS}`,
-		`claude-sonnet-5`,
 		`name: Pre-compute semantic refactor slice`,
 		`/tmp/gh-aw/agent/semantic-function-refactor/analysis.json`,
 		`go run ./scripts/semantic-refactor-slice`,
@@ -95,6 +94,9 @@ func TestSemanticFunctionRefactorWorkflowCostGuardrails(t *testing.T) {
 			if !strings.Contains(string(content), snippet) {
 				t.Fatalf("missing prompt/tool/budget guardrail: %q", snippet)
 			}
+		}
+		if strings.Contains(lockStr, "GH_AW_INFO_MODEL_COSTS:") {
+			t.Fatal("compiled workflow must not inject catalog pricing into reporting metadata")
 		}
 	}
 }

@@ -45,6 +45,8 @@ type TokenUsageEntry struct {
 	AICreditsThisResponse   json.RawMessage `json:"ai_credits_this_response,omitempty"`
 	AICreditsTotal          json.RawMessage `json:"ai_credits_total,omitempty"`
 	InputTokensIncludeCache json.RawMessage `json:"input_tokens_include_cache,omitempty"`
+	// reportedCreditDelta is derived from ordered cumulative totals, never token prices.
+	reportedCreditDelta float64
 	// Steering is the AWF steering notice delivered on this request, if any.
 	// Older AWF versions never record it, so nil means "no notice recorded".
 	Steering *TokenUsageSteering `json:"steering,omitempty"`
@@ -422,6 +424,9 @@ type agentUsageEntry struct {
 	// AICredits is the pre-computed total AI Credits value written by parse_token_usage.cjs.
 	// When present and valid it is used directly so we don't need per-model pricing.
 	AICredits json.RawMessage `json:"ai_credits"`
+	// Native engines may report USD costs instead of credits.
+	CostUSD      json.RawMessage `json:"cost_usd"`
+	TotalCostUSD json.RawMessage `json:"total_cost_usd"`
 }
 
 // proxyEventsEntry is a JSONL record from api-proxy-logs/events.jsonl.

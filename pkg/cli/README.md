@@ -12,6 +12,8 @@ Besides Cobra entry points, the package also exposes reusable helpers for workfl
 
 All diagnostic output MUST go to `stderr` using `console` formatting helpers. Structured output (JSON, hashes, graphs) goes to `stdout`.
 
+`gh aw models --json` retains the deprecated `catalog` and `observed[].in_catalog` fields for compatibility. They always contain `[]` and `false`, respectively; no repository-owned pricing catalog or membership lookup is used. Use AWF model metadata for catalog information and `observed` for locally recorded model evidence. The console report lists aliases and observed models only.
+
 ## Command Groups
 
 | Command | Entry Point | Description |
@@ -577,7 +579,7 @@ err := cli.AuditWorkflowRun(ctx, runID, cli.AuditOptions{
 - `github.com/github/gh-aw/pkg/syncutil` — thread-safe one-shot caching (used for repository slug lookup)
 - `github.com/github/gh-aw/pkg/github` — label-based objective value mapping for issue prioritization scoring
 - `github.com/github/gh-aw/pkg/intent` — intent attribution and resolution for mapping PRs and issues to labelled intent records
-- `github.com/github/gh-aw/pkg/modelsdev` — model pricing lookup backed by the public `models.dev` catalog
+- `github.com/github/gh-aw/pkg/modelsdev` — provider and model identifier normalization helpers
 - `github.com/github/gh-aw/pkg/setutil` — set operations backed by `map[K]struct{}`
 - `github.com/github/gh-aw/pkg/colorwriter` — color-profile-aware writers and ANSI degradation for terminal output
 - `github.com/github/gh-aw/pkg/ctxutil` — non-nil `context.Context` fallback for optional context options
@@ -913,7 +915,7 @@ Method-form symbols on exported types (e.g. `(*FileTracker).TrackCreated`, `(*Do
 | `logs_multi.go` | `DownloadWorkflowLogsForTargets` | `func DownloadWorkflowLogsForTargets(ctx context.Context, opts LogsDownloadOptions, targets []logsWorkflowTarget, initialErrors []error) (err error)` | Downloads several workflow reports concurrently and renders one combined report, using an isolated output directory per target so run IDs from different repositories cannot collide in the local cache. |
 | `mcp_schema.go` | `GenerateNamedOutputSchema` | `func GenerateNamedOutputSchema(name string) ([]byte, error)` | Generates and serializes a known CLI output schema by name (e.g. `audit`). |
 | `mcp_schema.go` | `MarshalOutputSchema` | `func MarshalOutputSchema(schema *jsonschema.Schema) ([]byte, error)` | Serializes a generated output schema using the CLI's standard indented JSON format. |
-| `models_command.go` | `NewModelsCommand` | `func NewModelsCommand() *cobra.Command` | Creates the `models` command that lists model catalog pricing, aliases, and observed automation models. |
+| `models_command.go` | `NewModelsCommand` | `func NewModelsCommand() *cobra.Command` | Creates the `models` command that lists aliases and observed automation models. |
 
 ### Additional exported symbols (verified 2026-10-06)
 

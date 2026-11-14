@@ -1276,7 +1276,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `compiler_mutators.go` | `(*Compiler).SetForceRefreshActionPins` | `func (*Compiler).SetForceRefreshActionPins(force bool)` | SetForceRefreshActionPins configures whether to force refresh of action pins |
 | `compiler_mutators.go` | `(*Compiler).SetForceStaged` | `func (*Compiler).SetForceStaged(force bool)` | SetForceStaged configures whether safe-outputs should always compile in staged mode. |
 | `compiler_mutators.go` | `(*Compiler).SetGHESCompat` | `func (*Compiler).SetGHESCompat(enabled bool)` | SetGHESCompat enables GHES compatibility mode via the --ghes CLI flag. |
-| `compiler_mutators.go` | `(*Compiler).SetModelPricingResolver` | `func (*Compiler).SetModelPricingResolver(fn func(ctx context.Context, provider, model string) (map[string]float64, bool))` | SetModelPricingResolver registers a callback used to resolve pricing for models that are not present in the embedded models. |
 | `compiler_mutators.go` | `(*Compiler).SetNoEmit` | `func (*Compiler).SetNoEmit(noEmit bool)` | SetNoEmit configures whether to validate without generating lock files |
 | `compiler_mutators.go` | `(*Compiler).SetPriorManifests` | `func (*Compiler).SetPriorManifests(manifests map[string]*GHAWManifest)` | SetPriorManifests replaces the entire pre-cached manifest map. |
 | `compiler_mutators.go` | `(*Compiler).SetQuiet` | `func (*Compiler).SetQuiet(quiet bool)` | SetQuiet configures whether to suppress success messages (for interactive mode) |
@@ -1459,7 +1458,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `mcp_config_types.go` | `(MapToolConfig).GetString` | `func (MapToolConfig).GetString(key string) (string, bool)` | Exported function or method declared in `mcp_config_types.go`. |
 | `mcp_config_types.go` | `(MapToolConfig).GetStringArray` | `func (MapToolConfig).GetStringArray(key string) ([]string, bool)` | Exported function or method declared in `mcp_config_types.go`. |
 | `mcp_config_types.go` | `(MapToolConfig).GetStringMap` | `func (MapToolConfig).GetStringMap(key string) (map[string]string, bool)` | Exported function or method declared in `mcp_config_types.go`. |
-| `mcp_config_validation.go` | `ValidateMCPConfigs` | `func ValidateMCPConfigs(tools map[string]any) error` | ValidateMCPConfigs validates all MCP configurations in the tools section using JSON schema. |
 | `mcp_config_validation.go` | `ValidateToolsSection` | `func ValidateToolsSection(tools map[string]any) error` | ValidateToolsSection validates that all entries in the user-facing tools: frontmatter section are recognized built-in tool names. |
 | `mcp_detection.go` | `HasMCPServers` | `func HasMCPServers(workflowData *WorkflowData) bool` | HasMCPServers checks if the workflow has any MCP servers configured |
 | `mcp_renderer.go` | `HandleCustomMCPToolInSwitch` | `func HandleCustomMCPToolInSwitch( yaml *strings.Builder, toolName string, tools map[string]any, isLast bool, renderFunc RenderCustomMCPToolConfigHandler, ) bool` | HandleCustomMCPToolInSwitch processes custom MCP tools in the default case of a switch statement. |

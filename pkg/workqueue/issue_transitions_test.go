@@ -44,7 +44,7 @@ func TestTerminalIssueTargetsSurviveCheckpointWithoutChangingOriginalAuthority(t
 		if err != nil {
 			t.Fatal(err)
 		}
-		targets, err := state.issueTransitionTargets("cancel-mirror")
+		targets, _, err := state.issueTransitionSelection("cancel-mirror")
 		if err != nil || len(targets) != 1 || targets[0].WorkID != workID || targets[0].Status != "Cancelled" {
 			t.Fatalf("exact terminal receipt was not retained: %+v %v", targets, err)
 		}
@@ -53,14 +53,14 @@ func TestTerminalIssueTargetsSurviveCheckpointWithoutChangingOriginalAuthority(t
 		if state.projectionAuthority(impostor, workID, strings.Repeat("0", 40), testRepository, "") == nil {
 			t.Fatal("terminal synchronization broadened original admission authority")
 		}
-		if _, err := state.issueTransitionTargets("unknown"); err == nil {
+		if _, _, err := state.issueTransitionSelection("unknown"); err == nil {
 			t.Fatal("unknown request acquired terminal targets")
 		}
-		if targets, err := state.issueTransitionTargets("mirror-admission"); err != nil || len(targets) != 0 {
+		if targets, _, err := state.issueTransitionSelection("mirror-admission"); err != nil || len(targets) != 0 {
 			t.Fatalf("admission acquired terminal transition authority: %v %v", targets, err)
 		}
 		state.Works[workID].BackingIssue = state.Works[workID].IssueLink
-		if targets, err := state.issueTransitionTargets("cancel-mirror"); err != nil || len(targets) != 0 {
+		if targets, _, err := state.issueTransitionSelection("cancel-mirror"); err != nil || len(targets) != 0 {
 			t.Fatal("pre-existing backing Issue acquired automatic terminal projection")
 		}
 	}
@@ -109,7 +109,7 @@ func TestOperatorTerminalIssueSynchronizationUsesExactReceiptsAndSharedLocks(t *
 	commits, workID := terminalIssueFixture(t)
 	installMockLog(t, server, commits)
 	head := server.head
-	report, err := branch.synchronizeIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, syncGraph(t, nil, nil))
+	report, err := branch.synchronizeCheckedIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, syncGraph(t, nil, nil), nil)
 	if err != nil || report.Synchronized != 1 {
 		t.Fatalf("terminal mirror synchronization failed: %+v %v", report, err)
 	}
@@ -135,7 +135,7 @@ func TestOperatorTerminalIssueSynchronizationRetainsUnknownWritesAndRejectsLostI
 			} else {
 				transform = func(result map[string]any) { result["node"] = nil }
 			}
-			_, err := branch.synchronizeIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, syncGraph(t, mutationError, transform))
+			_, err := branch.synchronizeCheckedIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, syncGraph(t, mutationError, transform), nil)
 			if err == nil {
 				t.Fatal("uncertain write or deleted immutable summary was silently accepted")
 			}
@@ -183,12 +183,12 @@ func TestTerminalIssueTargetStatusAndExactBarrierIdentity(t *testing.T) {
 			receipt.Operations = []Operation{operation}
 			state.Requests["terminal"] = receipt
 			state.TerminalBarriers[workID] = operation
-			targets, err := state.issueTransitionTargets("terminal")
+			targets, _, err := state.issueTransitionSelection("terminal")
 			if err != nil || len(targets) != 1 || targets[0].Status != test.want {
 				t.Fatalf("terminal status diverged from runtime: %+v %v", targets, err)
 			}
 			state.TerminalBarriers[workID] = mustOp(t, map[string]any{"kind": test.kind, "work_id": workID, "claim_id": "other", "completion_id": "completion"})
-			if targets, err := state.issueTransitionTargets("terminal"); err != nil || len(targets) != 0 {
+			if targets, _, err := state.issueTransitionSelection("terminal"); err != nil || len(targets) != 0 {
 				t.Fatal("stale terminal barrier acquired mirror authority")
 			}
 		})
@@ -266,7 +266,7 @@ func TestTerminalDeliveryIssueTargetsSurviveRealReplayAndCheckpoint(t *testing.T
 					forged[field] = "foreign"
 					original := state.TerminalBarriers[workID]
 					state.TerminalBarriers[workID] = mustOp(t, forged)
-					if targets, err := state.issueTransitionTargets("terminal-delivery"); err != nil || len(targets) != 0 {
+					if targets, _, err := state.issueTransitionSelection("terminal-delivery"); err != nil || len(targets) != 0 {
 						t.Fatalf("changed %s acquired terminal authority: %v %v", field, targets, err)
 					}
 					state.TerminalBarriers[workID] = original
@@ -323,11 +323,11 @@ func TestOperatorTerminalIssueSynchronizationDoesNotStealRetainedLocks(t *testin
 	name := projectionLockName("work:" + workID)
 	server.projectionRefs = map[string]string{name: "existing-owner"}
 	calls := 0
-	_, err := branch.synchronizeIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"},
+	_, err := branch.synchronizeCheckedIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"},
 		func(context.Context, string, map[string]any, any) error {
 			calls++
 			return nil
-		})
+		}, nil)
 	if err == nil || calls != 0 || len(server.projectionRefs) != 1 || server.projectionRefs[name] != "existing-owner" {
 		t.Fatalf("retained coordination was bypassed: %v %v", server.projectionRefs, err)
 	}
@@ -358,7 +358,7 @@ func TestOperatorTerminalIssueSynchronizationProvisionsOnlyCheckedLabels(t *test
 		}
 		return json.Unmarshal(data, response)
 	}
-	result, err := branch.synchronizeIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, graph)
+	result, err := branch.synchronizeCheckedIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, graph, nil)
 	if err != nil || result.Synchronized != 1 || created != 2 || len(server.projectionRefs) != 0 {
 		t.Fatalf("checked label provisioning failed: %+v %v", result, err)
 	}

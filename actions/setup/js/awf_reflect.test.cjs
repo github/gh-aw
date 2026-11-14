@@ -972,8 +972,9 @@ describe("awf_reflect.cjs", () => {
       expect(inferWireApiForModel("openai", "gpt-4.1", null)).toBe("completions");
     });
 
-    it.each(["gpt-5-mini", "gpt-6-luna"])("uses the bundled Responses API metadata for %s", model => {
-      const modelsJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "models.json"), "utf8"));
+    it("uses explicit Responses API metadata for a custom model", () => {
+      const model = "custom-model";
+      const modelsJson = { providers: { openai: { models: { [model]: { wire_api: "responses" } } } } };
       const catalogEntry = getCatalogModelEntry(modelsJson, model, "openai");
       expect(catalogEntry.wire_api).toBe("responses");
       expect(inferWireApiForModel("openai", model, catalogEntry)).toBe("responses");

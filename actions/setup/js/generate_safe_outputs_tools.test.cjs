@@ -381,6 +381,18 @@ describe("generate_safe_outputs_tools", () => {
     expect(tool.inputSchema.properties).toHaveProperty("value");
   });
 
+  it.each(["log", "set", "table"])("applies the configured value schema to a single typed %s ledger", type => {
+    fs.copyFileSync(path.join(__dirname, "safe_outputs_tools.json"), toolsSourcePath);
+    const schema = { type: "object", required: ["head_sha"], properties: { head_sha: { type: "string" } }, additionalProperties: false };
+    const operation = { log: "append", set: "add", table: "insert" }[type];
+    fs.writeFileSync(configPath, JSON.stringify({ ledger_append: { ledgers: [{ name: "reviews", type, schema }] } }));
+    runScript();
+    const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(tool.inputSchema.properties.value).toMatchObject(schema);
+    expect(validateValueAgainstSchema({ ledger: "reviews", operation, value: { head_sha: "abc123" } }, tool.inputSchema)).toBeNull();
+    expect(validateValueAgainstSchema({ ledger: "reviews", operation, value: "not-an-object" }, tool.inputSchema)).toBeTruthy();
+  });
+
   it("preserves namespaced public names", () => {
     fs.writeFileSync(
       toolsSourcePath,

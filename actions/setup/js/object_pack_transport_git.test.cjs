@@ -285,7 +285,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     recoveryDirectories.clear();
     for (const filename of regeneratedArtifacts) expect(fs.existsSync(filename)).toBe(false);
     regeneratedArtifacts.clear();
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
