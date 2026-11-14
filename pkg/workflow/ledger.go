@@ -24,6 +24,8 @@ const (
 	ledgerProjectionRoot           = "/tmp/gh-aw/ledgers"
 	ledgerReplayPromptFile         = ledgerProjectionRoot + "/replay-prompt.txt"
 	ledgerTransactionsArtifactName = "gh-aw-ledger-transactions"
+	ledgerTransactionsArtifactDir  = "${{ runner.temp }}/gh-aw"
+	ledgerTransactionsArtifactPath = ledgerTransactionsArtifactDir + "/ledger-transactions.json"
 	// Ledger compaction is owned by Agentic Maintenance. Keep these defaults and bounds
 	// synchronized with actions/setup/js/ledger_compaction.cjs.
 	defaultLedgerCompactionSchedule    = "daily"

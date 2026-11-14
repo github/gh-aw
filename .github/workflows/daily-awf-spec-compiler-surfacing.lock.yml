@@ -2721,6 +2721,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
+          GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: gh-aw-ledger-transactions
           GH_AW_LEDGER_CONFIG_BASE64: W3sibmFtZSI6ImF3Zi1mZWF0dXJlLXJldmlld3MiLCJzY2hlbWEiOnsiYWRkaXRpb25hbFByb3BlcnRpZXMiOmZhbHNlLCJwcm9wZXJ0aWVzIjp7Im9wZW5fZmVhdHVyZV9pZHMiOnsiaXRlbXMiOnsidHlwZSI6InN0cmluZyJ9LCJ0eXBlIjoiYXJyYXkifSwib3V0Y29tZSI6eyJlbnVtIjpbImlzc3VlX2NyZWF0ZWQiLCJub29wIl19LCJyZWNvcmRfdHlwZSI6eyJlbnVtIjpbImF3Zl9zcGVjX3N1cmZhY2luZ19yZXZpZXciXX0sInJldmlld2VkX2F0Ijp7InR5cGUiOiJzdHJpbmcifSwicmV2aWV3ZWRfc2hhIjp7InR5cGUiOiJzdHJpbmcifSwicnVuX2lkIjp7InR5cGUiOiJzdHJpbmcifSwic2NoZW1hX3NoYTI1NiI6eyJ0eXBlIjoic3RyaW5nIn19LCJyZXF1aXJlZCI6WyJyZWNvcmRfdHlwZSIsInJ1bl9pZCIsInJldmlld2VkX2F0IiwicmV2aWV3ZWRfc2hhIiwic2NoZW1hX3NoYTI1NiIsIm9wZW5fZmVhdHVyZV9pZHMiLCJvdXRjb21lIl0sInR5cGUiOiJvYmplY3QifSwibWF4X3JlY29yZF9rYiI6OCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibWF4X3BhdGNoX2tiIjoxMCwiYnJhbmNoX25hbWUiOiJsZWRnZXJzL2F3Zi1mZWF0dXJlLXJldmlld3MifV0=
         with:
           script: |
@@ -2848,6 +2849,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"awf\",\"compiler\",\"specifications\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[awf-feature-surfacing] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":8,\"max_segment_kb\":100,\"name\":\"awf-feature-reviews\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"open_feature_ids\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"outcome\":{\"enum\":[\"issue_created\",\"noop\"]},\"record_type\":{\"enum\":[\"awf_spec_surfacing_review\"]},\"reviewed_at\":{\"type\":\"string\"},\"reviewed_sha\":{\"type\":\"string\"},\"run_id\":{\"type\":\"string\"},\"schema_sha256\":{\"type\":\"string\"}},\"required\":[\"record_type\",\"run_id\",\"reviewed_at\",\"reviewed_sha\",\"schema_sha256\",\"open_feature_ids\",\"outcome\"],\"type\":\"object\"},\"type\":\"\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"awf-feature-reviews\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

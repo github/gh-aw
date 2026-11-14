@@ -368,6 +368,7 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 		// Custom safe jobs should only run if the agent output contains the job name (tool call)
 		// Use normalized job name to match the underscore format in output_types
 		safeOutputCondition := BuildSafeOutputType(normalizedJobName) // min=0 means check for the tool in output_types
+		safeOutputCondition = requireSafeOutputsAgentSuccess(safeOutputCondition, data.SafeOutputs)
 
 		// When detection is expression-controlled the detection job may be skipped at runtime.
 		// Wrap the condition with always() + detection-passed so the safe-job still runs when

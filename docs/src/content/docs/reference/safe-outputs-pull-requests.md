@@ -53,7 +53,7 @@ safe-outputs:
       client-id: ${{ vars.FORK_APP_CLIENT_ID }}
       private-key: ${{ secrets.FORK_APP_PRIVATE_KEY }}
     github-token-for-extra-empty-commit: ${{ secrets.CI_TOKEN }} # optional token to push empty commit triggering CI
-    signed-commits: true          # signed commits via GraphQL API (default: true); set false to use git push directly
+    signed-commits: true          # signed commits via GitHub APIs (default: true); set false to use git push directly
     protected-files: fallback-to-issue  # push branch, create review issue if protected files modified
 ```
 
@@ -152,7 +152,9 @@ The agent's commits are packaged as a **git bundle** and uploaded as an Actions 
 
 1. Checks out the target repository at the base branch (shallow, depth 1). Any additional `fetch:` refs declared in `checkout:` frontmatter for the target repository are fetched so their commits are locally available.
 2. Imports the local bundle offline with `git bundle unbundle`. If prerequisite commits are missing, the handler fails by default; provision the required objects during authenticated checkout or opt in to prerequisite recovery with `allow-full-history-fetch: true` on that specific PR handler. The opt-in permits potentially unbounded recovery downloads, but bundle import and validation remain offline.
-3. Pushes the branch using the GitHub GraphQL API (signed commits) and creates the pull request.
+3. Publishes signed commits through GitHub's APIs and creates the pull request. For a new branch, it creates the first commit through the REST API, requires GitHub to verify its signature, and creates the branch at that commit. Subsequent commits use GraphQL `createCommitOnBranch`.
+
+The new branch first appears with the proposed changes, rather than pointing temporarily at the base commit. This prevents branch-push CI from reporting skipped or cancelled builds against the base commit. If GitHub does not verify the initial signature, the handler refuses to publish the branch.
 
 If the base branch advances between agent start and `safe_outputs` apply, the PR can be created slightly behind the current base and addressed with a rebase when the necessary bundle objects are available. Otherwise, missing prerequisites cause the handler to fail unless recovery is explicitly enabled as described above. If a non-fast-forward race occurs during the push itself, the job creates a fallback PR from a temporary branch so no changes are lost.
 
@@ -182,6 +184,8 @@ When `head-repo` is set, the preferred model is an ephemeral upstream-based bran
 ## Pull Request Updates (`update-pull-request:`)
 
 Updates PR title or body. Both fields are enabled by default. The `operation` field controls how body updates are applied: `replace` (default), `append`, `prepend`, or `replace-island` (updates a run-specific section delimited by HTML comments).
+
+`safe-outputs.update-pull-request.operation` sets the default body operation when the agent omits `operation`. An explicit agent operation takes precedence; without either value, the handler uses `replace`.
 
 ```yaml wrap
 safe-outputs:
@@ -615,9 +619,11 @@ When `fallback-as-pull-request` is enabled (default), non-fast-forward push fail
 
 When `ignore-missing-branch-failure: true` is set, push failures caused by a deleted or missing PR branch return `skipped: true` instead of a hard failure. This is useful when the PR branch may have been deleted before the safe-output job runs (for example, on auto-merged PRs). Without this flag, a missing branch is a terminal error.
 
-When `check-branch-protection: false` is set, the branch protection pre-flight check is skipped. By default (`true`), the handler calls `GET /repos/{owner}/{repo}/branches/{branch}` and checks the `protected` flag before pushing. Branches protected by classic branch protection or restrictive rulesets are rejected, even when the proposed push would satisfy the ruleset (for example, by using a signed commit).
+When `check-branch-protection: false` is set, the branch protection pre-flight check is skipped. By default (`true`), the handler calls `GET /repos/{owner}/{repo}/branches/{branch}` and checks the `protected` flag before pushing. Branches protected by classic branch protection or blocking rulesets (such as required reviews or status checks) are rejected.
 
-The sole exception is a non-default branch whose metadata explicitly disables classic protection, whose complete list of active rules contains only `copilot_code_review`, and whose GraphQL `Ref.refUpdateRule` is explicitly `null`. Automatic Copilot review does not restrict pushes. Rules are read page by page; unknown or mixed rule types, missing metadata, an empty initial response, an incomplete rules list, or any failed rules query leave the push blocked. Branch metadata may use `contents: read`; [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) require `Metadata: read`, while [classic-protection confirmation](https://docs.github.com/en/graphql/reference/git#ref) uses `refUpdateRule`, which is viewable by non-admins and does not require `Administration: read`. If these reads are unavailable, the branch remains blocked without requesting broader credentials. No classic-protection lookup is needed for an unprotected branch.
+The exception is a non-default branch whose metadata explicitly disables classic protection, whose complete list of active rules contains only non-blocking types, and whose GraphQL `Ref.refUpdateRule` is explicitly `null`. Non-blocking types are `copilot_code_review`, `branch_name_pattern`, `commit_message_pattern`, `commit_author_email_pattern`, `committer_email_pattern`, `file_path_restriction`, `file_extension_restriction`, `max_file_path_length`, and `max_file_size`. `required_signatures` is also non-blocking when `signed-commits` is enabled (the default). Signed pushes admitted through this exception fail rather than falling back to unsigned Git pushes if signing fails. GitHub still enforces signature, naming, and content requirements during the push; this exception does not bypass them.
+
+Rules are read page by page; any blocking or unknown rule type, missing metadata, an empty initial response, an incomplete rules list, or any failed rules query leaves the push blocked. Branch metadata may use `contents: read`; [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) require `Metadata: read`, while [classic-protection confirmation](https://docs.github.com/en/graphql/reference/git#ref) uses `refUpdateRule`, which is viewable by non-admins and does not require `Administration: read`. If these reads are unavailable, the branch remains blocked without requesting broader credentials. No classic-protection lookup is needed for an unprotected branch.
 
 If the initial branch API returns 403, the check logs a warning and continues (GitHub still enforces protection at push time). The default branch is rejected whenever repository metadata identifies it, regardless of `check-branch-protection`.
 

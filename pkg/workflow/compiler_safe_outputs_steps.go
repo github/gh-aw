@@ -190,6 +190,9 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	if err := c.addSafeOutputCoreEnvVars(&steps, data); err != nil {
 		return nil, err
 	}
+	if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
+		steps = append(steps, fmt.Sprintf("          GH_AW_LEDGER_TRANSACTIONS: %s\n", ledgerTransactionsArtifactPath))
+	}
 	c.addSafeOutputTokenEnvVars(&steps, data)
 	steps = append(steps, fmt.Sprintf("          GH_AW_GITHUB_TOKEN_SOURCE: %s\n", c.safeOutputGitHubTokenSource(data)))
 

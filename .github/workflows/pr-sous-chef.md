@@ -41,6 +41,7 @@ engine:
     mode: economy
 strict: true
 imports:
+  - shared/reporting.md
   - shared/mcp-pagination.md
   - shared/otlp.md
 tools:

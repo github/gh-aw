@@ -25,6 +25,8 @@ steps:
     run: mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache
 strict: true
 timeout-minutes: 30
+max-ai-credits: 15
+max-turns: 40
 network:
   allowed:
     - defaults
@@ -76,9 +78,10 @@ Analyze up to twenty-five Go test files per run and add `t.Parallel()` only wher
 1. Use `grep` to list tracked `*_test.go` files containing top-level `Test` functions. Exclude `vendor/` and generated files, then sort paths lexicographically.
 2. Read `/tmp/gh-aw/cache-memory/go-test-parallelizer/state.json` when it exists. It has this shape:
    `{"last_file":"path/to/file_test.go"}`.
-3. Select up to 25 consecutive paths starting after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path.
-4. Analyze and modify only this selected batch (maximum 25 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
-5. Minimize token usage: avoid re-reading files you already analyzed, and do not paste full file contents into notes or outputs.
+3. Rotate the sorted list to start after `last_file`, wrapping to the first path. If the cache is absent, malformed, or names a removed file, start from the first path. Partition the rotated list into non-overlapping batches of at most 25 files; do not wrap within a batch.
+4. Select batch `(github.run_number - 1) % number_of_batches`, using run number `${{ github.run_number }}`. This attempted-batch rotation permits zero consecutive retries after a block: the next run selects the next batch regardless of outcome, without changing the completed-analysis cursor. If there are no files, report a completed no-candidate analysis; if there is only one batch, report that rotation cannot select a different batch.
+5. Analyze and modify only this selected batch (maximum 25 files). Keep the previous cursor unchanged; selection alone is not completed analysis.
+6. Minimize token usage: avoid re-reading files you already analyzed, and do not paste full file contents into notes or outputs.
 
 ## Analyze safety
 
@@ -105,7 +108,7 @@ After editing the selected batch:
 1. Run `go test -race` once per unique modified package (deduplicate package paths across edited files).
 2. Run `go test ./...` once after all candidate edits.
 3. Inspect the diff and confirm it contains only safe `t.Parallel()` additions in selected files.
-4. If any test command fails, restore only your candidate edits and call `report_incomplete` with the failed command and concrete error. If the diff contains any other change, remove your out-of-scope edits and call `report_incomplete`; never revert pre-existing work.
+4. If any test command fails, restore only your candidate edits and call `report_incomplete`. If the diff contains any other change, remove your out-of-scope edits and call `report_incomplete`; never revert pre-existing work.
 
 Security-policy limitations are not test failures or evidence that no safe
 candidate exists. The full suite includes environment-enumeration and
@@ -113,8 +116,19 @@ credential-fixture tests that may be incompatible with the run's immutable
 policy. Do not execute prohibited operations, grant fixture exceptions, omit
 tests, or replace the required full-suite/race evidence with static analysis.
 If required validation is blocked, leave test files unchanged, preserve the
-previous cursor, and call `report_incomplete` with the specific limitation.
+previous cursor, and call `report_incomplete`.
 Do not create a pull request or use `noop` to imply validation succeeded.
+
+Before `report_incomplete`, self-check and report:
+
+- The blocked batch, the exact required command and its concrete error. If a
+  command was prohibited before execution, say it was not run and name the
+  policy limitation instead of inventing an error. Classify the outcome as
+  environment/policy blocked, test failure, or agent failure; state uncertainty.
+- Confirm candidate edits were restored by inspecting the diff without reverting
+  pre-existing work; if restoration cannot be confirmed, say so.
+- Confirm the completed-analysis cursor remains unchanged and identify the next
+  attempted batch using the rotation above, or state why it cannot be determined.
 
 ## Persist and report
 
@@ -132,10 +146,11 @@ directory. Preserve the previous cursor byte-for-byte (or leave it absent) on
 every outcome, including successful validation and completed no-candidate
 analysis. Never advance the cursor immediately after selection.
 
-This deliberately suspends round-robin advancement until a trusted persistence
-gate can independently verify the terminal outcome and all required validation.
-An agent-written success flag is not validation evidence. Repeated runs may
-analyze the same batch; report that limitation rather than claim cursor progress.
+The run-number rotation advances attempted batches independently of completion;
+it does not persist progress or prove analysis succeeded. A retry of the same
+workflow run keeps the same run number, and changes to the file list can alter
+batch boundaries. A trusted persistence gate is still required to advance the
+completed-analysis cursor; an agent-written success flag is not validation evidence.
 
 Use `###` or lower headings in any PR description or final report. Present a
 concise overview, selected files and results, collapsible detailed test evidence,
@@ -149,7 +164,7 @@ pull request when validation succeeds with a change; use `noop` only for a
 completed analysis with no safe edit; use `report_incomplete` when analysis or
 required validation is blocked or fails. Include the selected batch and a short
 reason, and state that the completed-analysis cursor did not advance
-(restore-only mode).
+(restore-only mode). For incomplete outcomes include the self-check above.
 
 Do not parallelize tests that use or may conflict through:
 

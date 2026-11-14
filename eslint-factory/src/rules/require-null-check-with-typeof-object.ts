@@ -89,6 +89,30 @@ function hasSameExpressionGuard(node: TSESTree.Node, text: string): boolean {
   return false;
 }
 
+function canSuggestNullCheck(node: TSESTree.BinaryExpression): boolean {
+  const isTestExpression = (candidate: TSESTree.Node) =>
+    (candidate.parent?.type === AST_NODE_TYPES.IfStatement && candidate.parent.test === candidate) || (candidate.parent?.type === AST_NODE_TYPES.ConditionalExpression && candidate.parent.test === candidate);
+
+  let current: TSESTree.Node = node;
+  let inLogicalChain = false;
+  let isLeftmost = true;
+  let isRightmost = true;
+  while (current.parent?.type === AST_NODE_TYPES.LogicalExpression) {
+    const parent: TSESTree.LogicalExpression = current.parent;
+    if (parent.operator !== "&&") return false;
+    inLogicalChain = true;
+    isLeftmost &&= parent.left === current;
+    isRightmost &&= parent.right === current;
+    current = parent;
+  }
+
+  if (!inLogicalChain) return isTestExpression(node);
+
+  const containsOnlyAnd = (candidate: TSESTree.Node): boolean => candidate.type !== AST_NODE_TYPES.LogicalExpression || (candidate.operator === "&&" && containsOnlyAnd(candidate.left) && containsOnlyAnd(candidate.right));
+
+  return (isLeftmost || isRightmost) && containsOnlyAnd(current);
+}
+
 function enclosingFunction(node: TSESTree.Node): TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression | null {
   let current: TSESTree.Node | undefined = node.parent;
   while (current) {
@@ -116,6 +140,7 @@ export const requireNullCheckWithTypeofObjectRule = createRule({
   name: "require-null-check-with-typeof-object",
   meta: {
     type: "problem",
+    hasSuggestions: true,
     docs: {
       description: 'Require a null check for the same value alongside `typeof value === "object"`, because `typeof null === "object"` and a null value would otherwise be treated as an object.',
     },
@@ -123,10 +148,11 @@ export const requireNullCheckWithTypeofObjectRule = createRule({
     messages: {
       missingNullCheck:
         '`typeof {{subject}} {{operator}} "object"` is also satisfied by `null`. Guard `{{subject}}` in the same conjunction or exit early for null before this check; otherwise a null value is treated as an object and later property access throws.',
+      addNullCheck: "Add a null check before this typeof expression.",
     },
   },
   defaultOptions: [],
-  create(context: Readonly<TSESLint.RuleContext<"missingNullCheck", []>>) {
+  create(context: Readonly<TSESLint.RuleContext<"missingNullCheck" | "addNullCheck", []>>) {
     return {
       BinaryExpression(node: TSESTree.BinaryExpression) {
         const match = matchTypeofObject(node);
@@ -138,6 +164,18 @@ export const requireNullCheckWithTypeofObjectRule = createRule({
           node,
           messageId: "missingNullCheck",
           data: { subject: match.text, operator: match.operator },
+          ...(canSuggestNullCheck(node)
+            ? {
+                suggest: [
+                  {
+                    messageId: "addNullCheck" as const,
+                    fix(fixer: TSESLint.RuleFixer) {
+                      return fixer.insertTextBefore(node, `${match.text} !== null && `);
+                    },
+                  },
+                ],
+              }
+            : {}),
         });
       },
     };

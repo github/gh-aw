@@ -730,6 +730,7 @@ safe-outputs:
     status:                   # enable status updates
     title:                    # enable title updates
     body:                     # enable body updates
+    operation: replace-island # default body operation when omitted by the agent
     required-title-prefix: "[bot] "  # only update issues with this title prefix
     required-labels: [automated]     # only update if ALL these labels are present
     max: 3                    # max updates (default: 1)
@@ -751,7 +752,7 @@ When using `target: "*"`, the agent must provide `issue_number` or `item_number`
 - `replace`: Completely replaces existing body with new content and attribution
 - `replace-island`: Updates a specific section marked with HTML comments
 
-Agent output format: `{"type": "update_issue", "issue_number": 123, "operation": "append", "body": "..."}`. The `operation` field is optional (defaults to `append`). Each call must include at least one update field: `status`, `title`, `body`, `labels`, `assignees`, `milestone`, or `artifacts`; an issue number or operation alone is rejected. Set `milestone` to `null` to clear the issue's milestone; omitting `milestone` leaves it unchanged.
+Agent output format: `{"type": "update_issue", "issue_number": 123, "operation": "append", "body": "..."}`. The agent's `operation` field is optional: when omitted, the handler uses `safe-outputs.update-issue.operation`, or `append` if no workflow default is configured. An explicit agent operation overrides the workflow default. For tracker issues rewritten each run, set `operation: replace-island`. If the workflow's island is absent, including on the first run, `replace-island` appends a new island to the existing body with a separator; subsequent runs replace that island and preserve the surrounding issue text. Each call must include at least one update field: `status`, `title`, `body`, `labels`, `assignees`, `milestone`, or `artifacts`; an issue number or operation alone is rejected. Set `milestone` to `null` to clear the issue's milestone; omitting `milestone` leaves it unchanged.
 For issue field updates, use [`set_issue_field`](#set-issue-field-set-issue-field).
 
 #### Updating Issue Artifacts
@@ -1844,6 +1845,22 @@ Using `target-repo: "*"` enables fully dynamic routing — the agent provides th
 See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for comprehensive documentation.
 
 ## Global Configuration Options
+
+### Require Agent Success (`require-agent-success`)
+
+`safe-outputs.require-agent-success` is a boolean that defaults to `false`. When `true`, detection, built-in safe-output handlers, custom safe jobs, asset publication, and repo-memory pushes require `needs.agent.result == 'success'`. Downstream uploads and workflow calls are also skipped when safe-output processing is skipped.
+
+```aw wrap
+safe-outputs:
+  require-agent-success: true
+  add-comment:
+```
+
+A failing agent step, including a deterministic `post-steps` check, blocks these publication paths without needing to delete staged output or repo-memory files. The check must fail the agent job; a step with `continue-on-error: true` does not block publication. This setting does not provide a new gate hook or change the restrictions on accessing safe-output files from `post-steps`.
+
+When omitted or `false`, safe outputs can still run after an agent failure for failure reporting. Conclusion and failure-reporting jobs remain unchanged.
+
+An explicit value in the main workflow overrides imports. Otherwise, any imported `require-agent-success: true` enables the requirement.
 
 ### Workflow Call Outputs (`workflow_call`)
 

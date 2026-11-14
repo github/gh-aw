@@ -3091,6 +3091,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
+          GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: gh-aw-ledger-transactions
           GH_AW_LEDGER_CONFIG_BASE64: W3sibmFtZSI6InJldmlldy1oaXN0b3J5Iiwic3RvcmFnZSI6ImNvbW1lbnQtbWVtb3J5IiwidHlwZSI6ImxvZyIsInNjaGVtYSI6eyJhZGRpdGlvbmFsUHJvcGVydGllcyI6ZmFsc2UsInByb3BlcnRpZXMiOnsiZmluZGluZ19jb3VudCI6eyJ0eXBlIjoiaW50ZWdlciJ9LCJoZWFkX3NoYSI6eyJ0eXBlIjoic3RyaW5nIn0sIm91dGNvbWUiOnsiZW51bSI6WyJmaW5kaW5ncyIsIm5vX2ZpbmRpbmdzIiwiaW5jb21wbGV0ZSJdfX0sInJlcXVpcmVkIjpbImhlYWRfc2hhIiwib3V0Y29tZSIsImZpbmRpbmdfY291bnQiXSwidHlwZSI6Im9iamVjdCJ9LCJtYXhfcmVjb3JkX2tiIjoxLCJtYXhfc2VnbWVudF9rYiI6MTAwLCJtYXhfcGF0Y2hfa2IiOjIsImJyYW5jaF9uYW1lIjoiIn1d
           GH_AW_COMMENT_MEMORY_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_AW_COMMENT_MEMORY_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
@@ -3225,6 +3226,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"comment_memory\":{\"max\":1,\"memory_id\":\"pr-code-quality-reviewer\",\"target\":\"triggering\"},\"create_check_run\":{\"max\":1},\"create_pull_request_review_comment\":{\"max\":10,\"side\":\"RIGHT\"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"\",\"max_patch_kb\":2,\"max_record_kb\":1,\"max_segment_kb\":100,\"name\":\"review-history\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"finding_count\":{\"type\":\"integer\"},\"head_sha\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"findings\",\"no_findings\",\"incomplete\"]}},\"required\":[\"head_sha\",\"outcome\",\"finding_count\"],\"type\":\"object\"},\"type\":\"log\"}],\"max\":100},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{},\"submit_pull_request_review\":{\"allowed_events\":[\"COMMENT\",\"REQUEST_CHANGES\"],\"max\":1}}"
+          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

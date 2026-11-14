@@ -2753,6 +2753,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
+          GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: gh-aw-ledger-transactions
           GH_AW_LEDGER_CONFIG_BASE64: W3sibmFtZSI6InNtb2tlIiwidHlwZSI6InRhYmxlIiwia2V5Ijoid29ya2Zsb3dfcnVuX2lkIiwic2NoZW1hIjp7ImFkZGl0aW9uYWxQcm9wZXJ0aWVzIjpmYWxzZSwicHJvcGVydGllcyI6eyJyZWNvcmRfdHlwZSI6eyJlbnVtIjpbInJlcG9fbWVtb3J5X2xlZGdlcl9zbW9rZSJdfSwicmVzdWx0Ijp7ImVudW0iOlsicGFzc2VkIl19LCJ3b3JrZmxvd19ydW5faWQiOnsidHlwZSI6InN0cmluZyJ9fSwicmVxdWlyZWQiOlsicmVjb3JkX3R5cGUiLCJ3b3JrZmxvd19ydW5faWQiLCJyZXN1bHQiXSwidHlwZSI6Im9iamVjdCJ9LCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJtYXhfcGF0Y2hfa2IiOjEwLCJicmFuY2hfbmFtZSI6ImxlZGdlcnMvc21va2UifV0=
         with:
           script: |
@@ -2879,6 +2880,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-repo-memory-ledger\",\"labels\":[\"automation\",\"testing\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[smoke-repo-memory-ledger] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"workflow_run_id\",\"max_patch_kb\":10,\"max_record_kb\":4,\"max_segment_kb\":100,\"name\":\"smoke\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"record_type\":{\"enum\":[\"repo_memory_ledger_smoke\"]},\"result\":{\"enum\":[\"passed\"]},\"workflow_run_id\":{\"type\":\"string\"}},\"required\":[\"record_type\",\"workflow_run_id\",\"result\"],\"type\":\"object\"},\"type\":\"table\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"smoke\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

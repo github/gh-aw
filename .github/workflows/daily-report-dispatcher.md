@@ -5,6 +5,7 @@ on:
   schedule: daily around 12:00
 if: github.run_attempt == 1
 imports:
+  - shared/reporting.md
   - shared/work-queue-staged-plan.md
 permissions:
   contents: read

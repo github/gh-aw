@@ -50,7 +50,7 @@ if [ -f /tmp/gh-aw/usage/activity/summary.json ]; then
   cp /tmp/gh-aw/usage/activity/summary.json "$TEST_DIR/previous-summary.json"
   rm /tmp/gh-aw/usage/activity/summary.json
 fi
-for utility in mkdir cp find sort; do
+for utility in mkdir cp find sort dirname mktemp mv rm; do
   ln -s "$(command -v "$utility")" "$TEST_DIR/bin-with-node/$utility"
   ln -s "$(command -v "$utility")" "$TEST_DIR/bin-without-node/$utility"
 done
@@ -75,5 +75,22 @@ PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" >/dev/null
 test ! -f /tmp/gh-aw/usage/agent/harness_retry.json
 test ! -f /tmp/gh-aw/usage/detection/harness_retry.json
 grep -q '"model":"final"' /tmp/gh-aw/usage/aw_info.json
+
+ISOLATED_ROOT="$TEST_DIR/isolated/gh-aw"
+ISOLATED_SCRIPT="$TEST_DIR/collect_usage_artifact_files.sh"
+mkdir -p "$ISOLATED_ROOT/usage" "$ISOLATED_ROOT/agent"
+printf '{"model":"safe"}\n' > "$ISOLATED_ROOT/aw_info.json"
+printf 'external sentinel\n' > "$TEST_DIR/sentinel"
+ln -s "$TEST_DIR/sentinel" "$ISOLATED_ROOT/usage/aw_info.json"
+ln -s "$TEST_DIR/sentinel" "$ISOLATED_ROOT/agent_usage.json"
+sed "s|/tmp/gh-aw|$ISOLATED_ROOT|g" "$SCRIPT" > "$ISOLATED_SCRIPT"
+if /bin/bash "$ISOLATED_SCRIPT" >/dev/null 2>&1; then
+  test "$(cat "$TEST_DIR/sentinel")" = "external sentinel"
+  test -L "$ISOLATED_ROOT/usage/aw_info.json"
+  test -L "$ISOLATED_ROOT/agent_usage.json"
+else
+  echo "Usage collector failed when rejecting symlinks"
+  exit 1
+fi
 
 echo "Usage collector tests passed"

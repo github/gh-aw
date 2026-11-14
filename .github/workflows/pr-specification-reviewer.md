@@ -39,6 +39,7 @@ strict: true
 network:
   allowed: []
 imports:
+  - shared/reporting.md
   - shared/github-guard-policy.md
   - uses: shared/pr-diff-data-fetch.md
     with:

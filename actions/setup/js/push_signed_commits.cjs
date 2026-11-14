@@ -15,6 +15,7 @@ const { overridePersistedExtraheader, restorePersistedExtraheader } = require(".
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { redactSecrets, redactBuiltInPatterns } = require("./redact_secrets.cjs");
 const { withGitClaimEffects } = require("./work_queue_git_effects.cjs");
+const { createClaimEffectBatch, withClaimEffectBatch, discardClaimEffectBatch } = require("./work_queue_claim_scope.cjs");
 const ERROR_CODE_PREFIX_RE = /^(?:ERR_[A-Z_]+|E\d{3}):\s*/;
 
 /**
@@ -823,6 +824,13 @@ async function pushSignedCommits({
       const paths = [...additions, ...deletions].map(file => file.path);
       core.info(`pushSignedCommits: processing commit ${i + 1}/${shas.length} sha=${sha}`);
 
+      // Full commit message (subject + body)
+      const { stdout: msgOut } = await getGitExecOutput(["log", "-1", "--format=%B", sha], { cwd });
+      const message = msgOut.trim();
+      const headline = message.split("\n")[0];
+      const body = message.split("\n").slice(1).join("\n").trim();
+      core.info(`pushSignedCommits: commit message headline: "${headline}"`);
+
       // Determine the expected HEAD OID for this commit.
       // After the first signed commit, reuse the OID returned by the previous GraphQL
       // mutation instead of re-querying ls-remote (works even if the branch is new).
@@ -838,8 +846,8 @@ async function pushSignedCommits({
           if (requireExistingBranch) throw new Error(`${ERR_API}: Branch ${branch} no longer exists; refusing to recreate it`);
           // Branch does not exist on the remote yet.
           // createCommitOnBranch requires the branch to already exist – it does NOT auto-create branches.
-          // Resolve the parent OID, create the branch on the remote via the REST API,
-          // then proceed with the signed-commit mutation as normal.
+          // Create the first commit before publishing the ref, so branch-push CI
+          // never sees a new branch pointing at the base commit.
           core.info(`pushSignedCommits: branch ${branch} not yet on the remote, resolving parent OID for first commit`);
           if (baseRefOid !== undefined) {
             expectedHeadOid = baseRefOid;
@@ -851,7 +859,44 @@ async function pushSignedCommits({
           if (!expectedHeadOid) {
             throw new Error(`${ERR_API}: Could not resolve OID for new branch ${branch}`);
           }
-          core.info(`pushSignedCommits: creating remote branch ${branch} at parent OID ${expectedHeadOid}`);
+          assertTransportUnchanged?.();
+          const parent = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: expectedHeadOid });
+          const objectBatch = createClaimEffectBatch();
+          const createInitialObject = callback => withClaimEffectBatch(objectBatch, callback);
+          let createdCommit;
+          try {
+            createdCommit = await createInitialObject(async () => {
+              /** @type {Array<{path: string, mode: "100644", type: "blob", sha: string | null}>} */
+              const tree = [];
+              for (const addition of additions) {
+                assertTransportUnchanged?.();
+                const blob = await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths: [addition.path] }, () =>
+                  githubClient.rest.git.createBlob({ owner, repo, content: addition.contents, encoding: "base64" })
+                );
+                tree.push({ path: addition.path, mode: "100644", type: "blob", sha: blob.data.sha });
+              }
+              for (const deletion of deletions) tree.push({ path: deletion.path, mode: "100644", type: "blob", sha: null });
+              assertTransportUnchanged?.();
+              const treeOid = tree.length
+                ? (await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths }, () => githubClient.rest.git.createTree({ owner, repo, base_tree: parent.data.tree.sha, tree }))).data.sha
+                : parent.data.tree.sha;
+              assertTransportUnchanged?.();
+              return withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths }, () => githubClient.rest.git.createCommit({ owner, repo, message, tree: treeOid, parents: [expectedHeadOid] }));
+            });
+          } catch (error) {
+            discardClaimEffectBatch(objectBatch);
+            throw error;
+          }
+          const firstOid = createdCommit?.data?.sha;
+          if (typeof firstOid !== "string" || firstOid.length === 0) {
+            discardClaimEffectBatch(objectBatch);
+            throw new Error(`${ERR_API}: REST createCommit did not return a valid commit OID`);
+          }
+          if (createdCommit?.data?.verification?.verified !== true) {
+            discardClaimEffectBatch(objectBatch);
+            throw new PushSignedCommitsPolicyViolation(`${ERR_VALIDATION}: GitHub did not verify the initial commit signature; refusing to publish branch '${branch}'`);
+          }
+          core.info(`pushSignedCommits: creating remote branch ${branch} at first signed commit ${firstOid}`);
           try {
             assertTransportUnchanged?.();
             await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths }, () =>
@@ -859,12 +904,19 @@ async function pushSignedCommits({
                 owner,
                 repo,
                 ref: `refs/heads/${branch}`,
-                sha: expectedHeadOid,
+                sha: firstOid,
               })
             );
             core.info(`pushSignedCommits: remote branch ${branch} created successfully`);
+            lastOid = firstOid;
+            continue;
           } catch (createRefError) {
-            assertTransportUnchanged?.();
+            try {
+              assertTransportUnchanged?.();
+            } catch (error) {
+              discardClaimEffectBatch(objectBatch);
+              throw error;
+            }
             /** @type {any} */
             const err = createRefError;
             const status = err && typeof err === "object" ? err.status : undefined;
@@ -873,12 +925,25 @@ async function pushSignedCommits({
             // GitHub returns 422 "Reference refs/heads/<branch> already exists". Treat that as success and continue.
             if (status === 422 && /reference.*already exists/i.test(message)) {
               core.info(`pushSignedCommits: remote branch ${branch} was created concurrently (422 Reference already exists); continuing with signed commits`);
-              const refreshedOid = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
+              let refreshedOid;
+              try {
+                refreshedOid = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
+              } catch (error) {
+                discardClaimEffectBatch(objectBatch);
+                throw error;
+              }
               if (!refreshedOid) {
+                discardClaimEffectBatch(objectBatch);
                 throw new Error(`${ERR_API}: Could not resolve remote branch OID for ${branch} after concurrent creation`);
               }
               expectedHeadOid = refreshedOid;
+              if (refreshedOid === firstOid) {
+                lastOid = firstOid;
+                continue;
+              }
+              discardClaimEffectBatch(objectBatch);
             } else {
+              discardClaimEffectBatch(objectBatch);
               throw createRefError;
             }
           }
@@ -889,13 +954,6 @@ async function pushSignedCommits({
           throw new Error(`${ERR_API}: ledger branch moved after transition validation`);
         }
       }
-
-      // Full commit message (subject + body)
-      const { stdout: msgOut } = await getGitExecOutput(["log", "-1", "--format=%B", sha], { cwd });
-      const message = msgOut.trim();
-      const headline = message.split("\n")[0];
-      const body = message.split("\n").slice(1).join("\n").trim();
-      core.info(`pushSignedCommits: commit message headline: "${headline}"`);
 
       core.info(`pushSignedCommits: file changes: ${additions.length} addition(s), ${deletions.length} deletion(s)`);
 

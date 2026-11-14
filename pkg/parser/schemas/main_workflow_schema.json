@@ -10697,6 +10697,11 @@
                   "description": "Allow updating issue body. Set to true to enable body updates, false to disable. For backward compatibility, null (body:) also enables body updates.",
                   "default": true
                 },
+                "operation": {
+                  "type": "string",
+                  "description": "Default operation for body updates when the agent omits operation: 'append' (add to end), 'prepend' (add to start), 'replace' (overwrite completely), or 'replace-island' (update a workflow-specific section). An explicit agent operation takes precedence. Defaults to 'append' if not specified.",
+                  "enum": ["append", "prepend", "replace", "replace-island"]
+                },
                 "footer": {
                   "type": "boolean",
                   "description": "Controls whether AI-generated footer is added when updating the issue body. When false, the visible footer content is omitted but XML markers are still included. Defaults to true. Only applies when 'body' is enabled.",
@@ -12567,6 +12572,11 @@
             }
           ],
           "description": "Enable AI agents to edit and update GitHub release content, including release notes, assets, and metadata."
+        },
+        "require-agent-success": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, require the agent job to succeed before running detection or processing safe outputs"
         },
         "staged": {
           "$ref": "#/$defs/templatable_boolean",

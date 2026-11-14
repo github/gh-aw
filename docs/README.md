@@ -56,18 +56,43 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone ten-slide deck, separate from the homepage slideshow, linked
+It is a standalone forty-five-slide deck, separate from the homepage slideshow, linked
 from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
 Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
-The navigation dots jump directly to a slide; `#1` through `#10` are shareable
+The navigation dots jump directly to a slide (on narrow screens they become
+previous/next arrow buttons); `#1` through `#45` are shareable
 slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
+Slides are grouped into sections: slides within a section push left, and
+moving to the next section slides up (reversed when going back).
+Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
+1200x630 render of the title slide; regenerate it if the title slide changes.
 
-Examples, review activity, repository counts, and cost figures are synthetic.
-Use role icons rather than employee profiles, and keep private repository
+Examples, review activity, repository counts, and cost figures are synthetic,
+except the model routing slide's results, which are measured on this
+repository's own workflows, the Issues as intent slide's counts of
+issues labelled `community` and the merged pull requests that closed them
+(November 2026 snapshot), the Mine · Refine · Apply slide's dated feed and
+counts of Linter Miner analyzer pull requests, LintMonster issues and the
+merged pull requests that closed them (May to November 2026), the Go Fan slide's counts of daily
+library review issues and the merged pull requests that closed them
+(February to November 2026, with shortened titles), the Continuous Security slide's
+counts and dates, measured from that red-team workflow's repository memory and
+the firewall fix it led to (its attack diagram is a simplified illustration),
+the Semantic
+clustering slide's functions, files and counts from one Semantic Function
+Refactoring report (7 May 2026) and the merged pull request that closed it, and the three data slides after the finale: "First
+commit to GA", which shows this repository's measured public history from its
+first commit to general availability at GitHub Universe, and "How PRs land",
+which shows measured time-to-merge and lines-changed distributions of its
+merged pull requests, and "How workflows evolve", which shows a statistical
+study of the commits that changed its own workflow Markdown. All say so in their speaker notes.
+Use role icons rather than employee profiles. The only exceptions are the
+local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` in `public/cracktro/assets/avatars/`.
+Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.
-The workflow illustration and fonts are local.
+The workflow illustration, avatars, and fonts are local.
 Mona Sans reuses `public/fonts/`; Monaspace Neon and its SIL Open Font License
 are in `public/cracktro/fonts/`.
 
