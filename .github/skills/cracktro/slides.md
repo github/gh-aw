@@ -54,7 +54,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Experiments, graders & evals | illustrative |
 | Audit & Optimize | illustrative |
 | Enterprise |  |
-| Enterprise infrastructure as code | illustrative |
+| Infrastructure as code | illustrative |
 | OpenTelemetry | illustrative |
 | GitHub-native governance | illustrative |
 | Operator-owned infrastructure | illustrative |

@@ -10378,7 +10378,7 @@
     });
   }
 
-  // Enterprise infrastructure as code: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  // Infrastructure as code: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
   {
     resetIndex();
     const RUN = [
@@ -10486,7 +10486,7 @@
     const el = h(
       "section",
       { class: "slide er" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("infrastructure as code", "l-grad"))),
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Infrastructure "), letters("as code", "l-grad"))),
       h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
       ed,
       arrow,
@@ -10537,7 +10537,7 @@
     slides.push({
       group: "enterprise",
       notes:
-        "Enterprise infrastructure as code. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+        "Infrastructure as code. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
       enter() {
         typed = RUN[0].k;
         vRun.textContent = typed;
