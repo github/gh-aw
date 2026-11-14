@@ -92,12 +92,8 @@
     color: transparent; -webkit-text-stroke: 2px #ffffff26; animation: scroll 30s linear infinite; }
   .ga-bg div:nth-child(2) { animation-direction: reverse; animation-duration: 36s; -webkit-text-stroke-color: #2ea04355; }
   .ga-copy { position: absolute; left: 110px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; gap: 26px; }
-  .ga-copy h2 { margin: 0; font-size: 116px; line-height: .92; font-variation-settings: "wght" 700, "wdth" 100; }
+  .ga-copy h2 { margin: 0; font-size: 106px; line-height: .92; font-variation-settings: "wght" 700, "wdth" 100; }
   .ga-copy h2 .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950); }
-  .ga-copy .meta { font: 500 26px/1.4 var(--mono); color: #9198a1; }
-  .ga-copy .meta a { color: #4493f8; text-decoration: none; }
-  .ga-copy .meta a:hover { text-decoration: underline; }
-  .active .ga-copy .meta { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
   .badge { align-self: flex-start; font: 500 22px/1 "Mona Sans"; color: #3fb950; background: #2ea04326;
     border: 1px solid #2ea04366; padding: 10px 18px; border-radius: 2em; box-shadow: 0 0 30px #2ea04333; }
   .active .badge { animation: rise .7s both .1s, pulse 2.4s ease-in-out infinite 1s; }
@@ -831,8 +827,7 @@
           "div",
           { class: "ga-copy" },
           h("div", { class: "badge" }, "● GITHUB ACTIONS"),
-          h("h2", {}, letters("Built on", "l-grad"), h("br"), letters("GitHub"), h("br"), letters("Actions.")),
-          h("div", { class: "meta" }, "Markdown workflows. Built-in guardrails.", h("br"), h("a", { href: DOCS_URL, target: "_blank", rel: "noopener" }, "Read the documentation"))
+          h("h2", {}, letters("AI-powered", "l-grad"), h("br"), letters("workflows", "l-grad"), h("br"), letters("for GitHub"))
         ),
         h(
           "div",

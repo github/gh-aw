@@ -14,7 +14,7 @@ test("presents the sixteen slides without the removed sections", async ({ page }
 
   const headings = [
     "GitHubAgenticWorkflows",
-    "Built onGitHubActions.",
+    "AI-poweredworkflowsfor GitHub",
     "Spec Driven Automation",
     "Safety and control",
     "Automation hardening",
