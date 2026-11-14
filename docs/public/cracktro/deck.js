@@ -3097,7 +3097,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#rpaAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mnkiefer.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rpaClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // Two synthetic source files as syntax-coloured bars; rows 3–6 of A repeat as rows 4–7 of B.
     const TOK = ["#ff7b72", "#d2a8ff", "#79c0ff", "#a5d6ff", "#8b949e"];
@@ -3173,7 +3173,7 @@
       ["e8", "nResearch", 1800],
     ];
     const LANE = { nResearch: 0, nCode: 0, nIssue: 1, nCopilot: 2, nPR: 2, nDev: 2, nMerge: 2 };
-    let g = `<defs><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="rpaClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="rpaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="rpaBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
       <marker id="rpaB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
@@ -3290,7 +3290,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#raoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/dsyme.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#raoClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
@@ -3338,7 +3338,7 @@
       ["#3fb950", 0.25],
       ["#d29922", 0.15],
     ];
-    let g = `<defs><radialGradient id="raoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="raoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="raoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="raoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="raoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
@@ -3590,7 +3590,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#mraAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#mraClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
@@ -3621,7 +3621,7 @@
       ["e9", "nMerge"],
     ];
     const LANE = { nComment: 0, nPR1: 0, nDev1: 1, nIssue: 1, nPR2: 1, nRefiner: 1, nMonster: 2, nPR3: 2, nDev2: 2, nMerge: 2 };
-    let g = `<defs><radialGradient id="mraAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="mraClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mraAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="mraP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="mraB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
@@ -3802,8 +3802,8 @@
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#sflAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const maint = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+    const maint = (id, x, y, avatar = "assets/avatars/ievangelist.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
     const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
@@ -3868,7 +3868,7 @@
       ["sflE6", "sflScan", 1800],
     ];
     const LANE = { sflScan: 0, sflPipes: 0, sflKbe: 1, sflFixer: 1, sflOut0: 1, sflOut1: 1, sflOut2: 1, sflDev: 1, sflFeed: 2, sflKpi: 2, sflRubric: 2, sflDev2: 2 };
-    let g = `<defs><radialGradient id="sflAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="sflClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="sflAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="sflP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="sflBeamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
       <marker id="sflB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
@@ -3889,7 +3889,7 @@
     g += pipes + box("sflKbe", 640, 340, "issue");
     g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
     g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
-    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580);
+    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580, "assets/avatars/pelikhan.jpg");
     g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

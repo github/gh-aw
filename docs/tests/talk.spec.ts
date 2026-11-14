@@ -108,7 +108,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
 });
 
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
-  const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer)\.jpg$/;
+  const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer|ievangelist)\.jpg$/;
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
     expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
   }
