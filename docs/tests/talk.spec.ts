@@ -15,7 +15,7 @@ test("presents the sixteen slides without the removed sections", async ({ page }
   const headings = [
     "GitHubAgenticWorkflows",
     "Built onGitHubActions.",
-    "Prompt to factory",
+    "Spec Driven Automation",
     "Safety and control",
     "Automation hardening",
     "Stop manually translating intent into code.",
@@ -73,7 +73,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#1$/);
 
-  const assets = ["deck.js", "assets/workflow-run.svg", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -82,20 +82,17 @@ test("ships local assets with the docs and links to the talk from the footer", a
   }
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.fonts.check('16px "Monaspace Neon"'))).toBe(true);
-  expect(await page.locator(".shot img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
 });
 
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
   const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer)\.jpg$/;
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
-    expect(asset === "workflow-run.svg" || asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
+    expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
   }
   const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
   expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/"]);
-  const illustration = await (await request.get("/gh-aw/cracktro/assets/workflow-run.svg")).text();
-  expect(illustration).not.toMatch(/<(?:image|script|foreignObject|metadata)\b/i);
 
   const externalRequests: string[] = [];
   const errors: string[] = [];

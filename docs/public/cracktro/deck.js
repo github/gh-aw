@@ -102,20 +102,46 @@
     border: 1px solid #2ea04366; padding: 10px 18px; border-radius: 2em; box-shadow: 0 0 30px #2ea04333; }
   .active .badge { animation: rise .7s both .1s, pulse 2.4s ease-in-out infinite 1s; }
   @keyframes pulse { 50% { box-shadow: 0 0 50px #2ea04388; } }
-  .shot-wrap { position: absolute; right: 90px; top: 150px; width: 1080px; height: 780px; perspective: 1800px; }
+  .shot-wrap { position: absolute; right: 90px; top: 150px; width: 1080px; height: 780px; }
   .shot { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; background: #0d1117; border: 1px solid #3d444d;
-    box-shadow: 0 60px 140px -20px #000, 0 0 0 1px #000, 0 0 120px -30px #3fb950;
-    transform: rotateY(-14deg) rotateX(6deg); }
+    box-shadow: 0 60px 140px -20px #000, 0 0 0 1px #000, 0 0 120px -30px #3fb950; }
   .active .shot { animation: shot-in 1.4s cubic-bezier(.2,.9,.2,1) both .35s, float 7s ease-in-out infinite 1.8s; }
-  @keyframes shot-in { from { opacity: 0; transform: translateY(120px) rotateY(-24deg) rotateX(16deg) scale(.95); } }
-  @keyframes float { 0%, 100% { transform: rotateY(-14deg) rotateX(6deg) translateY(0); } 50% { transform: rotateY(-9deg) rotateX(3deg) translateY(-8px); } }
+  @keyframes shot-in { from { opacity: 0; transform: translateY(120px); } }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
   .shot .bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 20px; background: #151b23; border-bottom: 1px solid #3d444d; }
   .shot .bar i { width: 14px; height: 14px; border-radius: 50%; }
   .shot .bar .url { margin-left: 18px; flex: 1; font: 500 17px/32px var(--mono); color: #9198a1; background: #0d1117;
     border-radius: 6px; padding: 0 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .shot img { display: block; width: 100%; height: calc(100% - 48px); object-fit: cover; object-position: 50% 0%; }
-  .active .shot img { animation: pan 14s ease-in-out infinite alternate 2s; }
-  @keyframes pan { to { object-position: 50% 100%; } }
+  .ga-svg { display: block; width: 100%; height: calc(100% - 48px); font-family: "Mona Sans", sans-serif; }
+  .ga-svg text { fill: #e6edf3; }
+  .ga-svg .ga-mono { font-family: var(--mono); white-space: pre; }
+  .ga-svg .ga-hdot { fill: #6e7681; transition: fill .3s; }
+  .ga-svg.ga-running .ga-hdot { fill: #d29922; animation: ga-blink 1s ease-in-out infinite; }
+  .ga-svg.ga-done .ga-hdot { fill: #2ea043; }
+  @keyframes ga-blink { 50% { opacity: .35; } }
+  .ga-svg .ga-note { opacity: 0; transition: opacity .6s; }
+  .ga-svg.ga-aw .ga-note { opacity: 1; }
+  .ga-flip .ga-head { animation: ga-flip 1.6s ease-in-out; transform-box: fill-box; transform-origin: center; }
+  @keyframes ga-flip { 50% { transform: scaleY(0); } }
+  .ga-card .box { fill: #151b23; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, fill .3s; }
+  .ga-card.run .box { stroke: #d29922; }
+  .ga-card.ok .box { stroke: #2ea043; }
+  .ga-card.ag .box { fill: #1d1730; stroke: #8957e5; }
+  .ga-card.ag.run .box { stroke: #ab7df8; animation: ga-glow 1.2s ease-in-out infinite; }
+  @keyframes ga-glow { 50% { filter: drop-shadow(0 0 22px #a371f7); } }
+  .ga-card .ga-tag { fill: #ab7df8; opacity: 0; transition: opacity .4s; }
+  .ga-card.ag .ga-tag { opacity: 1; }
+  .ga-card .ring { fill: none; stroke: #6e7681; stroke-width: 3; transform-box: fill-box; transform-origin: center; }
+  .ga-card.run .ring { stroke: #d29922; stroke-dasharray: 46 23; animation: ga-spin 1s linear infinite; }
+  .ga-card.ag.run .ring { stroke: #ab7df8; }
+  .ga-card.ok .ring { fill: #238636; stroke: #238636; }
+  .ga-card .chk { opacity: 0; }
+  .ga-card.ok .chk { opacity: 1; }
+  @keyframes ga-spin { to { transform: rotate(360deg); } }
+  .ga-edge { stroke: #3d444d; stroke-width: 3; transition: stroke .3s; }
+  .ga-edge.on { stroke: #2ea043; stroke-dasharray: 10 8; animation: ga-dash .6s linear infinite; }
+  .ga-aw .ga-edge.on { stroke: #ab7df8; }
+  @keyframes ga-dash { to { stroke-dashoffset: -18; } }
   .shot .glare { position: absolute; inset: 0; pointer-events: none;
     background: linear-gradient(115deg, transparent 30%, #ffffff14 45%, transparent 60%); background-size: 300% 100%;
     animation: glare 5s ease-in-out infinite; }
@@ -303,7 +329,6 @@
   .sec-ent i { font: 600 18px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: #d29922; font-style: normal; margin-right: 10px; }
   .sec-ent span { font-size: 24px; padding: 8px 20px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992214; color: #f0f6fc; opacity: 0; }
   .active .sec-ent span { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 120ms + 1200ms); }
-  .confetti { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; z-index: 5; }
   .sec-lane { position: absolute; left: 0; top: 880px; width: 1920px; height: 120px; }
 
   /* --- compiler hardening --- */
@@ -332,7 +357,8 @@
   .ch-scan { position: absolute; left: 1340px; top: 928px; width: 480px; font: 500 15px/1 var(--mono); letter-spacing: .08em; color: #9198a1; text-align: center; opacity: 0; }
   .active .ch-scan { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.4s; }
 
-  /* --- prompt to factory --- */
+  /* --- spec driven automation --- */
+  .slide-head h2.pf-h { font-size: 100px; }
   .pf-card { position: absolute; top: 360px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -25px var(--c); opacity: 0; transform: translateY(30px) scale(.97); transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1); }
   .pf-card.on { opacity: 1; transform: none; }
   .pf-tta { position: absolute; left: 1330px; top: 112px; width: 480px; display: flex; align-items: center; gap: 26px; padding: 20px 28px; border-radius: 22px;
@@ -573,70 +599,215 @@
   {
     resetIndex();
     const ga = "GITHUB ACTIONS ✦ AGENTIC WORKFLOWS ✦ ";
-    const conf = h("canvas", { class: "confetti", width: 1920, height: 1080 });
-    const cctx = conf.getContext("2d");
-    const CC = ["#3fb950", "#4493f8", "#a371f7", "#f778ba", "#d29922", "#ffffff", "#56d364"];
-    let bits = [],
-      cLast = 0;
-    const burst = (x, y, dir, n) => {
-      for (let i = 0; i < n; i++) {
-        const a = -Math.PI / 2 + dir * (0.35 + Math.random() * 0.55),
-          v = 14 + Math.random() * 16;
-        bits.push({
-          x,
-          y,
-          vx: Math.cos(a) * v,
-          vy: Math.sin(a) * v,
-          r: Math.random() * 6,
-          vr: (Math.random() - 0.5) * 0.4,
-          w: 10 + Math.random() * 10,
-          hh: 5 + Math.random() * 6,
-          c: CC[(Math.random() * CC.length) | 0],
-          ph: Math.random() * 6,
-        });
+    // One repository's Actions tab: a CI run (build, test, deploy) opens up and an agent step is inserted into the same pipeline.
+    // [title, subtitle, file, trigger, result, jobs: [card, name, detail, ms, agentic, log lines]]
+    const GA_RUNS = [
+      [
+        "CI",
+        "build · test · deploy",
+        "ci.yml",
+        "on: push",
+        "✓ All checks passed",
+        [
+          [0, "build", "npm run build", 1300, 0, ["Checked out acme/app@main", "> app@1.4.0 build", "Compiling 248 modules…", "✓ Built dist/ in 3.1s"]],
+          [2, "test", "npm test", 1300, 0, ["PASS  src/api.test.ts", "PASS  src/ui.test.ts", "Tests: 132 passed, 132 total"]],
+          [3, "deploy", "upload artifact", 900, 0, ["Uploading dist.zip (1.2 MB)", "✓ Artifact uploaded"]],
+        ],
+      ],
+      [
+        "Issue triage",
+        "agentic workflow",
+        "triage.md → triage.lock.yml",
+        "on: issues",
+        "✓ Issue #42 triaged",
+        [
+          [0, "activation", "role · sanitize", 1100, 0, ["Event: issues.opened #42", "Actor has triage role ✓", "Sanitized issue body → prompt"]],
+          [1, "agent", "copilot · sandbox", 2600, 1, ["Firewall: 3 allowed domains", "Reading issue #42…", "Searching related code…", "Proposal: label bug + comment", "Wrote safe outputs (read-only token)"]],
+          [2, "detection", "threat scan", 1200, 0, ["Scanning agent output…", "No prompt injection found", "No secrets found ✓"]],
+          [3, "safe-outputs", "label · comment", 1100, 0, ["add_labels: bug", "add_comment on #42", "✓ Posted with scoped write token"]],
+        ],
+      ],
+    ];
+    // card x in the CI layout (agent card absent) and in the agentic layout
+    const GA_XA = [272, 385, 497, 722],
+      GA_XB = [160, 385, 610, 835],
+      GA_W = 200,
+      GA_Y = 268,
+      GA_CY = GA_Y + 60;
+    const gaSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    gaSvg.setAttribute("class", "ga-svg");
+    gaSvg.setAttribute("viewBox", "0 0 1080 732");
+    gaSvg.setAttribute("role", "img");
+    gaSvg.setAttribute("aria-label", "Illustrative repository Actions tab: an agent step is inserted into a build, test and deploy workflow, turning it into an agentic workflow with activation, agent, detection and safe-outputs jobs");
+    gaSvg.innerHTML = `
+      <rect x="0" y="0" width="1080" height="732" fill="#0d1117"/>
+      <path d="M40 40h16v24h-16z M44 46h8 M44 52h8" stroke="#9198a1" stroke-width="2" fill="none"/>
+      <text x="72" y="60" class="ga-mono" font-size="26"><tspan fill="#4493f8">acme</tspan><tspan fill="#9198a1"> / </tspan><tspan fill="#4493f8" font-weight="700">app</tspan></text>
+      <g font-size="20">
+        <text x="40" y="118" fill="#9198a1">‹› Code</text><text x="150" y="118" fill="#9198a1">Issues</text>
+        <text x="240" y="118" fill="#9198a1">Pull requests</text><text x="400" y="118" fill="#f0f6fc" font-weight="700">▶ Actions</text>
+      </g>
+      <rect x="392" y="134" width="114" height="4" rx="2" fill="#f78166"/>
+      <line x1="0" y1="138" x2="1080" y2="138" stroke="#3d444d"/>
+      <g class="ga-head">
+        <circle class="ga-hdot" cx="52" cy="190" r="10"/>
+        <text x="74" y="199" font-size="30" font-weight="700" class="ga-title"></text>
+        <text x="74" y="232" font-size="18" class="ga-mono ga-file" fill="#9198a1"></text>
+        <text x="1040" y="199" font-size="18" text-anchor="end" class="ga-mono ga-note" fill="#ab7df8">same runner · same logs · same checks</text>
+      </g>
+      <circle cx="96" cy="${GA_CY}" r="34" fill="#151b23" stroke="#3d444d" stroke-width="2"/>
+      <text x="96" y="${GA_CY + 8}" font-size="22" text-anchor="middle" fill="#9198a1">⚡</text>
+      <text x="96" y="${GA_Y + 128}" font-size="17" text-anchor="middle" class="ga-mono ga-on" fill="#9198a1"></text>
+      ${[0, 1, 2, 3, 4].map(() => `<line class="ga-edge" y1="${GA_CY}" y2="${GA_CY}"/>`).join("")}
+      ${[0, 1, 2, 3]
+        .map(
+          () => `<g class="ga-card">
+          <text class="ga-tag" x="${GA_W / 2}" y="${GA_Y - 16}" text-anchor="middle" font-size="18" font-weight="700">✦ AGENTIC STEP</text>
+          <rect class="box" x="0" y="${GA_Y}" width="${GA_W}" height="120" rx="12"/>
+          <circle class="ring" cx="28" cy="${GA_Y + 34}" r="11"/>
+          <path class="chk" d="M22 ${GA_Y + 34}l4 4 8-8" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <g class="lbl">
+            <text class="nm" x="50" y="${GA_Y + 42}" font-size="22" font-weight="700"></text>
+            <text class="sub ga-mono" x="20" y="${GA_Y + 90}" font-size="16" fill="#9198a1"></text>
+          </g>
+        </g>`
+        )
+        .join("")}
+      <rect x="40" y="452" width="1000" height="244" rx="10" fill="#010409" stroke="#3d444d"/>
+      <text x="64" y="488" font-size="20" font-weight="700" class="ga-mono ga-logh"></text>
+      <line x1="40" y1="504" x2="1040" y2="504" stroke="#21262d"/>
+      ${[0, 1, 2, 3, 4, 5].map(i => `<text class="ga-mono ga-ln" x="64" y="${540 + i * 28}" font-size="18"></text>`).join("")}`;
+    const gq = s => gaSvg.querySelector(s),
+      gqa = s => [...gaSvg.querySelectorAll(s)];
+    const gaCards = gqa(".ga-card"),
+      gaEdges = gqa(".ga-edge"),
+      gaLines = gqa(".ga-ln");
+    gaCards[1].classList.add("ag");
+    let gaT0 = 0,
+      gaPhase = -1,
+      gaKey = "",
+      gaM = -1;
+    const gaLabel = p => {
+      const [title, sub, file, on, , jobs] = GA_RUNS[p];
+      gaPhase = p;
+      gaKey = "";
+      gaSvg.classList.toggle("ga-aw", p === 1);
+      gq(".ga-title").textContent = `${title} · ${sub}`;
+      gq(".ga-file").textContent = file;
+      gq(".ga-on").textContent = on;
+      for (const [c, nm, sub2] of jobs) {
+        gaCards[c].querySelector(".nm").textContent = nm;
+        gaCards[c].querySelector(".sub").textContent = sub2;
       }
     };
+    const gaEase = x => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+    // m: 0 = CI layout, 1 = agentic layout. The pipeline opens up, then the agent card drops into the gap.
+    const gaLayout = m => {
+      if (m === gaM) return;
+      gaM = m;
+      const s = gaEase(m / 0.55),
+        a = gaEase((m - 0.4) / 0.6),
+        x = GA_XA.map((xa, i) => xa + (GA_XB[i] - xa) * s),
+        r = i => x[i] + GA_W;
+      gaCards.forEach((c, i) => c.setAttribute("transform", `translate(${x[i]} ${i === 1 ? (1 - a) * -190 : 0})`));
+      gaCards[1].style.opacity = a;
+      // label cross-fade for cards that change role
+      const lo = Math.abs(2 * Math.min(1, Math.max(0, (m - 0.15) / 0.7)) - 1);
+      for (const i of [0, 2, 3]) gaCards[i].querySelector(".lbl").style.opacity = m > 0 && m < 1 ? lo : 1;
+      // [x1, x2, opacity]: trigger→first, first→test (CI bridge), first→agent, agent→detection, test→last
+      [
+        [130, x[0], 1],
+        [r(0), x[2], 1 - a],
+        [r(0), x[1], a],
+        [r(1), x[2], a],
+        [r(2), x[3], 1],
+      ].forEach(([x1, x2, o], i) => {
+        gaEdges[i].setAttribute("x1", x1);
+        gaEdges[i].setAttribute("x2", x2);
+        gaEdges[i].style.opacity = o;
+      });
+    };
+    // e: ms into the run of phase p (Infinity = finished, -1 = queued)
+    const gaRender = (p, e) => {
+      const jobs = GA_RUNS[p][5];
+      let s = 0,
+        cur = -1;
+      const log = [],
+        st = [0, 0, 0, 0];
+      for (const [c, nm, , ms, ag, lines] of jobs) {
+        const a = s;
+        s += ms;
+        if (e < a) continue;
+        const n = e >= s ? lines.length : Math.min(lines.length, 1 + Math.floor(((e - a) / ms) * lines.length));
+        log.push(...lines.slice(0, n).map(l => [nm, l]));
+        if (e < s) ((st[c] = 1), (cur = [nm, ag]));
+        else st[c] = 2;
+      }
+      const done = e >= s;
+      const key = `${p}|${st.join("")}|${log.length}|${done}`;
+      if (key === gaKey) return;
+      gaKey = key;
+      gaCards.forEach((c, i) => {
+        c.classList.toggle("run", st[i] === 1);
+        c.classList.toggle("ok", st[i] === 2);
+      });
+      const started = e >= 0;
+      [started, st[0] === 2, st[0] === 2, st[1] === 2, st[2] === 2].forEach((on, i) => gaEdges[i].classList.toggle("on", on));
+      gaSvg.classList.toggle("ga-done", done);
+      gaSvg.classList.toggle("ga-running", started && !done);
+      const lh = gq(".ga-logh");
+      lh.textContent = done ? GA_RUNS[p][4] : cur ? `▾ ${cur[0]}` : "Queued…";
+      lh.setAttribute("fill", done ? "#3fb950" : cur && cur[1] ? "#ab7df8" : "#f0f6fc");
+      const tail = log.slice(-gaLines.length);
+      gaLines.forEach((t, i) => {
+        const l = tail[i];
+        t.textContent = l ? `${l[0].padEnd(13)}${l[1]}` : "";
+        t.setAttribute("fill", l && i === tail.length - 1 && !done ? "#f0f6fc" : "#9198a1");
+      });
+    };
+    const GA_START = 1600,
+      GA_HOLD = [1800, 2600],
+      GA_MORPH = 1600;
+    const gaLen = p => GA_RUNS[p][5].reduce((a, j) => a + j[3], 0) + GA_HOLD[p];
     slides.push({
-      sound: "victory",
+      sound: "ship",
       trans: "up",
-      techno: 1,
       enter() {
-        bits = [];
-        cLast = 0;
-        setTimeout(() => {
-          burst(-20, 1100, 1, 140);
-          burst(1940, 1100, -1, 140);
-        }, 200);
-        setTimeout(() => {
-          burst(960, 1120, 0.15, 60);
-          burst(960, 1120, -0.15, 60);
-        }, 900);
+        gaT0 = performance.now();
+        gaM = -1;
+        gaSvg.classList.remove("ga-flip");
+        gaLabel(0);
+        gaLayout(0);
+        gaRender(0, -1);
       },
       tick() {
-        const now = performance.now(),
-          dt = cLast ? Math.min(3, (now - cLast) / 16.7) : 1;
-        cLast = now;
-        cctx.clearRect(0, 0, 1920, 1080);
-        bits = bits.filter(b => b.y < 1140);
-        for (const b of bits) {
-          b.vx *= 0.985 ** dt;
-          b.vy = b.vy * 0.985 ** dt + 0.38 * dt;
-          b.x += b.vx * dt;
-          b.y += b.vy * dt;
-          b.r += b.vr * dt;
-          b.ph += 0.15 * dt;
-          cctx.save();
-          cctx.translate(b.x + Math.sin(b.ph) * 6, b.y);
-          cctx.rotate(b.r);
-          cctx.scale(1, Math.cos(b.ph));
-          cctx.fillStyle = b.c;
-          cctx.fillRect(-b.w / 2, -b.hh / 2, b.w, b.hh);
-          cctx.restore();
+        const u = performance.now() - gaT0 - GA_START,
+          A = gaLen(0),
+          B = gaLen(1),
+          cyc = A + B + 2 * GA_MORPH;
+        if (u < 0) return gaRender(0, -1);
+        const c = u % cyc;
+        let p = 0,
+          e = c,
+          m = 0;
+        if (c >= A && c < A + GA_MORPH) {
+          m = (c - A) / GA_MORPH;
+          p = m < 0.5 ? 0 : 1;
+          e = p ? -1 : Infinity;
+        } else if (c >= A + GA_MORPH && c < A + GA_MORPH + B) ((p = 1), (e = c - A - GA_MORPH), (m = 1));
+        else if (c >= A + GA_MORPH + B) {
+          m = 1 - (c - A - GA_MORPH - B) / GA_MORPH;
+          p = m >= 0.5 ? 1 : 0;
+          e = p ? Infinity : -1;
         }
+        if (p !== gaPhase) gaLabel(p);
+        gaSvg.classList.toggle("ga-flip", m > 0 && m < 1);
+        gaLayout(m);
+        gaRender(p, e);
       },
       palette: ["#238636", "#1f6feb", "#8957e5", "#2ea043"],
       notes:
-        "GitHub Agentic Workflows compiles Markdown into GitHub Actions workflows. This diagram is an illustrative example, not a screenshot of a real repository or workflow run. See the public documentation for setup and availability.",
+        "GitHub Agentic Workflows runs on the GitHub Actions you already use. The same repository runs a familiar build, test and deploy workflow; then an agent step is inserted into that pipeline, giving activation, agent, threat detection, and safe outputs. Same runner, same logs, same checks. This diagram is a synthetic, illustrative example, not a real repository or workflow run. See the public documentation for setup and availability.",
       el: h(
         "section",
         { class: "slide" },
@@ -655,16 +826,15 @@
             "div",
             { class: "shot" },
             h("div", { class: "bar" }, h("i", { style: { background: "#ff5f57" } }), h("i", { style: { background: "#febc2e" } }), h("i", { style: { background: "#28c840" } }), h("div", { class: "url" }, DOCS_URL.replace("https://", ""))),
-            h("img", { src: "assets/workflow-run.svg", alt: "Illustrative workflow: Markdown compiles into GitHub Actions, with an isolated agent and separate safe outputs" }),
+            gaSvg,
             h("div", { class: "glare" })
           )
-        ),
-        conf
+        )
       ),
     });
   }
 
-  // Prompt to factory: prompt → markdown → issue (from the gh-aw hero)
+  // Spec Driven Automation: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
     const PROMPT = "Create a daily agentic workflow that gives me an issue summary";
@@ -752,7 +922,7 @@
       trans: "up",
       palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
-        "Prompt to factory: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning the issue summary shows up. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
+        "Spec Driven Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning the issue summary shows up. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
       enter() {
         t0 = 0;
         snd = { p: 0, m: -2, go: false, card: [] };
@@ -816,7 +986,7 @@
         n2.textContent = Math.round(6 * ez);
         n3.textContent = Math.round(2 * ez);
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", {}, letters("Prompt to "), letters("factory", "l-grad"))), tta, links, tags, cards),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Spec Driven "), letters("Automation", "l-grad"))), tta, links, tags, cards),
     });
   }
 
@@ -3928,39 +4098,6 @@
       title: t => {
         pad([48, 55, 64, 71], t + 0.1, 3.2, 0.045);
         [72, 76, 79, 83, 86, 91].forEach((m, i) => bell(m, t + 0.5 + i * 0.11, 0.05, 1.4));
-      },
-      // Party poppers, a brass fanfare and a sparkle of confetti bells
-      victory: t => {
-        [0.12, 0.3].forEach(d => {
-          const src = ac.createBufferSource(),
-            f = ac.createBiquadFilter(),
-            g = ac.createGain();
-          src.buffer = noise();
-          f.type = "bandpass";
-          f.frequency.value = 1800;
-          f.Q.value = 0.8;
-          src.connect(f);
-          f.connect(g);
-          g.connect(out);
-          env(g, t + d, 0.002, 0.35, 0.12);
-          src.start(t + d, Math.random() * 0.5);
-          src.stop(t + d + 0.2);
-        });
-        const b = 0.11,
-          br = { type: "sawtooth", vol: 0.09, cutoff: 4200, detune: 9 };
-        [
-          [67, 0],
-          [67, b],
-          [67, 2 * b],
-          [72, 3 * b, 0.5],
-          [67, 3 * b + 0.55, 0.14],
-          [72, 3 * b + 0.72, 0.14],
-        ].forEach(([m, d, dur = 0.09]) => tone(m, t + 0.35 + d, { ...br, dur }));
-        const c = t + 0.35 + 3 * b + 0.88;
-        [72, 76, 79, 84].forEach(m => tone(m, c, { ...br, dur: 1.3, vol: 0.06 }));
-        tone(48, c, { type: "triangle", dur: 1.3, vol: 0.2, cutoff: 900 });
-        tone(36, c, { type: "sine", dur: 1.4, vol: 0.2, cutoff: 600 });
-        for (let i = 0; i < 18; i++) bell(88 + SCALE[(Math.random() * SCALE.length) | 0], t + 0.2 + Math.random() * 2.2, 0.025, 0.8);
       },
       ship: t => {
         [
