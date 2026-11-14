@@ -784,5 +784,43 @@
    "Repository root contains only LICENSE and README.md"
   ],
   "blogged": false
+ },
+ "ymd65536/GitHubAgenticWorkflows": {
+  "kind": "other",
+  "reviewed": "2026-11-14",
+  "score": 2,
+  "summary": "Single-workflow quick-start copy of githubnext/agentics daily-team-status; no original catalog content",
+  "highlights": [
+   "README.md: setup via gh extension install githubnext/gh-aw and gh aw add githubnext/agentics/daily-team-status --pr",
+   ".github/workflows/daily-team-status.md (1.5 KB) is an upstream copy; .lock.yml is 231 KB",
+   "AGENTS.md is empty; CONTRIBUTING.md is template text; no license; last commit 2025-11-22"
+  ],
+  "blogged": false
+ },
+ "svennijhuis/agentic-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-14",
+  "score": 8,
+  "summary": "Installable catalog of 11 gh-aw workflows: builder, 4-axis reviewer with round caps, fail-closed shared fragments",
+  "highlights": [
+   "workflows/pr-reviewer.md: rounds 1-3 only via if:; round derived from earlier 'Reviewer: changes needed' reviews; COMMENT-only reviews (allowed-events)",
+   "workflows/issue-builder.md: if: caps fix rounds to 1-2; max-ai-credits/max-turns/timeout caps per workflow",
+   "workflows/shared/security.md: network closed to defaults, threat-detection on; workflows/shared/README.md records source commit and licence per vendored skill",
+   "aw.yml: manifest with min-version v0.93.4 listing 11 includes; docs/install.md for org setup"
+  ],
+  "blogged": true
+ },
+ "githubnext/repo-mind-light-aw": {
+  "kind": "shared-component",
+  "reviewed": "2026-11-14",
+  "score": 5,
+  "summary": "Companion gh-aw shared workflow for Repo Mind Light; README-only evidence, shared workflow file policy-filtered",
+  "highlights": [
+   "README.md (18 KB): documents one MCP server 'repo-mind' with a single 'query' tool and config schema (slug, store_path, conversations, query)",
+   "Pins guidance: pin imports to a commit SHA; COPILOT_GITHUB_TOKEN must be user/org-bound (not GITHUB_TOKEN)",
+   ".github/workflows/shared/repo-mind-light.md returned 'filtered by secrecy policy'; not analysed, not worked around",
+   "CHANGELOG up to v1.1.5 (2026-05-19); last push 2026-06-10"
+  ],
+  "blogged": false
  }
 }

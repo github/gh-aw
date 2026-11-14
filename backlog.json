@@ -1,17 +1,5 @@
 [
  {
-  "id": "ymd65536/GitHubAgenticWorkflows",
-  "kind": "other",
-  "source": "search: gh aw add/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
-  "id": "svennijhuis/agentic-workflows",
-  "kind": "workflow-collection",
-  "source": "search: gh aw add/agentic repo search",
-  "discovered": "2026-11-11"
- },
- {
   "id": "OttilieWilliams/agentic-workflows-playground",
   "kind": "other",
   "source": "search: gh-aw safe-outputs/agentic repo search",
@@ -21,12 +9,6 @@
   "id": "githubnext/evergreen",
   "kind": "other",
   "source": "repo search 2026-11-12: gh-aw policy-aware PR workflow",
-  "discovered": "2026-11-12"
- },
- {
-  "id": "githubnext/repo-mind-light-aw",
-  "kind": "shared-component",
-  "source": "repo search 2026-11-12: companion gh-aw shared workflow repo",
   "discovered": "2026-11-12"
  },
  {
