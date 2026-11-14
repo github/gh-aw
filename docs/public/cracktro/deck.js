@@ -1328,14 +1328,15 @@
   .bh-row.many li { height: 150px; padding: 18px 22px; }
   .bh-row.many .bh-t { font-size: 25px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
   .bh-t { font-size: 28px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
-  .arrows { position: fixed; left: 16px; bottom: 10px; display: none; gap: 8px; z-index: 5; }
+  .arrows { position: fixed; left: 12px; bottom: 10px; display: none; gap: 6px; z-index: 5; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
   .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
-    color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; }
+    color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .arrows button:hover { color: #f0f6fc; border-color: #9198a1; }
   .arrows button:disabled { opacity: .35; cursor: default; }
   .arrows svg { width: 100%; height: 100%; display: block; }
   body.compact-nav .dots { display: none; }
   body.compact-nav .arrows { display: flex; }
+  body.compact-nav .snd { right: 112px; }
   .snd { position: fixed; right: 124px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
   .snd:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -11390,11 +11391,36 @@
       },
     });
     b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+    b._nav = fn;
     return b;
   };
+  const bandPrevBtn = arrowBtn("Previous band", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
   const prevBtn = arrowBtn("Previous slide", "M15 5l-7 7 7 7", () => prev());
   const nextBtn = arrowBtn("Next slide", "M9 5l7 7-7 7", () => next());
-  const arrows = h("div", { class: "arrows" }, prevBtn, nextBtn);
+  const bandNextBtn = arrowBtn("Next band", "M18 5v14M6 6l7 6-7 6", () => band(1));
+  const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
+  // Taps on the arrows navigate on touchend and cancel the default action, so Safari neither
+  // double-tap zooms nor synthesizes a second click, and the window swipe handlers never see them.
+  let arrowTouchAt = 0;
+  arrows.addEventListener("touchstart", e => e.stopPropagation(), { passive: true });
+  arrows.addEventListener("touchmove", e => e.stopPropagation(), { passive: true });
+  arrows.addEventListener("touchcancel", e => e.stopPropagation());
+  arrows.addEventListener(
+    "touchend",
+    e => {
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+      arrowTouchAt = Date.now();
+      const b = e.target.closest?.("button"),
+        t = e.changedTouches[0];
+      if (!b || b.disabled || !t) return;
+      const r = b.getBoundingClientRect();
+      if (t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom) b._nav();
+    },
+    { passive: false }
+  );
+  arrows.addEventListener("click", e => Date.now() - arrowTouchAt < 700 && e.detail > 0 && (e.stopPropagation(), e.preventDefault()), true);
+  arrows.addEventListener("click", e => e.stopPropagation());
   const count = h("div", { class: "count" });
   const snd = h("button", {
     class: "snd",
@@ -12462,6 +12488,8 @@
     [...dots.children].forEach((r, i) => r.classList.toggle("on", i === slides[n].band));
     prevBtn.disabled = n === 0;
     nextBtn.disabled = n === slides.length - 1;
+    bandPrevBtn.disabled = slides[n].band === 0;
+    bandNextBtn.disabled = slides[n].band === rows.length - 1;
     count.textContent = `${String(n + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
