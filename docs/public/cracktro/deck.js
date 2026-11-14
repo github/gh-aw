@@ -24,9 +24,11 @@
   canvas.bg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
   .stage { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
   .slide { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
-  .slide.active { visibility: visible; pointer-events: auto; animation: wipe-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving { visibility: visible; animation: fade-out .7s cubic-bezier(.6,0,.4,1) both; }
-  @keyframes wipe-in { from { clip-path: circle(0% at var(--ox, 100%) 50%); } to { clip-path: circle(150% at var(--ox, 100%) 50%); } }
+  /* reveal-style horizontal push: --dx is +100% going forward, -100% going back, 0 on first load */
+  .slide.active { visibility: visible; pointer-events: auto; animation: slide-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving { visibility: visible; animation: slide-out .8s cubic-bezier(.26,.86,.44,.985) both; }
+  @keyframes slide-in { from { transform: translateX(var(--dx, 100%)); } to { transform: none; } }
+  @keyframes slide-out { to { transform: translateX(calc(-1 * var(--dx, 100%))); } }
   .slide.active.up-in { animation: up-in 1s cubic-bezier(.7,0,.2,1) both; }
   .slide.leaving.up-out { animation: up-out 1s cubic-bezier(.7,0,.2,1) both; }
   .slide.active.down-in { animation: down-in 1s cubic-bezier(.7,0,.2,1) both; }
@@ -48,7 +50,6 @@
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
   @keyframes down-out { to { transform: translateY(100%); } }
-  @keyframes fade-out { to { opacity: 0; transform: scale(.985); filter: blur(8px); } }
 
   .kicker { font: 500 24px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; font-stretch: 100%; }
   .active .kicker { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .1s; }
@@ -186,6 +187,8 @@
   .rpa-badge { fill: #d29922; font: 600 17px var(--mono); }
   .rpa-dup.on, .rpa-link.on, .rpa-badge.on { opacity: 1; }
   .rpa-scan { opacity: 0; } .rpa-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
+  .fm-wire.day { stroke-dasharray: 10 8; }
+  .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .rao-card.on { stroke: var(--rc, #3fb950); filter: drop-shadow(0 0 12px var(--rc, #3fb950)); }
   .rao-h { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
@@ -1703,7 +1706,7 @@
     });
   }
 
-  // Research → Plan → Assign: deep research becomes a plan, the plan becomes assigned tasks
+  // Research → Assign → Refine: deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
     resetIndex();
     const VW = 1700,
@@ -1767,53 +1770,48 @@
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
       ["e0", "M200 168 V206", "p", ["scans for duplicate code"], 222, 196, "start"],
-      ["e1", "M380 418 V500", "p", ["creates", "artifact"], 402, 452, "start"],
-      ["e2", "M418 540 H636", "p", ["discussion"], 580, 524, "middle"],
-      ["e3", "M680 506 V376", "b", ["runs /plan", "on discussion"], 702, 436, "start"],
-      ["e4", "M718 338 H882", "p", ["sub-issues"], 800, 322, "middle"],
-      ["e5", "M920 300 V168", "p", ["picked", "up by"], 942, 222, "start"],
-      ["e6", "M1068 140 H1258", "p", ["dispatches", "tasks to"], 1163, 92, "middle"],
-      ["e7", "M1300 168 V292", "p", ["works on task,", "opens pull request"], 1322, 222, "start"],
-      ["e8", "M1300 372 V500", "b", ["assigns"], 1322, 442, "start"],
-      ["e9", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
-      ["e10", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+      ["e1", "M494 340 H816", "p", ["files issue"], 655, 324, "middle"],
+      ["e2", "M860 304 V140 H1258", "p", ["assigned", "to Copilot"], 882, 222, "start"],
+      ["e4", "M1300 168 V292", "p", ["works on issue,", "opens pull request"], 1322, 222, "start"],
+      ["e5", "M1300 372 V500", "b", ["assigns"], 1322, 442, "start"],
+      ["e6", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
+      ["e7", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+      ["e8", "M1624 574 V650 H10 V140 H82", "p day", ["every day, the loop runs again"], 860, 636, "middle"],
     ];
     // the token's journey: [edge, node lit on arrival, duration]; a null edge is the duplicate-code scan
     const SEQ = [
       ["e0", "nCode"],
       [null, "nCode", 3000],
-      ["e1", "nDisc"],
-      ["e2", "nDev1"],
-      ["e3", "nIssue"],
-      ["e4", "nTasks"],
-      ["e5", "nMonster"],
-      ["e6", "nCopilot"],
-      ["e7", "nPR"],
-      ["e8", "nDev2"],
-      ["e10", "nCopilot"],
-      ["e9", "nMerge"],
+      ["e1", "nIssue"],
+      ["e2", "nCopilot"],
+      ["e4", "nPR"],
+      ["e5", "nDev"],
+      ["e7", "nCopilot"],
+      ["e6", "nMerge"],
+      ["e8", "nResearch", 1800],
     ];
-    const LANE = { nCode: 0, nDisc: 0, nDev1: 1, nIssue: 1, nTasks: 1, nMonster: 1, nCopilot: 2, nPR: 2, nDev2: 2, nMerge: 2 };
+    const LANE = { nResearch: 0, nCode: 0, nIssue: 1, nCopilot: 2, nPR: 2, nDev: 2, nMerge: 2 };
     let g = `<defs><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="rpaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="rpaBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
       <marker id="rpaB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
-      [0, 520, "RESEARCH"],
-      [520, 1140, "PLAN"],
-      [1140, VW, "ASSIGN"],
+      [0, 560, "RESEARCH"],
+      [560, 1160, "ASSIGN"],
+      [1160, VW, "REFINE"],
     ].forEach(([x0, x1, t], i) => {
       g += `<text class="fm-lane-t mra-lane" id="rpaLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
     });
     for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rpa${c === "p" ? "P" : "B"})"/>`;
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rpa${c.startsWith("p") ? "P" : "B"})"/>`;
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
-    g += agent("nResearch", 120, 140, 250, "Deep Research") + agent("nMonster", 800, 140, 250, "Issue Monster") + agent("nCopilot", 1300, 140, 236, "Copilot");
-    g += codeScan() + box("nDisc", 380, 540, "discussion") + box("nIssue", 680, 338, "issue") + box("nTasks", 920, 338, "tasklist") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
-    g += dev("nDev1", 680, 540) + dev("nDev2", 1300, 540);
+    g += agent("nResearch", 120, 140, 250, "Deep Research") + agent("nCopilot", 1300, 140, 236, "Copilot");
+    g += codeScan() + box("nIssue", 860, 340, "issue") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
+    g += dev("nDev", 1300, 540);
+    g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="rpaDay" x="52" y="101">DAY 1</text></g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg rpa-svg");
@@ -1825,7 +1823,7 @@
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const STEP = 1050,
       START = 900,
-      HOLD = 2600,
+      HOLD = 800,
       T = [];
     let END = START;
     for (const s of SEQ) {
@@ -1844,7 +1842,7 @@
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Research, plan, assign: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is written to a discussion. A developer runs /plan on that discussion to turn it into an issue with sub-issues. Issue Monster picks up the tasks and dispatches them to Copilot, which works on each task and opens a pull request. The pull request is assigned back to the developer, who iterates with Copilot, then reviews and merges. Humans stay in the loop at the plan and at the merge.",
+        "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -1856,6 +1854,7 @@
           u = e % CYC;
         if (c !== cyc) {
           cyc = c;
+          $("rpaDay").textContent = `DAY ${c + 1}`;
           svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
           $("rpaScan").style.opacity = 0;
           $("nResearch").classList.add("on");
@@ -1895,7 +1894,7 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Plan · "), letters("Assign", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
     });
   }
 
@@ -3287,7 +3286,10 @@
 
   // ---------- sound: tiny WebAudio synth (M to mute) ----------
   const sfx = (() => {
+    // `out` is the current slide's bus; it is swapped (and the old one faded) on every slide change
+    // so long themes and drones scheduled for one slide never leak into the next.
     let ac = null,
+      master = null,
       out = null,
       dry = null,
       muted = localStorage.getItem("aw-mute") === "1";
@@ -3302,8 +3304,10 @@
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       ac = new AC();
+      master = ac.createGain();
+      master.gain.value = 0.5;
       out = ac.createGain();
-      out.gain.value = 0.5;
+      out.connect(master);
       const comp = ac.createDynamicsCompressor();
       dry = ac.createGain();
       dry.gain.value = 0.5;
@@ -3317,8 +3321,8 @@
       wet.gain.value = 0.32;
       lp.type = "lowpass";
       lp.frequency.value = 2600;
-      out.connect(comp);
-      out.connect(dl);
+      master.connect(comp);
+      master.connect(dl);
       dl.connect(lp);
       lp.connect(fb);
       fb.connect(dl);
@@ -3326,6 +3330,17 @@
       wet.connect(comp);
       comp.connect(ac.destination);
       return ac;
+    };
+    const cut = () => {
+      if (!ac) return;
+      const old = out,
+        t = ac.currentTime;
+      old.gain.cancelScheduledValues(t);
+      old.gain.setValueAtTime(old.gain.value, t);
+      old.gain.linearRampToValueAtTime(0, t + 0.25);
+      setTimeout(() => old.disconnect(), 400);
+      out = ac.createGain();
+      out.connect(master);
     };
     const noise = (() => {
       let b = null;
@@ -3731,7 +3746,7 @@
         TZ.send = ac.createGain();
         TZ.send.gain.value = 1;
         TZ.send.connect(TZ.bus);
-        TZ.send.connect(out);
+        TZ.send.connect(master);
         TZ.next = t + 0.05;
         TZ.i = 0;
         TZ.timer = setInterval(tsched, 25);
@@ -3752,6 +3767,7 @@
     };
     return {
       unlock: init,
+      cut,
       techno,
       // A soft rising blip for demo steps.
       pop: (() => {
@@ -3907,6 +3923,7 @@
   function show(n, horiz) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
+    sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
     // "up"/"down" on a slide: it enters that way going forward, and reverses going back
@@ -3921,10 +3938,11 @@
     } else if (cur >= 0) {
       const old = slides[cur].el;
       old.classList.remove("active", ...TR);
+      old.style.setProperty("--dx", dir > 0 ? "100%" : "-100%");
       old.classList.add("leaving");
       if (vert) old.classList.add(vert + "-out");
       clearTimeout(old._lt);
-      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), vert ? 1000 : 700);
+      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), vert ? 1000 : 800);
     }
     const el = slides[n].el;
     clearTimeout(el._lt);
@@ -3932,7 +3950,7 @@
     if (vert) el.classList.add(vert + "-in");
     if (horiz) el.classList.add(horiz + "-in");
     wash.classList.remove("cover");
-    el.style.setProperty("--ox", dir > 0 ? "100%" : "0%");
+    el.style.setProperty("--dx", cur < 0 ? "0%" : dir > 0 ? "100%" : "-100%");
     el.classList.remove("leaving");
     void el.offsetWidth; // restart CSS animations on re-entry
     el.classList.add("active");
