@@ -927,6 +927,50 @@
   .ge-mark.g text { fill: #3fb950; } .ge-mark.g path { stroke: #3fb950; filter: drop-shadow(0 0 8px #3fb950); }
   .ge-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
   .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
+  .ek .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #f778ba, #3fb950); }
+  .ek-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
+  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .ek-hd { font: 600 15px var(--mono); letter-spacing: .12em; } .ek-hd.b { fill: #79c0ff; } .ek-hd.g { fill: #7ee787; } .ek-hd.o { fill: #ffa657; }
+  .ek-card { fill: #0d1117d9; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
+  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #3fb95014; transition: filter .3s; }
+  .ek-iss circle:first-child { fill: none; stroke: #3fb950; stroke-width: 2.5; }
+  .ek-t { fill: #f0f6fc; font: 800 24px "Mona Sans"; } .ek-t.s { font-size: 20px; }
+  .ek-ti { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
+  .ek-tx { fill: #c9d1d9; font: 500 19px "Mona Sans"; } .ek-tx.r { fill: #ffa198; font-weight: 700; }
+  .ek-s { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .04em; }
+  .ek-m { fill: #c9d1d9; font: 600 16px var(--mono); } .ek-m.c { text-anchor: middle; } .ek-m.k { fill: #7ee787; } .ek-m.x { fill: #ff7b72; letter-spacing: .06em; } .ek-m.j { fill: #7ee787; }
+  .ek-ft { fill: #9198a1; font: 600 16px var(--mono); text-anchor: middle; }
+  .ek-pill rect { fill: none; stroke-width: 1.5; } .ek-pill text { font: 600 14px var(--mono); text-anchor: middle; }
+  .ek-pill.b rect { stroke: #4493f8; fill: #4493f81f; } .ek-pill.b text { fill: #79c0ff; }
+  .ek-pill.o rect { stroke: #f0883e; fill: #f0883e1f; } .ek-pill.o text { fill: #ffa657; }
+  .ek-pill.y rect { stroke: #d29922; fill: #d299221f; } .ek-pill.y text { fill: #e3b341; }
+  .ek-task { fill: none; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
+  .ek-wall { fill: #f0883e0d; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
+  .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e99); } }
+  .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
+  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x { opacity: 0; transition: opacity .4s, transform .4s; }
+  .ek-resp rect { fill: #3fb9501a; stroke: #3fb950; stroke-width: 2; }
+  .ek-shield { fill: #0d1117; stroke: #3fb950; stroke-width: 2.5; stroke-linejoin: round; opacity: 0; transition: opacity .3s .4s; }
+  .ek-leak rect { fill: #f851491a; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
+  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s6 .ek-cmt, .s7 .ek-clean { opacity: 1; }
+  .s5 .ek-shield { opacity: 1; filter: drop-shadow(0 0 8px #3fb950); }
+  .s5 .ek-leak text { text-decoration: line-through; } .s5 .ek-leak { opacity: .45; }
+  .ek-x circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; } .ek-x path { stroke: #ff7b72; stroke-width: 3.5; stroke-linecap: round; }
+  .s4 .ek-x { filter: drop-shadow(0 0 10px #f85149); }
+  .ek-opt { transition: fill .3s; } .s5 .ek-opt { fill: #3fb950; font-weight: 800; }
+  .s5 .ek-card.gt { filter: drop-shadow(0 0 14px #3fb95099); }
+  .ek-hl { fill: #7ee787; font-weight: 700; }
+  .s7 .ek-in { opacity: .2; transition: opacity .6s; } .ek-in { transition: opacity .4s; }
+  .ek-clean rect { fill: #0d1117; stroke: #f0883e; stroke-width: 3; } .ek-clean text { fill: #ffa657; font: 800 22px var(--mono); letter-spacing: .12em; text-anchor: middle; }
+  .ek-lock circle { fill: #0d1117; stroke: #f0883e; stroke-width: 2.5; } .ek-lock rect { fill: #ffa657; } .ek-lock path { fill: none; stroke: #ffa657; stroke-width: 3; }
+  .ek-file rect { fill: #161b22; stroke: #30363d; stroke-width: 1.5; transition: stroke .3s, filter .3s; }
+  .s3 .ek-f2 rect { stroke: #f0883e; filter: drop-shadow(0 0 10px #f0883e88); }
+  .ek-note rect { fill: #3fb95014; stroke: #3fb95088; stroke-width: 1.5; }
+  .ek-conf rect { fill: #f8514914; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
+  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; transition: opacity .3s; } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; }
+  .ek-wire.hot { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
+  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; } .ek-wl.o { fill: #ffa657; }
+  .ek-dot { fill: #7ee787; opacity: 0; filter: drop-shadow(0 0 10px #3fb950); } .ek-dot.o { fill: #ffa657; filter: drop-shadow(0 0 10px #f0883e); } .ek-dot.r { fill: #ff7b72; filter: drop-shadow(0 0 10px #f85149); }
   .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
   .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
   .zs-vm { fill: #8957e52a; stroke: #a371f7; stroke-width: 4; }
@@ -981,10 +1025,6 @@
   .zs-cut.on { opacity: 1; }
   .zs-phase { fill: #f0f6fc; font: 600 18px var(--mono); text-anchor: end; }
   .zs-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
-  .zs-pr { position: absolute; left: 0; right: 0; top: 986px; display: flex; justify-content: center; gap: 110px; font: 700 30px "Mona Sans"; color: #6e7681; }
-  .zs-pr span { display: flex; align-items: center; gap: 14px; opacity: .7; }
-  .zs-pr span.on { color: #f778ba; opacity: 1; text-shadow: 0 0 18px #f778ba66; }
-  .zs-pr svg { width: 34px; height: 34px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .so-box { position: absolute; top: 300px; width: 500px; height: 620px; padding: 30px 34px; border-radius: 22px; border: 2px solid var(--c);
     background: #0d1117ee; box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); opacity: 0; transition: box-shadow .5s, border-color .5s; }
   .active .so-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 400ms); }
@@ -1854,69 +1894,6 @@
   .er-chip { padding: 10px 16px; border-radius: 99px; border: 1.5px solid #d2992255; background: #d2992210; font: 500 19px/1 var(--mono); color: #c9d1d9; white-space: nowrap; opacity: 0; transition: all .35s; }
   .active .er-chip { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(1.1s + var(--i) * 90ms); }
   .er-chip.lit { border-color: #d29922; background: #d2992230; color: #f0f6fc; box-shadow: 0 0 30px -6px #d29922; }
-  .en .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #39c5cf, #3fb950, #ab7df8); }
-  .en-card { position: absolute; top: 310px; height: 580px; box-sizing: border-box; padding: 30px 34px; border-radius: 22px; background: #0d1117f0;
-    border: 2px solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: 0 0 60px -30px var(--c); opacity: 0; }
-  .active .en-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(.3s + var(--i) * .25s); }
-  .en-card > i { font: 600 18px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
-  .en-card h3 { margin: 14px 0 12px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
-  .en-pub { left: 110px; width: 480px; }
-  .en-vault { left: 1010px; width: 800px; border-style: dashed; border-width: 3px; background: #08130cf0; transition: box-shadow .4s; }
-  .en-vault.busy { box-shadow: 0 0 90px -20px var(--c), inset 0 0 80px -50px var(--c); }
-  .en-lock { position: absolute; right: 26px; top: 26px; padding: 8px 14px; border-radius: 8px; background: var(--c); color: #0d1117;
-    font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
-  .en-facts { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-  .en-facts span { padding: 7px 12px; border-radius: 99px; border: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #d1d7e0; }
-  .en-facts b { color: var(--c); }
-  .en-call { padding: 16px 18px; border-radius: 12px; background: #151b23; border: 1px solid #3d444d; font: 500 18px/1.35 var(--mono); color: #d1d7e0; }
-  .en-call > b { display: block; color: #4493f8; font-weight: 700; margin-bottom: 6px; }
-  .en-call small { display: block; margin-top: 8px; color: #656c76; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
-  .en-task { color: #f0f6fc; min-height: 50px; }
-  .en-schema { color: #a5d6ff; }
-  .en-call.flash { animation: en-flash .6s ease-out; }
-  @keyframes en-flash { from { border-color: #4493f8; box-shadow: 0 0 30px -4px #4493f8; } }
-  .en-log { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
-  .en-log li { font: 500 19px/1.2 var(--mono); color: #d1d7e0; padding-left: 28px; position: relative; animation: rise .5s cubic-bezier(.2,.9,.2,1) both; }
-  .en-log li::before { content: "✓"; position: absolute; left: 0; color: #3fb950; font-weight: 800; }
-  .en-out { position: absolute; left: 34px; right: 34px; bottom: 26px; padding: 12px 16px; border-radius: 12px; border: 2px solid #ab7df8; background: #1c1430;
-    font: 600 19px/1.2 "Mona Sans"; color: #f0f6fc; opacity: 0; transform: translateY(12px); transition: all .5s cubic-bezier(.2,.9,.2,1); }
-  .en-out.show { opacity: 1; transform: none; box-shadow: 0 0 40px -10px #ab7df8; }
-  .en-out code { font: 600 17px var(--mono); color: #ab7df8; margin-right: 8px; }
-  .en-code { border-radius: 12px; background: #0d1117; border: 1px solid #263a2c; padding: 12px 0; font: 500 19px/30px var(--mono); color: #9198a1; }
-  .en-line { display: flex; white-space: pre; padding-right: 16px; transition: background .3s, color .3s; }
-  .en-line .no { width: 56px; padding-right: 18px; text-align: right; color: #3d444d; flex: none; }
-  .en-line.hot { color: #f0f6fc; background: linear-gradient(90deg, #3fb95040, transparent 85%); }
-  .en-status { margin-top: 14px; font: 600 19px/1 var(--mono); color: #3fb950; letter-spacing: .06em; min-height: 20px; }
-  .en-vault.busy .en-status::after { content: "▍"; animation: ga-blink .7s steps(1) infinite; }
-  .en-gate { position: absolute; left: 700px; top: 290px; width: 200px; height: 620px; text-align: center; opacity: 0; }
-  .active .en-gate { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .55s; }
-  .en-gate > i { display: block; font: 600 17px/1.25 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #d29922; font-style: normal; }
-  .en-gate small { position: absolute; left: 0; right: 0; bottom: 0; font: 500 16px/1.4 var(--mono); color: #9198a1; }
-  .en-pillar { position: absolute; left: 92px; top: 60px; bottom: 60px; width: 16px; border-radius: 8px; background: linear-gradient(#d2992200, #d29922, #d2992200);
-    box-shadow: 0 0 30px #d2992288; }
-  .en-gnote { position: absolute; left: 50%; top: 360px; transform: translate(-50%, 10px); white-space: nowrap; padding: 10px 16px; border-radius: 10px;
-    font: 700 19px/1 var(--mono); background: #0d1117; border: 2px solid; opacity: 0; transition: opacity .3s, transform .3s; z-index: 4; }
-  .en-gnote.show { opacity: 1; transform: translate(-50%, 0); }
-  .en-gnote.ok { color: #3fb950; border-color: #3fb950; }
-  .en-gnote.no { color: #ff7b72; border-color: #f85149; box-shadow: 0 0 40px -6px #f85149; }
-  .en-pk { position: absolute; left: 0; top: 582px; padding: 9px 16px; border-radius: 99px; white-space: nowrap; font: 600 17px/1 var(--mono); z-index: 3;
-    background: #0d1117; border: 2px solid var(--c); color: var(--c); box-shadow: 0 0 26px -4px var(--c); }
-  .en-pk.q { --c: #4493f8; }
-  .en-pk.a { --c: #3fb950; }
-  .en-pk.leak { --c: #f85149; }
-  .en-pk.burst { animation: en-burst .6s ease-out forwards; }
-  @keyframes en-burst { to { opacity: 0; filter: blur(8px); scale: 1.6; } }
-  .en-ledger { position: absolute; left: 110px; top: 930px; width: 1700px; display: flex; align-items: center; gap: 22px; opacity: 0; }
-  .active .en-ledger { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
-  .en-ledger > i { font: 600 17px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; font-style: normal; white-space: nowrap; }
-  .en-bar { flex: 1; height: 18px; border-radius: 9px; background: #21262d; overflow: hidden; }
-  .en-fill { height: 100%; width: 100%; border-radius: 9px; background: linear-gradient(90deg, #3fb950, #39c5cf); transition: width .8s cubic-bezier(.2,.9,.2,1); }
-  .en-fill.low { background: linear-gradient(90deg, #d29922, #f0883e); }
-  .en-left { font: 600 20px/1 var(--mono); color: #d1d7e0; white-space: nowrap; }
-  .en-left b { color: #f0f6fc; font-size: 26px; }
-  .en-sens { display: flex; gap: 8px; }
-  .en-sens span { padding: 7px 12px; border-radius: 8px; font: 500 16px/1 var(--mono); color: #656c76; border: 1px solid #30363d; }
-  .en-sens span.on { color: #0d1117; background: #3fb950; border-color: #3fb950; font-weight: 700; }
 
   /* --- first commit to GA (measured history) --- */
   .hist-tiles { position: absolute; left: 110px; top: 300px; width: 640px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
@@ -3233,20 +3210,6 @@
       g += `<text class="zs-phase" id="zsPhase" x="1476" y="34"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
       svg.innerHTML = g;
     };
-    const pi = (d, ...kids) => h("span", { class: d ? "on" : "" }, ...kids);
-    const icon = paths => {
-      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      s.setAttribute("viewBox", "0 0 32 32");
-      s.innerHTML = paths;
-      return s;
-    };
-    const principles = h(
-      "div",
-      { class: "zs-pr" },
-      pi(true, icon('<rect x="4" y="5" width="24" height="22" rx="3"/><circle cx="16" cy="16" r="5"/><path d="M16 11v-2M16 23v-2M8 9v14"/>'), "Zero-secret agents"),
-      pi(false, icon('<circle cx="16" cy="16" r="12"/><path d="M10 16l4 4 8-8"/>'), "Control untrusted reads"),
-      pi(false, icon('<circle cx="13" cy="13" r="9"/><path d="M20 20l8 8"/>'), "Audit all writes")
-    );
     let built = false,
       t0 = 0,
       cyc = -1,
@@ -3261,7 +3224,7 @@
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
-        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The next two principles are controlling untrusted reads and auditing all writes. The request flows animated here are illustrative.",
+        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
       enter() {
         if (!built) {
           built = true;
@@ -3328,7 +3291,7 @@
           dot.style.opacity = 1;
         } else dot.style.opacity = 0;
       },
-      el: h("section", { class: "slide zs" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Nothing to steal inside the sandbox"), h("h2", {}, letters("Zero-secret "), letters("agents", "l-grad"))), svg, principles),
+      el: h("section", { class: "slide zs" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Nothing to steal inside the sandbox"), h("h2", {}, letters("Zero-secret "), letters("agents", "l-grad"))), svg),
     });
   }
 
@@ -10211,225 +10174,138 @@
     });
   }
 
-  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
+  // Need-to-know enclaves: the GitLost story; a public issue asks about a private repo, an isolated enclave reads it, and only schema values come back
   {
     resetIndex();
-    const BUDGET = 8;
-    const ROUNDS = [
-      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
-      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
-      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
-      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
-    ];
-    const CODE = [
-      "// billing/client.ts",
-      'import { charge } from "./v1/billing";',
-      "export async function renew(acct) {",
-      "  const plan = await lookup(acct);",
-      '  return charge(plan, { api: "v1" });',
-      "}",
-      "// auth/session.ts",
-      'import { sign } from "auth-lib@2.3.0";',
-      "// tests/integration/sync.test.ts",
-      'test.retry(3)("sync settles", run);',
-    ];
-    const PX = 560,
-      GX = 800,
-      VX = 1040;
-    const qTask = h("div", { class: "en-task" });
-    const qSchema = h("div", { class: "en-schema" });
-    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
-    const log = h("ul", { class: "en-log" });
-    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
-    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
-    const vaultStatus = h("div", { class: "en-status" });
-    const vault = h(
-      "div",
-      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
-      h("b", { class: "en-lock" }, "🔒 enclave"),
-      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
-      h("h3", {}, "octo-org/private-service"),
-      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
-      h("div", { class: "en-code" }, lines),
-      vaultStatus
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "ek-svg");
+    svg.setAttribute("viewBox", "0 0 1800 600");
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "Need-to-know enclaves: a public issue asks whether version 2 is compatible with an internal integration; the primary agent hands the task through a trusted broker to a single-use enclave agent with read access to a private repository; the enclave tries to return a confidential launch date but the output gate drops anything outside the response schema; only compatibility and migrationRequired values reach the public comment, and the enclave is cleaned up"
     );
-    const gNote = h("div", { class: "en-gnote" });
-    const fill = h("div", { class: "en-fill" });
-    const leftN = h("b");
-    const invN = h("span", { class: "en-left" });
-    const el = h(
-      "section",
-      { class: "slide en" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
-      h(
-        "div",
-        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
-        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
-        h("h3", {}, "Asks, never reads"),
-        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
-        call,
-        log,
-        out
-      ),
-      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
-      vault,
-      h(
-        "div",
-        { class: "en-ledger" },
-        h("i", {}, "Information budget"),
-        h("div", { class: "en-bar" }, fill),
-        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
-        invN,
-        h(
-          "div",
-          { class: "en-sens" },
-          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
-        )
-      )
-    );
-    let ev = [],
-      evI = 0,
-      pks = [],
-      used = 0,
-      calls = 0,
+    const bot = (cx, cy, s, c) =>
+      `<g fill="none" stroke="${c}" stroke-width="${3.5 / s}" stroke-linecap="round" stroke-linejoin="round" transform="translate(${cx},${cy}) scale(${s})"><path d="M0 -28 V-18"/><circle cx="0" cy="-31" r="4" fill="${c}"/><rect x="-24" y="-18" width="48" height="38" rx="10"/><path d="M-29 -6 V8 M29 -6 V8"/><circle cx="-10" cy="-2" r="4.5" fill="${c}" stroke="none"/><circle cx="10" cy="-2" r="4.5" fill="${c}" stroke="none"/><path d="M-8 10 H8"/></g>`;
+    const pill = (x, y, w, t, c) => `<g class="ek-pill ${c}"><rect x="${x}" y="${y}" width="${w}" height="28" rx="14"/><text x="${x + w / 2}" y="${y + 19}">${t}</text></g>`;
+    const PATHS = {
+      ekP1: "M380 175 H440",
+      ekP2: "M820 140 H910",
+      ekP3: "M1380 220 H1315 V145 H1270",
+      ekP4: "M910 461 H842",
+      ekP5: "M910 338 C866 338 864 410 820 410",
+      ekP6: "M440 440 H380",
+    };
+    const build = () => {
+      let g = `<defs><radialGradient id="ekBotA"><stop offset="0" stop-color="#a371f7"/><stop offset="1" stop-color="#6e40c9"/></radialGradient><radialGradient id="ekBotB"><stop offset="0" stop-color="#f0883e"/><stop offset="1" stop-color="#9b4215"/></radialGradient></defs>`;
+      // headers
+      g += `<g class="ek-area" style="--i:0"><text class="ek-hd b" x="0" y="22">PUBLIC ISSUE</text><text class="ek-hd g" x="440" y="22">AGENTIC WORKFLOW</text><text class="ek-hd o" x="890" y="22">ISOLATED ENCLAVE · SINGLE USE</text><text class="ek-hd o" x="1360" y="22">PRIVATE REPOSITORY</text></g>`;
+      // A: public issue + comment
+      g += `<g class="ek-area" style="--i:1"><rect class="ek-card b" x="0" y="50" width="380" height="250" rx="16"/>`;
+      g += `<g class="ek-iss"><circle cx="34" cy="86" r="11"/><circle cx="34" cy="86" r="3" fill="#3fb950" stroke="none"/></g><text class="ek-t" x="56" y="94">Issue #42</text>${pill(290, 72, 70, "Public", "b")}`;
+      g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}</g>`;
+      g += `<g class="ek-cmt"><rect class="ek-card c" x="0" y="340" width="380" height="200" rx="16"/>${bot(34, 380, 0.5, "#d2a8ff")}<text class="ek-t s" x="58" y="386">AI agent commented</text>${pill(24, 406, 190, "Visible to everyone", "b")}`;
+      g += `<text class="ek-tx" x="24" y="470">v2 is <tspan class="ek-hl">compatible</tspan> with our</text><text class="ek-tx" x="24" y="496">internal integration.</text><text class="ek-tx" x="24" y="522"><tspan class="ek-hl">No migration</tspan> is required.</text></g>`;
+      g += `<text class="ek-ft" x="190" y="582">✓ no project name · no launch date</text>`;
+      // B: primary agent + output gate
+      g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="url(#ekBotA)"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
+      g += `<text class="ek-t" x="556" y="112">Primary agent</text><text class="ek-s" x="556" y="140">public repo · untrusted</text>`;
+      g += `<rect class="ek-task" x="460" y="176" width="340" height="38" rx="10"/><text class="ek-m c" x="630" y="201">task: check v2 compatibility</text></g>`;
+      g += `<g class="ek-area ek-gate" style="--i:3"><rect class="ek-card gt" x="440" y="300" width="380" height="240" rx="16"/><text class="ek-t" x="460" y="338">Output gate</text><text class="ek-s" x="460" y="364">only schema values leave</text>`;
+      g += `<text class="ek-m k" x="460" y="408">compatibility</text><text class="ek-m" x="460" y="434"><tspan class="ek-opt">compatible</tspan> | incompatible | unknown</text>`;
+      g += `<text class="ek-m k" x="460" y="478">migrationRequired</text><text class="ek-m" x="460" y="504">true | <tspan class="ek-opt">false</tspan></text></g>`;
+      g += `<text class="ek-ft" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
+      // C: enclave
+      g += `<g class="ek-area" style="--i:4"><rect class="ek-wall" x="880" y="40" width="420" height="510" rx="24"/><g class="ek-in">`;
+      g += `<rect class="ek-card o" x="910" y="70" width="360" height="150" rx="16"/><circle cx="970" cy="143" r="36" fill="url(#ekBotB)"/>${bot(970, 145, 0.75, "#f0f6fc")}`;
+      g += `<text class="ek-t" x="1024" y="136">Enclave agent</text><text class="ek-s" x="1024" y="164">read-only · no network</text>`;
+      g += `<rect class="ek-stat" x="910" y="236" width="360" height="38" rx="19"/><text id="ekStat" class="ek-m c" x="1090" y="261">Waiting for task</text>`;
+      g += `<g class="ek-resp"><rect x="910" y="290" width="360" height="96" rx="14"/><text class="ek-m j" x="928" y="330">{"compatibility": "compatible",</text><text class="ek-m j" x="928" y="360"> "migrationRequired": false}</text>`;
+      g += `<path class="ek-shield" d="M1252 286 l16 6 v12 c0 10 -7 16 -16 20 c-9 -4 -16 -10 -16 -20 v-12 z M1245 305 l5 5 l9 -9"/></g>`;
+      g += `<g class="ek-leak"><rect x="910" y="406" width="360" height="110" rx="14"/><text class="ek-tx r" x="930" y="446">"Project Orchid launches</text><text class="ek-tx r" x="930" y="472">June 12…"</text><text class="ek-m x" x="930" y="502">✗ not in schema · dropped</text></g></g>`;
+      g += `<g class="ek-clean"><rect x="975" y="372" width="230" height="60" rx="10"/><text x="1090" y="411">CLEANED UP</text></g></g>`;
+      g += `<text class="ek-ft" x="1090" y="582">launched per question · destroyed after</text>`;
+      // D: private repo
+      g += `<g class="ek-area" style="--i:5"><rect class="ek-card o" x="1360" y="50" width="400" height="490" rx="16"/>`;
+      g += `<g class="ek-lock"><circle cx="1396" cy="92" r="20"/><path d="M1389 92 V85 a7 7 0 0 1 14 0 V92"/><rect x="1385" y="91" width="22" height="14" rx="3"/></g>`;
+      g += `<text class="ek-t s" x="1428" y="99">contoso/private-repo</text>${pill(1666, 126, 76, "Private", "o")}`;
+      g += `<g class="ek-file"><rect x="1380" y="168" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="194">README.md</text></g>`;
+      g += `<g class="ek-file ek-f2"><rect x="1380" y="218" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="244">compat-notes.md</text></g>`;
+      g += `<g class="ek-note"><rect x="1380" y="276" width="360" height="74" rx="10"/><text class="ek-tx" x="1398" y="306">v2: compatible with integration</text><text class="ek-tx" x="1398" y="334">migration: not required</text></g>`;
+      g += `<g class="ek-conf"><rect x="1380" y="366" width="360" height="94" rx="10"/><text class="ek-m x" x="1398" y="398">CONFIDENTIAL</text><text class="ek-tx" x="1398" y="434">Project Orchid launches June 12</text></g>`;
+      g += `${pill(1460, 484, 200, "authorized read access", "o")}</g>`;
+      // wires
+      g += Object.entries(PATHS)
+        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"/>`)
+        .join("");
+      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text>`;
+      g += `<g class="ek-x"><circle cx="830" cy="461" r="14"/><path d="M823 454 l14 14 M837 454 l-14 14"/></g>`;
+      g += `<circle id="ekDot" class="ek-dot" r="9"/>`;
+      svg.innerHTML = g;
+    };
+    // [time, path, stage label, sound]
+    const STEPS = [
+      [400, "ekP1", "Waiting for task", () => sfx.pop(0)],
+      [1300, "ekP2", "Launching enclave…", () => sfx.key()],
+      [2300, "ekP3", "Reading private repo…", () => sfx.key(0.6)],
+      [3600, "ekP4", "Checking response…", () => sfx.block(true)],
+      [5000, "ekP5", "Response matches schema", () => (sfx.route(2), sfx.review())],
+      [6400, "ekP6", "Answer posted", () => sfx.notify()],
+      [7800, null, "Analysis ended · enclave cleaned up", () => sfx.pop(4)],
+    ];
+    const CYC = 11000,
+      DUR = 750;
+    let built = false,
       t0 = 0,
-      now = 0,
-      fresh = true;
-    const fmt = n => (Math.round(n * 10) / 10).toString();
-    const ledger = () => {
-      const left = BUDGET - used;
-      fill.style.width = `${(left / BUDGET) * 100}%`;
-      fill.classList.toggle("low", left < 3);
-      leftN.textContent = fmt(left);
-      invN.textContent = `· ${calls} / 4 invocations`;
-    };
-    const say = (txt, ok) => {
-      gNote.textContent = txt;
-      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
-    };
-    const launch = (txt, cls, x0, x1, dur, blocked) => {
-      const p = h("div", { class: `en-pk ${cls}` }, txt);
-      el.append(p);
-      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
-    };
-    const script = () => {
-      ev = [];
-      evI = 0;
-      const at = (ms, fn) => ev.push([ms, fn]);
-      let T = 600;
-      ROUNDS.forEach((r, k) => {
-        const s = T;
-        at(s, () => {
-          qTask.textContent = r.q;
-          qSchema.textContent = r.schema;
-          call.classList.remove("flash");
-          void call.offsetWidth;
-          call.classList.add("flash");
-          lines.forEach(l => l.classList.remove("hot"));
-          gNote.classList.remove("show");
-          sfx.key();
-        });
-        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
-        if (r.over) {
-          at(s + 1400, () => {
-            say(`✗ over budget · needs ${r.bits} bits`, 0);
-            sfx.route(0);
-          });
-          T = s + 3200;
-          return;
-        }
-        at(s + 1350, () => say("✓ masked capability", 1));
-        at(s + 2000, () => {
-          calls++;
-          ledger();
-          vault.classList.add("busy");
-          vaultStatus.textContent = "sub-agent reading ";
-          gNote.classList.remove("show");
-        });
-        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
-        let u = s + 3600;
-        at(u, () => {
-          vault.classList.remove("busy");
-          vaultStatus.textContent = "answer ready";
-        });
-        if (r.leak) {
-          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
-          at(u + 800, () => {
-            say("✗ free-form string · denied", 0);
-            sfx.route(0);
-          });
-          u += 1800;
-        }
-        at(u, () => launch(r.a, "a", VX, PX, 1400));
-        at(u + 700, () => {
-          used += r.bits;
-          ledger();
-          say(`✓ schema · −${r.bits} bits`, 1);
-          sfx.route(2);
-        });
-        at(u + 1400, () => {
-          log.append(h("li", {}, r.log));
-          sfx.pop(k * 2);
-        });
-        T = u + 2200;
-      });
-      at(T, () => {
-        out.classList.add("show");
-        gNote.classList.remove("show");
-        sfx.review();
-      });
-      at(T + 4000, () => (fresh = true));
-    };
-    const reset = () => {
-      pks.forEach(p => p.el.remove());
-      pks = [];
-      used = calls = 0;
-      log.replaceChildren();
-      out.classList.remove("show");
-      vault.classList.remove("busy");
-      vaultStatus.textContent = "";
-      gNote.className = "en-gnote";
-      qTask.textContent = "";
-      qSchema.textContent = "";
-      lines.forEach(l => l.classList.remove("hot"));
-      ledger();
-      t0 = now;
-      script();
+      stage = -1;
+    const setStage = k => {
+      stage = k;
+      svg.setAttribute("class", "ek-svg" + STEPS.slice(0, k + 1).map((_, i) => " s" + (i + 1)).join(""));
+      const st = svg.querySelector("#ekStat");
+      if (st) st.textContent = k >= 1 ? STEPS[k][2] : "Waiting for task";
     };
     slides.push({
       group: "security",
       sound: "vault",
-      palette: ["#8957e5", "#1f6feb", "#238636", "#1b7c83"],
+      red: true,
+      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
-        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
+        "Need-to-know enclaves. GitLost was a real attack: a public issue prompted an agent with access to a private repository, and the agent's public reply leaked private contents. Enclaves stop private-to-public leaks in cross-repo flows. Here a public issue asks whether version 2 is compatible with an internal integration. The primary agent in the public repo never reads the private repo; it hands the repo, the task and a response schema to a trusted broker, which launches a single-use, isolated enclave agent with read-only access to the private repository. The enclave finds the answer, and also a confidential launch date. If it tries to return free text, the output gate drops it: only schema values leave. Compatibility is compatible, incompatible or unknown, and migrationRequired is true or false, so there are six possible answers, three bits, which together with timing and error bits fit an eight-bit confidential budget. The public comment says compatible, no migration required, and nothing else. Then the enclave is destroyed. The issue, repository, project name and date are synthetic, and the flow is illustrative.",
       enter() {
-        fresh = true;
+        if (!built) {
+          built = true;
+          build();
+        }
+        t0 = 0;
+        setStage(-1);
       },
       tick(t) {
-        now = t;
-        if (fresh) {
-          fresh = false;
-          reset();
+        if (!t0) t0 = t;
+        const u = (t - t0) % CYC;
+        let k = -1;
+        for (let i = 0; i < STEPS.length; i++) if (u >= STEPS[i][0]) k = i;
+        if (k !== stage) {
+          setStage(k);
+          if (k >= 0) STEPS[k][3]();
         }
-        const e = t - t0;
-        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
-        for (const p of pks) {
-          if (p.dead) continue;
-          const u = Math.min(1, (t - p.start) / p.dur);
-          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
-          if (u >= 1) {
-            p.dead = t + 600;
-            if (p.blocked) p.el.classList.add("burst");
-            else p.dead = t;
-          }
+        const dot = svg.querySelector("#ekDot");
+        if (!dot) return;
+        const s = k >= 0 ? STEPS[k] : null;
+        const p = s && s[1] && u < s[0] + DUR ? svg.querySelector("#" + s[1]) : null;
+        svg.querySelectorAll(".ek-wire").forEach(w => w.classList.toggle("hot", !!p && w === p));
+        if (!p) {
+          dot.style.opacity = 0;
+          return;
         }
-        pks = pks.filter(p => {
-          if (p.dead && t >= p.dead) p.el.remove();
-          return !p.dead || t < p.dead;
-        });
+        const v = Math.min(1, (u - s[0]) / DUR),
+          e = v < 0.5 ? 2 * v * v : 1 - (-2 * v + 2) ** 2 / 2,
+          pt = p.getPointAtLength(e * p.getTotalLength());
+        dot.setAttribute("cx", pt.x);
+        dot.setAttribute("cy", pt.y);
+        dot.setAttribute("class", "ek-dot " + (s[1] === "ekP4" ? "r" : s[1] === "ekP3" ? "o" : ""));
+        dot.style.opacity = 1;
       },
-      el,
+      el: h("section", { class: "slide ek" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
     });
   }
 

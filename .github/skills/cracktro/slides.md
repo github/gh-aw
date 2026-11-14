@@ -21,7 +21,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Supply chain hardening | illustrative |
 | Safe outputs | illustrative |
 | Continuous Security | illustrative |
-| Private enclaves | illustrative |
+| Need-to-know enclaves | illustrative |
 | Stop manually translating intent into code. |  |
 | Human agent processes |  |
 | Human Agent Processes | illustrative |
