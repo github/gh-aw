@@ -4884,7 +4884,7 @@
       ];
     g += `<g id="robPanel"><rect class="rob-card" x="${RX}" y="166" width="${RW}" height="306" rx="14"/>
       <text class="rob-h" x="${RX + 16}" y="190">MEASURED · CLI PERFORMANCE</text>
-      <text class="rob-s" x="${RX + 16}" y="210">gh-aw benchmarks · 13 Mar – 25 Oct 2026</text>`;
+      <text class="rob-s" x="${RX + 16}" y="210">regression issues filed 13 Mar – 25 Oct 2026</text>`;
     FUNNEL.forEach(([n, l, m], i) => {
       const y = 224 + i * 27;
       g += `<rect class="rob-bar${m}" x="${RX + 12}" y="${y}" width="${((RW - 24) * n) / 116}" height="22" rx="4"/>
@@ -4898,7 +4898,7 @@
         <text x="${RX + 16}" y="${y}">${d}  ${b}</text><text class="p" x="${RX + RW - 78}" y="${y}" text-anchor="end">${p}</text>
         <text class="f" x="${RX + RW - 16}" y="${y}" text-anchor="end">✓ ${hrs}</text></g>`;
     });
-    g += `</g><text class="rob-cap" x="${VW / 2}" y="634">Measured: gh-aw daily-cli-performance → Issue Monster → Copilot, re-benchmarked daily (87 runs in repo memory). Fleet and spans are simulated.</text>`;
+    g += `</g><text class="rob-cap" x="${VW / 2}" y="634">Measured · issues filed 13 Mar – 25 Oct 2026 · 87 daily benchmarks 5 Apr – 13 Nov · snapshot 14 Nov 2026 · fleet and spans simulated</text>`;
     g += agent("nResearch", 90, 140, 250, "Deep Research") + agent("nMonster", 510, 560, 220, "Issue Monster") + agent("nCopilot", 880, 560, 170, "Copilot");
     g += box("nRepo", 170, 350, "repo") + box("nIssues", 170, 560, "issue") + box("nMerge", 1620, 560, "merge") + dev("nDev", 1160, 560);
     g += `<g id="raoPkts"></g><circle class="fm-dot mra-dot" r="8"/>`;
