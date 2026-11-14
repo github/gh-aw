@@ -3287,7 +3287,10 @@
 
   // ---------- sound: tiny WebAudio synth (M to mute) ----------
   const sfx = (() => {
+    // `out` is the current slide's bus; it is swapped (and the old one faded) on every slide change
+    // so long themes and drones scheduled for one slide never leak into the next.
     let ac = null,
+      master = null,
       out = null,
       dry = null,
       muted = localStorage.getItem("aw-mute") === "1";
@@ -3302,8 +3305,10 @@
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       ac = new AC();
+      master = ac.createGain();
+      master.gain.value = 0.5;
       out = ac.createGain();
-      out.gain.value = 0.5;
+      out.connect(master);
       const comp = ac.createDynamicsCompressor();
       dry = ac.createGain();
       dry.gain.value = 0.5;
@@ -3317,8 +3322,8 @@
       wet.gain.value = 0.32;
       lp.type = "lowpass";
       lp.frequency.value = 2600;
-      out.connect(comp);
-      out.connect(dl);
+      master.connect(comp);
+      master.connect(dl);
       dl.connect(lp);
       lp.connect(fb);
       fb.connect(dl);
@@ -3326,6 +3331,17 @@
       wet.connect(comp);
       comp.connect(ac.destination);
       return ac;
+    };
+    const cut = () => {
+      if (!ac) return;
+      const old = out,
+        t = ac.currentTime;
+      old.gain.cancelScheduledValues(t);
+      old.gain.setValueAtTime(old.gain.value, t);
+      old.gain.linearRampToValueAtTime(0, t + 0.25);
+      setTimeout(() => old.disconnect(), 400);
+      out = ac.createGain();
+      out.connect(master);
     };
     const noise = (() => {
       let b = null;
@@ -3731,7 +3747,7 @@
         TZ.send = ac.createGain();
         TZ.send.gain.value = 1;
         TZ.send.connect(TZ.bus);
-        TZ.send.connect(out);
+        TZ.send.connect(master);
         TZ.next = t + 0.05;
         TZ.i = 0;
         TZ.timer = setInterval(tsched, 25);
@@ -3752,6 +3768,7 @@
     };
     return {
       unlock: init,
+      cut,
       techno,
       // A soft rising blip for demo steps.
       pop: (() => {
@@ -3907,6 +3924,7 @@
   function show(n, horiz) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
+    sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
     // "up"/"down" on a slide: it enters that way going forward, and reverses going back
