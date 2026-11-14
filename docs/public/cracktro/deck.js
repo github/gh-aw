@@ -290,10 +290,15 @@
   body.light .count { color: #424a53; }
   body.light .snd, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
   body.light .snd:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
-  .active .tp-copy > * { animation: tp-up .7s cubic-bezier(.2,.8,.2,1) both; }
-  .active .tp-copy > :nth-child(2) { animation-delay: .1s; } .active .tp-copy > :nth-child(3) { animation-delay: .35s; }
-  .active .tp-copy > :nth-child(4) { animation-delay: .6s; } .active .tp-copy > :nth-child(5) { animation-delay: .8s; }
-  @keyframes tp-up { from { opacity: 0; transform: translateY(30px); } }
+  .active .tp-copy > :nth-child(odd):not(.tp-vs), .active .tp-vs > :first-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .active .tp-copy > :nth-child(even):not(.tp-vs), .active .tp-vs > :last-child { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both; }
+  .active .tp-copy > :nth-child(2) { animation-delay: .15s !important; }
+  .active .tp-vs > * { animation-delay: .45s !important; }
+  .active .tp-vs > b { animation: tp-vs .5s cubic-bezier(.3,1.6,.4,1) both 1.05s !important; }
+  .active .tp-copy > :nth-child(4) { animation-delay: .8s !important; } .active .tp-copy > :nth-child(5) { animation-delay: .95s !important; }
+  @keyframes tp-l { from { opacity: 0; transform: translateX(-1500px); } }
+  @keyframes tp-r { from { opacity: 0; transform: translateX(1500px); } }
+  @keyframes tp-vs { from { opacity: 0; transform: scale(0); } }
   @keyframes tp-pop { from { transform: scale(0); } }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
