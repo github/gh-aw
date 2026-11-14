@@ -32,6 +32,7 @@ test("presents the twenty-three slides without the removed sections", async ({ p
     "Audit & Optimize",
     "Cost management",
     "Model routing",
+    "Experiments, graders & evals",
     "Any agent, any provider",
     "Connectors",
     "Enterprise ready",

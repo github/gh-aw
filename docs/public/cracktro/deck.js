@@ -716,6 +716,69 @@
   .mr-rf em b { font-size: 18px; color: #f0f6fc; font-variant-numeric: tabular-nums; }
   .mr-cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
 
+  /* --- experiments, graders & evals --- */
+  .xp .slide-head h2 { font-size: 100px; }
+  .xp .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #ab7df8, #3fb950, #4493f8); }
+  /* yes/no use cyan vs orange plus fill and glyph, so they stay distinct for red-green colour blindness */
+  .xp { --a: #4493f8; --b: #ab7df8; --yes: #39c5cf; --no: #f0883e; }
+  /* the run conveyor: five station columns, two variant lanes running through them */
+  .xp-flow { position: absolute; left: 110px; top: 270px; width: 1700px; height: 250px; opacity: 0; }
+  .active .xp-flow { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .xp-st { position: absolute; top: 0; width: 260px; height: 250px; border-radius: 18px; background: #0d1117d0; border: 1px solid #3d444d; transition: border-color .3s, box-shadow .3s; }
+  .xp-st.hot { border-color: var(--c); box-shadow: 0 0 40px -12px var(--c), inset 0 0 40px -24px var(--c); }
+  .xp-st i { display: block; margin: 20px 0 0 22px; font: 600 14px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--c); font-style: normal; }
+  .xp-st b { display: block; margin: 10px 0 0 22px; font: 700 34px/1 "Mona Sans"; color: #f0f6fc; }
+  .xp-st small { display: block; margin: 8px 0 0 22px; font: 500 16px/1.2 var(--mono); color: #9198a1; }
+  .xp-lane { position: absolute; left: 0; width: 1700px; height: 0; border-top: 2px dashed var(--c); opacity: .35; }
+  .xp-ll { position: absolute; font: 600 15px/1 var(--mono); color: var(--c); letter-spacing: .06em; }
+  .xp-run { position: absolute; left: 0; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; width: 190px; height: 46px; padding: 0 10px; box-sizing: border-box; border-radius: 10px;
+    background: #161b22; border: 2px solid #656c76; font: 600 16px/1 var(--mono); color: #d1d7e0; white-space: nowrap; transition: border-color .3s, box-shadow .3s, opacity .25s; }
+  .xp-run.a { border-color: var(--a); box-shadow: 0 0 20px -6px var(--a); }
+  .xp-run.b { border-color: var(--b); box-shadow: 0 0 20px -6px var(--b); }
+  .xp-run > b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: #30363d; color: #f0f6fc; font: 700 16px/1 var(--mono); }
+  .xp-run.a > b { background: var(--a); } .xp-run.b > b { background: var(--b); }
+  .xp-run em { font-style: normal; color: #f0f6fc; font-variant-numeric: tabular-nums; }
+  .xp-run em:empty, .xp-run u:empty { display: none; }
+  .xp-run em, .xp-run u { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  .xp-run u { margin-left: auto; text-decoration: none; padding: 4px 7px; border-radius: 6px; font-weight: 700; }
+  .xp-run u.yes { color: #0d1117; background: var(--yes); } .xp-run u.no { color: var(--no); background: transparent; box-shadow: inset 0 0 0 2px var(--no); }
+  .xp-run.gone { opacity: 0; }
+  /* the workflow frontmatter: each block lights up as its stage acts on a run */
+  .xp-code { position: absolute; left: 110px; top: 550px; width: 620px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .xp-code { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .45s; }
+  .xp-code pre { margin: 0; padding: 12px 0 14px; font: 500 19px/24px var(--mono); color: #e6edf3; }
+  .xp-code pre > span { display: block; padding: 0 22px; border-left: 4px solid transparent; transition: background .5s, border-color .5s; }
+  .xp-code pre > span.on { background: color-mix(in srgb, var(--c) 20%, transparent); border-left-color: var(--c); transition: none; }
+  .xp-k { color: #7ee787; } .xp-s { color: #a5d6ff; } .xp-n { color: #79c0ff; }
+  /* the analysis: every finished run lands in its variant's row */
+  .xp-an { position: absolute; left: 770px; top: 550px; width: 1040px; height: 386px; box-sizing: border-box; padding: 0 30px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d;
+    box-shadow: 0 30px 80px -30px #000; opacity: 0; }
+  .active .xp-an { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .xp-an-h { display: flex; align-items: center; gap: 14px; height: 64px; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .xp-an-h > span:first-child::before { content: "$ "; color: #3fb950; }
+  .xp-pill { margin-left: auto; padding: 7px 12px; border-radius: 99px; border: 1px solid #d29922; color: #e3b341; font: 700 15px/1 var(--mono); letter-spacing: .1em; font-variant-numeric: tabular-nums; }
+  .xp-pill.ready { border-color: var(--yes); color: var(--yes); box-shadow: 0 0 20px -6px var(--yes); }
+  .xp-row { display: grid; grid-template-columns: 210px 1fr 96px; align-items: center; gap: 18px; height: 70px; }
+  .xp-row > i { font: 600 18px/1.25 "Mona Sans"; font-style: normal; color: #f0f6fc; }
+  .xp-row > i small { display: block; font: 500 14px/1.2 var(--mono); color: #9198a1; }
+  .xp-row > i::before { content: attr(data-v); display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 10px; border-radius: 6px; background: var(--c); font: 700 15px/1 var(--mono); color: #0d1117; }
+  .xp-cells { display: grid; grid-template-columns: repeat(25, 1fr); gap: 5px; }
+  .xp-cells b { display: grid; place-items: center; height: 26px; border-radius: 5px; background: #ffffff10; font: 800 15px/1 var(--mono); }
+  .xp-cells b.yes { background: var(--yes); color: #0d1117; box-shadow: 0 0 10px -3px var(--yes); }
+  .xp-cells b.yes::after { content: "✓"; }
+  .xp-cells b.no { background: transparent; color: var(--no); box-shadow: inset 0 0 0 2px var(--no); }
+  .xp-cells b.no::after { content: "✗"; }
+  .xp-cells b.yes, .xp-cells b.no { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  .xp-rate { font: 700 34px/1 var(--mono); color: #f0f6fc; text-align: right; font-variant-numeric: tabular-nums; }
+  .xp-m { display: flex; align-items: center; gap: 14px; height: 44px; border-top: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #9198a1; }
+  .xp-m b { color: #f0f6fc; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .xp-m .ok { color: var(--yes); font-weight: 800; }
+  .xp-m > span:last-child { margin-left: auto; }
+  .xp-dec { position: absolute; right: 30px; bottom: 22px; padding: 12px 20px; border-radius: 12px; border: 3px solid #656c76; font: 800 30px/1 var(--mono); letter-spacing: .08em; color: #9198a1; transition: color .3s, border-color .3s; }
+  .xp-dec.promote { color: var(--yes); border-color: var(--yes); box-shadow: 0 0 40px -8px var(--yes); animation: xp-stamp .5s cubic-bezier(.3,1.6,.4,1); }
+  @keyframes xp-stamp { from { transform: scale(1.8) rotate(-6deg); opacity: 0; } }
+  .xp-why { position: absolute; left: 30px; bottom: 34px; width: 640px; font: 500 18px/1.3 "Mona Sans"; color: #9198a1; }
+
   /* --- finale --- */
   .fin-bg { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
   .fin-bg h1 { margin: 0; font-size: 150px; line-height: 1.1; letter-spacing: -.01em; font-variation-settings: "wght" 700, "wdth" 100; white-space: nowrap;
@@ -5167,6 +5230,271 @@
     });
   }
 
+  // Experiments, graders & evals: each run is assigned an A/B variant, graders measure it, evals judge it, and the analysis decides
+  {
+    resetIndex();
+    // stations: [kicker, title, sub, colour, frontmatter lines lit when a run passes]
+    const ST = [
+      ["experiments", "Assign", "A/B · least-used", "#e3b341", [0, 1, 2]],
+      ["agent", "Run", "same task, one variant", "#d1d7e0", [14]],
+      ["graders", "Measure", "deterministic · no LLM", "#39c5cf", [8, 9]],
+      ["evals", "Judge", "LLM asks: focused?", "#f778ba", [10, 11, 12]],
+      ["gh aw experiments", "Analyze", "per variant · stats", "#3fb950", [3, 4, 5, 6, 7]],
+    ];
+    const CODE = [
+      [["experiments", "k"], [":"]],
+      [["  "], ["style", "k"], [":"]],
+      [["    "], ["variants", "k"], [": [detailed, concise]"]],
+      [["    "], ["metric", "k"], [": "], ["eval:focused", "s"]],
+      [["    "], ["guardrail_metrics", "k"], [":"]],
+      [["      - "], ["name", "k"], [": "], ["grader:tool-success-rate", "s"]],
+      [["        "], ["threshold", "k"], [": "], ['">=0.95"', "s"]],
+      [["    "], ["min_samples", "k"], [": "], ["25", "n"]],
+      [["graders", "k"], [":"]],
+      [["  "], ["tool-success-rate", "k"], [": { "], ["threshold", "k"], [": "], ["0.95", "n"], [" }"]],
+      [["evals", "k"], [":"]],
+      [["  - "], ["id", "k"], [": "], ["focused", "s"]],
+      [["    "], ["question", "k"], [": Is the pull request focused?"]],
+      [["---"]],
+      [["Write a "], ["${{ experiments.style }}", "s"], [" fix."]],
+    ];
+    const N = 25,
+      COL = 360,
+      CW = 186,
+      Y = [138, 204],
+      MID = 171,
+      X0 = 130,
+      X1 = 4 * COL + 130,
+      V = 0.36,
+      DWELL = 1000;
+    const lineOf = new Map();
+    ST.forEach(([, , , c, ls]) => ls.forEach(l => lineOf.set(l, c)));
+    const lines = CODE.map((parts, i) => h("span", { "--c": lineOf.get(i) || "#9198a1" }, parts.map(([s, k]) => (k ? h("span", { class: `xp-${k}` }, s) : s))));
+    const code = h("div", { class: "xp-code" }, h("pre", {}, lines));
+    const stations = ST.map(([k, b, s, c], i) => h("div", { class: "xp-st", "--c": c, style: { left: `${i * COL}px` } }, h("i", {}, k), h("b", {}, b), h("small", {}, s)));
+    const flow = h(
+      "div",
+      { class: "xp-flow" },
+      Y.map((y, v) => h("div", { class: "xp-lane", "--c": v ? "var(--b)" : "var(--a)", style: { top: `${y}px` } })),
+      stations
+    );
+
+    const VAR = [
+      ["A", "detailed", "control", "var(--a)"],
+      ["B", "concise", "candidate", "var(--b)"],
+    ];
+    const rows = VAR.map(([v, name, role, c]) => {
+      const cells = Array.from({ length: N }, () => h("b"));
+      const rate = h("div", { class: "xp-rate" }, "—");
+      return { el: h("div", { class: "xp-row" }, h("i", { "data-v": v, "--c": c }, name, h("small", {}, role)), h("div", { class: "xp-cells" }, cells), rate), cells, rate };
+    });
+    const pill = h("span", { class: "xp-pill" }),
+      delta = h("b"),
+      pval = h("b"),
+      guard = h("span"),
+      dec = h("div", { class: "xp-dec" }),
+      why = h("div", { class: "xp-why" });
+    const an = h(
+      "div",
+      { class: "xp-an" },
+      h("div", { class: "xp-an-h" }, h("span", {}, "gh aw experiments analyze fix-bot"), pill),
+      rows.map(r => r.el),
+      h("div", { class: "xp-m" }, h("span", {}, "primary ", h("b", {}, "eval:focused"), " Δ ", delta), h("span", {}, pval)),
+      h("div", { class: "xp-m" }, h("span", {}, "guardrail ", h("b", {}, "grader:tool-success-rate ≥ 0.95")), guard),
+      why,
+      dec
+    );
+    const sec = h(
+      "section",
+      { class: "slide xp" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Is the agent getting better?"), h("h2", {}, letters("Experiments, "), letters("graders & evals", "l-grad"))),
+      flow,
+      code,
+      an
+    );
+
+    // two-sided two-proportion z-test, the analyzer's test for yes/no metrics
+    const erf = x => {
+      const s = Math.sign(x),
+        a = Math.abs(x),
+        k = 1 / (1 + 0.3275911 * a);
+      return s * (1 - ((((1.061405429 * k - 1.453152027) * k + 1.421413741) * k - 0.284496736) * k + 0.254829592) * k * Math.exp(-a * a));
+    };
+    const pTwo = (y1, n1, y2, n2) => {
+      const p = (y1 + y2) / (n1 + n2),
+        se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));
+      return se ? 1 - erf(Math.abs(y2 / n2 - y1 / n1) / se / Math.SQRT2) : 1;
+    };
+    // illustrative outcomes: the totals are fixed (A 14/25, B 22/25 focused); the order is shuffled every cycle
+    const deal = yes => {
+      const a = Array.from({ length: N }, (_, i) => i < yes);
+      for (let i = N - 1; i > 0; i--) {
+        const j = (Math.random() * (i + 1)) | 0;
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+
+    let t0 = 0,
+      cycle = 0,
+      runs = [],
+      spawned = 0,
+      nextAt = 0,
+      no = 0,
+      used = [0, 0],
+      got = [[], []],
+      ts = [[], []],
+      answers = [],
+      doneAt = 0,
+      ready = false,
+      promoted = false,
+      lit = [],
+      hot = [];
+    const flash = (i, t) => {
+      hot[i] = t;
+      stations[i].classList.add("hot");
+      for (const l of ST[i][4]) {
+        lit[l] = t;
+        lines[l].classList.add("on");
+      }
+    };
+    const fmt = v => `${Math.round(v * 100)}%`;
+    const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+    const refresh = () => {
+      const n = Math.min(got[0].length, got[1].length);
+      pill.textContent = ready ? "READY" : `COLLECTING ${n}/${N}`;
+      pill.classList.toggle("ready", ready);
+      const r = got.map(g => (g.length ? g.filter(Boolean).length / g.length : null));
+      rows.forEach((row, v) => (row.rate.textContent = r[v] == null ? "—" : fmt(r[v])));
+      delta.textContent = r[0] != null && r[1] != null ? `${r[1] >= r[0] ? "+" : "−"}${Math.round(Math.abs(r[1] - r[0]) * 100)} pts` : "…";
+      pval.textContent = ready ? `p = ${pTwo(got[0].filter(Boolean).length, N, got[1].filter(Boolean).length, N).toFixed(3)} · two-proportion` : "p = …";
+      guard.replaceChildren(
+        ...VAR.map(([v], i) => (ts[i].length ? h("span", {}, `${v} `, h("b", {}, mean(ts[i]).toFixed(2)), " ", h("span", { class: "ok" }, mean(ts[i]) >= 0.95 ? "✓  " : "✗  ")) : `${v} …  `))
+      );
+    };
+    const reset = () => {
+      runs.forEach(r => r.el.remove());
+      runs = [];
+      spawned = no = doneAt = 0;
+      used = [0, 0];
+      got = [[], []];
+      ts = [[], []];
+      answers = [deal(14), deal(22)];
+      ready = promoted = false;
+      nextAt = 0;
+      rows.forEach(r => r.cells.forEach(c => (c.className = "")));
+      dec.className = "xp-dec";
+      dec.textContent = "EXTEND";
+      why.textContent = `Collecting: each variant needs ${N} usable runs.`;
+      refresh();
+    };
+    const spawn = (t, gap) => {
+      // least-used variant first; a tie is broken at random
+      const v = used[0] === used[1] ? (Math.random() < 0.5 ? 0 : 1) : used[0] < used[1] ? 0 : 1;
+      const k = used[v]++;
+      no += 1 + ((Math.random() * 3) | 0);
+      const em = h("em"),
+        u = h("u"),
+        el = h("div", { class: "xp-run" }, h("b", {}, "?"), h("span", {}, `#${no}`), em, u);
+      flow.append(el);
+      runs.push({ el, em, u, v, k, t, st: 0, yes: answers[v][k], g: v ? 0.94 + Math.random() * 0.06 : 0.93 + Math.random() * 0.06 });
+      flash(0, t);
+      if (gap > 500) sfx.pop(v ? 5 : 1);
+    };
+    const step = (r, t) => {
+      // each run waits at Assign for a second before it starts moving
+      const e = t - r.t,
+        x = Math.min(X1, X0 + Math.max(0, e - DWELL) * V),
+        u = Math.min(1, e / 420),
+        y = MID + (Y[r.v] - MID) * (1 - (1 - u) ** 3);
+      r.el.style.transform = `translate(${(x - CW / 2).toFixed(1)}px, ${(y - 23).toFixed(1)}px)`;
+      if (r.st < 1 && e > 120) {
+        r.st = 1;
+        r.el.classList.add(r.v ? "b" : "a");
+        r.el.firstChild.textContent = VAR[r.v][0];
+      }
+      if (r.st < 2 && x >= COL + 130) {
+        r.st = 2;
+        flash(1, t);
+      }
+      if (r.st < 3 && x >= 2 * COL + 130) {
+        r.st = 3;
+        r.em.textContent = r.g.toFixed(2);
+        flash(2, t);
+      }
+      if (r.st < 4 && x >= 3 * COL + 130) {
+        r.st = 4;
+        r.u.textContent = r.yes ? "YES" : "NO";
+        r.u.className = r.yes ? "yes" : "no";
+        flash(3, t);
+        if (cycle === 0 && no < 40) sfx.notify(!r.yes);
+      }
+      if (r.st < 5 && x >= X1) {
+        r.st = 5;
+        r.at = t;
+        r.el.classList.add("gone");
+        flash(4, t);
+        got[r.v].push(r.yes);
+        ts[r.v].push(r.g);
+        rows[r.v].cells[got[r.v].length - 1].className = r.yes ? "yes" : "no";
+        refresh();
+      }
+      return r.st < 5 || t - r.at < 300;
+    };
+
+    slides.push({
+      group: "cost",
+      sound: "lab",
+      palette: ["#1f6feb", "#8957e5", "#238636", "#0d419d"],
+      notes:
+        "Experiments, graders and evals. How do you know a change to a workflow makes the agent better, not just different? Declare an experiment in the frontmatter: here the prompt style, detailed (the control) against concise (the candidate). On every run the activation job assigns one variant, least-used first so the two stay balanced, and the prompt reads it as experiments.style. After the run, graders measure it: ten deterministic built-ins such as tool-success-rate, loops and duration are computed from the unified session with no model call, and you can add your own JavaScript graders. Evals then judge it: an LLM answers a yes or no question such as 'is the pull request focused?'. The experiment names one of those as its primary metric (eval:focused) and others as guardrails (grader:tool-success-rate at 0.95 or better). gh aw experiments analyze joins each run's scores to its assigned variant, waits for min_samples per variant, runs the statistical test, checks every guardrail, and decides: extend, promote, reject or inconclusive. It never edits the workflow itself; promotion stays a reviewed change. The workflow, runs, scores and decision in the animation are illustrative and synthetic. Keys: → next slide.",
+      enter() {
+        t0 = cycle = 0;
+        lit = [];
+        hot = [];
+        lines.forEach(l => l.classList.remove("on"));
+        stations.forEach(s => s.classList.remove("hot"));
+        reset();
+      },
+      tick(t) {
+        if (!t0) {
+          t0 = t;
+          nextAt = t + 900;
+        }
+        // runs start slowly so each step can be followed, then speed up
+        if (spawned < 2 * N && t >= nextAt) {
+          const gap = Math.max(480, 1800 * 0.86 ** spawned);
+          spawn(t, gap);
+          spawned++;
+          nextAt = t + gap;
+        }
+        runs = runs.filter(r => step(r, t) || (r.el.remove(), false));
+        lit.forEach((at, l) => at && t - at > 140 && ((lit[l] = 0), lines[l].classList.remove("on")));
+        hot.forEach((at, i) => at && t - at > 260 && ((hot[i] = 0), stations[i].classList.remove("hot")));
+        if (!doneAt && got[0].length + got[1].length === 2 * N) doneAt = t;
+        if (doneAt && !ready && t - doneAt > 400) {
+          ready = true;
+          refresh();
+          if (cycle === 0) sfx.touch();
+          sfx.compile();
+        }
+        if (doneAt && !promoted && t - doneAt > 1300) {
+          promoted = true;
+          dec.textContent = "PROMOTE concise";
+          dec.className = "xp-dec promote";
+          why.textContent = "The candidate wins on the primary metric and passes every guardrail.";
+          sfx.review();
+        }
+        if (doneAt && t - doneAt > 7500) {
+          cycle++;
+          reset();
+          nextAt = t + 600;
+        }
+      },
+      el: sec,
+    });
+  }
+
   // Any agent, any provider: one Markdown workflow retargets engine + model provider; tokens stream from the provider through the same guardrails
   {
     resetIndex();
@@ -6880,6 +7208,12 @@
         [57, 61, 64, 69, 73].forEach((m, i) => tone(m, t + 0.9 + i * s, { type: "sawtooth", dur: i === 4 ? 0.9 : 0.16, vol: 0.05, cutoff: 3600, detune: 6 }));
         bell(81, t + 0.9 + 5 * s, 0.04, 1.4);
         pad([45, 52, 57, 61], t + 0.9, 2.2, 0.022, "triangle", 1600);
+      },
+      // experiments: control and candidate trade notes (A low, B high), then a resolving bell chord
+      lab: t => {
+        [60, 67, 60, 69, 60, 71].forEach((m, i) => tone(m, t + 0.2 + i * 0.13, { type: i % 2 ? "triangle" : "square", dur: 0.14, vol: 0.05, cutoff: 2400, detune: 4 }));
+        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.05 + i * 0.07, 0.035, 1.3));
+        pad([48, 55, 60, 64], t + 1, 2.2, 0.022, "triangle", 1600);
       },
       // enclaves: a heavy vault bolt sliding shut, then a low sealed hum
       vault: t => {
