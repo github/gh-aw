@@ -177,6 +177,8 @@ on:
 
 The default `pull_request` policy-check trigger skips fork PRs. If a check must review fork contributions directly, explicitly allow the required forks with `forks:` (prefer a narrow allowlist) and keep the workflow read-only; treat PR content as untrusted input.
 
+For PR checks against policy files (for example alt-text rules, allowlists or owners), read the policy from the default branch or a CODEOWNERS-protected path, never the PR head; otherwise the PR author can change the policy to satisfy the check.
+
 Use `workflow_run` instead when the check depends on another workflow's completed result or artifact and must wait for that workflow, rather than racing it on `pull_request`. Scope it to the named workflow and completion type, gate on its conclusion, and read the result through GitHub APIs or artifacts. Do not use `workflow_run` to check out or execute the PR's head code or as a way to bypass fork safeguards.
 
 ### Command Triggers (/mentions)
