@@ -4909,7 +4909,7 @@
       MID = 171,
       X0 = 130,
       X1 = 4 * COL + 130,
-      V = 0.6,
+      V = 0.36,
       DWELL = 1000;
     const lineOf = new Map();
     ST.forEach(([, , , c, ls]) => ls.forEach(l => lineOf.set(l, c)));
@@ -5107,7 +5107,7 @@
         }
         // runs start slowly so each step can be followed, then speed up
         if (spawned < 2 * N && t >= nextAt) {
-          const gap = Math.max(320, 1300 * 0.84 ** spawned);
+          const gap = Math.max(480, 1800 * 0.86 ** spawned);
           spawn(t, gap);
           spawned++;
           nextAt = t + gap;
