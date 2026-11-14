@@ -65,6 +65,8 @@ slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
 Slides are grouped into sections: slides within a section push left, and
 moving to the next section slides up (reversed when going back).
+Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
+1200x630 render of the title slide; regenerate it if the title slide changes.
 
 Examples, review activity, repository counts, and cost figures are synthetic,
 except the model routing slide's results, which are measured on this
