@@ -929,7 +929,14 @@
   .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
   .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
   .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
-  .zs-vm { fill: #8957e51f; stroke: #a371f7; stroke-width: 2.5; }
+  .zs-vm { fill: #8957e52a; stroke: #a371f7; stroke-width: 4; }
+  .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
+  .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 1.4s; }
+  @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f7aa); } }
+  .zs-lock circle { fill: #0d1117; stroke: #a371f7; stroke-width: 3; filter: drop-shadow(0 0 10px #a371f788); }
+  .zs-lock rect { fill: #d2a8ff; } .zs-lock path { fill: none; stroke: #d2a8ff; stroke-width: 3.5; stroke-linecap: round; }
+  .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
+  .zs-port { fill: #0d1117; stroke: #d2a8ff; stroke-width: 3; }
   .zs-host { fill: #3fb95012; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
   .zs-kern.g { fill: #8957e526; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #3fb9501f; stroke: #2ea043; stroke-width: 2; }
   .zs-kern.r { fill: #3fb95014; stroke: #3fb95088; stroke-width: 2; }
@@ -3088,7 +3095,7 @@
     // rows: workspace/safe outputs/artifacts 95, gateway/GitHub MCP/Squid 240, API proxy 345, internet 420
     // [id, path, node lit on arrival]
     const EDGES = [
-      ["zsVm", "M300 240 H380", ""],
+      ["zsVm", "M310 240 H380", ""],
       ["zsFs", "M380 240 V95 H482", "zsNFs"],
       ["zsMcp", "M380 240 H482", "zsNGw"],
       ["zsLlm", "M380 240 V345 H482", "zsNProxy"],
@@ -3137,15 +3144,18 @@
       g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
       g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
       g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
-      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/><text class="zs-at g" x="150" y="34">AGENT MICRO-VM · NO AUTH</text>`;
-      g += `<circle cx="150" cy="130" r="54" fill="url(#zsAgentG)"/>${ico("copilot", 150, 132, 62)}<text class="zs-s" x="150" y="218">CODING AGENT RUNTIME</text>`;
+      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
+      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g>`;
+      g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
+      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/>${ico("copilot", 150, 158, 56)}<text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
       [
         ["copilot", 14],
         ["claude", 107],
         ["codex", 200],
-      ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="238" width="86" height="38" rx="19"/><text x="${x + 43}" y="263">${n}</text></g>`));
-      g += `<g class="zs-nokey" transform="translate(138,336)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
-      g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text></g>`;
+      ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="248" width="86" height="38" rx="19"/><text x="${x + 43}" y="273">${n}</text></g>`));
+      g += `<g class="zs-nokey" transform="translate(138,340)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
+      g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text>`;
+      g += `<rect class="zs-port" x="290" y="226" width="20" height="28" rx="5"/></g>`;
       g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
       // wires and labels
       g += `<g class="zs-area" style="--i:4">`;
