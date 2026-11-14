@@ -1911,13 +1911,13 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#prqAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const human = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#prqClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     const REV = ["nRevA", "nRevB", "nRevC"];
     // [edge id, path, color, label, lx, ly, anchor]; fan-out/fan-in wires (no label) light with their main edge
     const EDGES = [
       ["classic", "M90 374 V640 H1460 V598", "classic", ["classic review: straight to a human"], 760, 626, "middle"],
-      ["p0", "M90 174 V302", "b", ["opens draft PR"], 112, 246, "start"],
+      ["p0", "M90 174 V302", "b", ["opens draft", "pull request"], 112, 236, "start"],
       ["p1", "M126 340 H462", "b", ["ready for", "review"], 250, 300, "middle"],
       ["p1a", "M400 340 V220 H462", "b", [], 0, 0, "start"],
       ["p1b", "M400 340 V460 H462", "b", [], 0, 0, "start"],
@@ -1948,6 +1948,7 @@
     let g = `<defs><radialGradient id="prqAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="prqP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="prqB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
+      <clipPath id="prqClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
       <marker id="prqG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#9198a1"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
@@ -1966,7 +1967,7 @@
     g += human("nAuthor", 90, 140, 200, "Developer") + box("nPRq", 90, 340, "pr");
     g += agent("nRevA", 500, 220, 290, "Matt Pocock skills") + agent("nRevB", 500, 340, 290, "Code quality") + agent("nRevC", 500, 460, 290, "Test quality");
     g += agent("nChef", 1080, 140, 242, "PR Sous Chef") + agent("nCopilotq", 1080, 560, 200, "Copilot");
-    g += human("nMaint", 1460, 340, 220, "Maintainer") + box("nMergeq", 1460, 560, "merge");
+    g += human("nMaint", 1460, 340, 220, "Developer") + box("nMergeq", 1460, 560, "merge");
     g += `<text class="prq-thr" id="prqThr" x="968" y="356"></text>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -2008,7 +2009,7 @@
       sound: "loop",
       palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
       notes:
-        "PR Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so a maintainer only sees a clean pull request. A human still reviews and merges.",
+        "Pull Request Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -2055,7 +2056,7 @@
           threads(k);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Ready for review · agentic reviewers · PR Sous Chef"), h("h2", {}, letters("PR "), letters("Review²", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Ready for review · agentic reviewers · PR Sous Chef"), h("h2", {}, letters("Pull Request "), letters("Review²", "l-grad"))), svg),
     });
   }
 

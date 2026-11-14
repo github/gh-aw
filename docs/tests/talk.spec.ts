@@ -22,7 +22,7 @@ test("presents the fifteen slides without the removed sections", async ({ page }
     "Human Agent Processes",
     "Repo Assist",
     "Research · Assign · Refine",
-    "PR Review²",
+    "Pull Request Review²",
     "Research · Assign · Observe",
     "Mine · Refine · Apply",
     "Cost management",
@@ -85,9 +85,13 @@ test("ships local assets with the docs and links to the talk from the footer", a
 });
 
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
-  expect(readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true })).toEqual(["workflow-run.svg"]);
+  const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer)\.jpg$/;
+  for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
+    expect(asset === "workflow-run.svg" || asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
+  }
   const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
-  expect(source.match(/assets\/avatars|<image\b|\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
+  expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
+  for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
   expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/"]);
   const illustration = await (await request.get("/gh-aw/cracktro/assets/workflow-run.svg")).text();
   expect(illustration).not.toMatch(/<(?:image|script|foreignObject|metadata)\b/i);
@@ -106,7 +110,9 @@ test("publishes synthetic examples without profile assets or private source refe
   for (const author of await page.locator(".mra-who").allTextContents()) {
     expect(author).toMatch(/^(?:reviewer|maintainer|copilot) · /);
   }
-  await expect(page.locator("svg image")).toHaveCount(0);
+  for (const href of await page.locator("svg image").evaluateAll(images => images.map(image => image.getAttribute("href")))) {
+    expect(href).toMatch(allowedAvatar);
+  }
   await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
   await page.keyboard.press("n");
   for (const slide of [2, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15]) {
