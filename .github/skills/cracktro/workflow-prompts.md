@@ -28,17 +28,17 @@ Slides built on a gh-aw agentic workflow show, at `top: 30px`, the first user me
 
 | Slide | Workflow | PR | Source |
 |---|---|---|---|
-| Pull Request Review² (16) | pr-sous-chef | #31911 | task `a70501b3-515a-4256-b691-e77b75eb8394`, session `4e5f906c-6ef8-407f-9c87-90e1bf7a7bd4` |
-| Daily Unsloppers (19) | duplicate-code-detector | #1293 | PR body "Original prompt" (Serena DOCKER.md URL stripped) |
-| Merge fast, unslop daily (20) | jsweep | #6854 | PR body |
-| Query · Ask · Grow (22) | daily-otel-instrumentation-advisor | #24655 | task `4f75f9b3-462c-4143-ae1d-0dae11684d5a`, session `2b0febeb-53b8-4f19-83d4-471aed9ce7d9` |
-| Mine · Refine · Apply (23) | linter-miner | #32263 | task `414cf3c4-ff06-4015-92ec-2c9eec136b3e`, session `3e5e3881-fdf1-4f74-8c10-674d786224d3` |
-| Explore · Reuse · Lint (24) | sergo | #10063 | PR body |
-| Semantic clustering (25) | semantic-function-refactor | #2109 | PR body (commit subject lacks PR number) |
-| Go Fan (27) | go-fan | #5092 | PR body |
-| Spec-driven testing (28) | spec-extractor / enforcer / librarian | #26083 | task `fca20c82-56ce-4da2-bfc3-629bc47c120f`, session `1b7312fb-2292-4227-84ea-2d170e3906be` |
-| Docs that heal (29) | daily-doc-updater | #1861 | PR body |
-| Speak · Map · Grep (30) | dictation-prompt | #2147 | PR body |
+| Pull Request Review² (17) | pr-sous-chef | #31911 | task `a70501b3-515a-4256-b691-e77b75eb8394`, session `4e5f906c-6ef8-407f-9c87-90e1bf7a7bd4` |
+| Daily Unsloppers (20) | duplicate-code-detector | #1293 | PR body "Original prompt" (Serena DOCKER.md URL stripped) |
+| Merge fast, unslop daily (21) | jsweep | #6854 | PR body |
+| Query · Ask · Grow (23) | daily-otel-instrumentation-advisor | #24655 | task `4f75f9b3-462c-4143-ae1d-0dae11684d5a`, session `2b0febeb-53b8-4f19-83d4-471aed9ce7d9` |
+| Mine · Refine · Apply (24) | linter-miner | #32263 | task `414cf3c4-ff06-4015-92ec-2c9eec136b3e`, session `3e5e3881-fdf1-4f74-8c10-674d786224d3` |
+| Explore · Reuse · Lint (25) | sergo | #10063 | PR body |
+| Semantic clustering (26) | semantic-function-refactor | #2109 | PR body (commit subject lacks PR number) |
+| Go Fan (28) | go-fan | #5092 | PR body |
+| Spec-driven testing (29) | spec-extractor / enforcer / librarian | #26083 | task `fca20c82-56ce-4da2-bfc3-629bc47c120f`, session `1b7312fb-2292-4227-84ea-2d170e3906be` |
+| Docs that heal (30) | daily-doc-updater | #1861 | PR body |
+| Speak · Map · Grep (31) | dictation-prompt | #2147 | PR body |
 
 Alternates that were not used:
 - lint-monster: #32687, task `906f95f4-b0fb-4743-a58d-44bcc5693072`, session `57e5e168-24eb-4ba4-8dcc-15bf71e21dd5`.

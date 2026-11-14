@@ -89,7 +89,7 @@ Baseline (`END=2026-11-14`, 30 days), slide value vs helper:
 2. If the run count changes, update the header tspan (`30 DAYS`).
 3. Caption: set the dates as `D Mon – D Mon YYYY (N days)` and `snapshot D Mon YYYY`, keeping `flows illustrative`.
 4. Notes: update every number, the window and the snapshot date. Keep the sentence "The flows are illustrative patterns with synthetic labels…" so the notes still match `/illustrative|synthetic|simulated/i`.
-5. In `../content-rules.md`: update the "Human Agent Processes slide (15, `hap-` classes)" Exception bullet with the new numbers and dates. Slide numbers shift, so find it by the `hap-` text.
+5. In `../content-rules.md`: update the "Human Agent Processes slide (16, `hap-` classes)" Exception bullet with the new numbers and dates. Slide numbers shift, so find it by the `hap-` text.
 6. If the chosen workflow is renamed, removed, or idle (0 in the window), pick another one with the same trigger. Update `HAP`, the notes, the content-rules.md bullet, the source table above, and the helper.
 
 ## 6. Validation

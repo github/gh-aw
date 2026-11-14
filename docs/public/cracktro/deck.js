@@ -1174,6 +1174,32 @@
   .ch-scan { position: absolute; left: 1340px; top: 928px; width: 480px; font: 500 15px/1 var(--mono); letter-spacing: .08em; color: #9198a1; text-align: center; opacity: 0; }
   .active .ch-scan { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.4s; }
 
+  /* --- turn automation into value --- */
+  .tv-live { position: absolute; right: 110px; top: 120px; display: flex; align-items: center; gap: 14px; padding: 16px 26px; border-radius: 99px; background: #161b22e8; border: 1px solid #3d444d;
+    font: 500 20px/1 var(--mono); letter-spacing: .08em; color: #d1d7e0; text-transform: uppercase; }
+  .tv-live::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #3fb950; box-shadow: 0 0 12px #3fb950; animation: tvpulse 1.6s ease-in-out infinite; }
+  .tv-live b { color: #f0f6fc; font-variant-numeric: tabular-nums; }
+  @keyframes tvpulse { 50% { opacity: .35; } }
+  .tv-kpis { position: absolute; left: 110px; right: 110px; top: 290px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 30px; }
+  .tv-kpi { height: 150px; padding: 22px 26px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; border-top: 4px solid var(--c); display: flex; flex-direction: column; justify-content: space-between; }
+  .active .tv-kpi { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .3s); }
+  .tv-kpi div { display: flex; justify-content: space-between; align-items: center; }
+  .tv-kpi i { font: 600 16px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #9198a1; font-style: normal; }
+  .tv-kpi em { font: 700 22px/1 var(--mono); font-style: normal; color: var(--c); padding: 7px 12px; border-radius: 8px; background: #ffffff0d; opacity: 0; transform: scale(.8); transition: opacity .4s, transform .5s cubic-bezier(.2,1.6,.4,1); }
+  .tv-kpi.done em { opacity: 1; transform: none; }
+  .tv-kpi b { font: 700 62px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+  .tv-kpi small { font: 500 24px/1 var(--mono); color: #9198a1; margin-left: 10px; }
+  .tv-panels { position: absolute; left: 110px; right: 110px; top: 470px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+  .tv-p { height: 440px; padding: 24px 26px 14px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; }
+  .active .tv-p { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 110ms + .6s); }
+  .tv-p h4 { margin: 0; font-size: 30px; font-variation-settings: "wght" 650, "wdth" 100; color: #f0f6fc; }
+  .tv-p svg { display: block; width: 100%; height: 360px; margin-top: 8px; overflow: visible; }
+  .tv-p svg text { font: 500 15px/1 var(--mono); fill: #9198a1; }
+  .tv-p svg .grid { stroke: #ffffff12; }
+  .tv-p svg .end { opacity: 0; transition: opacity .5s; font-size: 18px; font-weight: 700; }
+  .tv-p.done svg .end { opacity: 1; }
+  .tv-cap { position: absolute; left: 110px; right: 110px; top: 952px; font: 500 18px/1.3 var(--mono); color: #9198a1; }
+
   /* --- turn intent to automation --- */
   .slide-head h2.pf-h { font-size: 100px; }
   .pf-card { position: absolute; top: 360px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -25px var(--c); opacity: 0; transform: translateY(30px) scale(.97); transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1); }
@@ -2148,7 +2174,7 @@
           "div",
           { class: "ga-copy" },
           h("div", { class: "badge" }, "● GITHUB ACTIONS"),
-          h("h2", {}, letters("AI-powered", "l-grad"), h("br"), letters("workflows", "l-grad"), h("br"), letters("for GitHub"))
+          h("h2", {}, letters("CI/CD to"), h("br"), letters("Continuous", "l-grad"), h("br"), letters("AI", "l-grad"))
         ),
         h(
           "div",
@@ -2473,6 +2499,138 @@
         n3.textContent = Math.round(212 * ez);
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))), tta, links, tags, cards),
+    });
+  }
+
+  // Turn Automation into Value: a synthetic twelve-week dashboard (backlog burndown, quality, delivery)
+  {
+    resetIndex();
+    const N = 12,
+      X0 = 46,
+      X1 = 486,
+      Y0 = 40,
+      Y1 = 320,
+      START = 1.1,
+      DUR = 4.4;
+    const xs = i => X0 + ((X1 - X0) * i) / (N - 1);
+    const ys = (v, lo, hi) => Y1 - ((Y1 - Y0) * (v - lo)) / (hi - lo);
+    const at = (d, w) => {
+      const i = Math.min(N - 1, Math.floor(w)),
+        j = Math.min(N - 1, i + 1);
+      return d[i] + (d[j] - d[i]) * (w - i);
+    };
+    const BACKLOG = [412, 398, 371, 352, 318, 291, 262, 230, 204, 181, 157, 138],
+      TREND = [412, 418, 423, 431, 436, 441, 447, 452, 458, 463, 470, 476],
+      COVER = [61, 62, 64, 66, 69, 71, 74, 76, 78, 80, 82, 84],
+      BUGS = [9, 8, 8, 7, 6, 5, 5, 4, 3, 3, 2, 2],
+      LEAD = [52, 47, 41, 33, 28, 22, 18, 14, 11, 9, 8, 7],
+      DEPLOY = [4, 5, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19];
+    // series: [data, lo, hi, kind, color, end label]; the last line series carries the cursor
+    const PANELS = [
+      ["Backlog burndown", [["with agents", "#3fb950"], ["without, trend", "#656c76", 1]], [[TREND, 0, 500, "dash", "#656c76", "476"], [BACKLOG, 0, 500, "area", "#3fb950", "138"]]],
+      ["Quality up", [["test coverage", "#4493f8"], ["escaped bugs / wk", "#f85149"]], [[BUGS, 0, 12, "bar", "#f85149", "2"], [COVER, 50, 90, "area", "#4493f8", "84%"]]],
+      ["Faster delivery", [["deploys / wk", "#d29922"], ["PR lead time", "#ab7df8"]], [[LEAD, 0, 60, "bar", "#ab7df8", "7h"], [DEPLOY, 0, 20, "area", "#d29922", "19"]]],
+    ];
+    const clips = [],
+      cursors = [],
+      panels = PANELS.map(([title, legend, series], n) => {
+        let g = `<defs><clipPath id="tv-c${n}"><rect x="0" y="0" width="0" height="360"/></clipPath>`;
+        series.forEach(([, , , , c], k) => (g += `<linearGradient id="tv-g${n}${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".35"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient>`));
+        g += "</defs>";
+        for (let k = 0; k <= 4; k++) g += `<line class="grid" x1="${X0 - 14}" x2="${X1 + 14}" y1="${Y0 + ((Y1 - Y0) * k) / 4}" y2="${Y0 + ((Y1 - Y0) * k) / 4}"/>`;
+        [0, 3, 7, 11].forEach(i => (g += `<text x="${xs(i)}" y="350" text-anchor="middle">W${i + 1}</text>`));
+        let lx = X0 - 14;
+        legend.forEach(([l, c, dash]) => {
+          g += dash ? `<line x1="${lx}" x2="${lx + 18}" y1="8" y2="8" stroke="${c}" stroke-width="3" stroke-dasharray="5 4"/>` : `<rect x="${lx}" y="2" width="18" height="12" rx="3" fill="${c}"/>`;
+          g += `<text x="${lx + 26}" y="14">${l}</text>`;
+          lx += 26 + l.length * 9.2 + 26;
+        });
+        let clipped = "",
+          ends = "";
+        series.forEach(([d, lo, hi, kind, c, end], k) => {
+          const pts = d.map((v, i) => `${xs(i).toFixed(1)} ${ys(v, lo, hi).toFixed(1)}`),
+            ey = ys(d[N - 1], lo, hi);
+          if (kind === "dash") g += `<path d="M${pts.join(" L")}" fill="none" stroke="${c}" stroke-width="3" stroke-dasharray="8 7"/>`;
+          if (kind === "bar") clipped += d.map((v, i) => `<rect x="${xs(i) - 11}" y="${ys(v, lo, hi)}" width="22" height="${Y1 - ys(v, lo, hi)}" rx="4" fill="${c}" fill-opacity=".6"/>`).join("");
+          if (kind === "area") clipped += `<path d="M${pts.join(" L")} L${X1} ${Y1} L${X0} ${Y1}Z" fill="url(#tv-g${n}${k})"/><path d="M${pts.join(" L")}" fill="none" stroke="${c}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
+          ends += `<text class="end" x="${kind === "bar" ? X1 : X1 - 12}" y="${ey - 16}" text-anchor="${kind === "bar" ? "middle" : "end"}" style="fill:${c}">${end}</text>`;
+        });
+        const [d, lo, hi, , c] = series[series.length - 1];
+        g += `<g clip-path="url(#tv-c${n})">${clipped}</g><line class="tv-gd" x1="0" x2="0" y1="${Y0}" y2="${Y1}" stroke="${c}" stroke-opacity=".4" stroke-dasharray="3 5"/><circle r="8" fill="${c}" stroke="#0d1117" stroke-width="4"/>${ends}`;
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 500 360");
+        svg.innerHTML = g;
+        clips.push(svg.querySelector("clipPath rect"));
+        cursors.push([svg.querySelector("circle"), svg.querySelector(".tv-gd"), d, lo, hi]);
+        return h("div", { class: "tv-p", "--i": n }, h("h4", {}, title), svg);
+      });
+    // [label, color, series, unit, delta]
+    const KPIS = [
+      ["Open backlog", "#3fb950", BACKLOG, " issues", "−67%"],
+      ["Test coverage", "#4493f8", COVER, "%", "+23 pts"],
+      ["PR lead time", "#ab7df8", LEAD, "h", "−87%"],
+      ["Deploys / week", "#d29922", DEPLOY, "", "4.8×"],
+    ];
+    const vals = KPIS.map(() => h("b", {}, "0")),
+      kpis = KPIS.map(([l, c, , unit, delta], i) => h("div", { class: "tv-kpi", "--c": c, "--i": i }, h("div", {}, h("i", {}, l), h("em", {}, delta)), h("span", {}, vals[i], unit ? h("small", {}, unit.trim()) : null)));
+    const wk = h("b", {}, "01");
+    let t0 = 0,
+      now = 0,
+      seen = -1,
+      done = false;
+    slides.push({
+      group: "platform",
+      sound: "value",
+      palette: ["#238636", "#1f6feb", "#d29922", "#8957e5"],
+      notes:
+        "Turn Automation into Value: an illustrative dashboard with synthetic data for a sample repository, twelve weeks after switching on agentic workflows. The backlog burns down instead of following its growing trend, test coverage climbs while escaped bugs fall, and PR lead time drops as deploys per week rise. These numbers are not measured on a real repository; they show the kind of outcomes worth tracking. The AW factory band later shows gh-aw's own measured history.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        done = false;
+        [...kpis, ...panels].forEach(e => e.classList.remove("done"));
+      },
+      onNext() {
+        if (!t0 || done) return false;
+        t0 = Math.min(t0, now - (START + DUR) * 1000);
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        now = t;
+        const p = Math.min(1, Math.max(0, ((t - t0) / 1000 - START) / DUR)),
+          w = (1 - (1 - p) ** 2) * (N - 1),
+          x = xs(w);
+        clips.forEach(r => r.setAttribute("width", x + 12));
+        cursors.forEach(([dot, gd, d, lo, hi]) => {
+          const y = ys(at(d, w), lo, hi);
+          dot.setAttribute("cx", x);
+          dot.setAttribute("cy", y);
+          gd.setAttribute("x1", x);
+          gd.setAttribute("x2", x);
+        });
+        KPIS.forEach(([, , d], i) => (vals[i].textContent = Math.round(at(d, w))));
+        const week = Math.round(w);
+        wk.textContent = String(week + 1).padStart(2, "0");
+        if (week > seen) {
+          if (seen >= 0) sfx.pop(week);
+          seen = week;
+        }
+        if (p >= 1 && !done) {
+          done = true;
+          [...kpis, ...panels].forEach(e => e.classList.add("done"));
+          sfx.review();
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Why it matters"), h("h2", { class: "pf-h" }, letters("Turn Automation into "), letters("Value", "l-grad"))),
+        h("div", { class: "tv-live" }, "acme/app · week ", wk, " / 12"),
+        h("div", { class: "tv-kpis" }, kpis),
+        h("div", { class: "tv-panels" }, panels),
+        h("div", { class: "tv-cap" }, "Illustrative dashboard · synthetic data for a sample repository, twelve weeks after switching on agentic workflows")
+      ),
     });
   }
 
@@ -12011,7 +12169,7 @@
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
   // The title and the finale (last) are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
   const BANDS = {
-    platform: ["Workflows", "Markdown in, GitHub Actions out"],
+    platform: ["Agentic Workflows", "AI-Powered workflows for GitHub"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code", ["#58a6ff", "#1f6feb", "#a5d6ff", "#cae8ff"]],
     cost: ["Cost & context", "Debug, spend less, route smarter"],
@@ -12712,6 +12870,13 @@
           o.start(t + d);
           o.stop(t + d + 0.25);
         }
+      },
+      // turn automation into value: a rising walk up the scale as the charts climb, then a bright two-bell payoff
+      value: t => {
+        [60, 62, 64, 67, 69, 72, 74, 76].forEach((m, i) => tone(m, t + 0.15 + i * 0.12, { type: "triangle", dur: 0.2, vol: 0.045, cutoff: 2600 }));
+        pad([48, 55, 60, 64], t + 0.2, 2.4, 0.022, "triangle", 1800);
+        bell(84, t + 1.15, 0.05, 1.4);
+        bell(91, t + 1.28, 0.04, 1.6);
       },
       // cost management: coins dropping into a jar, then a gentle register "ding"
       coins: t => {

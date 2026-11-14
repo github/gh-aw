@@ -27,14 +27,14 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 
 | Slide | Refresh skill |
 |---|---|
-| 15 Human Agent Processes | `refresh/human-agent-processes.md` |
-| 16 Pull Request Review² | `refresh/pr-review-squared.md` |
-| 19 Daily Unsloppers | `refresh/daily-unsloppers.md` |
-| 20 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
-| 21 Research · Assign · Observe | `refresh/research-assign-observe.md` |
-| 24 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
-| 26 Spec · Model · Test | `refresh/spec-model-test.md` |
-| 28 Spec-driven testing | `refresh/spec-driven-testing.md` |
-| 29 Docs that heal | `refresh/docs-that-heal.md` |
-| 31 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+| 16 Human Agent Processes | `refresh/human-agent-processes.md` |
+| 17 Pull Request Review² | `refresh/pr-review-squared.md` |
+| 20 Daily Unsloppers | `refresh/daily-unsloppers.md` |
+| 21 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
+| 22 Research · Assign · Observe | `refresh/research-assign-observe.md` |
+| 25 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
+| 27 Spec · Model · Test | `refresh/spec-model-test.md` |
+| 29 Spec-driven testing | `refresh/spec-driven-testing.md` |
+| 30 Docs that heal | `refresh/docs-that-heal.md` |
+| 32 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
 
