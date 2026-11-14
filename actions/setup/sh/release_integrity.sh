@@ -268,8 +268,8 @@ report_release_quota_blocked() {
 verify_release_attestation() {
   local file="$1" repository="$2" output status now deadline delay reason max_wait
   local transient_retries=0 waited=0
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "ERROR: GitHub CLI (gh) is required for release attestation verification. Install gh with attestation support on the runner and ensure it is on PATH before running this installer. Verification cannot be skipped." >&2
+  if ! command -v gh >/dev/null 2>&1 || ! gh attestation verify --help >/dev/null 2>&1; then
+    echo "ERROR: GitHub CLI (gh) with 'gh attestation verify' support is required for release attestation verification. Install or upgrade GitHub CLI on the runner and ensure it is on PATH before running this installer. Verification cannot be skipped." >&2
     return 1
   fi
   max_wait="${GH_AW_GITHUB_API_QUOTA_MAX_WAIT_SECONDS:-300}"

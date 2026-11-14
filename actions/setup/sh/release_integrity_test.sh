@@ -16,10 +16,23 @@ attestation_status=0
 ) >"$TEMP_DIR/attestation-stdout" 2>"$TEMP_DIR/attestation-stderr" || attestation_status=$?
 test "$attestation_status" = 1
 test ! -s "$TEMP_DIR/attestation-stdout"
-grep -qF 'GitHub CLI (gh) is required for release attestation verification' "$TEMP_DIR/attestation-stderr"
-grep -qF 'Install gh with attestation support on the runner and ensure it is on PATH' "$TEMP_DIR/attestation-stderr"
+grep -qF "GitHub CLI (gh) with 'gh attestation verify' support is required" "$TEMP_DIR/attestation-stderr"
+grep -qF 'Install or upgrade GitHub CLI on the runner and ensure it is on PATH' "$TEMP_DIR/attestation-stderr"
 grep -qF 'Verification cannot be skipped' "$TEMP_DIR/attestation-stderr"
 echo "PASS: missing gh fails closed with an actionable prerequisite diagnostic"
+
+mkdir -p "$TEMP_DIR/old-gh"
+printf '#!/bin/bash\nexit 127\n' >"$TEMP_DIR/old-gh/gh"
+chmod +x "$TEMP_DIR/old-gh/gh"
+attestation_status=0
+(
+  PATH="$TEMP_DIR/old-gh"
+  verify_release_attestation "$TEMP_DIR/checksums.txt" github/gh-aw-firewall
+) >"$TEMP_DIR/old-gh-stdout" 2>"$TEMP_DIR/old-gh-stderr" || attestation_status=$?
+test "$attestation_status" = 1
+test ! -s "$TEMP_DIR/old-gh-stdout"
+grep -qF "GitHub CLI (gh) with 'gh attestation verify' support is required" "$TEMP_DIR/old-gh-stderr"
+echo "PASS: gh without attestation verification support fails closed"
 
 mkdir -p "$TEMP_DIR/bin" "$TEMP_DIR/home" "$TEMP_DIR/scripts" "$TEMP_DIR/copilot-fixture" "$TEMP_DIR/runner"
 cp "$SCRIPT_DIR/install_awf_binary.sh" "$TEMP_DIR/scripts/"
@@ -41,6 +54,7 @@ printf '%s  copilot-linux-x64.tar.gz\n%s  copilot-linuxmusl-x64.tar.gz\n' "$arch
 copilot_digest="$(shasum -a 256 "$TEMP_DIR/SHA256SUMS.txt" | awk '{print $1}')"
 # Test pins live only beside copies of the real installers, never in production inputs.
 sed -e "s/0b03f6ea5b638356a799fa541ade4fd7902a6ac8d7c3f0252ee09d8259a4ce8f/$manifest_digest/" \
+    -e "s/df77f6dd216030f6c604839136ccfed07b922690594db518a83ff3bcc555e788/$manifest_digest/" \
     -e "s/372f0c8d3d50076455cd19ef080dc59dc2a32401d8b2d4f77ce190c8ab13bc59/$copilot_digest/" \
     -e "s/018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be/$copilot_digest/" \
     -e "s/26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2/$copilot_digest/" \
@@ -97,6 +111,7 @@ EOF
 cat >"$TEMP_DIR/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [ "$1" = attestation ] && [ "$2" = verify ] && [ "$3" = --help ]; then exit 0; fi
 test "$1" = attestation
 test "$2" = verify
 test "$4" = --hostname
@@ -125,9 +140,17 @@ exec /usr/bin/find "$@"
 EOF
 chmod +x "$TEMP_DIR/bin/"*
 
+mkdir -p "$TEMP_DIR/bin-no-gh"
+for tool in bash env dirname basename mkdir mktemp stat grep sha256sum shasum awk cat cp rm; do
+  ln -s "$(command -v "$tool")" "$TEMP_DIR/bin-no-gh/$tool"
+done
+for tool in curl uname; do
+  ln -s "$TEMP_DIR/bin/$tool" "$TEMP_DIR/bin-no-gh/$tool"
+done
+
 run_awf() {
   env TEST_ROOT="$TEMP_DIR" EXECUTION_LOG="$TEMP_DIR/executions" HOME="$TEMP_DIR/home" \
-    GITHUB_PATH="$TEMP_DIR/github-path" PATH="$TEMP_DIR/bin:$PATH" \
+    GITHUB_PATH="$TEMP_DIR/github-path" PATH="${AWF_TEST_PATH:-$TEMP_DIR/bin:$PATH}" \
     bash "$TEMP_DIR/scripts/install_awf_binary.sh" "$@" >"$TEMP_DIR/output" 2>&1
 }
 run_copilot() {
@@ -139,6 +162,18 @@ run_copilot() {
     bash "$TEMP_DIR/scripts/install_copilot_cli.sh" "$@" >"$TEMP_DIR/output" 2>&1
 }
 COPILOT_INSTALL_DIR="$TEMP_DIR/runner/gh-aw/bin"
+
+rm -f "$TEMP_DIR/executions" "$TEMP_DIR/home/.local/bin/awf"
+installer_exit=0
+AWF_TEST_PATH="$TEMP_DIR/bin-no-gh" run_awf v0.29.5 --rootless || installer_exit=$?
+test "$installer_exit" = 1
+grep -qF "GitHub CLI (gh) with 'gh attestation verify' support is required" "$TEMP_DIR/output" || {
+  cat "$TEMP_DIR/output" >&2
+  exit 1
+}
+test ! -e "$TEMP_DIR/home/.local/bin/awf"
+test ! -e "$TEMP_DIR/executions"
+echo "PASS: missing gh blocks installation of an attestation-required AWF release"
 
 run_awf v0.28.62 --rootless
 test -x "$TEMP_DIR/home/.local/bin/awf"
