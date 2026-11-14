@@ -83,7 +83,7 @@ issues labelled `community` and the merged pull requests that closed them
 counts of Linter Miner analyzer pull requests, LintMonster issues and the
 merged pull requests that closed them (May to November 2026), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
-(February to November 2026, with shortened titles), the Continuous Security slide's
+(February to November 2026, with shortened titles), the Continuous Red Teaming slide's
 counts and dates, measured from that red-team workflow's repository memory and
 the firewall fix it led to (its attack diagram is a simplified illustration),
 the Semantic
