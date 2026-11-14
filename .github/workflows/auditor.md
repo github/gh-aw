@@ -267,7 +267,7 @@ jobs:
             if (!discovery || !Array.isArray(health.workflows) ||
                 (discovery.partial !== false &&
                   !(discovery.partial === true && (discovery.reason === 'failure_listing_limit' ||
-                    (discovery.reason === 'time_budget' &&
+                    ((discovery.reason === 'time_budget' || discovery.reason === 'request_budget') &&
                       discovery.failure_listing_complete === true && discovery.failure_pass_complete === true)))) ||
                 (discovery.partial === false &&
                   (discovery.failure_listing_complete !== true || discovery.failure_pass_complete !== true)) ||

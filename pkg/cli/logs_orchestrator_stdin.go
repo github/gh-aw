@@ -290,7 +290,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		if opts.Parse {
 			awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 			detectedEngine := extractEngineFromAwInfo(awInfoPath, opts.Verbose)
-			if err := parseAgentLog(result.LogsPath, detectedEngine, opts.Verbose); err != nil {
+			if err := parseAgentLog(ctx, result.LogsPath, detectedEngine, opts.Verbose); err != nil {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log for run %d: %v", processedRun.Run.DatabaseID, err)))
 			} else {
 				logMdPath := filepath.Join(result.LogsPath, "log.md")

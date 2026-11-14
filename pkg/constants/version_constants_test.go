@@ -82,8 +82,8 @@ func TestDefaultThreatDetectReleasePins(t *testing.T) {
 func TestDefaultPlaywrightCLIVersionOutsideCooldownWindow(t *testing.T) {
 	t.Parallel()
 	const (
-		expectedVersion    Version = "0.1.23"
-		publishedAtRFC3339         = "2026-10-31T15:22:58.073Z"
+		expectedVersion    Version = "0.1.24"
+		publishedAtRFC3339         = "2026-11-10T01:16:05Z"
 		minReleaseAge              = 72 * time.Hour
 	)
 

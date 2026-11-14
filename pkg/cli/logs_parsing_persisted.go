@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -17,11 +17,11 @@ var logsParsingPersistedLog = logger.New("cli:logs_parsing_persisted")
 
 // Persisted and supported native transcripts carry their own schema and identity; rendering them
 // must not depend on an imported engine still being installed in the registry.
-func parsePersistedAgentLog(runDir string) (bool, error) {
-	return parseUnifiedAgentLog(runDir, "")
+func parsePersistedAgentLog(ctx context.Context, runDir string) (bool, error) {
+	return parseUnifiedAgentLog(ctx, runDir, "")
 }
 
-func parseUnifiedAgentLog(runDir, engineID string) (bool, error) {
+func parseUnifiedAgentLog(ctx context.Context, runDir, engineID string) (bool, error) {
 	found := false
 	for _, name := range []string{"agent-session.jsonl", "agent-stdio.log"} {
 		stat, err := os.Lstat(filepath.Join(runDir, name))
@@ -41,7 +41,7 @@ func parseUnifiedAgentLog(runDir, engineID string) (bool, error) {
 	if engineID != "" {
 		args = append(args, engineID)
 	}
-	session, err := runSessionParser(context.Background(), args...)
+	session, err := runSessionParser(ctx, args...)
 	if err != nil {
 		if errors.Is(err, errNoRecognizableAgentSession) {
 			logsParsingPersistedLog.Printf("No recognizable agent session reconstructed from %s", runDir)
@@ -55,7 +55,7 @@ func parseUnifiedAgentLog(runDir, engineID string) (bool, error) {
 		return false, err
 	}
 	output, err := runSessionParserWithSources(
-		context.Background(),
+		ctx,
 		map[string][]byte{"persisted_session.jsonl": session},
 		"markdown", "persisted_session.jsonl",
 	)
@@ -81,7 +81,7 @@ func readableUnifiedAgentSession(session []byte) (bool, error) {
 				Component string `json:"component"`
 			} `json:"provenance"`
 		}
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
+		if err := jsonutil.UnmarshalString(line, &event); err != nil {
 			return false, fmt.Errorf("invalid reconstructed agent session: %w", err)
 		}
 		if event.Provenance.Component == "agent" {
