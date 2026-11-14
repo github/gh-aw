@@ -107,6 +107,17 @@ test("ships local assets with the docs and links to the talk from the footer", a
   expect(await page.evaluate(() => document.fonts.check('16px "Monaspace Neon"'))).toBe(true);
 });
 
+test("publishes a social card for link previews", async ({ page, request }) => {
+  await page.goto("/gh-aw/cracktro/");
+  const image = "https://github.github.com/gh-aw/cracktro/og-image.png";
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", image);
+  await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute("content", image);
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+  const response = await request.get("/gh-aw/cracktro/og-image.png");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toContain("image/png");
+});
+
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
   const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer|ievangelist)\.jpg$/;
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
