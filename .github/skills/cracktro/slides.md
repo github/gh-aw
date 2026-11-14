@@ -42,6 +42,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Speak · Map · Grep | illustrative |
 | Scan · Fix · Learn | illustrative |
 | For PMs | illustrative |
+| If every PR needs deep human review, you don’t trust your process. | illustrative |
 | Cost & context |  |
 | Cost management | illustrative |
 | Model routing | illustrative |
