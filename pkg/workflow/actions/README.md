@@ -21,6 +21,7 @@ The resolver validates output references and job dependencies without changing t
 | `Emit` | Serializes a workflow, retaining source formatting and comments for parsed documents. |
 | `EditSource` | Merges semantic changes into authored YAML while retaining unaffected syntax. |
 | `ValidateJob` | Validates one job's native Actions structure. |
+| `RenderExpression` | `func(expr Expression, consumer JobID, resolved *Workflow, wrap bool) (string, error)` renders an expression using resolved output bindings; call `Resolve` first to validate dependencies and populate bindings. |
 
 Workflow and step IDs are job-scoped. A step can read only outputs from earlier steps in its job, and workflow-level environment values cannot reference job or step outputs.
 

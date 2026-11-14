@@ -41,9 +41,9 @@ For the full queue behavior and operator configuration, see the [work-queue refe
 
 | Area | Exported symbols | Description |
 |------|------------------|-------------|
-| Operation data | `CheckpointOperation`, `CheckpointParameters`, `ClaimOperation`, `Dependency`, `Replacement`, `ResultReference`, `OperationsParameters`, `SubmitParameters`, `Position` | Typed inputs and references used to validate checkpoint, claim, dependency, replacement, and submission transitions; `Position` identifies a commit and operation index in the ledger. |
+| Operation data | `CheckpointOperation`, `CheckpointParameters`, `ClaimOperation`, `Dependency`, `Resource`, `Replacement`, `ResultReference`, `OperationsParameters`, `SubmitParameters`, `Position` | Typed inputs and references used to validate checkpoint, claim, dependency, replacement, and submission transitions; `Resource` identifies a repository resource, and `Position` identifies a commit and operation index in the ledger. |
 | Issue projection | `IssueLinkOperation`, `IssueCommentOperation`, `IssueSynchronizationPending`, `IssuesSettings` | Optional issue projection operations and synchronization state; they do not make Issues the queue's source of truth. |
-| Scheduling and routing | `ProducerRule`, `ProjectorRule`, `PoolPolicy`, `PoolInstallOperation`, `WorkerProfile`, `WorkerRevision`, `WorkerDeployment`, `RetryPolicy`, `ReconciliationPolicy`, `Limits` | Admission rules, installed pool configuration, worker routes, bounded retry/reconciliation behavior, and resource limits. |
+| Scheduling and routing | `ProducerRule`, `ProjectorRule`, `PoolPolicy`, `PoolInstallOperation`, `WorkerProfile`, `WorkerRevision`, `WorkerDeployment`, `DeploymentOperation`, `RetryPolicy`, `ReconciliationPolicy`, `Limits` | Admission rules, installed pool configuration, worker routes and route-change requests, bounded retry/reconciliation behavior, and resource limits. |
 | Inspection and delivery | `Capacity`, `NativeRun`, `RunBinding`, `DeliveryVerification`, `RemediationVerifier`, `Clock`, `PoolClocks` | Bounded native-run evidence, host delivery verification, reconciliation inputs, capacity observations, and deterministic pool clocks. |
 
 These types are the payloads and supporting records for the public replay,
@@ -54,7 +54,9 @@ grant actor, worker-route, or effect authority.
 
 | Type | Description |
 |------|-------------|
+| `Trace` | Optional trace/span correlation IDs and publisher-attempt number carried with a ledger request. |
 | `TraceOptions`, `TraceEvent`, `TraceEvidence`, `TracePage` | Bounded ledger provenance, including lifecycle events and evidence metadata without work payloads or request parameters. |
+| `Observation` | Resource-condition evidence, including observed state, read status, credential generation, timestamps, and optional merge metadata. |
 | `NativeDeliveryScope` | Binds approved host callbacks to an immutable assignment and authenticated Actions attempt. |
 | `NativeDeliveryOutput`, `NativeDeliveryInventory` | Closed effect-channel records supplied by an approved process callback; neither caller data nor receipts can create verifier authority. |
 | `NativeOutputVerifier` | Host-registered callback for independent readback of a native delivery output. |
