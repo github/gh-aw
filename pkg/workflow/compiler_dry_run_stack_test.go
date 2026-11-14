@@ -51,18 +51,14 @@ Analyze the repository.
 					c.SetDryRun(dryRun)
 					err := c.CompileWorkflow(path)
 					lockPath := strings.TrimSuffix(path, ".md") + ".lock.yml"
-					if dryRun && steps != "none" {
-						require.ErrorContains(t, err, "--dry-run cannot safely execute")
-						assert.Contains(t, err.Error(), "pre-steps")
-						require.NoFileExists(t, lockPath)
-						return
-					}
 					require.NoError(t, err)
 					lock, err := os.ReadFile(lockPath)
 					require.NoError(t, err)
 					assert.Equal(t, 1, strings.Count(string(lock), "Stack position gate (max-stack: 2)"))
 					assert.Contains(t, string(lock), "STACK_POSITION + max_stack <= STACK_SIZE")
-					if steps != "none" {
+					if dryRun {
+						assert.NotContains(t, string(lock), "echo host-effect", "dry-run must omit pre-steps")
+					} else if steps != "none" {
 						assert.Contains(t, string(lock), "echo host-effect")
 						assert.Less(t, strings.Index(string(lock), "name: Authored host step"), strings.Index(string(lock), "Stack position gate"))
 					}

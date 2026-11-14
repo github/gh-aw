@@ -40,7 +40,7 @@ func (c *Compiler) warnCheckoutRefWithSteps(data *WorkflowData, markdownPath str
 			entry.ref,
 		)
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", msg))
-		c.IncrementWarningCount()
+		c.IncrementSecurityWarningCount()
 		return
 	}
 }

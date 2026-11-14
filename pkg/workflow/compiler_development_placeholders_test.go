@@ -52,8 +52,8 @@ func TestDryRunPlaceholderReusableOutputContract(t *testing.T) {
 				return
 			}
 			assert.Equal(t, map[string]string{
-				"value": "${{ '' }}", "bracket-value": "${{ '' }}", "typed": "${{ '' }}",
-				"workflow_result": "${{ '' }}", "ready": "${{ '' }}",
+				"value": `""`, "bracket-value": `""`, "typed": `""`,
+				"workflow_result": `""`, "ready": `""`,
 			}, producer.Outputs)
 			assert.Empty(t, producer.Uses)
 			assert.False(t, producer.SecretsInherit)
@@ -84,7 +84,7 @@ func TestDryRunPlaceholderPreservesTypedDeclarations(t *testing.T) {
 	makeDryRunJobInert(job, "runs-on: self-hosted")
 	assert.Equal(t, []string{"activation", "other"}, job.Needs)
 	assert.Equal(t, map[string]string{
-		"legacy": "${{ '' }}", "typed": "${{ '' }}", "callee": "${{ '' }}",
+		"legacy": `""`, "typed": `""`, "callee": `""`,
 	}, job.Outputs)
 	assert.Nil(t, job.Actions)
 	assert.Equal(t, "permissions: {}", job.Permissions)
@@ -112,8 +112,8 @@ func TestDryRunReferencedOutputsImplicitConditions(t *testing.T) {
 	)
 	assert.Equal(t, map[string]map[string]string{
 		"prepare": {
-			"ready": "${{ '' }}", "bracket-ready": "${{ '' }}", "wrapped": "${{ '' }}",
-			"typed": "${{ '' }}", "explicit": "${{ '' }}",
+			"ready": `""`, "bracket-ready": `""`, "wrapped": `""`,
+			"typed": `""`, "explicit": `""`,
 		},
 	}, outputs)
 }
@@ -152,7 +152,7 @@ Analyze the repository.
 			require.NoError(t, yaml.Unmarshal([]byte(compiled), &workflow))
 			jobs := workflow["jobs"].(map[string]any)
 			prepare := jobs["prepare"].(map[string]any)
-			assert.Equal(t, map[string]any{"ready": "${{ '' }}"}, prepare["outputs"])
+			assert.Equal(t, map[string]any{"ready": ""}, prepare["outputs"])
 			assert.Equal(t, "${{ !always() }}", prepare["if"])
 			assert.Equal(t, map[string]any{}, prepare["permissions"])
 			assert.NotContains(t, compiled, "secrets: inherit")
@@ -210,7 +210,7 @@ func TestDryRunPlaceholderSelfHostedPolicy(t *testing.T) {
 			custom := &Job{Name: "prepare", RunsOn: "runs-on: ${{ matrix.runner }}", Strategy: "strategy:\n  matrix:\n    runner: [self-hosted]"}
 			require.NoError(t, c.jobManager.AddJob(custom))
 			managed := c.buildCallWorkflowJob(data, "worker", "")
-			assert.Equal(t, map[string]string{"result": "${{ '' }}"}, managed.Outputs)
+			assert.Equal(t, map[string]string{"result": `""`}, managed.Outputs)
 			require.NoError(t, c.jobManager.AddJob(managed))
 			c.disableDryRunCustomJobs(data)
 			for _, name := range []string{"prepare", "call-worker"} {
@@ -279,7 +279,7 @@ Analyze the repository using ${{ needs.prepare.outputs.value }}.
 			require.NoError(t, validateSelfHostedRunners(workflow))
 			jobs := workflow["jobs"].(map[string]any)
 			prepare := jobs["prepare"].(map[string]any)
-			assert.Equal(t, map[string]any{"value": "${{ '' }}"}, prepare["outputs"])
+			assert.Equal(t, map[string]any{"value": ""}, prepare["outputs"])
 			assert.NotContains(t, compiled, "echo unsafe")
 			assert.NotContains(t, compiled, "secrets: inherit")
 			assert.NotContains(t, compiled, "${{ matrix.runner }}")

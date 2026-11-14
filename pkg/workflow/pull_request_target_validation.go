@@ -119,7 +119,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 			message += "\nTo suppress this warning in non-strict mode only, set " +
 				"features.dangerously-allow-roles-read-and-pull-request-target: true."
 			fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
-			c.IncrementWarningCount()
+			c.IncrementSecurityWarningCount()
 		}
 		break
 	}
@@ -179,7 +179,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 			message += "\nThe dangerous feature flag features.dangerously-allow-pull-request-target-forks-all is enabled."
 		}
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
-		c.IncrementWarningCount()
+		c.IncrementSecurityWarningCount()
 	}
 
 	// In strict mode, emit a warning unless the trigger-specific risk is acknowledged,
@@ -196,7 +196,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 			"To acknowledge this risk only, set on.pull_request_target.acknowledge-risk: true.\n" +
 			"See: https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warningMsg))
-		c.IncrementWarningCount()
+		c.IncrementSecurityWarningCount()
 	}
 
 	// If checkout was explicitly disabled by the user (checkout: false in frontmatter),
@@ -241,7 +241,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 
 	// Non-strict mode: emit a warning so existing workflows continue to compile.
 	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 
 	return nil
 }

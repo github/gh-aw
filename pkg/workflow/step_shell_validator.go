@@ -110,7 +110,7 @@ func (c *Compiler) validateStepShellScriptsSection(frontmatter map[string]any, s
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 	return nil
 }
 

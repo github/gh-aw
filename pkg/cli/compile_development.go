@@ -99,10 +99,12 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 			}
 		}
 	}
+	advisoryWarnings := max(compiler.GetWarningCount()-ignoredLowSeverityWarnings-compiler.GetSecurityWarningCount(), 0)
 	if config.dryRunReport != nil {
 		config.dryRunReport.IgnoredLowSeverityWarnings = ignoredLowSeverityWarnings + ignoredWorkflowWarnings
+		config.dryRunReport.AdvisoryCompilerWarnings = advisoryWarnings + len(compiler.GetScheduleWarnings())
 	}
-	appendDevelopmentCompilerDiagnostics(compiler, stats, results, ignoredLowSeverityWarnings, ignoredWorkflowWarnings)
+	appendDevelopmentCompilerDiagnostics(compiler, stats, results, ignoredLowSeverityWarnings+advisoryWarnings, ignoredWorkflowWarnings)
 	if len(config.modelValidationWarnings) > 0 {
 		appendDevelopmentBatchDiagnostics("models", modelInventoryWarnings(config), stats, results)
 	}
@@ -133,7 +135,7 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 	if len(diagnostics) == 0 {
 		return nil
 	}
-	return errors.New("development testing checks failed; resolve medium-or-higher warnings, unclassified diagnostics, and validation/scanner failures before uploading or dispatching a live test:\n" + strings.Join(diagnostics, "\n"))
+	return errors.New("development testing checks failed; resolve lint/security warnings, medium-or-higher findings, and validation/scanner failures before uploading or dispatching a live test:\n" + strings.Join(diagnostics, "\n"))
 }
 
 func appendDevelopmentCompilerDiagnostics(compiler *workflow.Compiler, stats *CompilationStats, results *[]ValidationResult, ignoredCompilerWarnings, ignoredWorkflowWarnings int) {
@@ -141,9 +143,8 @@ func appendDevelopmentCompilerDiagnostics(compiler *workflow.Compiler, stats *Co
 	for _, message := range compiler.GetSafeUpdateWarnings() {
 		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{Type: "safe_update_warning", Message: message})
 	}
-	for _, message := range compiler.GetScheduleWarnings() {
-		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{Type: "schedule_warning", Message: message})
-	}
+	// Generic compiler and schedule warnings (deprecations, style, concurrency hints) are advisory in
+	// dry-run; lint and security-relevant warnings remain blocking.
 	if stats.Warnings > ignoredCompilerWarnings+ignoredWorkflowWarnings || compiler.GetWarningCount() > ignoredCompilerWarnings {
 		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{
 			Type: "compiler_warning", Message: "compiler reported warnings; review the complete compiler diagnostics",

@@ -138,7 +138,15 @@ func TestEnforceDevelopmentDiagnostics(t *testing.T) {
 		message string
 	}{
 		{"clean", nil, nil, ""},
-		{"compiler warnings", func(c *workflow.Compiler, _ *CompilationStats, _ *[]ValidationResult) { c.IncrementWarningCount() }, nil, "compiler reported warnings"},
+		{"advisory compiler warnings", func(c *workflow.Compiler, s *CompilationStats, _ *[]ValidationResult) {
+			c.IncrementWarningCount()
+			s.Warnings++
+		}, nil, ""},
+		{"security compiler warnings", func(c *workflow.Compiler, s *CompilationStats, _ *[]ValidationResult) {
+			c.IncrementWarningCount()
+			c.IncrementSecurityWarningCount()
+			s.Warnings += 2
+		}, nil, "compiler reported warnings"},
 		{"aggregate warnings", func(_ *workflow.Compiler, s *CompilationStats, _ *[]ValidationResult) { s.Warnings++ }, nil, "compiler reported warnings"},
 		{"safe update warnings", func(c *workflow.Compiler, _ *CompilationStats, _ *[]ValidationResult) {
 			c.AddSafeUpdateWarning("new restricted secret")
@@ -287,7 +295,7 @@ func TestDevelopmentExplicitlyDisabledChecks(t *testing.T) {
 func TestDevelopmentDiagnosticsKeepWorkflowWarningsLocal(t *testing.T) {
 	t.Parallel()
 	compiler := workflow.NewCompiler()
-	compiler.IncrementWarningCount()
+	compiler.IncrementSecurityWarningCount()
 	compiler.AddSafeUpdateWarning("batch safe-update warning")
 	stats := &CompilationStats{Total: 2, Succeeded: 2, Warnings: 1}
 	results := []ValidationResult{

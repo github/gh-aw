@@ -88,6 +88,6 @@ func (c *Compiler) validateRunInstallScripts(workflowData *WorkflowData) error {
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 	return nil
 }

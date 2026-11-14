@@ -194,7 +194,7 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 					return fmt.Errorf("strict mode: %s", msg)
 				}
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
-				c.IncrementWarningCount()
+				c.IncrementSecurityWarningCount()
 			}
 			if hasExplicitAppTokenPermission(with) {
 				continue
@@ -208,7 +208,7 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 				return fmt.Errorf("strict mode: %s", msg)
 			}
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
-			c.IncrementWarningCount()
+			c.IncrementSecurityWarningCount()
 		}
 	}
 	return nil

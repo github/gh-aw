@@ -69,7 +69,7 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 			if _, err := fmt.Fprintln(os.Stderr, formatCompilerMessage(sourcePath, "warning", message)); err != nil {
 				failures = append(failures, fmt.Errorf("write workflow lint warning: %w", err))
 			}
-			c.IncrementWarningCount()
+			c.IncrementSecurityWarningCount()
 		}
 	}
 	if err := errors.Join(failures...); err != nil {

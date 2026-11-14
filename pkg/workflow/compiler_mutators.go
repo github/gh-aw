@@ -232,6 +232,17 @@ func (c *Compiler) IncrementExperimentalWarningCount() {
 	c.experimentalWarnings++
 }
 
+// IncrementSecurityWarningCount records a lint or security-relevant warning; dry-run keeps these blocking.
+func (c *Compiler) IncrementSecurityWarningCount() {
+	c.warningCount++
+	c.securityWarnings++
+}
+
+// GetSecurityWarningCount returns only lint and security-relevant warnings.
+func (c *Compiler) GetSecurityWarningCount() int {
+	return c.securityWarnings
+}
+
 // GetExperimentalWarningCount returns only built-in experimental-feature notices.
 func (c *Compiler) GetExperimentalWarningCount() int {
 	return c.experimentalWarnings
@@ -251,6 +262,7 @@ func (c *Compiler) GetWarningCount() int {
 func (c *Compiler) ResetWarningCount() {
 	c.warningCount = 0
 	c.experimentalWarnings = 0
+	c.securityWarnings = 0
 }
 
 // SetWorkflowIdentifier sets the identifier for the current workflow being compiled

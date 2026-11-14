@@ -48,9 +48,13 @@ in either scan remain fatal.
 
 Built-in experimental-feature notices are low-severity and nonblocking;
 `--allow-experimental` additionally records explicit acknowledgement.
-Their counts remain visible in the dry-run summary. Validation errors, unclassified
-compiler warnings, model-inventory failures, built-in Actions/AW AST lint findings,
-and scanner execution/parsing failures remain fatal. Neither this policy nor
+Their counts remain visible in the dry-run summary. Generic compiler warnings
+(deprecations, style, concurrency/schedule hints) are advisory and counted as
+`advisory_compiler_warnings`; fix them when convenient. Validation errors,
+security-relevant compiler warnings (strict-mode secrets, `pull_request_target`,
+permissions, checkout, firewall), safe-update warnings, model-inventory failures,
+built-in Actions/AW AST lint findings, and scanner execution/parsing failures
+remain fatal. Neither this policy nor
 explicit acknowledgement grants live execution or policy-installation authorization.
 
 Built-in AST lint now runs by default as part of every compile, before zizmor/
@@ -77,16 +81,19 @@ credential-free placeholders; neither step-level staging overrides nor
 available, but their outputs are empty and dependent jobs may be skipped.
 Reusable output bindings and self-hosted runner policy remain valid without
 retaining original executable targets or matrix-dependent runner expressions.
-Authored `steps` and `post-steps` are accepted but their code and credentials
-are omitted from dry-run locks before job construction and token wiring.
-Separate dispatch cannot execute them; review the reduced coverage from missing
-setup and cleanup. The agent and compiler-owned steps still execute on an
-authorized live test.
-Other host steps (`pre-steps`, `pre-agent-steps`, `on.steps`,
-safe-output/threat-detection/secret-masking steps, and unsafe built-in job
-overrides), custom MCP servers, `mcp-scripts`, custom safe-output scripts/actions,
-enabled Bash graders, and authored OIDC permissions (including safe-output
-permissions) are rejected, including declarations from imports. Compiler-owned
+Authored `steps`, `post-steps`, `pre-steps`, `pre-agent-steps`, custom MCP
+servers (`mcp-servers`, custom `tools`, imported `shared/mcp/*`), `mcp-scripts`,
+and enabled Bash graders are accepted, but their code and credentials are
+omitted from dry-run locks before job construction and token wiring, including
+declarations from imports. Separate dispatch cannot execute them; the agent runs
+without those tools or setup, so review the reduced coverage. Engines that install
+their CLI through `pre-agent-steps` cannot run in a dry-run lock. Network
+allowlists derived from omitted servers are retained. The agent and compiler-owned
+steps still execute on an authorized live test.
+`on.steps`, safe-output/threat-detection/secret-masking steps, unsafe built-in
+job overrides, custom safe-output scripts/actions, and authored OIDC permissions
+(including safe-output permissions) are rejected, including declarations from
+imports. Compiler-owned
 pull-request stack gates remain enabled. Remove those declarations
 from a separate diagnostic workflow; there is no unsafe dry-run override.
 Compiler-generated connector safe-output handlers are accepted with forced staging
@@ -114,13 +121,14 @@ and `not_run`; each scanner's `differential` reports baseline, existing, added,
 and ignored low-severity counts. A passed scanner gate is not a claim of zero findings.
 The summary records `warning_baseline: "pre_compile_lock_files"`,
 `minimum_severity: "medium"`, `ignored_scanner_rules`, and
-`ignored_low_severity_warnings`. Model inventory refresh/collection warnings fail the dry-run
+`ignored_low_severity_warnings`, `advisory_compiler_warnings`, and the omitted
+`disabled_effects`. Model inventory refresh/collection warnings fail the dry-run
 gate. Check the exit status and all results; preflight failures may emit no
 summary. Passing coverage is not execution approval or per-image/script proof.
 
 This is not a sandbox for arbitrary code. Agent shell commands, custom engine
 execution, custom credentials, and compiler-managed OIDC integrations remain
-unverified. Rejected declarations are not evidence that all other code is safe.
+unverified. Omitted and rejected declarations are not evidence that all other code is safe.
 The runtime explicitly warns about this scope; review remaining side effects before
 live testing, even after a successful dry-run compilation.
 

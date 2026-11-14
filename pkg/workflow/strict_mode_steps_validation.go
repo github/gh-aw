@@ -116,7 +116,7 @@ func (c *Compiler) validateStepsSectionSecrets(frontmatter map[string]any, secti
 		sectionName, strings.Join(allSecretRefs, ", "),
 	)
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 
 	return nil
 }

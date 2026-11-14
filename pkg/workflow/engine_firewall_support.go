@@ -89,7 +89,7 @@ func (c *Compiler) checkFirewallDisable(networkPermissions *NetworkPermissions) 
 
 			// In non-strict mode, emit a warning
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
-			c.IncrementWarningCount()
+			c.IncrementSecurityWarningCount()
 		}
 	}
 

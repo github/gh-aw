@@ -9,7 +9,7 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
-const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations, authored custom jobs, daily credit accounting, and OTLP telemetry configuration are disabled; OTEL_* and GH_AW_OTLP_* environment variables are removed. Authored steps and post-steps are omitted from emitted locks, including their code and credentials; separate dispatch does not execute them. Pre-steps, pre-agent-steps, on.steps, custom MCP servers, custom safe-output scripts, Bash graders, and authored OIDC permissions are rejected. Per-run credit limits are retained or derived from configured daily limits. Manual dispatch is enabled with maintainer/admin authorization. Agent shell commands and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
+const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations, authored custom jobs, daily credit accounting, and OTLP telemetry configuration are disabled; OTEL_* and GH_AW_OTLP_* environment variables are removed. Authored steps, post-steps, pre-steps, pre-agent-steps, custom MCP servers, mcp-scripts, and Bash graders are omitted from emitted locks, including their code and credentials; separate dispatch does not execute them, so the agent runs without those tools. On.steps, custom safe-output scripts, and authored OIDC permissions are rejected. Generic compiler warnings are advisory; lint and security warnings fail the gate. Per-run credit limits are retained or derived from configured daily limits. Manual dispatch is enabled with maintainer/admin authorization. Agent shell commands and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
 
 // DryRunCompileReport describes the compilation gate, not execution authorization.
 type DryRunCompileReport struct {
@@ -24,6 +24,7 @@ type DryRunCompileReport struct {
 	DisabledEffects              []string                      `json:"disabled_effects"`
 	AcceptedExperimentalWarnings int                           `json:"accepted_experimental_warnings,omitempty"`
 	IgnoredLowSeverityWarnings   int                           `json:"ignored_low_severity_warnings,omitempty"`
+	AdvisoryCompilerWarnings     int                           `json:"advisory_compiler_warnings,omitempty"`
 	WarningBaseline              string                        `json:"warning_baseline"`
 	MinimumSeverity              string                        `json:"minimum_severity"`
 	IgnoredScannerRules          map[string][]string           `json:"ignored_scanner_rules"`
@@ -43,7 +44,7 @@ func newDryRunCompileReport(config CompileConfig) *DryRunCompileReport {
 		IgnoredScannerRules:    map[string][]string{"zizmor": {"secrets-outside-env"}},
 		Scanners:               make(map[string]DryRunScannerCheck),
 		ValidateImagesRequired: config.ValidateImages,
-		DisabledEffects:        []string{"steps", "post-steps"},
+		DisabledEffects:        []string{"steps", "post-steps", "pre-steps", "pre-agent-steps", "custom MCP servers", "mcp-scripts", "Bash graders"},
 		UnverifiedEffects: []string{
 			"agent shell commands", "custom engine execution", "custom credentials", "compiler-managed OIDC integrations",
 			"hosted approvals/OIDC/runners", "live model availability", "diagnostic artifacts/summaries",
@@ -81,7 +82,7 @@ func appendDryRunCompileReport(config CompileConfig, stats *CompilationStats, re
 		report = newDryRunCompileReport(config)
 	}
 	report.ModelInventoryAvailable = config.activeModels != nil
-	valid := stats.Errors == 0 && stats.Warnings <= report.IgnoredLowSeverityWarnings && stats.Succeeded > 0
+	valid := stats.Errors == 0 && stats.Warnings <= report.IgnoredLowSeverityWarnings+report.AdvisoryCompilerWarnings && stats.Succeeded > 0
 	for _, result := range *results {
 		valid = valid && result.Valid && len(result.Errors) == 0
 		for _, warning := range result.Warnings {
@@ -120,6 +121,9 @@ func displayDryRunCompileReport(report *DryRunCompileReport) {
 		report.Gate, strings.Join(statuses, ", "), strings.Join(report.UnverifiedEffects, ", "))
 	if report.AcceptedExperimentalWarnings > 0 {
 		message += fmt.Sprintf(" Accepted %d experimental-feature notice(s) via --allow-experimental.", report.AcceptedExperimentalWarnings)
+	}
+	if report.AdvisoryCompilerWarnings > 0 {
+		message += fmt.Sprintf(" %d advisory compiler warning(s) (deprecation, style, schedule) did not fail the gate; lint and security warnings still do.", report.AdvisoryCompilerWarnings)
 	}
 	message += " Existing and added medium-or-higher or unclassified scanner findings fail; low-severity findings and zizmor secrets-outside-env are excluded from the gate."
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(message))

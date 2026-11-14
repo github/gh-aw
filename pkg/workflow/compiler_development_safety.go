@@ -14,40 +14,22 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+// dryRunEmptyOutput is a YAML empty string. A literal ${{ ” }} expression
+// would trip the obfuscation lint on every placeholder output.
+const dryRunEmptyOutput = `""`
+
 // Authored host code cannot be made read-only by staging safe outputs.
 func (c *Compiler) validateDryRunEffects(data *WorkflowData) error {
 	if !c.dryRun {
 		return nil
 	}
+	// pre-steps, pre-agent-steps, custom MCP servers, mcp-scripts and Bash graders are
+	// omitted by omitDryRunHostEffects instead of rejected.
 	var unsupported []string
-	for _, section := range []struct {
-		name, content string
-	}{
-		{"pre-steps", data.PreSteps},
-		{"pre-agent-steps", data.PreAgentSteps},
-	} {
-		if strings.TrimSpace(section.content) != "" {
-			unsupported = append(unsupported, section.name)
-		}
-	}
 	if len(data.OnSteps) > 0 {
 		unsupported = append(unsupported, "on.steps")
 	}
-	if len(data.ResolvedMCPServers) > 0 || (data.ParsedTools != nil && len(data.ParsedTools.Custom) > 0) {
-		unsupported = append(unsupported, "custom MCP servers")
-	}
-	if data.MCPScripts != nil {
-		unsupported = append(unsupported, "mcp-scripts")
-	}
 	unsupported = append(unsupported, dryRunResolvedOutputEffects(data)...)
-	if data.Graders != nil {
-		for _, name := range slices.Sorted(maps.Keys(data.Graders.Graders)) {
-			grader := data.Graders.Graders[name]
-			if grader != nil && (grader.Enabled == nil || *grader.Enabled) && grader.Run != "" {
-				unsupported = append(unsupported, "graders."+name+".run")
-			}
-		}
-	}
 	permissions := NewPermissionsParser(data.Permissions).ToPermissions()
 	if level, _ := permissions.Get(PermissionIdToken); level == PermissionWrite {
 		unsupported = append(unsupported, "permissions.id-token")
@@ -62,6 +44,38 @@ func (c *Compiler) validateDryRunEffects(data *WorkflowData) error {
 		return fmt.Errorf("--dry-run cannot safely execute %s: remove these declarations and their imports from the diagnostic workflow; staging does not isolate host scripts, external MCP effects, or cloud credentials", strings.Join(unsupported, ", "))
 	}
 	return nil
+}
+
+// omitDryRunHostEffects drops authored host code, external MCP servers and Bash graders so they
+// neither execute nor receive credentials. The dry-run report lists them as disabled effects.
+func omitDryRunHostEffects(data *WorkflowData) {
+	data.PreSteps = ""
+	data.PreAgentSteps = ""
+	data.MCPScripts = nil
+	data.ResolvedMCPServers = nil
+	for name := range data.Tools {
+		if _, known := knownTools[name]; !known {
+			delete(data.Tools, name)
+		}
+	}
+	if data.ParsedTools != nil && len(data.ParsedTools.Custom) > 0 {
+		tools := *data.ParsedTools
+		tools.Custom = make(map[string]MCPServerConfig)
+		data.ParsedTools = &tools
+	}
+	if data.Graders != nil {
+		graders := GradersConfig{Graders: make(map[string]*GraderDefinition, len(data.Graders.Graders))}
+		for name, grader := range data.Graders.Graders {
+			if grader != nil && grader.Run != "" {
+				disabled := *grader
+				enabled := false
+				disabled.Enabled = &enabled
+				grader = &disabled
+			}
+			graders.Graders[name] = grader
+		}
+		data.Graders = &graders
+	}
 }
 
 func dryRunResolvedOutputEffects(data *WorkflowData) []string {
@@ -167,7 +181,7 @@ func makeDryRunJobInert(job *Job, runsOn string) {
 	outputs := make(map[string]string, len(job.Outputs))
 	needs := slices.Clone(job.Needs)
 	for output := range job.Outputs {
-		outputs[output] = "${{ '' }}"
+		outputs[output] = dryRunEmptyOutput
 	}
 	if job.Actions != nil {
 		for _, dep := range job.Actions.Needs {
@@ -176,10 +190,10 @@ func makeDryRunJobInert(job *Job, runsOn string) {
 			}
 		}
 		for output := range job.Actions.Outputs {
-			outputs[string(output)] = "${{ '' }}"
+			outputs[string(output)] = dryRunEmptyOutput
 		}
 		for _, output := range job.Actions.CallOutputs {
-			outputs[string(output.Name)] = "${{ '' }}"
+			outputs[string(output.Name)] = dryRunEmptyOutput
 		}
 	}
 	*job = Job{
@@ -225,7 +239,7 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 		if outputs[job] == nil {
 			outputs[job] = make(map[string]string)
 		}
-		outputs[job][output] = "${{ '' }}"
+		outputs[job][output] = dryRunEmptyOutput
 	}
 	var visit func(reflect.Value, bool)
 	visit = func(value reflect.Value, implicitCondition bool) {

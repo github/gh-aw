@@ -233,5 +233,5 @@ func (c *Compiler) warnEnvSecrets(sectionName string, secretRefs []string) {
 		warningMsg = fmt.Sprintf("secrets detected in '%s' section will be leaked to the agent container. Found: %s. Consider using engine-specific secret configuration instead.", sectionName, strings.Join(secretRefs, ", "))
 	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 }

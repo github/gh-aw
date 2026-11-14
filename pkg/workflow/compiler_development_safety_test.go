@@ -18,14 +18,8 @@ func TestDryRunRejectsUnsupportedEffects(t *testing.T) {
 		name string
 		data WorkflowData
 	}{
-		{"pre-steps", WorkflowData{PreSteps: "- run: echo unsafe"}},
-		{"pre-agent-steps", WorkflowData{PreAgentSteps: "- run: echo unsafe"}},
 		{"on.steps", WorkflowData{OnSteps: []map[string]any{{"run": "echo unsafe"}}}},
-		{"custom MCP servers", WorkflowData{ResolvedMCPServers: map[string]any{"external": map[string]any{"command": "unsafe"}}}},
-		{"custom MCP servers", WorkflowData{ParsedTools: &Tools{Custom: map[string]MCPServerConfig{"external": {Command: "unsafe"}}}}},
-		{"mcp-scripts", WorkflowData{MCPScripts: &MCPScriptsConfig{}}},
 		{"safe-outputs.scripts", WorkflowData{SafeOutputs: &SafeOutputsConfig{Scripts: map[string]*SafeScriptConfig{"publish": {}}}}},
-		{"graders.operational-value.run", WorkflowData{Graders: &GradersConfig{Graders: map[string]*GraderDefinition{"operational-value": {Run: "grade.sh"}}}}},
 		{"permissions.id-token", WorkflowData{Permissions: "permissions:\n  id-token: write\n"}},
 		{"on.permissions.id-token", WorkflowData{OnPermissions: NewPermissionsParser("permissions:\n  id-token: write\n").ToPermissions()}},
 		{"jobs.agent.pre-steps", WorkflowData{Jobs: map[string]any{"agent": map[string]any{"pre-steps": []any{map[string]any{"run": "echo unsafe"}}}}}},
@@ -70,6 +64,35 @@ func TestDryRunWorkflowStepPreparation(t *testing.T) {
 	result, err = c.prepareDryRunWorkflowData(data)
 	require.NoError(t, err)
 	assert.Same(t, data, result)
+}
+
+func TestDryRunOmitsHostEffects(t *testing.T) {
+	data := &WorkflowData{
+		On: "on: workflow_dispatch", PreSteps: "- run: echo pre", PreAgentSteps: "- run: echo pre-agent",
+		Tools:              map[string]any{"github": map[string]any{}, "external": map[string]any{"command": "unsafe"}},
+		ParsedTools:        &Tools{Custom: map[string]MCPServerConfig{"external": {Command: "unsafe"}}},
+		ResolvedMCPServers: map[string]any{"external": map[string]any{"command": "unsafe"}},
+		MCPScripts:         &MCPScriptsConfig{},
+		Graders: &GradersConfig{Graders: map[string]*GraderDefinition{
+			"operational-value": {Run: "grade.sh"}, "builtin": {},
+		}},
+	}
+	c := NewCompiler()
+	c.SetDryRun(true)
+	require.NoError(t, c.validateDryRunEffects(data), "omitted effects must not be rejected")
+	result, err := c.prepareDryRunWorkflowData(data)
+	require.NoError(t, err)
+	assert.Empty(t, result.PreSteps)
+	assert.Empty(t, result.PreAgentSteps)
+	assert.Nil(t, result.MCPScripts)
+	assert.Nil(t, result.ResolvedMCPServers)
+	assert.Empty(t, result.ParsedTools.Custom)
+	assert.NotContains(t, result.Tools, "external")
+	assert.Contains(t, result.Tools, "github")
+	assert.Equal(t, []string{"builtin"}, result.Graders.EnabledGraderIDs())
+	assert.Contains(t, data.Tools, "external", "source workflow data must not be mutated")
+	assert.Len(t, data.ParsedTools.Custom, 1)
+	assert.Equal(t, []string{"builtin", "operational-value"}, data.Graders.EnabledGraderIDs())
 }
 
 func TestDryRunCompilesWorkflowStepsAndPostSteps(t *testing.T) {
@@ -180,7 +203,7 @@ func TestDryRunCustomJobsAreInert(t *testing.T) {
 					assert.Empty(t, job.Uses)
 					assert.False(t, job.SecretsInherit)
 					assert.Empty(t, job.Env)
-					assert.Equal(t, "${{ '' }}", job.Outputs["result"])
+					assert.Equal(t, `""`, job.Outputs["result"])
 					assert.NotContains(t, strings.Join(job.Steps, ""), "gh issue close")
 					assert.Nil(t, job.Actions)
 				} else {
@@ -247,10 +270,33 @@ Analyze the repository.
 	assert.Contains(t, string(lock), "secrets: inherit")
 }
 
+func TestDryRunOmitsImportedHostEffects(t *testing.T) {
+	for _, test := range []struct{ declaration, marker string }{
+		{"pre-steps:\n  - run: echo host-script\n", "echo host-script"},
+		{"pre-agent-steps:\n  - run: echo pre-agent-script\n", "echo pre-agent-script"},
+		{"mcp-servers:\n  external:\n    command: npx\n    args: [external-server]\n    allowed: [read]\n", "external-server"},
+	} {
+		t.Run(strings.Split(test.declaration, ":")[0], func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "workflow.md")
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte("---\n"+test.declaration+"---\nShared configuration.\n"), 0600))
+			require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\nengine: copilot\nimports: [shared.md]\n---\nAnalyze the repository.\n"), 0600))
+			for _, dryRun := range []bool{false, true} {
+				c := NewCompiler()
+				c.SetSkipValidation(true)
+				c.SetApprove(true)
+				c.SetDryRun(dryRun)
+				require.NoError(t, c.CompileWorkflow(path))
+				lock, err := os.ReadFile(filepath.Join(dir, "workflow.lock.yml"))
+				require.NoError(t, err)
+				assert.Equal(t, !dryRun, strings.Contains(string(lock), test.marker), "dry-run=%t", dryRun)
+			}
+		})
+	}
+}
+
 func TestDryRunRejectsImportedHostEffects(t *testing.T) {
 	for _, declaration := range []string{
-		"pre-steps:\n  - run: echo host-script\n",
-		"mcp-servers:\n  external:\n    command: npx\n    args: [external-server]\n    allowed: [read]\n",
 		"permissions:\n  id-token: write\n",
 	} {
 		t.Run(strings.Split(declaration, ":")[0], func(t *testing.T) {
