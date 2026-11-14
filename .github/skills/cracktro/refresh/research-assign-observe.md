@@ -95,7 +95,7 @@ Pick FIXES rows from `issues.fixes`: 5 rows spread across the window, sorted by 
 2. Replace `FIXES` with 5 new rows; keep the `["DD Mon", "Bench", "+N%", "H.H h"]` format.
 3. Update the subtitle window, the median/within-a-day line, the comment above `const RX`, and the caption (issue window, benchmark count and window, snapshot date, `fleet and spans simulated`).
 4. Update `notes:` with the same numbers and windows. Keep the sentence `Illustrative: the production fleet, its numbers and the span stream are simulated in the browser.` so notes still match `/illustrative|synthetic|simulated/i`.
-5. Update the `Research · Assign · Observe slide (21, rob- classes)` Exception bullet in `.github/skills/cracktro/SKILL.md` (window, counts, median, snapshots).
+5. Update the `Research · Assign · Observe slide (21, rob- classes)` Exception bullet in `.github/skills/cracktro/content-rules.md` (window, counts, median, snapshots).
 6. Do not add issue/PR numbers, SHAs or `github/<repo>` text to deck.js.
 
 ## 6. Validation

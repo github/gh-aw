@@ -92,7 +92,7 @@ Output shape and baseline (14 Nov 2026):
 4. Caption: new end date, day count, snapshot date; keep `MEASURED`, `PRs/issues by title prefix`, `flow illustrative`. Must stay one line (`white-space: nowrap`, ends at x≈1810).
 5. Comment above `SDM_STATS`: new snapshot date.
 6. Notes: update every number, window and snapshot; keep the sentence saying the flow is an illustrative excerpt (must match `/illustrative|synthetic|simulated/i`).
-7. `SKILL.md` Content rules: update the "Exception: the Spec-driven testing slide" bullet numbers and window.
+7. `content-rules.md`: update the "Exception: the Spec-driven testing slide" bullet numbers and window.
 
 ## 6. Validation
 

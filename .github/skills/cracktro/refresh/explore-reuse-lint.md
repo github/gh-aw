@@ -104,7 +104,7 @@ Sanity baseline (2026-11-14):
 4. Caption: set the overall window, the day count and the snapshot date. Keep the `MEASURED ·` prefix and `· grid is illustrative`.
 5. `meas` `aria-label`: update the numbers and dates.
 6. Notes: update the numbers, the overall window and the per-stat windows. Keep the sentence saying the grid/loop is illustrative, so the notes still match `/illustrative|synthetic|simulated/i`.
-7. `.github/skills/cracktro/SKILL.md`: update the Explore · Reuse · Lint Exception bullet (numbers and window).
+7. `.github/skills/cracktro/content-rules.md`: update the Explore · Reuse · Lint Exception bullet (numbers and window).
 
 ## 6. Validation
 

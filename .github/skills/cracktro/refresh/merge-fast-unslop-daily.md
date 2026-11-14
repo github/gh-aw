@@ -104,7 +104,7 @@ For context only (do not put it on the slide unless asked): about 25k PRs have e
 4. Update the `mfu-win` dates (`D Mon – D Mon YYYY · snapshot D Mon YYYY`), `mfu-big` (comma thousands, per_day), `mfu-row` (median lines, minutes as `XhYYm`) and `mfu-leg` (`unslop_days of 30`).
 5. Update the `us-meas` caption: first–last dates, merged count, `+additions −deletions` (U+2212 minus). Keep `lanes illustrative`.
 6. Update the speaker notes: every number and date, both windows, the snapshot date. They must still say the lanes are illustrative and match `/illustrative|synthetic|simulated/i`.
-7. Update the slide's `Exception:` bullet in `.github/skills/cracktro/SKILL.md` (Content rules) with the new numbers and windows.
+7. Update the slide's `Exception:` bullet in `.github/skills/cracktro/content-rules.md` with the new numbers and windows.
 8. Update the baseline in section 4 of this file.
 
 ## 6. Validation

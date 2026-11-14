@@ -84,7 +84,7 @@ gh api "repos/$R/actions/workflows/ci-failure-scan.lock.yml/runs?per_page=1" --j
 3. `KBE_MONTHS`: one `["Mon", n]` per `perMonth` entry; set the bar-scale divisor to the new max. Mark the current month partial in notes.
 4. Title: `MEASURED · .NET RUNTIME · <D MON> – <D MON YYYY> · <days> DAYS`. Caption: update `snapshot <D Mon>`; keep "flow illustrative".
 5. Notes: rewrite the measured sentences (window, 305/280/270/median, monthly list, 22/19/5, 12/7, 882 = 429+292+161). Keep "synthetic and illustrative" for the loop so notes match `/illustrative|synthetic|simulated/i`.
-6. SKILL.md: update the Scan · Fix · Learn "Exception:" bullet (window and counts).
+6. content-rules.md: update the Scan · Fix · Learn "Exception:" bullet (window and counts).
 
 ## 6. Validation
 

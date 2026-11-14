@@ -96,7 +96,7 @@ If the new numbers are lower than the baseline, suspect the query, not the data:
 2. **Timeline:** replace `RULES` with `healer.RULES`, update the `250` axis span in `TX`, and recompute the month ticks as day offsets of the 1st of each month from `healer.window[0]` (keep about 5 labels). Update the title counts from `issues`, `merged` and `inUpdaterPrompt`.
 3. **Caption:** update the snapshot date, the PR window end and its day count, and the healer window and its day count. Keep "MEASURED ·" and "loop illustrative". Keep the caption ending left of the sound button (about x=1700 at 1920 wide); shorten it before you shrink the font.
 4. **Notes:** update the snapshot date, the windows and every number in the measured sentence. Also update the not-merged breakdown, which you get from `detail` stateReason plus reading the issue titles. Keep "…illustrative, simplified example…" so the notes still match `/illustrative|synthetic|simulated/i`.
-5. **`.github/skills/cracktro/SKILL.md`:** update the numbers and dates in the "Docs that heal slide" Exception bullet. Do not change other bullets.
+5. **`.github/skills/cracktro/content-rules.md`:** update the numbers and dates in the "Docs that heal slide" Exception bullet. Do not change other bullets.
 
 ## 6. Validation
 

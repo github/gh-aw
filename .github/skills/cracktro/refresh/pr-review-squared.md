@@ -29,7 +29,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
      - Comment above it: `// measured on gh-aw merged PRs, 15 Oct to 13 Nov 2026; ...`
   2. Caption `<text class="prq-cap" ...>MEASURED · only PRs merged 15 Oct – 13 Nov 2026 (30 days), snapshot 14 Nov · flow above is illustrative</text>`.
   3. `notes:` string starting `"Pull Request Review squared.`: repeats every number plus `660 of the 682 reviewed pull requests` (single round) and the window/snapshot dates.
-- Elsewhere: `.github/skills/cracktro/SKILL.md` Exception bullet "the Pull Request Review² slide (16, `prq-` classes)". `1,263` also appears on slide 20 (`mfu-big`); keep both consistent if the windows match.
+- Elsewhere: `.github/skills/cracktro/content-rules.md` Exception bullet "the Pull Request Review² slide (16, `prq-` classes)". `1,263` also appears on slide 20 (`mfu-big`); keep both consistent if the windows match.
 - The open-thread counter in the flow is synthetic; do not touch it.
 
 ## 2. Window & snapshot
@@ -81,7 +81,7 @@ Output shape → slide field:
 2. Edit `STATS` values and label numbers (`of N PRs merged`, `on N PRs`). Format: thousands comma (`1,337`), hours one decimal + ` h`.
 3. Edit the `STATS` comment dates and the `prq-cap` caption: `MEASURED · only PRs merged D Mon – D Mon YYYY (30 days), snapshot D Mon · flow above is illustrative`. Keep it on one line; it must fit the 1700-wide card.
 4. Rewrite every number and date in `notes`. Keep the words "illustrative" and "synthetic" (must match `/illustrative|synthetic|simulated/i`). Keep the method sentence (footers, workflow marker).
-5. Update the SKILL.md Exception bullet for slide 16 (window and all six counts).
+5. Update the content-rules.md Exception bullet for slide 16 (window and all six counts).
 6. If slide 20 uses the same window, sync its `1,263` / per-day figures or note the mismatch.
 
 ## 6. Validation

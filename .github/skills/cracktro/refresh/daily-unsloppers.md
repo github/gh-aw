@@ -25,7 +25,7 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/
   - Comment line above `DU_MONTHS` repeats the window.
 - `notes:` repeats every number, the window (twice, in words), "112 of them opened by Copilot", the snapshot date and "Since 27 October 2026 the detector opens its pull requests directly".
 - The slide has no caption element; the panel header carries the window.
-- Also stated in `.github/skills/cracktro/SKILL.md`, "Exception: the Daily Unsloppers slide (19, ...)" bullet.
+- Also stated in `.github/skills/cracktro/content-rules.md`, "Exception: the Daily Unsloppers slide (19, ...)" bullet.
 
 ## 2. Window & snapshot
 
@@ -80,7 +80,7 @@ Run it once on an unchanged window first; if it does not reproduce the baseline 
 3. Stat array: `filed`, `assignedToCopilot`, `closedByMergedPR`, `"<median> h"`.
 4. Panel header: `D Mon YYYY – D Mon YYYY (N days) · snapshot D Mon YYYY` (en dash, middle dot); axis labels to first/last month; update the `// Measured:` comment window.
 5. `notes:`: update every number, "112 of them opened by Copilot", both window mentions, "385 days", and "Snapshot taken ...". Keep the sentences "The flow is illustrative, with synthetic files" (must still match `/illustrative|synthetic|simulated/i`) and the 27 October switch sentence.
-6. `.github/skills/cracktro/SKILL.md`: update the Daily Unsloppers Exception bullet (window, 211/144/115/3.8 h, snapshot month).
+6. `.github/skills/cracktro/content-rules.md`: update the Daily Unsloppers Exception bullet (window, 211/144/115/3.8 h, snapshot month).
 7. Keep `docs/README.md` in sync only if it states these numbers (`grep -n "duplicate-code" docs/README.md`).
 
 ## 6. Validation

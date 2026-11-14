@@ -65,7 +65,7 @@ Baseline (14 Nov 2026): FairDAGGitHub passed, exhausted, 1,055,182 distinct, dep
 3. `tick()`: replace `1055182`, depth cap, `735`, `756`.
 4. Caption `smt-cap`: record date and daily run date.
 5. Notes: update every number and date; keep the "Illustrative:" sentence (must match `/illustrative|synthetic|simulated/i`).
-6. `.github/skills/cracktro/SKILL.md`: update the Spec · Model · Test "Exception:" bullet numbers and window.
+6. `.github/skills/cracktro/content-rules.md`: update the Spec · Model · Test "Exception:" bullet numbers and window.
 7. Keep invariant/mutant names in sync with `WorkQueue.tla` if renamed.
 
 ## 6. Validation
