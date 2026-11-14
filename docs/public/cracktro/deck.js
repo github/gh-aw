@@ -4366,7 +4366,7 @@
       [30, 17], [49, 30], [31, 24], [0, 0], [0, 0], [0, 0], [0, 0],
       [5, 2], [15, 4], [19, 11], [30, 17], [0, 0], [32, 10],
     ];
-    g += `<g class="du"><rect class="du-card" x="584" y="396" width="552" height="216" rx="14"/><text class="du-t" x="602" y="422">MEASURED · [duplicate-code] ISSUES</text><text class="du-t" x="1118" y="422" text-anchor="end">OCT 25 – OCT 26</text>`;
+    g += `<g class="du"><rect class="du-card" x="584" y="386" width="552" height="226" rx="14"/><text class="du-t" x="602" y="410">MEASURED · [duplicate-code]</text><text class="du-t" x="1118" y="410" text-anchor="end">FLOW ILLUSTRATIVE</text><text class="du-ax" x="602" y="430">7 Oct 2025 – 26 Oct 2026 (385 days) · snapshot 14 Nov 2026</text>`;
     [
       ["211", "", "issues", "filed"],
       ["144", "p", "assigned", "to Copilot"],
@@ -4374,13 +4374,13 @@
       ["3.8 h", "", "median issue", "→ merge"],
     ].forEach(([n, c, a, b], k) => {
       const x = 653 + k * 138;
-      g += `<text class="du-n ${c}" x="${x}" y="468">${n}</text><text class="du-l" x="${x}" y="490">${a}</text><text class="du-l" x="${x}" y="507">${b}</text>`;
+      g += `<text class="du-n ${c}" x="${x}" y="472">${n}</text><text class="du-l" x="${x}" y="493">${a}</text><text class="du-l" x="${x}" y="509">${b}</text>`;
     });
     DU_MONTHS.forEach(([f, m], i) => {
       const x = 608 + i * 40;
       g += `<rect class="du-b f" style="--i:${i}" x="${x}" y="${584 - f}" width="14" height="${f}" rx="2"/><rect class="du-b m" style="--i:${i}" x="${x + 16}" y="${584 - m}" width="14" height="${m}" rx="2"/>`;
     });
-    g += `<line x1="602" y1="585" x2="1118" y2="585" stroke="#3d444d" stroke-width="2"/><text class="du-ax" x="602" y="602">Oct</text><text class="du-ax" x="860" y="602" text-anchor="middle"><tspan fill="#ab7df8">▮</tspan> filed  <tspan fill="#3fb950">▮</tspan> merged · per month</text><text class="du-ax" x="1118" y="602" text-anchor="end">Oct</text></g>`;
+    g += `<line x1="602" y1="585" x2="1118" y2="585" stroke="#3d444d" stroke-width="2"/><text class="du-ax" x="602" y="602">Oct 2025</text><text class="du-ax" x="860" y="602" text-anchor="middle"><tspan fill="#ab7df8">▮</tspan> filed  <tspan fill="#3fb950">▮</tspan> merged · per month</text><text class="du-ax" x="1118" y="602" text-anchor="end">Oct 2026</text></g>`;
     g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="rpaDay" x="52" y="101">DAY 1</text></g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -4413,7 +4413,7 @@
       sound: "research",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Duplicate Code Detector, Daily Test Improver and Daily Perf Improver. The flow is illustrative, with synthetic files; the panel in the middle is measured on gh-aw itself. From 7 October 2025 to 26 October 2026 the Duplicate Code Detector filed 211 issues titled duplicate-code, 144 of them assigned to Copilot; 115 were closed by merged pull requests, 112 of them opened by Copilot, with a median of 3.8 hours from issue to merge. The bars show issues filed and pull requests merged per month; empty months are months it filed nothing. Since 27 October 2026 the detector opens its pull requests directly. Snapshot taken 14 November 2026 from GitHub issue search and each issue's closing event. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
+        "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Duplicate Code Detector, Daily Test Improver and Daily Perf Improver. The flow is illustrative, with synthetic files; the panel in the middle is measured on gh-aw itself. From 7 October 2025 to 26 October 2026 the Duplicate Code Detector filed 211 issues titled duplicate-code, 144 of them assigned to Copilot; 115 were closed by merged pull requests, 112 of them opened by Copilot, with a median of 3.8 hours from issue to merge. The data window, 7 October 2025 to 26 October 2026, 385 days, is printed on the panel. The bars show issues filed and pull requests merged per month; empty months are months it filed nothing. Since 27 October 2026 the detector opens its pull requests directly. Snapshot taken 14 November 2026 from GitHub issue search and each issue's closing event. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
         t0 = 0;
         cyc = -1;
