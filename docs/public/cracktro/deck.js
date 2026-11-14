@@ -64,12 +64,12 @@
   .ch { display: inline-block; font-variation-settings: "wght" 700, "wdth" 100; }
   .l-grad .ch { color: transparent; -webkit-background-clip: text; background-clip: text;
     background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #4493f8, #ab7df8);
-    background-size: 1800px 100%; background-position: var(--bx) 0; }
+    background-size: 1800px 100%; background-position: var(--bx) 0; padding-bottom: .14em; margin-bottom: -.14em; }
   @keyframes settle { from { opacity: 0; transform: translateY(.25em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
   @keyframes breathe { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
   .l-out .ch { color: transparent; -webkit-text-stroke: 3px #f0f6fc; }
   /* Hero: GitHub brand "AI green" (brand.github.com Green 1–5) */
-  .title .l-grad .ch { background-image: linear-gradient(90deg, #0fbf3e, #5fed83, #bfffd1, #8cf2a6, #0fbf3e); filter: drop-shadow(0 0 28px #5fed8355); padding-bottom: .14em; margin-bottom: -.14em; }
+  .title .l-grad .ch { background-image: linear-gradient(90deg, #0fbf3e, #5fed83, #bfffd1, #8cf2a6, #0fbf3e); filter: drop-shadow(0 0 28px #5fed8355); }
   .title .l-out .ch { -webkit-text-stroke-color: #5fed83; }
   @keyframes rise { from { opacity: 0; transform: translateY(.3em) scale(.94); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
   @keyframes flex { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
