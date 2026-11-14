@@ -132,12 +132,108 @@ test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
   await expect(prev).toBeDisabled();
   await next.click();
   await expect(page.locator(".count")).toHaveText("02 / 52");
+  // clicks in the gaps between the arrows do not fall through to the slide click handler
+  const nb = (await page.getByRole("button", { name: "Next band", exact: true }).boundingBox())!;
+  await page.mouse.click(nb.x - 3, nb.y + nb.height / 2);
+  await expect(page.locator(".count")).toHaveText("02 / 52");
   await prev.click();
   await expect(page.locator(".count")).toHaveText("01 / 52");
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeVisible();
   await expect(next).toBeHidden();
+  await expect(page.getByRole("button", { name: "Previous band", exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Next band", exact: true })).toBeHidden();
+});
+
+test("jumps between bands with the compact track buttons", async ({ page }) => {
+  const count = page.locator(".count");
+  const prevBand = page.getByRole("button", { name: "Previous band", exact: true });
+  const nextBand = page.getByRole("button", { name: "Next band", exact: true });
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/gh-aw/cracktro/#1");
+  await expect(prevBand).toBeDisabled();
+  await expect(nextBand).toBeEnabled();
+  await nextBand.click();
+  await expect(count).toHaveText("02 / 52");
+  // from an interior slide, next band lands on the header below and previous band on the header above
+  await page.goto("/gh-aw/cracktro/#3");
+  await expect(count).toHaveText("03 / 52");
+  await nextBand.click();
+  await expect(count).toHaveText("06 / 52");
+  await page.goto("/gh-aw/cracktro/#8");
+  await expect(count).toHaveText("08 / 52");
+  await prevBand.click();
+  await expect(count).toHaveText("02 / 52");
+  await prevBand.click();
+  await expect(count).toHaveText("01 / 52");
+  await expect(prevBand).toBeDisabled();
+  await page.goto("/gh-aw/cracktro/#52");
+  await expect(count).toHaveText("52 / 52");
+  await expect(nextBand).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Next slide", exact: true })).toBeDisabled();
+  await expect(prevBand).toBeEnabled();
+  // keyboard activation of a focused button navigates exactly once
+  await page.goto("/gh-aw/cracktro/#3");
+  await expect(count).toHaveText("03 / 52");
+  await nextBand.focus();
+  await page.keyboard.press("Enter");
+  await expect(count).toHaveText("06 / 52");
+
+  // at 320px the four buttons fit left of the sound toggle, which stays clear of the count
+  const boxes = await page.evaluate(() =>
+    [...document.querySelectorAll(".arrows button"), document.querySelector(".snd")!, document.querySelector(".count")!].map(e => {
+      const r = e.getBoundingClientRect();
+      return { left: r.left, right: r.right };
+    })
+  );
+  expect(boxes).toHaveLength(6);
+  const [, , , lastArrow, snd, countBox] = boxes;
+  expect(boxes[0].left).toBeGreaterThanOrEqual(0);
+  for (let i = 1; i < 4; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].right);
+  expect(snd.left).toBeGreaterThan(lastArrow.right);
+  expect(countBox.left).toBeGreaterThan(snd.right);
+  expect(countBox.right).toBeLessThanOrEqual(320);
+});
+
+test.describe("compact navigation on touch screens", () => {
+  test.use({ hasTouch: true, viewport: { width: 320, height: 640 } });
+
+  test("navigates once per tap and cancels the touch defaults", async ({ page }) => {
+    const count = page.locator(".count");
+    await page.goto("/gh-aw/cracktro/#3");
+    await expect(count).toHaveText("03 / 52");
+    await page.getByRole("button", { name: "Next slide", exact: true }).tap();
+    await expect(count).toHaveText("04 / 52");
+    await page.getByRole("button", { name: "Next band", exact: true }).tap();
+    await expect(count).toHaveText("06 / 52");
+
+    // rapid taps: every touchend is cancelled (no synthetic click, no double-tap zoom), never reaches
+    // the window swipe handlers, and moves exactly one band per tap
+    const result = await page.evaluate(() => {
+      const btn = document.querySelector('[aria-label="Previous band"]') as HTMLButtonElement;
+      const seen: string[] = [];
+      for (const type of ["touchstart", "touchend"]) addEventListener(type, () => seen.push(type));
+      const r = btn.getBoundingClientRect();
+      const fire = (type: string) => {
+        const t = new Touch({ identifier: 1, target: btn, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+        const e = new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === "touchend" ? [] : [t], changedTouches: [t] });
+        btn.dispatchEvent(e);
+        return e.defaultPrevented;
+      };
+      const prevented: boolean[] = [];
+      for (let i = 0; i < 2; i++) {
+        fire("touchstart");
+        prevented.push(fire("touchend"));
+      }
+      return { prevented, seen, count: document.querySelector(".count")!.textContent };
+    });
+    expect(result.prevented).toEqual([true, true]);
+    expect(result.seen).toEqual([]);
+    expect(result.count).toBe("01 / 52");
+    await expect(count).toHaveText("01 / 52");
+    await expect(page.locator(".arrows")).toHaveCSS("touch-action", "manipulation");
+  });
 });
 
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {

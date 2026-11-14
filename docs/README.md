@@ -65,8 +65,8 @@ Left/Right (or Space, Page Up/Page Down) step through the slides in reading
 order and wrap between bands, and Up/Down jump to the first slide of the band
 above or below. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
 and M to toggle sound. The navigation dots form a map with one row per band and
-jump directly to a slide (on narrow screens they become previous/next arrow
-buttons); `#1` through `#52` are shareable slide links. Clicking the left third
+jump directly to a slide (on narrow screens they become previous/next slide arrows
+flanked by track-style previous/next band buttons); `#1` through `#52` are shareable slide links. Clicking the left third
 goes back; clicking elsewhere advances. On touch screens, swipe left or right
 within a band and up or down between bands. Slides within a band push left, and
 moving to a later band slides up (reversed when going back).

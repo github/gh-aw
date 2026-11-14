@@ -262,6 +262,11 @@ func TestConnectorSmokeIssuesMessageMetadata(t *testing.T) {
 	compiler := NewCompiler(WithNoEmit(true))
 	compiler.gitRoot = root
 	installConnectorTestSources(t, root)
+	reporting, err := os.ReadFile("../../.github/workflows/shared/reporting.md")
+	require.NoError(t, err)
+	reportingPath := filepath.Join(root, ".github", "workflows", "shared", "reporting.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(reportingPath), 0700))
+	require.NoError(t, os.WriteFile(reportingPath, reporting, 0600))
 	compiler.SetWorkflowIdentifier("smoke-issues.md")
 	data, err := compiler.ParseWorkflowString(string(source), filepath.Join(root, ".github/workflows/smoke-issues.md"))
 	require.NoError(t, err)
