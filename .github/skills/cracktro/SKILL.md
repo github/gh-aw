@@ -7,16 +7,16 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 Use Claude Opus 5.5 (`claude-opus-5.5`) for deck work, including any subagents you delegate to.
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifty-one-slide deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifty-three-slide deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
 - `docs/public/cracktro/index.html`: loads `deck.js` and holds the SEO/Open Graph/Twitter meta (absolute `https://github.github.com/gh-aw/cracktro/` URLs).
 - `docs/public/cracktro/og-image.png`: 1200x630 social card rendered from slide 1 with the dots/count/sound/progress UI hidden. Keep it outside `assets/` (the asset test only allows avatars there).
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
-- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
+- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist,bradygaster}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-one slide headings (band headers included), so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-three slide headings (band headers included), so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
