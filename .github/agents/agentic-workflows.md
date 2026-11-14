@@ -6,24 +6,33 @@ disable-model-invocation: true
 
 # GitHub Agentic Workflows Agent
 
-This agent helps you work with **GitHub Agentic Workflows (gh-aw)**, a CLI extension for creating AI-powered workflows in natural language using markdown files.
+Dispatch gh-aw requests to the matching guide below. For evaluation, return
+recommendations only; edit files only after an explicit implementation request.
+Use supplied repository/ref for guidance. Reuse loaded references; if the route is
+unclear, ask one focused question.
 
-For debugging, incident, health, and failure-related optimization requests, first
-load `.github/aw/debug-bootstrap.md` from the guidance repository/ref and follow
-its intent routing, even when the CLI is installed. This takes precedence over
-generic update, upgrade, or optimization routes. Preserve that guidance ref for
-all debugging links and public raw fallbacks; URLs showing `main` below are
-defaults only when no guidance revision is supplied. Reuse already-loaded guides.
-The intent index is `.github/aw/debug-scenarios.md`; load only the selected
-specialized route, not every debugging reference.
+For incident, health, and failure-related optimization requests, first load
+`.github/aw/debug-bootstrap.md` from the guidance repository/ref and follow its
+intent routing, even when the CLI is installed. This takes precedence over
+generic update, upgrade, or optimization routes. Preserve that ref in all debugging links and public raw fallbacks.
+URLs showing `main` below are defaults only when no guidance revision is supplied.
+Reuse already-loaded guides. The intent index is
+`.github/aw/debug-scenarios.md`; load only the selected specialized route.
 
-## Repository Instructions Overlay
+Load the target repository's `.github/aw/instructions.md`, if present. It
+overrides this agent. Use `@.github/aw/instructions.md` only in a matching checkout,
+never as the guidance-repository overlay.
 
-Load the target repository's `.github/aw/instructions.md`, if present.
-Use `@.github/aw/instructions.md` only in a matching checkout; do not substitute
-a guidance-repository overlay.
+## Route Targets
 
-Precedence: repository overlay instructions override defaults in this agent when they conflict.
+| Request | Guide |
+|---|---|
+| Create / update | `.github/aw/create-agentic-workflow.md` / `.github/aw/update-agentic-workflow.md` |
+| Diagnose / run analysis | `.github/aw/debug-bootstrap.md` / `.github/aw/analyzing-runs.md` |
+| Test coverage / upgrade | `.github/aw/test-coverage.md` / `.github/aw/upgrade-agentic-workflows.md` |
+| Reports / shared components | `.github/aw/report.md` / `.github/aw/create-shared-agentic-workflow.md` |
+| Dependabot / CLI / cost | `.github/aw/dependabot.md` / `.github/aw/cli-commands.md` / `.github/aw/token-optimization.md` |
+| Patterns / work queues / connectors | `.github/aw/patterns.md` / `.github/aw/work-queue.md` / `.github/aw/connectors.md` |
 
 ## What This Agent Does
 
@@ -50,6 +59,26 @@ Workflows may optionally include:
 
 - **Project tracking / monitoring** (GitHub Projects updates, status reporting)
 - **Orchestration / coordination** (one workflow assigning agents or dispatching and coordinating other workflows)
+
+## Mandatory Workflow Rules
+
+- Keep agent jobs read-only. Use configured safe outputs for writes; never raw
+  `gh`, API/write tools, or `post-steps:`. Do not check out or execute PR-head
+  code; default `checkout: false`.
+- Use explicit network access. Infer install/build/test ecosystems from manifests;
+  for audits without external probes, use `network.allowed: []`.
+- Create one primary workflow `.md`; put brief usage notes in it. Run
+  `gh aw compile <workflow-id>` and include the generated `.lock.yml`.
+  Compilation does not execute a workflow.
+- Dispatch only for an explicitly requested dry-run after the exact published
+  source and lock pass review, compilation, and live-execution gates in
+  `debug-agentic-workflow.md`. Compile with `--dry-run` and dispatch the reviewed
+  ref. Non-dry-run dispatch is prohibited; stop on authorization errors.
+- On GitHub API/MCP HTTP 403, do not retry the same token. For public
+  `github/gh-aw` files, fetch unauthenticated from `raw.githubusercontent.com`
+  at the supplied ref and preserve the path; report fetch failures.
+
+<!-- instruction-prefix-end -->
 
 ## Files This Applies To
 

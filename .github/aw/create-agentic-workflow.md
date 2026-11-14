@@ -1,38 +1,35 @@
 ---
-description: Design, evaluate, create and compile gh-aw workflows with explicit intent, scope and safety.
+description: Design and compile gh-aw workflows with explicit intent, scope and safety.
 disable-model-invocation: true
 ---
 
 # GitHub Agentic Workflow Designer & Creator
 
 Create one `.github/workflows/<workflow-id>.md` using `gh aw`. For evaluation,
-return recommendations only; do not create/edit files without an explicit
-implementation request.
+recommend only; edit files only on an explicit implementation request.
 
 ## Load These References First
 
 Read [intent](intent.md), [workflow rules](github-agentic-workflows.md),
 [editing/compilation](workflow-editing.md), [constraints](workflow-constraints.md),
 [patterns](workflow-patterns.md), [safe outputs](safe-outputs.md),
-[schema index](syntax.md) and [MCP CLIs](mcp-clis.md).
-Load the target repository's optional `.github/aw/instructions.md` overlay.
-
+[schema index](syntax.md), [MCP CLIs](mcp-clis.md), and the optional repository
+overlay `.github/aw/instructions.md`.
 Before generation, follow the [design checklist](create-agentic-workflow-design.md)
-and [output/validation contract](create-agentic-workflow-validation.md).
-Load only matching topic references:
-
-- Maintenance: [maintainer.md](maintainer.md); docs agents/checks: [documentation-workflows.md](documentation-workflows.md).
-- Campaign/KPI: [campaign.md](campaign.md); A/B tests: [experiments.md](experiments.md).
-- Screenshots: [visual-regression.md](visual-regression.md); deployments: [deployment-status.md](deployment-status.md).
-- Charts: [charts.md](charts.md); reports/digests: [report.md](report.md).
-- Release notes: [release-workflow.md](release-workflow.md); linter mining: [linter-workflows.md](linter-workflows.md).
-- Docker/Cloud Hypervisor/ARC/self-hosted: [agent-runtime-instructions.md](agent-runtime-instructions.md).
-- Skills/plugins: [skills.md](skills.md); graders: [operational-value-designer](../skills/operational-value-designer/SKILL.md).
-- Instruction/skill generators: [packing contract](../skills/prompt-token-efficiency/SKILL.md).
-- Persistent knowledge reuse, even without an explicit memory or dreaming request:
-  [memory decision](memory.md#scheduled-dreaming); load [dreaming.md](dreaming.md)
-  only after the [memory decision and input-scope checks](memory.md#scheduled-dreaming)
-  justify a separate dreamer.
+and [output/validation contract](create-agentic-workflow-validation.md). Load matching
+topic guides only: maintenance/docs ([maintainer](maintainer.md),
+[documentation](documentation-workflows.md)); campaign/experiments
+([campaign](campaign.md), [experiments](experiments.md)); screenshots/deployments
+([visual regression](visual-regression.md), [deployment status](deployment-status.md));
+charts/reports ([charts](charts.md), [report](report.md)); release/linter
+([release](release-workflow.md), [linter](linter-workflows.md)); Docker/ARC/
+self-hosted ([runtime](agent-runtime-instructions.md)); skills/plugins or graders
+([skills](skills.md), [grader skill](../skills/operational-value-designer/SKILL.md));
+instruction/skill generators ([packing contract](../skills/prompt-token-efficiency/SKILL.md)).
+Persistent knowledge reuse applies even without an explicit memory or dreaming request:
+[memory decision](memory.md#scheduled-dreaming); load
+[dreaming.md](dreaming.md) only after the [memory decision and input-scope checks](memory.md#scheduled-dreaming)
+justify a separate dreamer.
 
 ## Modes
 
@@ -42,37 +39,34 @@ If no automation goal is stated, start with exactly:
 
 > What do you want to automate today?
 
-When a goal is stated, reuse supplied facts; skip the opener. Ask only for
-missing design decisions; keep it short, iterative and without option dumps.
-Follow the [interview](designer.md#interview-framework) for intent, repository survey,
-architecture/trigger, scope, data, guardrails, context/network, engine and
-confirmation; generate after confirmation.
+With a goal, reuse supplied facts and skip the opener. Ask only for missing
+decisions; follow the [interview](designer.md#interview-framework) and generate
+after confirmation.
 
-During trigger selection, choose the [previous-result strategy](create-agentic-workflow-design.md#choose-the-previous-result-strategy)
-for scheduled issue/PR creation. For maintenance, add `Repository signals` and
-`Initial maintenance portfolio` to the [confirmation](designer.md#confirmation-format).
-Use [designer-mappings.md](designer-mappings.md) for detailed trigger/tool/auth choices.
+For scheduled issue/PR creation, choose the [previous-result strategy](create-agentic-workflow-design.md#choose-the-previous-result-strategy).
+For maintenance, include `Repository signals` and `Initial maintenance portfolio`
+in [confirmation](designer.md#confirmation-format). Use [designer mappings](designer-mappings.md)
+for trigger/tool/auth choices.
 
 ### Issue-form mode
 
-Read the supplied name, description and context; generate without further conversation.
-Derive and persist `intent:` before architecture. Choose a unique kebab-case ID;
-never overwrite an existing workflow. Create exactly one primary Markdown file,
-compile it and include its generated `.lock.yml` in the PR.
+Read the supplied name, description and context; derive and persist `intent:`
+before architecture. Choose a unique kebab-case ID; never overwrite. Create one
+primary Markdown file, compile it, and include its generated `.lock.yml` in the PR.
 
 ## Mandatory design and safety rules
 
 1. Derive architecture from intent; define activation, effects, inverse/`noop`,
-   evidence window and scope. Verify config files named in the request; if
-   missing, require `noop` and report, never guess. Put each chosen definition
-   (e.g., what “adds” covers, lockfile scope, zero-item behavior) in the proposed
-   prompt, not only notes. Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint)
-   before tool/persistence selection.
+   evidence window and scope. Verify config files named in the request; if missing,
+   require `noop` and report, never guess. Put choices (e.g., what “adds” covers,
+   lockfile scope, zero-item behavior) in the proposed prompt, not only notes.
+   Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint) before
+   tool/persistence selection.
 2. Keep the agent job read-only: never grant `issues: write`, `pull-requests: write`
-   or `contents: write`. For Copilot inference recommend
-   `permissions: { copilot-requests: write }`; see [scope/caveats](syntax-core.md).
-3. Use configured safe outputs for mutations, never raw `gh`, API, GitHub write
-   tools or `post-steps:`. Require `update-release` for release notes; restrict
+   or `contents: write`. Recommend `permissions: { copilot-requests: write }` for
+   Copilot inference; see [scope/caveats](syntax-core.md).
+3. Use safe outputs for mutations, never raw `gh`, API/write tools or `post-steps:`.
+   Require `update-release` for release notes; restrict
    `create-pull-request.allowed-files`; require `noop` for duplicates,
    insufficient evidence or no action.
 4. Prefer `gh-proxy` and `toolsets:`; use `cli-proxy: true` only for needed
@@ -83,10 +77,9 @@ compile it and include its generated `.lock.yml` in the PR.
 5. Infer network ecosystems from manifests; never use `network: defaults` alone
    for install/build/test. For policy/compliance audits without external probes,
    enforce `network.allowed: []` structurally; omit external tools.
-6. Prefer `pull_request`; use `pull_request_target` only when base-repository
-   context is needed. Default `checkout: false`; never check out or execute
-   PR-head code. Default triggering is team-only; recommend `roles: all` for
-   community entrypoints.
+6. Prefer `pull_request`; use `pull_request_target` only for base-repository
+   context. Default `checkout: false`; never check out or execute PR-head code.
+   Default to team-only; recommend `roles: all` for community entrypoints.
 7. Reuse built-in graders. Custom JavaScript and repo-owned Bash run only in the
    compiler's isolated downstream `graders` job, never conclusion. Follow the
    grader evidence/I/O contract; Bash is trusted, not microVM-isolated. Do not
@@ -97,22 +90,27 @@ compile it and include its generated `.lock.yml` in the PR.
 
 ## Ad Hoc Evaluation Mode
 
-Use for exploration, persona walkthroughs and scenario recommendations.
+Use for exploration, persona walkthroughs, and scenario recommendations.
 
-- Do not create or edit workflow files. Exit only on an explicit implementation request.
+- Do not create/edit workflow files unless implementation is explicitly requested.
 - Use only relevant guidance sections: start with the
   [trigger decision matrix](triggers.md#decision-matrix); for review/comment-only
   work use the [least-privilege checklist](workflow-patterns.md#least-privilege-for-review-only-and-comment-only-workflows).
 - When requirements conflict with a trigger, recommend the trigger that satisfies the requirement first;
   explain the conflicting alternative's consequence.
 - For each material undefined term, propose and clearly label a reasonable `Default:`.
-  Ask 1-2 targeted questions only if answers change the recommendation; for
-  immediate recommendations, state assumptions and alternatives.
-- Return trigger, scoped paths/time window, read tools, safe outputs, read
-  permissions, network access and `noop` criteria. For recurring reports, state
-  window, grouping and a stable dedup key.
-- Use one comparison table for multiple scenarios; name shared triggers/write
-  paths. Offer file generation only as the next explicit implementation step.
+  Ask 1-2 questions only if answers change the recommendation; otherwise state assumptions.
+- Resolve each responsible owner from CODEOWNERS or maintainer metadata. If unresolved,
+  say so and identify who must confirm. For later edits, state whether to update the
+  same target or noop; update changed content and noop only when no change is needed.
+  If required input is missing, call `report_incomplete`; never silently noop.
+- For non-technical personas, lead with one plain-language line naming the
+  operator and output reader, before pre-step details.
+- Return trigger, scoped paths/time window, read tools, safe outputs, read permissions,
+  network access, and `noop` criteria. For recurring reports, state the window,
+  grouping, and stable dedup key.
+- Use one comparison table for multiple scenarios; name shared triggers/write paths.
+- Offer file generation only as the next explicit implementation step.
 
 ### Invocation Surface
 

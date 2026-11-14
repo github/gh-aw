@@ -73,7 +73,9 @@ class GuidanceTests(unittest.TestCase):
             ".github/aw/github-agentic-workflows.md": ("syntax.md", "safe-outputs.md", "gh aw compile", "squad.md"),
             ".github/aw/create-agentic-workflow.md": (
                 "read-only", "create-agentic-workflow-design.md", "create-agentic-workflow-validation.md",
-                "gh aw compile <workflow-id>", "noop", "Default:",
+                "gh aw compile <workflow-id>", "noop", "Default:", "CODEOWNERS",
+                "later edits", "same target or noop", "report_incomplete",
+                "non-technical personas", "operator and output reader",
             ),
             ".github/aw/debug-agentic-workflow.md": (
                 "Non-dry-run dispatch remains prohibited", "before execution or upload",
@@ -90,6 +92,28 @@ class GuidanceTests(unittest.TestCase):
             for rule in required:
                 with self.subTest(path=name, rule=rule):
                     self.assertIn(rule, prefix)
+
+    def test_agent_dispatch_contract_fits_instruction_prefix(self):
+        data = (ROOT / ".github/agents/agentic-workflows.md").read_bytes()
+        marker = b"<!-- instruction-prefix-end -->"
+        self.assertLessEqual(data.index(marker) + len(marker), 7500)
+        prefix = data[:8000].decode("utf-8")
+        for route in (
+            ".github/aw/analyzing-runs.md",
+            ".github/aw/test-coverage.md",
+            ".github/aw/upgrade-agentic-workflows.md",
+            ".github/aw/report.md",
+        ):
+            with self.subTest(route=route):
+                self.assertIn(route, prefix)
+        for rule in (
+            "Non-dry-run dispatch is prohibited",
+            "Create one primary workflow `.md`",
+            "gh aw compile <workflow-id>",
+            "network.allowed: []",
+        ):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, prefix)
 
     def test_connector_creation_routes_to_spec_and_skill(self):
         skill = ROOT / ".github/skills/create-connector/SKILL.md"
