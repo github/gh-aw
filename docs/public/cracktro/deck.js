@@ -258,6 +258,26 @@
   .fmm-cell.flip { transform: rotateY(90deg); }
   .fmm-cell.flop { transform: rotateY(0); transition: transform .26s cubic-bezier(.3,1.6,.4,1); }
   @keyframes fmm-in { from { transform: scale(0) rotate(-20deg); } }
+  .tp { display: grid; place-items: center; }
+  .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
+  .tp-copy h2 { margin: 0; font-variation-settings: "wght" 520, "wdth" 100; letter-spacing: -.02em; }
+  .tp-q { margin-top: 26px !important; font-size: 76px; line-height: 1.1; color: #f0f6fc; }
+  .tp-vs { display: flex; justify-content: center; align-items: flex-start; gap: 70px; margin: 64px 0 60px; }
+  .tp-vs > b { font: 500 40px/86px var(--mono); color: #8b949e; }
+  .tp-lane { width: 400px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .tp-pill { position: relative; overflow: hidden; width: 100%; height: 86px; border: 2px solid var(--c); border-radius: 43px; color: var(--c);
+    font: 500 38px/82px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+  .tp-pill i { position: absolute; inset: 0; width: 0; background: var(--c); opacity: .22; }
+  .tp-pill span { position: relative; }
+  .tp-tray { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 52px; width: 100%; }
+  .tp-tray svg { width: 30px; height: 30px; fill: var(--c); animation: tp-pop .35s cubic-bezier(.3,1.6,.4,1) both; }
+  .tp-blue { --c: #4493f8; } .tp-green { --c: #3fb950; }
+  .tp-go { font-size: 112px !important; line-height: 1.04; color: #3fb950; }
+  .active .tp-copy > * { animation: tp-up .7s cubic-bezier(.2,.8,.2,1) both; }
+  .active .tp-copy > :nth-child(2) { animation-delay: .1s; } .active .tp-copy > :nth-child(3) { animation-delay: .35s; }
+  .active .tp-copy > :nth-child(4) { animation-delay: .6s; } .active .tp-copy > :nth-child(5) { animation-delay: .8s; }
+  @keyframes tp-up { from { opacity: 0; transform: translateY(30px); } }
+  @keyframes tp-pop { from { transform: scale(0); } }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
   .fm-cap b { font-weight: 700; font-stretch: 100%; }
@@ -8062,6 +8082,71 @@
     });
   }
 
+  // Trust the process: deep human review on every PR means the process is not trusted
+  {
+    resetIndex();
+    const MERGE = `<svg viewBox="0 0 16 16"><path d="${OCTI.merge[0]}"/></svg>`;
+    const lane = (cls, label) => {
+      const fill = h("i"),
+        tray = h("div", { class: "tp-tray" });
+      return { fill, tray, el: h("div", { class: `tp-lane ${cls}` }, h("div", { class: "tp-pill" }, fill, h("span", {}, label)), tray) };
+    };
+    const slow = lane("tp-blue", "1h review"),
+      fast = lane("tp-green", "30sec skim");
+    const SLOW = 7200,
+      FAST = 400,
+      MAX = 30;
+    let t0 = 0,
+      nSlow = 0,
+      nFast = 0;
+    const merge = tray => tray.insertAdjacentHTML("beforeend", MERGE);
+    slides.push({
+      group: "trust",
+      sound: "trust",
+      palette: ["#3fb950", "#1f6feb", "#2da44e", "#0a3069"],
+      notes:
+        "Trust the process. If every pull request needs a deep human review, you do not trust your process. The race is illustrative: a one-hour review on the left lands one change while a thirty-second skim on the right lands dozens, because checks, agent reviewers, tests and safe outputs already did the deep work. So do not add reviewers, improve the process until a skim is enough. Improve your process. Accelerate your factory.",
+      enter() {
+        t0 = 0;
+        nSlow = nFast = 0;
+        for (const l of [slow, fast]) {
+          l.tray.replaceChildren();
+          l.fill.style.width = "0";
+        }
+      },
+      tick(t) {
+        if (!t0) t0 = t + 1100;
+        const e = t - t0;
+        if (e < 0) return;
+        const loop = e % (SLOW + 1600);
+        if (loop < 30 && (nSlow || nFast)) {
+          nSlow = nFast = 0;
+          slow.tray.replaceChildren();
+          fast.tray.replaceChildren();
+        }
+        const ls = Math.min(loop, SLOW);
+        slow.fill.style.width = `${(ls / SLOW) * 100}%`;
+        fast.fill.style.width = `${ls >= SLOW ? 100 : ((ls % FAST) / FAST) * 100}%`;
+        const f = Math.min(MAX, Math.floor(ls / FAST));
+        while (nFast < f) (merge(fast.tray), nFast++, nFast % 3 || sfx.pop(nFast % 8));
+        if (loop >= SLOW && !nSlow) (merge(slow.tray), (nSlow = 1), sfx.step());
+      },
+      el: h(
+        "section",
+        { class: "slide tp" },
+        h(
+          "div",
+          { class: "tp-copy" },
+          h("div", { class: "kicker" }, "Trust the process"),
+          h("h2", { class: "tp-q" }, "If every PR needs deep human review, you don\u2019t trust your process."),
+          h("div", { class: "tp-vs" }, slow.el, h("b", {}, "VS"), fast.el),
+          h("h2", { class: "tp-go" }, "Improve your process."),
+          h("h2", { class: "tp-go" }, "Accelerate your factory.")
+        )
+      ),
+    });
+  }
+
   // Cost management: guard, measure, optimize (+ model routing)
   {
     resetIndex();
@@ -12597,7 +12682,7 @@
     data: ["AW factory", "Measured on gh-aw's own history"],
   };
   // Header-less rows of a single slide.
-  const SOLO = { intro: "Title", mindset: "Factory mindset", finale: "Finale" };
+  const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
   // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
   const rows = [];
   for (const s of slides) {
@@ -13225,6 +13310,12 @@
           click(tt + 0.08, 6000, 0.08, 1);
           if (i % 4 === 2) [1, 1.48, 2.13].forEach(r => osc("square", 310 * r, tt, 0.12, 0.025));
         }
+      },
+      // trust the process: one slow, heavy review bell against a quick run of merge blips, then a bright resolving chord
+      trust: t => {
+        bell(55, t + 0.2, 0.05, 2.4);
+        [72, 76, 79, 84, 79, 84, 88, 91].forEach((m, i) => tone(m, t + 0.5 + i * 0.08, { type: "triangle", dur: 0.12, vol: 0.05, cutoff: 3200 }));
+        pad([60, 64, 67, 72], t + 1.3, 1.8, 0.03, "triangle", 2400);
       },
       // human agent processes: looping sequencer motif, human heartbeat underneath
       loop: t => {
