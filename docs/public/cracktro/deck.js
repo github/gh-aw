@@ -36,7 +36,7 @@
   .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   /* full-screen red wash for "Agentic attacks", "Safety and control", "Supply chain hardening" and "Safe outputs": fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
-    background: radial-gradient(ellipse 80% 75% at 50% 55%, #6e0b12 0%, #3a0408 55%, #140103 100%); }
+    background: radial-gradient(ellipse 80% 75% at 50% 55%, #4e070c 0%, #280205 55%, #0e0102 100%); }
   /* blueprint grid on its own layer above the wash, so it can rotate to 45° as the red fades in */
   canvas.gridc { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
   .wash.cover + canvas.gridc { z-index: 4; }
@@ -258,6 +258,26 @@
   .fmm-cell.flip { transform: rotateY(90deg); }
   .fmm-cell.flop { transform: rotateY(0); transition: transform .26s cubic-bezier(.3,1.6,.4,1); }
   @keyframes fmm-in { from { transform: scale(0) rotate(-20deg); } }
+  .tp { display: grid; place-items: center; }
+  .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
+  .tp-copy h2 { margin: 0; font-variation-settings: "wght" 520, "wdth" 100; letter-spacing: -.02em; }
+  .tp-q { margin-top: 26px !important; font-size: 76px; line-height: 1.1; color: #f0f6fc; }
+  .tp-vs { display: flex; justify-content: center; align-items: flex-start; gap: 70px; margin: 64px 0 60px; }
+  .tp-vs > b { font: 500 40px/86px var(--mono); color: #8b949e; }
+  .tp-lane { width: 400px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .tp-pill { position: relative; overflow: hidden; width: 100%; height: 86px; border: 2px solid var(--c); border-radius: 43px; color: var(--c);
+    font: 500 38px/82px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+  .tp-pill i { position: absolute; inset: 0; width: 0; background: var(--c); opacity: .22; }
+  .tp-pill span { position: relative; }
+  .tp-tray { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 52px; width: 100%; }
+  .tp-tray svg { width: 30px; height: 30px; fill: var(--c); animation: tp-pop .35s cubic-bezier(.3,1.6,.4,1) both; }
+  .tp-blue { --c: #4493f8; } .tp-green { --c: #3fb950; }
+  .tp-go { font-size: 112px !important; line-height: 1.04; color: #3fb950; }
+  .active .tp-copy > * { animation: tp-up .7s cubic-bezier(.2,.8,.2,1) both; }
+  .active .tp-copy > :nth-child(2) { animation-delay: .1s; } .active .tp-copy > :nth-child(3) { animation-delay: .35s; }
+  .active .tp-copy > :nth-child(4) { animation-delay: .6s; } .active .tp-copy > :nth-child(5) { animation-delay: .8s; }
+  @keyframes tp-up { from { opacity: 0; transform: translateY(30px); } }
+  @keyframes tp-pop { from { transform: scale(0); } }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
   .fm-cap b { font-weight: 700; font-stretch: 100%; }
@@ -726,6 +746,47 @@
   .sfm-m div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; color: #6e7681; font-size: 12px; }
   .sfm-m i { display: block; width: 100%; background: linear-gradient(#ab7df8, #8957e5); border-radius: 3px 3px 0 0; }
   .sfm-c { margin-top: 6px; color: #6e7681; font-size: 12.5px; white-space: nowrap; }
+  .pm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #ab7df8, #3fb950, #4493f8, #d29922); }
+  .pm-src { color: #d29922; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+  .pm-src:hover { color: #f0f6fc; }
+  .pm-tabs { position: absolute; left: 110px; top: 262px; display: flex; gap: 20px; opacity: 0; }
+  .active .pm-tabs { animation: settle .6s .3s both; }
+  .pm-tab { display: flex; align-items: center; gap: 16px; width: 560px; padding: 16px 22px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; color: #9198a1; text-align: left; cursor: pointer; font: inherit; transition: border-color .3s, background .3s, color .3s, box-shadow .3s; }
+  .pm-tab:hover { border-color: #6e7681; color: #f0f6fc; }
+  .pm-tab:focus-visible { outline: 3px solid #4493f8; outline-offset: 3px; }
+  .pm-tab i { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 2px solid currentColor; font: 600 20px var(--mono); font-style: normal; }
+  .pm-tab b { display: block; font: 600 28px/1.15 "Mona Sans"; }
+  .pm-tab em { display: block; margin-top: 4px; font: normal 16px var(--mono); color: #6e7681; }
+  .pm-tab.on { border-color: #d29922; background: #161b22f0; color: #f0f6fc; box-shadow: 0 0 30px #d2992240; }
+  .pm-tab.on i { color: #d29922; }
+  .pm-flow { position: absolute; left: 110px; top: 400px; width: 1700px; display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 56px; }
+  .pm-st { position: relative; height: 126px; padding: 16px 20px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; transition: border-color .3s, box-shadow .3s, background .3s; }
+  .pm-st + .pm-st::before { content: ""; position: absolute; left: -54px; top: 50%; width: 46px; height: 2px; background: #3d444d; transition: background .3s; }
+  .pm-st + .pm-st::after { content: ""; position: absolute; left: -14px; top: calc(50% - 6px); border: 7px solid transparent; border-left-color: #3d444d; border-right: 0; transition: border-color .3s; }
+  .pm-st small { display: flex; align-items: center; gap: 10px; font: 500 14px var(--mono); letter-spacing: .12em; color: #6e7681; }
+  .pm-st svg { width: 22px; height: 22px; fill: #6e7681; transition: fill .3s; }
+  .pm-st b { display: block; margin-top: 12px; color: #f0f6fc; font: 600 27px/1.15 "Mona Sans"; }
+  .pm-st em { display: block; margin-top: 6px; color: #9198a1; font: normal 16px/1.25 var(--mono); }
+  .pm-st.k1 b { font-family: var(--mono); font-size: 25px; color: #c297ff; }
+  .pm-st.lit { border-color: var(--c); background: #161b22f0; box-shadow: 0 0 28px color-mix(in srgb, var(--c) 40%, transparent); }
+  .pm-st.lit small { color: var(--c); }
+  .pm-st.lit svg { fill: var(--c); }
+  .pm-st.lit::before { background: var(--c); }
+  .pm-st.lit::after { border-left-color: var(--c); }
+  .pm-doc { position: absolute; left: 110px; top: 580px; width: 1050px; height: 420px; padding: 22px 28px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117e8; }
+  .pm-doc-h { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #21262d; color: #f0f6fc; font: 600 26px "Mona Sans"; }
+  .pm-doc-h svg { width: 28px; height: 28px; fill: #3fb950; }
+  .pm-doc-h .pm-when { margin-left: auto; color: #6e7681; font: 15px var(--mono); }
+  .pm-ln { display: grid; grid-template-columns: 34px 270px 1fr; align-items: baseline; padding: 11px 0; border-bottom: 1px solid #161b22; color: #9198a1; font: 21px var(--mono); opacity: 0; transform: translateX(-12px); transition: opacity .35s, transform .35s; }
+  .pm-ln.on { opacity: 1; transform: none; }
+  .pm-ln i { font-style: normal; font-weight: 700; }
+  .pm-ln b { color: #f0f6fc; font: 600 22px "Mona Sans"; }
+  .pm-ln.ok i { color: #3fb950; } .pm-ln.bad i, .pm-ln.bad b { color: #f85149; } .pm-ln.warn i { color: #d29922; } .pm-ln.hl b { color: #d29922; }
+  .pm-idea { position: absolute; left: 1210px; top: 580px; width: 600px; height: 420px; padding: 26px 30px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117e0; }
+  .pm-idea small { font: 500 15px var(--mono); letter-spacing: .12em; color: #d29922; }
+  .pm-idea b { display: block; margin-top: 18px; color: #f0f6fc; font: 700 44px/1.1 "Mona Sans"; }
+  .pm-idea p { margin: 20px 0 0; color: #9198a1; font: 22px/1.4 "Mona Sans"; }
+  .pm-cap { position: absolute; left: 110px; right: 100px; bottom: 34px; color: #6e7681; font: 15px var(--mono); }
   .ao-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .ao-run .sfl-card { transition: stroke .4s, filter .4s; }
   .ao-run.bad .sfl-card { stroke: #f85149; filter: drop-shadow(0 0 10px #f8514966); }
@@ -929,11 +990,11 @@
   .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
   .ek .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #f778ba, #3fb950); }
   .ek-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
-  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 200ms + 300ms); }
   .ek-hd { font: 600 15px var(--mono); letter-spacing: .12em; } .ek-hd.b { fill: #79c0ff; } .ek-hd.g { fill: #7ee787; } .ek-hd.o { fill: #ffa657; }
-  .ek-card { fill: #0d1117d9; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
-  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #3fb95014; transition: filter .3s; }
-  .ek-iss circle:first-child { fill: none; stroke: #3fb950; stroke-width: 2.5; }
+  .ek-card { fill: #0d1117f5; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
+  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #0e1a13f5; transition: filter .3s; }
+  .ek-who circle { fill: #0d1117; stroke: #4493f8; stroke-width: 2; } .ek-who text { fill: #9198a1; font: 600 14px var(--mono); }
   .ek-t { fill: #f0f6fc; font: 800 24px "Mona Sans"; } .ek-t.s { font-size: 20px; }
   .ek-ti { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
   .ek-tx { fill: #c9d1d9; font: 500 19px "Mona Sans"; } .ek-tx.r { fill: #ffa198; font-weight: 700; }
@@ -944,84 +1005,84 @@
   .ek-pill.b rect { stroke: #4493f8; fill: #4493f81f; } .ek-pill.b text { fill: #79c0ff; }
   .ek-pill.o rect { stroke: #f0883e; fill: #f0883e1f; } .ek-pill.o text { fill: #ffa657; }
   .ek-pill.y rect { stroke: #d29922; fill: #d299221f; } .ek-pill.y text { fill: #e3b341; }
-  .ek-task { fill: none; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
-  .ek-wall { fill: #f0883e0d; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
+  .ek-task { fill: #0e1a13; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
+  .ek-wall { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
   .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e99); } }
   .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
-  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x { opacity: 0; transition: opacity .4s, transform .4s; }
-  .ek-resp rect { fill: #3fb9501a; stroke: #3fb950; stroke-width: 2; }
-  .ek-shield { fill: #0d1117; stroke: #3fb950; stroke-width: 2.5; stroke-linejoin: round; opacity: 0; transition: opacity .3s .4s; }
-  .ek-leak rect { fill: #f851491a; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
-  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s6 .ek-cmt, .s7 .ek-clean { opacity: 1; }
+  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x, .ek-ft { opacity: 0; transition: opacity .4s, transform .4s; }
+  .ek-shield circle { fill: #0d1117; stroke: #3fb950; stroke-width: 2; }
+  .ek-resp rect { fill: #0e1a13; stroke: #3fb950; stroke-width: 2; }
+  .ek-shield { fill: #3fb950; opacity: 0; transition: opacity .3s .4s; }
+  .ek-leak rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
+  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s5 .ek-ft.f5, .s6 .ek-cmt, .s6 .ek-ft.f6, .s7 .ek-clean, .s7 .ek-ft.f7 { opacity: 1; }
   .s5 .ek-shield { opacity: 1; filter: drop-shadow(0 0 8px #3fb950); }
   .s5 .ek-leak text { text-decoration: line-through; } .s5 .ek-leak { opacity: .45; }
-  .ek-x circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; } .ek-x path { stroke: #ff7b72; stroke-width: 3.5; stroke-linecap: round; }
+  .ek-x { fill: #ff7b72; } .ek-x circle { fill: #0d1117; }
   .s4 .ek-x { filter: drop-shadow(0 0 10px #f85149); }
   .ek-opt { transition: fill .3s; } .s5 .ek-opt { fill: #3fb950; font-weight: 800; }
   .s5 .ek-card.gt { filter: drop-shadow(0 0 14px #3fb95099); }
   .ek-hl { fill: #7ee787; font-weight: 700; }
   .s7 .ek-in { opacity: .2; transition: opacity .6s; } .ek-in { transition: opacity .4s; }
   .ek-clean rect { fill: #0d1117; stroke: #f0883e; stroke-width: 3; } .ek-clean text { fill: #ffa657; font: 800 22px var(--mono); letter-spacing: .12em; text-anchor: middle; }
-  .ek-lock circle { fill: #0d1117; stroke: #f0883e; stroke-width: 2.5; } .ek-lock rect { fill: #ffa657; } .ek-lock path { fill: none; stroke: #ffa657; stroke-width: 3; }
+  .ek-lock circle { fill: #0d1117; stroke: #f0883e; stroke-width: 2.5; } .ek-lock { fill: #ffa657; }
+  .ek-file { fill: #9198a1; } .ek-file text { fill: #c9d1d9; }
   .ek-file rect { fill: #161b22; stroke: #30363d; stroke-width: 1.5; transition: stroke .3s, filter .3s; }
   .s3 .ek-f2 rect { stroke: #f0883e; filter: drop-shadow(0 0 10px #f0883e88); }
-  .ek-note rect { fill: #3fb95014; stroke: #3fb95088; stroke-width: 1.5; }
-  .ek-conf rect { fill: #f8514914; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
-  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; transition: opacity .3s; } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; }
+  .ek-note rect { fill: #0e1a13; stroke: #3fb95088; stroke-width: 1.5; }
+  .ek-conf rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
+  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; stroke-dasharray: 1; stroke-dashoffset: 1; transition: opacity .3s, stroke-dashoffset .75s cubic-bezier(.45,0,.55,1); } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; stroke-dashoffset: 0; opacity: 0; }
+  .s1 #ekP1, .s2 #ekP2, .s3 #ekP3, .s5 #ekP5, .s6 #ekP6 { stroke-dashoffset: 0; } .s4 #ekP4 { opacity: .45; }
   .ek-wire.hot { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
-  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; } .ek-wl.o { fill: #ffa657; }
+  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s; } .ek-wl.o { fill: #ffa657; } .s2 .ek-wl:not(.o), .s3 .ek-wl.o { opacity: 1; }
   .ek-dot { fill: #7ee787; opacity: 0; filter: drop-shadow(0 0 10px #3fb950); } .ek-dot.o { fill: #ffa657; filter: drop-shadow(0 0 10px #f0883e); } .ek-dot.r { fill: #ff7b72; filter: drop-shadow(0 0 10px #f85149); }
   .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
-  .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
-  .zs-vm { fill: #8957e52a; stroke: #a371f7; stroke-width: 4; }
+  .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .zs-vm { fill: #1c1233f2; stroke: #a371f7; stroke-width: 4; }
   .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
   .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 2.6s; }
   @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f7aa); } }
   .zs-lock circle { fill: #0d1117; stroke: #a371f7; stroke-width: 3; filter: drop-shadow(0 0 10px #a371f788); }
-  .zs-lock rect { fill: #d2a8ff; } .zs-lock path { fill: none; stroke: #d2a8ff; stroke-width: 3.5; stroke-linecap: round; }
+  .zs-lock .zs-li { fill: #d2a8ff; }
   .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
   .zs-port { fill: #0d1117; stroke: #d2a8ff; stroke-width: 3; }
-  .zs-bars { opacity: 0; } .active .zs-bars { animation: zs-dim .8s ease both 2.5s; }
-  @keyframes zs-dim { from { opacity: 1; } to { opacity: .2; } }
-  .zs-bar { fill: url(#zsSteel); stroke: #0d1117; stroke-width: 1.5; transform: translateY(-470px); }
-  .active .zs-bar { animation: zs-slam .42s cubic-bezier(.5,0,1,1) both calc(var(--b) * 70ms + 950ms); }
-  @keyframes zs-slam { 0% { transform: translateY(-470px); } 78% { transform: translateY(8px); } 90% { transform: translateY(-5px); } 100% { transform: none; } }
-  .zs-cross { fill: url(#zsSteelH); stroke: #0d1117; stroke-width: 1.5; transform: scaleX(0); transform-box: fill-box; transform-origin: left; }
-  .active .zs-cross { animation: zs-cross .3s cubic-bezier(.2,.9,.2,1) both calc(var(--b) * 90ms + 1620ms); }
-  @keyframes zs-cross { to { transform: none; } }
-  .zs-lock path { transform: translateY(-7px); } .active .zs-lock path { animation: zs-shackle .18s ease-in both 2.05s; }
-  @keyframes zs-shackle { to { transform: none; } }
-  .active .zs-lock circle { animation: zs-snap .5s ease-out both 2.05s; transform-box: fill-box; transform-origin: center; }
+  /* sealed boundary: a glowing perimeter traces around the micro-VM, then the lock snaps shut */
+  .zs-ring { fill: none; stroke: #d2a8ff; stroke-width: 4; stroke-dasharray: 1536; stroke-dashoffset: 1536; filter: drop-shadow(0 0 10px #a371f7); }
+  .active .zs-ring { animation: zs-ring .8s cubic-bezier(.6,0,.4,1) both .9s; }
+  @keyframes zs-ring { to { stroke-dashoffset: 0; } }
+  .zs-li { transform: translateY(-6px); opacity: .5; } .active .zs-li { animation: zs-shackle .18s ease-in both 1.9s; }
+  @keyframes zs-shackle { to { transform: none; opacity: 1; } }
+  .active .zs-lock circle { animation: zs-snap .5s ease-out both 1.9s; transform-box: fill-box; transform-origin: center; }
   @keyframes zs-snap { 0% { transform: scale(1); } 35% { transform: scale(1.3); filter: drop-shadow(0 0 22px #f778ba); stroke: #f778ba; } 100% { transform: scale(1); } }
-  .zs-host { fill: #3fb95012; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
-  .zs-kern.g { fill: #8957e526; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #3fb9501f; stroke: #2ea043; stroke-width: 2; }
-  .zs-kern.r { fill: #3fb95014; stroke: #3fb95088; stroke-width: 2; }
+  .zs-host { fill: #0e1a13eb; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
+  .zs-kern.g { fill: #1c1233f2; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #0e1a13f2; stroke: #2ea043; stroke-width: 2; }
+  .zs-kern.r { fill: #0d1117eb; stroke: #3fb95088; stroke-width: 2; }
   .zs-kt { font: 700 26px "Mona Sans"; text-anchor: middle; } .zs-kt.g { fill: #d2a8ff; } .zs-kt.h, .zs-kt.r { fill: #7ee787; }
   .zs-at { font: 600 15px var(--mono); letter-spacing: .1em; text-anchor: middle; } .zs-at.g { fill: #d2a8ff; } .zs-at.h { fill: #7ee787; text-anchor: start; }
-  .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; transition: opacity .3s, stroke .3s; }
+  .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; stroke-dasharray: 1; stroke-dashoffset: 1; transition: opacity .3s, stroke .3s, stroke-dashoffset .56s cubic-bezier(.45,0,.55,1); }
+  .zs-wire.on { stroke-dashoffset: 0; } .zs-wire.done { marker-end: url(#zsM); }
   .zs-wire.hot { opacity: 1; stroke: #7ee787; filter: drop-shadow(0 0 6px #3fb950); }
-  .zs-l { fill: #7ee787; font: 600 17px var(--mono); }
+  .zs-l { fill: #7ee787; font: 600 17px var(--mono); opacity: 0; transition: opacity .4s; } .zs-l.on { opacity: 1; }
   .zs-l.m { text-anchor: middle; }
   .zs-node rect { fill: #0d1117; stroke: #3fb950; stroke-width: 2; transition: stroke .3s, filter .3s; }
-  .zs-node.key rect { fill: #8957e533; stroke: #a371f7; }
+  .zs-node.key rect { fill: #24173f; stroke: #a371f7; }
   .zs-node.hot rect { filter: drop-shadow(0 0 16px #3fb950); stroke: #7ee787; }
   .zs-node.key.hot rect { filter: drop-shadow(0 0 18px #a371f7); stroke: #d2a8ff; }
   .zs-n { fill: #f0f6fc; font: 700 22px "Mona Sans"; text-anchor: middle; }
   .zs-s { fill: #9198a1; font: 600 15px var(--mono); text-anchor: middle; letter-spacing: .06em; }
-  .zs-key { fill: none; stroke: #e2c5ff; stroke-width: 3; stroke-linecap: round; transition: stroke .3s; }
-  .zs-node.hot .zs-key { stroke: #f778ba; filter: drop-shadow(0 0 8px #f778ba); }
+  .zs-key { fill: #e2c5ff; transition: fill .3s; }
+  .zs-node.hot .zs-key { fill: #f778ba; filter: drop-shadow(0 0 8px #f778ba); }
   .zs-folder { fill: #a371f7; } .zs-folder.h { fill: #2ea043; }
   .zs-ft { fill: #f0f6fc; font: 700 19px "Mona Sans"; text-anchor: middle; }
   .zs-eng rect { fill: #0d1117cc; stroke: #a371f7; stroke-width: 1.5; } .zs-eng text { fill: #e2c5ff; font: 600 17px var(--mono); text-anchor: middle; }
   .zs-none { fill: #f778ba; font: 700 17px var(--mono); letter-spacing: .08em; text-anchor: middle; }
-  .zs-nokey { fill: none; stroke: #f778ba99; stroke-width: 3; stroke-linecap: round; } .zs-nokey .x { stroke: #f778ba; stroke-width: 4; }
-  .zs-dest { fill: none; stroke-width: 3; } .zs-dest.gh { stroke: #4493f8; } .zs-dest.net { stroke: #4493f8; }
+  .zs-nokey { fill: #f778ba99; } .zs-nokey .x { fill: none; stroke: #f778ba; stroke-width: 4; stroke-linecap: round; }
+  .zs-dest { fill: #4493f8; transition: fill .3s; }
   .zs-dl { fill: #79c0ff; font: 600 17px var(--mono); text-anchor: middle; }
-  .zs-dest-g.hot .zs-dest { filter: drop-shadow(0 0 12px #4493f8); stroke: #79c0ff; }
-  .zs-cyl { fill: #3fb95033; stroke: #3fb950; stroke-width: 2; transition: filter .3s, stroke .3s; } .zs-cyl.top { fill: #3fb9505c; }
-  .zs-node.hot .zs-cyl { stroke: #7ee787; filter: drop-shadow(0 0 14px #3fb950); }
-  .zs-cut { opacity: 0; } .zs-cut circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; filter: drop-shadow(0 0 10px #f85149); }
-  .zs-cut path { stroke: #f85149; stroke-width: 5; stroke-linecap: round; } .zs-cut text { fill: #ff7b72; font: 600 17px var(--mono); text-anchor: middle; }
+  .zs-dest-g.hot .zs-dest { filter: drop-shadow(0 0 12px #4493f8); fill: #79c0ff; }
+  .zs-cyl { fill: #3fb950; transition: filter .3s, fill .3s; }
+  .zs-node.hot .zs-cyl { fill: #7ee787; filter: drop-shadow(0 0 14px #3fb950); }
+  .zs-cut { opacity: 0; fill: #f85149; } .zs-cut circle { fill: #0d1117; filter: drop-shadow(0 0 10px #f85149); }
+  .zs-cut text { fill: #ff7b72; font: 600 17px var(--mono); text-anchor: middle; }
   .zs-cut.on { opacity: 1; }
   .zs-phase { fill: #f0f6fc; font: 600 18px var(--mono); text-anchor: end; }
   .zs-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
@@ -1991,29 +2052,18 @@
   // Keys are the octicon name plus the grid size its path is drawn on.
   const OCTICONS = {
     "circle-slash-16": "M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM3.965 13.096a6.5 6.5 0 0 0 9.131-9.131ZM1.5 8a6.474 6.474 0 0 0 1.404 4.035l9.131-9.131A6.499 6.499 0 0 0 1.5 8Z",
-    "gear-24":
-      "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm-1.5 0a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0ZM12 1c.266 0 .532.009.797.028.763.055 1.345.617 1.512 1.304l.352 1.45c.019.078.09.171.225.221.247.089.49.19.728.302.13.061.246.044.315.002l1.275-.776c.603-.368 1.411-.353 1.99.147.402.349.78.726 1.128 1.129.501.578.515 1.386.147 1.99l-.776 1.274c-.042.069-.058.185.002.315.112.238.213.481.303.728.048.135.142.205.22.225l1.45.352c.687.167 1.249.749 1.303 1.512.038.531.038 1.063 0 1.594-.054.763-.616 1.345-1.303 1.512l-1.45.352c-.078.019-.171.09-.221.225-.089.248-.19.491-.302.728-.061.13-.044.246-.002.315l.776 1.275c.368.603.353 1.411-.147 1.99-.349.402-.726.78-1.129 1.128-.578.501-1.386.515-1.99.147l-1.274-.776c-.069-.042-.185-.058-.314.002a8.606 8.606 0 0 1-.729.303c-.135.048-.205.142-.225.22l-.352 1.45c-.167.687-.749 1.249-1.512 1.303-.531.038-1.063.038-1.594 0-.763-.054-1.345-.616-1.512-1.303l-.352-1.45c-.019-.078-.09-.171-.225-.221a8.138 8.138 0 0 1-.728-.302c-.13-.061-.246-.044-.315-.002l-1.275.776c-.603.368-1.411.353-1.99-.147-.402-.349-.78-.726-1.128-1.129-.501-.578-.515-1.386-.147-1.99l.776-1.274c.042-.069.058-.185-.002-.314a8.606 8.606 0 0 1-.303-.729c-.048-.135-.142-.205-.22-.225l-1.45-.352c-.687-.167-1.249-.749-1.304-1.512a11.158 11.158 0 0 1 0-1.594c.055-.763.617-1.345 1.304-1.512l1.45-.352c.078-.019.171-.09.221-.225.089-.248.19-.491.302-.728.061-.13.044-.246.002-.315l-.776-1.275c-.368-.603-.353-1.411.147-1.99.349-.402.726-.78 1.129-1.128.578-.501 1.386-.515 1.99-.147l1.274.776c.069.042.185.058.315-.002.238-.112.481-.213.728-.303.135-.048.205-.142.225-.22l.352-1.45c.167-.687.749-1.249 1.512-1.304C11.466 1.01 11.732 1 12 1Zm-.69 1.525c-.055.004-.135.05-.161.161l-.353 1.45a1.832 1.832 0 0 1-1.172 1.277 7.147 7.147 0 0 0-.6.249 1.833 1.833 0 0 1-1.734-.074l-1.274-.776c-.098-.06-.186-.036-.228 0a9.774 9.774 0 0 0-.976.976c-.036.042-.06.131 0 .228l.776 1.274c.314.529.342 1.18.074 1.734a7.147 7.147 0 0 0-.249.6 1.831 1.831 0 0 1-1.278 1.173l-1.45.351c-.11.027-.156.107-.16.162a9.63 9.63 0 0 0 0 1.38c.004.055.05.135.161.161l1.45.353a1.832 1.832 0 0 1 1.277 1.172c.074.204.157.404.249.6.268.553.24 1.204-.074 1.733l-.776 1.275c-.06.098-.036.186 0 .228.301.348.628.675.976.976.042.036.131.06.228 0l1.274-.776a1.83 1.83 0 0 1 1.734-.075c.196.093.396.176.6.25a1.831 1.831 0 0 1 1.173 1.278l.351 1.45c.027.11.107.156.162.16a9.63 9.63 0 0 0 1.38 0c.055-.004.135-.05.161-.161l.353-1.45a1.834 1.834 0 0 1 1.172-1.278 6.82 6.82 0 0 0 .6-.248 1.831 1.831 0 0 1 1.733.074l1.275.776c.098.06.186.036.228 0 .348-.301.675-.628.976-.976.036-.042.06-.131 0-.228l-.776-1.275a1.834 1.834 0 0 1-.075-1.733c.093-.196.176-.396.25-.6a1.831 1.831 0 0 1 1.278-1.173l1.45-.351c.11-.027.156-.107.16-.162a9.63 9.63 0 0 0 0-1.38c-.004-.055-.05-.135-.161-.161l-1.45-.353c-.626-.152-1.08-.625-1.278-1.172a6.576 6.576 0 0 0-.248-.6 1.833 1.833 0 0 1 .074-1.734l.776-1.274c.06-.098.036-.186 0-.228a9.774 9.774 0 0 0-.976-.976c-.042-.036-.131-.06-.228 0l-1.275.776a1.831 1.831 0 0 1-1.733.074 6.88 6.88 0 0 0-.6-.249 1.835 1.835 0 0 1-1.173-1.278l-.351-1.45c-.027-.11-.107-.156-.162-.16a9.63 9.63 0 0 0-1.38 0Z",
-    "globe-16":
-      "M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 1.363 4.177c.255.426.542.832.857 1.215.245-.296.551-.705.857-1.215A9.64 9.64 0 0 0 10.22 8.75Zm4.44-1.5a9.64 9.64 0 0 0-1.363-4.177c-.307-.51-.612-.919-.857-1.215a9.927 9.927 0 0 0-.857 1.215A9.64 9.64 0 0 0 5.78 7.25Zm-5.944 1.5H1.543a6.507 6.507 0 0 0 4.666 5.5c-.123-.181-.24-.365-.352-.552-.715-1.192-1.437-2.874-1.581-4.948Zm-2.733-1.5h2.733c.144-2.074.866-3.756 1.58-4.948.12-.197.237-.381.353-.552a6.507 6.507 0 0 0-4.666 5.5Zm10.181 1.5c-.144 2.074-.866 3.756-1.58 4.948-.12.197-.237.381-.353.552a6.507 6.507 0 0 0 4.666-5.5Zm2.733-1.5a6.507 6.507 0 0 0-4.666-5.5c.123.181.24.365.353.552.714 1.192 1.436 2.874 1.58 4.948Z",
-    "north-star-16":
-      "M8.5.75a.75.75 0 0 0-1.5 0v5.19L4.391 3.33a.75.75 0 1 0-1.06 1.061L5.939 7H.75a.75.75 0 0 0 0 1.5h5.19l-2.61 2.609a.75.75 0 1 0 1.061 1.06L7 9.561v5.189a.75.75 0 0 0 1.5 0V9.56l2.609 2.61a.75.75 0 1 0 1.06-1.061L9.561 8.5h5.189a.75.75 0 0 0 0-1.5H9.56l2.61-2.609a.75.75 0 0 0-1.061-1.06L8.5 5.939V.75Z",
-    "organization-16":
-      "M1.75 16A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0h8.5C11.216 0 12 .784 12 1.75v12.5c0 .085-.006.168-.018.25h2.268a.25.25 0 0 0 .25-.25V8.285a.25.25 0 0 0-.111-.208l-1.055-.703a.749.749 0 1 1 .832-1.248l1.055.703c.487.325.779.871.779 1.456v5.965A1.75 1.75 0 0 1 14.25 16h-3.5a.766.766 0 0 1-.197-.026c-.099.017-.2.026-.303.026h-3a.75.75 0 0 1-.75-.75V14h-1v1.25a.75.75 0 0 1-.75.75Zm-.25-1.75c0 .138.112.25.25.25H4v-1.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .75.75v1.25h2.25a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25ZM3.75 6h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 3.75A.75.75 0 0 1 3.75 3h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 3.75Zm4 3A.75.75 0 0 1 7.75 6h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 6.75ZM7.75 3h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 9.75A.75.75 0 0 1 3.75 9h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 9.75ZM7.75 9h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z",
-    "repo-16":
-      "M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z",
-    "workflow-16":
-      "M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7H4v4a1 1 0 0 0 1 1h4v-1.25C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25v-.75H5A2.5 2.5 0 0 1 2.5 11V7h-.75A1.75 1.75 0 0 1 0 5.25Zm1.75-.25a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Zm9 9a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Z",
+    "gear-24": "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm-1.5 0a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0ZM12 1c.266 0 .532.009.797.028.763.055 1.345.617 1.512 1.304l.352 1.45c.019.078.09.171.225.221.247.089.49.19.728.302.13.061.246.044.315.002l1.275-.776c.603-.368 1.411-.353 1.99.147.402.349.78.726 1.128 1.129.501.578.515 1.386.147 1.99l-.776 1.274c-.042.069-.058.185.002.315.112.238.213.481.303.728.048.135.142.205.22.225l1.45.352c.687.167 1.249.749 1.303 1.512.038.531.038 1.063 0 1.594-.054.763-.616 1.345-1.303 1.512l-1.45.352c-.078.019-.171.09-.221.225-.089.248-.19.491-.302.728-.061.13-.044.246-.002.315l.776 1.275c.368.603.353 1.411-.147 1.99-.349.402-.726.78-1.129 1.128-.578.501-1.386.515-1.99.147l-1.274-.776c-.069-.042-.185-.058-.314.002a8.606 8.606 0 0 1-.729.303c-.135.048-.205.142-.225.22l-.352 1.45c-.167.687-.749 1.249-1.512 1.303-.531.038-1.063.038-1.594 0-.763-.054-1.345-.616-1.512-1.303l-.352-1.45c-.019-.078-.09-.171-.225-.221a8.138 8.138 0 0 1-.728-.302c-.13-.061-.246-.044-.315-.002l-1.275.776c-.603.368-1.411.353-1.99-.147-.402-.349-.78-.726-1.128-1.129-.501-.578-.515-1.386-.147-1.99l.776-1.274c.042-.069.058-.185-.002-.314a8.606 8.606 0 0 1-.303-.729c-.048-.135-.142-.205-.22-.225l-1.45-.352c-.687-.167-1.249-.749-1.304-1.512a11.158 11.158 0 0 1 0-1.594c.055-.763.617-1.345 1.304-1.512l1.45-.352c.078-.019.171-.09.221-.225.089-.248.19-.491.302-.728.061-.13.044-.246.002-.315l-.776-1.275c-.368-.603-.353-1.411.147-1.99.349-.402.726-.78 1.129-1.128.578-.501 1.386-.515 1.99-.147l1.274.776c.069.042.185.058.315-.002.238-.112.481-.213.728-.303.135-.048.205-.142.225-.22l.352-1.45c.167-.687.749-1.249 1.512-1.304C11.466 1.01 11.732 1 12 1Zm-.69 1.525c-.055.004-.135.05-.161.161l-.353 1.45a1.832 1.832 0 0 1-1.172 1.277 7.147 7.147 0 0 0-.6.249 1.833 1.833 0 0 1-1.734-.074l-1.274-.776c-.098-.06-.186-.036-.228 0a9.774 9.774 0 0 0-.976.976c-.036.042-.06.131 0 .228l.776 1.274c.314.529.342 1.18.074 1.734a7.147 7.147 0 0 0-.249.6 1.831 1.831 0 0 1-1.278 1.173l-1.45.351c-.11.027-.156.107-.16.162a9.63 9.63 0 0 0 0 1.38c.004.055.05.135.161.161l1.45.353a1.832 1.832 0 0 1 1.277 1.172c.074.204.157.404.249.6.268.553.24 1.204-.074 1.733l-.776 1.275c-.06.098-.036.186 0 .228.301.348.628.675.976.976.042.036.131.06.228 0l1.274-.776a1.83 1.83 0 0 1 1.734-.075c.196.093.396.176.6.25a1.831 1.831 0 0 1 1.173 1.278l.351 1.45c.027.11.107.156.162.16a9.63 9.63 0 0 0 1.38 0c.055-.004.135-.05.161-.161l.353-1.45a1.834 1.834 0 0 1 1.172-1.278 6.82 6.82 0 0 0 .6-.248 1.831 1.831 0 0 1 1.733.074l1.275.776c.098.06.186.036.228 0 .348-.301.675-.628.976-.976.036-.042.06-.131 0-.228l-.776-1.275a1.834 1.834 0 0 1-.075-1.733c.093-.196.176-.396.25-.6a1.831 1.831 0 0 1 1.278-1.173l1.45-.351c.11-.027.156-.107.16-.162a9.63 9.63 0 0 0 0-1.38c-.004-.055-.05-.135-.161-.161l-1.45-.353c-.626-.152-1.08-.625-1.278-1.172a6.576 6.576 0 0 0-.248-.6 1.833 1.833 0 0 1 .074-1.734l.776-1.274c.06-.098.036-.186 0-.228a9.774 9.774 0 0 0-.976-.976c-.042-.036-.131-.06-.228 0l-1.275.776a1.831 1.831 0 0 1-1.733.074 6.88 6.88 0 0 0-.6-.249 1.835 1.835 0 0 1-1.173-1.278l-.351-1.45c-.027-.11-.107-.156-.162-.16a9.63 9.63 0 0 0-1.38 0Z",
+    "globe-16": "M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 1.363 4.177c.255.426.542.832.857 1.215.245-.296.551-.705.857-1.215A9.64 9.64 0 0 0 10.22 8.75Zm4.44-1.5a9.64 9.64 0 0 0-1.363-4.177c-.307-.51-.612-.919-.857-1.215a9.927 9.927 0 0 0-.857 1.215A9.64 9.64 0 0 0 5.78 7.25Zm-5.944 1.5H1.543a6.507 6.507 0 0 0 4.666 5.5c-.123-.181-.24-.365-.352-.552-.715-1.192-1.437-2.874-1.581-4.948Zm-2.733-1.5h2.733c.144-2.074.866-3.756 1.58-4.948.12-.197.237-.381.353-.552a6.507 6.507 0 0 0-4.666 5.5Zm10.181 1.5c-.144 2.074-.866 3.756-1.58 4.948-.12.197-.237.381-.353.552a6.507 6.507 0 0 0 4.666-5.5Zm2.733-1.5a6.507 6.507 0 0 0-4.666-5.5c.123.181.24.365.353.552.714 1.192 1.436 2.874 1.58 4.948Z",
+    "north-star-16": "M8.5.75a.75.75 0 0 0-1.5 0v5.19L4.391 3.33a.75.75 0 1 0-1.06 1.061L5.939 7H.75a.75.75 0 0 0 0 1.5h5.19l-2.61 2.609a.75.75 0 1 0 1.061 1.06L7 9.561v5.189a.75.75 0 0 0 1.5 0V9.56l2.609 2.61a.75.75 0 1 0 1.06-1.061L9.561 8.5h5.189a.75.75 0 0 0 0-1.5H9.56l2.61-2.609a.75.75 0 0 0-1.061-1.06L8.5 5.939V.75Z",
+    "organization-16": "M1.75 16A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0h8.5C11.216 0 12 .784 12 1.75v12.5c0 .085-.006.168-.018.25h2.268a.25.25 0 0 0 .25-.25V8.285a.25.25 0 0 0-.111-.208l-1.055-.703a.749.749 0 1 1 .832-1.248l1.055.703c.487.325.779.871.779 1.456v5.965A1.75 1.75 0 0 1 14.25 16h-3.5a.766.766 0 0 1-.197-.026c-.099.017-.2.026-.303.026h-3a.75.75 0 0 1-.75-.75V14h-1v1.25a.75.75 0 0 1-.75.75Zm-.25-1.75c0 .138.112.25.25.25H4v-1.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .75.75v1.25h2.25a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25ZM3.75 6h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 3.75A.75.75 0 0 1 3.75 3h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 3.75Zm4 3A.75.75 0 0 1 7.75 6h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 6.75ZM7.75 3h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 9.75A.75.75 0 0 1 3.75 9h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 9.75ZM7.75 9h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z",
+    "repo-16": "M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z",
+    "workflow-16": "M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7H4v4a1 1 0 0 0 1 1h4v-1.25C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25v-.75H5A2.5 2.5 0 0 1 2.5 11V7h-.75A1.75 1.75 0 0 1 0 5.25Zm1.75-.25a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Zm9 9a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Z",
   };
   const octPaths = {};
   const octicon = (ctx, name, x, y, size, color) => {
-    const n = +name.slice(name.lastIndexOf("-") + 1),
-      p = (octPaths[name] ??= new Path2D(OCTICONS[name]));
-    ctx.save();
-    ctx.translate(x - size / 2, y - size / 2);
-    ctx.scale(size / n, size / n);
-    ctx.fillStyle = color;
-    ctx.fill(p);
-    ctx.restore();
+    const n = +name.slice(name.lastIndexOf("-") + 1), p = (octPaths[name] ??= new Path2D(OCTICONS[name]));
+    ctx.save(); ctx.translate(x - size / 2, y - size / 2); ctx.scale(size / n, size / n);
+    ctx.fillStyle = color; ctx.fill(p); ctx.restore();
   };
 
   // ---------- slides ----------
@@ -2818,7 +2868,12 @@
 
     const cards = SC.map((s, i) => h("div", { class: "atk-card" }, h("b", {}, i + 1), h("h4", {}, s.t), h("p", {}, s.d)));
     const body = h("div", { class: "atk-body" });
-    const term = h("div", { class: "atk-term" }, h("header", {}, h("i"), h("i"), h("i"), h("span", {}, "agent · sandboxed · read-only token")), body);
+    const term = h(
+      "div",
+      { class: "atk-term" },
+      h("header", {}, h("i"), h("i"), h("i"), h("span", {}, "agent · sandboxed · read-only token")),
+      body
+    );
     const rows = DEFS.map(([tag, name, d]) => {
       const stamp = h("s", {}, "BLOCKED");
       const row = h("div", { class: "atk-def" }, h("i", { class: tag === "SUBSTRATE" ? "sub" : "" }, tag), h("h4", {}, name), h("p", {}, d), stamp);
@@ -2923,7 +2978,7 @@
         const s = t - t0,
           p = plan[sc];
         while (ix < p.ev.length && s >= p.ev[ix][0]) {
-          if (typing) ((typing.ln.textContent = typing.text), typing.ln.classList.remove("typing"));
+          if (typing) (typing.ln.textContent = typing.text), typing.ln.classList.remove("typing");
           typing = null;
           const [, li, ty] = p.ev[ix++];
           emit(SC[sc].lines[li], ty);
@@ -2935,7 +2990,7 @@
             typing.ln.textContent = typing.text.slice(0, k);
             if (typing.text[k - 1] !== " ") sfx.key(0.7);
           }
-          if (k >= typing.text.length) (typing.ln.classList.remove("typing"), (typing = null));
+          if (k >= typing.text.length) typing.ln.classList.remove("typing"), (typing = null);
         }
         if (s > p.len) {
           done.add(sc);
@@ -3158,59 +3213,57 @@
     });
     const CYC = T + HOLD;
     const build = () => {
-      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-      const key = (x, y) => `<g class="zs-key" transform="translate(${x},${y})"><circle cx="0" cy="0" r="8"/><path d="M8 0 H30 M22 0 V8 M28 0 V6"/></g>`;
+      // fill = null leaves the colour to CSS
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})"${fill ? ` fill="${fill}"` : ""}>${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      const key = (x, y) => `<g class="zs-key">${ico("key", x + 15, y, 30, null)}</g>`;
       const folder = (x, y, w, ht, cls = "") => `<path class="zs-folder ${cls}" d="M${x} ${y + 8} q0 -8 8 -8 h${w * 0.32} l10 12 h${w * 0.68 - 26} q8 0 8 8 v${ht - 28} q0 8 -8 8 h${-(w - 16)} q-8 0 -8 -8z"/>`;
       const box = (id, x, y, w, ht, name, sub, isKey) =>
         `<g class="zs-node${isKey ? " key" : ""}" id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${ht}" rx="12"/><text class="zs-n" x="${x + w / 2}" y="${y + (isKey ? 38 : ht / 2 + (sub ? -2 : 8))}">${name}</text>${
           isKey ? key(x + w / 2 - 15, y + ht - 28) : sub ? `<text class="zs-s" x="${x + w / 2}" y="${y + ht / 2 + 24}">${sub}</text>` : ""
         }</g>`;
       let g = `<defs><marker id="zsM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>`;
-      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient>`;
-      g += `<linearGradient id="zsSteel"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
-      g += `<linearGradient id="zsSteelH" x2="0" y2="1"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
-      g += `<clipPath id="zsCell"><rect x="0" y="0" width="300" height="450" rx="18"/></clipPath></defs>`;
-      // runner VM, kernels and the two areas
-      g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
-      g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
+      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient></defs>`;
+      // build order: the agent's micro-VM seals first, then the host and its services, the wires between them, the exits, and finally the kernels and runner underneath
+      g += `<g class="zs-area" style="--d:3.1s"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
+      g += `<g class="zs-area" style="--d:2.9s"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
       g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
-      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
+      g += `<g class="zs-area" style="--d:2.1s"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
+      g += `<g class="zs-area zs-vm-g" style="--d:.3s"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
       g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
-      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/><g class="zs-bot" fill="none" stroke="#f0f6fc" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M150 128 V138"/><circle cx="150" cy="125" r="4" fill="#f0f6fc"/><rect x="126" y="138" width="48" height="38" rx="10"/><path d="M121 150 V164 M179 150 V164"/><circle cx="140" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><circle cx="160" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><path d="M142 166 H158"/></g><text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
+      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/>${ico("copilot", 150, 156, 58)}<text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
       [
         ["copilot", 14],
         ["claude", 107],
         ["codex", 200],
       ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="248" width="86" height="38" rx="19"/><text x="${x + 43}" y="273">${n}</text></g>`));
-      g += `<g class="zs-nokey" transform="translate(138,340)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
+      g += `<g class="zs-nokey">${ico("key", 150, 340, 40, null)}<path class="x" d="M124 316 L176 364"/></g>`;
       g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text>`;
       g += `<rect class="zs-port" x="290" y="226" width="20" height="28" rx="5"/>`;
-      // jail cell: bars slam down, crossbars slide in, then the lock snaps shut and the bars dim
-      g += `<g class="zs-bars" clip-path="url(#zsCell)">${[0, 1, 2, 3, 4, 5, 6].map(b => `<rect class="zs-bar" style="--b:${b}" x="${26 + b * 40}" y="-4" width="10" height="458" rx="5"/>`).join("")}`;
-      g += `${[94, 303].map((y, b) => `<rect class="zs-cross" style="--b:${b}" x="-4" y="${y}" width="308" height="10" rx="5"/>`).join("")}</g>`;
-      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g></g>`;
-      g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
+      // sealed boundary: a glowing perimeter traces around the VM, then the lock snaps shut
+      g += `<rect class="zs-ring" x="-10" y="-10" width="320" height="470" rx="26"/>`;
+      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><g class="zs-li">${ico("lock", 150, 0, 26, null)}</g></g></g>`;
       // wires and labels
-      g += `<g class="zs-area" style="--i:4">`;
-      for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" marker-end="url(#zsM)"/>`;
-      g += `<text class="zs-l" x="392" y="85">virtiofs</text><text class="zs-l" x="392" y="230">MCP</text><text class="zs-l" x="392" y="335">LLM API</text><text class="zs-l m" x="860" y="410">internet traffic</text>`;
+      g += `<g class="zs-area" style="--d:2.5s">`;
+      // wires draw in the first time a request travels them; labels follow their wire
+      for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" pathLength="1"/>`;
+      g += `<text class="zs-l" data-e="zsFs" x="392" y="85">virtiofs</text><text class="zs-l" data-e="zsMcp" x="392" y="230">MCP</text><text class="zs-l" data-e="zsLlm" x="392" y="335">LLM API</text><text class="zs-l m" data-e="zsNet" x="860" y="410">internet traffic</text>`;
       g += `</g>`;
       // host services
-      g += `<g class="zs-area" style="--i:5">`;
+      g += `<g class="zs-area" style="--d:2.3s">`;
       g += `<g class="zs-node" id="zsNFs">${folder(500, 56, 170, 80, "h")}<text class="zs-ft" x="585" y="98">workspace</text><text class="zs-ft" x="585" y="121">tool cache</text></g>`;
       g += box("zsNGw", 490, 200, 190, 80, "MCP gateway", "routes tools");
       g += box("zsNProxy", 490, 305, 190, 84, "API proxy", "", true);
       g += box("zsNSo", 790, 55, 200, 80, "Safe outputs", "proposals");
       g += box("zsNGhMcp", 790, 198, 200, 84, "GitHub MCP", "", true);
       g += box("zsNSquid", 1090, 200, 330, 80, "Squid firewall", "egress allowlist");
-      g += `<g class="zs-node" id="zsNArt"><path class="zs-cyl" d="M1195 66 V124 A45 12 0 0 0 1285 124 V66"/><ellipse class="zs-cyl top" cx="1240" cy="66" rx="45" ry="12"/><text class="zs-s" x="1240" y="164">ACTION ARTIFACTS</text></g>`;
-      g += `<g class="zs-cut" id="zsCut"><circle cx="1512" cy="240" r="20"/><path d="M1503 231 L1521 249 M1521 231 L1503 249"/><text x="1512" y="290">not allowed</text></g>`;
+      g += `<g class="zs-node" id="zsNArt"><g class="zs-cyl">${ico("package", 1240, 98, 64, null)}</g><text class="zs-s" x="1240" y="164">ACTION ARTIFACTS</text></g>`;
+      g += `<g class="zs-cut" id="zsCut"><circle cx="1512" cy="240" r="22"/>${ico("xCircle", 1512, 240, 40, null)}<text x="1512" y="290">not allowed</text></g>`;
       g += `</g>`;
       // destinations outside the runner
-      g += `<g class="zs-area" style="--i:6">`;
-      g += `<g class="zs-dest-g" id="zsDGh" transform="translate(1650,95)"><path class="zs-dest gh" d="M0 -34 L28 -23 V2 C28 20 13 30 0 36 C-13 30 -28 20 -28 2 V-23 Z"/><path class="zs-dest gh" d="M-11 0 L-3 9 L12 -8"/></g>`;
+      g += `<g class="zs-area" style="--d:2.7s">`;
+      g += `<g class="zs-dest-g" id="zsDGh"><g class="zs-dest">${ico("github", 1650, 95, 64, null)}</g></g>`;
       g += `<text class="zs-dl" x="1650" y="158">allow/deny</text><text class="zs-dl" x="1650" y="180">GitHub updates</text>`;
-      g += `<g class="zs-dest-g" id="zsDNet" transform="translate(1650,240)"><path class="zs-dest net" d="M-34 16 H32 A16 16 0 0 0 28 -14 A22 22 0 0 0 -12 -20 A18 18 0 0 0 -34 16 Z"/></g>`;
+      g += `<g class="zs-dest-g" id="zsDNet"><g class="zs-dest">${ico("globe", 1650, 240, 60, null)}</g></g>`;
       g += `<text class="zs-dl" x="1650" y="294">allow/deny</text><text class="zs-dl" x="1650" y="316">hosts/ports</text>`;
       g += `</g>`;
       g += `<text class="zs-phase" id="zsPhase" x="1476" y="34"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
@@ -3220,8 +3273,8 @@
       t0 = 0,
       cyc = -1,
       state = "",
-      jail = 0;
-    const JAIL = 1300;
+      seal = 0;
+    const SEAL = 2400;
     const $ = id => svg.querySelector("#" + id);
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     slides.push({
@@ -3230,7 +3283,7 @@
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
-        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
+        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; a sealed boundary traces around it and locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
       enter() {
         if (!built) {
           built = true;
@@ -3239,19 +3292,20 @@
         t0 = 0;
         cyc = -1;
         state = "";
-        jail = 0;
+        seal = 0;
+        svg.querySelectorAll(".zs-wire, .zs-l").forEach(x => x.classList.remove("on", "done"));
       },
       tick(t) {
         if (!t0) t0 = t;
         const raw = t - t0;
-        if (jail === 0 && raw >= 1330) {
-          jail = 1;
+        if (seal === 0 && raw >= 1700) {
+          seal = 1;
           sfx.block();
-        } else if (jail === 1 && raw >= 2050) {
-          jail = 2;
+        } else if (seal === 1 && raw >= 1900) {
+          seal = 2;
           sfx.key(1);
         }
-        const e = Math.max(0, raw - JAIL),
+        const e = Math.max(0, raw - SEAL),
           c = Math.floor(e / CYC),
           u = e % CYC;
         if (c !== cyc) {
@@ -3262,8 +3316,17 @@
         for (let i = 0; i < FLOW_AT.length; i++) if (u >= FLOW_AT[i]) f = i;
         const segs = SEGS.filter(s => s.f === f);
         const cur = segs.find(s => u >= s.t0 && u < s.t0 + SEG);
-        const done = segs.filter(s => u >= s.t0 + SEG).length;
         const deny = f >= 0 && FLOWS[f][2];
+        for (const s of segs) {
+          if (u < s.t0 || (deny && s.k === segs.length - 1)) continue;
+          const w = $(s.e);
+          if (!w.classList.contains("on")) {
+            w.classList.add("on");
+            svg.querySelectorAll(`[data-e="${s.e}"]`).forEach(x => x.classList.add("on"));
+          }
+          if (u >= s.t0 + SEG) w.classList.add("done");
+        }
+        const done = segs.filter(s => u >= s.t0 + SEG).length;
         const flowEnd = f >= 0 ? FLOW_AT[f] + segs.length * SEG + GAP - 150 : 0;
         const live = f >= 0 && u < flowEnd;
         const st = `${f}:${done}:${live}`;
@@ -3787,227 +3850,6 @@
     });
   }
 
-  // The Great Escapi: a daily red-team agent tries a new firewall escape each run; 400 recorded techniques fail, #401 (SNI domain fronting through a CDN-shared allowed host) escapes, and the firewall is fixed to check the TLS SNI. Counts and dates are measured from the workflow's repo memory
-  {
-    resetIndex();
-    const VW = 1800,
-      VH = 600;
-    // measured: The Great Escapi's repo memory (escape-attempts.json), 426 techniques in order, 15 Feb to 22 Sep 2026
-    const N = 426,
-      FIRST = 400,
-      ESC = new Set([400, 401, 402, 404, 405, 406, 409, 410, 411, 422, 423, 424, 425]),
-      MONTHS = [
-        [0, "FEB"],
-        [37, "JUL"],
-        [85, "AUG"],
-        [321, "SEP"],
-      ];
-    const ROWS = 3,
-      X0 = 60,
-      PITCH = 11.75,
-      CY0 = 432,
-      CS = 10;
-    const cx = i => X0 + Math.floor(i / ROWS) * PITCH;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg ge-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      "The Great Escapi: 426 recorded escape attempts; the first 400 are blocked, attempt 401 escapes by opening a tunnel to an allowed host on a shared CDN and asking for a different host in the TLS SNI, and the firewall fix checks the SNI against the allowlist"
-    );
-    const build = () => {
-      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-      // [id, path, color, label, lx, ly]
-      const EDGES = [
-        ["geW1", "M300 200 H520", "b", ["CONNECT", "registry.npmjs.org"], 410, 126],
-        ["geW2", "M745 200 H950", "o", ["TLS ClientHello", "SNI = contoso.com"], 850, 126],
-        ["geW3", "M1210 186 C1290 186 1290 120 1360 120", "g", [], 0, 0],
-        ["geW4", "M1210 214 C1290 214 1290 280 1360 280", "r", [], 0, 0],
-      ];
-      let g = `<defs><radialGradient id="geAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ff9b94"/><stop offset=".55" stop-color="#da3633"/><stop offset="1" stop-color="#6e1013"/></radialGradient>`;
-      for (const [k, c] of [
-        ["b", "#4493f8"],
-        ["o", "#d29922"],
-        ["g", "#3fb950"],
-        ["r", "#f85149"],
-      ])
-        g += `<marker id="geM${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
-      g += `</defs>`;
-      g += `<rect class="ge-box" x="20" y="70" width="270" height="260" rx="22"/><text class="ge-box-t" x="155" y="104">AWF SANDBOX</text>`;
-      for (const [id, d, c, lab, lx, ly] of EDGES) {
-        g += `<path class="ge-wire ${c}" id="${id}" d="${d}" marker-end="url(#geM${c})"/>`;
-        if (lab.length) g += `<text class="ge-l ${c}" x="${lx}" y="${ly}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-      }
-      g += `<g class="ge-node" id="geAgent"><circle cx="155" cy="200" r="54" fill="url(#geAgentG)"/>${ico("copilot", 155, 202, 58)}<text class="ge-n" x="155" y="294">Great Escapi</text></g>`;
-      g += `<g class="ge-node ge-proxy" id="geSquid"><rect x="525" y="120" width="215" height="160" rx="18"/><text class="ge-k" x="632" y="160">EGRESS PROXY</text><text class="ge-n" x="632" y="202">allowlist</text><text class="ge-s" id="geSquidT" x="632" y="244"></text></g>`;
-      g += `<g class="ge-node" id="geCdn"><rect x="955" y="130" width="250" height="140" rx="70"/><text class="ge-k" x="1080" y="186">SHARED CDN EDGE</text><text class="ge-s" x="1080" y="226">routes by SNI</text></g>`;
-      g += `<g class="ge-node ge-dest ok" id="geOk"><rect x="1365" y="88" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="129">registry.npmjs.org</text><text class="ge-tag g" x="1677" y="128">allowed</text></g>`;
-      g += `<g class="ge-node ge-dest bad" id="geBad"><rect x="1365" y="248" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="289">contoso.com</text><text class="ge-tag r" x="1677" y="288">not allowed</text><text class="ge-hit" id="geHit" x="1530" y="350">ESCAPED · 200 OK</text></g>`;
-      g += `<g class="ge-cut" id="geCut"><circle cx="800" cy="200" r="22"/><path d="M790 190 L810 210 M810 190 L790 210"/></g>`;
-      g += `<text class="ge-phase" id="gePhase" x="${VW - 60}" y="40"></text>`;
-      g += `<text class="ge-h" x="${X0}" y="402">EACH SQUARE IS ONE ESCAPE TECHNIQUE, IN THE ORDER THE AGENT TRIED THEM</text><text class="ge-h ge-cnt" id="geCnt" x="${cx(N - 1) + CS}" y="402"></text>`;
-      for (let i = 0; i < N; i++) g += `<rect class="ge-c${ESC.has(i) ? " x" : ""}" id="geC${i}" x="${cx(i)}" y="${CY0 + (i % ROWS) * PITCH}" width="${CS}" height="${CS}" rx="2"/>`;
-      const yb = CY0 + ROWS * PITCH + 4;
-      for (const [i, m] of MONTHS) g += `<line class="ge-tick" x1="${cx(i)}" y1="${yb}" x2="${cx(i)}" y2="${yb + 14}"/><text class="ge-m" x="${cx(i)}" y="${yb + 36}">${m}</text>`;
-      const xf = cx(FIRST) + CS / 2;
-      g += `<g class="ge-mark r" id="geFirst"><line x1="${xf}" y1="${yb}" x2="${xf}" y2="${yb + 62}"/><text x="${xf}" y="${yb + 88}" text-anchor="end">#401 · first escape · 14 Sep</text></g>`;
-      const xe = cx(N - 1) + CS + 8;
-      g += `<g class="ge-mark g" id="geFix"><path d="M${xe} ${CY0 - 4} H${xe + 10} V${CY0 + ROWS * PITCH} H${xe}"/><text x="${xe + 10}" y="402" text-anchor="end">firewall fix · 22 Sep</text></g>`;
-      g += `<circle class="ge-dot" id="geDot" r="9"/>`;
-      svg.innerHTML = g;
-    };
-    // measured from the same memory and the firewall pull request
-    const STATS = [
-      [400, "", "techniques blocked before the first escape", "#8b949e", "#c9d1d9"],
-      [401, "#", "SNI domain fronting through a CDN-shared allowed host", "#ff7b72", "#d29922"],
-      [13, "", "escapes logged, all variants of that one tunnel trick", "#d29922", "#ff7b72"],
-      [8, " days", "from first escape to the firewall fix", "#3fb950", "#79c0ff"],
-    ];
-    const fmt = (v, i) => (STATS[i][1] === "#" ? "#" + v : v + STATS[i][1]);
-    const nums = STATS.map((s, i) => h("div", { class: "ct-num" }, fmt(0, i)));
-    const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
-    // [phase, ms into the cycle]
-    const P = {
-      sweep: 600,
-      first: 4200,
-      w1: 4600,
-      w2: 5600,
-      w4: 6800,
-      hit: 7600,
-      more: 8200,
-      fix: 10200,
-      w1b: 10800,
-      w2b: 11800,
-      cut: 12400,
-    };
-    const CYC = 16000;
-    let built = false,
-      t0 = 0,
-      cyc = -1,
-      seen = new Set(),
-      lit = 0;
-    const $ = id => svg.querySelector("#" + id);
-    const fire = (name, fn) => {
-      if (seen.has(name)) return;
-      seen.add(name);
-      fn();
-    };
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const along = (id, f, col) => {
-      const p = $(id),
-        q = p.getPointAtLength(p.getTotalLength() * ease(Math.max(0, Math.min(1, f)))),
-        dot = $("geDot");
-      dot.setAttribute("cx", q.x);
-      dot.setAttribute("cy", q.y);
-      dot.setAttribute("fill", col);
-      dot.style.opacity = 1;
-      p.classList.add("hot");
-    };
-    const lightTo = n => {
-      for (; lit < n; lit++) $("geC" + lit).classList.add("on");
-      $("geCnt").textContent = lit ? "#" + String(lit).padStart(3, "0") : "";
-    };
-    slides.push({
-      group: "security",
-      sound: "escape",
-      palette: ["#8e1519", "#1f6feb", "#3d0a0d", "#238636"],
-      notes:
-        "The Great Escapi is gh-aw's own red-team workflow: every day an agent runs inside the agent workflow firewall (AWF) with instructions to escape it, reads repo memory of every technique already tried so it never repeats one, tries something new, and writes the result back. The squares are measured from that memory: 426 recorded techniques between 15 February and 22 September 2026, in order. The first 400 were all blocked: DNS tricks, IPv6, request smuggling, encoding games, container and kernel escapes, proxy bypasses. Attempt 401, on 14 September, escaped. The agent noticed that a newly allowed package registry sits on a shared CDN, opened a proxy tunnel to it, which the allowlist accepts, and then asked for a different site in the TLS handshake's SNI. The proxy only checked the CONNECT target, so the CDN served the forbidden site. Over the next eight days the agent logged 13 escapes, all variants of that one trick, through more allowed hosts. Its report on 22 September went to the firewall team, and the same day the firewall shipped a fix: the proxy now peeks at the TLS ClientHello without decrypting it and terminates the connection unless the SNI is on the allowlist. The attack diagram is illustrative and simplified; the counts and dates are measured from the workflow's memory and the firewall pull request.",
-      enter() {
-        if (!built) {
-          built = true;
-          build();
-        }
-        t0 = 0;
-        cyc = -1;
-        nums.forEach((n, i) => (n.textContent = fmt(0, i)));
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC,
-          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
-        nums.forEach((n, i) => (n.textContent = fmt(Math.round(STATS[i][0] * f), i)));
-        if (c !== cyc) {
-          cyc = c;
-          seen = new Set();
-          lit = 0;
-          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
-          svg.classList.remove("fixed");
-          $("geSquidT").textContent = "";
-          $("gePhase").textContent = "";
-          $("geCnt").textContent = "";
-          $("geAgent").classList.add("on");
-          $("geSquid").classList.add("on");
-        }
-        svg.querySelectorAll(".ge-wire.hot").forEach(w => w.classList.remove("hot"));
-        const dot = $("geDot");
-        dot.style.opacity = 0;
-        if (u >= P.sweep && u < P.first) {
-          const n = Math.floor(((u - P.sweep) / (P.first - P.sweep)) * FIRST);
-          if (Math.floor(n / 25) !== Math.floor(lit / 25)) sfx.key(0.5);
-          lightTo(n);
-          fire("sweep", () => ($("gePhase").textContent = "attempts 1–400 · all blocked"));
-        }
-        if (u >= P.first) {
-          fire("first", () => {
-            lightTo(FIRST + 1);
-            $("geFirst").classList.add("on");
-            $("gePhase").textContent = "attempt #401 · 14 Sep 2026";
-            sfx.block(false);
-          });
-        }
-        if (u >= P.w1 && u < P.w2) along("geW1", (u - P.w1) / 800, "#4493f8");
-        if (u >= P.w1 + 800) fire("ok1", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
-        if (u >= P.w2 && u < P.w4) {
-          along("geW2", (u - P.w2) / 900, "#d29922");
-          fire("pass", () => ($("geSquidT").textContent = "tunnel open"));
-        }
-        if (u >= P.w2 + 900) fire("cdn", () => ($("geCdn").classList.add("on"), sfx.pop(4)));
-        if (u >= P.w4 && u < P.hit) along("geW4", (u - P.w4) / 700, "#f85149");
-        if (u >= P.hit && u < P.fix)
-          fire("hit", () => {
-            $("geBad").classList.add("on", "hot");
-            $("geW4").classList.add("on");
-            sfx.bug();
-          });
-        if (u >= P.more && u < P.fix) {
-          lightTo(FIRST + 1 + Math.floor(Math.min(1, (u - P.more) / 1600) * (N - FIRST - 1)));
-          fire("more", () => ($("gePhase").textContent = "13 escapes logged in 8 days"));
-        }
-        if (u >= P.fix)
-          fire("fix", () => {
-            lightTo(N);
-            ["geBad", "geW4", "geCdn"].forEach(id => $(id).classList.remove("on", "hot"));
-            svg.classList.add("fixed");
-            $("geFix").classList.add("on");
-            $("geSquidT").textContent = "+ SNI check";
-            $("gePhase").textContent = "firewall fix · 22 Sep 2026 · SNI must be allowed";
-            sfx.review();
-          });
-        if (u >= P.w1b && u < P.w2b) along("geW1", (u - P.w1b) / 800, "#4493f8");
-        if (u >= P.w1b + 800) fire("ok2", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
-        if (u >= P.w2b && u < P.cut) along("geW2", ((u - P.w2b) / 600) * 0.25, "#d29922");
-        if (u >= P.cut)
-          fire("cut", () => {
-            $("geCut").classList.add("on");
-            $("geSquidT").textContent = "✕ SNI denied";
-            sfx.block(true);
-          });
-      },
-      el: h(
-        "section",
-        { class: "slide ge" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A red-team agent that tries a new escape every day"), h("h2", {}, letters("Continuous "), letters("Security", "l-grad"))),
-        svg,
-        stats,
-        h("div", { class: "ct-src" }, "measured from The Great Escapi's repo memory · Feb–Sep 2026 · fixed in the AWF firewall")
-      ),
-    });
-  }
-
   // The factory mindset: engineer processes, not code
   {
     resetIndex();
@@ -4147,6 +3989,15 @@
     calendar: [
       "M6.75 0a.75.75 0 0 1 .75.75V3h9V.75a.75.75 0 0 1 1.5 0V3h2.75c.966 0 1.75.784 1.75 1.75v16a1.75 1.75 0 0 1-1.75 1.75H3.25a1.75 1.75 0 0 1-1.75-1.75v-16C1.5 3.784 2.284 3 3.25 3H6V.75A.75.75 0 0 1 6.75 0ZM21 9.5H3v11.25c0 .138.112.25.25.25h17.5a.25.25 0 0 0 .25-.25Zm-17.75-5a.25.25 0 0 0-.25.25V8h18V4.75a.25.25 0 0 0-.25-.25Z",
     ],
+    key: ["M16.75 8.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z", "M15.75 0a8.25 8.25 0 1 1-2.541 16.101l-1.636 1.636a1.744 1.744 0 0 1-1.237.513H9.25a.25.25 0 0 0-.25.25v1.448a.876.876 0 0 1-.256.619l-.214.213a.75.75 0 0 1-.545.22H5.25a.25.25 0 0 0-.25.25v1A1.75 1.75 0 0 1 3.25 24h-1.5A1.75 1.75 0 0 1 0 22.25v-2.836c0-.464.185-.908.513-1.236l7.386-7.388A8.249 8.249 0 0 1 15.75 0ZM9 8.25a6.733 6.733 0 0 0 .463 2.462.75.75 0 0 1-.168.804l-7.722 7.721a.25.25 0 0 0-.073.177v2.836c0 .138.112.25.25.25h1.5a.25.25 0 0 0 .25-.25v-1c0-.966.784-1.75 1.75-1.75H7.5v-1c0-.966.784-1.75 1.75-1.75h1.086a.25.25 0 0 0 .177-.073l1.971-1.972a.75.75 0 0 1 .804-.168A6.75 6.75 0 1 0 9 8.25Z"],
+    lock: ["M6 9V7.25C6 3.845 8.503 1 12 1s6 2.845 6 6.25V9h.5a2.5 2.5 0 0 1 2.5 2.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 19.5v-8A2.5 2.5 0 0 1 5.5 9Zm-1.5 2.5v8a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-13a1 1 0 0 0-1 1Zm3-4.25V9h9V7.25c0-2.67-1.922-4.75-4.5-4.75-2.578 0-4.5 2.08-4.5 4.75Z"],
+    repoLocked: ["M3 2.75A2.75 2.75 0 0 1 5.75 0h14.5a.75.75 0 0 1 .75.75v8a.75.75 0 0 1-1.5 0V1.5H5.75c-.69 0-1.25.56-1.25 1.25v12.651A2.987 2.987 0 0 1 6 15h5.25a.75.75 0 0 1 0 1.5H6A1.5 1.5 0 0 0 4.5 18v1.25c0 .69.56 1.25 1.25 1.25h5a.75.75 0 0 1 0 1.5h-5A2.75 2.75 0 0 1 3 19.25V2.75Z", "M15 14.5a3.5 3.5 0 1 1 7 0V16h.25c.966 0 1.75.784 1.75 1.75v4.5A1.75 1.75 0 0 1 22.25 24h-7.5A1.75 1.75 0 0 1 13 22.25v-4.5c0-.966.784-1.75 1.75-1.75H15Zm3.5-2a2 2 0 0 0-2 2V16h4v-1.5a2 2 0 0 0-2-2Z"],
+    github: ["M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"],
+    globe: ["M12 1c6.075 0 11 4.925 11 11s-4.925 11-11 11S1 18.075 1 12 5.925 1 12 1Zm3.241 10.5v-.001c-.1-2.708-.992-4.904-1.89-6.452a13.919 13.919 0 0 0-1.304-1.88L12 3.11l-.047.059c-.354.425-.828 1.06-1.304 1.88-.898 1.547-1.79 3.743-1.89 6.451Zm-12.728 0h4.745c.1-3.037 1.1-5.49 2.093-7.204.39-.672.78-1.233 1.119-1.673C6.11 3.329 2.746 7 2.513 11.5Zm18.974 0C21.254 7 17.89 3.329 13.53 2.623c.339.44.729 1.001 1.119 1.673.993 1.714 1.993 4.167 2.093 7.204ZM8.787 13c.182 2.478 1.02 4.5 1.862 5.953.382.661.818 1.29 1.304 1.88l.047.057.047-.059c.354-.425.828-1.06 1.304-1.88.842-1.451 1.679-3.471 1.862-5.951Zm-1.504 0H2.552a9.505 9.505 0 0 0 7.918 8.377 15.773 15.773 0 0 1-1.119-1.673C8.413 18.085 7.47 15.807 7.283 13Zm9.434 0c-.186 2.807-1.13 5.085-2.068 6.704-.39.672-.78 1.233-1.118 1.673A9.506 9.506 0 0 0 21.447 13Z"],
+    package: ["M12.876.64V.639l8.25 4.763c.541.313.875.89.875 1.515v9.525a1.75 1.75 0 0 1-.875 1.516l-8.25 4.762a1.748 1.748 0 0 1-1.75 0l-8.25-4.763a1.75 1.75 0 0 1-.875-1.515V6.917c0-.625.334-1.202.875-1.515L11.126.64a1.748 1.748 0 0 1 1.75 0Zm-1 1.298L4.251 6.34l7.75 4.474 7.75-4.474-7.625-4.402a.248.248 0 0 0-.25 0Zm.875 19.123 7.625-4.402a.25.25 0 0 0 .125-.216V7.639l-7.75 4.474ZM3.501 7.64v8.803c0 .09.048.172.125.216l7.625 4.402v-8.947Z"],
+    xCircle: ["M9.036 7.976a.75.75 0 0 0-1.06 1.06L10.939 12l-2.963 2.963a.75.75 0 1 0 1.06 1.06L12 13.06l2.963 2.964a.75.75 0 0 0 1.061-1.06L13.061 12l2.963-2.964a.75.75 0 1 0-1.06-1.06L12 10.939 9.036 7.976Z", "M12 1c6.075 0 11 4.925 11 11s-4.925 11-11 11S1 18.075 1 12 5.925 1 12 1ZM2.5 12a9.5 9.5 0 0 0 9.5 9.5 9.5 9.5 0 0 0 9.5-9.5A9.5 9.5 0 0 0 12 2.5 9.5 9.5 0 0 0 2.5 12Z"],
+    shieldCheck: ["M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z", "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z"],
+    file: ["M3 3a2 2 0 0 1 2-2h9.982a2 2 0 0 1 1.414.586l4.018 4.018A2 2 0 0 1 21 7.018V21a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm2-.5a.5.5 0 0 0-.5.5v18a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V8.5h-4a2 2 0 0 1-2-2v-4Zm10 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0-.146-.336l-4.018-4.018A.5.5 0 0 0 15 2.5Z"],
   };
   // Human Agent Processes: trigger → agent → output → human patterns, then the Repo Assist loop
   {
@@ -4438,7 +4289,10 @@
         });
         nodes.forEach(([kind, icon, label], k) => {
           const x = HCX[k];
-          const disc = kind === "a" ? `<circle cx="${x}" cy="${y}" r="32" fill="url(#hapAgent)"/>${ico(icon, x, y + 1, 36)}` : `<circle class="hap-disc ${kind}" cx="${x}" cy="${y}" r="32"/>${ico(icon, x, y, kind === "h" ? 38 : 30)}`;
+          const disc =
+            kind === "a"
+              ? `<circle cx="${x}" cy="${y}" r="32" fill="url(#hapAgent)"/>${ico(icon, x, y + 1, 36)}`
+              : `<circle class="hap-disc ${kind}" cx="${x}" cy="${y}" r="32"/>${ico(icon, x, y, kind === "h" ? 38 : 30)}`;
           g += `<g class="hap-node" id="hapN${r}_${k}"><g class="fm-pill${kind === "h" ? " b" : kind === "e" ? " g" : ""}"><rect x="${x}" y="${y - 25}" width="${HPW}" height="50" rx="25"/><text x="${x + 16 + HPW / 2}" y="${y + 8}">${label}</text></g>${disc}</g>`;
         });
         g += `<g class="hap-m" id="hapM${r}"><text x="${HMX}" y="${y - 6}"><tspan class="hap-mn" fill="${c}">${num}</tspan><tspan class="hap-mw" dx="10">${what}</tspan></text><text class="hap-mf" x="${HMX}" y="${y + 20}">${wf}</text><text class="hap-mo" x="${HMX}" y="${y + 42}">${of}</text></g>`;
@@ -4725,9 +4579,7 @@
       // live data the debug agent investigates on prem: always redacted, never shown or filed
       const data = (id, x, y) =>
         `<g class="ct-data" id="${id}"><rect class="ct-data-b" x="${x}" y="${y}" width="170" height="160" rx="14"/><text class="ct-data-t" x="${x + 14}" y="${y + 30}">LIVE DATA</text>${lock(x + 148, y + 22, 0.8)}` +
-        ["logs", "audit", "config"]
-          .map((l, i) => `<text class="ct-data-l" x="${x + 14}" y="${y + 70 + i * 34}">${l}</text><rect class="ct-bar" x="${x + 90}" y="${y + 58 + i * 34}" width="${66 - i * 12}" height="15" rx="3" style="animation-delay:${i * 0.18}s"/>`)
-          .join("") +
+        ["logs", "audit", "config"].map((l, i) => `<text class="ct-data-l" x="${x + 14}" y="${y + 70 + i * 34}">${l}</text><rect class="ct-bar" x="${x + 90}" y="${y + 58 + i * 34}" width="${66 - i * 12}" height="15" rx="3" style="animation-delay:${i * 0.18}s"/>`).join("") +
         `</g>`;
       const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
       const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
@@ -4802,7 +4654,11 @@
         [96, "%", "of those pull requests authored by Copilot", "#ab7df8", "#d2a8ff"],
       ];
       const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
-      const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
+      const stats = h(
+        "div",
+        { class: "ct-stats" },
+        ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+      );
       const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
       const STEP = 1000,
         START = 900,
@@ -5026,19 +4882,8 @@
     g += dev("nDev", 1300, 540);
     // Measured: gh-aw [duplicate-code] issues filed by the Duplicate Code Detector, 7 Oct 2025 to 26 Oct 2026, and the merged PRs that closed them
     const DU_MONTHS = [
-      [30, 17],
-      [49, 30],
-      [31, 24],
-      [0, 0],
-      [0, 0],
-      [0, 0],
-      [0, 0],
-      [5, 2],
-      [15, 4],
-      [19, 11],
-      [30, 17],
-      [0, 0],
-      [32, 10],
+      [30, 17], [49, 30], [31, 24], [0, 0], [0, 0], [0, 0], [0, 0],
+      [5, 2], [15, 4], [19, 11], [30, 17], [0, 0], [32, 10],
     ];
     g += `<g class="du"><rect class="du-card" x="584" y="386" width="552" height="226" rx="14"/><text class="du-t" x="602" y="410">MEASURED · [duplicate-code]</text><text class="du-t" x="1118" y="410" text-anchor="end">FLOW ILLUSTRATIVE</text><text class="du-ax" x="602" y="430">7 Oct 2025 – 26 Oct 2026 (385 days) · snapshot 14 Nov 2026</text>`;
     [
@@ -5152,20 +4997,7 @@
       A_SPAN = 3800,
       A_AT = k => 200 + k * A_SPAN,
       A_X = k => 440 + k * 440,
-      NITS = [
-        "nit: rename this",
-        "nit: typo",
-        "nit: extract helper",
-        "nit: blank line",
-        "nit: reword comment",
-        "nit: early return",
-        "nit: sort imports",
-        "nit: one more test",
-        "nit: naming again",
-        "nit: inline this",
-        "nit: fix wording",
-        "nit: lgtm, but…",
-      ],
+      NITS = ["nit: rename this", "nit: typo", "nit: extract helper", "nit: blank line", "nit: reword comment", "nit: early return", "nit: sort imports", "nit: one more test", "nit: naming again", "nit: inline this", "nit: fix wording", "nit: lgtm, but…"],
       ROUND = (A_SPAN - 400) / (NITS.length / A_N),
       B_N = 30,
       B_AT = i => 300 + i * 290,
@@ -5175,14 +5007,7 @@
       LA = 230,
       LB = 560;
     // measured on gh-aw (snapshot 14 Nov 2026): merged clean-up PRs per unslopper, all time, by title prefix
-    const UNSLOP = [
-      ["jsweep", 144],
-      ["dead-code-remover", 117],
-      ["code-simplifier", 89],
-      ["tidy", 66],
-      ["daily-file-diet", 7],
-      ["duplicate-code-detector", 4],
-    ];
+    const UNSLOP = [["jsweep", 144], ["dead-code-remover", 117], ["code-simplifier", 89], ["tidy", 66], ["daily-file-diet", 7], ["duplicate-code-detector", 4]];
     // measured: merged PRs per UTC day, 15 Oct to 13 Nov 2026, and how many of them came from the unsloppers above
     const DAY_ALL = [31, 77, 25, 31, 42, 41, 51, 49, 17, 36, 41, 24, 35, 12, 26, 32, 28, 38, 38, 69, 72, 37, 37, 64, 63, 60, 46, 63, 31, 47],
       DAY_UN = [1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 0, 3, 0, 1, 2, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 1, 0];
@@ -5194,14 +5019,7 @@
       <svg viewBox="0 0 350 64">${DAY_ALL.map((v, i) => `<rect class="mfu-bar" style="--d:${0.3 + i * 0.03}s" x="${i * 11.7}" y="${50 - v * 0.6}" width="9" height="${v * 0.6}" rx="2"/>${DAY_UN[i] ? `<circle class="mfu-dot" style="--d:${1.3 + i * 0.03}s" cx="${i * 11.7 + 4.5}" cy="58" r="${2.5 + DAY_UN[i]}"/>` : ""}`).join("")}</svg>
       <div class="mfu-leg"><i></i>unslop PRs merged on 25 of 30 days</div>`;
     // a couple of synthetic slop specks per fast commit
-    const SPECKS = Array.from({ length: B_N }, (_, i) =>
-      i % 3 === 1
-        ? [[0, -24]]
-        : [
-            [-10, -22],
-            [10, -26],
-          ]
-    );
+    const SPECKS = Array.from({ length: B_N }, (_, i) => (i % 3 === 1 ? [[0, -24]] : [[-10, -22], [10, -26]]));
     let g = `<line class="us-main" x1="0" y1="${LA}" x2="1500" y2="${LA}"/><text class="us-mainl" x="0" y="${LA + 38}">main</text>
       <line class="us-main" x1="0" y1="${LB}" x2="1500" y2="${LB}"/><text class="us-mainl" x="0" y="${LB + 38}">main</text>
       <line class="us-div" x1="0" y1="300" x2="1700" y2="300"/>
@@ -5317,13 +5135,7 @@
         $("usMB").textContent = `${n} PR${n === 1 ? "" : "s"} merged`;
         $("usCB").textContent = `${eaten} slop eaten`;
       },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))),
-        panel,
-        svg
-      ),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))), panel, svg),
     });
   }
 
@@ -5493,10 +5305,7 @@
       for (const item of list) if ((r -= item[item.length - 1]) <= 0) return item;
       return list[0];
     };
-    const hex = () =>
-      Math.floor(Math.random() * 65536)
-        .toString(16)
-        .padStart(4, "0");
+    const hex = () => Math.floor(Math.random() * 65536).toString(16).padStart(4, "0");
     const fmt = n => Math.round(n).toLocaleString("en-US");
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const STEP = 1050,
@@ -5522,7 +5331,8 @@
       deployed = true;
       SRV.forEach((_, i) => ($("raoVer" + i).textContent = "v1.4.3"));
     };
-    const spark = (el, data, x0, x1, yb, h) => el.setAttribute("points", data.map((v, j) => `${(x0 + ((x1 - x0) * j) / (N - 1)).toFixed(1)},${(yb - (Math.min(v, 600) / 600) * h).toFixed(1)}`).join(" "));
+    const spark = (el, data, x0, x1, yb, h) =>
+      el.setAttribute("points", data.map((v, j) => `${(x0 + ((x1 - x0) * j) / (N - 1)).toFixed(1)},${(yb - (Math.min(v, 600) / 600) * h).toFixed(1)}`).join(" "));
     const sample = () => {
       tick++;
       let rpsSum = 0;
@@ -5962,10 +5772,7 @@
     svg.setAttribute("class", "fm-svg mra-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      "Linter Miner mines issues, discussions and code and opens a draft analyzer pull request; review threads and Copilot fixes refine it until it merges; LintMonster then scans daily, files finding issues, and Copilot cleanup pull requests apply the rule across the repository"
-    );
+    svg.setAttribute("aria-label", "Linter Miner mines issues, discussions and code and opens a draft analyzer pull request; review threads and Copilot fixes refine it until it merges; LintMonster then scans daily, files finding issues, and Copilot cleanup pull requests apply the rule across the repository");
     svg.innerHTML = g;
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".mra-dot");
@@ -6231,10 +6038,7 @@
     svg.setAttribute("class", "fm-svg exr-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      "Explore, reuse, lint: each day Sergo reads its strategy cache, reuses its best strategy on a nearby target and explores an untried one, logs the result, and turns every pattern it finds into a linter until the whole pattern space has been tried"
-    );
+    svg.setAttribute("aria-label", "Explore, reuse, lint: each day Sergo reads its strategy cache, reuses its best strategy on a nearby target and explores an untried one, logs the result, and turns every pattern it finds into a linter until the whole pattern space has been tried");
     svg.style.setProperty("--c", "#ab7df8");
     svg.innerHTML = g;
     // measured: findings per run by month from sergo-stats.json in the memory/sergo branch (no runs were cached in August)
@@ -6308,10 +6112,7 @@
     meas.setAttribute("class", "exm-svg");
     meas.setAttribute("viewBox", "0 0 1400 210");
     meas.setAttribute("role", "img");
-    meas.setAttribute(
-      "aria-label",
-      "Measured: Sergo's findings per run fell from 8.3 in May to 3.3 in October 2026; one cached strategy, paren_unwrap_gap, was reused for 13 merged pull requests between 31 October and 12 November; 128 runs, 667 findings, 287 issues, 164 merged fix pull requests"
-    );
+    meas.setAttribute("aria-label", "Measured: Sergo's findings per run fell from 8.3 in May to 3.3 in October 2026; one cached strategy, paren_unwrap_gap, was reused for 13 merged pull requests between 31 October and 12 November; 128 runs, 667 findings, 287 issues, 164 merged fix pull requests");
     meas.innerHTML = m;
     const $ = id => svg.querySelector("#" + id),
       NS = "http://www.w3.org/2000/svg";
@@ -6637,15 +6438,12 @@
     const hl = line =>
       line.startsWith("\\*")
         ? `<tspan class="c">${esc(line)}</tspan>`
-        : line
-            .match(/"[^"]*"|==|\\\/|\/\\|\\A|\\E|\\in|=>|<=|~|-{4}|={4}|[^"=\\/~<-]+|./g)
-            .map((tok, k, all) => {
-              if (tok[0] === '"') return `<tspan class="s"${tok === '"none"' ? ' id="fvBroken"' : ""}>${esc(tok)}</tspan>`;
-              if (/^(==|\\\/|\/\\|\\A|\\E|\\in|=>|<=|~|-{4}|={4})$/.test(tok)) return `<tspan class="k">${esc(tok)}</tspan>`;
-              if (!k && line[0] !== " " && all[1] === "==") return `<tspan class="n">${esc(tok)}</tspan>`;
-              return esc(tok);
-            })
-            .join("");
+        : line.match(/"[^"]*"|==|\\\/|\/\\|\\A|\\E|\\in|=>|<=|~|-{4}|={4}|[^"=\\/~<-]+|./g).map((tok, k, all) => {
+            if (tok[0] === '"') return `<tspan class="s"${tok === '"none"' ? ' id="fvBroken"' : ""}>${esc(tok)}</tspan>`;
+            if (/^(==|\\\/|\/\\|\\A|\\E|\\in|=>|<=|~|-{4}|={4})$/.test(tok)) return `<tspan class="k">${esc(tok)}</tspan>`;
+            if (!k && line[0] !== " " && all[1] === "==") return `<tspan class="n">${esc(tok)}</tspan>`;
+            return esc(tok);
+          }).join("");
     // a small, deterministic state graph explored breadth-first
     let seed = 11;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -6871,16 +6669,7 @@
           "div",
           { class: "smt-led" },
           h("div", { class: "smt-h" }, "MEASURED · 2 Oct – 14 Nov 2026 (43 days)"),
-          h(
-            "div",
-            { class: "smt-k" },
-            ...[
-              ["16", "TLA+ modules"],
-              ["218", "TLC configs"],
-              ["99", "mutants"],
-              ["55", "witnesses"],
-            ].map(([n, l]) => h("div", {}, h("b", {}, n), h("span", {}, l)))
-          ),
+          h("div", { class: "smt-k" }, ...[["16", "TLA+ modules"], ["218", "TLC configs"], ["99", "mutants"], ["55", "witnesses"]].map(([n, l]) => h("div", {}, h("b", {}, n), h("span", {}, l)))),
           h("div", { class: "smt-run" }, h("i", { class: "o" }, "◔"), "11 Nov · QueueOrdering open: 178.9M states, 4 h 40 m"),
           h("div", { class: "smt-run" }, h("i", { class: "g" }, "✓"), "2 Oct – 14 Nov · 35 merged PRs changed the spec"),
           h("div", { class: "smt-cap" }, "specs/work-queue · TLC 7 Oct, 11 Nov · flow illustrative")
@@ -6973,10 +6762,7 @@
     svg.setAttribute("class", "fm-svg gf-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      "Go Fan loop: every weekday an agent picks the next Go dependency, reads its README, releases and changelog, compares them with how the repository uses it, and files a review issue that Copilot turns into a merged pull request"
-    );
+    svg.setAttribute("aria-label", "Go Fan loop: every weekday an agent picks the next Go dependency, reads its README, releases and changelog, compares them with how the repository uses it, and files a review issue that Copilot turns into a merged pull request");
     svg.style.setProperty("--c", "#3fb950");
     svg.innerHTML = g;
     const $ = id => svg.querySelector("#" + id),
@@ -6989,7 +6775,11 @@
       [16372, "", "lines changed by those pull requests", "#ab7df8", "#d2a8ff"],
     ];
     const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
-    const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
+    const stats = h(
+      "div",
+      { class: "ct-stats" },
+      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+    );
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const STEP = 1000,
       START = 700,
@@ -7228,7 +7018,7 @@
         num.innerHTML = n;
         return h("div", { class: "sdm-c" }, h("div", { class: "sdm-w" }, w), num, h("div", { class: "sdm-l" }, l));
       }),
-      h("div", { class: "sdm-c" }, h("div", { class: "sdm-w" }, "TestSpec_ in pkg/"), h("div", { class: "sdm-n" }, "0 → 415"), h("div", { class: "sdm-l" }, "48 spec_test.go"), spark)
+      h("div", { class: "sdm-c" }, h("div", { class: "sdm-w" }, "TestSpec_ in pkg/"), h("div", { class: "sdm-n" }, "0 → 415"), h("div", { class: "sdm-l" }, "48 spec_test.go"), spark),
     );
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const CYC = 15500;
@@ -7325,7 +7115,7 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Humans state intent, agents write the RFC spec, test it and extract it from every change"), h("h2", {}, letters("Spec-driven "), letters("testing", "l-grad"))),
         svg,
         sdmStrip,
-        h("div", { class: "sdm-cap" }, h("b", {}, "MEASURED "), "all-time · 30 Mar – 14 Nov 2026 (229 days) · snapshot 14 Nov 2026 · PRs/issues by title prefix · flow illustrative")
+        h("div", { class: "sdm-cap" }, h("b", {}, "MEASURED "), "all-time · 30 Mar – 14 Nov 2026 (229 days) · snapshot 14 Nov 2026 · PRs/issues by title prefix · flow illustrative"),
       ),
     });
   }
@@ -7498,37 +7288,7 @@
     };
     // measured: merged [docs] PRs per agent (Oct 2025 to 14 Nov 2026) and [doc-healer] issues by day since 26 Feb 2026;
     // u = rule merged into the updater's prompt, h = merged elsewhere (healer prompt or docs), x = declined
-    const RULES = [
-      [0, "u"],
-      [19, "u"],
-      [32, "x"],
-      [38, "u"],
-      [44, "h"],
-      [48, "u"],
-      [52, "u"],
-      [56, "u"],
-      [77, "h"],
-      [85, "h"],
-      [93, "u"],
-      [112, "x"],
-      [115, "x"],
-      [116, "x"],
-      [117, "x"],
-      [123, "x"],
-      [125, "u"],
-      [126, "x"],
-      [132, "h"],
-      [136, "x"],
-      [144, "x"],
-      [146, "x"],
-      [149, "x"],
-      [155, "u"],
-      [195, "x"],
-      [207, "x"],
-      [243, "x"],
-      [244, "x"],
-      [246, "x"],
-    ];
+    const RULES = [[0,"u"],[19,"u"],[32,"x"],[38,"u"],[44,"h"],[48,"u"],[52,"u"],[56,"u"],[77,"h"],[85,"h"],[93,"u"],[112,"x"],[115,"x"],[116,"x"],[117,"x"],[123,"x"],[125,"u"],[126,"x"],[132,"h"],[136,"x"],[144,"x"],[146,"x"],[149,"x"],[155,"u"],[195,"x"],[207,"x"],[243,"x"],[244,"x"],[246,"x"]];
     const TW = 520,
       TX = d => 10 + (d * (TW - 20)) / 250;
     let tl = `<text class="t" x="0" y="16">29 HEALER RULES · 13 MERGED · 9 IN UPDATER PROMPT</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
@@ -7536,13 +7296,7 @@
       const hh = s === "u" ? 50 : s === "h" ? 36 : 18;
       tl += `<rect class="${s}" style="--i:${i}" x="${TX(d) - 3}" y="${96 - hh}" width="6" height="${hh}" rx="2"/>`;
     });
-    [
-      [3, "Mar"],
-      [64, "May"],
-      [125, "Jul"],
-      [187, "Sep"],
-      [248, "Nov"],
-    ].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
+    [[3, "Mar"], [64, "May"], [125, "Jul"], [187, "Sep"], [248, "Nov"]].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
     const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     tlSvg.setAttribute("class", "dhm-tl");
     tlSvg.setAttribute("width", TW);
@@ -7552,15 +7306,8 @@
     const dhm = h(
       "div",
       { class: "dhm" },
-      h(
-        "div",
-        { class: "dhm-k" },
-        kpi("189", "daily-doc-updater", "PRs merged"),
-        kpi("250", "unbloat-docs", ["PRs merged", h("br"), h("em", {}, "−22,043 net lines")]),
-        kpi("146", "glossary-maintainer", "PRs merged"),
-        kpi("64", "daily-doc-healer", "PRs merged", "g")
-      ),
-      tlSvg
+      h("div", { class: "dhm-k" }, kpi("189", "daily-doc-updater", "PRs merged"), kpi("250", "unbloat-docs", ["PRs merged", h("br"), h("em", {}, "−22,043 net lines")]), kpi("146", "glossary-maintainer", "PRs merged"), kpi("64", "daily-doc-healer", "PRs merged", "g")),
+      tlSvg,
     );
     const reset = () => {
       svg.querySelectorAll(".on, .hot, .ok, .bad, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone"));
@@ -7612,7 +7359,7 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
         svg,
         dhm,
-        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 14 Nov 2026 · PRs 10 Oct 2025–14 Nov 2026 (400 d) · healer issues 26 Feb–30 Oct 2026 (246 d) · loop illustrative")
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 14 Nov 2026 · PRs 10 Oct 2025–14 Nov 2026 (400 d) · healer issues 26 Feb–30 Oct 2026 (246 d) · loop illustrative"),
       ),
     });
   }
@@ -8008,12 +7755,186 @@
           light(at(nid, o));
         }
       },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))), svg, measured),
+    });
+  }
+
+  // For PMs: two clickable PM processes (feature intake, launch readiness) from the public chrizbo/agentics-beyond-code repo (MIT): habit → agent → artifact → human, with a synthetic artifact
+  {
+    resetIndex();
+    const icon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    const COLS = ["#d29922", "#ab7df8", "#3fb950", "#4493f8"];
+    const KINDS = ["HABIT", "AGENT", "ARTIFACT", "HUMAN"];
+    // steps: [title, detail, icon] × 4; doc lines: [mark, label, value, cls]
+    const PROCS = [
+      {
+        tab: ["Feature intake", "a Slack reaction becomes a scored issue"],
+        steps: [
+          ["React 📥 in Slack", "on any message · no form", "comment"],
+          ["intake-triage", "scores it against strategy.md", "copilot"],
+          ["Scored intake issue", "RICE · Kano · strategy fit", "issue"],
+          ["PM decides", "accept · ask for more · park", "person"],
+        ],
+        doc: ["issue", "Intake: bulk export for workspace admins", "opened by the agent"],
+        lines: [
+          ["→", "Source", "Slack · #customer-feedback · 3 reactions", ""],
+          ["R", "Reach", "~340 admins / quarter", ""],
+          ["I", "Impact · Confidence", "2 (high) · 80%", ""],
+          ["E", "Effort", "3 person-weeks", ""],
+          ["=", "RICE score", "181 · top 10% of the backlog", "hl"],
+          ["✓", "Kano · strategy fit", "Performance · pillar 2, admin self-serve", "ok"],
+        ],
+        idea: ["Your habits are already triggers", "Nobody fills in a form. The emoji the team already uses is the trigger; the agent does the paperwork and the PM keeps the decision."],
+      },
+      {
+        tab: ["Launch readiness", "every Monday, against the policy"],
+        steps: [
+          ["Monday morning", "every launch in flight", "calendar"],
+          ["launch-readiness", "reads launch-ready.md", "copilot"],
+          ["Readiness report", "blockers · risk · sign-offs", "tasklist"],
+          ["DRI unblocks", "chases the one missing sign-off", "person"],
+        ],
+        doc: ["tasklist", "Readiness: bulk export · GA in 2 weeks", "posted Monday"],
+        lines: [
+          ["✓", "Docs", "published to staging", "ok"],
+          ["✓", "Security review", "approved", "ok"],
+          ["!", "Support runbook", "draft · no owner yet", "warn"],
+          ["✗", "Legal sign-off", "missing · blocks GA", "bad"],
+          ["✓", "Metrics dashboard", "live", "ok"],
+          ["=", "Overall risk", "medium · 1 blocker, 1 at risk", "hl"],
+        ],
+        idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
+      },
+    ];
+    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
+    const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
+    const docIco = h("span", {}),
+      docT = h("div", {}),
+      docS = h("span", { class: "pm-when" }),
+      docLines = h("div", {});
+    const ideaB = h("b", {}),
+      ideaP = h("p", {});
+    const STEP = 650;
+    let sel = 0,
+      t0 = 0,
+      shown = -1;
+    function pick(i) {
+      sel = i;
+      const p = PROCS[i];
+      tabs.forEach((t, j) => (t.classList.toggle("on", j === i), t.setAttribute("aria-pressed", String(j === i))));
+      stepEls.forEach((el, j) => {
+        const [b, em, ic] = p.steps[j];
+        el.classList.remove("lit");
+        el.querySelector("small span").replaceWith(h("span", {}, icon(ic)));
+        el.querySelector("b").textContent = b;
+        el.querySelector("em").textContent = em;
+      });
+      docIco.replaceChildren(icon(p.doc[0]));
+      docT.textContent = p.doc[1];
+      docS.textContent = p.doc[2];
+      docLines.replaceChildren(...p.lines.map(([m, l, v, c]) => h("div", { class: `pm-ln ${c}` }, h("i", {}, m), h("b", {}, l), h("span", {}, v))));
+      ideaB.textContent = p.idea[0];
+      ideaP.textContent = p.idea[1];
+      t0 = 0;
+      shown = -1;
+    }
+    slides.push({
+      group: "process",
+      sound: "pm",
+      palette: ["#d29922", "#8957e5", "#2da44e", "#1f6feb"],
+      notes:
+        "For PMs. Agentic workflows are not only for code. These two processes come from the public, MIT-licensed agentics-beyond-code repository (chrizbo/agentics-beyond-code), a collection of gh-aw workflows for product managers, DRIs and leaders; the workflow names, inputs, outputs and ideas are taken from it. The issue and report contents are synthetic and illustrative. Click a process, or press right, to switch. Each one has the same shape: a habit the team already has, an agent, an artifact left in the repo, and a human who decides. One, feature intake: someone reacts with an inbox emoji on a Slack message; the intake triage agent turns it into an issue scored with RICE and Kano against the strategy doc, and the PM accepts it, asks for more or parks it. The repo's idea: your habits are already triggers. Two, launch readiness: every Monday the agent reads the launch-ready policy, itself a Markdown file, checks every launch in flight and reports blockers, risk and sign-offs; the DRI chases the one missing sign-off. The idea: process as code. The repo has more, a decision log, an adversarial PM, a Friday leadership post and a process analyzer that opens a pull request when the team drifts from how-we-work.md.",
+      enter(dir) {
+        pick(dir < 0 ? 1 : 0);
+      },
+      onNext() {
+        if (sel === 0) return pick(1), sfx.step(), true;
+      },
+      onPrev() {
+        if (sel === 1) return pick(0), sfx.step(), true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const n = Math.floor((t - t0 - 500) / STEP);
+        if (n < 0 || n === shown || n > 4 + PROCS[sel].lines.length) return;
+        shown = n;
+        if (n < 4) (stepEls[n].classList.add("lit"), sfx.pop(n));
+        else if (n > 4) docLines.children[n - 5]?.classList.add("on");
+      },
       el: h(
         "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))),
-        svg,
-        measured
+        { class: "slide pm" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentics beyond code · patterns from ", h("a", { class: "pm-src", href: "https://github.com/chrizbo/agentics-beyond-code", target: "_blank", rel: "noopener" }, "chrizbo/agentics-beyond-code")), h("h2", {}, letters("For "), letters("PMs", "l-grad"))),
+        h("div", { class: "pm-tabs" }, ...tabs),
+        h("div", { class: "pm-flow" }, ...stepEls),
+        h("div", { class: "pm-doc" }, h("div", { class: "pm-doc-h" }, docIco, docT, docS), docLines),
+        h("div", { class: "pm-idea" }, h("small", {}, "THE IDEA · FROM THE REPO"), ideaB, ideaP),
+        h("div", { class: "pm-cap" }, "Workflows and ideas from chrizbo/agentics-beyond-code (MIT) · issue and report contents synthetic")
+      ),
+    });
+  }
+
+  // Trust the process: deep human review on every PR means the process is not trusted
+  {
+    resetIndex();
+    const MERGE = `<svg viewBox="0 0 16 16"><path d="${OCTI.merge[0]}"/></svg>`;
+    const lane = (cls, label) => {
+      const fill = h("i"),
+        tray = h("div", { class: "tp-tray" });
+      return { fill, tray, el: h("div", { class: `tp-lane ${cls}` }, h("div", { class: "tp-pill" }, fill, h("span", {}, label)), tray) };
+    };
+    const slow = lane("tp-blue", "1h review"),
+      fast = lane("tp-green", "30sec skim");
+    const SLOW = 7200,
+      FAST = 400,
+      MAX = 30;
+    let t0 = 0,
+      nSlow = 0,
+      nFast = 0;
+    const merge = tray => tray.insertAdjacentHTML("beforeend", MERGE);
+    slides.push({
+      group: "trust",
+      sound: "trust",
+      palette: ["#3fb950", "#1f6feb", "#2da44e", "#0a3069"],
+      notes:
+        "Trust the process. If every pull request needs a deep human review, you do not trust your process. The race is illustrative: a one-hour review on the left lands one change while a thirty-second skim on the right lands dozens, because checks, agent reviewers, tests and safe outputs already did the deep work. So do not add reviewers, improve the process until a skim is enough. Improve your process. Accelerate your factory.",
+      enter() {
+        t0 = 0;
+        nSlow = nFast = 0;
+        for (const l of [slow, fast]) {
+          l.tray.replaceChildren();
+          l.fill.style.width = "0";
+        }
+      },
+      tick(t) {
+        if (!t0) t0 = t + 1100;
+        const e = t - t0;
+        if (e < 0) return;
+        const loop = e % (SLOW + 1600);
+        if (loop < 30 && (nSlow || nFast)) {
+          nSlow = nFast = 0;
+          slow.tray.replaceChildren();
+          fast.tray.replaceChildren();
+        }
+        const ls = Math.min(loop, SLOW);
+        slow.fill.style.width = `${(ls / SLOW) * 100}%`;
+        fast.fill.style.width = `${ls >= SLOW ? 100 : ((ls % FAST) / FAST) * 100}%`;
+        const f = Math.min(MAX, Math.floor(ls / FAST));
+        while (nFast < f) (merge(fast.tray), nFast++, nFast % 3 || sfx.pop(nFast % 8));
+        if (loop >= SLOW && !nSlow) (merge(slow.tray), (nSlow = 1), sfx.step());
+      },
+      el: h(
+        "section",
+        { class: "slide tp" },
+        h(
+          "div",
+          { class: "tp-copy" },
+          h("div", { class: "kicker" }, "Trust the process"),
+          h("h2", { class: "tp-q" }, "If every PR needs deep human review, you don\u2019t trust your process."),
+          h("div", { class: "tp-vs" }, slow.el, h("b", {}, "VS"), fast.el),
+          h("h2", { class: "tp-go" }, "Improve your process."),
+          h("h2", { class: "tp-go" }, "Accelerate your factory.")
+        )
       ),
     });
   }
@@ -8856,42 +8777,9 @@
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     // the three calls: [verb, call text, chip index, selected run rows, findings [class, text][]]
     const CALLS = [
-      [
-        "① DEBUG",
-        "audit { run: 1842 }",
-        3,
-        [0],
-        "DEBUG · audit 1842",
-        [
-          ["ko", "✕ failed at turn 27 of 41"],
-          ["ed", "⚠ api.contoso.com blocked"],
-          ["ok", "→ add it to network.allowed"],
-        ],
-      ],
-      [
-        "② AUDIT",
-        "logs { triage, last: 20 }",
-        2,
-        [0, 1, 2, 3, 4, 5],
-        "AUDIT · 20 runs · 3 engines",
-        [
-          ["k", "one schema across engines"],
-          ["ko", "✕ 4 runs hit blocked domains"],
-          ["ok", "✓ 0 safe-output violations"],
-        ],
-      ],
-      [
-        "③ OPTIMIZE",
-        "audit-diff { 1842, 1849 }",
-        4,
-        [0, 5],
-        "OPTIMIZE · 1842 → 1849",
-        [
-          ["ok", "✓ tokens 412k → 138k (−66%)"],
-          ["ok", "✓ turns 41 → 17"],
-          ["ed", "⚠ 9 repeated searches removed"],
-        ],
-      ],
+      ["① DEBUG", "audit { run: 1842 }", 3, [0], "DEBUG · audit 1842", [["ko", "✕ failed at turn 27 of 41"], ["ed", "⚠ api.contoso.com blocked"], ["ok", "→ add it to network.allowed"]]],
+      ["② AUDIT", "logs { triage, last: 20 }", 2, [0, 1, 2, 3, 4, 5], "AUDIT · 20 runs · 3 engines", [["k", "one schema across engines"], ["ko", "✕ 4 runs hit blocked domains"], ["ok", "✓ 0 safe-output violations"]]],
+      ["③ OPTIMIZE", "audit-diff { 1842, 1849 }", 4, [0, 5], "OPTIMIZE · 1842 → 1849", [["ok", "✓ tokens 412k → 138k (−66%)"], ["ok", "✓ turns 41 → 17"], ["ed", "⚠ 9 repeated searches removed"]]],
     ];
     const TOOLS = [
       ["status", "workflows · state"],
@@ -9020,7 +8908,7 @@
       if (!nid.startsWith("mcChip") || nid === "mcChip" + CALLS[phase][2]) $(nid).classList.add(call ? "seen" : "on");
       if (nid.startsWith("mcChip")) $("mcSrv").classList.add("on");
       if (call) $("mcCalls").classList.add("on");
-      const lane = nid.startsWith("mcCard") ? 3 : (LANE[nid.replace(/\d+$/, "")] ?? (nid.startsWith("mcChip") ? 1 : 0));
+      const lane = nid.startsWith("mcCard") ? 3 : LANE[nid.replace(/\d+$/, "")] ?? (nid.startsWith("mcChip") ? 1 : 0);
       $("mcLane" + lane).classList.add("on");
     };
     const select = p => {
@@ -9108,12 +8996,7 @@
           light(nid);
         }
       },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The agentic-workflows MCP · logs · audit · unified sessions"), h("h2", {}, letters("Agents that "), letters("debug agents", "l-grad"))),
-        svg
-      ),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The agentic-workflows MCP · logs · audit · unified sessions"), h("h2", {}, letters("Agents that "), letters("debug agents", "l-grad"))), svg),
     });
   }
 
@@ -9137,40 +9020,7 @@
     const ENG = { copilot: "Copilot", claude: "Claude", codex: "Codex", pi: "Pi" };
     // Monochrome marks (currentColor): Copilot, Claude, OpenAI from Simple Icons (CC0), GitHub from Octicons (MIT),
     // Pi from pi.dev, Anthropic from Simple Icons (CC0). Trademarks belong to their respective owners.
-    const LOGO = {
-      copilot: [
-        "0 0 24 24",
-        [
-          "M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z",
-        ],
-      ],
-      claude: [
-        "0 0 24 24",
-        [
-          "m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z",
-        ],
-      ],
-      codex: [
-        "0 0 24 24",
-        [
-          "M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z",
-        ],
-      ],
-      pi: ["0 0 560 560", ["M420 280H280V140H0V0H420V280Z", "M560 560H420V280H560V560Z", "M140 560H0V140H140V280H280V420H140V560Z"]],
-      openai: [
-        "0 0 24 24",
-        [
-          "M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z",
-        ],
-      ],
-      github: [
-        "0 0 16 16",
-        [
-          "M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z",
-        ],
-      ],
-      anthropic: ["0 0 24 24", ["M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"]],
-    };
+    const LOGO = {"copilot": ["0 0 24 24", ["M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"]], "claude": ["0 0 24 24", ["m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"]], "codex": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "pi": ["0 0 560 560", ["M420 280H280V140H0V0H420V280Z", "M560 560H420V280H560V560Z", "M140 560H0V140H140V280H280V420H140V560Z"]], "openai": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "github": ["0 0 16 16", ["M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"]], "anthropic": ["0 0 24 24", ["M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"]]};
     const logo = id => {
       const s = h("span", { class: "ae-logo" });
       s.innerHTML = `<svg viewBox="${LOGO[id][0]}" aria-hidden="true" fill="currentColor">${LOGO[id][1].map(d => `<path d="${d}"/>`).join("")}</svg>`;
@@ -9204,18 +9054,7 @@
       [["# Daily issue triage", T]],
       [["Label new issues and suggest an owner.", T]],
     ];
-    const rows = LINES.map((parts, i) =>
-      h(
-        "div",
-        { class: "ae-row" + (i === 3 || i === 4 ? " hot" : "") },
-        h("span", { class: "no" }, String(i + 1)),
-        h(
-          "span",
-          {},
-          parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0])))
-        )
-      )
-    );
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 3 || i === 4 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
     const ed = h("div", { class: "ae-ed" }, h("div", { class: "ae-tab" }, "daily-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
     const arrow = h("div", { class: "ae-arrow" }, "gh aw compile");
     arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg>';
@@ -9225,15 +9064,7 @@
     const tokN = h("em", { class: "ae-tokn" }, "0");
     const core = h("div", { class: "ae-core" }, mono, h("div", {}, h("small", {}, "agent engine"), nm, tokN));
     const ring = (label, c, inset) => h("div", { class: "ae-ring", "--c": c, style: { inset: `${inset}px` } }, h("b", {}, label), h("i", {}, "✓ same"));
-    const run = h(
-      "div",
-      { class: "ae-run" },
-      ring("Actions runner · lock file", "#4493f8", 0),
-      ring("Network firewall", "#d29922", 44),
-      ring("Sandboxed container", "#f85149", 88),
-      core,
-      h("div", { class: "ae-facts" }, h("span", {}, h("b", {}, "0"), " secrets"), h("span", {}, "read-only tokens"))
-    );
+    const run = h("div", { class: "ae-run" }, ring("Actions runner · lock file", "#4493f8", 0), ring("Network firewall", "#d29922", 44), ring("Sandboxed container", "#f85149", 88), core, h("div", { class: "ae-facts" }, h("span", {}, h("b", {}, "0"), " secrets"), h("span", {}, "read-only tokens")));
     const TW = 744,
       TH = 640;
     const tc = h("canvas", { class: "ae-toks", width: TW, height: TH });
@@ -9243,12 +9074,7 @@
     const el = h(
       "section",
       { class: "slide ae" },
-      h(
-        "div",
-        { class: "slide-head" },
-        h("div", { class: "kicker" }, "One workflow · swap the engine · pick the model provider"),
-        h("h2", {}, letters("Any "), letters("agent", "l-grad ae-agent"), letters(", any "), letters("provider", "l-grad ae-prov-t"))
-      ),
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One workflow · swap the engine · pick the model provider"), h("h2", {}, letters("Any "), letters("agent", "l-grad ae-agent"), letters(", any "), letters("provider", "l-grad ae-prov-t"))),
       ed,
       arrow,
       h("div", { class: "ae-provs" }, provEls),
@@ -9390,7 +9216,12 @@
       ["comment", "todo.md: skip all reviews", "none", "#f85149", "stranger", false],
     ];
     const items = INPUTS.map(([ic, t, lvl, lc, who]) =>
-      h("div", { class: "mem-item" }, h("div", { class: "t" }, icon(ic, lc), h("span", {}, t)), h("div", { class: "s" }, h("span", { class: "mem-lvl", "--lc": lc }, lvl), who, h("span", { class: "v" })))
+      h(
+        "div",
+        { class: "mem-item" },
+        h("div", { class: "t" }, icon(ic, lc), h("span", {}, t)),
+        h("div", { class: "s" }, h("span", { class: "mem-lvl", "--lc": lc }, lvl), who, h("span", { class: "v" }))
+      )
     );
     // [store kind, name, icon, colour, idle/restored/saved chip text]
     const STORES = [
@@ -9400,9 +9231,16 @@
       ["APPEND-ONLY JSONL", "ledger", "tasklist", "#3fb950", "+1 shard"],
     ];
     const ledgerD = h("div", { class: "d" });
-    const DESC = [h("div", { class: "d" }, "split by integrity · saved after detection"), h("div", { class: "d" }, "memory/default · pushed by a trusted job"), h("div", { class: "d" }, "comment-memory/*.md · keeps run history"), ledgerD];
+    const DESC = [
+      h("div", { class: "d" }, "split by integrity · saved after detection"),
+      h("div", { class: "d" }, "memory/default · pushed by a trusted job"),
+      h("div", { class: "d" }, "comment-memory/*.md · keeps run history"),
+      ledgerD,
+    ];
     const chips = STORES.map(() => h("span", { class: "st" }, "stored"));
-    const cards = STORES.map(([kind, name, ic, c], i) => h("div", { class: "mem-card", "--c": c, "--i": i + 2, style: { top: `${320 + i * 155}px` } }, h("i", {}, kind), chips[i], h("div", { class: "n" }, icon(ic, c), name), DESC[i]));
+    const cards = STORES.map(([kind, name, ic, c], i) =>
+      h("div", { class: "mem-card", "--c": c, "--i": i + 2, style: { top: `${320 + i * 155}px` } }, h("i", {}, kind), chips[i], h("div", { class: "n" }, icon(ic, c), name), DESC[i])
+    );
     const runNo = h("span", {});
     const triaged = h("span", {});
     const prevRun = h("span", {});
@@ -9704,12 +9542,7 @@
   // Index & search: a non-agentic indexing job (contents: read) writes the index; the agent job (contents: none) gets a read-only copy and a query/get-only search server; one shared import adds both
   {
     resetIndex();
-    const tags = list =>
-      h(
-        "div",
-        { class: "ix-tags" },
-        list.map(([t, c]) => h("span", { "--tc": c }, t))
-      );
+    const tags = list => h("div", { class: "ix-tags" }, list.map(([t, c]) => h("span", { "--tc": c }, t)));
     const IDX = ["$ checkout docs", "$ qmd update   # ", "$ qmd embed    # new vectors", "↑ save index to Actions cache"];
     const AGT = ["↓ restore index from cache", "→ qmd.query  lex + vec → 2 hits", "→ qmd.get    permissions.md:40-80", "✕ qmd embed  not allowed", "✓ ~9k tokens, not ~180k"];
     const idxSteps = IDX.map(s => h("div", { class: "ix-step" }, s));
@@ -9746,8 +9579,22 @@
     cyl.innerHTML = '<g fill="none" stroke="#e3b341" stroke-width="3"><ellipse cx="32" cy="14" rx="22" ry="8"/><path d="M10 14v36c0 4.4 9.8 8 22 8s22-3.6 22-8V14"/><path d="M10 32c0 4.4 9.8 8 22 8s22-3.6 22-8"/></g>';
     const ioSave = h("div", { class: "io" }, "→ save"),
       ioRestore = h("div", { class: "io" }, "restore →");
-    const cache = h("div", { class: "ix-cache" }, h("i", {}, "ACTIONS CACHE"), cyl, h("div", { class: "n" }, "index.sqlite"), h("div", { class: "k" }, "key: qmd-docs"), ioSave, ioRestore);
-    const shared = h("div", { class: "ix-shared", "--c": "#79c0ff", "--i": 2 }, h("i", {}, "SHARED AGENTIC WORKFLOW"), h("span", {}, h("b", {}, "imports"), ": [shared/qmd.md] adds both jobs · one cache key links them, run after run"));
+    const cache = h(
+      "div",
+      { class: "ix-cache" },
+      h("i", {}, "ACTIONS CACHE"),
+      cyl,
+      h("div", { class: "n" }, "index.sqlite"),
+      h("div", { class: "k" }, "key: qmd-docs"),
+      ioSave,
+      ioRestore
+    );
+    const shared = h(
+      "div",
+      { class: "ix-shared", "--c": "#79c0ff", "--i": 2 },
+      h("i", {}, "SHARED AGENTIC WORKFLOW"),
+      h("span", {}, h("b", {}, "imports"), ": [shared/qmd.md] adds both jobs · one cache key links them, run after run")
+    );
     const el = h(
       "section",
       { class: "slide ix" },
@@ -9793,15 +9640,14 @@
           [...idxSteps, ...agtSteps, ioSave, ioRestore].forEach(x => x.classList.remove("on"));
         }
         IDX_AT.forEach((ms, i) => u >= ms && fire("i" + i, () => (idxSteps[i].classList.add("on"), sfx.key(0.7))));
-        AGT_AT.forEach(
-          (ms, i) =>
-            u >= ms &&
-            fire("a" + i, () => {
-              agtSteps[i].classList.add("on");
-              if (i === 3) sfx.step(-1);
-              else if (i === 4) sfx.notify(false);
-              else sfx.key(0.7);
-            })
+                AGT_AT.forEach((ms, i) =>
+          u >= ms &&
+          fire("a" + i, () => {
+            agtSteps[i].classList.add("on");
+            if (i === 3) sfx.step(-1);
+            else if (i === 4) sfx.notify(false);
+            else sfx.key(0.7);
+          })
         );
         if (u >= IDX_AT[3]) fire("cs", () => (ioSave.classList.add("on"), sfx.pop(3)));
         if (u >= AGT_AT[0]) fire("cr", () => (ioRestore.classList.add("on"), sfx.pop(5)));
@@ -9852,13 +9698,7 @@
       DWELL = 1000;
     const lineOf = new Map();
     ST.forEach(([, , , c, ls]) => ls.forEach(l => lineOf.set(l, c)));
-    const lines = CODE.map((parts, i) =>
-      h(
-        "span",
-        { "--c": lineOf.get(i) || "#9198a1" },
-        parts.map(([s, k]) => (k ? h("span", { class: `xp-${k}` }, s) : s))
-      )
-    );
+    const lines = CODE.map((parts, i) => h("span", { "--c": lineOf.get(i) || "#9198a1" }, parts.map(([s, k]) => (k ? h("span", { class: `xp-${k}` }, s) : s))));
     const code = h("div", { class: "xp-code" }, h("pre", {}, lines));
     const stations = ST.map(([k, b, s, c], i) => h("div", { class: "xp-st", "--c": c, style: { left: `${i * COL}px` } }, h("i", {}, k), h("b", {}, b), h("small", {}, s)));
     const flow = h(
@@ -9957,7 +9797,9 @@
       rows.forEach((row, v) => (row.rate.textContent = r[v] == null ? "—" : fmt(r[v])));
       delta.textContent = r[0] != null && r[1] != null ? `${r[1] >= r[0] ? "+" : "−"}${Math.round(Math.abs(r[1] - r[0]) * 100)} pts` : "…";
       pval.textContent = ready ? `p = ${pTwo(got[0].filter(Boolean).length, N, got[1].filter(Boolean).length, N).toFixed(3)} · two-proportion` : "p = …";
-      guard.replaceChildren(...VAR.map(([v], i) => (ts[i].length ? h("span", {}, `${v} `, h("b", {}, mean(ts[i]).toFixed(2)), " ", h("span", { class: "ok" }, mean(ts[i]) >= 0.95 ? "✓  " : "✗  ")) : `${v} …  `)));
+      guard.replaceChildren(
+        ...VAR.map(([v], i) => (ts[i].length ? h("span", {}, `${v} `, h("b", {}, mean(ts[i]).toFixed(2)), " ", h("span", { class: "ok" }, mean(ts[i]) >= 0.95 ? "✓  " : "✗  ")) : `${v} …  `))
+      );
     };
     const reset = () => {
       runs.forEach(r => r.el.remove());
@@ -10361,12 +10203,7 @@
           light(nid);
         }
       },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))),
-        svg
-      ),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
     });
   }
 
@@ -10381,8 +10218,8 @@
       "aria-label",
       "Need-to-know enclaves: a public issue asks whether version 2 is compatible with an internal integration; the primary agent hands the task through a trusted broker to a single-use enclave agent with read access to a private repository; the enclave tries to return a confidential launch date but the output gate drops anything outside the response schema; only compatibility and migrationRequired values reach the public comment, and the enclave is cleaned up"
     );
-    const bot = (cx, cy, s, c) =>
-      `<g fill="none" stroke="${c}" stroke-width="${3.5 / s}" stroke-linecap="round" stroke-linejoin="round" transform="translate(${cx},${cy}) scale(${s})"><path d="M0 -28 V-18"/><circle cx="0" cy="-31" r="4" fill="${c}"/><rect x="-24" y="-18" width="48" height="38" rx="10"/><path d="M-29 -6 V8 M29 -6 V8"/><circle cx="-10" cy="-2" r="4.5" fill="${c}" stroke="none"/><circle cx="10" cy="-2" r="4.5" fill="${c}" stroke="none"/><path d="M-8 10 H8"/></g>`;
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})"${fill ? ` fill="${fill}"` : ""}>${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const bot = (cx, cy, s, c) => ico("copilot", cx, cy, 60 * s, c);
     const pill = (x, y, w, t, c) => `<g class="ek-pill ${c}"><rect x="${x}" y="${y}" width="${w}" height="28" rx="14"/><text x="${x + w / 2}" y="${y + 19}">${t}</text></g>`;
     const PATHS = {
       ekP1: "M380 175 H440",
@@ -10393,16 +10230,16 @@
       ekP6: "M440 440 H380",
     };
     const build = () => {
-      let g = `<defs><radialGradient id="ekBotA"><stop offset="0" stop-color="#a371f7"/><stop offset="1" stop-color="#6e40c9"/></radialGradient><radialGradient id="ekBotB"><stop offset="0" stop-color="#f0883e"/><stop offset="1" stop-color="#9b4215"/></radialGradient></defs>`;
+      let g = `<defs><clipPath id="ekClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ekBotA"><stop offset="0" stop-color="#a371f7"/><stop offset="1" stop-color="#6e40c9"/></radialGradient><radialGradient id="ekBotB"><stop offset="0" stop-color="#f0883e"/><stop offset="1" stop-color="#9b4215"/></radialGradient></defs>`;
       // headers
       g += `<g class="ek-area" style="--i:0"><text class="ek-hd b" x="0" y="22">PUBLIC ISSUE</text><text class="ek-hd g" x="440" y="22">AGENTIC WORKFLOW</text><text class="ek-hd o" x="890" y="22">ISOLATED ENCLAVE · SINGLE USE</text><text class="ek-hd o" x="1360" y="22">PRIVATE REPOSITORY</text></g>`;
       // A: public issue + comment
       g += `<g class="ek-area" style="--i:1"><rect class="ek-card b" x="0" y="50" width="380" height="250" rx="16"/>`;
-      g += `<g class="ek-iss"><circle cx="34" cy="86" r="11"/><circle cx="34" cy="86" r="3" fill="#3fb950" stroke="none"/></g><text class="ek-t" x="56" y="94">Issue #42</text>${pill(290, 72, 70, "Public", "b")}`;
-      g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}</g>`;
+      g += `<g class="ek-iss">${ico("issue", 34, 86, 26, "#3fb950")}</g><text class="ek-t" x="56" y="94">Issue #42</text>${pill(290, 72, 70, "Public", "b")}`;
+      g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}<g class="ek-who"><circle cx="196" cy="258" r="17"/><image href="assets/avatars/ducky.jpg" x="181" y="243" width="30" height="30" clip-path="url(#ekClip)"/><text x="222" y="264">Ducky opened</text></g></g>`;
       g += `<g class="ek-cmt"><rect class="ek-card c" x="0" y="340" width="380" height="200" rx="16"/>${bot(34, 380, 0.5, "#d2a8ff")}<text class="ek-t s" x="58" y="386">AI agent commented</text>${pill(24, 406, 190, "Visible to everyone", "b")}`;
       g += `<text class="ek-tx" x="24" y="470">v2 is <tspan class="ek-hl">compatible</tspan> with our</text><text class="ek-tx" x="24" y="496">internal integration.</text><text class="ek-tx" x="24" y="522"><tspan class="ek-hl">No migration</tspan> is required.</text></g>`;
-      g += `<text class="ek-ft" x="190" y="582">✓ no project name · no launch date</text>`;
+      g += `<text class="ek-ft f6" x="190" y="582">✓ no project name · no launch date</text>`;
       // B: primary agent + output gate
       g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="url(#ekBotA)"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
       g += `<text class="ek-t" x="556" y="112">Primary agent</text><text class="ek-s" x="556" y="140">public repo · untrusted</text>`;
@@ -10410,32 +10247,33 @@
       g += `<g class="ek-area ek-gate" style="--i:3"><rect class="ek-card gt" x="440" y="300" width="380" height="240" rx="16"/><text class="ek-t" x="460" y="338">Output gate</text><text class="ek-s" x="460" y="364">only schema values leave</text>`;
       g += `<text class="ek-m k" x="460" y="408">compatibility</text><text class="ek-m" x="460" y="434"><tspan class="ek-opt">compatible</tspan> | incompatible | unknown</text>`;
       g += `<text class="ek-m k" x="460" y="478">migrationRequired</text><text class="ek-m" x="460" y="504">true | <tspan class="ek-opt">false</tspan></text></g>`;
-      g += `<text class="ek-ft" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
+      g += `<text class="ek-ft f5" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
       // C: enclave
       g += `<g class="ek-area" style="--i:4"><rect class="ek-wall" x="880" y="40" width="420" height="510" rx="24"/><g class="ek-in">`;
       g += `<rect class="ek-card o" x="910" y="70" width="360" height="150" rx="16"/><circle cx="970" cy="143" r="36" fill="url(#ekBotB)"/>${bot(970, 145, 0.75, "#f0f6fc")}`;
       g += `<text class="ek-t" x="1024" y="136">Enclave agent</text><text class="ek-s" x="1024" y="164">read-only · no network</text>`;
       g += `<rect class="ek-stat" x="910" y="236" width="360" height="38" rx="19"/><text id="ekStat" class="ek-m c" x="1090" y="261">Waiting for task</text>`;
       g += `<g class="ek-resp"><rect x="910" y="290" width="360" height="96" rx="14"/><text class="ek-m j" x="928" y="330">{"compatibility": "compatible",</text><text class="ek-m j" x="928" y="360"> "migrationRequired": false}</text>`;
-      g += `<path class="ek-shield" d="M1252 286 l16 6 v12 c0 10 -7 16 -16 20 c-9 -4 -16 -10 -16 -20 v-12 z M1245 305 l5 5 l9 -9"/></g>`;
+      g += `<g class="ek-shield"><circle cx="1252" cy="304" r="18"/>${ico("shieldCheck", 1252, 304, 26)}</g></g>`;
       g += `<g class="ek-leak"><rect x="910" y="406" width="360" height="110" rx="14"/><text class="ek-tx r" x="930" y="446">"Project Orchid launches</text><text class="ek-tx r" x="930" y="472">June 12…"</text><text class="ek-m x" x="930" y="502">✗ not in schema · dropped</text></g></g>`;
       g += `<g class="ek-clean"><rect x="975" y="372" width="230" height="60" rx="10"/><text x="1090" y="411">CLEANED UP</text></g></g>`;
-      g += `<text class="ek-ft" x="1090" y="582">launched per question · destroyed after</text>`;
+      g += `<text class="ek-ft f7" x="1090" y="582">launched per question · destroyed after</text>`;
       // D: private repo
       g += `<g class="ek-area" style="--i:5"><rect class="ek-card o" x="1360" y="50" width="400" height="490" rx="16"/>`;
-      g += `<g class="ek-lock"><circle cx="1396" cy="92" r="20"/><path d="M1389 92 V85 a7 7 0 0 1 14 0 V92"/><rect x="1385" y="91" width="22" height="14" rx="3"/></g>`;
+      g += `<g class="ek-lock"><circle cx="1396" cy="92" r="20"/>${ico("repoLocked", 1396, 92, 22)}</g>`;
       g += `<text class="ek-t s" x="1428" y="99">contoso/private-repo</text>${pill(1666, 126, 76, "Private", "o")}`;
-      g += `<g class="ek-file"><rect x="1380" y="168" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="194">README.md</text></g>`;
-      g += `<g class="ek-file ek-f2"><rect x="1380" y="218" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="244">compat-notes.md</text></g>`;
+      g += `<g class="ek-file"><rect x="1380" y="168" width="360" height="40" rx="8"/>${ico("file", 1406, 188, 20)}<text class="ek-m" x="1428" y="194">README.md</text></g>`;
+      g += `<g class="ek-file ek-f2"><rect x="1380" y="218" width="360" height="40" rx="8"/>${ico("file", 1406, 238, 20)}<text class="ek-m" x="1428" y="244">compat-notes.md</text></g>`;
       g += `<g class="ek-note"><rect x="1380" y="276" width="360" height="74" rx="10"/><text class="ek-tx" x="1398" y="306">v2: compatible with integration</text><text class="ek-tx" x="1398" y="334">migration: not required</text></g>`;
       g += `<g class="ek-conf"><rect x="1380" y="366" width="360" height="94" rx="10"/><text class="ek-m x" x="1398" y="398">CONFIDENTIAL</text><text class="ek-tx" x="1398" y="434">Project Orchid launches June 12</text></g>`;
       g += `${pill(1460, 484, 200, "authorized read access", "o")}</g>`;
-      // wires
+      // wires appear once both ends are on screen
+      g += `<g class="ek-area" style="--i:6">`;
       g += Object.entries(PATHS)
-        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"/>`)
+        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"${id === "ekP4" ? "" : ' pathLength="1"'}/>`)
         .join("");
-      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text>`;
-      g += `<g class="ek-x"><circle cx="830" cy="461" r="14"/><path d="M823 454 l14 14 M837 454 l-14 14"/></g>`;
+      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text></g>`;
+      g += `<g class="ek-x"><circle cx="830" cy="461" r="16"/>${ico("xCircle", 830, 461, 30)}</g>`;
       g += `<circle id="ekDot" class="ek-dot" r="9"/>`;
       svg.innerHTML = g;
     };
@@ -10477,7 +10315,9 @@
       },
       tick(t) {
         if (!t0) t0 = t;
-        const u = (t - t0) % CYC;
+        // hold the flow until every card and wire has risen in
+        const LEAD = 1900,
+          u = t - t0 < LEAD ? -1 : (t - t0 - LEAD) % CYC;
         let k = -1;
         for (let i = 0; i < STEPS.length; i++) if (u >= STEPS[i][0]) k = i;
         if (k !== stage) {
@@ -10502,6 +10342,231 @@
         dot.style.opacity = 1;
       },
       el: h("section", { class: "slide ek" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
+    });
+  }
+
+  // The Great Escapi: a daily red-team agent tries a new firewall escape each run; 400 recorded techniques fail, #401 (SNI domain fronting through a CDN-shared allowed host) escapes, and the firewall is fixed to check the TLS SNI. Counts and dates are measured from the workflow's repo memory
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 600;
+    // measured: The Great Escapi's repo memory (escape-attempts.json), 426 techniques in order, 15 Feb to 22 Sep 2026
+    const N = 426,
+      FIRST = 400,
+      ESC = new Set([400, 401, 402, 404, 405, 406, 409, 410, 411, 422, 423, 424, 425]),
+      MONTHS = [
+        [0, "FEB"],
+        [37, "JUL"],
+        [85, "AUG"],
+        [321, "SEP"],
+      ];
+    const ROWS = 3,
+      X0 = 60,
+      PITCH = 11.75,
+      CY0 = 432,
+      CS = 10;
+    const cx = i => X0 + Math.floor(i / ROWS) * PITCH;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ge-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "The Great Escapi: 426 recorded escape attempts; the first 400 are blocked, attempt 401 escapes by opening a tunnel to an allowed host on a shared CDN and asking for a different host in the TLS SNI, and the firewall fix checks the SNI against the allowlist"
+    );
+    const build = () => {
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      // [id, path, color, label, lx, ly]
+      const EDGES = [
+        ["geW1", "M300 200 H520", "b", ["CONNECT", "registry.npmjs.org"], 410, 126],
+        ["geW2", "M745 200 H950", "o", ["TLS ClientHello", "SNI = contoso.com"], 850, 126],
+        ["geW3", "M1210 186 C1290 186 1290 120 1360 120", "g", [], 0, 0],
+        ["geW4", "M1210 214 C1290 214 1290 280 1360 280", "r", [], 0, 0],
+      ];
+      let g = `<defs><radialGradient id="geAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ff9b94"/><stop offset=".55" stop-color="#da3633"/><stop offset="1" stop-color="#6e1013"/></radialGradient>`;
+      for (const [k, c] of [
+        ["b", "#4493f8"],
+        ["o", "#d29922"],
+        ["g", "#3fb950"],
+        ["r", "#f85149"],
+      ])
+        g += `<marker id="geM${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+      g += `</defs>`;
+      g += `<rect class="ge-box" x="20" y="70" width="270" height="260" rx="22"/><text class="ge-box-t" x="155" y="104">AWF SANDBOX</text>`;
+      for (const [id, d, c, lab, lx, ly] of EDGES) {
+        g += `<path class="ge-wire ${c}" id="${id}" d="${d}" marker-end="url(#geM${c})"/>`;
+        if (lab.length) g += `<text class="ge-l ${c}" x="${lx}" y="${ly}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+      }
+      g += `<g class="ge-node" id="geAgent"><circle cx="155" cy="200" r="54" fill="url(#geAgentG)"/>${ico("copilot", 155, 202, 58)}<text class="ge-n" x="155" y="294">Great Escapi</text></g>`;
+      g += `<g class="ge-node ge-proxy" id="geSquid"><rect x="525" y="120" width="215" height="160" rx="18"/><text class="ge-k" x="632" y="160">EGRESS PROXY</text><text class="ge-n" x="632" y="202">allowlist</text><text class="ge-s" id="geSquidT" x="632" y="244"></text></g>`;
+      g += `<g class="ge-node" id="geCdn"><rect x="955" y="130" width="250" height="140" rx="70"/><text class="ge-k" x="1080" y="186">SHARED CDN EDGE</text><text class="ge-s" x="1080" y="226">routes by SNI</text></g>`;
+      g += `<g class="ge-node ge-dest ok" id="geOk"><rect x="1365" y="88" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="129">registry.npmjs.org</text><text class="ge-tag g" x="1677" y="128">allowed</text></g>`;
+      g += `<g class="ge-node ge-dest bad" id="geBad"><rect x="1365" y="248" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="289">contoso.com</text><text class="ge-tag r" x="1677" y="288">not allowed</text><text class="ge-hit" id="geHit" x="1530" y="350">ESCAPED · 200 OK</text></g>`;
+      g += `<g class="ge-cut" id="geCut"><circle cx="800" cy="200" r="22"/><path d="M790 190 L810 210 M810 190 L790 210"/></g>`;
+      g += `<text class="ge-phase" id="gePhase" x="${VW - 60}" y="40"></text>`;
+      g += `<text class="ge-h" x="${X0}" y="402">EACH SQUARE IS ONE ESCAPE TECHNIQUE, IN THE ORDER THE AGENT TRIED THEM</text><text class="ge-h ge-cnt" id="geCnt" x="${cx(N - 1) + CS}" y="402"></text>`;
+      for (let i = 0; i < N; i++) g += `<rect class="ge-c${ESC.has(i) ? " x" : ""}" id="geC${i}" x="${cx(i)}" y="${CY0 + (i % ROWS) * PITCH}" width="${CS}" height="${CS}" rx="2"/>`;
+      const yb = CY0 + ROWS * PITCH + 4;
+      for (const [i, m] of MONTHS) g += `<line class="ge-tick" x1="${cx(i)}" y1="${yb}" x2="${cx(i)}" y2="${yb + 14}"/><text class="ge-m" x="${cx(i)}" y="${yb + 36}">${m}</text>`;
+      const xf = cx(FIRST) + CS / 2;
+      g += `<g class="ge-mark r" id="geFirst"><line x1="${xf}" y1="${yb}" x2="${xf}" y2="${yb + 62}"/><text x="${xf}" y="${yb + 88}" text-anchor="end">#401 · first escape · 14 Sep</text></g>`;
+      const xe = cx(N - 1) + CS + 8;
+      g += `<g class="ge-mark g" id="geFix"><path d="M${xe} ${CY0 - 4} H${xe + 10} V${CY0 + ROWS * PITCH} H${xe}"/><text x="${xe + 10}" y="402" text-anchor="end">firewall fix · 22 Sep</text></g>`;
+      g += `<circle class="ge-dot" id="geDot" r="9"/>`;
+      svg.innerHTML = g;
+    };
+    // measured from the same memory and the firewall pull request
+    const STATS = [
+      [400, "", "techniques blocked before the first escape", "#8b949e", "#c9d1d9"],
+      [401, "#", "SNI domain fronting through a CDN-shared allowed host", "#ff7b72", "#d29922"],
+      [13, "", "escapes logged, all variants of that one tunnel trick", "#d29922", "#ff7b72"],
+      [8, " days", "from first escape to the firewall fix", "#3fb950", "#79c0ff"],
+    ];
+    const fmt = (v, i) => (STATS[i][1] === "#" ? "#" + v : v + STATS[i][1]);
+    const nums = STATS.map((s, i) => h("div", { class: "ct-num" }, fmt(0, i)));
+    const stats = h(
+      "div",
+      { class: "ct-stats" },
+      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+    );
+    // [phase, ms into the cycle]
+    const P = {
+      sweep: 600,
+      first: 4200,
+      w1: 4600,
+      w2: 5600,
+      w4: 6800,
+      hit: 7600,
+      more: 8200,
+      fix: 10200,
+      w1b: 10800,
+      w2b: 11800,
+      cut: 12400,
+    };
+    const CYC = 16000;
+    let built = false,
+      t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      lit = 0;
+    const $ = id => svg.querySelector("#" + id);
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const along = (id, f, col) => {
+      const p = $(id),
+        q = p.getPointAtLength(p.getTotalLength() * ease(Math.max(0, Math.min(1, f)))),
+        dot = $("geDot");
+      dot.setAttribute("cx", q.x);
+      dot.setAttribute("cy", q.y);
+      dot.setAttribute("fill", col);
+      dot.style.opacity = 1;
+      p.classList.add("hot");
+    };
+    const lightTo = n => {
+      for (; lit < n; lit++) $("geC" + lit).classList.add("on");
+      $("geCnt").textContent = lit ? "#" + String(lit).padStart(3, "0") : "";
+    };
+    slides.push({
+      group: "security",
+      sound: "escape",
+      palette: ["#8e1519", "#1f6feb", "#3d0a0d", "#238636"],
+      notes:
+        "The Great Escapi is gh-aw's own red-team workflow: every day an agent runs inside the agent workflow firewall (AWF) with instructions to escape it, reads repo memory of every technique already tried so it never repeats one, tries something new, and writes the result back. The squares are measured from that memory: 426 recorded techniques between 15 February and 22 September 2026, in order. The first 400 were all blocked: DNS tricks, IPv6, request smuggling, encoding games, container and kernel escapes, proxy bypasses. Attempt 401, on 14 September, escaped. The agent noticed that a newly allowed package registry sits on a shared CDN, opened a proxy tunnel to it, which the allowlist accepts, and then asked for a different site in the TLS handshake's SNI. The proxy only checked the CONNECT target, so the CDN served the forbidden site. Over the next eight days the agent logged 13 escapes, all variants of that one trick, through more allowed hosts. Its report on 22 September went to the firewall team, and the same day the firewall shipped a fix: the proxy now peeks at the TLS ClientHello without decrypting it and terminates the connection unless the SNI is on the allowlist. The attack diagram is illustrative and simplified; the counts and dates are measured from the workflow's memory and the firewall pull request.",
+      enter() {
+        if (!built) {
+          built = true;
+          build();
+        }
+        t0 = 0;
+        cyc = -1;
+        nums.forEach((n, i) => (n.textContent = fmt(0, i)));
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = fmt(Math.round(STATS[i][0] * f), i)));
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          lit = 0;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          svg.classList.remove("fixed");
+          $("geSquidT").textContent = "";
+          $("gePhase").textContent = "";
+          $("geCnt").textContent = "";
+          $("geAgent").classList.add("on");
+          $("geSquid").classList.add("on");
+        }
+        svg.querySelectorAll(".ge-wire.hot").forEach(w => w.classList.remove("hot"));
+        const dot = $("geDot");
+        dot.style.opacity = 0;
+        if (u >= P.sweep && u < P.first) {
+          const n = Math.floor(((u - P.sweep) / (P.first - P.sweep)) * FIRST);
+          if (Math.floor(n / 25) !== Math.floor(lit / 25)) sfx.key(0.5);
+          lightTo(n);
+          fire("sweep", () => ($("gePhase").textContent = "attempts 1–400 · all blocked"));
+        }
+        if (u >= P.first) {
+          fire("first", () => {
+            lightTo(FIRST + 1);
+            $("geFirst").classList.add("on");
+            $("gePhase").textContent = "attempt #401 · 14 Sep 2026";
+            sfx.block(false);
+          });
+        }
+        if (u >= P.w1 && u < P.w2) along("geW1", (u - P.w1) / 800, "#4493f8");
+        if (u >= P.w1 + 800) fire("ok1", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
+        if (u >= P.w2 && u < P.w4) {
+          along("geW2", (u - P.w2) / 900, "#d29922");
+          fire("pass", () => ($("geSquidT").textContent = "tunnel open"));
+        }
+        if (u >= P.w2 + 900) fire("cdn", () => ($("geCdn").classList.add("on"), sfx.pop(4)));
+        if (u >= P.w4 && u < P.hit) along("geW4", (u - P.w4) / 700, "#f85149");
+        if (u >= P.hit && u < P.fix)
+          fire("hit", () => {
+            $("geBad").classList.add("on", "hot");
+            $("geW4").classList.add("on");
+            sfx.bug();
+          });
+        if (u >= P.more && u < P.fix) {
+          lightTo(FIRST + 1 + Math.floor(Math.min(1, (u - P.more) / 1600) * (N - FIRST - 1)));
+          fire("more", () => ($("gePhase").textContent = "13 escapes logged in 8 days"));
+        }
+        if (u >= P.fix)
+          fire("fix", () => {
+            lightTo(N);
+            ["geBad", "geW4", "geCdn"].forEach(id => $(id).classList.remove("on", "hot"));
+            svg.classList.add("fixed");
+            $("geFix").classList.add("on");
+            $("geSquidT").textContent = "+ SNI check";
+            $("gePhase").textContent = "firewall fix · 22 Sep 2026 · SNI must be allowed";
+            sfx.review();
+          });
+        if (u >= P.w1b && u < P.w2b) along("geW1", (u - P.w1b) / 800, "#4493f8");
+        if (u >= P.w1b + 800) fire("ok2", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
+        if (u >= P.w2b && u < P.cut) along("geW2", ((u - P.w2b) / 600) * 0.25, "#d29922");
+        if (u >= P.cut)
+          fire("cut", () => {
+            $("geCut").classList.add("on");
+            $("geSquidT").textContent = "✕ SNI denied";
+            sfx.block(true);
+          });
+      },
+      el: h(
+        "section",
+        { class: "slide ge" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A red-team agent that tries a new escape every day"), h("h2", {}, letters("Continuous "), letters("Security", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "measured from The Great Escapi's repo memory · Feb–Sep 2026 · fixed in the AWF firewall")
+      ),
     });
   }
 
@@ -11308,77 +11373,44 @@
     // [label, kind] where kind 1 = selected by the workflow, "+" = collapsed remainder
     const PV = [
       {
-        id: "linear",
-        name: "Linear",
-        host: "api.linear.app",
-        c: "#79c0ff",
+        id: "linear", name: "Linear", host: "api.linear.app", c: "#79c0ff",
         trig: [["issue-created"], ["+6 more", "+"]],
-        tools: [
-          ["get-issue", 1],
-          ["list-comments", 1],
-          ["+27 more", "+"],
-        ],
+        tools: [["get-issue", 1], ["list-comments", 1], ["+27 more", "+"]],
         safe: [["add-comment", 1], ["create-issue"], ["+6 more", "+"]],
-        sel: "[get-issue, list-comments]",
-        reads: ["get-issue", "list-comments"],
-        fx: "add-comment",
+        sel: "[get-issue, list-comments]", reads: ["get-issue", "list-comments"], fx: "add-comment",
       },
       {
-        id: "jira",
-        name: "Jira",
-        host: "<site>.atlassian.net",
-        c: "#4c9aff",
+        id: "jira", name: "Jira", host: "<site>.atlassian.net", c: "#4c9aff",
         trig: [["issue-created"], ["+6 more", "+"]],
         tools: [["getJiraIssue", 1], ["get-issue-remote-links"], ["+ MCP readers", "+"]],
         safe: [["add-comment", 1], ["add-label"], ["+4 more", "+"]],
-        sel: "{personal: [getJiraIssue]}",
-        reads: ["getJiraIssue"],
-        fx: "add-comment",
+        sel: "{personal: [getJiraIssue]}", reads: ["getJiraIssue"], fx: "add-comment",
       },
       {
-        id: "azure-devops",
-        name: "Azure DevOps",
-        host: "dev.azure.com",
-        c: "#39c5cf",
+        id: "azure-devops", name: "Azure DevOps", host: "dev.azure.com", c: "#39c5cf",
         trig: [["work-item-created"], ["+7 more", "+"]],
         tools: [["get-work-item-description", 1], ["get-work-item"], ["+10 more", "+"]],
         safe: [["comment-on-work-item", 1], ["create-work-item"], ["+21 more", "+"]],
-        sel: "[get-work-item-description]",
-        reads: ["get-work-item-description"],
-        fx: "comment-on-work-item",
+        sel: "[get-work-item-description]", reads: ["get-work-item-description"], fx: "comment-on-work-item",
       },
       {
-        id: "gitlab",
-        name: "GitLab",
-        host: "gitlab.com · self-managed",
-        c: "#f0883e",
+        id: "gitlab", name: "GitLab", host: "gitlab.com · self-managed", c: "#f0883e",
         trig: [["merge-request-opened"], ["pipeline-updated"]],
         tools: [["get-merge-request", 1], ["get-pipeline"]],
         safe: [["add-merge-request-note", 1]],
-        sel: "[get-merge-request]",
-        reads: ["get-merge-request"],
-        fx: "add-merge-request-note",
+        sel: "[get-merge-request]", reads: ["get-merge-request"], fx: "add-merge-request-note",
       },
     ];
     const CATALOG = ["Linear", "Jira", "Azure DevOps", "Slack", "Teams", "Confluence", "Sentry", "ServiceNow", "GitLab", "PagerDuty", "Datadog", "Zendesk", "Notion", "Asana"];
-    const K = "#ff7b72",
-      D = "#656c76",
-      T = "#f0f6fc",
-      V = "#a5d6ff";
-    const R = "var(--r)",
-      Wr = "var(--w)";
+    const K = "#ff7b72", D = "#656c76", T = "#f0f6fc", V = "#a5d6ff";
+    const R = "var(--r)", Wr = "var(--w)";
 
     // declaration card
     const cardFile = h("em");
     const body = h("div", { class: "cn-body" });
     const card = h("div", { class: "cn-card" }, h("div", { class: "cn-tab" }, "connectors/", cardFile, ".md"), body);
     let pick = 0;
-    const chips = (list, k) =>
-      h(
-        "div",
-        { class: "cn-chips" },
-        list.map(([l, s]) => h("span", { class: `cn-chip ${k}${s === 1 ? " pick" : ""}${s === "+" ? " more" : ""}`, "--i": s === 1 ? pick++ : 0 }, l))
-      );
+    const chips = (list, k) => h("div", { class: "cn-chips" }, list.map(([l, s]) => h("span", { class: `cn-chip ${k}${s === 1 ? " pick" : ""}${s === "+" ? " more" : ""}`, "--i": s === 1 ? pick++ : 0 }, l)));
     const sec = (label, ...kids) => h("div", { class: "cn-sec" }, h("small", {}, label), ...kids);
     const buildCard = p => {
       pick = 0;
@@ -11401,19 +11433,13 @@
     const S = [slot("var(--pc)"), slot(R), slot(R), slot(Wr), slot(Wr)];
     const LINES = [
       [["---", D]],
-      [
-        ["on: ", K],
-        ["workflow_dispatch", V],
-      ],
+      [["on: ", K], ["workflow_dispatch", V]],
       [["imports:", K]],
       [["  - ", K], [".github/workflows/connectors/", V], S[0], [".md", V]],
       [["tools:", K]],
       [["  ", K], S[1], [": ", K], S[2]],
       [["safe-outputs:", K]],
-      [
-        ["  staged: ", K],
-        ["true", V],
-      ],
+      [["  staged: ", K], ["true", V]],
       [["  ", K], S[3], ["-", K], S[4], [":", K]],
       [["---", D]],
       [["# Intake handoff", T]],
@@ -11421,16 +11447,7 @@
     ];
     const HOT = { 3: "var(--pc)", 5: R, 8: Wr };
     const rows = LINES.map((parts, i) =>
-      h(
-        "div",
-        { class: "cn-row" + (HOT[i] ? " hot" : ""), "--k": HOT[i] || "transparent" },
-        h("span", { class: "no" }, String(i + 1)),
-        h(
-          "span",
-          {},
-          parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0])))
-        )
-      )
+      h("div", { class: "cn-row" + (HOT[i] ? " hot" : ""), "--k": HOT[i] || "transparent" }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0])))))
     );
     const ed = h("div", { class: "cn-ed" }, h("div", { class: "cn-tab" }, "intake.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cn-code" }, rows));
     const target = p => [p.id, p.id, p.sel, p.id, p.fx];
@@ -11931,13 +11948,9 @@
     svg.setAttribute("class", "hist-svg");
     svg.setAttribute("viewBox", "0 0 1150 700");
     svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      "Measured gh-aw history: pull requests opened per month split by origin: workflow PRs, Copilot coding agent PRs from a workflow-written issue, from a human-written issue or with no linked issue, and other PRs, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026"
-    );
+    svg.setAttribute("aria-label", "Measured gh-aw history: pull requests opened per month split by origin: workflow PRs, Copilot coding agent PRs from a workflow-written issue, from a human-written issue or with no linked issue, and other PRs, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026");
     let grid = "";
-    for (const v of [0, 500, 1000, 1500, 2000, 2500])
-      grid += `<line x1="${CX - 10}" x2="${xs(N) + 6}" y1="${yP(v)}" y2="${yP(v)}" class="hist-grid"/><text x="${CX - 16}" y="${yP(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
+    for (const v of [0, 500, 1000, 1500, 2000, 2500]) grid += `<line x1="${CX - 10}" x2="${xs(N) + 6}" y1="${yP(v)}" y2="${yP(v)}" class="hist-grid"/><text x="${CX - 16}" y="${yP(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
     for (const v of [500000, 1000000, 1500000]) grid += `<text x="${xs(N) + 14}" y="${yL(v) + 6}" class="hist-ax hist-ax-l">${v / 1e6}M</text>`;
     let months = "";
     MON.forEach((m, i) => {
@@ -12008,16 +12021,8 @@
         "div",
         { class: "hist-split" },
         h("div", { class: "hist-split-t" }, title),
-        h(
-          "div",
-          { class: "hist-split-bar" },
-          parts.map(([w, c]) => h("i", { style: { width: `${w}%`, background: c } }))
-        ),
-        h(
-          "div",
-          { class: "hist-split-l" },
-          parts.map(([w, c, l]) => h("span", { "--c": c }, h("em", {}, `${w}%`), ` ${l}`))
-        )
+        h("div", { class: "hist-split-bar" }, parts.map(([w, c]) => h("i", { style: { width: `${w}%`, background: c } }))),
+        h("div", { class: "hist-split-l" }, parts.map(([w, c, l]) => h("span", { "--c": c }, h("em", {}, `${w}%`), ` ${l}`)))
       );
     let p = P0,
       t0 = 0,
@@ -12282,10 +12287,7 @@
     main.setAttribute("class", "evo-svg");
     main.setAttribute("viewBox", `0 0 ${W} ${H}`);
     main.setAttribute("role", "img");
-    main.setAttribute(
-      "aria-label",
-      "Measured: commits on gh-aw's main branch that changed workflow Markdown, per month, split into agent and bot accounts and people, with the number of live workflows at month end, from August 2025 to general availability in October 2026"
-    );
+    main.setAttribute("aria-label", "Measured: commits on gh-aw's main branch that changed workflow Markdown, per month, split into agent and bot accounts and people, with the number of live workflows at month end, from August 2025 to general availability in October 2026");
     let g = "";
     for (const v of [0, 100, 200, 300, 400])
       g += `<line x1="${CX - 8}" x2="${xs(N) + 6}" y1="${y(v)}" y2="${y(v)}" class="hist-grid"/><text x="${CX - 14}" y="${y(v) + 6}" class="hist-ax" text-anchor="end">${v}</text><text x="${xs(N) + 16}" y="${y(v) + 6}" class="hist-ax evo-ax-r">${v}</text>`;
@@ -12406,10 +12408,22 @@
           { class: "evo-main", "--i": 0 },
           h("div", { class: "land-t" }, "Commits per month · live workflows"),
           h("div", { class: "land-big" }, h("b", {}, "3,687"), h("span", {}, "commits changed a workflow .md · 545 created, 196 retired, 349 live")),
-          h("div", { class: "hist-legend" }, h("span", { "--c": "#ab7df8" }, "agent & bot accounts · 82%"), h("span", { "--c": "#4493f8" }, "people · 18%"), h("span", { "--c": "#3fb950", class: "ln" }, "live workflows")),
+          h(
+            "div",
+            { class: "hist-legend" },
+            h("span", { "--c": "#ab7df8" }, "agent & bot accounts · 82%"),
+            h("span", { "--c": "#4493f8" }, "people · 18%"),
+            h("span", { "--c": "#3fb950", class: "ln" }, "live workflows")
+          ),
           main
         ),
-        h("div", { class: "evo-side", "--i": 1 }, h("div", { class: "land-t" }, "Lines changed per commit"), h("div", { class: "land-big" }, h("b", {}, "18"), h("span", {}, "median · p90 209 · 71% touch one file")), side),
+        h(
+          "div",
+          { class: "evo-side", "--i": 1 },
+          h("div", { class: "land-t" }, "Lines changed per commit"),
+          h("div", { class: "land-big" }, h("b", {}, "18"), h("span", {}, "median · p90 209 · 71% touch one file")),
+          side
+        ),
         h(
           "div",
           { class: "evo-facts" },
@@ -12474,18 +12488,7 @@
       ["sg", "gq", [T("sg"), B("gq")], "true", 1395, 265, "end"],
       ["sg", "gp", [B("sg"), T("gp")], "false", 1395, 400, "end"],
       ["gq", "t7", [T("gq"), B("t7")]],
-      [
-        "gq",
-        "gp",
-        [
-          [1495, 222],
-          [1495, 438],
-        ],
-        "GraphQL error",
-        1488,
-        428,
-        "end",
-      ],
+      ["gq", "gp", [[1495, 222], [1495, 438]], "GraphQL error", 1488, 428, "end"],
       ["gq", "pr", [R("gq"), [1540, 190], [1540, 330], L("pr")]],
       ["gp", "pr", [R("gp"), [1540, 470], [1540, 330], L("pr")]],
       ["pr", "done", [R("pr"), L("done")]],
@@ -12699,7 +12702,7 @@
     data: ["AW factory", "Measured on gh-aw's own history"],
   };
   // Header-less rows of a single slide.
-  const SOLO = { intro: "Title", mindset: "Factory mindset", finale: "Finale" };
+  const SOLO = { intro: "Title", mindset: "Factory mindset", trust: "Trust the process", finale: "Finale" };
   // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
   const rows = [];
   for (const s of slides) {
@@ -12708,20 +12711,12 @@
     else rows.push({ group: s.group, items: [s] });
   }
   // The finale closes the deck, after the data band.
-  rows.push(
-    ...rows.splice(
-      rows.findIndex(r => r.group === "finale"),
-      1
-    )
-  );
+  rows.push(...rows.splice(rows.findIndex(r => r.group === "finale"), 1));
   {
     const label = s => {
       const hd = s.el.querySelector("h1, h2, h3");
       const ls = hd ? [...hd.querySelectorAll(".line")] : [];
-      const t = (ls.length ? ls.map(l => l.textContent).join(" ") : hd?.textContent || "")
-        .replace(/\s+/g, " ")
-        .replace(/ ([,.])/g, "$1")
-        .trim();
+      const t = (ls.length ? ls.map(l => l.textContent).join(" ") : hd?.textContent || "").replace(/\s+/g, " ").replace(/ ([,.])/g, "$1").trim();
       const k = s.el.querySelector(".kicker")?.textContent.trim();
       return t.length > 32 && k ? k : t;
     };
@@ -12764,11 +12759,7 @@
             "div",
             { class: "bh-head" },
             h("div", { class: "kicker" }, `Part ${String(part).padStart(2, "0")} / ${String(parts.length).padStart(2, "0")}`),
-            h(
-              "h2",
-              {},
-              title.split(" ").flatMap((w, i) => (i ? [" ", letters(w, "l-grad")] : [letters(w, "l-grad")]))
-            ),
+            h("h2", {}, title.split(" ").flatMap((w, i) => (i ? [" ", letters(w, "l-grad")] : [letters(w, "l-grad")]))),
             h("p", { class: "bh-sub" }, sub)
           ),
           map,
@@ -13285,6 +13276,14 @@
         bell(76, t + 1.45, 0.04, 1.2);
         bell(79, t + 1.57, 0.035, 1.4);
       },
+      // for PMs: a notification blip (the habit), a hand-off up to the agent, a page stamp (the artifact), then a warm nod resolving home
+      pm: t => {
+        [84, 88].forEach((m, i) => osc("sine", hz(m), t + 0.2 + i * 0.09, 0.14, 0.03, { a: 0.003 }));
+        [67, 71, 74].forEach((m, i) => tone(m, t + 0.65 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.055, cutoff: 2600, detune: 3 }));
+        click(t + 1.1, 1800, 0.06, 6);
+        [72, 76, 79].forEach((m, i) => bell(m, t + 1.35 + i * 0.07, 0.035, 1.3));
+        pad([48, 55, 64, 67], t + 1.35, 1.8, 0.025, "triangle", 1800);
+      },
       // agents that debug agents: three call/response pings (one per MCP tool call), then findings resolving upward
       mcp: t => {
         [0, 1, 2].forEach(i => {
@@ -13331,6 +13330,12 @@
           click(tt + 0.08, 6000, 0.08, 1);
           if (i % 4 === 2) [1, 1.48, 2.13].forEach(r => osc("square", 310 * r, tt, 0.12, 0.025));
         }
+      },
+      // trust the process: one slow, heavy review bell against a quick run of merge blips, then a bright resolving chord
+      trust: t => {
+        bell(55, t + 0.2, 0.05, 2.4);
+        [72, 76, 79, 84, 79, 84, 88, 91].forEach((m, i) => tone(m, t + 0.5 + i * 0.08, { type: "triangle", dur: 0.12, vol: 0.05, cutoff: 3200 }));
+        pad([60, 64, 67, 72], t + 1.3, 1.8, 0.03, "triangle", 2400);
       },
       // human agent processes: looping sequencer motif, human heartbeat underneath
       loop: t => {

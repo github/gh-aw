@@ -24,6 +24,8 @@ that satisfies it. Use the [Decision Matrix](triggers.md#decision-matrix) and
 Apply the [memory reuse checkpoint](designer.md#memory-reuse-checkpoint) before
 selecting tools or persistence; follow [memory policy](memory.md#scheduled-dreaming).
 
+- PR reviewers: `pull_request` with `types: [ready_for_review]`; add `opened`,
+  `synchronize`, `reopened` only for required checks. See [pr-reviewer.md](pr-reviewer.md).
 - Changed-file reviews: `pull_request` with scoped `paths:`. Backend reviews scope
   migrations/schema/API contracts; design reviews scope tokens/theme/assets;
   compliance reviews scope manifests/policy/control docs.
