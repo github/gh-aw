@@ -67,7 +67,7 @@ slides.push({
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 2, 3, 5, 7, 8, 9, and 11–22 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 2, 3, 5, 7, 8, and 10–22 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop

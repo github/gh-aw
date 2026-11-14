@@ -20,7 +20,6 @@ test("presents the twenty-two slides without the removed sections", async ({ pag
     "Supply chain hardening",
     "Safety and control",
     "Safe outputs",
-    "Enterprise ready",
     "Private enclaves",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
@@ -33,6 +32,7 @@ test("presents the twenty-two slides without the removed sections", async ({ pag
     "Cost management",
     "Model routing",
     "Any agent, any provider",
+    "Enterprise ready",
     "Centralized campaigns",
     "G\u0131tHub",
   ];
@@ -46,8 +46,8 @@ test("presents the twenty-two slides without the removed sections", async ({ pag
 });
 
 test("preserves navigation, slide links, speaker notes, and sound controls", async ({ page }) => {
-  await page.goto("/gh-aw/cracktro/#11");
-  await expect(page.locator(".count")).toHaveText("11 / 22");
+  await page.goto("/gh-aw/cracktro/#10");
+  await expect(page.locator(".count")).toHaveText("10 / 22");
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
   await expect(page.locator(".notes")).toContainText("LabelOps");
@@ -61,11 +61,11 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#12$/);
+  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#11$/);
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("11 / 22");
+  await expect(page.locator(".count")).toHaveText("10 / 22");
   await page.reload();
-  await expect(page.locator(".count")).toHaveText("11 / 22");
+  await expect(page.locator(".count")).toHaveText("10 / 22");
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(".count")).toHaveText("01 / 22");
@@ -109,7 +109,7 @@ test("publishes synthetic examples without profile assets or private source refe
     return route.abort();
   });
   await page.clock.install();
-  await page.goto("/gh-aw/cracktro/#16");
+  await page.goto("/gh-aw/cracktro/#15");
   await page.clock.runFor(15_000);
   for (const author of await page.locator(".mra-who").allTextContents()) {
     expect(author).toMatch(/^(?:reviewer|maintainer|copilot) · /);
@@ -119,7 +119,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
   await page.keyboard.press("n");
-  for (const slide of [2, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]) {
+  for (const slide of [2, 3, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
