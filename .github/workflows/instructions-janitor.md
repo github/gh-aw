@@ -66,6 +66,17 @@ evals:
 
 # Instructions Janitor
 
+## Markdown Report Formatting
+
+For every human-readable Markdown report, comment, or discussion:
+- Use `###` or deeper headings; never use `#` or `##`.
+- Follow this order: overview, key metrics/issues, detailed findings, next actions. Keep the overview and key metrics/issues visible.
+- Put long findings, lists, and evidence in `<details><summary>**View detailed findings**</summary> ... </details>` blocks.
+- Finish with concrete next actions, using checkboxes for actionable follow-up.
+- Format workflow-run references as `[§12345](https://github.com/owner/repo/actions/runs/12345)` when applicable.
+
+Keep required machine-readable output formats, including JSON and safe-output payloads, unchanged.
+
 Keep `.github/aw/` accurate, truncation-safe and free of duplicate guidance.
 Copilot CLI prompt-file queries may expose only the first **8,000 UTF-8 bytes**.
 Within **7,500 bytes including frontmatter**, pack objective, mandatory rules,

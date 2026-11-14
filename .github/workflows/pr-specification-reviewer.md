@@ -122,6 +122,17 @@ evals:
 
 # PR Specification Reviewer
 
+## Markdown Report Formatting
+
+For every human-readable Markdown report, comment, or discussion:
+- Use `###` or deeper headings; never use `#` or `##`.
+- Follow this order: overview, key metrics/issues, detailed findings, next actions. Keep the overview and key metrics/issues visible.
+- Put long findings, lists, and evidence in `<details><summary>**View detailed findings**</summary> ... </details>` blocks.
+- Finish with concrete next actions, using checkboxes for actionable follow-up.
+- Format workflow-run references as `[§12345](https://github.com/owner/repo/actions/runs/12345)` when applicable.
+
+Keep required machine-readable output formats, including JSON and safe-output payloads, unchanged.
+
 Use only commands listed under `tools.bash`, one standalone command per call. Do not combine commands with shell operators unless the complete command is explicitly allowlisted. If a required operation is blocked, stop and report it instead of probing command variants.
 
 Review the triggering PR against the formal contracts it affects. Enforce

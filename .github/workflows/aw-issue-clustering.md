@@ -119,6 +119,17 @@ safe-outputs:
 
 # AW essential ten
 
+## Markdown Report Formatting
+
+For every human-readable Markdown report, comment, or discussion:
+- Use `###` or deeper headings; never use `#` or `##`.
+- Follow this order: overview, key metrics/issues, detailed findings, next actions. Keep the overview and key metrics/issues visible.
+- Put long findings, lists, and evidence in `<details><summary>**View detailed findings**</summary> ... </details>` blocks.
+- Finish with concrete next actions, using checkboxes for actionable follow-up.
+- Format workflow-run references as `[§12345](https://github.com/owner/repo/actions/runs/12345)` when applicable.
+
+Keep required machine-readable output formats, including JSON and safe-output payloads, unchanged.
+
 Act as the gh-aw operator's backlog curator. Recompute the best assignments every
 day, rather than accumulating another ten issues each run. A trusted cleanup job
 first closes unchanged AW source issues linked to summaries closed as completed,
