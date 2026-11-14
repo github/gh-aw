@@ -280,3 +280,9 @@
 - DGTP #77069 still producing incomplete-result issues (#77299, #77312, #77339).
 - New smoke agent-job failures: smoke-copilot (unified-session contract), smoke-codex-routed-openai (model-routing evidence), smoke-atomic (Atomic CLI install). Covered by existing smoke issue groups; not a new startup-failure cluster.
 - AWF startup-failure cluster (Install AWF binary): no occurrences after 2026-11-12T23:30Z.
+
+## Update — 2026-11-14 (Workflow Health Manager)
+- **Auditor tracker #77062 expired and auto-closed 2026-11-13T04:37Z while Auditor was still failing.** Re-filed as a new P1 tracker (temp id #77641). Do not cite #77062 as an open tracker. Recommend maintainers keep P1 trackers open until the failing step passes for 24h.
+- The 2026-11-12 "time_budget" attribution for Auditor is NOT re-verified (job logs HTTP 403). Treat as hypothesis.
+- "Handle agent failure" conclusion-job failures with green agent jobs now span several workflows (daily-doc-updater, daily-experiment-report, daily-byok-ollama-test), not only daily-go-test-parallelizer. No tracker found.
+- AWF "Install AWF binary" failure recurred 2026-11-13T09:36Z (daily-spending-forecast). The 2026-11-13 note that the cluster had no occurrences after 11-12 23:30Z is stale.
