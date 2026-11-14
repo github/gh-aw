@@ -3161,7 +3161,7 @@
       g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
       g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
       g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
-      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/>${ico("copilot", 150, 158, 56)}<text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
+      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/><g class="zs-bot" fill="none" stroke="#f0f6fc" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M150 128 V138"/><circle cx="150" cy="125" r="4" fill="#f0f6fc"/><rect x="126" y="138" width="48" height="38" rx="10"/><path d="M121 150 V164 M179 150 V164"/><circle cx="140" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><circle cx="160" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><path d="M142 166 H158"/></g><text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
       [
         ["copilot", 14],
         ["claude", 107],
