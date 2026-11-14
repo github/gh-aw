@@ -14,7 +14,6 @@ describe("merge_frontmatter_models.cjs", () => {
   let mergeModelCosts;
   let writeMergedModelsJSON;
   let isPlainObject;
-  let DEFAULT_MODELS_JSON_PATH;
   let MERGED_MODELS_JSON_PATH;
   /** @type {string[]} */
   const tmpDirs = [];
@@ -23,10 +22,11 @@ describe("merge_frontmatter_models.cjs", () => {
     vi.clearAllMocks();
     const mod = await import("./merge_frontmatter_models.cjs");
     mergeModelCosts = mod.mergeModelCosts;
-    writeMergedModelsJSON = mod.writeMergedModelsJSON;
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-models-output-"));
+    tmpDirs.push(outputDir);
+    MERGED_MODELS_JSON_PATH = path.join(outputDir, "models.json");
+    writeMergedModelsJSON = core => mod.writeMergedModelsJSON(core, MERGED_MODELS_JSON_PATH);
     isPlainObject = mod.isPlainObject;
-    DEFAULT_MODELS_JSON_PATH = mod.DEFAULT_MODELS_JSON_PATH;
-    MERGED_MODELS_JSON_PATH = mod.MERGED_MODELS_JSON_PATH;
   });
 
   afterEach(() => {
@@ -188,7 +188,6 @@ describe("merge_frontmatter_models.cjs", () => {
       const base = { providers: { anthropic: { models: { "claude-opus": { cost: { input: "1e-5" } } } } } };
       const dir = makeTempModelsDir(base);
       process.env.GH_AW_MODELS_JSON_SRC_PATH = path.join(dir, "models.json");
-      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
 
       writeMergedModelsJSON(mockCore);
 
@@ -203,7 +202,6 @@ describe("merge_frontmatter_models.cjs", () => {
       const dir = makeTempModelsDir(base);
       process.env.GH_AW_MODELS_JSON_SRC_PATH = path.join(dir, "models.json");
       process.env.GH_AW_INFO_MODEL_COSTS = JSON.stringify(overlay);
-      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
 
       writeMergedModelsJSON(mockCore);
 
@@ -214,7 +212,6 @@ describe("merge_frontmatter_models.cjs", () => {
 
     it("warns and uses empty base when base file is missing", () => {
       process.env.GH_AW_MODELS_JSON_SRC_PATH = "/nonexistent/models.json";
-      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
 
       writeMergedModelsJSON(mockCore);
 
@@ -228,7 +225,6 @@ describe("merge_frontmatter_models.cjs", () => {
       const dir = makeTempModelsDir(base);
       process.env.GH_AW_MODELS_JSON_SRC_PATH = path.join(dir, "models.json");
       process.env.GH_AW_INFO_MODEL_COSTS = '["not-an-object"]';
-      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
 
       writeMergedModelsJSON(mockCore);
 
@@ -241,12 +237,12 @@ describe("merge_frontmatter_models.cjs", () => {
       const base = { providers: {} };
       const dir = makeTempModelsDir(base);
       process.env.GH_AW_MODELS_JSON_SRC_PATH = path.join(dir, "models.json");
-      process.env.GH_AW_INFO_MODEL_COSTS = "not-json";
-      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+      process.env.GH_AW_INFO_MODEL_COSTS = "sensitive-model-pricing-payload";
 
       writeMergedModelsJSON(mockCore);
 
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to parse GH_AW_INFO_MODEL_COSTS"));
+      expect(mockCore.warning).toHaveBeenCalledWith("Failed to parse GH_AW_INFO_MODEL_COSTS, ignoring");
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining(process.env.GH_AW_INFO_MODEL_COSTS));
     });
 
     it("frontier overlay overrides an existing model's cost", () => {
@@ -263,12 +259,25 @@ describe("merge_frontmatter_models.cjs", () => {
       const dir = makeTempModelsDir(base);
       process.env.GH_AW_MODELS_JSON_SRC_PATH = path.join(dir, "models.json");
       process.env.GH_AW_INFO_MODEL_COSTS = JSON.stringify(overlay);
-      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
 
       writeMergedModelsJSON(mockCore);
 
       const written = JSON.parse(fs.readFileSync(MERGED_MODELS_JSON_PATH, "utf8"));
       expect(written.providers["anthropic"].models["claude-opus"]).toEqual({ cost: { input: "9e-6" } });
+    });
+
+    it("writes only explicit frontmatter overrides when no source is configured", () => {
+      const overlay = { providers: { custom: { models: { example: { cost: { input: "2e-6" }, wire_api: "responses" } } } } };
+      process.env.GH_AW_INFO_MODEL_COSTS = JSON.stringify(overlay);
+      writeMergedModelsJSON(mockCore);
+      expect(mockCore.warning).not.toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(MERGED_MODELS_JSON_PATH, "utf8"))).toEqual(overlay);
+    });
+
+    it("writes an empty overlay without warning when no overrides are configured", () => {
+      writeMergedModelsJSON(mockCore);
+      expect(mockCore.warning).not.toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(MERGED_MODELS_JSON_PATH, "utf8"))).toEqual({});
     });
   });
 });

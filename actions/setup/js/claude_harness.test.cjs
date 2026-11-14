@@ -361,6 +361,32 @@ describe("claude_harness.cjs", () => {
       expect(child.ANTHROPIC_MODEL).toBe("claude-opus-5.5");
     });
 
+    it.each(["agent", "detection"])("supplies runtime Claude model overrides for aliases and routing in %s", phase => {
+      const stubScript = `
+        const fs = require("fs");
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, JSON.stringify({
+          args: process.argv.slice(2), model: process.env.ANTHROPIC_MODEL
+        }) + "\\n");
+        process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "done" }) + "\\n");
+      `;
+      for (const routed of [false, true]) {
+        const reflect = {
+          endpoints: [{ ...reflectData.endpoints[1], models: ["claude-opus-5.5"] }],
+          ...(routed ? { routing: { status: "selected", selection: { provider: "github", model: "github-copilot/claude-opus-5.5", wire_model: "claude-opus-5.5", endpoint: "/v1/messages" } } } : {}),
+        };
+        const { result, calls } = runHarnessWithStub({
+          stubScript,
+          reflectData: reflect,
+          extraEnv: { GH_AW_PHASE: phase, GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: "opus", GH_AW_MODEL_ROUTING: routed ? "1" : "", GH_AW_CLAUDE_SETTINGS: "", GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "0" },
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(calls[0].model).toBe("claude-opus-5.5");
+        const settingsIndex = calls[0].args.indexOf("--settings");
+        expect(settingsIndex).toBeGreaterThan(-1);
+        expect(JSON.parse(calls[0].args[settingsIndex + 1])).toEqual({ modelOverrides: { "claude-opus-5-5": "claude-opus-5.5" } });
+      }
+    });
+
     it.each(["auto", "copilot/auto"])("starts the real harness with an unset bootstrap URL and %s resolved in environment and CLI model inputs", model => {
       const reflect = { endpoints: [{ ...reflectData.endpoints[1], models: ["gpt-6.1-sol", "claude-sonnet-5"] }] };
       const stubScript = `
@@ -1944,6 +1970,26 @@ describe("applyClaudeSettingsEnv", () => {
   it("keeps caller-provided --settings in either form", () => {
     expect(applyClaudeSettingsEnv(["--settings", "{}"], { GH_AW_CLAUDE_SETTINGS: settings })).toEqual(["--settings", "{}"]);
     expect(applyClaudeSettingsEnv(["--settings={}"], { GH_AW_CLAUDE_SETTINGS: settings })).toEqual(["--settings={}"]);
+  });
+
+  it("builds runtime overrides only from configured Copilot inventory and resolved models", () => {
+    const reflectData = {
+      endpoints: [
+        { provider: "anthropic", configured: true, models: ["claude-opus-99.1"] },
+        { provider: "copilot", configured: false, models: ["claude-opus-98.1"] },
+        { provider: "copilot", configured: true, models: ["claude-haiku-4.5", "gpt-5.5"] },
+      ],
+    };
+    const result = applyClaudeSettingsEnv(["--print"], { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: "claude-opus-5.5?effort=high" }, reflectData, ["copilot/claude-sonnet-5.5"]);
+    expect(result.slice(0, 2)).toEqual(["--print", "--settings"]);
+    expect(JSON.parse(result[2])).toEqual({ modelOverrides: { "claude-haiku-4-5": "claude-haiku-4.5", "claude-opus-5-5": "claude-opus-5.5", "claude-sonnet-5-5": "claude-sonnet-5.5" } });
+  });
+
+  it("does not override explicit inline, file-based, or detector settings with live metadata", () => {
+    const env = { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: "claude-opus-5.5" };
+    for (const args of [["--settings", '{"modelOverrides":{"custom":"chosen"}}'], ["--settings=custom-settings.json"]]) expect(applyClaudeSettingsEnv(args, env)).toEqual(args);
+    expect(applyClaudeSettingsEnv(["--print"], { ...env, GH_AW_CLAUDE_SETTINGS: "custom-settings.json" })).toEqual(["--print", "--settings", "custom-settings.json"]);
+    expect(applyClaudeSettingsEnv(["--print"], { ...env, GH_AW_LLM_PROVIDER: "anthropic" })).toEqual(["--print"]);
   });
 });
 

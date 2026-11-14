@@ -20,8 +20,14 @@ import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 import { failure as claudeFailures } from "./fixtures/claude_ci_sessions.cjs";
 import { createSessionLookups } from "./grader_session.cjs";
 import { sessionTimestampNs } from "./unified_session_order.cjs";
+import { useModelOverrides } from "./fixtures/model_overrides.cjs";
 
 describe("essential unified session payloads", () => {
+  let restoreModels;
+  afterEach(() => {
+    restoreModels?.();
+    restoreModels = undefined;
+  });
   it.each([false, { value: 0 }, "yesterday", "2026-02-30T00:00:00Z", Infinity, NaN])("falls back from an invalid native clock to a valid archived message clock %j", timestamp => {
     for (const archivedTimestamp of [0, 1.25, "2026-11-09T00:27:23.729123456Z"]) {
       const original = {
@@ -1345,6 +1351,7 @@ describe("essential unified session payloads", () => {
   });
 
   it("preserves camelCase AIC checkpoints and resolves only valid priced token usage", () => {
+    restoreModels = useModelOverrides({ openai: { models: { "gpt-4o-mini": { cost: { input: "0.000002", cache_read: "0.0000002" } } } } });
     const checkpoint = normalizeUnifiedSessionEvent({ type: "usage.report", data: { provider: "openai", model: "gpt-4o-mini", aiCreditsTotal: 2.5, input_tokens: 100 } }, "evals");
     expect(checkpoint.data).toMatchObject({ totalAic: 2.5 });
     expect(checkpoint.data).not.toHaveProperty("aic");

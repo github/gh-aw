@@ -2,16 +2,13 @@
 /// <reference types="@actions/github-script" />
 
 const fs = require("fs");
-const path = require("path");
-
-const DEFAULT_MODELS_PATH = path.join(__dirname, "models.json");
 
 /** @type {Array<{id: string, provider: string, model: string, pricing: Record<string, number>}> | null | undefined} */
 let _catalog = undefined;
 
 function getModelsPath() {
   const override = process.env.GH_AW_MODELS_JSON_PATH;
-  return override && override.trim() ? override : DEFAULT_MODELS_PATH;
+  return override && override.trim() ? override : null;
 }
 
 /**
@@ -35,8 +32,10 @@ function loadCatalog() {
     return _catalog || [];
   }
 
+  const modelsPath = getModelsPath();
+  if (!modelsPath) return [];
   try {
-    const raw = fs.readFileSync(getModelsPath(), "utf8");
+    const raw = fs.readFileSync(modelsPath, "utf8");
     const parsed = JSON.parse(raw);
     const providers = parsed?.providers && typeof parsed.providers === "object" ? parsed.providers : {};
     _catalog = Object.entries(providers).flatMap(([providerName, providerData]) => {
@@ -292,16 +291,14 @@ function parseModelsJsonFile(filePath) {
 }
 
 /**
- * Load and return the raw parsed models.json catalog object.
+ * Load and return an explicitly configured models.json overlay.
  *
  * Returns the full JSON object (including `provider_type` fields per model entry)
  * so callers can perform custom lookups like provider-type resolution.
  * The result is cached after the first successful read.
  *
- * When GH_AW_MODELS_JSON_PATH is set but points to a file that does not exist
- * (e.g. detection/evals jobs that do not download the activation artifact containing
- * the merged catalog), falls back to the bundled catalog co-located with this module.
- * The merged catalog is a superset of the bundled one, so the fallback is always valid.
+ * Without a readable GH_AW_MODELS_JSON_PATH, callers use AWF metadata and
+ * reported costs rather than a local default pricing catalog.
  *
  * @returns {Record<string, unknown> | null}
  */
@@ -309,11 +306,8 @@ function loadModelsJson() {
   if (_modelsJson !== undefined) {
     return _modelsJson ?? null;
   }
-  _modelsJson = parseModelsJsonFile(getModelsPath());
-  // If the override path was used but the file doesn't exist, fall back to the bundled catalog.
-  if (_modelsJson === null && process.env.GH_AW_MODELS_JSON_PATH) {
-    _modelsJson = parseModelsJsonFile(DEFAULT_MODELS_PATH);
-  }
+  const modelsPath = getModelsPath();
+  _modelsJson = modelsPath ? parseModelsJsonFile(modelsPath) : null;
   return _modelsJson ?? null;
 }
 

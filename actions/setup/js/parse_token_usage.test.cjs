@@ -1304,7 +1304,7 @@ describe("parse_token_usage", () => {
       expect(mockCore.summary.write).not.toHaveBeenCalled();
     });
 
-    test("writes agent_usage.json with aggregated token totals and primary_model", async () => {
+    test("writes agent_usage.json with token totals without estimating AI credits", async () => {
       const agentUsageFile = path.join(tmpDir, "agent_usage.json");
 
       fs.existsSync = vi.fn(p => {
@@ -1339,7 +1339,7 @@ describe("parse_token_usage", () => {
       expect(agentUsage.cache_read_tokens).toBe(5000);
       expect(agentUsage.cache_write_tokens).toBe(3000);
       expect(agentUsage.ambient_context).toBe(900);
-      expect(typeof agentUsage.ai_credits).toBe("number");
+      expect(agentUsage.ai_credits).toBeUndefined();
       // primary_model is the actual model from token-usage data (not a user alias)
       expect(agentUsage.primary_model).toBe("claude-sonnet-4-6");
       // GH_AW_PRIMARY_MODEL is exported so footer attribution can use the real model name

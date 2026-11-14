@@ -256,13 +256,8 @@ func (c *Compiler) buildInitialWorkflowData(
 	mergedModelCosts := mergeModelCostOverlays(importsResult.MergedModelCosts, mainModelCosts)
 	if len(mergedModelCosts) > 0 {
 		workflowData.ModelCostOverrides = mergedModelCosts
-		workflowData.ModelCosts = cloneModelCosts(mergedModelCosts)
+		workflowData.ModelCosts = mergedModelCosts
 	}
-	// Attempt to resolve reporting pricing for the workflow model when it is absent
-	// from the frontmatter overlay and embedded catalog. These resolved defaults go
-	// only into ModelCosts; apiProxy.providers uses ModelCostOverrides.
-	workflowData.ModelCosts = c.resolveModelPricingIfMissing(workflowData.ModelCosts, workflowData)
-	workflowData.ModelCosts = c.resolveFallbackModelPricing(workflowData.ModelCosts, workflowData)
 	mainModelPolicy := extractMainModelPolicyOverlay(toolsResult, result.Frontmatter)
 	allowedModels, disallowedModels := mergeModelPolicyOverlays(importsResult.MergedModelPolicies, mainModelPolicy)
 	if len(allowedModels) > 0 {

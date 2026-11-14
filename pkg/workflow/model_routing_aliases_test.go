@@ -337,35 +337,34 @@ func TestRoutingAllowedModelsPrefixedIdStaysExact(t *testing.T) {
 		compiled := compileRoutedAliasWorkflow(t, "copilot", "", models, "")
 		require.Equal(t, []string{"github-copilot/gemini-3.8-flash"}, compiled.candidates(t), models)
 	}
-	// The bare names are aliases but not bundled model ids, so only the prefix keeps them exact.
+	// Prefixes keep alias names exact without consulting a repository-owned catalog.
 	for _, tc := range []struct{ prefix, name string }{{"github-copilot/", "gpt-5"}, {"copilot/", "gpt-5.6"}} {
 		require.Contains(t, BuiltinModelAliases(), tc.name)
-		require.False(t, isBundledProviderModelID(copilotRoutingNamespace, tc.name))
 		compiled := compileRoutedAliasWorkflow(t, "copilot", "", "["+tc.prefix+tc.name+"]", "")
 		require.Equal(t, []string{"github-copilot/" + tc.name}, compiled.candidates(t), tc.prefix+tc.name)
 	}
 }
 
-func TestRoutingAllowedModelsKnownCopilotIdStaysExact(t *testing.T) {
-	// Each name is both a bundled GitHub Copilot model id and a gh-aw alias; like
-	// resolveConfiguredModel, the model id wins.
+func TestRoutingAllowedModelsExplicitCopilotIdStaysExact(t *testing.T) {
+	// Explicit workflow model IDs win over aliases without a bundled inventory.
 	for _, model := range []string{"gpt-5.4", "gpt-5-mini", "gemini-3.8-flash"} {
 		require.Contains(t, BuiltinModelAliases(), model)
-		require.True(t, isBundledProviderModelID(copilotRoutingNamespace, model))
-		compiled := compileRoutedAliasWorkflow(t, "copilot", "", "["+model+"]", "")
-		require.Equal(t, []string{"github-copilot/" + model}, compiled.candidates(t), model)
+		data := routedPolicyWorkflowData("copilot", "", nil, nil, []string{model})
+		data.ModelCosts = map[string]any{"providers": map[string]any{
+			"github-copilot": map[string]any{"models": map[string]any{model: map[string]any{}}},
+		}}
+		groups := mustRoutingGroups(t, data, "copilot")
+		require.False(t, groups[0].Alias)
+		require.Equal(t, []string{"github-copilot/" + model}, groups[0].Patterns, model)
 	}
-	// An alias that is not a bundled model id still expands.
+	// Without an explicit ID an alias still expands.
 	compiled := compileRoutedAliasWorkflow(t, "copilot", "", "[gpt-5.6]", "")
 	require.Equal(t, []string{"github-copilot/gpt-5.6*"}, compiled.candidates(t))
 }
 
 func TestRoutingAllowedModelsAliasNamedLikeIdFollowsEngineModelRule(t *testing.T) {
 	aliases := BuiltinModelAliases()
-	var catalog []string
-	for id := range bundledProviderModelIDs()[copilotRoutingNamespace] {
-		catalog = append(catalog, "github-copilot/"+id)
-	}
+	catalog := []string{"github-copilot/gemini-3.8-flash", "github-copilot/gpt-5-mini", "github-copilot/gpt-5.5"}
 	names := []string{"gemini-3.8-flash", "gpt-5-mini", "gpt-5.5", "gpt-5", "gpt-5-codex", "gpt-6"}
 	aliasesJSON, err := json.Marshal(aliases)
 	require.NoError(t, err)
@@ -374,7 +373,7 @@ func TestRoutingAllowedModelsAliasNamedLikeIdFollowsEngineModelRule(t *testing.T
 	namesJSON, err := json.Marshal(names)
 	require.NoError(t, err)
 
-	// Resolve each name with the engine.model resolver against the bundled Copilot catalogue.
+	// Resolve each name against the same explicitly supplied model inventory.
 	cmd := exec.Command("node", "-e", `
 const { resolveConfiguredModel } = require("./actions/setup/js/resolve_model_alias.cjs");
 const aliasMap = JSON.parse(process.env.ALIASES), catalog = JSON.parse(process.env.CATALOG);
@@ -399,7 +398,15 @@ process.stdout.write(JSON.stringify(status));`)
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			require.Contains(t, aliases, name, "%s must be an alias for this test", name)
-			groups := mustRoutingGroups(t, routedPolicyWorkflowData("copilot", "", nil, nil, []string{name}), "copilot")
+			data := routedPolicyWorkflowData("copilot", "", nil, nil, []string{name})
+			models := map[string]any{}
+			for _, id := range catalog {
+				models[strings.TrimPrefix(id, "github-copilot/")] = map[string]any{}
+			}
+			data.ModelCosts = map[string]any{"providers": map[string]any{
+				"github-copilot": map[string]any{"models": models},
+			}}
+			groups := mustRoutingGroups(t, data, "copilot")
 			require.Len(t, groups, 1)
 			if engineModelStatus[name] == "exact" {
 				require.False(t, groups[0].Alias)
@@ -415,12 +422,17 @@ process.stdout.write(JSON.stringify(status));`)
 	require.Equal(t, "resolved", engineModelStatus["gpt-5"])
 }
 
-func TestRoutingAllowedModelsNoInventedFamilyPatterns(t *testing.T) {
-	for _, alias := range []string{"grok", "computer-use"} {
-		_, err := expandModelRoutingAliasInNamespace(alias, BuiltinModelAliases(), "codex", copilotRoutingNamespace)
-		require.ErrorContains(t, err, "no models compatible with Codex's Responses API", alias)
-	}
-	patterns, err := expandModelRoutingAliasInNamespace("sonnet", BuiltinModelAliases(), "claude", copilotRoutingNamespace)
+func TestRoutingAllowedModelsFamilyPatternsDoNotRequireLocalInventory(t *testing.T) {
+	patterns, err := expandModelRoutingAliasInNamespace("future", map[string][]string{
+		"future": {"copilot/*future*", "openai/*future*"},
+	}, "codex", copilotRoutingNamespace)
+	require.NoError(t, err)
+	require.Equal(t, []string{"github-copilot/gpt-*future*"}, patterns, "AWF checks the current inventory at runtime")
+	_, err = expandModelRoutingAliasInNamespace("other", map[string][]string{
+		"other": {"copilot/gemini-*"},
+	}, "codex", copilotRoutingNamespace)
+	require.ErrorContains(t, err, "no models compatible with Codex's Responses API")
+	patterns, err = expandModelRoutingAliasInNamespace("sonnet", BuiltinModelAliases(), "claude", copilotRoutingNamespace)
 	require.NoError(t, err)
 	require.Equal(t, []string{"github-copilot/claude-*sonnet*"}, patterns)
 }
@@ -429,7 +441,7 @@ func TestRoutingAllowedModelsIntersectsLeadingWildcardWithFamily(t *testing.T) {
 	aliases := map[string][]string{"my-claude": {"copilot/*claude-sonnet*", "anthropic/*sonnet*"}}
 	patterns, err := expandModelRoutingAliasInNamespace("my-claude", aliases, "claude", copilotRoutingNamespace)
 	require.NoError(t, err)
-	require.Equal(t, []string{"github-copilot/claude-sonnet*"}, patterns)
+	require.Equal(t, []string{"github-copilot/claude-sonnet*", "github-copilot/claude-*claude-sonnet*"}, patterns)
 	matched, _ := path.Match(strings.TrimPrefix(patterns[0], "github-copilot/"), "claude-sonnet-5")
 	require.True(t, matched, "claude-sonnet-5 matches the authored pattern and the Claude family")
 

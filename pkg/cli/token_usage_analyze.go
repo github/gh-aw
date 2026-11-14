@@ -258,20 +258,3 @@ func (s *TokenUsageSummary) ModelRows() []ModelTokenUsageRow {
 	})
 	return rows
 }
-
-func populateAIC(summary *TokenUsageSummary) {
-	if summary == nil {
-		return
-	}
-
-	total := 0.0
-	for model, usage := range summary.ByModel {
-		if usage == nil {
-			continue
-		}
-		aic := computeModelInferenceAIC(usage.Provider, model, usage.InputTokens, usage.OutputTokens, usage.CacheReadTokens, usage.CacheWriteTokens, usage.ReasoningTokens)
-		usage.AIC = aic
-		total += aic
-	}
-	summary.TotalAIC = total
-}

@@ -76,7 +76,7 @@ import "embed"
 //go:embed js/mcp_handler_python.cjs js/mcp_handler_shell.cjs
 //go:embed js/glob_pattern_helpers.cjs js/handler_auth.cjs js/invocation_context_helpers.cjs
 //go:embed js/read_buffer.cjs js/repo_helpers.cjs js/safe_output_helpers.cjs js/staged_preview.cjs
-//go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/models.json js/shim.cjs
+//go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/shim.cjs
 //go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs js/harness_retry_record.cjs
 //go:embed js/harness_retry_session.cjs
 //go:embed js/engine_log_parser.cjs

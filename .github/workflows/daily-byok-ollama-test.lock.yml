@@ -2008,7 +2008,6 @@ jobs:
           DISABLE_TELEMETRY: 1
           GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}
           GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
-          GH_AW_CLAUDE_SETTINGS: '{"modelOverrides":{"claude-fable-5-1":"claude-fable-5.1","claude-haiku-4-5":"claude-haiku-4.5","claude-haiku-5-5":"claude-haiku-5.5","claude-opus-4-5":"claude-opus-4.5","claude-opus-4-6":"claude-opus-4.6","claude-opus-4-7":"claude-opus-4.7","claude-opus-4-8":"claude-opus-4.8","claude-opus-5-5":"claude-opus-5.5","claude-sonnet-4-5":"claude-sonnet-4.5","claude-sonnet-4-6":"claude-sonnet-4.6","claude-sonnet-5-5":"claude-sonnet-5.5"}}'
           GH_AW_HARNESS_MAX_RETRIES: 0
           GH_AW_LLM_PROVIDER: github
           GH_AW_LLM_PROVIDER_EXPLICIT: 1

@@ -25,7 +25,7 @@ func captureModelsCommandStdout(t *testing.T, args ...string) string {
 	require.NoError(t, err)
 	os.Stdout = writer
 
-	// The catalog table is larger than the pipe buffer, so drain it concurrently.
+	// Drain concurrently so dense reports cannot fill the pipe buffer.
 	outputChan := make(chan string, 1)
 	go func() {
 		var buf bytes.Buffer
@@ -93,6 +93,7 @@ func writeModelsLogsFixture(t *testing.T) string {
 	reflectPath := filepath.Join(logsDir, "run-222", "sandbox", "firewall", "awf-reflect.json")
 	require.NoError(t, os.MkdirAll(filepath.Dir(reflectPath), 0o755))
 	reflectPayload := map[string]any{
+		"models_fetch_complete": true,
 		"endpoints": []any{
 			map[string]any{
 				"provider": "copilot",
@@ -109,7 +110,7 @@ func writeModelsLogsFixture(t *testing.T) string {
 
 // TestModelsCommandJSONOutputIsSingleDocument runs `gh aw models --json` end to end
 // against a fixture logs directory and verifies stdout is exactly one JSON payload
-// containing catalog, alias, and observed model data.
+// containing alias and observed model data.
 func TestModelsCommandJSONOutputIsSingleDocument(t *testing.T) {
 	logsDir := writeModelsLogsFixture(t)
 
@@ -124,8 +125,16 @@ func TestModelsCommandJSONOutputIsSingleDocument(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, strings.TrimSpace(string(remaining)), "stdout should contain a single JSON document")
 
-	require.NotEmpty(t, report.Catalog)
 	require.NotEmpty(t, report.Aliases)
+	require.NotNil(t, report.Catalog)
+	require.Len(t, report.Catalog, 1)
+	require.NotNil(t, report.CatalogComplete)
+	assert.True(t, *report.CatalogComplete)
+	var compatibility map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(output), &compatibility))
+	assert.JSONEq(t, `[{"provider":"github-copilot","model":"claude-sonnet-4.6"}]`, string(compatibility["catalog"]))
+	var observedJSON []map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(compatibility["observed"], &observedJSON))
 	assert.Empty(t, report.Warnings)
 
 	observed := make(map[string]observedModelRow, len(report.Observed))
@@ -139,37 +148,38 @@ func TestModelsCommandJSONOutputIsSingleDocument(t *testing.T) {
 	assert.Contains(t, sonnet.Sources, "awf-reflect")
 	assert.NotContains(t, sonnet.Sources, "token-usage", "run-111 is already covered by summary.json")
 	assert.Equal(t, 4, sonnet.Occurrences, "summary requests plus one awf-reflect sighting")
-	assert.True(t, sonnet.InCatalog)
 	assert.NotEmpty(t, sonnet.AliasHints)
+	assert.True(t, sonnet.InCatalog)
 
 	gpt, ok := observed["openai/gpt-5.4"]
 	require.True(t, ok, "observed models should include the unsummarized run")
 	assert.Contains(t, gpt.Sources, "token-usage")
-	assert.True(t, gpt.InCatalog)
+	assert.False(t, gpt.InCatalog)
 }
 
 // TestModelsCommandConsoleOutputSections runs the command without --json and verifies
-// the human-readable report renders all three sections.
+// the human-readable report renders all sections.
 func TestModelsCommandConsoleOutputSections(t *testing.T) {
 	logsDir := writeModelsLogsFixture(t)
 
 	output := captureModelsCommandStdout(t, "--refresh-observed=false", "--logs-dir", logsDir)
 
-	assert.Contains(t, output, "Catalog Models")
+	assert.Contains(t, output, "AWF Model Inventory")
 	assert.Contains(t, output, "Model Aliases")
 	assert.Contains(t, output, "Observed Models")
 	assert.Contains(t, output, "claude-sonnet-4.6")
 	assert.NotContains(t, output, "No observed models found")
 }
 
-// TestModelsCommandWithEmptyLogsDir verifies the command still reports catalog and
-// alias data when no automation artifacts are available.
+// TestModelsCommandWithEmptyLogsDir verifies alias data remains available without artifacts.
 func TestModelsCommandWithEmptyLogsDir(t *testing.T) {
 	output := captureModelsCommandStdout(t, "--json", "--refresh-observed=false", "--logs-dir", filepath.Join(t.TempDir(), "missing"))
 
 	var report modelsReport
 	require.NoError(t, json.Unmarshal([]byte(output), &report))
-	assert.NotEmpty(t, report.Catalog)
+	require.NotNil(t, report.Catalog)
+	assert.Empty(t, report.Catalog)
+	assert.Nil(t, report.CatalogComplete)
 	assert.NotEmpty(t, report.Aliases)
 	assert.Empty(t, report.Observed)
 	assert.Empty(t, report.Warnings)

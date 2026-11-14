@@ -593,7 +593,7 @@ func aggregateModelRoutingCosts(summary *ModelRoutingSummary, requests []modelRo
 		}
 	}
 
-	for _, entry := range usageEntries {
+	for _, entry := range tokenUsageEntriesWithCreditDeltas(usageEntries) {
 		var bucket *ModelRoutingCost
 		switch {
 		case entry.Purpose == "routing_classification":
@@ -610,11 +610,7 @@ func aggregateModelRoutingCosts(summary *ModelRoutingSummary, requests []modelRo
 		bucket.OutputTokens += entry.OutputTokens
 		bucket.CacheReadTokens += entry.CacheReadTokens
 		bucket.CacheWriteTokens += entry.CacheWriteTokens
-		delta, _, valid := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse)
-		if !valid {
-			inputTokensIncludeCache, _, _ := parseOptionalBool(entry.InputTokensIncludeCache)
-			delta = computeModelInferenceAICWithCacheSemantics(entry.Provider, entry.Model, entry.InputTokens, entry.OutputTokens, entry.CacheReadTokens, entry.CacheWriteTokens, entry.ReasoningTokens, inputTokensIncludeCache)
-		}
+		delta := tokenUsageEntryCredits(entry)
 		bucket.AIC += delta
 	}
 }

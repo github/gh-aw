@@ -8,6 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { loadModelsJson } = require("./model_costs.cjs");
 
 /** Runner-written record of configured and resolved models, relative to /tmp/gh-aw. */
 const MODEL_RESOLUTION_RECORD_PATH = "agent/model-resolution.json";
@@ -410,32 +411,16 @@ function isLiveModelId(modelId, catalog) {
   });
 }
 
-/** @type {Set<string>|null} */
-let bundledModelIds = null;
-
 /**
  * Whether `modelId` (no provider prefix, no parameters) is listed, under any provider, in
- * the bundled model catalogue (`models.json`, shipped with the setup action). This is the
- * "plausible model id" test used when no `/reflect` catalogue can exist: a name such as
- * `gpt-5-mini` is a model id there, while a pure alias such as `small`, `opus` or `auto`
- * is not.
+ * the explicit GH_AW_MODELS_JSON_PATH overlay when no `/reflect` catalogue can exist.
  * @param {string} modelId
  * @returns {boolean}
  */
-function isBundledModelId(modelId) {
+function isExplicitModelId(modelId) {
   if (!modelId) return false;
-  if (!bundledModelIds) {
-    bundledModelIds = new Set();
-    try {
-      const providers = JSON.parse(fs.readFileSync(path.join(__dirname, "models.json"), "utf8"))?.providers || {};
-      for (const section of Object.values(providers)) {
-        for (const id of Object.keys(section?.models || {})) bundledModelIds.add(id.toLowerCase());
-      }
-    } catch {
-      // No bundled catalogue: nothing counts as a plausible model id.
-    }
-  }
-  return bundledModelIds.has(modelId.toLowerCase());
+  const providers = loadModelsJson()?.providers || {};
+  return Object.values(providers).some(section => Object.keys(section?.models || {}).some(id => id.toLowerCase() === modelId.toLowerCase()));
 }
 
 /**
@@ -460,9 +445,8 @@ function isBundledModelId(modelId) {
  *   there is no exact live match;
  * - `?effort=` and other parameters carry through.
  * - when no `/reflect` catalogue can exist on this run (`noCatalog`, set when AWF is
- *   disabled), a value whose id is listed in the bundled model catalogue
- *   (`isBundledModelId`) is exact and passes through even when an alias has the same
- *   name; any other alias fails with catalog_unavailable.
+ *   disabled), an explicit overlay id or a version-shaped built-in alias matching
+ *   its provider pattern passes through as exact; other aliases fail with catalog_unavailable.
  *
  * `resolvedModel` keeps the configured form: a provider-prefixed alias resolves to a
  * provider-prefixed id, a provider-scoped bare alias resolves to a bare id, and an
@@ -500,9 +484,21 @@ function resolveConfiguredModel(options) {
   if (options.preserveAuto && aliasKey.toLowerCase() === "auto") {
     return exact;
   }
-  if (options.noCatalog && isBundledModelId(aliasKey)) {
-    // No live catalogue can exist (AWF disabled): a bundled model id stays exact.
-    logger(`${logPrefix}: no live catalogue on this run; '${configuredModel}' is a bundled model id${scope ? ` (provider=${scope})` : ""}; passing it through as exact`);
+  const builtinPatterns = loadBuiltinModelAliases()?.[aliasKey];
+  const isNativeModelId =
+    /-\d/.test(aliasKey) &&
+    Array.isArray(builtinPatterns) &&
+    aliasMap[aliasKey].length === builtinPatterns.length &&
+    aliasMap[aliasKey].every((entry, index) => entry === builtinPatterns[index]) &&
+    builtinPatterns.some(entry => {
+      const pattern = splitModelIdentifier(String(entry)).base;
+      const slash = pattern.indexOf("/");
+      if (slash < 0 || !pattern.includes("*")) return false;
+      if (scope && canonicalModelProvider(pattern.slice(0, slash)) !== scope) return false;
+      return globMatch(pattern.slice(slash + 1), aliasKey);
+    });
+  if (options.noCatalog && (isExplicitModelId(aliasKey) || isNativeModelId)) {
+    logger(`${logPrefix}: no live catalogue on this run; '${configuredModel}' is an explicit model id${scope ? ` (provider=${scope})` : ""}; passing it through as exact`);
     return exact;
   }
 
@@ -752,7 +748,7 @@ module.exports = {
   buildProviderCatalog,
   canonicalModelProvider,
   globMatch,
-  isBundledModelId,
+  isExplicitModelId,
   isLiveModelId,
   loadBuiltinModelAliases,
   loadModelAliasMap,

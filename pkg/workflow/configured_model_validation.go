@@ -24,7 +24,7 @@ func (c *Compiler) warnCopilotIntegrationModelAvailability(data *WorkflowData, m
 	if !strings.HasPrefix(model, "gemini-") {
 		return
 	}
-	message := fmt.Sprintf("Copilot model %q may not be available to the agentic-workflows integration, even when enabled by organization policy and available in the standalone Copilot CLI. The bundled model catalog does not guarantee integration access. Select a model in the workflow's live catalog; enabling missing Gemini models for agentic-workflows requires Copilot API support", data.Model)
+	message := fmt.Sprintf("Copilot model %q may not be available to the agentic-workflows integration, even when enabled by organization policy and available in the standalone Copilot CLI. Select a model in the workflow's live catalog; enabling missing Gemini models for agentic-workflows requires Copilot API support", data.Model)
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 		formatCompilerMessage(markdownPath, "warning", message)))
 	c.IncrementWarningCount()

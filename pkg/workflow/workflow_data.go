@@ -236,8 +236,8 @@ type WorkflowData struct {
 	CachedRuntimeRequirementsSet   bool                            // true once CachedRuntimeRequirements is populated; distinguishes "computed empty" from "not yet computed"
 	KnownActionCredentialEnvVars   map[string]struct{}             // env vars for clean_known_action_credentials.sh; keyed by GH_AW_CLEAN_* names; nil when no known credential-leaking actions are detected
 	ModelMappings                  map[string][]string             // merged model alias map (builtins + imported workflow aliases + main frontmatter overrides, in priority order); emitted to AWF config JSON as apiProxy.models for both agent and detection jobs
-	ModelCosts                     map[string]any                  // model pricing for reporting, including compiler-resolved defaults; merged with built-in models.json at runtime by generate_aw_info.cjs
-	ModelCostOverrides             map[string]any                  // explicit frontmatter/import pricing overlays; only these may be sent to AWF as apiProxy.providers overrides
+	ModelCosts                     map[string]any                  // explicit frontmatter model overlays used for reporting
+	ModelCostOverrides             map[string]any                  // explicit frontmatter/import pricing overlays sent to AWF as apiProxy.providers overrides
 	ModelPolicyAllowed             []string                        // merged models.allowed policy list (union across imports + main frontmatter)
 	ModelPolicyBlocked             []string                        // merged models.blocked policy list (union across imports + main frontmatter)
 	DefaultAiCreditsPricing        *AiCreditsPricingConfig         // fallback per-token pricing from frontmatter models.default-ai-credits-pricing; used by AWF API proxy for unrecognized models

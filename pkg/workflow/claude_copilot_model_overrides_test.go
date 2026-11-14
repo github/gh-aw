@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,27 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// expectedClaudeCopilotModelOverrides lists every dotted Copilot Claude id in the catalog.
-var expectedClaudeCopilotModelOverrides = map[string]string{
-	"claude-fable-5-1":  "claude-fable-5.1",
-	"claude-haiku-4-5":  "claude-haiku-4.5",
-	"claude-haiku-5-5":  "claude-haiku-5.5",
-	"claude-opus-4-5":   "claude-opus-4.5",
-	"claude-opus-4-6":   "claude-opus-4.6",
-	"claude-opus-4-7":   "claude-opus-4.7",
-	"claude-opus-4-8":   "claude-opus-4.8",
-	"claude-opus-5-5":   "claude-opus-5.5",
-	"claude-sonnet-4-5": "claude-sonnet-4.5",
-	"claude-sonnet-4-6": "claude-sonnet-4.6",
-	"claude-sonnet-5-5": "claude-sonnet-5.5",
-}
-
-// claudeModelOverridesShellArg is the --settings value as rendered inside the
-// single-quoted AWF `bash -c` command.
-func claudeModelOverridesShellArg() string {
-	return `--settings '\''` + claudeCopilotModelOverridesSettings() + `'\''`
-}
 
 func compileClaudeOverridesWorkflow(t *testing.T, frontmatter string) (string, string) {
 	t.Helper()
@@ -52,19 +30,7 @@ func compileClaudeOverridesWorkflow(t *testing.T, frontmatter string) (string, s
 	return string(lock), stderr
 }
 
-func TestClaudeCopilotModelOverridesSettings(t *testing.T) {
-	var settings struct {
-		ModelOverrides map[string]string `json:"modelOverrides"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(claudeCopilotModelOverridesSettings()), &settings))
-	assert.Equal(t, expectedClaudeCopilotModelOverrides, settings.ModelOverrides)
-	for _, id := range []string{"claude-sonnet-5", "claude-opus-5", "claude-fable-5", "claude-sonnet-4"} {
-		assert.NotContains(t, settings.ModelOverrides, id)
-	}
-	assert.True(t, strings.HasPrefix(claudeCopilotModelOverridesSettings(), `{"modelOverrides":{"claude-fable-5-1":"claude-fable-5.1","claude-haiku-4-5":"claude-haiku-4.5",`))
-}
-
-func TestClaudeCopilotModelOverridesInLock(t *testing.T) {
+func TestClaudeCopilotModelOverridesResolvedAtRuntime(t *testing.T) {
 	for name, frontmatter := range map[string]string{
 		"model-provider github": "engine:\n  id: claude\n  model-provider: github\nmodel: claude-haiku-4.5\nsafe-outputs:\n  noop:\n  threat-detection: false\n",
 		"copilot prefix":        "engine:\n  id: claude\nmodel: copilot/claude-haiku-4.5\nsafe-outputs:\n  noop:\n  threat-detection: false\n",
@@ -73,12 +39,12 @@ func TestClaudeCopilotModelOverridesInLock(t *testing.T) {
 			lock, _ := compileClaudeOverridesWorkflow(t, frontmatter)
 			agent := extractJobSection(lock, "agent")
 			assert.Contains(t, agent, "ANTHROPIC_MODEL: claude-haiku-4.5")
-			assert.Equal(t, 1, strings.Count(agent, claudeModelOverridesShellArg()), "agent Claude command should carry the modelOverrides map once")
-			assert.Contains(t, agent, `"claude-haiku-4-5":"claude-haiku-4.5"`)
+			assert.NotContains(t, agent, "--settings", "the runtime harness resolves model overrides from AWF")
+			assert.Contains(t, agent, "claude_harness.cjs")
 			assert.NotContains(t, agent, `"claude-sonnet-5":`)
 			assert.NotContains(t, agent, `"claude-opus-5":`)
 			assert.NotContains(t, agent, `"claude-fable-5":`)
-			assert.NotContains(t, agent, claudeSettingsEnvVar, "agent job passes the map on the command line")
+			assert.NotContains(t, agent, claudeSettingsEnvVar)
 		})
 	}
 }
@@ -90,11 +56,12 @@ func TestClaudeAnthropicProviderOmitsModelOverrides(t *testing.T) {
 	assert.NotContains(t, lock, claudeSettingsEnvVar)
 }
 
-func TestClaudeModelRoutingIncludesModelOverrides(t *testing.T) {
+func TestClaudeModelRoutingDefersModelOverridesToRuntime(t *testing.T) {
 	lock, _ := compileClaudeOverridesWorkflow(t, "engine:\n  id: claude\n  model-provider: github\n  model-routing:\n    goal: cost\n    mode: economy\n    allowed-models: [claude-sonnet-5]\nsafe-outputs:\n  noop:\n  threat-detection: false\n")
 	agent := extractJobSection(lock, "agent")
 	assert.Contains(t, agent, "GH_AW_MODEL_ROUTING")
-	assert.Equal(t, 1, strings.Count(agent, claudeModelOverridesShellArg()))
+	assert.NotContains(t, agent, "--settings")
+	assert.Contains(t, agent, "claude_harness.cjs")
 }
 
 func TestClaudeEngineArgsSettingsKeptWithWarning(t *testing.T) {
@@ -131,7 +98,8 @@ func TestClaudeCopilotThreatDetectionModelOverrides(t *testing.T) {
 		detection := extractJobSection(lock, "detection")
 		require.NotEmpty(t, detection)
 		assert.Contains(t, detection, "threat-detect --engine claude")
-		assert.Contains(t, detection, claudeSettingsEnvVar+": '"+claudeCopilotModelOverridesSettings()+"'")
+		assert.NotContains(t, detection, claudeSettingsEnvVar)
+		assert.NotContains(t, detection, "modelOverrides")
 	})
 
 	t.Run("inline claude detector", func(t *testing.T) {
@@ -139,7 +107,8 @@ func TestClaudeCopilotThreatDetectionModelOverrides(t *testing.T) {
 		detection := extractJobSection(lock, "detection")
 		require.NotEmpty(t, detection)
 		assert.NotContains(t, detection, "threat-detect --engine")
-		assert.Equal(t, 1, strings.Count(detection, claudeModelOverridesShellArg()))
+		assert.NotContains(t, detection, "--settings")
+		assert.Contains(t, detection, "claude_harness.cjs")
 	})
 }
 

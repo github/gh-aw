@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,23 +115,12 @@ func TestEngineFallbackModelsValidation(t *testing.T) {
 	}
 }
 
-func TestEngineFallbackAliasesAndPricing(t *testing.T) {
+func TestEngineFallbackAliases(t *testing.T) {
 	data := &WorkflowData{
 		EngineConfig:  &EngineConfig{ID: "copilot", FallbackModels: []string{"recovery", "last"}},
 		ModelMappings: map[string][]string{"recovery": {"openai/secondary", "anthropic/backup"}},
 	}
 	require.Equal(t, []LLMProvider{LLMProviderGitHub, LLMProviderOpenAI, LLMProviderAnthropic}, fallbackModelProviders(data))
-	compiler := NewCompiler()
-	var models []string
-	compiler.modelPricingResolver = func(_ context.Context, provider, model string) (map[string]float64, bool) {
-		models = append(models, provider+"/"+model)
-		return map[string]float64{"input": 1, "output": 2}, true
-	}
-	costs := compiler.resolveFallbackModelPricing(nil, data)
-	require.Equal(t, []string{"openai/secondary", "anthropic/backup", "github-copilot/last"}, models)
-	require.True(t, modelCostsHasPricingFor(costs, "anthropic", "backup"))
-	require.True(t, modelCostsHasPricingFor(costs, "openai", "secondary"))
-	require.True(t, modelCostsHasPricingFor(costs, "github-copilot", "last"))
 }
 
 func TestEngineFallbackAliasEnvOverrides(t *testing.T) {

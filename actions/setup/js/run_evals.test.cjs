@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import os from "os";
+import path from "path";
 import { createRequire } from "module";
 import { createServer } from "node:http";
 
@@ -7,6 +9,7 @@ const require = createRequire(import.meta.url);
 const realFetch = globalThis.fetch;
 const { executeMain, parseMain, summarizeUsageMain, recordUsage, classifyJudgeExecution } = require("./run_evals.cjs");
 const { findModelPricing } = require("./model_costs.cjs");
+const { useModelOverrides } = require("./fixtures/model_overrides.cjs");
 const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const { readEvalsNotEvaluatedStatus, EVALS_REASON_CODES } = require("./evals_status.cjs");
 const dir = "/tmp/gh-aw/evals";
@@ -22,8 +25,16 @@ const core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn(), setOutput: v
 global.core = core;
 
 describe("Decisions BinEval harness", () => {
+  let restoreModels;
+  let root;
   beforeEach(() => {
     vi.clearAllMocks();
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-evals-"));
+    for (const method of ["mkdirSync", "rmSync", "writeFileSync", "readFileSync", "existsSync"]) {
+      const original = fs[method].bind(fs);
+      vi.spyOn(fs, method).mockImplementation((file, ...args) => original(typeof file === "string" && file.startsWith("/tmp/gh-aw/") ? path.join(root, file.slice("/tmp/gh-aw/".length)) : file, ...args));
+    }
+    restoreModels = useModelOverrides({ "github-copilot": { models: { "gpt-6-luna": { cost: { input: "0.000002", output: "0.000004", cache_read: "0.0000002", cache_write: "0.0000025" } } } } });
     fs.mkdirSync(dir, { recursive: true });
     for (const file of files) fs.rmSync(file, { force: true });
     vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
@@ -53,6 +64,9 @@ describe("Decisions BinEval harness", () => {
     for (const file of files) fs.rmSync(file, { force: true });
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    restoreModels();
+    vi.restoreAllMocks();
+    fs.rmSync(root, { recursive: true, force: true });
   });
 
   it("batches all questions as BinEval choices and matches reordered answers by ID", async () => {

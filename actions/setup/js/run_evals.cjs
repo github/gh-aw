@@ -23,7 +23,7 @@ function tokenCount(value, field) {
 }
 
 /**
- * Persist one response's usage and catalog-derived cost for downstream accounting.
+ * Persist one response's usage and explicitly configured cost for downstream accounting.
  * @param {unknown} usage
  * @param {string} model
  * @param {string} provider

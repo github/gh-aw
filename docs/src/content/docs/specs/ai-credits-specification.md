@@ -32,7 +32,7 @@ This document is governed by the GitHub Agentic Workflows project specifications
 2. [Conformance](#2-conformance)
 3. [AI Credits Accounting Model](#3-ai-credits-accounting-model)
 4. [Pricing Catalog Format (`models.json`)](#4-pricing-catalog-format-modelsjson)
-5. [Catalog Provisioning and Synchronization](#5-catalog-provisioning-and-synchronization)
+5. [AWF Pricing Catalog Ownership](#5-awf-pricing-catalog-ownership)
 6. [Copilot Billing Reference Requirements](#6-copilot-billing-reference-requirements)
 7. [Reporting Requirements](#7-reporting-requirements)
 8. [Compliance Testing](#8-compliance-testing)
@@ -58,7 +58,7 @@ This specification covers:
 - The normative AIC unit definition and conversion rules.
 - The per-invocation and aggregated AIC calculation formulas.
 - Required `models.json` data structure and field semantics.
-- Requirements for how pricing catalog data is provided and mirrored in gh-aw.
+- Requirements for AWF-owned pricing and explicit workflow overrides.
 - Required references to GitHub Copilot model and billing documentation.
 
 This specification does NOT cover:
@@ -73,7 +73,7 @@ The specification is designed to:
 1. Provide a testable and deterministic calculation contract.
 2. Keep pricing inputs explicit and auditable through structured catalog files.
 3. Support model-name drift through normalized lookup and prefix fallback matching.
-4. Maintain compatibility between CLI and setup runtime pricing catalogs.
+4. Consume AWF pricing evidence without maintaining duplicate catalogs.
 
 ---
 
@@ -83,7 +83,7 @@ The specification is designed to:
 
 **Conforming implementation**: Satisfies all MUST/SHALL requirements in Sections 3 through 8.
 
-**Partially conforming implementation**: Computes core AIC from token usage and model pricing (Section 3) but omits one or more optional reporting or synchronization requirements.
+**Partially conforming implementation**: Computes core AIC from token usage and model pricing (Section 3) but omits one or more optional reporting requirements.
 
 ### 2.2 Requirements Notation
 
@@ -93,7 +93,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 - **Level 1 – Calculation**: Implements AIC formulas and provider token handling (Section 3).
 - **Level 2 – Catalog**: Implements required `models.json` structure and lookup semantics (Section 4).
-- **Level 3 – Operational**: Implements catalog provisioning, Copilot reference alignment, and reporting requirements (Sections 5–7).
+- **Level 3 – Operational**: Implements AWF pricing integration, Copilot reference alignment, and reporting requirements (Sections 5–7).
 
 ---
 
@@ -215,7 +215,8 @@ An `InvocationRecord` represents a single LLM API call and its associated token 
 
 ### 4.1 Top-Level Structure
 
-A conforming catalog MUST be valid JSON with this structure:
+Explicit workflow pricing overlays and runtime pricing documents MUST be valid JSON with
+this structure. This format does not require a bundled gh-aw catalog:
 
 ```json
 {
@@ -269,50 +270,25 @@ The `github_models` alias is written by the AWF proxy for Copilot engine runs an
 
 ---
 
-## 5. Catalog Provisioning and Synchronization
+## 5. AWF Pricing Catalog Ownership
 
-### 5.1 Embedded Runtime Catalogs
+### 5.1 Runtime Catalog
 
-gh-aw implementations MUST provide synchronized pricing catalogs at:
+AWF owns the model pricing catalog. gh-aw MUST NOT bundle a pricing catalog or inject
+catalog-derived rates during compilation. Explicit workflow `models.providers` overrides
+MUST continue to be passed to AWF.
 
-- `pkg/cli/data/models.json`
-- `actions/setup/js/models.json`
+### 5.2 Reported Costs
 
-These files SHALL represent the same pricing dataset.
+gh-aw SHOULD use AWF-reported inference costs and runtime pricing evidence. When pricing
+is unavailable, implementations MUST NOT invent rates or fall back to a repository-owned
+catalog. Token usage and available reported costs MUST remain accessible.
 
-### 5.2 Source and Refresh Expectations
+### 5.3 Catalog Maintenance
 
-Catalog refresh processes SHOULD use normalized upstream model inventories and SHOULD validate Copilot entries against authoritative GitHub Copilot model and billing documentation.
-
-### 5.3 Change Control
-
-Catalog updates MUST preserve JSON validity and MUST maintain backward-safe handling for historical model IDs that remain in the catalog but are absent from current live inventories.
-
-### 5.4 Catalog Sync Failure Handling
-
-A conforming implementation MUST define and enforce behavior for catalog synchronization failures. Specifically:
-
-1. **Unreachable catalog source**: When the upstream pricing catalog source is unreachable during a sync operation, the implementation MUST fall back to the last successfully synchronized catalog version. The implementation MUST NOT silently use an empty or zero-cost catalog. The implementation MUST emit a diagnostic warning identifying the sync failure and the fallback version in use.
-
-2. **Malformed catalog**: When a fetched catalog update fails JSON schema validation or contains non-numeric cost fields, the implementation MUST reject the update entirely, retain the previous valid catalog, and emit a validation error identifying the malformed field(s). The implementation MUST NOT partially apply a malformed update.
-
-3. **Missing required fields**: When a catalog entry is missing required fields (`input` or `output` cost values), the implementation MUST treat that entry as invalid and MUST NOT compute AIC using zero or undefined costs for that model. The entry MUST be skipped or flagged, and a diagnostic MUST be emitted.
-
-4. **Catalog version mismatch**: When the two required catalog paths (`pkg/cli/data/models.json` and `actions/setup/js/models.json`) diverge in content after a sync operation, the sync tooling/CI gate MUST treat this as a sync failure. The refresh operation MUST fail until consistency is restored. In the gh-aw repository:
-   - CI MUST run `make validate-models-json-sync` (or an equivalent normalized-content comparison gate).
-   - That gate MUST fail whenever these mirror files cease to represent the same JSON dataset.
-
-### 5.5 Catalog Staleness SLA
-
-A catalog that has not been refreshed from its upstream source within **7 days** is considered stale. Implementations SHOULD track the timestamp of the last successful catalog sync.
-
-When the elapsed time since the last successful sync exceeds 7 days, the implementation SHOULD emit a re-sync warning. The warning MUST include:
-
-- The timestamp of the last successful sync.
-- The number of days elapsed since that sync.
-- A recommendation to run the catalog refresh process.
-
-This is a SHOULD-level norm; catalog staleness does not constitute a hard failure, but implementations MUST NOT suppress the warning if the threshold is exceeded. Implementations that cannot determine the last sync timestamp SHOULD treat the catalog as potentially stale and emit the warning unconditionally.
+Catalog refresh, validation, and historical model coverage are AWF responsibilities.
+gh-aw pricing diagnostics SHOULD identify the runtime evidence used rather than recommend
+refreshing local catalog mirrors.
 
 ---
 
@@ -332,7 +308,7 @@ These references SHOULD be treated as the external billing-alignment sources for
 
 A conforming implementation MUST expose AIC in runtime reporting outputs where cost metrics are emitted.
 
-When AWF token-usage records provide finite, non-negative `ai_credits_this_response` values, reporting MUST prefer those per-request values. The chronologically last valid `ai_credits_total` is the reported run total. If later records omit or contain invalid reported values, reporting MUST surface a warning and extend the last valid total with available per-request values or legacy pricing until another valid cumulative total appears. Implementations MUST recompute AIC from token counts and catalog pricing for legacy records that omit these fields.
+When AWF token-usage records provide finite, non-negative `ai_credits_this_response` values, reporting MUST prefer those per-request values. The chronologically last valid `ai_credits_total` is the reported run total. If later records omit or contain invalid reported values, reporting MUST surface a warning and extend the last valid total with available per-request values until another valid cumulative total appears. Implementations MUST NOT recompute legacy record costs using a bundled pricing catalog; missing cost evidence remains unavailable.
 
 > [!NOTE]
 > Token-usage files are diagnostic artifacts visible to the agent runtime. Their mirrored AIC fields improve usage summaries, but are not sufficient evidence to classify a provider failure as budget enforcement or to change retry, authentication, or safe-output behavior.
@@ -358,7 +334,7 @@ A conformance test suite MUST include at least the following test cases:
 - **T-AIC-004**: Verify fallback pricing when optional cost fields are omitted.
 - **T-AIC-005**: Verify `models.json` rejects missing required fields (`input`, `output`).
 - **T-AIC-006**: Verify provider key normalization and `github`, `copilot`, and `github_models` to `github-copilot` mapping behavior.
-- **T-AIC-007**: Verify catalog mirror consistency between CLI and setup runtime paths.
+- **T-AIC-007**: Verify AWF-reported costs and explicit workflow pricing overrides work without a bundled catalog.
 - **T-AIC-008**: Verify reporting outputs include per-run AIC values.
 
 ### 8.2 Compliance Checklist
@@ -371,7 +347,7 @@ A conformance test suite MUST include at least the following test cases:
 | Optional price fallback behavior | T-AIC-004 | 1 | Required |
 | Catalog schema conformance | T-AIC-005 | 2 | Required |
 | Provider/model normalization behavior | T-AIC-006 | 2 | Required |
-| Mirrored catalog consistency | T-AIC-007 | 3 | Required |
+| AWF pricing evidence and explicit overrides | T-AIC-007 | 3 | Required |
 | AIC reporting visibility | T-AIC-008 | 3 | Required |
 
 ---
@@ -750,18 +726,8 @@ Pricing catalogs are configuration inputs. Implementations MUST:
 <a id="sync-notes"></a>
 ## Sync Notes
 
-The canonical gh-aw mirror files for this specification are:
-
-- `pkg/cli/data/models.json`
-- `actions/setup/js/models.json`
-
-The repository validation target for mirror consistency is `make validate-models-json-sync`.
-
-This specification MUST be revalidated when any of the following occurs:
-
-1. A new model or provider entry is added to either mirror.
-2. A pricing value or billing-related field changes in either mirror.
-3. This specification is incremented to a new minor version.
+This specification MUST be revalidated when the AWF pricing evidence contract,
+explicit workflow pricing overrides, or the specification's minor version changes.
 
 ---
 

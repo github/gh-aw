@@ -141,6 +141,14 @@ describe("write_daily_aic_usage_cache", () => {
     expect(typeof entry.timestamp).toBe("string");
   });
 
+  it("does not cache token-only usage as free when pricing is unavailable", async () => {
+    fs.writeFileSync(path.join(usageDir, "agent_usage.jsonl"), JSON.stringify({ provider: "unknown", model: "unknown", input_tokens: 100 }), "utf8");
+    await runMain();
+
+    expect(fs.existsSync(cacheFile)).toBe(false);
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("unpriced"));
+  });
+
   it("drops non-object lines from the existing cache file", async () => {
     const recentTs = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     fs.writeFileSync(cacheFile, "not-valid-json\n" + JSON.stringify({ run_id: 5001, aic: 2.5, timestamp: recentTs }) + "\n", "utf8");

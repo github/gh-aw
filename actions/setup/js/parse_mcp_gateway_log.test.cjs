@@ -749,6 +749,8 @@ Some content here.`;
             cache_read_tokens: 141738,
             cache_write_tokens: 38170,
             duration_ms: 26500,
+            ai_credits_this_response: 0.25,
+            ai_credits_total: 0.25,
           })
         );
 
@@ -2161,6 +2163,30 @@ Some content here.`;
   });
 
   describe("parseTokenUsageJsonl", () => {
+    let restoreModels;
+    beforeEach(() => {
+      const { useModelOverrides } = require("./fixtures/model_overrides.cjs");
+      restoreModels = useModelOverrides({
+        openai: { models: { "gpt-4o": { cost: { input: "0.000002" } } } },
+        "github-copilot": { models: { "gpt-4o-mini": { cost: { input: "0.00000015", output: "0.0000006", cache_read: "0.000000075" } } } },
+      });
+    });
+    afterEach(() => restoreModels());
+
+    test("uses AWF-reported credits without any explicit pricing overlay", () => {
+      delete process.env.GH_AW_MODELS_JSON_PATH;
+      require("./model_costs.cjs")._resetModelCostsCache();
+      const summary = parseTokenUsageJsonl(JSON.stringify({ model: "awf-only-model", input_tokens: 1000, ai_credits_this_response: 0.125, ai_credits_total: 0.5 }));
+      expect(summary).toMatchObject({ aiCreditsAvailable: true, aiCreditsSource: "awf_reported", totalAIC: 0.5 });
+      expect(summary.entries[0].deltaAIC).toBe(0.125);
+    });
+
+    test("withholds unreported credits without explicit pricing", () => {
+      delete process.env.GH_AW_MODELS_JSON_PATH;
+      require("./model_costs.cjs")._resetModelCostsCache();
+      const summary = parseTokenUsageJsonl(JSON.stringify({ provider: "openai", model: "gpt-4o", input_tokens: 1000 }));
+      expect(summary.aiCreditsAvailable).toBe(false);
+    });
     test.each(["{truncated", '{"input_tokens":100,', "not-json"])("withholds every counter for malformed evidence: %s", malformed => {
       const record = JSON.stringify({ model: "gpt-4o", input_tokens: 100, output_tokens: 5, cache_read_tokens: 0, cache_write_tokens: 0 });
       for (const content of [`${record}\n${malformed}`, `${malformed}\n${record}`, `${record}\n${malformed}\n${record}`]) {

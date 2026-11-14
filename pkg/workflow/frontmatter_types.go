@@ -454,10 +454,8 @@ type FrontmatterConfig struct {
 	// Experiments during frontmatter parsing.  Keys match those of Experiments.
 	ExperimentConfigs map[string]*ExperimentConfig `json:"-"`
 
-	// ModelCosts holds model pricing data in the same structure as models.json.
-	// Declared in frontmatter as the `models` field (json:"models,omitempty") using a top-level
-	// `providers` key. At runtime the activation job merges this with the built-in models.json
-	// so that custom or adjusted cost values are reflected in AI Credits accounting.
+	// ModelCosts holds explicit frontmatter `models.providers` overlays passed to AWF
+	// so custom or adjusted prices are reflected in AI Credits accounting.
 	// Structure: {"providers": {"<provider>": {"models": {"<model>": {"cost": {...}}}}}}
 	ModelCosts map[string]any `json:"models,omitempty"`
 	// ModelPolicyAllowed is the experimental frontmatter models.allowed (allowlist), merged as a union across imports.

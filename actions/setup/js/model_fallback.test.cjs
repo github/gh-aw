@@ -5,15 +5,14 @@ const require = createRequire(import.meta.url);
 const { injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs, normalizeClaudeModel, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
 
 describe("Claude model IDs", () => {
-  const copilotModels = require("./models.json").providers["github-copilot"].models;
-
-  it("uses the same Copilot catalog as the compiler", () => {
-    expect(copilotModels).toEqual(require("../../../pkg/cli/data/models.json").providers["github-copilot"].models);
-  });
-
-  it.each(Object.keys(copilotModels).filter(id => id.startsWith("claude-")))("normalizes the catalog model %s", model => {
+  it.each(["claude-sonnet-4.6", "claude-opus-5.5", "claude-sonnet-5"])("normalizes the model %s without a catalog", model => {
     expect(normalizeClaudeModel(model.replaceAll(".", "-"), "github", {})).toBe(model);
     expect(normalizeClaudeModel(model, "github", {})).toBe(model);
+  });
+
+  it("uses advertised Claude IDs rather than assuming punctuation for custom versions", () => {
+    const reflectData = { endpoints: [{ provider: "copilot", configured: true, models: ["claude-sonnet-5.5-preview"] }] };
+    expect(normalizeClaudeModel("claude-sonnet-5-5-preview?effort=high", "github", {}, { reflectData })).toBe("claude-sonnet-5.5-preview?effort=high");
   });
 
   it.each(["github", "copilot", "github-copilot", "github_models", " COPILOT "])("maps Anthropic IDs for provider %s", provider => {
