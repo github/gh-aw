@@ -37,7 +37,7 @@ func TestRunScriptAccessPathMalformedLiteral(t *testing.T) {
 }
 
 // validateNoTemplateInjection is a test helper that parses YAML and validates
-// it for template injection vulnerabilities using validateNoTemplateInjectionFromParsed.
+// it for template injection vulnerabilities using validateRunScriptTemplateInjection.
 func validateNoTemplateInjection(yamlContent string) error {
 	if !mayContainInlineExpression(yamlContent) {
 		return nil
@@ -46,7 +46,7 @@ func validateNoTemplateInjection(yamlContent string) error {
 	if err := yaml.Unmarshal([]byte(yamlContent), &workflow); err != nil {
 		return nil
 	}
-	return validateNoTemplateInjectionFromParsed(workflow)
+	return validateRunScriptTemplateInjection(workflow, true)
 }
 
 func TestTemplateInjectionNativeParserFailClosed(t *testing.T) {
@@ -86,8 +86,8 @@ func TestTemplateInjectionNativeParserFailClosed(t *testing.T) {
 			scan := scanRunContentExpressions(string(content))
 			assert.Equal(t, test.unsafe, scan.hasUnsafe)
 			assert.Equal(t, test.disallowed, scan.hasDisallowed)
-			assert.Equal(t, test.unsafe, validateNoTemplateInjectionFromParsed(workflow) != nil)
-			assert.Equal(t, test.disallowed, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow) != nil)
+			assert.Equal(t, test.unsafe, validateRunScriptTemplateInjection(workflow, true) != nil)
+			assert.Equal(t, test.disallowed, validateRunScriptExpressions(workflow, true) != nil)
 
 			compiler := NewCompiler(WithNoEmit(true))
 			for _, parsed := range []map[string]any{workflow, nil} {
