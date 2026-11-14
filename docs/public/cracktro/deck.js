@@ -2927,29 +2927,43 @@
     };
     // token stream: from the active provider card (top) down into the agent core
     const CORE = { x: TW / 2, y: 120 + 245 };
+    const WORDS = ["label", " the", " issue", "triage", " owner", " bug", " new", " suggest", " needs", "-info", " repro", " docs", "ing", " area", ":ui", " P2"];
     const drawToks = (t, dt) => {
       tx.clearRect(0, 0, TW, TH);
+      tx.font = "600 18px 'Monaspace Neon', monospace";
+      tx.textAlign = "center";
+      tx.textBaseline = "middle";
       const pid = COMBOS[cur][1],
         j = PIDS.indexOf(pid),
         sx = 124 + j * 248,
         sy = 70,
         c = PROV[pid].c;
       if (phase === "hold" && t > spawnAt) {
-        spawnAt = t + 90;
-        toks.push({ p: 0, sx, sy: sy + 40, c });
+        spawnAt = t + 240;
+        toks.push({ p: 0, sx: sx + (Math.random() - 0.5) * 140, sy: sy + 40, c, w: WORDS[(Math.random() * WORDS.length) | 0] });
       }
       for (const q of toks) {
         q.p += dt / 900;
         const u = Math.min(1, q.p);
-        tx.fillStyle = q.c;
+        tx.globalAlpha = u > 0.85 ? (1 - u) / 0.15 : Math.min(1, u * 6);
+        const x = q.sx + (CORE.x - q.sx) * u,
+          y = q.sy + (CORE.y - 75 - q.sy) * u,
+          bw = tx.measureText(q.w).width + 20;
+        tx.fillStyle = "#0d1117";
+        tx.strokeStyle = q.c;
+        tx.lineWidth = 1.5;
         tx.beginPath();
-        tx.arc(q.sx + (CORE.x - q.sx) * u, q.sy + (CORE.y - 75 - q.sy) * u, 5, 0, Math.PI * 2);
+        tx.roundRect(x - bw / 2, y - 15, bw, 30, 8);
         tx.fill();
+        tx.stroke();
+        tx.fillStyle = q.c;
+        tx.fillText(q.w.trim(), x, y + 1);
         if (q.p >= 1) {
           tokens += 100 + ((Math.random() * 200) | 0);
           gulp = Math.min(1, gulp + 0.15);
         }
       }
+      tx.globalAlpha = 1;
       toks = toks.filter(q => q.p < 1);
       gulp *= 0.94 ** (dt / 16);
       core.style.setProperty("--gl", `${40 + gulp * 90}px`);
