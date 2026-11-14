@@ -205,8 +205,42 @@
       "avg_comments": 7.68,
       "success_rate": 0.8529,
       "note": "primary analysis window (2026-11-10T00:00:00Z..2026-11-11T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=34, 1 still open at collection time (#76617, model-routing simplification, created 21:38:20Z, open ~20h, not stalled - substantive in-progress scope); agent_prs_merged_from_created=29, closed_prs=4 (#76540, #76403 - lock/metadata no-op closures explaining why no change was needed; #76535 - explicit 'no implementation changes made' no-op with substantive rationale; #76434 - verification-only no-op after confirming existing protections; none were bare WIP placeholders); agent_success_rate=85.3%, down vs 11-09 (86.5%->85.3%, -1.4% relative, not significant); avg_duration created->merged over 29 merged PRs=268.58min, down vs 11-09 (279.12->268.58, -3.8%, not significant); volume down vs 11-09 (37->34, -8.1%, not significant); agent_prs_merged (event-scoped, mergedAt in window)=31, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range, total_count=31), cross-checked against 46 all-author merged PRs in window (31<=46, consistent); avg_comments=7.68 is total PR-thread comment count per PR via search_pull_requests 'comments' field (not filtered to humans; per-PR get_comments/get_review_comments not run due to cost across 34 PRs), across all 34 cohort PRs - not directly comparable to human-filtered avg_comments days (10-29, 10-31, 11-03, 11-07)"
+    },
+    {
+      "date": "2026-11-11",
+      "agent_prs_total": 32,
+      "agent_prs_merged": 31,
+      "agent_prs_merged_from_created": 28,
+      "closed_prs": 4,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 282.53,
+      "success_rate": 0.875,
+      "note": "gap-fill (workflow did not run 11-11..11-13, 3-day gap); true UTC calendar-day window (2026-11-11T00:00:00Z..2026-11-12T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=32, all resolved (0 open) at collection time (~3 days after window close); agent_prs_merged_from_created=28, closed_prs=4 (#76802, #76801, #76775, #76698, all substantive bodies, no bare WIP placeholders); agent_success_rate=87.5%; avg_duration created->merged over 28 merged PRs=282.53min; agent_prs_merged (event-scoped, mergedAt in window)=31, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range, total_count=31), cross-checked against 63 all-author merged PRs in window (31<=63, consistent); avg_comments not collected for this backfilled day (cost of per-PR comment retrieval across all 3 backfill+primary days was reserved for the primary day only)"
+    },
+    {
+      "date": "2026-11-12",
+      "agent_prs_total": 21,
+      "agent_prs_merged": 12,
+      "agent_prs_merged_from_created": 17,
+      "closed_prs": 4,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 645.0,
+      "success_rate": 0.8095,
+      "note": "gap-fill (workflow did not run 11-11..11-13, 3-day gap); true UTC calendar-day window (2026-11-12T00:00:00Z..2026-11-13T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=21, all resolved (0 open) at collection time; agent_prs_merged_from_created=17, closed_prs=4 (#77192, #77185, #77049 titled [WIP] but has a substantive body, #77048, none bare placeholders); agent_success_rate=81.0%, down vs 11-11 (87.5%->81.0%, -7.4% relative, not significant); avg_duration created->merged over 17 merged PRs=645.0min, up sharply vs 11-11 (282.53->645.0min, +128%, significant \u2014 inflated by backfill lag since merges were measured ~2 days after window close); agent_prs_merged (event-scoped, mergedAt in window)=12, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range, total_count=12), cross-checked against 31 all-author merged PRs in window (12<=31, consistent); volume down sharply vs 11-11 (32->21, -34.4%, significant); avg_comments not collected for this backfilled day"
+    },
+    {
+      "date": "2026-11-13",
+      "agent_prs_total": 15,
+      "agent_prs_merged": 13,
+      "agent_prs_merged_from_created": 11,
+      "closed_prs": 2,
+      "open_prs": 2,
+      "avg_agent_duration_minutes": 400.34,
+      "avg_comments": 0.93,
+      "success_rate": 0.7333,
+      "note": "primary analysis window (2026-11-13T00:00:00Z..2026-11-14T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=15, 2 still open at collection time (#77471 model-pricing-catalog removal, long-running with many CI follow-up cycles; #77573 startup-failure log capture, created 22:30Z, not stalled); agent_prs_merged_from_created=11, closed_prs=2 (#77506 'Close daily SPDD specification gaps' and #77473 '[WIP] Refactor logs_orchestrator_download.go', both have substantive bodies describing real work, not bare placeholders); agent_success_rate=73.3%, down vs 11-12 (81.0%->73.3%, -9.5% relative, not significant) but down sharply vs 11-11 (87.5%->73.3%, -16.2% relative over the 3-day window, significant); avg_duration created->merged over 11 merged PRs=400.34min, down vs 11-12 (645.0->400.34min, -37.9%, significant) but up vs 11-11 (282.53->400.34min, +41.7%, significant); agent_prs_merged (event-scoped, mergedAt in window)=13, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range, total_count=13), cross-checked against 47 all-author merged PRs in window (13<=47, consistent); volume down sharply vs 11-11 (32->15, -53.1%, significant); avg_comments=0.93 is human (non-bot) issue-thread comments only via get_comments across all 15 cohort PRs (review-thread comments via get_review_comments not collected due to cost) \u2014 most PR interaction here is automated reviewer-bot activity (Design Decision Gate, PR Code Quality Reviewer, Test Quality Sentinel, etc.), not human comments, so this is a low but expected figure, not directly comparable to pre-11-10 days that used a different comment-counting method"
     }
   ],
-  "last_updated": "2026-11-10",
-  "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward; gap-filled 11-08..11-10 during the 2026-11-11 run after a 3-day workflow gap (same pattern as the 11-04..11-06 gap resolved on 2026-11-07)"
+  "last_updated": "2026-11-13",
+  "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward; gap-filled 11-08..11-10 during the 2026-11-11 run after a 3-day workflow gap (same pattern as the 11-04..11-06 gap resolved on 2026-11-07) Gap-filled 11-11..11-13 during the 2026-11-14 run after a 3-day workflow gap (same recurring pattern as the 11-04..11-06 and 11-08..11-10 gaps)."
 }
