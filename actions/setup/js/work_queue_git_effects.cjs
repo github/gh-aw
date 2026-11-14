@@ -14,7 +14,7 @@ async function withGitClaimEffects(options, callback) {
   const paths = options.paths?.length ? [...new Set(options.paths)] : [undefined];
   const repository = await resolveRepositoryTarget(options.github || global.github, { repository: options.repository, ref });
   const resources = paths.map(path => ({ ...repository, ...(path === undefined ? {} : { path }) }));
-  return withClaimResourceEffects(resources, ["rest.git.createRef", "git.push"], callback);
+  return withClaimResourceEffects(resources, ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.createRef", "git.push"], callback);
 }
 
 function gitPushRepository(url) {
