@@ -615,16 +615,40 @@ test("bounded health inventory keeps verified failures actionable and reports pa
   assert.equal(manifest.discovery.reason, "failure_listing_limit");
 });
 
-test("success sampling timeout does not block a verified failure inventory", async t => {
-  const f = await fixture(t, {
-    runs: [run(42)],
-    healthCollection: { partial: true, reason: "time_budget" },
+for (const reason of ["time_budget", "request_budget"]) {
+  test(`success sampling ${reason} does not block a verified failure inventory`, async t => {
+    const f = await fixture(t, {
+      runs: [run(42)],
+      healthCollection: { partial: true, reason },
+    });
+    await f.execute();
+    assert.equal(f.outputs.has_new_failures, "true");
+    const manifest = JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json")));
+    assert.equal(manifest.evidence_complete, true);
+    assert.equal(manifest.discovery.partial, true);
+    assert.equal(manifest.discovery.reason, reason);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))).checkpoint, now);
+    assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
   });
-  await f.execute();
-  assert.equal(f.outputs.has_new_failures, "true");
-  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).evidence_complete, true);
-  assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
-});
+}
+
+for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) {
+  for (const value of [false, undefined]) {
+    test(`request budget with ${incomplete}=${value} preserves checkpoint and rejects discovery`, async t => {
+      const options = { runs: [run(42)] };
+      const f = await fixture(t, options);
+      await f.execute();
+      const checkpoint = fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8");
+      options.healthCollection = { partial: true, reason: "request_budget", [incomplete]: value };
+      f.calls.length = 0;
+      await assert.rejects(f.execute(), /Incomplete or invalid health discovery/);
+      assert.equal(fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8"), checkpoint);
+      assert.equal(f.outputs.has_new_failures, "false");
+      assert.equal(f.calls.filter(call => call[1] === "logs" || call[0] === "tracked" || call[0] === "prs").length, 0);
+      assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
+    });
+  }
+}
 
 for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) {
   test(`timed-out ${incomplete} defers and retries without losing checkpoint state`, async t => {
