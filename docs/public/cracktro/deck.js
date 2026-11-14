@@ -299,6 +299,17 @@
   @keyframes tp-l { from { opacity: 0; transform: translateX(-1500px); } }
   @keyframes tp-r { from { opacity: 0; transform: translateX(1500px); } }
   @keyframes tp-vs { from { opacity: 0; transform: scale(0); } }
+  /* enter and exit horizontally only: no vertical band push or fade for the slide itself; its text splits back out to the sides */
+  .slide.tp.up-in, .slide.tp.down-in, .slide.tp.leaving { animation: none; }
+  .slide.tp.fadeout { opacity: 1; }
+  .tp:is(.fadeout, .leaving) .tp-copy > :nth-child(odd):not(.tp-vs), .tp:is(.fadeout, .leaving) .tp-vs > :first-child {
+    animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .tp:is(.fadeout, .leaving) .tp-copy > :nth-child(even):not(.tp-vs), .tp:is(.fadeout, .leaving) .tp-vs > :last-child {
+    animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .tp:is(.fadeout, .leaving) .tp-vs > b { animation: tp-vso .25s ease-in both !important; }
+  @keyframes tp-lo { to { opacity: 0; transform: translateX(-1500px); } }
+  @keyframes tp-ro { to { opacity: 0; transform: translateX(1500px); } }
+  @keyframes tp-vso { to { opacity: 0; transform: scale(0); } }
   @keyframes tp-pop { from { transform: scale(0); } }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
