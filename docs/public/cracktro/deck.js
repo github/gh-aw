@@ -472,6 +472,27 @@
   .sdd-chips b { font: 600 17px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; margin-right: 6px; }
   .sdd-chips span { padding: 7px 13px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 16px/1 var(--mono); color: #c9d1d9; }
   .active .sdd-chips { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .mra-svg.sdm-svg { left: 118px; top: 272px; width: 1684px; height: 530px; }
+  .sdm-strip { position: absolute; left: 200px; top: 822px; width: 1610px; height: 100px; display: grid; grid-template-columns: repeat(4, 1fr) 1.9fr; gap: 14px; }
+  .sdm-c { position: relative; border: 1px solid #3d444d; border-radius: 14px; background: #0d1117d9; padding: 12px 16px 0; overflow: hidden; }
+  .sdm-w { font: 600 14px/1 var(--mono); letter-spacing: .06em; color: #c297ff; white-space: nowrap; }
+  .sdm-n { font: 700 38px/1.1 "Mona Sans"; color: #f0f6fc; margin-top: 8px; }
+  .sdm-n i { font-style: normal; color: #3fb950; }
+  .sdm-l { font: 500 14px/1.2 var(--mono); color: #9198a1; margin-top: 3px; white-space: nowrap; }
+  .sdm-spark { position: absolute; right: 14px; top: 12px; width: 250px; height: 76px; overflow: visible; }
+  .sdm-spark .ln { fill: none; stroke: #3fb950; stroke-width: 3; stroke-dasharray: 1; stroke-dashoffset: 1; filter: drop-shadow(0 0 6px #3fb95099); }
+  .sdm-spark .ar { fill: #3fb9501f; opacity: 0; }
+  .sdm-spark .pt { fill: #3fb950; } .sdm-spark text { fill: #6e7681; font: 500 13px var(--mono); }
+  .sdm-spark .hi { fill: #3fb950; font: 700 16px var(--mono); text-anchor: end; }
+  .active .sdm-c { animation: rise .7s cubic-bezier(.2,.9,.2,1) both; }
+  .active .sdm-c:nth-child(2) { animation-delay: .15s; } .active .sdm-c:nth-child(3) { animation-delay: .3s; } .active .sdm-c:nth-child(4) { animation-delay: .45s; } .active .sdm-c:nth-child(5) { animation-delay: .6s; }
+  .active .sdm-spark .ln { animation: sdmDraw 1.8s ease-out both .9s; }
+  .active .sdm-spark .ar { animation: sdmFade .8s ease-out both 2.3s; }
+  @keyframes sdmDraw { to { stroke-dashoffset: 0; } }
+  @keyframes sdmFade { to { opacity: 1; } }
+  .sdm-cap { position: absolute; left: 460px; width: 1350px; top: 936px; text-align: right; font: 500 14px/1.4 var(--mono); letter-spacing: .04em; color: #9198a1; }
+  .sdm-cap b { color: #3fb950; font-weight: 700; letter-spacing: .12em; }
+  .active .sdm-cap { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
   .dh-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dh-svg .mra-l.g { fill: #3fb950; }
   .dh-svg .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
   .dh-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
@@ -6290,13 +6311,48 @@
       <rect class="sdd-say" x="780" y="81" width="320" height="50" rx="25"/><text class="sdd-say-t" x="940" y="114">“nil should just work”</text></g>`;
     g += `<circle class="fm-dot sdd-dot" r="9"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg mra-svg sdd-svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg sdm-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
     svg.style.setProperty("--c", "#ab7df8");
     svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".sdd-dot"),
-      scan = $("sddScan");
+    // measured on gh-aw (snapshot 14 Nov 2026): merged PRs / issues by workflow title prefix, and TestSpec_ functions in pkg/**spec_test.go on main at the start of each month
+    const SDM_STATS = [
+      ["spec-extractor", "83", "README spec PRs merged"],
+      ["spec-enforcer", "69", "test PRs · +12,731 lines"],
+      ["spec-librarian", "68<i>→38</i>", "audits → merged fixes"],
+      ["safe-outputs-spec-review", "22", "weekly spec PRs merged"],
+    ];
+    const SDM_TESTS = [
+      [0, 0],
+      [30, 225],
+      [61, 297],
+      [91, 355],
+      [122, 374],
+      [153, 386],
+      [183, 386],
+      [214, 377],
+      [227, 415],
+    ];
+    const sdmX = d => 6 + (d / 227) * 200,
+      sdmY = v => 64 - (v / 415) * 50,
+      sdmPts = SDM_TESTS.map(([d, v]) => `${sdmX(d).toFixed(1)},${sdmY(v).toFixed(1)}`);
+    const spark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    spark.setAttribute("class", "sdm-spark");
+    spark.setAttribute("viewBox", "0 0 250 80");
+    spark.innerHTML =
+      `<path class="ar" d="M${sdmPts.join(" L")} L${sdmX(227)},64 L${sdmX(0)},64Z"/><path class="ln" pathLength="1" d="M${sdmPts.join(" L")}"/>` +
+      `<circle class="pt" cx="${sdmX(227)}" cy="${sdmY(415)}" r="5"/><text class="hi" x="250" y="${sdmY(415) + 6}">415</text>` +
+      `<text x="${sdmX(0)}" y="80">Apr</text><text x="${sdmX(122)}" y="80" text-anchor="middle">Aug</text><text x="${sdmX(227)}" y="80" text-anchor="end">Nov</text>`;
+    const sdmStrip = h(
+      "div",
+      { class: "sdm-strip" },
+      ...SDM_STATS.map(([w, n, l]) => {
+        const num = h("div", { class: "sdm-n" });
+        num.innerHTML = n;
+        return h("div", { class: "sdm-c" }, h("div", { class: "sdm-w" }, w), num, h("div", { class: "sdm-l" }, l));
+      }),
+      h("div", { class: "sdm-c" }, h("div", { class: "sdm-w" }, "TestSpec_ in pkg/"), h("div", { class: "sdm-n" }, "0 → 415"), h("div", { class: "sdm-l" }, "48 spec_test.go"), spark),
+    );
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const CYC = 15500;
     let t0 = 0,
@@ -6355,7 +6411,7 @@
       sound: "spec",
       palette: ["#8957e5", "#238636", "#1f6feb", "#d29922"],
       notes:
-        "Spec-driven testing, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt shown is an illustrative, simplified view of gh-aw's ctxutil package; the workflow names listed are gh-aw's own spec workflows.",
+        "Spec-driven testing, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt in the flow is an illustrative, simplified view of gh-aw's ctxutil package. The strip below is measured on gh-aw's public history, snapshot 14 November 2026: 83 merged spec-extractor pull requests updating package README specs; 69 merged spec-enforcer pull requests adding 12,731 lines of spec tests; 68 spec-librarian audit issues, which led to 38 merged Copilot fix pull requests; 22 merged pull requests from the weekly safe outputs spec review; and TestSpec functions in pkg on main growing from 0 at the start of April to 415 across 48 spec test files. The real ctxutil helper followed this path too: added on 3 August, spec tests on 14 August after a librarian audit, enforced on 6 October. Counts come from pull requests and issues matched by each workflow's title prefix, and from git history on main. pr-specification-reviewer and the W3C specification writer agent also take part.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -6391,7 +6447,8 @@
         { class: "slide" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Humans state intent, agents write the RFC spec, test it and extract it from every change"), h("h2", {}, letters("Spec-driven "), letters("testing", "l-grad"))),
         svg,
-        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["spec-extractor", "pr-specification-reviewer", "spec-librarian", "spec-enforcer", "w3c-specification-writer", "weekly-safe-outputs-spec-review"].map(n => h("span", {}, n))),
+        sdmStrip,
+        h("div", { class: "sdm-cap" }, h("b", {}, "MEASURED "), "gh-aw, 30 Mar – 14 Nov 2026 · merged PRs and audits by title prefix · TestSpec_ funcs on main · ctxutil flow illustrative"),
       ),
     });
   }
