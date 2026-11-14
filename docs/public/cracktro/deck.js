@@ -154,7 +154,15 @@
   .fm-quote em { font-style: normal; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8); }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
   .hap-quote { top: 288px; width: auto; white-space: nowrap; }
-  .hap-svg { position: absolute; left: 110px; top: 390px; width: 1700px; height: 580px; overflow: visible; font-family: "Mona Sans"; }
+  .hap-svg { position: absolute; left: 110px; top: 390px; width: 1700px; height: 625px; overflow: visible; font-family: "Mona Sans"; }
+  .hap-svg .fm-pill text { font-size: 20px; }
+  .hap-m { opacity: .35; transition: opacity .5s; }
+  .hap-m.on { opacity: 1; }
+  .hap-mn { font: 800 42px "Mona Sans"; font-stretch: 100%; }
+  .hap-mw { fill: #f0f6fc; font: 600 20px "Mona Sans"; }
+  .hap-mf { fill: #d1d7e0; font: 500 16px var(--mono); }
+  .hap-mo { fill: #9198a1; font: 500 15px var(--mono); }
+  .hap-cap { fill: #9198a1; font: 500 16px var(--mono); letter-spacing: .06em; text-anchor: middle; }
   .fm-lane-t.hap-lt { text-anchor: start; }
   .hap-r { opacity: 0; }
   .active .hap-r { animation: rise .8s cubic-bezier(.2,.9,.2,1) both; transform-box: fill-box; transform-origin: left center; }
@@ -3747,17 +3755,20 @@
         step,
       };
     };
-    // Patterns: [name, trigger, colour, nodes]; node = [kind (e event, a agent, h human), icon, label]
+    // Patterns: [name, trigger, colour, nodes, measured]; node = [kind (e event, a agent, h human), icon, label]
+    // measured = [count, what, exemplar workflow, pattern total]: gh-aw, 15 Oct to 14 Nov 2026 (Actions runs, issue search,
+    // workflow triggers in .github/workflows, smoke tests excluded)
     const HAP = [
-      ["IssueOps", "on: issues opened", "#3fb950", [["e", "issue", "Issue opened"], ["a", "copilot", "Triage"], ["e", "comment", "Comment"], ["h", "person", "Maintainer"]]],
-      ["DailyOps", "on: schedule", "#d29922", [["e", "calendar", "Schedule"], ["a", "copilot", "Daily scan"], ["e", "issue", "Issue"]]],
-      ["ReviewOps", "on: ready for review", "#ab7df8", [["e", "pr", "Ready for review"], ["a", "copilot", "Code review"], ["e", "comment", "Comments"], ["h", "person", "Maintainer"]]],
-      ["LabelOps", "on: label added", "#f778ba", [["e", "tag", "Label added"], ["a", "copilot", "Investigate"], ["e", "comment", "Comment"], ["h", "person", "Maintainer"]]],
+      ["IssueOps", "on: issues opened", "#3fb950", [["e", "issue", "Issue opened"], ["a", "copilot", "Triage"], ["e", "comment", "Comment"], ["h", "person", "Maintainer"]], ["366", "triage runs", "auto-triage-issues", "1 of 3 issue workflows"]],
+      ["DailyOps", "on: schedule", "#d29922", [["e", "calendar", "Schedule"], ["a", "copilot", "Daily scan"], ["e", "issue", "Issue"]], ["30", "issues · 16 done", "daily-cli-tools-tester", "1 of 194 scheduled"]],
+      ["ReviewOps", "on: ready for review", "#ab7df8", [["e", "pr", "Ready for review"], ["a", "copilot", "Code review"], ["e", "comment", "Comments"], ["h", "person", "Maintainer"]], ["825", "PRs reviewed", "pr-code-quality-reviewer", "1 of 8 review workflows"]],
+      ["LabelOps", "on: label added", "#f778ba", [["e", "tag", "Label added"], ["a", "copilot", "Investigate"], ["e", "comment", "Comment"], ["h", "person", "Maintainer"]], ["9", "PRs labelled", "changeset", "1 of 6 label workflows"]],
     ];
     const HVW = 1700,
-      HVH = 580,
-      HCX = [450, 770, 1090, 1410],
-      HPW = 230,
+      HVH = 625,
+      HCX = [340, 630, 920, 1210],
+      HPW = 210,
+      HMX = 1456,
       HY = [130, 260, 390, 520];
     const hapSvgFor = () => {
       let g = `<defs><radialGradient id="hapAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
@@ -3767,7 +3778,9 @@
       ["TRIGGER", "AGENT", "OUTPUT", "HUMAN"].forEach((t, k) => {
         g += `<text class="fm-lane-t" x="${HCX[k] + HPW / 2 - 10}" y="40">${t}</text>`;
       });
-      HAP.forEach(([name, sub, c, nodes], r) => {
+      g += `<line class="fm-div" x1="${HMX - 22}" y1="0" x2="${HMX - 22}" y2="${HY[3] + 54}"/><text class="fm-lane-t hap-lt" x="${HMX}" y="40">MEASURED</text>`;
+      g += `<text class="hap-cap" x="${HVW / 2}" y="${HVH - 8}">measured on gh-aw · 15 Oct – 14 Nov 2026 · successful Actions runs, filed issues and workflow triggers · flows illustrative</text>`;
+      HAP.forEach(([name, sub, c, nodes, [num, what, wf, of]], r) => {
         const y = HY[r];
         g += `<g class="hap-r" style="--c:${c};animation-delay:${0.6 + r * 0.15}s">`;
         g += `<rect class="hap-row" x="0" y="${y - 54}" width="${HVW}" height="108" rx="18"/>`;
@@ -3785,6 +3798,7 @@
               : `<circle class="hap-disc ${kind}" cx="${x}" cy="${y}" r="32"/>${ico(icon, x, y, kind === "h" ? 38 : 30)}`;
           g += `<g class="hap-node" id="hapN${r}_${k}"><g class="fm-pill${kind === "h" ? " b" : kind === "e" ? " g" : ""}"><rect x="${x}" y="${y - 25}" width="${HPW}" height="50" rx="25"/><text x="${x + 16 + HPW / 2}" y="${y + 8}">${label}</text></g>${disc}</g>`;
         });
+        g += `<g class="hap-m" id="hapM${r}"><text x="${HMX}" y="${y - 6}"><tspan class="hap-mn" fill="${c}">${num}</tspan><tspan class="hap-mw" dx="10">${what}</tspan></text><text class="hap-mf" x="${HMX}" y="${y + 20}">${wf}</text><text class="hap-mo" x="${HMX}" y="${y + 42}">${of}</text></g>`;
         g += `<circle class="fm-dot" id="hapD${r}" r="7"/></g>`;
       });
       return g;
@@ -3820,6 +3834,7 @@
           const j = ++hLit[r],
             kind = nodes[j][0];
           hapSvg.querySelector(`#hapN${r}_${j}`).classList.add("on");
+          if (j === n - 1) hapSvg.querySelector(`#hapM${r}`).classList.add("on");
           if (kind === "h") sfx.review();
           else if (kind === "a") sfx.pop(1);
           else sfx.notify(j === 0);
@@ -3847,7 +3862,7 @@
       sound: "loop",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
-        "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. These are illustrative patterns with synthetic examples, not activity attributed to particular people or teams.",
+        "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself, 15 October to 14 November 2026: auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed runs on 825 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals come from the triggers in gh-aw's own workflow files, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
       enter() {
         hT0 = 0;
         hCyc = -1;
@@ -3858,7 +3873,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative patterns"), h("h2", {}, letters("Human Agent "), letters("Processes", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Patterns · measured on gh-aw"), h("h2", {}, letters("Human Agent "), letters("Processes", "l-grad"))),
         h("div", { class: "fm-quote hap-quote" }, "Build the ", h("em", {}, "factory"), " that works for you."),
         hapSvg
       ),
