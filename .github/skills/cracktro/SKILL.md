@@ -67,7 +67,7 @@ slides.push({
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
-- Exception: the Issues as intent slide (12) shows real counts for gh-aw issues labelled `community` and the merged PRs that closed them (November 2026 snapshot); its notes and caption say so.
+- Exception: the Issues as intent slide (11) shows real counts for gh-aw issues labelled `community` and the merged PRs that closed them (November 2026 snapshot); its notes and caption say so.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
 - Speaker notes for slides 2, 3, 6, 7, and 9–27 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
