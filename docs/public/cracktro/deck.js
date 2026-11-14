@@ -497,7 +497,7 @@
   .active .dhm-tl rect { animation: dhm-up .5s cubic-bezier(.2,.9,.2,1) both; animation-delay: calc(1s + var(--i) * 60ms); }
   @keyframes dhm-up { from { transform: scaleY(0); } }
   .dhm-tl .u { fill: #3fb950; } .dhm-tl .h { fill: #7ee78799; } .dhm-tl .x { fill: #6e7681; }
-  .dhm-cap { position: absolute; left: 470px; top: 1036px; font: 500 14px/1 var(--mono); letter-spacing: .04em; color: #6e7681; }
+  .dhm-cap { position: absolute; left: 470px; top: 1036px; font: 500 14px/1 var(--mono); color: #6e7681; }
   .dg-svg { left: 110px; top: 280px; width: 1700px; height: 586px; }
   .dg-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dg-svg .mra-l.g { fill: #3fb950; }
   .dg-band { fill: #ffffff06; }
@@ -6616,7 +6616,7 @@
       sound: "docs",
       palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
       notes:
-        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, October 2025 to November 2026: 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026: 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
+        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, from the first one on 10 October 2025 to 14 November 2026 (400 days): 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026 (246 days): 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -6653,7 +6653,7 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
         svg,
         dhm,
-        h("div", { class: "dhm-cap" }, "Measured on gh-aw, Oct 2025 to 14 Nov 2026: merged [docs] PRs per agent, [doc-healer] issues. Loop is illustrative."),
+        h("div", { class: "dhm-cap" }, "MEASURED · snapshot 14 Nov 2026 · PRs 10 Oct 2025–14 Nov 2026 (400 d) · healer issues 26 Feb–30 Oct 2026 (246 d) · loop illustrative"),
       ),
     });
   }
