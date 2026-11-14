@@ -4210,7 +4210,7 @@ process.exit(1);`
     it("uses the advertised Responses API for MAI-Code-1.1-Flash", () => {
       process.env.COPILOT_MODEL = "mai-code-1.1-flash";
       applyCopilotWireAPI({
-        modelsJson: JSON.parse(fs.readFileSync(path.join(__dirname, "models.json"), "utf8")),
+        modelsJson: null,
         awfReflectData: reflectModels([["mai-code-1.1-flash", ["/responses", "ws:/responses"]]]),
       });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
@@ -4393,10 +4393,9 @@ process.exit(1);`
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBeUndefined();
     });
 
-    it.each(["grok-4.5", "grok-4.6", "grok-4.7"])("uses the responses API from the bundled catalog for %s", model => {
+    it.each(["grok-4.5", "grok-4.6", "grok-4.7"])("uses the responses API from AWF for %s without local metadata", model => {
       process.env.COPILOT_MODEL = model;
-      const modelsJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "models.json"), "utf8"));
-      applyCopilotWireAPI({ modelsJson, logger: () => {} });
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([[model, ["/responses"]]]), logger: () => {} });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
     });
 

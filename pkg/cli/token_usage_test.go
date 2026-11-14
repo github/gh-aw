@@ -112,7 +112,7 @@ func TestParseTokenUsageFile(t *testing.T) {
 		assert.Empty(t, summary.Warnings)
 	})
 
-	t.Run("retains legacy repricing when AWF-reported fields are absent", func(t *testing.T) {
+	t.Run("does not reprice when AWF-reported fields are absent", func(t *testing.T) {
 		fixture, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "js", "fixtures", "awf-v0.28.7-aic-token-usage.jsonl"))
 		require.NoError(t, err)
 		legacyLines := make([]string, 0, 5)
@@ -131,10 +131,12 @@ func TestParseTokenUsageFile(t *testing.T) {
 		summary, err := parseTokenUsageFile(filePath)
 		require.NoError(t, err)
 		require.NotNil(t, summary)
-		assert.InDelta(t, 0.44538, summary.TotalAIC, 1e-9)
+		assert.Zero(t, summary.TotalAIC)
+		assert.False(t, summary.AICFound)
+		assert.NotEmpty(t, summary.Warnings)
 	})
 
-	t.Run("falls back and warns for malformed AWF-reported credits", func(t *testing.T) {
+	t.Run("warns without repricing malformed AWF-reported credits", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "token-usage-malformed-aic")
 		filePath := filepath.Join(tmpDir, "token-usage.jsonl")
 		content := `{"provider":"copilot","model":"gpt-4o-mini-2024-07-18","input_tokens":19288,"output_tokens":35,"cache_read_tokens":0,"cache_write_tokens":0,"ai_credits_this_response":"0.29142","ai_credits_total":-1}`
@@ -144,9 +146,10 @@ func TestParseTokenUsageFile(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, summary)
 
-		assert.InDelta(t, 0.29142, summary.TotalAIC, 1e-9)
+		assert.Zero(t, summary.TotalAIC)
+		assert.False(t, summary.AICFound)
 		require.Len(t, summary.Warnings, 1)
-		assert.Contains(t, summary.Warnings[0], "fallback accounting")
+		assert.Contains(t, summary.Warnings[0], "unpriced usage")
 	})
 
 	t.Run("distinguishes zero AWF-reported credits from absent fields", func(t *testing.T) {
@@ -174,9 +177,10 @@ func TestParseTokenUsageFile(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, summary)
 
-		assert.InDelta(t, 0.29142, summary.TotalAIC, 1e-9)
+		assert.Zero(t, summary.TotalAIC)
+		assert.False(t, summary.AICFound)
 		require.Len(t, summary.Warnings, 1)
-		assert.Contains(t, summary.Warnings[0], "fallback accounting")
+		assert.Contains(t, summary.Warnings[0], "unpriced usage")
 	})
 
 	t.Run("treats null cache semantics as absent", func(t *testing.T) {
@@ -189,11 +193,13 @@ func TestParseTokenUsageFile(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, summary)
 
-		assert.InDelta(t, 0.0195, summary.TotalAIC, 1e-9)
-		assert.Empty(t, summary.Warnings)
+		assert.Zero(t, summary.TotalAIC)
+		assert.False(t, summary.AICFound)
+		require.Len(t, summary.Warnings, 1)
+		assert.Contains(t, summary.Warnings[0], "unpriced usage")
 	})
 
-	t.Run("uses legacy provider semantics and warns for invalid cache semantics", func(t *testing.T) {
+	t.Run("does not infer costs from invalid cache semantics", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "token-usage-invalid-cache-semantics")
 		filePath := filepath.Join(tmpDir, "token-usage.jsonl")
 		content := `{"provider":"copilot","model":"gpt-4o-mini-2024-07-18","input_tokens":1000,"output_tokens":100,"cache_read_tokens":400,"cache_write_tokens":100,"input_tokens_include_cache":"invalid"}`
@@ -203,9 +209,9 @@ func TestParseTokenUsageFile(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, summary)
 
-		assert.InDelta(t, 0.0195, summary.TotalAIC, 1e-9)
+		assert.Zero(t, summary.TotalAIC)
 		require.Len(t, summary.Warnings, 1)
-		assert.Contains(t, summary.Warnings[0], "invalid input_tokens_include_cache")
+		assert.Contains(t, summary.Warnings[0], "unpriced usage")
 	})
 
 	t.Run("does not warn for invalid cache semantics when reported credits are valid", func(t *testing.T) {
@@ -225,10 +231,9 @@ func TestParseTokenUsageFile(t *testing.T) {
 	for _, testCase := range []struct {
 		name               string
 		inputIncludesCache bool
-		expectedAIC        float64
 	}{
-		{name: "inclusive cache fields", inputIncludesCache: true, expectedAIC: 0.018},
-		{name: "additive cache fields", inputIncludesCache: false, expectedAIC: 0.0255},
+		{name: "inclusive cache fields", inputIncludesCache: true},
+		{name: "additive cache fields", inputIncludesCache: false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "token-usage-explicit-cache-semantics")
@@ -243,8 +248,10 @@ func TestParseTokenUsageFile(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, summary)
 
-			assert.InDelta(t, testCase.expectedAIC, summary.TotalAIC, 1e-9)
-			assert.Empty(t, summary.Warnings)
+			assert.Zero(t, summary.TotalAIC)
+			assert.False(t, summary.AICFound)
+			require.Len(t, summary.Warnings, 1)
+			assert.Contains(t, summary.Warnings[0], "unpriced usage")
 		})
 	}
 
@@ -695,7 +702,7 @@ func TestAnalyzeTokenUsageAICOnly(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, summary)
 		require.Len(t, summary.Warnings, 1)
-		assert.Contains(t, summary.Warnings[0], "fallback accounting")
+		assert.Contains(t, summary.Warnings[0], "unpriced usage")
 	})
 
 	t.Run("preserves zero AWF-reported totals instead of falling back to agent usage", func(t *testing.T) {
@@ -814,14 +821,14 @@ func TestAnalyzeTokenUsageAICOnlyIncompleteRecords(t *testing.T) {
 			files:    map[string]string{"usage/token_usage.jsonl": pricedAWF + "\n" + unpricedAWF},
 			aic:      1.25,
 			found:    true,
-			warnings: []string{"token_usage.jsonl line 2: unpriced usage", "fallback accounting"},
+			warnings: []string{"token_usage.jsonl line 2: unpriced usage", "only reported costs"},
 		},
 		{
 			name:     "schema-detected AWF stream",
 			files:    map[string]string{"usage/agent_usage.jsonl": pricedAWF + "\n" + unpricedAWF},
 			aic:      1.25,
 			found:    true,
-			warnings: []string{"agent_usage.jsonl line 2: unpriced usage", "fallback accounting"},
+			warnings: []string{"agent_usage.jsonl line 2: unpriced usage", "only reported costs"},
 		},
 		{
 			name: "agent cost with malformed detection",
@@ -1090,7 +1097,8 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.NotNil(t, summary, "should return summary")
 		assert.Equal(t, 1, summary.TotalRequests, "should have 1 request")
 		assert.Equal(t, 100, summary.TotalInputTokens, "should have correct input tokens")
-		assert.InDelta(t, 1.575, summary.TotalAIC, 1e-9, "should compute AI Credits from model pricing")
+		assert.Zero(t, summary.TotalAIC, "must not infer prices from raw tokens")
+		assert.False(t, summary.AICFound)
 	})
 
 	t.Run("counts steering events from api-proxy events log", func(t *testing.T) {
@@ -1190,7 +1198,8 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.NotNil(t, summary, "should return summary from agent_usage.json")
 		assert.Equal(t, 5944, summary.TotalInputTokens, "input tokens should match agent usage")
 		assert.Equal(t, 8698, summary.TotalOutputTokens, "output tokens should match agent usage")
-		assert.Greater(t, summary.TotalAIC, 0.0, "AI Credits should be recomputed from raw usage")
+		assert.Zero(t, summary.TotalAIC, "raw usage cannot supply unreported costs")
+		assert.False(t, summary.AICFound)
 		assert.Equal(t, 1, summary.TotalRequests, "agent usage fallback should synthesize one request")
 	})
 
@@ -1245,7 +1254,8 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.Empty(t, summary.SubagentModelRequests)
 		require.Empty(t, summary.SubagentModelActuals)
 		assert.Zero(t, summary.MismatchCount)
-		require.Empty(t, summary.Warnings)
+		require.Len(t, summary.Warnings, 1)
+		assert.Contains(t, summary.Warnings[0], "unpriced usage")
 	})
 
 	t.Run("records token-usage-missing reason when sub-agent model request is present but no model actuals exist", func(t *testing.T) {
@@ -1303,7 +1313,8 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.NotNil(t, summary)
 		require.Empty(t, summary.SubagentModelRequests)
 		assert.Zero(t, summary.MismatchCount)
-		require.Empty(t, summary.Warnings)
+		require.Len(t, summary.Warnings, 1)
+		assert.Contains(t, summary.Warnings[0], "unpriced usage")
 	})
 }
 

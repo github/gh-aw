@@ -82,7 +82,7 @@ func TestWarnCopilotIntegrationModelAvailability(t *testing.T) {
 			if tt.wantWarning {
 				assert.Equal(t, 1, compiler.GetWarningCount())
 				assert.Contains(t, string(output), "agentic-workflows integration")
-				assert.Contains(t, string(output), "does not guarantee integration access")
+				assert.Contains(t, string(output), "available to the agentic-workflows integration")
 			} else {
 				assert.Zero(t, compiler.GetWarningCount())
 				assert.Empty(t, output)
