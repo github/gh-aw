@@ -37,11 +37,11 @@ func run(pass *analysis.Pass) (any, error) {
 
 	nodeFilter := []ast.Node{(*ast.BlockStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
-		analyzeBlock(pass, n, generatedFiles, noLintIndex)
+		reportZeroLengthMakeBeforeRange(pass, n, generatedFiles, noLintIndex)
 	})
 }
 
-func analyzeBlock(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
+func reportZeroLengthMakeBeforeRange(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
 	block, ok := n.(*ast.BlockStmt)
 	if !ok {
 		return
@@ -56,12 +56,12 @@ func analyzeBlock(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.Gene
 			j := i + 1 + offset
 			if rangeStmt, ok := unlabeledStmt(stmt).(*ast.RangeStmt); ok {
 				if hasKnownRangeSize(pass, rangeStmt.X) && !containsReference(pass, rangeStmt.X, target) &&
-					appendsOneElement(pass, rangeStmt, target) && rangeAvailableBefore(pass, rangeStmt.X, block.List[i+1:j]) {
+					appendsOneElement(pass, rangeStmt, target) && rangeExprUntouchedBy(pass, rangeStmt.X, block.List[i+1:j]) {
 					reportDiagnostic(pass, call, sliceType, rangeStmt.X, generatedFiles, noLintIndex)
 					break
 				}
 			}
-			if containsReference(pass, stmt, target) || containsEarlyExit(stmt) {
+			if containsReference(pass, stmt, target) || containsReturnOrBranch(stmt) {
 				break
 			}
 		}
@@ -82,7 +82,7 @@ func unlabeledStmt(stmt ast.Stmt) ast.Stmt {
 
 // Moving the range expression before an early exit may evaluate it on a path
 // that previously never reached the loop.
-func containsEarlyExit(stmt ast.Stmt) bool {
+func containsReturnOrBranch(stmt ast.Stmt) bool {
 	found := false
 	ast.Inspect(stmt, func(node ast.Node) bool {
 		switch node.(type) {
@@ -98,7 +98,7 @@ func containsEarlyExit(stmt ast.Stmt) bool {
 
 // Moving len(rangeExpr) to the allocation must not cross a definition or use of
 // its inputs. Conservatively stop even on reads, which may escape mutable inputs.
-func rangeAvailableBefore(pass *analysis.Pass, rangeExpr ast.Expr, intervening []ast.Stmt) bool {
+func rangeExprUntouchedBy(pass *analysis.Pass, rangeExpr ast.Expr, intervening []ast.Stmt) bool {
 	available := true
 	ast.Inspect(rangeExpr, func(n ast.Node) bool {
 		ident, ok := n.(*ast.Ident)

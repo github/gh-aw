@@ -1592,10 +1592,10 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 
 	// --- Script assertions: verify collection logic inside collect_usage_artifact_files.sh ---
 
-	if !strings.Contains(script, "cp /tmp/gh-aw/aw_info.json /tmp/gh-aw/usage/aw_info.json") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/aw_info.json /tmp/gh-aw/usage/aw_info.json") {
 		t.Errorf("Expected collect script to include aw_info.json copy command.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/agent_usage.json /tmp/gh-aw/usage/agent_usage.json") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/agent_usage.json /tmp/gh-aw/usage/agent_usage.json") {
 		t.Errorf("Expected collect script to copy agent_usage.json.\nScript:\n%s", script)
 	}
 	if !strings.Contains(script, "if [ -f /tmp/gh-aw/threat-detection/detection_usage.jsonl ]; then") ||
@@ -1608,10 +1608,10 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(script, "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl") {
 		t.Errorf("Expected collect script to include firewall audit token usage path for agent.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl") {
 		t.Errorf("Expected collect script to copy agent model-routing logs into the compact usage artifact.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl") {
 		t.Errorf("Expected collect script to copy agent model-routing logs into the compact usage artifact.\nScript:\n%s", script)
 	}
 	// Verify the authoritative source is copied even when empty so its presence is
@@ -1640,13 +1640,13 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(script, ": > /tmp/gh-aw/usage/detection/token_usage.jsonl") {
 		t.Errorf("Expected collect script to ensure detection token usage file exists.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json") {
 		t.Errorf("Expected collect script to copy agent execution evidence into usage artifact staging.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json") {
 		t.Errorf("Expected collect script to copy detection execution evidence into usage artifact staging.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
 		t.Errorf("Expected collect script to copy evals execution evidence into usage artifact staging.\nScript:\n%s", script)
 	}
 	if !strings.Contains(generator, "calculateWorkingSetFromJSONL") || !strings.Contains(generator, "summary.working_set = workingSet") {
@@ -1700,7 +1700,7 @@ func TestConclusionJobIncludesEvalsInUsageArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read collect_usage_artifact_files.sh: %v", err)
 	}
-	if !strings.Contains(string(scriptBytes), "cp /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl") {
+	if !strings.Contains(string(scriptBytes), "safe_copy /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl") {
 		t.Errorf("Expected collect script to copy evals results.\nScript:\n%s", string(scriptBytes))
 	}
 
@@ -1763,10 +1763,10 @@ func TestConclusionJobIncludesExperimentsInUsageArtifact(t *testing.T) {
 		t.Fatalf("Failed to read collect_usage_artifact_files.sh: %v", err)
 	}
 	script := string(scriptBytes)
-	if !strings.Contains(script, `cp "/tmp/gh-aw/experiments/$file" "/tmp/gh-aw/usage/experiment/$file"`) {
+	if !strings.Contains(script, `safe_copy "/tmp/gh-aw/experiments/$file" "/tmp/gh-aw/usage/experiment/$file"`) {
 		t.Errorf("Expected collect script to stage experiment files into the usage artifact.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
 		t.Errorf("Expected collect script to stage nested evals execution evidence.\nScript:\n%s", script)
 	}
 }

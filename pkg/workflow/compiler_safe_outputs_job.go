@@ -585,7 +585,7 @@ func (c *Compiler) appendLedgerTransactionsArtifactUpload(data *WorkflowData, st
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", ledgerTransactionsArtifactName),
-		"          path: ${{ runner.temp }}/gh-aw/ledger-transactions.json\n",
+		fmt.Sprintf("          path: %s\n", ledgerTransactionsArtifactPath),
 		"          if-no-files-found: error\n",
 		"          retention-days: 1\n",
 	)

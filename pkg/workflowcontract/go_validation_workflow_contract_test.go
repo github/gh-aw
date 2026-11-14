@@ -56,6 +56,16 @@ func TestGoTestParallelizerPreservesValidationAndCompletedCursor(t *testing.T) {
 		"including successful validation and completed no-candidate analysis",
 		"Do not create a pull request or use `noop` to imply validation succeeded",
 		"use `report_incomplete` when analysis or required validation is blocked or fails",
+		"Partition the rotated list into non-overlapping batches of at most 25 files",
+		"(github.run_number - 1) % number_of_batches",
+		"${{ github.run_number }}",
+		"zero consecutive retries after a block",
+		"if there is only one batch, report that rotation cannot select a different batch",
+		"The blocked batch, the exact required command and its concrete error",
+		"say it was not run and name the policy limitation instead of inventing an error",
+		"environment/policy blocked, test failure, or agent failure",
+		"Confirm candidate edits were restored by inspecting the diff",
+		"Confirm the completed-analysis cursor remains unchanged and identify the next attempted batch",
 		"draft: true",
 		"strict: true",
 	} {
@@ -86,7 +96,9 @@ func TestGoTestParallelizerDisablesCursorPersistence(t *testing.T) {
 		t.Fatal("workflow must have YAML frontmatter")
 	}
 	var config struct {
-		Tools struct {
+		MaxAICredits int `yaml:"max-ai-credits"`
+		MaxTurns     int `yaml:"max-turns"`
+		Tools        struct {
 			CacheMemory struct {
 				RestoreOnly bool `yaml:"restore-only"`
 			} `yaml:"cache-memory"`
@@ -97,5 +109,8 @@ func TestGoTestParallelizerDisablesCursorPersistence(t *testing.T) {
 	}
 	if !config.Tools.CacheMemory.RestoreOnly {
 		t.Fatal("cursor must remain restore-only until trusted validation can authorize persistence")
+	}
+	if config.MaxAICredits != 15 || config.MaxTurns != 40 {
+		t.Fatal("parallelizer must retain its per-run credit and turn limits")
 	}
 }

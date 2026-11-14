@@ -205,6 +205,7 @@
   .fm-out.on { opacity: 1; animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
   .fm-out.on rect { stroke: var(--c); filter: drop-shadow(0 0 14px var(--c)); }
   .mra-svg { left: 60px; top: 290px; width: 1800px; height: 566px; }
+  .mra .mra-svg { top: 272px; }
   .mra-svg .fm-pill text { font-size: 26px; }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
@@ -308,6 +309,32 @@
   .fv-rs { fill: #9198a1; font: 500 18px var(--mono); }
   .fv-tr { fill: #c9d1d9; font: 500 19px var(--mono); }
   .fv-chip { opacity: .35; transition: opacity .3s; } .fv-chip.on { opacity: 1; }
+  .cpr-svg { position: absolute; left: 60px; top: 300px; width: 1800px; height: 680px; overflow: visible; font-family: "Mona Sans"; }
+  .cpr-e { fill: none; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, opacity .3s; }
+  .cpr-e.on { stroke: var(--c); stroke-width: 3.5; filter: drop-shadow(0 0 6px var(--c)); }
+  .cpr-el { fill: #6e7681; font: 500 14px var(--mono); }
+  .cpr-n { opacity: .5; transition: opacity .3s; }
+  .cpr-n.on { opacity: 1; }
+  .cpr-n rect, .cpr-n polygon { fill: #0d1117e6; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, filter .3s, fill .3s; }
+  .cpr-n.d polygon { stroke-dasharray: 0; }
+  .cpr-n.on rect, .cpr-n.on polygon { stroke: var(--c); fill: #161b22; filter: drop-shadow(0 0 12px var(--c)); }
+  .cpr-n.t.g { --c: #3fb950; } .cpr-n.t.r { --c: #f85149; } .cpr-n.t.o { --c: #d29922; }
+  .cpr-n.t rect { stroke-dasharray: 6 5; }
+  .cpr-n.t.on rect { stroke-dasharray: 0; }
+  .cpr-n.hit { animation: cpr-hit .5s cubic-bezier(.3,1.6,.4,1); transform-box: fill-box; transform-origin: center; }
+  @keyframes cpr-hit { from { transform: scale(.85); } }
+  .cpr-a { fill: #f0f6fc; font: 600 19px "Mona Sans"; text-anchor: middle; }
+  .cpr-b { fill: #9198a1; font: 500 13px var(--mono); text-anchor: middle; }
+  .cpr-n.t.on .cpr-a { fill: var(--c); }
+  .cpr-k { fill: #6e7681; font: 500 13px var(--mono); text-anchor: middle; }
+  .cpr-dot { fill: #f0f6fc; filter: drop-shadow(0 0 8px #f0f6fc); transition: opacity .2s; }
+  .cpr-cap { position: absolute; left: 1150px; top: 120px; width: 700px; font-family: "Mona Sans"; }
+  .cpr-cap i { display: block; font: 600 20px/1 var(--mono); font-style: normal; letter-spacing: .14em; color: #9198a1; }
+  .cpr-cap b { display: block; margin-top: 12px; font: 700 40px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; }
+  .cpr-cap span { display: block; margin-top: 10px; font: 600 26px/1.2 var(--mono); color: #9198a1; opacity: 0; transition: opacity .3s; }
+  .cpr-cap span.on { opacity: 1; }
+  .cpr-cap span.g { color: #3fb950; } .cpr-cap span.r { color: #ff7b72; } .cpr-cap span.o { color: #e3b341; }
+  .cpr-cap.swap b { animation: rise .6s cubic-bezier(.2,.9,.2,1) both; }
   .fv-chip rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: all .3s; }
   .fv-chip.on rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #3fb950); }
   .fv-chip text { fill: #f0f6fc; font: 600 20px "Mona Sans"; text-anchor: middle; }
@@ -348,7 +375,7 @@
   .mra-row.new { animation: mra-in .6s cubic-bezier(.2,.9,.2,1); }
   @keyframes mra-in { from { opacity: 0; } }
   .mra-who { fill: #79c0ff; font: 600 19px var(--mono); }
-  .mra-row.ag .mra-who { fill: #c297ff; }
+  .mra-row.m .mra-who, .mra-row.i .mra-who { fill: #c297ff; } .mra-row.c .mra-who { fill: #3fb950; }
   .mra-msg { fill: #e6edf3; font: 500 24px "Mona Sans"; }
   .mra-msg .pat { fill: #d29922; font-weight: 700; }
   .mra-beam { fill: none; stroke-width: 3; stroke-dasharray: 8 8; filter: drop-shadow(0 0 6px currentColor); animation: mra-beam 1.4s linear both; }
@@ -364,6 +391,29 @@
   .fm-wire.hot { opacity: 1; stroke-width: 3; }
   .fm-wire.hot + .mra-l { opacity: 1; }
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
+  .exr-svg { left: 60px; top: 290px; width: 1800px; height: 600px; }
+  .exr-svg .fm-pill text { font-size: 26px; }
+  .exr-card { fill: #0d111799; stroke: #3d444d; stroke-width: 2; }
+  .exr-card-t { fill: #9198a1; font: 600 20px var(--mono); }
+  .exr-cell { fill: #ffffff08; stroke: #3d444d; stroke-width: 2; transform-box: fill-box; transform-origin: center; transition: fill .4s, stroke .4s; }
+  .exr-cell.miss { fill: #ffffff1c; stroke: #6e7681; }
+  .exr-cell.hit { fill: #d2992240; stroke: #d29922; filter: drop-shadow(0 0 8px #d2992299); animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
+  .exr-cell.r { stroke: #ab7df8; stroke-width: 4; filter: drop-shadow(0 0 12px #ab7df8); }
+  .exr-cell.e { stroke: #3fb950; stroke-width: 4; filter: drop-shadow(0 0 12px #3fb950); }
+  .exr-rl { fill: #9198a1; font: 500 19px var(--mono); text-anchor: end; transition: fill .3s; }
+  .exr-rl.on { fill: #f0f6fc; }
+  .exr-leg { font: 600 19px var(--mono); }
+  .exr-day { fill: #f0f6fc; font: 700 30px var(--mono); text-anchor: end; }
+  .exr-log text { fill: #9198a1; font: 500 18px var(--mono); }
+  .exr-log .m-r { fill: #c297ff; } .exr-log .m-e { fill: #3fb950; } .exr-log .s { fill: #e6edf3; } .exr-log .hit { fill: #d29922; font-weight: 700; }
+  .exr-lint text { fill: #9198a1; font: 600 19px var(--mono); transition: fill .6s; }
+  .exr-lint.hot text { fill: #d29922; }
+  .exr-n { fill: #d29922; font: 700 26px var(--mono); text-anchor: end; }
+  .exr-bar { fill: #ffffff14; } .exr-fill { fill: url(#exrGrad); }
+  .exr-cov { fill: #9198a1; font: 500 19px var(--mono); }
+  .exr-done { fill: #3fb950; font: 700 19px var(--mono); text-anchor: end; opacity: 0; transition: opacity .5s; } .exr-done.on { opacity: 1; }
+  #nSergo.blink circle { animation: mra-blink .7s ease-out; }
+  .exr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #3fb950, #d29922, #ab7df8); }
   .sdd-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .sdd-svg .mra-l.g { fill: #3fb950; }
   .sdd-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .sdd-panel.on .sdd-card { stroke: #ab7df8; filter: drop-shadow(0 0 14px #8957e566); }
@@ -388,6 +438,46 @@
   .sdd-chips b { font: 600 17px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; margin-right: 6px; }
   .sdd-chips span { padding: 7px 13px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 16px/1 var(--mono); color: #c9d1d9; }
   .active .sdd-chips { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .dh-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dh-svg .mra-l.g { fill: #3fb950; }
+  .dh-svg .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
+  .dh-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
+  .dh-svg .sdd-panel.bad .sdd-card { stroke: #f85149; filter: drop-shadow(0 0 16px #da363399); }
+  .dh-svg .sdd-ln.gone { fill: #f85149; opacity: .4; text-decoration: line-through; }
+  .dh-svg .sdd-ln.fail { fill: #ff7b72; font-weight: 700; }
+  .dh-x { fill: #f85149; font: 700 24px var(--mono); text-anchor: end; opacity: 0; transition: opacity .25s; filter: drop-shadow(0 0 6px #f85149); }
+  .dh-x.on { opacity: 1; }
+  .dg-svg { left: 110px; top: 280px; width: 1700px; height: 586px; }
+  .dg-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dg-svg .mra-l.g { fill: #3fb950; }
+  .dg-band { fill: #ffffff06; }
+  .dg-mic { opacity: .5; transition: opacity .3s; }
+  .dg-mic.on { opacity: 1; }
+  .dg-ring { fill: none; stroke: #4493f8; stroke-width: 3; opacity: 0; transform-box: fill-box; transform-origin: center; }
+  .dg-mic.on .dg-ring { animation: dg-ring 1.2s ease-out infinite; }
+  @keyframes dg-ring { from { opacity: .8; transform: scale(1); } to { opacity: 0; transform: scale(1.7); } }
+  .dg-hd { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .1em; }
+  .dg-raw { fill: #f0883e; font: 600 26px var(--mono); }
+  .dg-miss { fill: #f85149; font: 500 17px var(--mono); }
+  .dg-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: all .3s; }
+  .dg-dict.on .dg-card { stroke: var(--c); filter: drop-shadow(0 0 14px var(--c)); }
+  .dg-row text, .dg-new text { fill: #6e7681; font: 500 20px var(--mono); transition: fill .3s; }
+  .dg-row .dg-id { fill: #9198a1; }
+  .dg-row rect { fill: transparent; stroke: transparent; stroke-width: 2; transition: all .3s; }
+  .dg-row.pick rect { fill: #4493f814; stroke: #4493f8; filter: drop-shadow(0 0 10px #4493f866); }
+  .dg-row.pick text { fill: #f0f6fc; } .dg-row.pick .dg-id { fill: #3fb950; }
+  .dg-new { opacity: 0; transition: opacity .5s; }
+  .dg-new.on { opacity: 1; }
+  .dg-new rect { fill: #3fb95014; stroke: #3fb950; stroke-width: 2; stroke-dasharray: 6 5; }
+  .dg-new text { fill: #f0f6fc; } .dg-new .dg-id { fill: #3fb950; }
+  .dg-ident { opacity: 0; fill: #3fb950; font: 600 22px var(--mono); transition: opacity .4s; }
+  .dg-ident.on { opacity: 1; } .dg-ident .dg-k { fill: #9198a1; }
+  .dg-term .dg-tb { fill: #010409; }
+  .dg-term .dg-tl { opacity: 0; transition: opacity .3s .25s; }
+  .dg-term.on .dg-tl { opacity: 1; }
+  .dg-cmd { fill: #f0f6fc; font: 500 22px var(--mono); }
+  .dg-hit { fill: #3fb950; font: 600 22px var(--mono); }
+  .dg-chip text { fill: #f0f6fc; font: 600 20px var(--mono); text-anchor: middle; }
+  .dg-chip .dg-old { fill: #f85149; text-decoration: line-through; } .dg-chip .dg-nn { fill: #3fb950; }
+  .dg-cap { fill: #9198a1; font: 500 16px var(--mono); letter-spacing: .06em; text-anchor: middle; }
   .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
   .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
@@ -1438,6 +1528,23 @@
   .land-med em { font: 700 19px var(--mono); font-style: normal; color: var(--c); }
   .land-med span:nth-child(5) em { color: #c3a6f9; }
   .land-legend.hist-legend { left: 110px; top: 1000px; width: auto; }
+  .evo-main, .evo-side { position: absolute; top: 280px; opacity: 0; }
+  .evo-main { left: 110px; width: 1060px; }
+  .evo-side { left: 1250px; width: 560px; }
+  .active .evo-main, .active .evo-side { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .evo-svg { display: block; width: 100%; height: 440px; overflow: visible; font-family: "Mona Sans"; }
+  .evo-main .hist-legend { position: static; width: auto; margin-top: 4px; opacity: 1; animation: none; }
+  .evo-wf { fill: none; stroke: #3fb950; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #3fb95088); }
+  .evo-wf-dot { fill: #3fb950; filter: drop-shadow(0 0 12px #3fb950); }
+  .evo-ax-r { fill: #3fb950; }
+  .evo-med { fill: #f0f6fc; font: 700 17px var(--mono); }
+  .evo-side .evo-svg { margin-top: 34px; }
+  .evo-sx { font-size: 14px; }
+  .evo-facts { position: absolute; left: 110px; top: 880px; width: 1700px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 26px; }
+  .evo-fact { border-left: 4px solid var(--c); padding: 4px 0 4px 18px; opacity: 0; }
+  .active .evo-fact { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 1.4s); }
+  .evo-fact b { display: block; font: 700 40px/1 var(--mono); color: var(--c); white-space: nowrap; }
+  .evo-fact span { display: block; margin-top: 8px; font-size: 19px; line-height: 1.25; color: #c9d1d9; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -2912,6 +3019,190 @@
           });
       },
       el,
+    });
+  }
+
+  // Patch to PR: the create-pull-request state machine; the agent packages a bundle or patch, detection scans it, the safe outputs job checks file policy, names a branch, applies (retrying at the original base), pushes signed commits through GraphQL and opens the PR, falling back to issues when it cannot
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 680;
+    // [id, kind (b box, d decision, t terminal), x, y, w, line1, line2, tone]
+    const NODES = [
+      ["c0", "b", 80, 330, 130, "agent", "commits"],
+      ["d1", "d", 240, 330, 150, "changes?", "excluded-files"],
+      ["t1", "t", 240, 560, 190, "no changes", "if-no-changes", "o"],
+      ["bun", "b", 415, 210, 150, "git bundle", "default"],
+      ["am", "b", 415, 450, 150, "format-patch", "patch-format: am"],
+      ["det", "d", 595, 330, 150, "threat?", "detection job"],
+      ["t2", "t", 595, 560, 170, "✗ stop", "nothing written", "r"],
+      ["pol", "d", 790, 330, 150, "files ok?", "protected-files"],
+      ["t4", "t", 790, 130, 200, "fallback-to-issue", "→ review issue", "o"],
+      ["t5", "t", 790, 560, 200, "✗ blocked", "or max-patch-size", "r"],
+      ["br", "b", 960, 330, 140, "branch", "+ hex suffix"],
+      ["ap", "d", 1145, 330, 150, "applies?", "am --3way"],
+      ["rb", "b", 1145, 520, 150, "retry at", "original base"],
+      ["t6", "t", 960, 600, 150, "✗ failed", "to apply", "r"],
+      ["sg", "d", 1405, 330, 150, "signed?", "signed-commits"],
+      ["gq", "b", 1405, 190, 210, "GraphQL commit", "✓ Verified"],
+      ["t7", "t", 1405, 86, 240, "✗ merge · submodule", "no unsigned fallback", "r"],
+      ["gp", "b", 1405, 470, 190, "git push", "unsigned"],
+      ["pr", "d", 1600, 330, 90, "PR?", ""],
+      ["done", "t", 1725, 330, 140, "PR open", "draft · labels", "g"],
+      ["t8", "t", 1695, 500, 200, "issue instead", "fallback-as-issue", "o"],
+    ];
+    const N = Object.fromEntries(NODES.map(([id, k, x, y, w]) => [id, { k, x, y, w, h: id === "t7" ? 52 : k === "d" ? 72 : k === "t" ? 60 : 64 }]));
+    const R = id => [N[id].x + N[id].w / 2, N[id].y],
+      L = id => [N[id].x - N[id].w / 2, N[id].y],
+      T = id => [N[id].x, N[id].y - N[id].h / 2],
+      B = id => [N[id].x, N[id].y + N[id].h / 2];
+    // [from, to, points, label, lx, ly, anchor]
+    const EDGES = [
+      ["c0", "d1", [R("c0"), L("d1")]],
+      ["d1", "t1", [B("d1"), T("t1")], "none", 250, 450],
+      ["d1", "bun", [R("d1"), [327, 330], [327, 210], L("bun")]],
+      ["d1", "am", [R("d1"), [327, 330], [327, 450], L("am")]],
+      ["bun", "det", [R("bun"), [505, 210], [505, 330], L("det")]],
+      ["am", "det", [R("am"), [505, 450], [505, 330], L("det")]],
+      ["det", "t2", [B("det"), T("t2")], "flagged", 605, 460],
+      ["det", "pol", [R("det"), L("pol")], "clean", 692, 316, "middle"],
+      ["pol", "t4", [T("pol"), B("t4")], "fallback", 800, 235],
+      ["pol", "t5", [B("pol"), T("t5")], "blocked", 800, 460],
+      ["pol", "br", [R("pol"), L("br")]],
+      ["br", "ap", [R("br"), L("ap")]],
+      ["ap", "rb", [B("ap"), T("rb")], "conflict", 1155, 440],
+      ["rb", "t6", [L("rb"), [960, 520], T("t6")]],
+      ["rb", "sg", [R("rb"), [1305, 520], [1305, 330], L("sg")]],
+      ["ap", "sg", [R("ap"), L("sg")], "re-check", 1262, 316, "middle"],
+      ["sg", "gq", [T("sg"), B("gq")], "true", 1395, 265, "end"],
+      ["sg", "gp", [B("sg"), T("gp")], "false", 1395, 400, "end"],
+      ["gq", "t7", [T("gq"), B("t7")]],
+      ["gq", "gp", [[1495, 222], [1495, 438]], "GraphQL error", 1488, 428, "end"],
+      ["gq", "pr", [R("gq"), [1540, 190], [1540, 330], L("pr")]],
+      ["gp", "pr", [R("gp"), [1540, 470], [1540, 330], L("pr")]],
+      ["pr", "done", [R("pr"), L("done")]],
+      ["pr", "t8", [B("pr"), [1600, 470]], "denied", 1610, 420],
+    ];
+    const PRE = ["c0", "d1", "bun", "det", "pol", "br", "ap", "sg", "gq"];
+    // [title, path, result, tone]
+    const RUNS = [
+      ["Happy path, signed", [...PRE, "pr", "done"], "● PR open · ✓ Verified commits", "g"],
+      ["Agent edits a protected file", ["c0", "d1", "am", "det", "pol", "t4"], "→ review issue instead of a PR", "o"],
+      ["Base moved, patch conflicts", ["c0", "d1", "bun", "det", "pol", "br", "ap", "rb", "sg", "gq", "pr", "done"], "● PR on the original base", "g"],
+      ["Bundle carries a merge commit", [...PRE, "t7"], "✗ refuses an unsigned push", "r"],
+      ["GraphQL unavailable", [...PRE, "gp", "pr", "done"], "● PR open · plain git push", "g"],
+      ["Actions may not open PRs", [...PRE, "pr", "t8"], "→ fallback issue, compare link", "o"],
+    ];
+    const pts = p => p.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+    let g = `<defs><marker id="cprA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6e7681"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="50"/>`;
+    [
+      [0, 500, "AGENT · PACKAGE"],
+      [500, 690, "DETECT"],
+      [690, 1310, "SAFE OUTPUTS · APPLY"],
+      [1310, 1800, "PUSH · OPEN"],
+    ].forEach(([x0, x1, t]) => {
+      g += `<text class="fm-lane-t" x="${(x0 + x1) / 2}" y="33">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 20}"/>`;
+    });
+    EDGES.forEach(([a, b, p, lab, lx, ly, anc]) => {
+      g += `<path class="cpr-e" id="cprE_${a}_${b}" d="${pts(p)}" marker-end="url(#cprA)"/>`;
+      if (lab) g += `<text class="cpr-el" x="${lx}" y="${ly}" text-anchor="${anc || "start"}">${lab}</text>`;
+    });
+    NODES.forEach(([id, k, x, y, w, a, b, tone]) => {
+      const hh = N[id].h;
+      const shape =
+        k === "d"
+          ? `<polygon points="${x - w / 2},${y} ${x - w / 2 + 18},${y - hh / 2} ${x + w / 2 - 18},${y - hh / 2} ${x + w / 2},${y} ${x + w / 2 - 18},${y + hh / 2} ${x - w / 2 + 18},${y + hh / 2}"/>`
+          : `<rect x="${x - w / 2}" y="${y - hh / 2}" width="${w}" height="${hh}" rx="${k === "t" ? 30 : 12}"/>`;
+      g += `<g class="cpr-n ${k}${tone ? " " + tone : ""}" id="cprN_${id}">${shape}<text class="cpr-a" x="${x}" y="${b ? y - 2 : y + 7}">${a}</text>${b ? `<text class="cpr-b" x="${x}" y="${y + 19}">${b}</text>` : ""}</g>`;
+    });
+    g += `<text class="cpr-k" x="960" y="392">preserve-branch-name</text><text class="cpr-k" x="960" y="410">recreate-ref</text>`;
+    g += `<circle class="cpr-dot" r="9" cx="-50" cy="-50" style="opacity:0"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "cpr-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#79c0ff");
+    svg.innerHTML = g;
+    const nEl = Object.fromEntries(NODES.map(([id]) => [id, svg.querySelector("#cprN_" + id)])),
+      eEl = Object.fromEntries(EDGES.map(([a, b]) => [`${a}>${b}`, svg.querySelector(`#cprE_${a}_${b}`)])),
+      dot = svg.querySelector(".cpr-dot");
+    const runT = h("i", {}),
+      runB = h("b", {}),
+      runR = h("span", {});
+    const cap = h("div", { class: "cpr-cap" }, runT, runB, runR);
+    const INTRO = 500,
+      HOP = 360,
+      HOLD = 2600,
+      DUR = RUNS.map(([, p]) => INTRO + (p.length - 1) * HOP + HOLD),
+      CYC = DUR.reduce((a, b) => a + b, 0);
+    let t0 = 0,
+      cur = -1,
+      reached = -1,
+      lenCache = new Map();
+    const len = el => {
+      if (!lenCache.has(el)) lenCache.set(el, el.getTotalLength());
+      return lenCache.get(el);
+    };
+    const start = i => {
+      cur = i;
+      reached = -1;
+      svg.querySelectorAll(".on, .hit").forEach(x => x.classList.remove("on", "hit"));
+      const [title, , result, tone] = RUNS[i];
+      runT.textContent = `RUN ${i + 1} / ${RUNS.length}`;
+      runB.textContent = title;
+      runR.textContent = result;
+      runR.className = tone;
+      cap.classList.remove("swap");
+      void cap.offsetWidth;
+      cap.classList.add("swap");
+    };
+    slides.push({
+      group: "security",
+      sound: "patch",
+      palette: ["#1f6feb", "#8957e5", "#238636", "#9e6a03"],
+      notes:
+        "Patch to PR: an approximate, illustrative decision diagram of gh-aw's create-pull-request safe output, simplified from its handler code; the six runs are synthetic. The agent only commits locally. Its changes are packaged as a git bundle by default, which keeps commit history, or as a format-patch series with patch-format: am; excluded-files are stripped first, and no changes at all follows if-no-changes (warn, error or ignore). The package travels as an artifact and the detection job scans it. The safe outputs job then checks file policy: allowed-files is an allowlist, protected-files can block, request review, or fall back to a review issue, and max-patch-size caps the size. It names a branch from the agent's suggestion plus a random hex suffix, unless preserve-branch-name is set, with recreate-ref deciding whether an existing branch is replaced. It applies the bundle or runs git am --3way; on a conflict it retries at the original base commit, so the PR shows the conflict, then re-checks the files actually written. With signed-commits on, the default, every commit is replayed through the GraphQL createCommitOnBranch mutation so GitHub marks it Verified; if GraphQL fails it falls back to git push, but merge commits, submodules and symlinks refuse the unsigned fallback. Finally it opens the PR with draft, labels, reviewers and auto-merge; if Actions may not open pull requests, fallback-as-issue files an issue with a compare link instead.",
+      enter() {
+        t0 = 0;
+        cur = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        let u = (t - t0) % CYC,
+          i = 0;
+        while (u >= DUR[i]) u -= DUR[i++];
+        if (i !== cur) start(i);
+        const [, path, , tone] = RUNS[i];
+        if (u < INTRO) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const k = Math.floor((u - INTRO) / HOP),
+          f = ((u - INTRO) % HOP) / HOP;
+        const at = Math.min(k, path.length - 1);
+        while (reached < at) {
+          reached++;
+          const id = path[reached];
+          nEl[id].classList.add("on");
+          if (reached) eEl[`${path[reached - 1]}>${id}`].classList.add("on");
+          if (reached === path.length - 1) {
+            nEl[id].classList.add("hit");
+            runR.classList.add("on");
+            if (tone === "g") sfx.notify(false);
+            else if (tone === "r") sfx.bug();
+            else sfx.pop(6);
+          } else sfx.pop(reached);
+        }
+        if (k < path.length - 1) {
+          const e = eEl[`${path[k]}>${path[k + 1]}`],
+            p = e.getPointAtLength(len(e) * (f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2));
+          dot.style.opacity = 1;
+          dot.setAttribute("cx", p.x);
+          dot.setAttribute("cy", p.y);
+        } else dot.style.opacity = 0;
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "create-pull-request, decoded"), h("h2", {}, letters("Patch to "), letters("PR", "l-grad"))), cap, svg),
     });
   }
 
@@ -4886,7 +5177,7 @@
     });
   }
 
-  // Mine → Refine → Apply: harvesting developer interventions into linters
+  // Mine → Refine → Apply: Linter Miner turns recurring patterns into analyzers, review refines them, LintMonster applies them across the repo. Feed events and counts are mined from gh-aw's history
   {
     resetIndex();
     const RX = 460,
@@ -4897,22 +5188,22 @@
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#mraAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#mraClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
-      ["e0", "M200 168 V292", "p", ["mines patterns", "autonomously"], 222, 222, "start"],
-      ["e1", "M200 372 V500", "p", ["opens", "analyzer PR"], 222, 430, "start"],
-      ["e2", "M238 540 H606", "p", ["analyzer rules"], 420, 524, "middle"],
-      ["e3", "M640 506 V372", "b", ["reviews &", "merges"], 662, 436, "start"],
-      ["e4", "M678 338 H882", "p", ["challenge"], 780, 322, "middle"],
-      ["e5", "M920 300 V168", "p", ["autonomous", "hardening PR"], 942, 222, "start"],
-      ["e6", "M1060 140 H1258", "p", ["hardened rules → repo"], 1158, 120, "middle"],
-      ["e7", "M1300 168 V292", "p", ["groups findings,", "opens cleanup PRs"], 1322, 222, "start"],
-      ["e8", "M1300 372 V500", "p", ["assigns"], 1322, 442, "start"],
-      ["e9", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
-      ["e10", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+      ["e0", "M200 168 V292", "p", ["mines issues,", "discussions & code"], 222, 222, "start"],
+      ["e1", "M200 372 V500", "p", ["opens draft", "analyzer PR"], 222, 430, "start"],
+      ["e2", "M238 540 H606", "p", ["analyzer + tests"], 420, 524, "middle"],
+      ["e3", "M640 506 V372", "b", ["review", "threads"], 662, 436, "start"],
+      ["e4", "M640 304 V140 H762", "b", ["@copilot"], 662, 222, "start"],
+      ["e5", "M920 168 V300", "p", ["pushes", "fixes"], 942, 222, "start"],
+      ["e6", "M958 338 H1100 V140 H1258", "p", ["merged"], 1029, 318, "middle"],
+      ["e7", "M1300 168 V292", "p", ["scans daily, files", "finding issues"], 1322, 222, "start"],
+      ["e8", "M1300 372 V500", "b", ["assigned"], 1322, 442, "start"],
+      ["e9", "M1504 540 H1584", "b", ["cleanup PR", "merged"], 1544, 594, "middle"],
+      ["e10", "M1624 506 V140 H1540", "p", ["rescans", "daily"], 1606, 330, "end"],
     ];
     // the token's journey: [edge, node lit on arrival]
     const SEQ = [
@@ -4920,29 +5211,29 @@
       ["e1", "nPR1"],
       ["e2", "nDev1"],
       ["e3", "nIssue"],
-      ["e4", "nPR2"],
-      ["e5", "nRefiner"],
+      ["e4", "nRefiner"],
+      ["e5", "nPR2"],
       ["e6", "nMonster"],
       ["e7", "nPR3"],
       ["e8", "nDev2"],
-      ["e10", "nMonster"],
       ["e9", "nMerge"],
+      ["e10", "nMonster"],
     ];
     const LANE = { nComment: 0, nPR1: 0, nDev1: 1, nIssue: 1, nPR2: 1, nRefiner: 1, nMonster: 2, nPR3: 2, nDev2: 2, nMerge: 2 };
     let g = `<defs><clipPath id="mraClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mraAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="mraP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="mraB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    g += `<text class="fm-lane-t mra-lane on" x="${RX / 2}" y="40">HUMANS ↔ AGENTS</text><line class="fm-div" x1="${RX}" y1="0" x2="${RX}" y2="${VH}"/>
+    g += `<text class="fm-lane-t mra-lane on" x="${RX / 2}" y="40">MINED FROM GH-AW</text><line class="fm-div" x1="${RX}" y1="0" x2="${RX}" y2="${VH}"/>
       <clipPath id="mraFeedClip"><rect x="16" y="164" width="${RX - 32}" height="${VH - 172}"/></clipPath>
       <rect class="mra-repo" x="16" y="78" width="${RX - 32}" height="${VH - 82}" rx="16"/>
-      <text class="mra-repo-t" x="38" y="114">▣ example/repo · synthetic activity</text>
+      <text class="mra-repo-t" x="38" y="114">▣ gh-aw · May–Nov 2026</text>
       <g id="mraBeams"></g><g id="mraFeed" clip-path="url(#mraFeedClip)"></g>
       <text class="mra-seen" id="mraSeen" x="${MINX - 34}" y="92"></text>
       <g transform="translate(${RX},0)">`;
     [
       [0, 520, "MINE"],
-      [520, 1140, "CHALLENGE"],
+      [520, 1140, "REFINE"],
       [1140, 1700, "APPLY"],
     ].forEach(([x0, x1, t], i) => {
       g += `<text class="fm-lane-t mra-lane" id="lane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
@@ -4952,14 +5243,15 @@
       g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mra${c === "p" ? "P" : "B"})"/>`;
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
-    g += agent("nMiner", 120, 140, 230, "Linter Miner") + agent("nRefiner", 800, 140, 240, "Linter Refiner") + agent("nMonster", 1300, 140, 236, "LintMonster");
-    g += box("nComment", 200, 332, "comment") + box("nPR1", 200, 540, "pr") + box("nIssue", 640, 338, "issue") + box("nPR2", 920, 338, "pr") + box("nPR3", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
-    g += dev("nDev1", 640, 540) + dev("nDev2", 1300, 540);
+    g += agent("nMiner", 120, 140, 230, "Linter Miner") + agent("nRefiner", 800, 140, 200, "Copilot") + agent("nMonster", 1300, 140, 236, "LintMonster");
+    g += box("nComment", 200, 332, "discussion") + box("nPR1", 200, 540, "pr") + box("nIssue", 640, 338, "comment") + box("nPR2", 920, 338, "pr") + box("nPR3", 1300, 332, "issue") + box("nMerge", 1624, 540, "merge");
+    g += dev("nDev1", 640, 540) + agent("nDev2", 1300, 540, 200, "Copilot");
     g += `<circle class="fm-dot mra-dot" r="8"/></g>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg mra-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Linter Miner mines issues, discussions and code and opens a draft analyzer pull request; review threads and Copilot fixes refine it until it merges; LintMonster then scans daily, files finding issues, and Copilot cleanup pull requests apply the rule across the repository");
     svg.innerHTML = g;
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".mra-dot");
@@ -4971,21 +5263,25 @@
     let t0 = 0,
       cyc = -1,
       popK = -1;
-    // humans and agents interacting in the repo; the miner watches every exchange
+    // measured on gh-aw: [kind, date, text, analyzer ordinal]; m = analyzer merged from a Linter Miner PR, i = LintMonster finding issue, c = Copilot cleanup PR merged
     const FEED = [
-      ["reviewer", "review", "don't swallow this error", "error"],
-      [0, "fix", "wrapped with fmt.Errorf(%w)"],
-      ["maintainer", "review", "use errors.Is, not ==", "errors.Is"],
-      [0, "fix", "updated 3 call sites"],
-      ["reviewer", "issue", "flaky test in example_test.go"],
-      [0, "CI Doctor", "proposed a test fix"],
-      ["maintainer", "review", "again: errors.Is, not ==", "errors.Is"],
-      [0, "fix", "switched to errors.Is"],
-      ["reviewer", "review", "no context.TODO in handlers"],
-      [0, "fix", "threaded ctx through"],
-      ["maintainer", "review", "wrap this error with %w", "error"],
-      [0, "Repo Assist", "labelled 4 issues"],
+      ["m", "15 May", "osexitinlibrary", 1],
+      ["m", "17 May", "ctxbackground", 3],
+      ["m", "18 May", "errstringmatch", 4],
+      ["i", "24 May", "28 panics in library code"],
+      ["c", "24 May", "18 library panics removed"],
+      ["m", "8 Jun", "sortslice", 18],
+      ["c", "9 Jun", "sort.Slice → slices.SortFunc"],
+      ["m", "14 Jun", "errorfwrapv", 23],
+      ["m", "13 Jul", "ioutildeprecated", 37],
+      ["c", "21 Jul", "33 long functions → 0"],
+      ["m", "21 Sep", "unchecked-slice-index", 52],
+      ["i", "4 Oct", "3,561 unchecked errors"],
+      ["m", "13 Oct", "goroutineresourceleak", 59],
+      ["c", "25 Oct", "slice indexing guarded"],
+      ["m", "11 Nov", "ignoredlocalerror", 65],
     ];
+    const WHO = { m: "linter miner", i: "lintmonster", c: "copilot" };
     const feed = $("mraFeed"),
       beams = $("mraBeams"),
       seen = $("mraSeen"),
@@ -4993,18 +5289,21 @@
       FBOT = VH - 52;
     let rows = [],
       fi = 0,
-      lastAdd = 0,
-      hits = 0;
+      lastAdd = 0;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
     const addRow = instant => {
-      if (!instant) sfx.notify(!!FEED[fi % FEED.length][0]);
-      const [who, kind, msg, pat] = FEED[fi++ % FEED.length],
+      const [kind, date, msg, nth] = FEED[fi++ % FEED.length],
         el = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      const body = pat ? esc(msg).replace(esc(pat), `<tspan class="pat">${esc(pat)}</tspan>`) : esc(msg);
-      el.setAttribute("class", "mra-row" + (who ? "" : " ag") + (instant ? "" : " new"));
+      if (!instant) sfx.notify(kind !== "m");
+      const body = kind === "m" ? `+ <tspan class="pat">${esc(msg)}</tspan>` : esc(msg);
+      el.setAttribute("class", "mra-row " + kind + (instant ? "" : " new"));
       el.innerHTML =
-        (who ? `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#4493f8" stroke-width="2"/>${ico("person", 58, 0, 30)}` : `<circle cx="58" cy="0" r="26" fill="url(#mraAgent)"/>${ico("copilot", 58, 1, 30)}`) +
-        `<text class="mra-who" x="96" y="-8">${who || "copilot"} · ${kind}</text><text class="mra-msg" x="96" y="20">${body}</text>`;
+        (kind === "m"
+          ? `<circle cx="58" cy="0" r="26" fill="url(#mraAgent)"/>${ico("copilot", 58, 1, 30)}`
+          : kind === "i"
+            ? `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("issue", 58, 0, 28, "#c297ff")}`
+            : `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#3fb950" stroke-width="2"/>${ico("merge", 58, 0, 26, "#3fb950")}`) +
+        `<text class="mra-who" x="96" y="-8">${WHO[kind]} · ${date}</text><text class="mra-msg" x="96" y="20">${body}</text>`;
       feed.appendChild(el);
       rows.push(el);
       rows.forEach((r, k) => {
@@ -5013,7 +5312,7 @@
       if (rows.length > 8) rows.shift().remove();
       if (instant) return;
       const y = FBOT,
-        col = pat ? "#d29922" : who ? "#4493f8" : "#ab7df8";
+        col = kind === "m" ? "#d29922" : kind === "i" ? "#ab7df8" : "#3fb950";
       const b = document.createElementNS("http://www.w3.org/2000/svg", "path");
       b.setAttribute("class", "mra-beam");
       b.setAttribute("stroke", col);
@@ -5023,9 +5322,8 @@
       $("nMiner").classList.remove("blink");
       void $("nMiner").getBBox();
       $("nMiner").classList.add("blink");
-      if (pat) {
-        hits++;
-        seen.textContent = `pattern seen ×${hits}`;
+      if (nth) {
+        seen.textContent = `analyzer #${nth} of 65`;
         seen.classList.remove("pop");
         void seen.getBBox();
         seen.classList.add("pop");
@@ -5036,29 +5334,40 @@
       $("nMiner").classList.add("on");
       $("lane0").classList.add("on");
     };
+    // measured on gh-aw, 15 May to 11 November 2026
+    const STATS = [
+      [65, "analyzers merged from 73 Linter Miner PRs", "#d29922", "#ab7df8"],
+      [376, "reviews refining them before merge", "#79c0ff", "#ab7df8"],
+      [235, "LintMonster finding issues filed", "#ab7df8", "#d2a8ff"],
+      [92, "Copilot cleanup PRs merged · 54,128 lines", "#3fb950", "#79c0ff"],
+    ];
+    const nums = STATS.map(() => h("div", { class: "ct-num" }, "0"));
+    const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
       group: "loops",
       sound: "mine",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
-        "Mine, refine, apply: harvesting developer interventions into linters. All activity and review messages shown here are synthetic examples, not quotations or records of real people. Repeated corrections can become analyzer proposals, reviewed and refined by a developer, then applied across the repository through cleanup pull requests. Human corrections become deterministic checks.",
+        "Mine, refine, apply: harvesting recurring corrections into Go linters. The loop is illustrative of three of gh-aw's own workflows; the feed and numbers are mined from gh-aw's history, 15 May to 11 November 2026. Mine: every day Linter Miner reads recent issues, discussions and the Go code, picks one pattern no existing analyzer catches, and opens a draft pull request with a go/analysis analyzer and its tests under pkg/linters. It opened 73 such pull requests; 65 merged and 8 were closed. Refine: Copilot code review and a maintainer leave review threads, and Copilot pushes fixes; 58 of the 65 needed follow-up commits, 376 reviews in all, and the median analyzer merged about two hours after it was opened. Apply: once merged the analyzer runs in make golint-custom. Every day LintMonster runs it, groups the findings by root cause and keeps one tracking issue per category, 235 so far, some counting thousands of findings, such as 3,561 unchecked errors on 4 October. Maintainers assign them to Copilot, and 92 merged Copilot pull requests closed them, changing 54,128 lines. For example, the sortslice analyzer merged on 8 June and the next day a Copilot pull request moved every sort.Slice call to slices.SortFunc. Human corrections become deterministic checks.",
       enter() {
         t0 = 0;
         cyc = -1;
         lastAdd = 0;
-        hits = 0;
         seen.textContent = "";
         feed.innerHTML = "";
         beams.innerHTML = "";
         rows = [];
         fi = 0;
+        nums.forEach(n => (n.textContent = "0"));
         for (let i = 0; i < 5; i++) addRow(true);
       },
       tick(t) {
         if (!t0) t0 = t;
         const e = t - t0,
           c = Math.floor(e / CYC),
-          u = e % CYC;
+          u = e % CYC,
+          fn = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * fn).toLocaleString("en-US")));
         if (c !== cyc) {
           cyc = c;
           reset();
@@ -5098,7 +5407,254 @@
           $("lane" + LANE[nid]).classList.add("on");
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide mra" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "mined from gh-aw [linter-miner] PRs, [lint-monster] issues and the PRs that closed them · May–Nov 2026")
+      ),
+    });
+  }
+
+  // Explore → Reuse → Lint: Sergo's daily run reads its strategy cache, spends half its effort reusing what found patterns before and half on untried corners, until the model's pattern space is exhausted; every pattern found becomes a linter
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 600;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // illustrative pattern space: [strategy family, targets where a pattern worth a linter hides (x), the linters those patterns yield]
+    const ROWS = [
+      ["symbols", "...xx..x..", ["largefunc", "excessivefuncparams", "seenmapbool"]],
+      ["types", "xx......x.", ["errortypeassertion", "sortslice", "slicemakezerolength"]],
+      ["call graph", "..xxx....x", ["ctxbackground", "nilctxpassed", "httpnoctx", "execcommandwithoutcontext"]],
+      ["diagnostics", "xx....xx..", ["closeerrorunchecked", "ignoredlocalerror", "bufioscannererunchecked", "fprintferrorunchecked"]],
+      ["refactor", ".....xxx..", ["deferinloop", "manualmutexunlock", "fileclosenotdeferred"]],
+      ["AST shapes", ".xx...xx..", ["regexpcompileinfunction", "lenstringzero", "splitindexzero", "fmterrorfnoverbs"]],
+    ];
+    const NR = ROWS.length,
+      NC = 10,
+      ALL = NR * NC;
+    // plan every day up front (seeded, so each loop is the same): [mode, row, col, hit, linter, score]
+    const DAYS = (() => {
+      let seed = 302;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const seen = ROWS.map(() => Array(NC).fill(false)),
+        hits = ROWS.map(() => []),
+        tries = Array(NR).fill(0),
+        out = [];
+      const free = r => [...Array(NC).keys()].filter(c => !seen[r][c]);
+      const take = (mode, r, c) => {
+        seen[r][c] = true;
+        tries[r]++;
+        const hit = ROWS[r][1][c] === "x",
+          lint = hit ? ROWS[r][2][hits[r].length] : "";
+        if (hit) hits[r].push(c);
+        return [mode, r, c, hit, lint, hit ? 7 + ((r + c) % 3) : 1 + ((r + c) % 3)];
+      };
+      for (;;) {
+        const day = [],
+          open = [...Array(NR).keys()].filter(r => free(r).length);
+        if (!open.length) break;
+        // reuse: a strategy that already found something, adapted to the untried target closest to one of its hits (best score breaks ties)
+        const near = (r, c) => Math.min(...hits[r].map(h => Math.abs(h - c))),
+          rate = r => hits[r].length / tries[r],
+          best = open
+            .filter(r => hits[r].length)
+            .flatMap(r => free(r).map(c => [r, c]))
+            .sort(([ra, ca], [rb, cb]) => near(ra, ca) - near(rb, cb) || rate(rb) - rate(ra) || ra - rb)[0];
+        if (best) day.push(take("reuse", ...best));
+        // explore: the least-tried strategy, at a random untried target
+        while (day.length < 2) {
+          const left = [...Array(NR).keys()].filter(r => free(r).length);
+          if (!left.length) break;
+          const r = left.sort((a, b) => tries[a] - tries[b] || rnd() - 0.5)[0],
+            f = free(r);
+          day.push(take("explore", r, f[Math.floor(rnd() * f.length)]));
+        }
+        out.push(day);
+      }
+      return out;
+    })();
+    const GX = 690,
+      GY = 168,
+      CW = 61,
+      CH = 60,
+      CS = 50,
+      LOGY = 160,
+      LOGH = 36,
+      MAXLOG = 12,
+      LINTY = 160,
+      LINTH = 36,
+      MAXLINT = 12;
+    const cell = (r, c) => [GX + c * CW + CS / 2, GY + r * CH + CS / 2];
+    let g = `<defs><radialGradient id="exrAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <linearGradient id="exrGrad"><stop offset="0" stop-color="#ab7df8"/><stop offset=".6" stop-color="#3fb950"/><stop offset="1" stop-color="#d29922"/></linearGradient></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 440, "CACHE"],
+      [440, 1360, "PATTERN SPACE"],
+      [1360, VW, "LINTERS"],
+    ].forEach(([x0, x1, t]) => {
+      g += `<text class="fm-lane-t mra-lane on" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    g += `<rect class="exr-card" x="16" y="78" width="408" height="${VH - 88}" rx="16"/><text class="exr-card-t" x="36" y="116">▣ sergo-strategies.jsonl</text><g class="exr-log" id="exrLog"></g>`;
+    g += `<rect class="exr-card" x="1376" y="78" width="408" height="${VH - 88}" rx="16"/><text class="exr-card-t" x="1396" y="116">▣ pkg/linters</text><text class="exr-n" id="exrN" x="1764" y="117">0</text><g class="exr-lint-l" id="exrLint"></g>`;
+    g += `<g id="exrBeams"></g>`;
+    g += `<g class="fm-task on" id="nSergo"><g class="fm-pill"><rect x="500" y="87" width="150" height="50" rx="25"/><text x="593" y="120">Sergo</text></g><circle cx="500" cy="112" r="34" fill="url(#exrAgent)"/>${ico("copilot", 500, 113, 38)}</g>`;
+    g += `<text class="exr-leg" x="700" y="120"><tspan fill="#c297ff">◆ reuse 50%</tspan><tspan dx="28" fill="#3fb950">◆ explore 50%</tspan><tspan dx="28" fill="#d29922">◆ pattern</tspan></text>`;
+    g += `<text class="exr-day" id="exrDay" x="${GX + NC * CW - 11}" y="122"></text>`;
+    ROWS.forEach(([lab], r) => {
+      g += `<text class="exr-rl" id="exrRl${r}" x="${GX - 16}" y="${GY + r * CH + CS / 2 + 7}">${lab}</text>`;
+      for (let c = 0; c < NC; c++) g += `<rect class="exr-cell" id="exrC${r}_${c}" x="${GX + c * CW}" y="${GY + r * CH}" width="${CS}" height="${CS}" rx="10"/>`;
+    });
+    const BW = NC * CW - 11;
+    g += `<rect class="exr-bar" x="${GX}" y="${GY + NR * CH + 14}" width="${BW}" height="10" rx="5"/><rect class="exr-fill" id="exrFill" x="${GX}" y="${GY + NR * CH + 14}" width="0" height="10" rx="5"/>`;
+    g += `<text class="exr-cov" id="exrCov" x="${GX}" y="${GY + NR * CH + 54}"></text><text class="exr-done" id="exrDone" x="${GX + BW}" y="${GY + NR * CH + 54}">exhaustive ✓ every target tried</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg exr-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Explore, reuse, lint: each day Sergo reads its strategy cache, reuses its best strategy on a nearby target and explores an untried one, logs the result, and turns every pattern it finds into a linter until the whole pattern space has been tried");
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      NS = "http://www.w3.org/2000/svg";
+    const mk = (cls, html) => {
+      const el = document.createElementNS(NS, "g");
+      el.setAttribute("class", cls);
+      el.innerHTML = html;
+      return el;
+    };
+    const beam = (d, col) => {
+      const b = document.createElementNS(NS, "path");
+      b.setAttribute("class", "mra-beam");
+      b.setAttribute("stroke", col);
+      b.setAttribute("d", d);
+      $("exrBeams").appendChild(b);
+      setTimeout(() => b.remove(), 1400);
+    };
+    let log = [],
+      lints = [],
+      tried = 0,
+      found = 0;
+    const flow = (rows, y0, step, newestFirst) =>
+      rows.forEach((r, k) => {
+        r.style.transform = `translateY(${y0 + (newestFirst ? rows.length - 1 - k : k) * step}px)`;
+      });
+    const coverage = () => {
+      $("exrFill").setAttribute("width", (BW * tried) / ALL);
+      $("exrCov").textContent = `tried ${tried}/${ALL} · patterns ${found}`;
+      $("exrN").textContent = found;
+    };
+    // three beats per day: read the cache, aim both halves, reveal and record
+    const beat = (d, s) => {
+      const day = DAYS[d];
+      if (s === 0) {
+        svg.querySelectorAll(".exr-rl.on").forEach(x => x.classList.remove("on"));
+        $("exrDay").textContent = "day " + String(d + 1).padStart(2, "0");
+        const y = log.length ? LOGY + (log.length - 1) * LOGH - 6 : 140;
+        beam(`M424 ${y} C460 ${y}, 440 112, 466 112`, "#ab7df8");
+        $("nSergo").classList.remove("blink");
+        void $("nSergo").getBBox();
+        $("nSergo").classList.add("blink");
+        return;
+      }
+      if (s === 1) {
+        day.forEach(([mode, r, c], i) => {
+          const [x, y] = cell(r, c);
+          $(`exrC${r}_${c}`).classList.add(mode === "reuse" ? "r" : "e");
+          $("exrRl" + r).classList.add("on");
+          beam(`M${520 + i * 20} 146 C${540 + i * 20} ${y - 40}, ${x - 80} ${y}, ${x - CS / 2 - 4} ${y}`, mode === "reuse" ? "#ab7df8" : "#3fb950");
+        });
+        sfx.pop(d);
+        return;
+      }
+      day.forEach(([mode, r, c, hit, lint, score]) => {
+        const el = $(`exrC${r}_${c}`);
+        el.classList.remove("r", "e");
+        el.classList.add(hit ? "hit" : "miss");
+        tried++;
+        const row = mk(
+          "mra-row new",
+          `<text x="36" y="0">d${String(d + 1).padStart(2, "0")}</text><text class="${mode === "reuse" ? "m-r" : "m-e"}" x="94" y="0">${mode}</text><text class="s" x="194" y="0">${ROWS[r][0]}</text><text class="${hit ? "hit" : ""}" x="404" y="0" text-anchor="end">★${score}</text>`
+        );
+        $("exrLog").appendChild(row);
+        log.push(row);
+        if (log.length > MAXLOG) log.shift().remove();
+        if (!hit) return;
+        found++;
+        const [x, y] = cell(r, c);
+        beam(`M${x} ${y} C${x + 220} ${y}, 1300 ${LINTY - 6}, 1384 ${LINTY - 6}`, "#d29922");
+        lints.forEach(l => l.classList.remove("hot"));
+        const li = mk("mra-row new exr-lint hot", `<text x="1400" y="0">+ ${lint}</text>`);
+        $("exrLint").appendChild(li);
+        lints.push(li);
+        if (lints.length > MAXLINT) lints.shift().remove();
+        sfx.notify(false);
+      });
+      flow(log, LOGY, LOGH, false);
+      flow(lints, LINTY, LINTH, true);
+      coverage();
+      if (d === DAYS.length - 1) $("exrDone").classList.add("on");
+    };
+    const DAY = 1500,
+      BEATS = [0, 300, 800],
+      START = 700,
+      HOLD = 4000,
+      END = START + DAYS.length * DAY,
+      CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      done = 0;
+    const reset = () => {
+      svg.querySelectorAll(".r, .e, .hit, .miss, .on:not(.fm-task):not(.mra-lane)").forEach(x => x.classList.remove("r", "e", "hit", "miss", "on"));
+      $("exrLog").innerHTML = "";
+      $("exrLint").innerHTML = "";
+      $("exrBeams").innerHTML = "";
+      $("exrDay").textContent = "";
+      log = [];
+      lints = [];
+      tried = found = done = 0;
+      coverage();
+    };
+    slides.push({
+      group: "loops",
+      sound: "explore",
+      palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
+      notes:
+        "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+        reset();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        if (u < START) return;
+        const v = Math.min(u, END - 1) - START,
+          d = Math.floor(v / DAY),
+          target = d * 3 + BEATS.filter(b => v % DAY >= b).length;
+        while (done < target) {
+          beat(Math.floor(done / 3), done % 3);
+          done++;
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide exr" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Exhaust the model's patterns · cache what worked, reuse it, explore the rest"), h("h2", {}, letters("Explore · Reuse · "), letters("Lint", "l-grad"))),
+        svg
+      ),
     });
   }
 
@@ -5764,6 +6320,409 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Humans state intent, agents write the RFC spec, test it and extract it from every change"), h("h2", {}, letters("Spec-driven "), letters("testing", "l-grad"))),
         svg,
         h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["spec-extractor", "pr-specification-reviewer", "spec-librarian", "spec-enforcer", "w3c-specification-writer", "weekly-safe-outputs-spec-review"].map(n => h("span", {}, n))),
+      ),
+    });
+  }
+
+  // Docs that heal: an updater writes docs from merged code, unbloat and glossary agents simplify them, the noob tester reads them as a newcomer, and a healer fixes what was missed and teaches the updater a new rule
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372,
+      PW = 540,
+      PX = [40, 810, 1580],
+      AY = 300;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#${cls ? "dhHeal" : "dhAgent"})"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    };
+    // an illustrative, simplified example: the updater's own workflow, a docs page it edits and the noob tester's report
+    const PANELS = [
+      [
+        "daily-doc-updater.md",
+        "WORKFLOW",
+        [
+          ["q", "---"],
+          ["", "on: daily"],
+          ["", "safe-outputs: create-pull-request"],
+          ["q", "---"],
+          ["h", "# Daily Doc Updater"],
+          ["", "- Read PRs merged since yesterday"],
+          ["", "- Document new flags and examples"],
+          ["add", "+ - Explain value formats of flags"],
+        ],
+      ],
+      [
+        "docs/reference/frontmatter.md",
+        "DOCS",
+        [
+          ["h", "## stop-after"],
+          ["add", "+ Stop a schedule at a deadline,"],
+          ["add", "+ e.g. stop-after: +48h."],
+          ["", "  This is a really useful option"],
+          ["", "  that you can use whenever you"],
+          ["", "  want things to stop running."],
+          ["api", "  → glossary: stop-after"],
+          ["add", "+ Units: m, h, d, w (e.g. +48h)."],
+        ],
+      ],
+      [
+        "noob-tester-report.md",
+        "TEST",
+        [
+          ["fn", "walk the docs as a newcomer"],
+          ["", "  install the extension"],
+          ["", "  quick start, steps 1-3"],
+          ["", "  find stop-after"],
+          ["", "  what does +48h mean?"],
+          ["q", ""],
+          ["fail", "issue: explain the +48h format"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["dhE0", "M124 106 H232", "p", ["merged"], 178, 90, "middle"],
+      ["dhE1", `M${PX[0] + PW + 6} ${AY} H${PX[1] - 8}`, "p", ["docs PR from", "merged code"], 695, AY - 56, "middle"],
+      ["dhE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["read it as a", "newcomer would"], 1465, AY - 56, "middle"],
+      ["dhE3", `M${PX[2] + PW / 2} ${PY + PH + 4} V618 H1214`, "g", ["missed gaps"], 1560, 600, "middle"],
+      ["dhE5", `M1104 590 V${PY + PH + 10}`, "g", [], 0, 0, "middle"],
+      ["dhE4", `M950 618 H${PX[0] + PW / 2} V${PY + PH + 10}`, "g", ["fix the gap, teach the updater"], 600, 600, "middle"],
+    ];
+    let g = `<defs><radialGradient id="dhAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <radialGradient id="dhHeal" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#7ee787"/><stop offset=".55" stop-color="#238636"/><stop offset="1" stop-color="#0f3d1c"/></radialGradient>
+      <marker id="dhP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="dhG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 695, "WRITE"],
+      [695, 1465, "SIMPLIFY"],
+      [1465, VW, "TEST · HEAL"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dhLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([file, tag, lines], i) => {
+      const x = PX[i];
+      g += `<g class="sdd-panel" id="dhP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${PW}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + PW}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + PW - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => {
+        const y = PY + 88 + j * 32;
+        g += `<text class="sdd-ln ${c}" id="dhL${i}_${j}" x="${x + 24}" y="${y}">${sp(s)}</text>`;
+        if (i === 2 && j >= 1 && j <= 4) g += `<text class="sdd-ck" id="dhCk${j}" x="${x + PW - 26}" y="${y + 1}">✓</text>`;
+        if (i === 2 && j === 4) g += `<text class="dh-x" id="dhX4" x="${x + PW - 26}" y="${y + 1}">✗</text>`;
+      });
+      g += `</g>`;
+    });
+    g += `<rect class="sdd-scan" id="dhScan" x="${PX[1] + 4}" y="${PY + 56}" width="${PW - 8}" height="5" rx="2"/>`;
+    g += `<text class="sdd-stamp" id="dhStamp" x="${PX[1] + PW - 24}" y="${PY + PH - 22}">Unbloat: −3 lines</text>`;
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#dh${c === "g" ? "G" : "P"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += `<g class="fm-task" id="dhMerge"><circle cx="88" cy="106" r="32" fill="#8957e5"/>${ico("merge", 88, 106, 30)}</g>`;
+    g += agent("dhUpdater", 400, 106, 240, "Doc Updater") + agent("dhUnbloat", 1080, 106, 300, "Unbloat · Glossary") + agent("dhTester", 1850, 106, 240, "Noob Tester");
+    g += agent("dhHealer", 1080, 618, 220, "Doc Healer", "g");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      scan = $("dhScan");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const CYC = 18000;
+    let t0 = 0,
+      cyc = -1,
+      ev = [],
+      evI = 0,
+      fly = null,
+      scanAt = 0;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("dhLane0"), on("dhP0"), on("dhMerge")));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(400 + j * 170, () => (on(`dhL0_${j}`), sfx.key(0.5))));
+      flight(1500, "dhE0", 500, "#ab7df8", 0);
+      at(2000, () => on("dhUpdater"));
+      flight(2200, "dhE1", 1000, "#ab7df8", 1);
+      at(3200, () => (on("dhLane1"), on("dhP1"), [0, 3, 4, 5].forEach(j => on(`dhL1_${j}`))));
+      at(3600, () => (on("dhL1_1"), sfx.key(0.6)));
+      at(3850, () => (on("dhL1_2"), sfx.key(0.6)));
+      at(4300, () => on("dhUnbloat"));
+      at(4400, () => (scanAt = 4400));
+      [3, 4, 5].forEach((j, k) => at(4800 + k * 300, () => (on(`dhL1_${j}`, "gone"), sfx.pop(2 + k))));
+      at(5800, () => ((scanAt = 0), (scan.style.opacity = 0), on("dhStamp"), on("dhL1_6"), sfx.key(0.7)));
+      at(6300, () => on("dhTester"));
+      flight(6400, "dhE2", 1000, "#ab7df8", 5);
+      at(7400, () => (on("dhLane2"), on("dhP2"), on("dhL2_0"), sfx.key(0.6)));
+      [1, 2, 3, 4].forEach((j, k) => {
+        at(7700 + k * 420, () => (on(`dhL2_${j}`), sfx.key(0.5)));
+        at(7950 + k * 420, () => (j === 4 ? (on("dhX4"), sfx.omen()) : (on(`dhCk${j}`), sfx.pop(5 + k))));
+      });
+      at(9700, () => (on("dhL2_6"), on("dhP2", "bad"), sfx.notify()));
+      flight(10000, "dhE3", 1100, "#3fb950", 6);
+      at(11100, () => (on("dhHealer"), sfx.key(0.8)));
+      flight(11300, "dhE5", 500, "#3fb950", 7);
+      at(11800, () => (on("dhL1_7"), on("dhP1", "ok"), sfx.pop(8)));
+      flight(12100, "dhE4", 1300, "#3fb950", 8);
+      at(13400, () => (on("dhL0_7"), on("dhP0", "ok"), sfx.review()));
+      at(14000, () => ($("dhX4").classList.remove("on"), on("dhCk4"), $("dhP2").classList.remove("bad"), on("dhP2", "ok"), sfx.pop(9)));
+    };
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone"));
+      scan.style.opacity = 0;
+      dot.style.opacity = 0;
+      fly = null;
+      scanAt = 0;
+      script();
+    };
+    slides.push({
+      group: "loops",
+      sound: "docs",
+      palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
+      notes:
+        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The workflow, page and noob tester report shown are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (scanAt) {
+          const f = Math.min(1, (u - scanAt) / 1300);
+          scan.style.opacity = 1;
+          scan.setAttribute("y", PY + 56 + f * (PH - 66));
+        }
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
+        svg,
+        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["daily-doc-updater", "unbloat-docs", "glossary-maintainer", "daily-documentation-diagram", "docs-noob-tester", "daily-multi-device-docs-tester", "enterprise-docs-audit", "daily-doc-healer"].map(n => h("span", {}, n))),
+      ),
+    });
+  }
+
+  // Speak → Map → Grep: a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const pill = (x, y, w, label) => `<g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#dgAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    // illustrative: misheard speech-to-text, the glossary identifier it maps to, and synthetic grep counts
+    const EX = [
+      ["cash memory", "cache-memory", 214, 31],
+      ["depend a bot", "Dependabot", 57, 12],
+      ["fire wall", "firewall", 163, 27],
+      ["A W dot Y M L", "aw.yml", 42, 9],
+    ];
+    // synthetic renames: [old, new, how it is spoken, glossary identifier]
+    const REN = [
+      ["procSO()", "parseSafeOutputs()", "parse safe outputs", "parseSafeOutputs"],
+      ["doCfg()", "loadConfig()", "load config", "loadConfig"],
+      ["hndl()", "handleComment()", "handle comment", "handleComment"],
+      ["chk()", "checkPermissions()", "check permissions", "checkPermissions"],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]; b = the speaker, p = agents, g = keeping names and glossary in sync
+    const EDGES = [
+      ["e0", "M106 190 H142", "b", [], 0, 0, "start"],
+      ["e1", "M476 190 H556", "b", ["maps"], 516, 162, "middle"],
+      ["e2", "M1112 190 H1198", "p", ["prompt"], 1155, 162, "middle"],
+      ["e3", "M1236 226 V272", "p", ["greps"], 1252, 256, "start"],
+      ["e4", "M1290 422 V502", "g", ["rename for", "findability"], 1306, 452, "start"],
+      ["e5", "M1254 540 H1094", "g", ["proposes"], 1174, 512, "middle"],
+      ["e6", "M698 540 H488", "g", ["new name"], 593, 512, "middle"],
+      ["e7", "M200 504 V390", "g", ["opens PR"], 216, 456, "start"],
+      ["e8", "M454 350 H556", "g", ["merges"], 505, 322, "middle"],
+    ];
+    const SEQ = [
+      ["e0", "nRaw", 900],
+      ["e1", "nDict"],
+      ["e2", "nAgent"],
+      ["e3", "nGrep", 1200],
+      ["e4", "nNamer", 1200],
+      ["e5", "nRen"],
+      ["e6", "nDP"],
+      ["e7", "nMaint", 1200],
+      ["e8", "dgNew", 1200],
+    ];
+    const LANE = { nMic: 0, nRaw: 0, nMaint: 0, nDict: 1, nAgent: 2, nGrep: 2 };
+    const MK = { g: ["dgG", "#3fb950"], b: ["dgB", "#4493f8"], p: ["dgP", "#ab7df8"] };
+    let g = `<defs><radialGradient id="dgAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient><radialGradient id="dgMicG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#79c0ff"/><stop offset=".55" stop-color="#1f6feb"/><stop offset="1" stop-color="#0c2d6b"/></radialGradient>`;
+    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+    g += `<clipPath id="dgClip"><circle cx="200" cy="350" r="31"/></clipPath>`;
+    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/><rect class="dg-band" x="0" y="470" width="${VW}" height="150"/>`;
+    g += `<text class="fm-lane-t" x="1680" y="546">KEEP IN SYNC</text>`;
+    [
+      [0, 520, "SPEAK"],
+      [520, 1150, "MAP"],
+      [1150, VW, "GREP"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dgLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="430"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += `<g class="dg-mic" id="nMic"><circle class="dg-ring" cx="70" cy="190" r="34"/><circle cx="70" cy="190" r="34" fill="url(#dgMicG)"/><rect x="62" y="170" width="16" height="26" rx="8" fill="#f0f6fc"/><path d="M57 190a13 13 0 0 0 26 0M70 203v9M63 212h14" fill="none" stroke="#f0f6fc" stroke-width="3" stroke-linecap="round"/></g>`;
+    g += `<text class="dg-cap" x="70" y="254">voice</text>`;
+    g += `<g class="fm-out" id="nRaw"><rect x="146" y="120" width="328" height="142" rx="14"/><text class="dg-hd" x="166" y="156">SPEECH-TO-TEXT</text><text class="dg-raw" x="166" y="206" id="dgRaw"></text><text class="dg-miss" x="166" y="242">grep → 0 matches</text></g>`;
+    g += `<g class="dg-dict" id="nDict"><rect class="dg-card" x="560" y="84" width="550" height="326" rx="16"/>${ico("tasklist", 590, 116, 22, "#9198a1")}<text class="dg-hd" x="610" y="122">DICTATION.md</text><text class="dg-hd" x="1090" y="122" text-anchor="end">SPOKEN → CODE</text>`;
+    const row = (cls, id, y, spoken, ident, sid = "", iid = "") =>
+      `<g class="${cls}" id="${id}"><rect x="570" y="${y - 22}" width="530" height="44" rx="10"/><text x="590" y="${y + 7}"${sid}>${spoken}</text><text x="870" y="${y + 7}" text-anchor="middle">→</text><text class="dg-id" x="894" y="${y + 7}"${iid}>${ident}</text></g>`;
+    EX.forEach(([s, id], i) => (g += row("dg-row", "dgRow" + i, 168 + i * 50, `"${s}"`, id)));
+    g += row("dg-new", "dgNew", 372, "", "", ' id="dgNewS"', ' id="dgNewI"') + `</g>`;
+    g += agent("nAgent", 1236, 190, 160, "Agent");
+    g += `<text class="dg-ident" id="dgIdent" x="1424" y="198"><tspan class="dg-k">uses </tspan><tspan id="dgIdentV"></tspan></text>`;
+    g += `<g class="fm-out dg-term" id="nGrep"><rect class="dg-tb" x="1180" y="276" width="600" height="144" rx="14"/>${["#f85149", "#d29922", "#3fb950"].map((c, k) => `<circle cx="${1204 + k * 22}" cy="298" r="6" fill="${c}"/>`).join("")}<text class="dg-hd" x="1272" y="304">bash</text><text class="dg-cmd dg-tl" x="1204" y="352" id="dgCmd"></text><text class="dg-hit dg-tl" x="1204" y="396" id="dgHit"></text></g>`;
+    g += agent("nNamer", 1290, 540, 250, "Function Namer") + `<text class="dg-cap" x="1290" y="604">daily</text>`;
+    g += `<g class="fm-out dg-chip" id="nRen"><rect x="700" y="512" width="390" height="56" rx="14"/><text x="895" y="548"><tspan class="dg-old" id="dgOld"></tspan> → <tspan class="dg-nn" id="dgNN"></tspan></text></g>`;
+    g += agent("nDP", 200, 540, 280, "Dictation Prompt") + `<text class="dg-cap" x="200" y="604">weekly</text>`;
+    g += `<g class="fm-task mra-dev" id="nMaint"><g class="fm-pill b"><rect x="200" y="325" width="250" height="50" rx="25"/><text x="343" y="358">Maintainer</text></g><circle cx="200" cy="350" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="169" y="319" width="62" height="62" clip-path="url(#dgClip)"/></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg dg-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "Speak, map, grep: a misheard speech-to-text phrase is mapped by the DICTATION.md glossary to the exact identifier, the agent greps it and finds matches; a daily namer agent proposes clearer API names, a weekly dictation agent opens a pull request adding them to the glossary, and the maintainer reviews and merges it"
+    );
+    svg.style.setProperty("--c", "#4493f8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1000,
+      START = 900,
+      HOLD = 2000,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      if (nid in LANE) $("dgLane" + LANE[nid]).classList.add("on");
+      if (nid === "nDict") $("dgRow" + (cyc % EX.length)).classList.add("pick");
+      if (nid === "nAgent") $("dgIdent").classList.add("on");
+    };
+    const fill = c => {
+      const [s, id, n, f] = EX[c % EX.length],
+        [old, nn, rs, ri] = REN[c % REN.length];
+      $("dgRaw").textContent = `"${s}"`;
+      $("dgIdentV").textContent = id;
+      $("dgCmd").textContent = `$ grep -rn "${id}" .`;
+      $("dgHit").textContent = `✓ ${n} matches in ${f} files`;
+      $("dgOld").textContent = old;
+      $("dgNN").textContent = nn;
+      $("dgNewS").textContent = `+ "${rs}"`;
+      $("dgNewI").textContent = ri;
+    };
+    slides.push({
+      group: "loops",
+      sound: "dictate",
+      palette: ["#1f6feb", "#8957e5", "#3fb950", "#79c0ff"],
+      notes:
+        "Speak, map, grep: talking to agents instead of typing. The run is illustrative; the phrases and corrections come from gh-aw's real DICTATION.md, while the grep counts and the renamed functions are synthetic. When you dictate a prompt, speech-to-text hears words, not identifiers: you say cache-memory and it writes cash memory, you say Dependabot and it writes depend a bot. Agents search the codebase with grep, which matches exact tokens, so cash memory finds nothing. DICTATION.md is a prompt you paste into your voice dictation app: a project glossary plus a list of spoken forms and the exact identifiers they map to, hyphens, dots and casing included. The app's model rewrites the transcript, the agent receives cache-memory, and grep lands on every definition and call site. Two agentic workflows keep it true. A daily namer agent reviews one package at a time and proposes renames so functions say what they do, procSO becomes parseSafeOutputs, which is also how you would say it out loud; Copilot implements the rename. A weekly dictation prompt agent re-reads the docs and code, extracts the vocabulary and opens a pull request that adds the new terms to DICTATION.md; the maintainer, the same person who dictates, reviews and merges it, so the glossary only holds words they actually say. Names you can say map to names you can grep.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .pick").forEach(x => x.classList.remove("on", "hot", "pick"));
+          fill(c);
+          light("nMic");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          fr = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", MK[p.classList[1]][1]);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (fr >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Dictate to agents · say the word, hit the symbol"), h("h2", {}, letters("Speak · Map · "), letters("Grep", "l-grad"))),
+        svg,
+        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["DICTATION.md", "dictation-prompt", "daily-function-namer"].map(n => h("span", {}, n)))
       ),
     });
   }
@@ -9629,6 +10588,180 @@
     });
   }
 
+  // How workflows evolve: measured commits that changed gh-aw's own workflow Markdown, the live workflow count and a statistical look at edit sizes
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    // Calendar months Aug 2025 – Oct 2026 (October ends at GA, 28 Oct 2026); first-parent commits on main touching .github/workflows/**/*.md
+    const MON = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
+    const AGENT = [11, 18, 225, 208, 249, 277, 161, 152, 279, 324, 293, 229, 399, 97, 100];
+    const PEOPLE = [19, 48, 70, 50, 52, 69, 73, 16, 22, 41, 16, 5, 19, 4, 161];
+    // live workflows (top-level .md files) at month end
+    const WF = [16, 4, 65, 90, 128, 147, 162, 179, 205, 237, 258, 266, 297, 300, 349];
+    // lines added + removed in workflow .md files per commit
+    const SIZE_BINS = ["1–2", "3–9", "10–29", "30–99", "100–299", "300–999", "1k+"];
+    const SIZE = [621, 793, 726, 777, 524, 218, 28];
+    const N = MON.length;
+    const W = 1060,
+      H = 470,
+      CX = 60,
+      BASE = 400,
+      TOP = 20,
+      YMAX = 450,
+      SLOT = (W - CX - 70) / N,
+      BW = SLOT * 0.6;
+    const xs = p => CX + p * SLOT;
+    const y = v => BASE - ((BASE - TOP) * v) / YMAX;
+    const main = document.createElementNS(NS, "svg");
+    main.setAttribute("class", "evo-svg");
+    main.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    main.setAttribute("role", "img");
+    main.setAttribute("aria-label", "Measured: commits on gh-aw's main branch that changed workflow Markdown, per month, split into agent and bot accounts and people, with the number of live workflows at month end, from August 2025 to general availability in October 2026");
+    let g = "";
+    for (const v of [0, 100, 200, 300, 400])
+      g += `<line x1="${CX - 8}" x2="${xs(N) + 6}" y1="${y(v)}" y2="${y(v)}" class="hist-grid"/><text x="${CX - 14}" y="${y(v) + 6}" class="hist-ax" text-anchor="end">${v}</text><text x="${xs(N) + 16}" y="${y(v) + 6}" class="hist-ax evo-ax-r">${v}</text>`;
+    MON.forEach((m, i) => {
+      g += `<text x="${xs(i + 0.5)}" y="${BASE + 30}" class="hist-ax" text-anchor="middle">${m}</text>`;
+      if (i === 0 || i === 5) g += `<text x="${xs(i + 0.5)}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">${i ? 2026 : 2025}</text>`;
+    });
+    main.innerHTML = `<g>${g}</g><g class="evo-bars"></g><path class="evo-wf" d=""/><circle class="evo-wf-dot" r="8" cx="${xs(0.5)}" cy="${y(WF[0])}"/><line class="hist-axis" x1="${CX - 8}" x2="${xs(N) + 6}" y1="${BASE}" y2="${BASE}"/>`;
+    const mk = (parent, cls, fill) => {
+      const r = document.createElementNS(NS, "rect");
+      if (cls) r.setAttribute("class", cls);
+      if (fill) r.setAttribute("fill", fill);
+      r.setAttribute("rx", 3);
+      parent.append(r);
+      return r;
+    };
+    const barsG = main.querySelector(".evo-bars");
+    const bars = MON.map((_, i) =>
+      ["hist-b-copilot", "hist-b-other"].map(cls => {
+        const r = mk(barsG, cls);
+        r.setAttribute("x", xs(i + 0.5) - BW / 2);
+        r.setAttribute("width", BW);
+        return r;
+      })
+    );
+    const wfPath = main.querySelector(".evo-wf"),
+      wfDot = main.querySelector(".evo-wf-dot");
+    // size histogram
+    const SW = 560,
+      SX = 50,
+      SYMAX = 900,
+      sslot = (SW - SX) / SIZE.length,
+      sbw = sslot * 0.66;
+    const sy = v => BASE - ((BASE - TOP) * v) / SYMAX;
+    const side = document.createElementNS(NS, "svg");
+    side.setAttribute("class", "evo-svg");
+    side.setAttribute("viewBox", `0 0 ${SW} ${H}`);
+    side.setAttribute("role", "img");
+    side.setAttribute("aria-label", "Measured: distribution of lines added plus removed in workflow Markdown per commit, on log-spaced bins; median 18 lines");
+    let sg = "";
+    for (const v of [0, 200, 400, 600, 800]) sg += `<line x1="${SX - 8}" x2="${SW}" y1="${sy(v)}" y2="${sy(v)}" class="hist-grid"/><text x="${SX - 14}" y="${sy(v) + 6}" class="hist-ax" text-anchor="end">${v}</text>`;
+    SIZE_BINS.forEach((b, i) => (sg += `<text x="${SX + sslot * (i + 0.5)}" y="${BASE + 30}" class="hist-ax evo-sx" text-anchor="middle">${b}</text>`));
+    // median 18 sits in the 10–29 bin; place the marker by log position within it
+    const mx = SX + sslot * (2 + Math.log(18 / 10) / Math.log(30 / 10));
+    sg += `<text x="${SX + sslot * 3.5}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">lines per commit (log bins)</text>`;
+    side.innerHTML = `<g>${sg}</g><g class="evo-sbars"></g><line class="hist-head" x1="${mx}" x2="${mx}" y1="${TOP + 10}" y2="${BASE}"/><text x="${mx + 8}" y="${TOP + 24}" class="evo-med">median 18</text><line class="hist-axis" x1="${SX - 8}" x2="${SW}" y1="${BASE}" y2="${BASE}"/>`;
+    const sbG = side.querySelector(".evo-sbars");
+    const sbars = SIZE.map((_, i) => {
+      const r = mk(sbG, "", "#db61a2");
+      r.setAttribute("x", SX + sslot * (i + 0.5) - sbw / 2);
+      r.setAttribute("width", sbw);
+      return r;
+    });
+    const ease = v => 1 - (1 - Math.max(0, Math.min(1, v))) ** 3;
+    const render = u => {
+      const p = u * N;
+      const pts = [];
+      for (let i = 0; i < N; i++) {
+        const e = ease((p - i) * 1.5);
+        const ha = (BASE - y(AGENT[i])) * e,
+          hp = (BASE - y(PEOPLE[i])) * e;
+        bars[i][0].setAttribute("y", BASE - ha);
+        bars[i][0].setAttribute("height", ha);
+        bars[i][1].setAttribute("y", BASE - ha - hp);
+        bars[i][1].setAttribute("height", hp);
+        if (p >= i) pts.push([xs(i + 0.5), y(WF[i])]);
+      }
+      const k = Math.min(N - 1, Math.floor(p)),
+        f = Math.min(1, p - k);
+      const cur = k < N - 1 ? [xs(k + 0.5 + f), y(WF[k] + (WF[k + 1] - WF[k]) * f)] : [xs(N - 0.5), y(WF[N - 1])];
+      const line = [...pts, cur];
+      wfPath.setAttribute("d", "M" + line.map(([a, b]) => `${a.toFixed(1)} ${b.toFixed(1)}`).join(" L"));
+      wfDot.setAttribute("cx", cur[0]);
+      wfDot.setAttribute("cy", cur[1]);
+      sbars.forEach((r, i) => {
+        const hgt = (BASE - sy(SIZE[i])) * ease(u * 2.2 - 0.9 - i * 0.08);
+        r.setAttribute("y", BASE - hgt);
+        r.setAttribute("height", hgt);
+      });
+    };
+    let t0 = 0,
+      u = 0,
+      lastMonth = -1;
+    const DUR = 4200;
+    const FACTS = [
+      ["ρ = −0.03", "edit size vs date · Spearman: no trend", "#f0f6fc"],
+      ["p = 0.22", "Mann–Whitney, before vs after Mar 2026 · both medians 18", "#4493f8"],
+      ["4.5 → 0.75", "commits per live workflow per month, Oct ’25 → Oct ’26", "#3fb950"],
+      ["61%", "of lines changed sit in the largest 10% of commits", "#db61a2"],
+      ["G = 0.52", "Gini of edits over 527 workflow files", "#ab7df8"],
+    ];
+    slides.push({
+      group: "scale",
+      sound: "evolve",
+      palette: ["#3fb950", "#ab7df8", "#db61a2", "#4493f8"],
+      notes:
+        "Not illustrative: measured from git on gh-aw's main branch, from the first commit on 12 August 2025 to the end of 28 October 2026 (GA at Universe), Pacific time. Commits are first-parent commits on main (squash merges, about one per merged pull request): 3,687 of 18,045 changed at least one Markdown file under .github/workflows, meaning workflows or their shared imports (497 files at GA); compiled lock files are excluded. Lines changed are lines added plus removed in those Markdown files only. Live workflows are top-level workflow Markdown files at each month end: 545 were created and 196 retired, leaving 349; September dips to 4 because 48 early examples were removed. 82 percent of these commits are authored by agent and bot accounts, mostly the Copilot coding agent; people's accounts may still have used AI. Size distribution: median 18 lines, mean 83, 90th percentile 209, 99th percentile 886. It is heavy-tailed: 38 percent change fewer than 10 lines, 71 percent touch one file, and the largest 10 percent of commits carry 61 percent of all lines changed. Statistical tests: the Spearman rank correlation between commit date and size is -0.03, so edit size shows no trend; a Mann-Whitney U test comparing sizes before and after 1 March 2026 (1,530 vs 2,157 commits) gives z = 1.23, p of about 0.22, with both medians at 18 lines and a common-language effect size of 0.51, so no detectable shift. Monthly commit volume is only weakly related to time (Spearman 0.32) while the fleet grew more than fivefold after October 2025, so commits per live workflow per month fell from 4.5 to 0.75: workflows settle after creation and are then tuned with small edits. Edits are concentrated: 527 workflow files were edited, a median of 15 times each, with a Gini coefficient of 0.52; the busiest are the engine smoke tests.",
+      enter() {
+        t0 = 0;
+        lastMonth = -1;
+        u = matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0;
+        render(u);
+      },
+      tick(t) {
+        if (u >= 1) return;
+        if (!t0) t0 = t;
+        u = Math.min(1, (t - t0) / DUR);
+        const m = Math.floor(u * N);
+        if (m !== lastMonth && m < N) sfx.pop((lastMonth = m));
+        render(u);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · workflow Markdown on gh-aw main"), h("h2", {}, letters("How workflows "), letters("evolve", "l-grad"))),
+        h(
+          "div",
+          { class: "evo-main", "--i": 0 },
+          h("div", { class: "land-t" }, "Commits per month · live workflows"),
+          h("div", { class: "land-big" }, h("b", {}, "3,687"), h("span", {}, "commits changed a workflow .md · 545 created, 196 retired, 349 live")),
+          h(
+            "div",
+            { class: "hist-legend" },
+            h("span", { "--c": "#ab7df8" }, "agent & bot accounts · 82%"),
+            h("span", { "--c": "#4493f8" }, "people · 18%"),
+            h("span", { "--c": "#3fb950", class: "ln" }, "live workflows")
+          ),
+          main
+        ),
+        h(
+          "div",
+          { class: "evo-side", "--i": 1 },
+          h("div", { class: "land-t" }, "Lines changed per commit"),
+          h("div", { class: "land-big" }, h("b", {}, "18"), h("span", {}, "median · p90 209 · 71% touch one file")),
+          side
+        ),
+        h(
+          "div",
+          { class: "evo-facts" },
+          FACTS.map(([big, txt, c], i) => h("div", { class: "evo-fact", "--c": c, "--i": i }, h("b", {}, big), h("span", {}, txt)))
+        )
+      ),
+    });
+  }
+
   const stage = h(
     "div",
     { class: "stage" },
@@ -9953,6 +11086,14 @@
         bell(79, t + 1.35, 0.045, 1.2);
         bell(84, t + 1.47, 0.04, 1.4);
       },
+      // patch to PR: the package is zipped (a run of ticks), scanned, applied, then a signed stamp and a bright chord
+      patch: t => {
+        [0, 1, 2, 3, 4].forEach(i => click(t + 0.2 + i * 0.07, 2200 + i * 300, 0.04, 6));
+        osc("sine", 2400, t + 0.6, 0.3, 0.01, { f1: 700 });
+        osc("triangle", 110, t + 1.0, 0.16, 0.05, { f1: 60 });
+        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.05 + i * 0.07, 0.03, 1));
+        pad([60, 67, 72, 76], t + 1.1, 1.6, 0.02, "triangle", 2200);
+      },
       // review squared: "ready for review" fans out to agent reviewers (panned left, right, centre), then a human approves
       reviews: t => {
         tone(67, t + 0.2, { type: "triangle", dur: 0.2, vol: 0.06, cutoff: 2000, detune: 3 });
@@ -10026,6 +11167,12 @@
           tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
         });
       },
+      // explore → reuse → lint: scattered sonar pings across the pattern space, a found pattern ringing, then a settling chord
+      explore: t => {
+        [0, 7, 2, 9, 4, 11].forEach((d, i) => osc("sine", hz(72 + d), t + 0.2 + i * 0.11, 0.18, 0.02, { a: 0.003 }));
+        [76, 79, 83, 88].forEach((m, i) => bell(m, t + 1.0 + i * 0.06, 0.03, 1.1));
+        pad([52, 59, 64, 71], t + 1.1, 1.8, 0.025, "triangle", 1800);
+      },
       // spec → model → test: a rising run of explored states, a counterexample's buzz, then the trace resolving into a test
       formal: t => {
         [0, 2, 4, 7, 9, 12, 14, 16].forEach((d, i) => osc("sine", hz(72 + d), t + 0.2 + i * 0.06, 0.06, 0.016));
@@ -10040,12 +11187,27 @@
         [79, 84, 88].forEach((m, i) => bell(m, t + 1.25 + i * 0.08, 0.035, 1.2));
         pad([52, 59, 64, 71], t + 1.25, 1.8, 0.025, "triangle", 1800);
       },
+      // speak → map → grep: a vowel-like spoken glide, glossary lookup ticks snapping to the exact word, then a found-it chime
+      dictate: t => {
+        [67, 71, 69].forEach((m, i) => osc("sine", hz(m), t + 0.15 + i * 0.18, 0.2, 0.03, { f1: hz(m + 2), a: 0.03 }));
+        [0, 0.08, 0.16, 0.24].forEach((d, i) => click(t + 0.8 + d, 2400 + i * 300, 0.035, 10));
+        tone(72, t + 1.15, { type: "triangle", dur: 0.14, vol: 0.05, cutoff: 2600, detune: 3 });
+        [79, 84, 88].forEach((m, i) => bell(m, t + 1.4 + i * 0.07, 0.035, 1.2));
+      },
       // spec-driven: the diff typed in, a page swish as the spec is written, then four rising test passes resolving on a bell
       spec: t => {
         for (let i = 0; i < 6; i++) click(t + 0.15 + i * 0.07, 2600 + (i % 2) * 500, 0.04, 5);
         osc("sine", 420, t + 0.65, 0.3, 0.02, { f1: 1300, a: 0.04 });
         [72, 76, 79, 84].forEach((m, i) => tone(m, t + 1.0 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.5 : 0.12, vol: 0.05, cutoff: 2800, detune: 3 }));
         bell(88, t + 1.5, 0.03, 1.2);
+      },
+      // docs that heal: a page typed in, two scissor snips as it is trimmed, then a warm healing chord rising to a bell
+      docs: t => {
+        for (let i = 0; i < 5; i++) click(t + 0.15 + i * 0.08, 2400 + (i % 2) * 600, 0.035, 5);
+        [0, 0.12].forEach(d => click(t + 0.7 + d, 5200, 0.05, 12));
+        pad([60, 64, 67, 72], t + 1.0, 1.4, 0.02, "triangle", 2000);
+        [72, 76, 79].forEach((m, i) => tone(m, t + 1.1 + i * 0.13, { type: "triangle", dur: 0.18, vol: 0.05, cutoff: 2600, detune: 3 }));
+        bell(84, t + 1.55, 0.035, 1.3);
       },
       // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
       cihealth: t => {
@@ -10270,6 +11432,12 @@
         [0, 0.07, 0.13, 0.2, 0.28, 0.4, 0.58, 0.85, 1.25].forEach((d, i) => tone(76 - i * 2, t + 0.15 + d, { type: "square", dur: 0.08, vol: 0.04, cutoff: 3000, detune: 3 }));
         pad([50, 57, 62, 66], t + 1.3, 2.4, 0.024, "triangle", 1500);
         bell(86, t + 1.4, 0.035, 1.4);
+      },
+      // how workflows evolve: a walk that branches upward as the fleet grows, then settles into small repeated steps
+      evolve: t => {
+        [55, 59, 62, 67, 66, 67, 71, 74, 72, 74, 74, 74].forEach((m, i) => tone(m, t + 0.15 + i * 0.16, { type: "triangle", dur: 0.22, vol: 0.045, cutoff: 2400, detune: 4 }));
+        pad([43, 50, 55, 59, 62], t + 0.2, 3.2, 0.022, "triangle", 1400);
+        [79, 83].forEach((m, i) => bell(m, t + 2.1 + i * 0.12, 0.035, 1.5));
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
