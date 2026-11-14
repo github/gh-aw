@@ -60,7 +60,8 @@
   .ch { display: inline-block; font-variation-settings: "wght" 700, "wdth" 100; }
   .l-grad .ch { color: transparent; -webkit-background-clip: text; background-clip: text;
     background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #4493f8, #ab7df8);
-    background-size: 1800px 100%; background-position: var(--bx) 0; padding-bottom: .14em; margin-bottom: -.14em; }
+    background-size: 1800px 100%; background-position: var(--bx) 0;
+    padding-bottom: .14em; margin-bottom: -.14em; }
   @keyframes settle { from { opacity: 0; transform: translateY(.25em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
   @keyframes breathe { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
   .l-out .ch { color: transparent; -webkit-text-stroke: 3px #f0f6fc; }
@@ -143,13 +144,13 @@
   @keyframes glare { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
   /* --- central agentic ops --- */
-  .cao-steps { position: absolute; left: 114px; top: 330px; width: 560px; display: flex; flex-direction: column; gap: 18px; }
+  .cao-steps { position: absolute; left: 114px; top: 276px; width: 560px; display: flex; flex-direction: column; gap: 20px; }
   .cao-step { display: grid; grid-template-columns: 64px 1fr; column-gap: 18px; opacity: 0; }
   .active .cao-step { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 500ms); }
   .cao-step i { grid-row: span 2; font: 600 22px/1 var(--mono); color: var(--c); padding-top: 8px; font-style: normal; }
   .cao-step b { font-size: 40px; font-variation-settings: "wght" 700, "wdth" 100; }
   .cao-step span { font-size: 22px; color: #9198a1; line-height: 1.35; }
-  .cao-canvas { position: absolute; left: 720px; top: 300px; width: 1140px; height: 640px; }
+  .cao-canvas { position: absolute; left: 700px; top: 262px; width: 1180px; height: 690px; }
   .fm-quote { position: absolute; left: 114px; top: 318px; width: 600px; font: 700 44px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; opacity: 0; }
   .fm-quote em { font-style: normal; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8); }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
@@ -615,9 +616,10 @@
   .fm-marquee span { padding: 8px 18px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 19px/1 var(--mono); color: #c9d1d9; }
   @keyframes fm-scroll { to { transform: translateX(-50%); } }
   .cao-tag { position: absolute; font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
-  .rollout { position: absolute; right: 110px; bottom: 70px; display: flex; gap: 14px; align-items: center; font: 600 20px/1 var(--mono); }
+  /* centred under the CAO diagram (canvas left 700px + its centre 590px), right below its success rate */
+  .rollout { position: absolute; left: 1290px; bottom: 70px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; font: 600 20px/1 var(--mono); }
   .rollout em { font-style: normal; padding: 10px 18px; border: 1px solid #3d444d; border-radius: 999px; color: #9198a1; transition: all .4s; }
-  .rollout em.on { color: #0d1117; background: #3fb950; border-color: #3fb950; box-shadow: 0 0 24px #3fb95080; }
+  .rollout em.on { color: #0d1117; background: #3fb950; border-color: #3fb950; }
   .rollout s { text-decoration: none; color: #3d444d; }
   .finale-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
 
@@ -1284,10 +1286,48 @@
   /* --- chrome --- */
   .progress { position: fixed; left: 0; bottom: 0; height: 5px; width: 100%; transform-origin: 0 50%;
     background: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950); transition: transform .8s cubic-bezier(.7,0,.2,1); z-index: 5; }
-  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; gap: 12px; z-index: 5; }
-  .dots button { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
+  /* dot map: one row per band, header dot outlined; the band you are in is bright, others dim until hovered */
+  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; flex-direction: column; gap: 5px; z-index: 5; }
+  .dots .drow { display: flex; gap: 5px; opacity: .45; transition: opacity .3s; }
+  .dots .drow.on, .dots:hover .drow { opacity: 1; }
+  .dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
     transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
-  .dots button.on { width: 40px; background: #f0f6fc; }
+  .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
+  .dots button.on { width: 24px; background: #f0f6fc; box-shadow: none; }
+  /* --- band header --- */
+  .bh-head { position: absolute; left: 140px; top: 170px; width: 960px; }
+  .bh-head h2 { margin: 26px 0 0; font-size: 150px; line-height: .95; }
+  .bh-head h2 .line { display: inline-block; white-space: nowrap; }
+  .bh .l-grad .ch { background-image: linear-gradient(90deg, var(--bh), var(--bh2), #f0f6fc, var(--bh2), var(--bh)); }
+  .active.bh .ch { animation: settle .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 30ms + .15s); }
+  .bh-sub { margin: 34px 0 0; font-size: 40px; line-height: 1.25; color: #c9d1d9; font-variation-settings: "wght" 500, "wdth" 100; }
+  .active .bh-sub { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .45s; }
+  .bh-map { position: absolute; right: 140px; top: 182px; display: flex; flex-direction: column; gap: 9px; }
+  .bh-mrow { display: flex; align-items: center; gap: 5px; opacity: .4; }
+  .bh-mrow.on { opacity: 1; }
+  .active .bh-mrow { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 45ms + .2s); }
+  .active .bh-mrow:not(.on) { animation-name: dimrise; }
+  @keyframes dimrise { from { opacity: 0; transform: translateY(.3em); } to { opacity: .4; transform: none; } }
+  .bh-ml { width: 230px; font: 500 15px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9198a1; text-align: right; margin-right: 14px; }
+  .bh-mrow.on .bh-ml { color: #f0f6fc; }
+  .bh-mrow i { width: 16px; height: 12px; border-radius: 3px; background: #ffffff30; }
+  .bh-mrow i.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
+  .bh-mrow.on i { background: var(--bh); box-shadow: 0 0 14px var(--bh); }
+  .bh-mrow.on i.hd { background: transparent; box-shadow: inset 0 0 0 2px var(--bh2); }
+  .bh-row { position: absolute; left: 140px; right: 140px; bottom: 190px; margin: 0; padding: 0; list-style: none; display: flex; gap: 22px; }
+  .bh-row li { cursor: pointer; flex: 1; min-width: 0; height: 170px; padding: 26px 28px; border: 1px solid #3d444d; border-top: 4px solid var(--bh); border-radius: 14px;
+    background: #151b23cc; display: flex; flex-direction: column; justify-content: space-between; }
+  .bh-row li:hover { border-color: var(--bh2); background: #1f2630cc; }
+  .active .bh-row li { animation: rowin .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .5s); }
+  @keyframes rowin { from { opacity: 0; transform: translateX(120px); } to { opacity: 1; transform: none; } }
+  .bh-n { font: 600 22px/1 var(--mono); color: var(--bh2); letter-spacing: .1em; }
+  .bh-row.many { display: grid; grid-template-columns: repeat(7, 1fr); bottom: 140px; }
+  .bh-row.many.lots { grid-template-columns: repeat(10, 1fr); gap: 14px; }
+  .bh-row.many.lots li { padding: 16px 14px; }
+  .bh-row.many.lots .bh-t { font-size: 21px; }
+  .bh-row.many li { height: 150px; padding: 18px 22px; }
+  .bh-row.many .bh-t { font-size: 25px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  .bh-t { font-size: 28px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
   .arrows { position: fixed; left: 16px; bottom: 10px; display: none; gap: 8px; z-index: 5; }
   .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
     color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; }
@@ -1309,6 +1349,7 @@
   .notes { position: fixed; left: 24px; right: 24px; bottom: 50px; max-width: 900px; margin: 0 auto; padding: 18px 22px;
     background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
   .notes.on { display: block; }
+  body:not(.compact-nav) .notes { left: 330px; }
 
   /* --- any engine --- */
   .ae .slide-head .ae-agent .ch { background-image: linear-gradient(90deg, #ab7df8, #d2b8ff, #ab7df8); }
@@ -1638,6 +1679,24 @@
       [...text].map((c, j) => (c === " " ? " " : h("span", { class: "ch", "--i": charIndex++, "--bx": `${-j * 120}px` }, c)))
     );
   const resetIndex = () => (charIndex = 0);
+
+  // Primer Octicons (© GitHub, Inc., MIT license), drawn into canvases as Path2D.
+  // Keys are the octicon name plus the grid size its path is drawn on.
+  const OCTICONS = {
+    "circle-slash-16": "M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM3.965 13.096a6.5 6.5 0 0 0 9.131-9.131ZM1.5 8a6.474 6.474 0 0 0 1.404 4.035l9.131-9.131A6.499 6.499 0 0 0 1.5 8Z",
+    "gear-24": "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm-1.5 0a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0ZM12 1c.266 0 .532.009.797.028.763.055 1.345.617 1.512 1.304l.352 1.45c.019.078.09.171.225.221.247.089.49.19.728.302.13.061.246.044.315.002l1.275-.776c.603-.368 1.411-.353 1.99.147.402.349.78.726 1.128 1.129.501.578.515 1.386.147 1.99l-.776 1.274c-.042.069-.058.185.002.315.112.238.213.481.303.728.048.135.142.205.22.225l1.45.352c.687.167 1.249.749 1.303 1.512.038.531.038 1.063 0 1.594-.054.763-.616 1.345-1.303 1.512l-1.45.352c-.078.019-.171.09-.221.225-.089.248-.19.491-.302.728-.061.13-.044.246-.002.315l.776 1.275c.368.603.353 1.411-.147 1.99-.349.402-.726.78-1.129 1.128-.578.501-1.386.515-1.99.147l-1.274-.776c-.069-.042-.185-.058-.314.002a8.606 8.606 0 0 1-.729.303c-.135.048-.205.142-.225.22l-.352 1.45c-.167.687-.749 1.249-1.512 1.303-.531.038-1.063.038-1.594 0-.763-.054-1.345-.616-1.512-1.303l-.352-1.45c-.019-.078-.09-.171-.225-.221a8.138 8.138 0 0 1-.728-.302c-.13-.061-.246-.044-.315-.002l-1.275.776c-.603.368-1.411.353-1.99-.147-.402-.349-.78-.726-1.128-1.129-.501-.578-.515-1.386-.147-1.99l.776-1.274c.042-.069.058-.185-.002-.314a8.606 8.606 0 0 1-.303-.729c-.048-.135-.142-.205-.22-.225l-1.45-.352c-.687-.167-1.249-.749-1.304-1.512a11.158 11.158 0 0 1 0-1.594c.055-.763.617-1.345 1.304-1.512l1.45-.352c.078-.019.171-.09.221-.225.089-.248.19-.491.302-.728.061-.13.044-.246.002-.315l-.776-1.275c-.368-.603-.353-1.411.147-1.99.349-.402.726-.78 1.129-1.128.578-.501 1.386-.515 1.99-.147l1.274.776c.069.042.185.058.315-.002.238-.112.481-.213.728-.303.135-.048.205-.142.225-.22l.352-1.45c.167-.687.749-1.249 1.512-1.304C11.466 1.01 11.732 1 12 1Zm-.69 1.525c-.055.004-.135.05-.161.161l-.353 1.45a1.832 1.832 0 0 1-1.172 1.277 7.147 7.147 0 0 0-.6.249 1.833 1.833 0 0 1-1.734-.074l-1.274-.776c-.098-.06-.186-.036-.228 0a9.774 9.774 0 0 0-.976.976c-.036.042-.06.131 0 .228l.776 1.274c.314.529.342 1.18.074 1.734a7.147 7.147 0 0 0-.249.6 1.831 1.831 0 0 1-1.278 1.173l-1.45.351c-.11.027-.156.107-.16.162a9.63 9.63 0 0 0 0 1.38c.004.055.05.135.161.161l1.45.353a1.832 1.832 0 0 1 1.277 1.172c.074.204.157.404.249.6.268.553.24 1.204-.074 1.733l-.776 1.275c-.06.098-.036.186 0 .228.301.348.628.675.976.976.042.036.131.06.228 0l1.274-.776a1.83 1.83 0 0 1 1.734-.075c.196.093.396.176.6.25a1.831 1.831 0 0 1 1.173 1.278l.351 1.45c.027.11.107.156.162.16a9.63 9.63 0 0 0 1.38 0c.055-.004.135-.05.161-.161l.353-1.45a1.834 1.834 0 0 1 1.172-1.278 6.82 6.82 0 0 0 .6-.248 1.831 1.831 0 0 1 1.733.074l1.275.776c.098.06.186.036.228 0 .348-.301.675-.628.976-.976.036-.042.06-.131 0-.228l-.776-1.275a1.834 1.834 0 0 1-.075-1.733c.093-.196.176-.396.25-.6a1.831 1.831 0 0 1 1.278-1.173l1.45-.351c.11-.027.156-.107.16-.162a9.63 9.63 0 0 0 0-1.38c-.004-.055-.05-.135-.161-.161l-1.45-.353c-.626-.152-1.08-.625-1.278-1.172a6.576 6.576 0 0 0-.248-.6 1.833 1.833 0 0 1 .074-1.734l.776-1.274c.06-.098.036-.186 0-.228a9.774 9.774 0 0 0-.976-.976c-.042-.036-.131-.06-.228 0l-1.275.776a1.831 1.831 0 0 1-1.733.074 6.88 6.88 0 0 0-.6-.249 1.835 1.835 0 0 1-1.173-1.278l-.351-1.45c-.027-.11-.107-.156-.162-.16a9.63 9.63 0 0 0-1.38 0Z",
+    "globe-16": "M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 1.363 4.177c.255.426.542.832.857 1.215.245-.296.551-.705.857-1.215A9.64 9.64 0 0 0 10.22 8.75Zm4.44-1.5a9.64 9.64 0 0 0-1.363-4.177c-.307-.51-.612-.919-.857-1.215a9.927 9.927 0 0 0-.857 1.215A9.64 9.64 0 0 0 5.78 7.25Zm-5.944 1.5H1.543a6.507 6.507 0 0 0 4.666 5.5c-.123-.181-.24-.365-.352-.552-.715-1.192-1.437-2.874-1.581-4.948Zm-2.733-1.5h2.733c.144-2.074.866-3.756 1.58-4.948.12-.197.237-.381.353-.552a6.507 6.507 0 0 0-4.666 5.5Zm10.181 1.5c-.144 2.074-.866 3.756-1.58 4.948-.12.197-.237.381-.353.552a6.507 6.507 0 0 0 4.666-5.5Zm2.733-1.5a6.507 6.507 0 0 0-4.666-5.5c.123.181.24.365.353.552.714 1.192 1.436 2.874 1.58 4.948Z",
+    "north-star-16": "M8.5.75a.75.75 0 0 0-1.5 0v5.19L4.391 3.33a.75.75 0 1 0-1.06 1.061L5.939 7H.75a.75.75 0 0 0 0 1.5h5.19l-2.61 2.609a.75.75 0 1 0 1.061 1.06L7 9.561v5.189a.75.75 0 0 0 1.5 0V9.56l2.609 2.61a.75.75 0 1 0 1.06-1.061L9.561 8.5h5.189a.75.75 0 0 0 0-1.5H9.56l2.61-2.609a.75.75 0 0 0-1.061-1.06L8.5 5.939V.75Z",
+    "organization-16": "M1.75 16A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0h8.5C11.216 0 12 .784 12 1.75v12.5c0 .085-.006.168-.018.25h2.268a.25.25 0 0 0 .25-.25V8.285a.25.25 0 0 0-.111-.208l-1.055-.703a.749.749 0 1 1 .832-1.248l1.055.703c.487.325.779.871.779 1.456v5.965A1.75 1.75 0 0 1 14.25 16h-3.5a.766.766 0 0 1-.197-.026c-.099.017-.2.026-.303.026h-3a.75.75 0 0 1-.75-.75V14h-1v1.25a.75.75 0 0 1-.75.75Zm-.25-1.75c0 .138.112.25.25.25H4v-1.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .75.75v1.25h2.25a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25ZM3.75 6h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 3.75A.75.75 0 0 1 3.75 3h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 3.75Zm4 3A.75.75 0 0 1 7.75 6h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 6.75ZM7.75 3h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 9.75A.75.75 0 0 1 3.75 9h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 9.75ZM7.75 9h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z",
+    "repo-16": "M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z",
+    "workflow-16": "M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7H4v4a1 1 0 0 0 1 1h4v-1.25C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25v-.75H5A2.5 2.5 0 0 1 2.5 11V7h-.75A1.75 1.75 0 0 1 0 5.25Zm1.75-.25a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Zm9 9a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Z",
+  };
+  const octPaths = {};
+  const octicon = (ctx, name, x, y, size, color) => {
+    const n = +name.slice(name.lastIndexOf("-") + 1), p = (octPaths[name] ??= new Path2D(OCTICONS[name]));
+    ctx.save(); ctx.translate(x - size / 2, y - size / 2); ctx.scale(size / n, size / n);
+    ctx.fillStyle = color; ctx.fill(p); ctx.restore();
+  };
 
   // ---------- slides ----------
   const slides = [];
@@ -3371,7 +3430,7 @@
     }
     let last = 0;
     slides.push({
-      group: "factory",
+      group: "mindset",
       sound: "factory",
       palette: ["#bf3989", "#238636", "#9e6a03", "#8957e5"],
       notes:
@@ -3804,7 +3863,7 @@
       });
     };
     slides.push({
-      group: "factory",
+      group: "process",
       sound: "loop",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
@@ -3932,7 +3991,7 @@
         thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
       };
       slides.push({
-        group: "factory",
+        group: "process",
         sound: "reviews",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
@@ -4110,7 +4169,7 @@
         $("ctLane" + LANE[nid]).classList.add("on");
       };
       slides.push({
-        group: "factory",
+        group: "process",
         sound: "contrib",
         palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
         notes:
@@ -4174,7 +4233,7 @@
     }
     resetIndex();
     slides.push({
-      group: "factory",
+      group: "process",
       sound: "assist",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
@@ -4340,7 +4399,7 @@
       $("rpaLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "research",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
@@ -4455,7 +4514,7 @@
       fired = new Set();
     const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "unslop",
       palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
       notes:
@@ -4771,7 +4830,7 @@
     };
     let prevT = 0;
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "telemetry",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
@@ -5014,7 +5073,7 @@
       dot.style.color = col;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "grow",
       palette: ["#8957e5", "#f0883e", "#238636", "#1f6feb"],
       notes:
@@ -5228,7 +5287,7 @@
     const nums = STATS.map(() => h("div", { class: "ct-num" }, "0"));
     const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "mine",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
@@ -5505,7 +5564,7 @@
       coverage();
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "explore",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
@@ -5660,7 +5719,7 @@
       fired = 0;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "dedupe",
       palette: ["#8957e5", "#d29922", "#1f6feb", "#238636"],
       notes:
@@ -5848,7 +5907,7 @@
       return s;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "formal",
       palette: ["#1f6feb", "#8957e5", "#238636", "#bf3989"],
       notes:
@@ -6082,7 +6141,7 @@
       $("gfShipT").textContent = title;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "gofan",
       palette: ["#238636", "#1f6feb", "#8957e5", "#3fb950"],
       notes:
@@ -6312,7 +6371,7 @@
       script();
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "spec",
       palette: ["#8957e5", "#238636", "#1f6feb", "#d29922"],
       notes:
@@ -6532,7 +6591,7 @@
       script();
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "docs",
       palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
       notes:
@@ -6702,7 +6761,7 @@
       $("dgNewI").textContent = ri;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "dictate",
       palette: ["#1f6feb", "#8957e5", "#3fb950", "#79c0ff"],
       notes:
@@ -6885,7 +6944,7 @@
       $("sflLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "cihealth",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
       notes:
@@ -6945,521 +7004,6 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))), svg),
-    });
-  }
-
-  // Agents that debug agents: any agent calls the agentic-workflows MCP server; logs, audit and audit-diff read runs as unified sessions to debug, audit and optimize other agents
-  {
-    resetIndex();
-    const VW = 1700,
-      VH = 680;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    // the three calls: [verb, call text, chip index, selected run rows, findings [class, text][]]
-    const CALLS = [
-      ["① DEBUG", "audit { run: 1842 }", 3, [0], "DEBUG · audit 1842", [["ko", "✕ failed at turn 27 of 41"], ["ed", "⚠ api.contoso.com blocked"], ["ok", "→ add it to network.allowed"]]],
-      ["② AUDIT", "logs { triage, last: 20 }", 2, [0, 1, 2, 3, 4, 5], "AUDIT · 20 runs · 3 engines", [["k", "one schema across engines"], ["ko", "✕ 4 runs hit blocked domains"], ["ok", "✓ 0 safe-output violations"]]],
-      ["③ OPTIMIZE", "audit-diff { 1842, 1849 }", 4, [0, 5], "OPTIMIZE · 1842 → 1849", [["ok", "✓ tokens 412k → 138k (−66%)"], ["ok", "✓ turns 41 → 17"], ["ed", "⚠ 9 repeated searches removed"]]],
-    ];
-    const TOOLS = [
-      ["status", "workflows · state"],
-      ["health", "success · trends"],
-      ["logs", "many runs"],
-      ["audit", "one run, deep"],
-      ["audit-diff", "compare runs"],
-      ["compile", "validate · lock"],
-      ["checks", "PR CI state"],
-      ["fix", "codemods"],
-    ];
-    // synthetic runs: [id, engine, bar count, denied bars, wasted bars, tokens]
-    const RUNS = [
-      ["#1842", "copilot", 24, [12, 19], [8, 15, 16], "412k"],
-      ["#1843", "claude", 24, [], [], "296k"],
-      ["#1845", "copilot", 24, [18], [], "344k"],
-      ["#1846", "codex", 24, [10], [], "371k"],
-      ["#1848", "claude", 24, [6], [], "305k"],
-      ["#1849", "copilot", 11, [], [], "138k"],
-    ];
-    const ENG = { copilot: "e0", claude: "e1", codex: "e2" };
-    const callY = p => 300 + p * 86,
-      chipY = i => 150 + i * 50,
-      rowY = r => 140 + r * 56,
-      cardY = p => 80 + p * 156,
-      runY = p => (p === 1 ? 280 : rowY(CALLS[p][3][CALLS[p][3].length - 1]));
-    let g = `<defs><clipPath id="mcClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mcAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
-      <marker id="mcP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <marker id="mcB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    [
-      [0, 380, "ANY AGENT"],
-      [380, 800, "AGENTIC-WORKFLOWS MCP"],
-      [800, 1270, "RUNS · UNIFIED SESSIONS"],
-      [1270, VW, "DEBUG · AUDIT · OPTIMIZE"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="mcLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
-    });
-    // edges: per call, agent → tool, tool → runs, runs → findings
-    const EDGES = [];
-    CALLS.forEach(([, , ci], p) => {
-      const y1 = callY(p) + 10,
-        y2 = chipY(ci),
-        ry = runY(p),
-        cy = cardY(p) + 70;
-      EDGES.push([`mcA${p}`, `M356 ${y1} C 400 ${y1}, 396 ${y2}, 436 ${y2}`, "p"]);
-      EDGES.push([`mcB${p}`, `M744 ${y2} C 790 ${y2}, 780 ${ry}, 826 ${ry}`, "p"]);
-      EDGES.push([`mcC${p}`, `M1254 ${ry} C 1272 ${ry}, 1266 ${cy}, 1286 ${cy}`, "b"]);
-    });
-    for (const [id, d, c] of EDGES) g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mc${c === "p" ? "P" : "B"})"/>`;
-    // the caller: any agent that speaks MCP
-    g += `<g class="fm-task" id="mcCaller"><g class="fm-pill"><rect x="70" y="105" width="270" height="50" rx="25"/><text x="223" y="138">any agent</text></g><circle cx="70" cy="130" r="34" fill="url(#mcAgent)"/>${ico("copilot", 70, 131, 38)}</g>`;
-    g += `<text class="mc-eng" x="190" y="206">Copilot · Claude · Codex</text><text class="mc-eng" x="190" y="230">IDE · terminal · workflow</text>`;
-    g += `<g class="sfl-box" id="mcCalls"><rect class="sfl-card" x="24" y="250" width="332" height="290" rx="12"/><text class="sfl-title" x="40" y="276">MCP TOOL CALLS</text>`;
-    CALLS.forEach(([v, c], p) => {
-      const y = callY(p) + 6;
-      g += `<g class="sfl-row mc-call" id="mcCall${p}"><rect x="32" y="${y - 22}" width="316" height="64" rx="6"/><text class="mc-v" x="44" y="${y}">${v}</text><text x="44" y="${y + 30}">${esc(c)}</text></g>`;
-    });
-    g += `</g>`;
-    // the MCP server and its tools
-    g += `<g class="sfl-box" id="mcSrv"><rect class="sfl-card" x="410" y="76" width="360" height="464" rx="16"/><text class="mc-sub" x="590" y="110">gh aw mcp-server</text>`;
-    TOOLS.forEach(([n, d], i) => {
-      const y = chipY(i);
-      g += `<g class="mc-chip" id="mcChip${i}"><rect x="440" y="${y - 20}" width="300" height="40" rx="8"/><text class="mc-n" x="456" y="${y + 7}">${n}</text><text class="mc-d" x="728" y="${y + 6}">${d}</text></g>`;
-    });
-    g += `</g>`;
-    // runs, each normalized to one unified session timeline
-    g += `<g class="sfl-box" id="mcRuns"><rect class="sfl-card" x="830" y="76" width="424" height="464" rx="12"/><text class="sfl-title" x="846" y="104">RUNS · aw_session.jsonl</text>`;
-    RUNS.forEach(([id, eng, n, den, waste, tok], r) => {
-      const y = rowY(r);
-      g += `<g class="mc-run" id="mcRun${r}"><rect class="mc-sel" x="838" y="${y - 22}" width="408" height="44" rx="6"/><text class="mc-id" x="846" y="${y + 6}">${id}</text><text class="mc-tag ${ENG[eng]}" x="916" y="${y + 6}">${eng}</text>`;
-      for (let j = 0; j < n; j++) {
-        const k = den.includes(j) ? "x" : waste.includes(j) ? "r" : j % 2 ? "t" : "m",
-          ht = k === "x" ? 26 : k === "r" ? 20 : 8 + ((j * 37 + r * 11) % 15);
-        g += `<rect class="ao-bar ${k}" data-j="${j}" x="${1000 + j * 7}" y="${y + 14 - ht}" width="5" height="${ht}" rx="1.5"/>`;
-      }
-      g += `<text class="mc-tok" x="1238" y="${y + 6}">${tok}</text></g>`;
-    });
-    [
-      ["#8957e5", "model"],
-      ["#1f6feb", "tool"],
-      ["#f85149", "denied"],
-      ["#d29922", "waste"],
-    ].forEach(([c, t], i) => (g += `<text class="ao-leg" x="${852 + i * 98}" y="478" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
-    g += `<text class="mc-cap" x="1042" y="518">every engine → one timeline</text></g>`;
-    // findings
-    CALLS.forEach(([, , , , title, rows], p) => {
-      const y = cardY(p);
-      g += `<g class="sfl-box" id="mcCard${p}"><rect class="sfl-card" x="1290" y="${y}" width="402" height="140" rx="12"/><text class="sfl-title" x="1306" y="${y + 28}">${esc(title)}</text>`;
-      rows.forEach(([c, t], i) => (g += `<g class="sfl-row mc-find"><text class="${c}" x="1306" y="${y + 64 + i * 30}">${esc(t)}</text></g>`));
-      g += `</g>`;
-    });
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg ao-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot");
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    // [edge id | CALL | SCAN | FIND, node lit on arrival, duration, call index]
-    const SEQ = [];
-    CALLS.forEach((_, p) => {
-      SEQ.push(["CALL", `mcCall${p}`, 900, p], [`mcA${p}`, `mcChip${CALLS[p][2]}`, 0, p], [`mcB${p}`, "mcRuns", 0, p], ["SCAN", "mcRuns", 1600, p], [`mcC${p}`, `mcCard${p}`, 0, p], ["FIND", `mcCard${p}`, 1500, p]);
-    });
-    const LANE = { mcCaller: 0, mcCalls: 0, mcSrv: 1, mcRuns: 2 };
-    const STEP = 1000,
-      START = 800,
-      HOLD = 2600,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1,
-      phase = -1,
-      shown = 0;
-    const light = nid => {
-      const call = /^mcCall\d/.test(nid);
-      if (!nid.startsWith("mcChip") || nid === "mcChip" + CALLS[phase][2]) $(nid).classList.add(call ? "seen" : "on");
-      if (nid.startsWith("mcChip")) $("mcSrv").classList.add("on");
-      if (call) $("mcCalls").classList.add("on");
-      const lane = nid.startsWith("mcCard") ? 3 : LANE[nid.replace(/\d+$/, "")] ?? (nid.startsWith("mcChip") ? 1 : 0);
-      $("mcLane" + lane).classList.add("on");
-    };
-    const select = p => {
-      if (phase === p) return;
-      phase = p;
-      svg.querySelectorAll(".mc-run.sel, .mc-call.on, .mc-chip.on").forEach(x => x.classList.remove("sel", "on"));
-      CALLS[p][3].forEach(r => $("mcRun" + r).classList.add("sel"));
-      $("mcCall" + p).classList.add("on");
-    };
-    const scan = (p, f) => {
-      const n = Math.min(1, f / 0.8) * 24;
-      CALLS[p][3].forEach(r => {
-        const row = $("mcRun" + r);
-        row.querySelectorAll(".ao-bar").forEach(b => +b.dataset.j < n && b.classList.add("seen"));
-        if (f >= 0.8) row.classList.add("seen");
-      });
-    };
-    slides.push({
-      group: "loops",
-      sound: "mcp",
-      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
-      notes:
-        "Agents that debug agents: every run, number and finding on this slide is illustrative and synthetic. gh aw ships an MCP server, agentic-workflows (gh aw mcp-server), that exposes the CLI as tools: status, health, logs, audit, audit-diff, compile, checks, fix. Any agent that speaks MCP can call it, whether Copilot, Claude or Codex, in an IDE, a terminal or inside another agentic workflow. logs and audit are read-only: they download a run's logs, firewall log and token usage and normalize every engine's trace into one unified session, aw_session.jsonl, with each turn, tool call, token count and denial in one schema. So an agent can debug one failed run with audit, audit twenty runs across engines with logs, and optimize by comparing a run before and after a change with audit-diff. The next slide puts that on a schedule.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          svg.querySelectorAll(".on, .hot, .seen, .sel").forEach(x => x.classList.remove("on", "hot", "seen", "sel"));
-          light("mcCaller");
-          popK = -1;
-          phase = -1;
-          shown = 0;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP, p] = SEQ[k],
-          f = (u - T[k]) / (dur || STEP);
-        select(p);
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
-        if (["CALL", "SCAN", "FIND"].includes(eid)) {
-          dot.style.opacity = 0;
-          light(nid);
-          if (eid === "SCAN") scan(p, f);
-          else if (eid === "FIND") {
-            const rows = [...$("mcCard" + p).querySelectorAll(".mc-find")];
-            rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.3) / rows.length));
-            const n = svg.querySelectorAll(".mc-find.seen").length;
-            if (n !== shown) {
-              shown = n;
-              if (n) sfx.pop(3 + n);
-            }
-          } else if (popK !== k) {
-            popK = k;
-            sfx.key();
-          }
-          return;
-        }
-        $("mcChip" + CALLS[p][2]).classList.toggle("on", eid !== `mcA${p}` || f >= 0.8);
-        const path = $(eid),
-          n = path.getTotalLength(),
-          q = path.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
-        path.classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", path.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        if (f >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k % 8);
-          }
-          light(nid);
-        }
-      },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The agentic-workflows MCP · logs · audit · unified sessions"), h("h2", {}, letters("Agents that "), letters("debug agents", "l-grad"))), svg),
-    });
-  }
-
-  // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
-  {
-    resetIndex();
-    const VW = 1700,
-      VH = 680;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
-    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
-    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    // synthetic run metrics: [label, before, after, format]
-    const MET = [
-      ["turns", 41, 17, v => `${Math.round(v)}`],
-      ["tokens", 412, 138, v => `${Math.round(v)}k`],
-      ["tool calls", 96, 22, v => `${Math.round(v)}`],
-      ["denied", 3, 0, v => `${Math.round(v)}`],
-    ];
-    // what the scheduled health agent sees across the repository's workflows: [name, score, ok]
-    const HEALTH = [
-      ["daily-report", 97, 1],
-      ["pr-review", 94, 1],
-      ["issue-triage", 58, 0],
-      ["docs-sync", 91, 1],
-    ];
-    let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="298" rx="12"/><text class="sfl-title" x="40" y="116">HEALTH · ${HEALTH.length} WORKFLOWS</text>`;
-    HEALTH.forEach(([n, sc, ok], i) => {
-      const y = 146 + i * 26;
-      run += `<g class="ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
-    });
-    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
-    MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${292 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${292 + i * 26}"></text>`));
-    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
-    // what the audit downloads, typed into the terminal
-    const TERM = [
-      ["cmd", "$ gh aw audit 1842"],
-      ["dl", "↓ agent logs · firewall log"],
-      ["dl", "↓ token usage · tool calls"],
-      ["dl", "↓ aw_session.jsonl (unified)"],
-      ["ok", "✓ 214 events · 41 turns"],
-      ["ko", "✕ conclusion: failure"],
-    ];
-    let term = `<g class="sfl-box" id="aoTerm"><rect class="sfl-card" x="398" y="90" width="404" height="300" rx="12"/><text class="sfl-title" x="414" y="116">AUDIT · RUN 1842</text>`;
-    TERM.forEach(([c, t], i) => (term += `<g class="sfl-row ao-term"><text class="${c}" x="414" y="${158 + i * 36}">${esc(t)}</text></g>`));
-    term += `</g>`;
-    // the unified session: one bar per turn (height = tokens); r repeated search, x firewall denial, f oversized read, t tool, m model
-    const REP = [8, 11, 14, 17, 20, 23, 26, 29, 33],
-      DEN = [12, 27, 35],
-      BIG = [31, 36, 38],
-      NB = 41,
-      BX = 858,
-      BW = 380 / NB,
-      BASE = 256;
-    const KIND = [...Array(NB)].map((_, i) => (REP.includes(i) ? "r" : DEN.includes(i) ? "x" : BIG.includes(i) ? "f" : i % 2 ? "t" : "m"));
-    const HT = KIND.map((k, i) => (k === "f" ? 100 : k === "x" ? 22 : k === "r" ? 34 : 14 + ((i * 37) % 23) + (i >= 30 ? 36 : 0)));
-    const FIND = [
-      ["ed", "r", n => `⚠ ${n}× identical issue search`],
-      ["ko", "x", n => `✕ ${n} fetches denied by firewall`],
-      ["ed", "f", n => `⚠ ${n} files > 20 KB read whole`],
-      ["ed", "late", () => "⚠ 61% of tokens after turn 30"],
-    ];
-    let sess = `<g class="sfl-box" id="aoSess"><rect class="sfl-card" x="838" y="90" width="420" height="380" rx="12"/><text class="sfl-title" x="854" y="116">UNIFIED SESSION · aw_session.jsonl</text>`;
-    sess += `<rect class="rpa-dup" id="aoLate" x="${BX + 30 * BW - 3}" y="132" width="${11 * BW + 4}" height="${BASE - 128}" rx="6"/>`;
-    KIND.forEach((k, i) => (sess += `<rect class="ao-bar ${k}" x="${(BX + i * BW).toFixed(1)}" y="${BASE - HT[i]}" width="${(BW - 3).toFixed(1)}" height="${HT[i]}" rx="2"/>`));
-    sess += `<line class="ao-axis" x1="${BX - 4}" y1="${BASE + 2}" x2="${BX + 384}" y2="${BASE + 2}"/>`;
-    [
-      ["#8957e5", "model"],
-      ["#1f6feb", "tool"],
-      ["#f85149", "denied"],
-      ["#d29922", "waste"],
-    ].forEach(([c, t], i) => (sess += `<text class="ao-leg" x="${BX + i * 98}" y="${BASE + 28}" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
-    FIND.forEach(([c], i) => (sess += `<g class="sfl-row ao-find"><text class="${c}" id="aoF${i}" x="854" y="${330 + i * 34}"></text></g>`));
-    sess += `<g class="sfl-scan" id="aoBeam"><rect x="-28" y="128" width="28" height="${BASE - 124}" fill="url(#aoBeamG)"/><line x1="0" y1="128" x2="0" y2="${BASE + 4}"/></g></g>`;
-    // the fix, as a diff of the workflow markdown
-    const DIFF = [
-      ["ctx", "  tools:"],
-      ["ctx", "    github: { toolsets: [issues] }"],
-      ["add", "+   web-fetch:"],
-      ["add", "+ network:"],
-      ["add", "+   allowed: [docs.contoso.com]"],
-      ["add", "+ cache-memory: true"],
-      ["ctx", "  ---"],
-      ["add", "+ Search once, then reuse the results."],
-      ["ok", "✓ gh aw compile · lock refreshed"],
-    ];
-    let diff = `<g class="sfl-box ao-diff" id="aoDiff"><rect class="sfl-card" x="1288" y="90" width="404" height="330" rx="12"/><text class="sfl-title" x="1304" y="116">issue-triage.md</text>`;
-    DIFF.forEach(([c, t], i) => (diff += `<g class="sfl-row ao-dl ${c}"><rect x="1296" y="${134 + i * 30}" width="388" height="28" rx="4" fill="none"/><text x="1304" y="${154 + i * 30}">${esc(t)}</text></g>`));
-    diff += `</g>`;
-    // [edge id, path, color, label, lx, ly, anchor]
-    const EDGES = [
-      ["aoE0", "M90 400 V542", "p", ["on schedule · gh aw health", "picks issue-triage"], 112, 446, "start"],
-      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 522, "middle"],
-      ["aoE2", "M450 544 V396", "p", ["audit"], 472, 478, "start"],
-      ["aoE3", "M804 240 H834", "p", [], 0, 0, "start"],
-      ["aoE4", "M1260 240 H1284", "p", [], 0, 0, "start"],
-      ["aoE5", "M1330 424 V542", "p", ["opens PR"], 1352, 490, "start"],
-      ["aoE7", "M1368 580 H1402", "b", ["✓ approves"], 1500, 534, "middle"],
-      ["aoE6", "M1440 616 V652 H8 V200 H20", "b day", ["merged · health keeps watching the next runs"], 760, 640, "middle"],
-    ];
-    // the token's journey: [edge, node lit on arrival, duration]; TYPE, SCAN, DIFF and RERUN are in-place steps
-    const SEQ = [
-      ["aoE0", "aoHealth"],
-      ["aoE1", "aoCop"],
-      ["aoE2", "aoTerm"],
-      ["TYPE", "aoTerm", 2200],
-      ["aoE3", "aoSess", 700],
-      ["SCAN", "aoSess", 3400],
-      ["aoE4", "aoDiff", 700],
-      ["DIFF", "aoDiff", 2600],
-      ["aoE5", "aoPR"],
-      ["aoE7", "aoDev", 900],
-      ["aoE6", "aoRun", 1800],
-      ["RERUN", "aoRun", 2200],
-    ];
-    const LANE = { aoRun: 0, aoHealth: 0, aoCop: 1, aoTerm: 1, aoSess: 2, aoDiff: 3, aoPR: 3, aoDev: 3 };
-    let g = `<defs><clipPath id="aoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="aoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
-      <marker id="aoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <linearGradient id="aoBeamG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
-      <marker id="aoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    [
-      [0, 380, "HEALTH"],
-      [380, 820, "AUDIT"],
-      [820, 1270, "AGENT · ANALYZE"],
-      [1270, VW, "AGENT · OPTIMIZE · FIX"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="aoLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
-    });
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#ao${c.startsWith("p") ? "P" : "B"})"/>`;
-      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${esc(l)}</tspan>`).join("")}</text>`;
-    }
-    g += run + term + sess + diff;
-    const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 20)}</g>`;
-    g += badge(1232, 444) + badge(1666, 394);
-
-    g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
-    g += `<g class="ao-badge"><circle cx="62" cy="548" r="17" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("calendar", 62, 548, 18, "#ab7df8")}</g>`;
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg ao-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot"),
-      bars = [...svg.querySelectorAll(".ao-bar")],
-      finds = [...svg.querySelectorAll(".ao-find")];
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 1050,
-      START = 900,
-      HOLD = 2400,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1,
-      typed = 0,
-      done = 0;
-    const light = nid => {
-      $(nid).classList.add("on");
-      $("aoLane" + LANE[nid]).classList.add("on");
-      if (nid === "aoHealth") $("aoPick").classList.add("on");
-    };
-    const setRun = (f, state) => {
-      const r = $("aoRun");
-      r.classList.toggle("bad", state === "bad");
-      r.classList.toggle("good", state === "good");
-      const st = $("aoStat");
-      st.textContent = state === "bad" ? "issue-triage #1842 · ✕" : state === "good" ? "issue-triage #1843 · ✓" : "issue-triage #1843 · ◌";
-      st.setAttribute("class", "ao-stat" + (state === "bad" ? " ko" : state === "good" ? " ok" : ""));
-      MET.forEach(([, a, b, fmt], i) => ($("aoV" + i).textContent = fmt(a + (b - a) * f)));
-    };
-    const reveal = (rows, f) => rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.4) / rows.length));
-    const scan = f => {
-      const b = $("aoBeam"),
-        x = BX + Math.min(1, f / 0.8) * (NB * BW + 4),
-        n = Math.floor((x - BX) / BW);
-      b.setAttribute("transform", `translate(${x},0)`);
-      b.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
-      bars.forEach((r, i) => r.classList.toggle("seen", i < n));
-      FIND.forEach(([, k, txt], i) => {
-        const c = k === "late" ? +(n >= NB) : KIND.slice(0, n).filter(x => x === k).length;
-        if (!c) return;
-        const el = $("aoF" + i),
-          s = txt(c);
-        if (el.textContent !== s) el.textContent = s;
-        if (!finds[i].classList.contains("seen")) {
-          finds[i].classList.add("seen");
-          sfx.pop(4 + i);
-        }
-        if (k === "late") $("aoLate").classList.add("on");
-      });
-    };
-    slides.push({
-      group: "loops",
-      sound: "audit",
-      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
-      notes:
-        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
-          FIND.forEach((_, i) => ($("aoF" + i).textContent = ""));
-          $("aoBeam").style.opacity = 0;
-          setRun(0, "bad");
-          light("aoRun");
-          popK = -1;
-          typed = 0;
-          done = 0;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP] = SEQ[k],
-          f = (u - T[k]) / dur;
-        if (["TYPE", "SCAN", "DIFF", "RERUN"].includes(eid)) {
-          dot.style.opacity = 0;
-          for (let j = 0; j <= k; j++) light(SEQ[j][1]);
-          if (eid === "TYPE") reveal([...svg.querySelectorAll(".ao-term")], f / 0.9);
-          else if (eid === "SCAN") scan(f);
-          else if (eid === "DIFF") reveal([...svg.querySelectorAll(".ao-dl")], f / 0.9);
-          else {
-            const g2 = Math.min(1, Math.max(0, (f - 0.15) / 0.6));
-            setRun(g2, f < 0.8 ? "run" : "good");
-            if (f >= 0.8 && !done) {
-              done = 1;
-              $("aoDelta").classList.add("on");
-              sfx.pop(9);
-            }
-          }
-          const rows = eid === "TYPE" ? ".ao-term.seen" : eid === "DIFF" ? ".ao-dl.seen" : null;
-          if (rows) {
-            const n = svg.querySelectorAll(rows).length;
-            if (n !== typed) {
-              typed = n;
-              if (n) sfx.key();
-            }
-          }
-          return;
-        }
-        const p = $(eid),
-          n = p.getTotalLength(),
-          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
-        p.classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
-        if (f >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          light(nid);
-        }
-      },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
     });
   }
 
@@ -8292,6 +7836,442 @@
     });
   }
 
+  // Agents that debug agents: any agent calls the agentic-workflows MCP server; logs, audit and audit-diff read runs as unified sessions to debug, audit and optimize other agents
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // the three calls: [verb, call text, chip index, selected run rows, findings [class, text][]]
+    const CALLS = [
+      ["① DEBUG", "audit { run: 1842 }", 3, [0], "DEBUG · audit 1842", [["ko", "✕ failed at turn 27 of 41"], ["ed", "⚠ api.contoso.com blocked"], ["ok", "→ add it to network.allowed"]]],
+      ["② AUDIT", "logs { triage, last: 20 }", 2, [0, 1, 2, 3, 4, 5], "AUDIT · 20 runs · 3 engines", [["k", "one schema across engines"], ["ko", "✕ 4 runs hit blocked domains"], ["ok", "✓ 0 safe-output violations"]]],
+      ["③ OPTIMIZE", "audit-diff { 1842, 1849 }", 4, [0, 5], "OPTIMIZE · 1842 → 1849", [["ok", "✓ tokens 412k → 138k (−66%)"], ["ok", "✓ turns 41 → 17"], ["ed", "⚠ 9 repeated searches removed"]]],
+    ];
+    const TOOLS = [
+      ["status", "workflows · state"],
+      ["health", "success · trends"],
+      ["logs", "many runs"],
+      ["audit", "one run, deep"],
+      ["audit-diff", "compare runs"],
+      ["compile", "validate · lock"],
+      ["checks", "PR CI state"],
+      ["fix", "codemods"],
+    ];
+    // synthetic runs: [id, engine, bar count, denied bars, wasted bars, tokens]
+    const RUNS = [
+      ["#1842", "copilot", 24, [12, 19], [8, 15, 16], "412k"],
+      ["#1843", "claude", 24, [], [], "296k"],
+      ["#1845", "copilot", 24, [18], [], "344k"],
+      ["#1846", "codex", 24, [10], [], "371k"],
+      ["#1848", "claude", 24, [6], [], "305k"],
+      ["#1849", "copilot", 11, [], [], "138k"],
+    ];
+    const ENG = { copilot: "e0", claude: "e1", codex: "e2" };
+    const callY = p => 300 + p * 86,
+      chipY = i => 150 + i * 50,
+      rowY = r => 140 + r * 56,
+      cardY = p => 80 + p * 156,
+      runY = p => (p === 1 ? 280 : rowY(CALLS[p][3][CALLS[p][3].length - 1]));
+    let g = `<defs><clipPath id="mcClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mcAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="mcP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="mcB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 380, "ANY AGENT"],
+      [380, 800, "AGENTIC-WORKFLOWS MCP"],
+      [800, 1270, "RUNS · UNIFIED SESSIONS"],
+      [1270, VW, "DEBUG · AUDIT · OPTIMIZE"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="mcLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    // edges: per call, agent → tool, tool → runs, runs → findings
+    const EDGES = [];
+    CALLS.forEach(([, , ci], p) => {
+      const y1 = callY(p) + 10,
+        y2 = chipY(ci),
+        ry = runY(p),
+        cy = cardY(p) + 70;
+      EDGES.push([`mcA${p}`, `M356 ${y1} C 400 ${y1}, 396 ${y2}, 436 ${y2}`, "p"]);
+      EDGES.push([`mcB${p}`, `M744 ${y2} C 790 ${y2}, 780 ${ry}, 826 ${ry}`, "p"]);
+      EDGES.push([`mcC${p}`, `M1254 ${ry} C 1272 ${ry}, 1266 ${cy}, 1286 ${cy}`, "b"]);
+    });
+    for (const [id, d, c] of EDGES) g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mc${c === "p" ? "P" : "B"})"/>`;
+    // the caller: any agent that speaks MCP
+    g += `<g class="fm-task" id="mcCaller"><g class="fm-pill"><rect x="70" y="105" width="270" height="50" rx="25"/><text x="223" y="138">any agent</text></g><circle cx="70" cy="130" r="34" fill="url(#mcAgent)"/>${ico("copilot", 70, 131, 38)}</g>`;
+    g += `<text class="mc-eng" x="190" y="206">Copilot · Claude · Codex</text><text class="mc-eng" x="190" y="230">IDE · terminal · workflow</text>`;
+    g += `<g class="sfl-box" id="mcCalls"><rect class="sfl-card" x="24" y="250" width="332" height="290" rx="12"/><text class="sfl-title" x="40" y="276">MCP TOOL CALLS</text>`;
+    CALLS.forEach(([v, c], p) => {
+      const y = callY(p) + 6;
+      g += `<g class="sfl-row mc-call" id="mcCall${p}"><rect x="32" y="${y - 22}" width="316" height="64" rx="6"/><text class="mc-v" x="44" y="${y}">${v}</text><text x="44" y="${y + 30}">${esc(c)}</text></g>`;
+    });
+    g += `</g>`;
+    // the MCP server and its tools
+    g += `<g class="sfl-box" id="mcSrv"><rect class="sfl-card" x="410" y="76" width="360" height="464" rx="16"/><text class="mc-sub" x="590" y="110">gh aw mcp-server</text>`;
+    TOOLS.forEach(([n, d], i) => {
+      const y = chipY(i);
+      g += `<g class="mc-chip" id="mcChip${i}"><rect x="440" y="${y - 20}" width="300" height="40" rx="8"/><text class="mc-n" x="456" y="${y + 7}">${n}</text><text class="mc-d" x="728" y="${y + 6}">${d}</text></g>`;
+    });
+    g += `</g>`;
+    // runs, each normalized to one unified session timeline
+    g += `<g class="sfl-box" id="mcRuns"><rect class="sfl-card" x="830" y="76" width="424" height="464" rx="12"/><text class="sfl-title" x="846" y="104">RUNS · aw_session.jsonl</text>`;
+    RUNS.forEach(([id, eng, n, den, waste, tok], r) => {
+      const y = rowY(r);
+      g += `<g class="mc-run" id="mcRun${r}"><rect class="mc-sel" x="838" y="${y - 22}" width="408" height="44" rx="6"/><text class="mc-id" x="846" y="${y + 6}">${id}</text><text class="mc-tag ${ENG[eng]}" x="916" y="${y + 6}">${eng}</text>`;
+      for (let j = 0; j < n; j++) {
+        const k = den.includes(j) ? "x" : waste.includes(j) ? "r" : j % 2 ? "t" : "m",
+          ht = k === "x" ? 26 : k === "r" ? 20 : 8 + ((j * 37 + r * 11) % 15);
+        g += `<rect class="ao-bar ${k}" data-j="${j}" x="${1000 + j * 7}" y="${y + 14 - ht}" width="5" height="${ht}" rx="1.5"/>`;
+      }
+      g += `<text class="mc-tok" x="1238" y="${y + 6}">${tok}</text></g>`;
+    });
+    [
+      ["#8957e5", "model"],
+      ["#1f6feb", "tool"],
+      ["#f85149", "denied"],
+      ["#d29922", "waste"],
+    ].forEach(([c, t], i) => (g += `<text class="ao-leg" x="${852 + i * 98}" y="478" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
+    g += `<text class="mc-cap" x="1042" y="518">every engine → one timeline</text></g>`;
+    // findings
+    CALLS.forEach(([, , , , title, rows], p) => {
+      const y = cardY(p);
+      g += `<g class="sfl-box" id="mcCard${p}"><rect class="sfl-card" x="1290" y="${y}" width="402" height="140" rx="12"/><text class="sfl-title" x="1306" y="${y + 28}">${esc(title)}</text>`;
+      rows.forEach(([c, t], i) => (g += `<g class="sfl-row mc-find"><text class="${c}" x="1306" y="${y + 64 + i * 30}">${esc(t)}</text></g>`));
+      g += `</g>`;
+    });
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // [edge id | CALL | SCAN | FIND, node lit on arrival, duration, call index]
+    const SEQ = [];
+    CALLS.forEach((_, p) => {
+      SEQ.push(["CALL", `mcCall${p}`, 900, p], [`mcA${p}`, `mcChip${CALLS[p][2]}`, 0, p], [`mcB${p}`, "mcRuns", 0, p], ["SCAN", "mcRuns", 1600, p], [`mcC${p}`, `mcCard${p}`, 0, p], ["FIND", `mcCard${p}`, 1500, p]);
+    });
+    const LANE = { mcCaller: 0, mcCalls: 0, mcSrv: 1, mcRuns: 2 };
+    const STEP = 1000,
+      START = 800,
+      HOLD = 2600,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1,
+      phase = -1,
+      shown = 0;
+    const light = nid => {
+      const call = /^mcCall\d/.test(nid);
+      if (!nid.startsWith("mcChip") || nid === "mcChip" + CALLS[phase][2]) $(nid).classList.add(call ? "seen" : "on");
+      if (nid.startsWith("mcChip")) $("mcSrv").classList.add("on");
+      if (call) $("mcCalls").classList.add("on");
+      const lane = nid.startsWith("mcCard") ? 3 : LANE[nid.replace(/\d+$/, "")] ?? (nid.startsWith("mcChip") ? 1 : 0);
+      $("mcLane" + lane).classList.add("on");
+    };
+    const select = p => {
+      if (phase === p) return;
+      phase = p;
+      svg.querySelectorAll(".mc-run.sel, .mc-call.on, .mc-chip.on").forEach(x => x.classList.remove("sel", "on"));
+      CALLS[p][3].forEach(r => $("mcRun" + r).classList.add("sel"));
+      $("mcCall" + p).classList.add("on");
+    };
+    const scan = (p, f) => {
+      const n = Math.min(1, f / 0.8) * 24;
+      CALLS[p][3].forEach(r => {
+        const row = $("mcRun" + r);
+        row.querySelectorAll(".ao-bar").forEach(b => +b.dataset.j < n && b.classList.add("seen"));
+        if (f >= 0.8) row.classList.add("seen");
+      });
+    };
+    slides.push({
+      group: "cost",
+      sound: "mcp",
+      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
+      notes:
+        "Agents that debug agents: every run, number and finding on this slide is illustrative and synthetic. gh aw ships an MCP server, agentic-workflows (gh aw mcp-server), that exposes the CLI as tools: status, health, logs, audit, audit-diff, compile, checks, fix. Any agent that speaks MCP can call it, whether Copilot, Claude or Codex, in an IDE, a terminal or inside another agentic workflow. logs and audit are read-only: they download a run's logs, firewall log and token usage and normalize every engine's trace into one unified session, aw_session.jsonl, with each turn, tool call, token count and denial in one schema. So an agent can debug one failed run with audit, audit twenty runs across engines with logs, and optimize by comparing a run before and after a change with audit-diff. The next slide puts that on a schedule.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .seen, .sel").forEach(x => x.classList.remove("on", "hot", "seen", "sel"));
+          light("mcCaller");
+          popK = -1;
+          phase = -1;
+          shown = 0;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP, p] = SEQ[k],
+          f = (u - T[k]) / (dur || STEP);
+        select(p);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (["CALL", "SCAN", "FIND"].includes(eid)) {
+          dot.style.opacity = 0;
+          light(nid);
+          if (eid === "SCAN") scan(p, f);
+          else if (eid === "FIND") {
+            const rows = [...$("mcCard" + p).querySelectorAll(".mc-find")];
+            rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.3) / rows.length));
+            const n = svg.querySelectorAll(".mc-find.seen").length;
+            if (n !== shown) {
+              shown = n;
+              if (n) sfx.pop(3 + n);
+            }
+          } else if (popK !== k) {
+            popK = k;
+            sfx.key();
+          }
+          return;
+        }
+        $("mcChip" + CALLS[p][2]).classList.toggle("on", eid !== `mcA${p}` || f >= 0.8);
+        const path = $(eid),
+          n = path.getTotalLength(),
+          q = path.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        path.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", path.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k % 8);
+          }
+          light(nid);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The agentic-workflows MCP · logs · audit · unified sessions"), h("h2", {}, letters("Agents that "), letters("debug agents", "l-grad"))), svg),
+    });
+  }
+
+  // Any agent, any provider: one Markdown workflow retargets engine + model provider; tokens stream from the provider through the same guardrails
+  {
+    resetIndex();
+    const PROV = {
+      github: { name: "GitHub", sub: "Copilot models", c: "#a371f7" },
+      anthropic: { name: "Anthropic", sub: "Claude models", c: "#e3845f" },
+      openai: { name: "OpenAI", sub: "GPT models", c: "#56d4bc" },
+    };
+    const PIDS = Object.keys(PROV);
+    const COMBOS = [
+      ["copilot", "github"],
+      ["claude", "anthropic"],
+      ["codex", "openai"],
+      ["claude", "github"],
+      ["pi", "github"],
+      ["codex", "github"],
+    ];
+    const ENG = { copilot: "Copilot", claude: "Claude", codex: "Codex", pi: "Pi" };
+    // Monochrome marks (currentColor): Copilot, Claude, OpenAI from Simple Icons (CC0), GitHub from Octicons (MIT),
+    // Pi from pi.dev, Anthropic from Simple Icons (CC0). Trademarks belong to their respective owners.
+    const LOGO = {"copilot": ["0 0 24 24", ["M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"]], "claude": ["0 0 24 24", ["m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"]], "codex": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "pi": ["0 0 560 560", ["M420 280H280V140H0V0H420V280Z", "M560 560H420V280H560V560Z", "M140 560H0V140H140V280H280V420H140V560Z"]], "openai": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "github": ["0 0 16 16", ["M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"]], "anthropic": ["0 0 24 24", ["M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"]]};
+    const logo = id => {
+      const s = h("span", { class: "ae-logo" });
+      s.innerHTML = `<svg viewBox="${LOGO[id][0]}" aria-hidden="true" fill="currentColor">${LOGO[id][1].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+      return s;
+    };
+    const K = "#ff7b72",
+      G = "#7ee787",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff";
+    const vId = h("span", { class: "ae-val" });
+    const vPv = h("span", { class: "ae-val" });
+    const caret = h("i", { class: "ae-caret" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["daily", V],
+      ],
+      [["engine:", K]],
+      [["  id: ", K], vId],
+      [["  model-provider: ", K], vPv],
+      [["tools:", K]],
+      [
+        ["  github: ", K],
+        ["issues", G],
+      ],
+      [["safe-outputs:", K]],
+      [["  add-labels:", K]],
+      [["---", D]],
+      [["# Daily issue triage", T]],
+      [["Label new issues and suggest an owner.", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 3 || i === 4 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "ae-ed" }, h("div", { class: "ae-tab" }, "daily-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "ae-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg>';
+    const provEls = PIDS.map(id => h("div", { class: "ae-prov", "--c": PROV[id].c }, logo(id), h("div", {}, h("b", {}, PROV[id].name), h("span", {}, PROV[id].sub))));
+    const mono = h("div", { class: "ae-mono" });
+    const nm = h("strong");
+    const tokN = h("em", { class: "ae-tokn" }, "0");
+    const core = h("div", { class: "ae-core" }, mono, h("div", {}, h("small", {}, "agent engine"), nm, tokN));
+    const ring = (label, c, inset) => h("div", { class: "ae-ring", "--c": c, style: { inset: `${inset}px` } }, h("b", {}, label), h("i", {}, "✓ same"));
+    const run = h("div", { class: "ae-run" }, ring("Actions runner · lock file", "#4493f8", 0), ring("Network firewall", "#d29922", 44), ring("Sandboxed container", "#f85149", 88), core, h("div", { class: "ae-facts" }, h("span", {}, h("b", {}, "0"), " secrets"), h("span", {}, "read-only tokens")));
+    const TW = 744,
+      TH = 640;
+    const tc = h("canvas", { class: "ae-toks", width: TW, height: TH });
+    const tx = tc.getContext("2d");
+    const picks = Object.keys(ENG).map(id => h("div", { class: "ae-pick", "data-e": id }, h("b", {}, logo(id)), id));
+    const tag = h("div", { class: "ae-tag" }, "Swap the ", h("em", {}, "engine"), ". Pick the ", h("em", {}, "provider"), ". Keep the guardrails.");
+    const el = h(
+      "section",
+      { class: "slide ae" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One workflow · swap the engine · pick the model provider"), h("h2", {}, letters("Any "), letters("agent", "l-grad ae-agent"), letters(", any "), letters("provider", "l-grad ae-prov-t"))),
+      ed,
+      arrow,
+      h("div", { class: "ae-provs" }, provEls),
+      run,
+      tc,
+      h("div", { class: "ae-picks" }, picks),
+      tag
+    );
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      tId = "",
+      tPv = "",
+      toks = [],
+      spawnAt = 0,
+      tokens = 0,
+      shown = 0,
+      gulp = 0,
+      last = 0;
+    const setCombo = i => {
+      cur = i;
+      const [eid, pid] = COMBOS[i];
+      const c = PROV[pid].c;
+      el.style.setProperty("--ec", c);
+      mono.replaceChildren(logo(eid));
+      nm.textContent = ENG[eid];
+      provEls.forEach((p, j) => p.classList.toggle("on", PIDS[j] === pid));
+      picks.forEach(p => p.classList.toggle("on", p.dataset.e === eid));
+      core.classList.remove("swap");
+      void core.offsetWidth;
+      core.classList.add("swap");
+    };
+    // token stream: from the active provider card (top) down into the agent core
+    const CORE = { x: TW / 2, y: 120 + 245 };
+    const WORDS = ["label", " the", " issue", "triage", " owner", " bug", " new", " suggest", " needs", "-info", " repro", " docs", "ing", " area", ":ui", " P2"];
+    const drawToks = (t, dt) => {
+      tx.clearRect(0, 0, TW, TH);
+      tx.font = "600 18px 'Monaspace Neon', monospace";
+      tx.textAlign = "center";
+      tx.textBaseline = "middle";
+      const pid = COMBOS[cur][1],
+        j = PIDS.indexOf(pid),
+        sx = 124 + j * 248,
+        sy = 70,
+        c = PROV[pid].c;
+      if (phase === "hold" && t > spawnAt) {
+        spawnAt = t + 240;
+        toks.push({ p: 0, sx: sx + (Math.random() - 0.5) * 140, sy: sy + 40, c, w: WORDS[(Math.random() * WORDS.length) | 0] });
+      }
+      for (const q of toks) {
+        q.p += dt / 900;
+        const u = Math.min(1, q.p);
+        tx.globalAlpha = u > 0.85 ? (1 - u) / 0.15 : Math.min(1, u * 6);
+        const x = q.sx + (CORE.x - q.sx) * u,
+          y = q.sy + (CORE.y - 75 - q.sy) * u,
+          bw = tx.measureText(q.w).width + 20;
+        tx.fillStyle = "#0d1117";
+        tx.strokeStyle = q.c;
+        tx.lineWidth = 1.5;
+        tx.beginPath();
+        tx.roundRect(x - bw / 2, y - 15, bw, 30, 8);
+        tx.fill();
+        tx.stroke();
+        tx.fillStyle = q.c;
+        tx.fillText(q.w.trim(), x, y + 1);
+        if (q.p >= 1) {
+          tokens += 100 + ((Math.random() * 200) | 0);
+          gulp = Math.min(1, gulp + 0.15);
+        }
+      }
+      tx.globalAlpha = 1;
+      toks = toks.filter(q => q.p < 1);
+      gulp *= 0.94 ** (dt / 16);
+      core.style.setProperty("--gl", `${40 + gulp * 90}px`);
+      shown += (tokens - shown) * Math.min(1, dt / 160);
+      tokN.textContent = "↓ " + Math.round(shown).toLocaleString("en-US") + " tokens";
+    };
+    slides.push({
+      group: "engineering",
+      sound: "engine",
+      palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
+      notes:
+        "Any agent, any provider. The same Markdown workflow can target different coding agents and model providers by changing two frontmatter lines: engine id copilot, claude, codex or pi, and model-provider github, anthropic or openai. Claude can run on Anthropic or on GitHub Copilot inference; Codex on OpenAI or GitHub. The agent pulls tokens from whichever provider you pick, but the compiler keeps the same guardrails around it: the Actions runner and lock file, the network firewall, and the sandboxed container, which holds zero secrets and only read-only tokens. Token counts are simulated and the workflow is a synthetic example; see the engines and model routing reference for setup and availability.",
+      enter() {
+        tId = COMBOS[0][0];
+        tPv = COMBOS[0][1];
+        vId.textContent = tId;
+        vPv.textContent = tPv;
+        phase = "hold";
+        since = last = spawnAt = 0;
+        toks = [];
+        tokens = shown = 0;
+        setCombo(0);
+      },
+      tick(t) {
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (!since) since = t;
+        const el2 = t - since;
+        const [nId, nPv] = COMBOS[(cur + 1) % COMBOS.length];
+        if (phase === "hold" && el2 > 3000) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 30) {
+          since = t;
+          if (tPv) tPv = tPv.slice(0, -1);
+          else if (tId !== nId) tId = tId.slice(0, -1);
+          vId.textContent = tId;
+          vPv.textContent = tPv;
+          if (!tPv && (tId === nId || !tId)) phase = "type";
+        } else if (phase === "type" && el2 > 75) {
+          since = t;
+          if (tId !== nId) tId = nId.slice(0, tId.length + 1);
+          else tPv = nPv.slice(0, tPv.length + 1);
+          vId.textContent = tId;
+          vPv.textContent = tPv;
+          sfx.key(0.7);
+          if (tId === nId && tPv === nPv) {
+            setCombo((cur + 1) % COMBOS.length);
+            sfx.pop(cur * 2);
+            phase = "hold";
+          }
+        }
+        drawToks(t, dt);
+      },
+      el,
+    });
+  }
+
   // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
   {
     resetIndex();
@@ -8391,7 +8371,7 @@
     };
     const setNotes = n => (ledgerD.textContent = `${n} notes · queried read-only in SQLite`);
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "memory",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#0a3069"],
       notes:
@@ -8567,7 +8547,7 @@
       while (log.children.length > 5) log.lastChild.remove();
     };
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "ephemeral",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#9a6700"],
       notes:
@@ -8707,7 +8687,7 @@
       fn();
     };
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "index",
       palette: ["#2da44e", "#1f6feb", "#8957e5", "#0a3069"],
       notes:
@@ -8960,7 +8940,7 @@
     };
 
     slides.push({
-      group: "cost",
+      group: "engineering",
       sound: "lab",
       palette: ["#1f6feb", "#8957e5", "#238636", "#0d419d"],
       notes:
@@ -9012,207 +8992,286 @@
     });
   }
 
-  // Any agent, any provider: one Markdown workflow retargets engine + model provider; tokens stream from the provider through the same guardrails
+  // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
   {
     resetIndex();
-    const PROV = {
-      github: { name: "GitHub", sub: "Copilot models", c: "#a371f7" },
-      anthropic: { name: "Anthropic", sub: "Claude models", c: "#e3845f" },
-      openai: { name: "OpenAI", sub: "GPT models", c: "#56d4bc" },
-    };
-    const PIDS = Object.keys(PROV);
-    const COMBOS = [
-      ["copilot", "github"],
-      ["claude", "anthropic"],
-      ["codex", "openai"],
-      ["claude", "github"],
-      ["pi", "github"],
-      ["codex", "github"],
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // synthetic run metrics: [label, before, after, format]
+    const MET = [
+      ["turns", 41, 17, v => `${Math.round(v)}`],
+      ["tokens", 412, 138, v => `${Math.round(v)}k`],
+      ["tool calls", 96, 22, v => `${Math.round(v)}`],
+      ["denied", 3, 0, v => `${Math.round(v)}`],
     ];
-    const ENG = { copilot: "Copilot", claude: "Claude", codex: "Codex", pi: "Pi" };
-    // Monochrome marks (currentColor): Copilot, Claude, OpenAI from Simple Icons (CC0), GitHub from Octicons (MIT),
-    // Pi from pi.dev, Anthropic from Simple Icons (CC0). Trademarks belong to their respective owners.
-    const LOGO = {"copilot": ["0 0 24 24", ["M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"]], "claude": ["0 0 24 24", ["m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"]], "codex": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "pi": ["0 0 560 560", ["M420 280H280V140H0V0H420V280Z", "M560 560H420V280H560V560Z", "M140 560H0V140H140V280H280V420H140V560Z"]], "openai": ["0 0 24 24", ["M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"]], "github": ["0 0 16 16", ["M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"]], "anthropic": ["0 0 24 24", ["M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"]]};
-    const logo = id => {
-      const s = h("span", { class: "ae-logo" });
-      s.innerHTML = `<svg viewBox="${LOGO[id][0]}" aria-hidden="true" fill="currentColor">${LOGO[id][1].map(d => `<path d="${d}"/>`).join("")}</svg>`;
-      return s;
-    };
-    const K = "#ff7b72",
-      G = "#7ee787",
-      D = "#656c76",
-      T = "#f0f6fc",
-      V = "#a5d6ff";
-    const vId = h("span", { class: "ae-val" });
-    const vPv = h("span", { class: "ae-val" });
-    const caret = h("i", { class: "ae-caret" });
-    const LINES = [
-      [["---", D]],
-      [
-        ["on: ", K],
-        ["daily", V],
-      ],
-      [["engine:", K]],
-      [["  id: ", K], vId],
-      [["  model-provider: ", K], vPv],
-      [["tools:", K]],
-      [
-        ["  github: ", K],
-        ["issues", G],
-      ],
-      [["safe-outputs:", K]],
-      [["  add-labels:", K]],
-      [["---", D]],
-      [["# Daily issue triage", T]],
-      [["Label new issues and suggest an owner.", T]],
+    // what the scheduled health agent sees across the repository's workflows: [name, score, ok]
+    const HEALTH = [
+      ["daily-report", 97, 1],
+      ["pr-review", 94, 1],
+      ["issue-triage", 58, 0],
+      ["docs-sync", 91, 1],
     ];
-    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 3 || i === 4 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
-    const ed = h("div", { class: "ae-ed" }, h("div", { class: "ae-tab" }, "daily-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
-    const arrow = h("div", { class: "ae-arrow" }, "gh aw compile");
-    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg>';
-    const provEls = PIDS.map(id => h("div", { class: "ae-prov", "--c": PROV[id].c }, logo(id), h("div", {}, h("b", {}, PROV[id].name), h("span", {}, PROV[id].sub))));
-    const mono = h("div", { class: "ae-mono" });
-    const nm = h("strong");
-    const tokN = h("em", { class: "ae-tokn" }, "0");
-    const core = h("div", { class: "ae-core" }, mono, h("div", {}, h("small", {}, "agent engine"), nm, tokN));
-    const ring = (label, c, inset) => h("div", { class: "ae-ring", "--c": c, style: { inset: `${inset}px` } }, h("b", {}, label), h("i", {}, "✓ same"));
-    const run = h("div", { class: "ae-run" }, ring("Actions runner · lock file", "#4493f8", 0), ring("Network firewall", "#d29922", 44), ring("Sandboxed container", "#f85149", 88), core, h("div", { class: "ae-facts" }, h("span", {}, h("b", {}, "0"), " secrets"), h("span", {}, "read-only tokens")));
-    const TW = 744,
-      TH = 640;
-    const tc = h("canvas", { class: "ae-toks", width: TW, height: TH });
-    const tx = tc.getContext("2d");
-    const picks = Object.keys(ENG).map(id => h("div", { class: "ae-pick", "data-e": id }, h("b", {}, logo(id)), id));
-    const tag = h("div", { class: "ae-tag" }, "Swap the ", h("em", {}, "engine"), ". Pick the ", h("em", {}, "provider"), ". Keep the guardrails.");
-    const el = h(
-      "section",
-      { class: "slide ae" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One workflow · swap the engine · pick the model provider"), h("h2", {}, letters("Any "), letters("agent", "l-grad ae-agent"), letters(", any "), letters("provider", "l-grad ae-prov-t"))),
-      ed,
-      arrow,
-      h("div", { class: "ae-provs" }, provEls),
-      run,
-      tc,
-      h("div", { class: "ae-picks" }, picks),
-      tag
-    );
-    let cur = 0,
-      phase = "hold",
-      since = 0,
-      tId = "",
-      tPv = "",
-      toks = [],
-      spawnAt = 0,
-      tokens = 0,
-      shown = 0,
-      gulp = 0,
-      last = 0;
-    const setCombo = i => {
-      cur = i;
-      const [eid, pid] = COMBOS[i];
-      const c = PROV[pid].c;
-      el.style.setProperty("--ec", c);
-      mono.replaceChildren(logo(eid));
-      nm.textContent = ENG[eid];
-      provEls.forEach((p, j) => p.classList.toggle("on", PIDS[j] === pid));
-      picks.forEach(p => p.classList.toggle("on", p.dataset.e === eid));
-      core.classList.remove("swap");
-      void core.offsetWidth;
-      core.classList.add("swap");
+    let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="298" rx="12"/><text class="sfl-title" x="40" y="116">HEALTH · ${HEALTH.length} WORKFLOWS</text>`;
+    HEALTH.forEach(([n, sc, ok], i) => {
+      const y = 146 + i * 26;
+      run += `<g class="ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
+    });
+    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
+    MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${292 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${292 + i * 26}"></text>`));
+    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
+    // what the audit downloads, typed into the terminal
+    const TERM = [
+      ["cmd", "$ gh aw audit 1842"],
+      ["dl", "↓ agent logs · firewall log"],
+      ["dl", "↓ token usage · tool calls"],
+      ["dl", "↓ aw_session.jsonl (unified)"],
+      ["ok", "✓ 214 events · 41 turns"],
+      ["ko", "✕ conclusion: failure"],
+    ];
+    let term = `<g class="sfl-box" id="aoTerm"><rect class="sfl-card" x="398" y="90" width="404" height="300" rx="12"/><text class="sfl-title" x="414" y="116">AUDIT · RUN 1842</text>`;
+    TERM.forEach(([c, t], i) => (term += `<g class="sfl-row ao-term"><text class="${c}" x="414" y="${158 + i * 36}">${esc(t)}</text></g>`));
+    term += `</g>`;
+    // the unified session: one bar per turn (height = tokens); r repeated search, x firewall denial, f oversized read, t tool, m model
+    const REP = [8, 11, 14, 17, 20, 23, 26, 29, 33],
+      DEN = [12, 27, 35],
+      BIG = [31, 36, 38],
+      NB = 41,
+      BX = 858,
+      BW = 380 / NB,
+      BASE = 256;
+    const KIND = [...Array(NB)].map((_, i) => (REP.includes(i) ? "r" : DEN.includes(i) ? "x" : BIG.includes(i) ? "f" : i % 2 ? "t" : "m"));
+    const HT = KIND.map((k, i) => (k === "f" ? 100 : k === "x" ? 22 : k === "r" ? 34 : 14 + ((i * 37) % 23) + (i >= 30 ? 36 : 0)));
+    const FIND = [
+      ["ed", "r", n => `⚠ ${n}× identical issue search`],
+      ["ko", "x", n => `✕ ${n} fetches denied by firewall`],
+      ["ed", "f", n => `⚠ ${n} files > 20 KB read whole`],
+      ["ed", "late", () => "⚠ 61% of tokens after turn 30"],
+    ];
+    let sess = `<g class="sfl-box" id="aoSess"><rect class="sfl-card" x="838" y="90" width="420" height="380" rx="12"/><text class="sfl-title" x="854" y="116">UNIFIED SESSION · aw_session.jsonl</text>`;
+    sess += `<rect class="rpa-dup" id="aoLate" x="${BX + 30 * BW - 3}" y="132" width="${11 * BW + 4}" height="${BASE - 128}" rx="6"/>`;
+    KIND.forEach((k, i) => (sess += `<rect class="ao-bar ${k}" x="${(BX + i * BW).toFixed(1)}" y="${BASE - HT[i]}" width="${(BW - 3).toFixed(1)}" height="${HT[i]}" rx="2"/>`));
+    sess += `<line class="ao-axis" x1="${BX - 4}" y1="${BASE + 2}" x2="${BX + 384}" y2="${BASE + 2}"/>`;
+    [
+      ["#8957e5", "model"],
+      ["#1f6feb", "tool"],
+      ["#f85149", "denied"],
+      ["#d29922", "waste"],
+    ].forEach(([c, t], i) => (sess += `<text class="ao-leg" x="${BX + i * 98}" y="${BASE + 28}" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
+    FIND.forEach(([c], i) => (sess += `<g class="sfl-row ao-find"><text class="${c}" id="aoF${i}" x="854" y="${330 + i * 34}"></text></g>`));
+    sess += `<g class="sfl-scan" id="aoBeam"><rect x="-28" y="128" width="28" height="${BASE - 124}" fill="url(#aoBeamG)"/><line x1="0" y1="128" x2="0" y2="${BASE + 4}"/></g></g>`;
+    // the fix, as a diff of the workflow markdown
+    const DIFF = [
+      ["ctx", "  tools:"],
+      ["ctx", "    github: { toolsets: [issues] }"],
+      ["add", "+   web-fetch:"],
+      ["add", "+ network:"],
+      ["add", "+   allowed: [docs.contoso.com]"],
+      ["add", "+ cache-memory: true"],
+      ["ctx", "  ---"],
+      ["add", "+ Search once, then reuse the results."],
+      ["ok", "✓ gh aw compile · lock refreshed"],
+    ];
+    let diff = `<g class="sfl-box ao-diff" id="aoDiff"><rect class="sfl-card" x="1288" y="90" width="404" height="330" rx="12"/><text class="sfl-title" x="1304" y="116">issue-triage.md</text>`;
+    DIFF.forEach(([c, t], i) => (diff += `<g class="sfl-row ao-dl ${c}"><rect x="1296" y="${134 + i * 30}" width="388" height="28" rx="4" fill="none"/><text x="1304" y="${154 + i * 30}">${esc(t)}</text></g>`));
+    diff += `</g>`;
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["aoE0", "M90 400 V542", "p", ["on schedule · gh aw health", "picks issue-triage"], 112, 446, "start"],
+      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 522, "middle"],
+      ["aoE2", "M450 544 V396", "p", ["audit"], 472, 478, "start"],
+      ["aoE3", "M804 240 H834", "p", [], 0, 0, "start"],
+      ["aoE4", "M1260 240 H1284", "p", [], 0, 0, "start"],
+      ["aoE5", "M1330 424 V542", "p", ["opens PR"], 1352, 490, "start"],
+      ["aoE7", "M1368 580 H1402", "b", ["✓ approves"], 1500, 534, "middle"],
+      ["aoE6", "M1440 616 V652 H8 V200 H20", "b day", ["merged · health keeps watching the next runs"], 760, 640, "middle"],
+    ];
+    // the token's journey: [edge, node lit on arrival, duration]; TYPE, SCAN, DIFF and RERUN are in-place steps
+    const SEQ = [
+      ["aoE0", "aoHealth"],
+      ["aoE1", "aoCop"],
+      ["aoE2", "aoTerm"],
+      ["TYPE", "aoTerm", 2200],
+      ["aoE3", "aoSess", 700],
+      ["SCAN", "aoSess", 3400],
+      ["aoE4", "aoDiff", 700],
+      ["DIFF", "aoDiff", 2600],
+      ["aoE5", "aoPR"],
+      ["aoE7", "aoDev", 900],
+      ["aoE6", "aoRun", 1800],
+      ["RERUN", "aoRun", 2200],
+    ];
+    const LANE = { aoRun: 0, aoHealth: 0, aoCop: 1, aoTerm: 1, aoSess: 2, aoDiff: 3, aoPR: 3, aoDev: 3 };
+    let g = `<defs><clipPath id="aoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="aoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="aoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="aoBeamG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
+      <marker id="aoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 380, "HEALTH"],
+      [380, 820, "AUDIT"],
+      [820, 1270, "AGENT · ANALYZE"],
+      [1270, VW, "AGENT · OPTIMIZE · FIX"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="aoLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#ao${c.startsWith("p") ? "P" : "B"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${esc(l)}</tspan>`).join("")}</text>`;
+    }
+    g += run + term + sess + diff;
+    const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 20)}</g>`;
+    g += badge(1232, 444) + badge(1666, 394);
+
+    g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
+    g += `<g class="ao-badge"><circle cx="62" cy="548" r="17" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("calendar", 62, 548, 18, "#ab7df8")}</g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot"),
+      bars = [...svg.querySelectorAll(".ao-bar")],
+      finds = [...svg.querySelectorAll(".ao-find")];
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 2400,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1,
+      typed = 0,
+      done = 0;
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("aoLane" + LANE[nid]).classList.add("on");
+      if (nid === "aoHealth") $("aoPick").classList.add("on");
     };
-    // token stream: from the active provider card (top) down into the agent core
-    const CORE = { x: TW / 2, y: 120 + 245 };
-    const WORDS = ["label", " the", " issue", "triage", " owner", " bug", " new", " suggest", " needs", "-info", " repro", " docs", "ing", " area", ":ui", " P2"];
-    const drawToks = (t, dt) => {
-      tx.clearRect(0, 0, TW, TH);
-      tx.font = "600 18px 'Monaspace Neon', monospace";
-      tx.textAlign = "center";
-      tx.textBaseline = "middle";
-      const pid = COMBOS[cur][1],
-        j = PIDS.indexOf(pid),
-        sx = 124 + j * 248,
-        sy = 70,
-        c = PROV[pid].c;
-      if (phase === "hold" && t > spawnAt) {
-        spawnAt = t + 240;
-        toks.push({ p: 0, sx: sx + (Math.random() - 0.5) * 140, sy: sy + 40, c, w: WORDS[(Math.random() * WORDS.length) | 0] });
-      }
-      for (const q of toks) {
-        q.p += dt / 900;
-        const u = Math.min(1, q.p);
-        tx.globalAlpha = u > 0.85 ? (1 - u) / 0.15 : Math.min(1, u * 6);
-        const x = q.sx + (CORE.x - q.sx) * u,
-          y = q.sy + (CORE.y - 75 - q.sy) * u,
-          bw = tx.measureText(q.w).width + 20;
-        tx.fillStyle = "#0d1117";
-        tx.strokeStyle = q.c;
-        tx.lineWidth = 1.5;
-        tx.beginPath();
-        tx.roundRect(x - bw / 2, y - 15, bw, 30, 8);
-        tx.fill();
-        tx.stroke();
-        tx.fillStyle = q.c;
-        tx.fillText(q.w.trim(), x, y + 1);
-        if (q.p >= 1) {
-          tokens += 100 + ((Math.random() * 200) | 0);
-          gulp = Math.min(1, gulp + 0.15);
+    const setRun = (f, state) => {
+      const r = $("aoRun");
+      r.classList.toggle("bad", state === "bad");
+      r.classList.toggle("good", state === "good");
+      const st = $("aoStat");
+      st.textContent = state === "bad" ? "issue-triage #1842 · ✕" : state === "good" ? "issue-triage #1843 · ✓" : "issue-triage #1843 · ◌";
+      st.setAttribute("class", "ao-stat" + (state === "bad" ? " ko" : state === "good" ? " ok" : ""));
+      MET.forEach(([, a, b, fmt], i) => ($("aoV" + i).textContent = fmt(a + (b - a) * f)));
+    };
+    const reveal = (rows, f) => rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.4) / rows.length));
+    const scan = f => {
+      const b = $("aoBeam"),
+        x = BX + Math.min(1, f / 0.8) * (NB * BW + 4),
+        n = Math.floor((x - BX) / BW);
+      b.setAttribute("transform", `translate(${x},0)`);
+      b.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      bars.forEach((r, i) => r.classList.toggle("seen", i < n));
+      FIND.forEach(([, k, txt], i) => {
+        const c = k === "late" ? +(n >= NB) : KIND.slice(0, n).filter(x => x === k).length;
+        if (!c) return;
+        const el = $("aoF" + i),
+          s = txt(c);
+        if (el.textContent !== s) el.textContent = s;
+        if (!finds[i].classList.contains("seen")) {
+          finds[i].classList.add("seen");
+          sfx.pop(4 + i);
         }
-      }
-      tx.globalAlpha = 1;
-      toks = toks.filter(q => q.p < 1);
-      gulp *= 0.94 ** (dt / 16);
-      core.style.setProperty("--gl", `${40 + gulp * 90}px`);
-      shown += (tokens - shown) * Math.min(1, dt / 160);
-      tokN.textContent = "↓ " + Math.round(shown).toLocaleString("en-US") + " tokens";
+        if (k === "late") $("aoLate").classList.add("on");
+      });
     };
     slides.push({
-      group: "enterprise",
-      sound: "engine",
-      palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
+      group: "engineering",
+      sound: "audit",
+      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
       notes:
-        "Any agent, any provider. The same Markdown workflow can target different coding agents and model providers by changing two frontmatter lines: engine id copilot, claude, codex or pi, and model-provider github, anthropic or openai. Claude can run on Anthropic or on GitHub Copilot inference; Codex on OpenAI or GitHub. The agent pulls tokens from whichever provider you pick, but the compiler keeps the same guardrails around it: the Actions runner and lock file, the network firewall, and the sandboxed container, which holds zero secrets and only read-only tokens. Token counts are simulated and the workflow is a synthetic example; see the engines and model routing reference for setup and availability.",
+        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
       enter() {
-        tId = COMBOS[0][0];
-        tPv = COMBOS[0][1];
-        vId.textContent = tId;
-        vPv.textContent = tPv;
-        phase = "hold";
-        since = last = spawnAt = 0;
-        toks = [];
-        tokens = shown = 0;
-        setCombo(0);
+        t0 = 0;
+        cyc = -1;
       },
       tick(t) {
-        const dt = last ? Math.min(50, t - last) : 16;
-        last = t;
-        if (!since) since = t;
-        const el2 = t - since;
-        const [nId, nPv] = COMBOS[(cur + 1) % COMBOS.length];
-        if (phase === "hold" && el2 > 3000) {
-          phase = "del";
-          since = t;
-        } else if (phase === "del" && el2 > 30) {
-          since = t;
-          if (tPv) tPv = tPv.slice(0, -1);
-          else if (tId !== nId) tId = tId.slice(0, -1);
-          vId.textContent = tId;
-          vPv.textContent = tPv;
-          if (!tPv && (tId === nId || !tId)) phase = "type";
-        } else if (phase === "type" && el2 > 75) {
-          since = t;
-          if (tId !== nId) tId = nId.slice(0, tId.length + 1);
-          else tPv = nPv.slice(0, tPv.length + 1);
-          vId.textContent = tId;
-          vPv.textContent = tPv;
-          sfx.key(0.7);
-          if (tId === nId && tPv === nPv) {
-            setCombo((cur + 1) % COMBOS.length);
-            sfx.pop(cur * 2);
-            phase = "hold";
-          }
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          FIND.forEach((_, i) => ($("aoF" + i).textContent = ""));
+          $("aoBeam").style.opacity = 0;
+          setRun(0, "bad");
+          light("aoRun");
+          popK = -1;
+          typed = 0;
+          done = 0;
         }
-        drawToks(t, dt);
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (["TYPE", "SCAN", "DIFF", "RERUN"].includes(eid)) {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(SEQ[j][1]);
+          if (eid === "TYPE") reveal([...svg.querySelectorAll(".ao-term")], f / 0.9);
+          else if (eid === "SCAN") scan(f);
+          else if (eid === "DIFF") reveal([...svg.querySelectorAll(".ao-dl")], f / 0.9);
+          else {
+            const g2 = Math.min(1, Math.max(0, (f - 0.15) / 0.6));
+            setRun(g2, f < 0.8 ? "run" : "good");
+            if (f >= 0.8 && !done) {
+              done = 1;
+              $("aoDelta").classList.add("on");
+              sfx.pop(9);
+            }
+          }
+          const rows = eid === "TYPE" ? ".ao-term.seen" : eid === "DIFF" ? ".ao-dl.seen" : null;
+          if (rows) {
+            const n = svg.querySelectorAll(rows).length;
+            if (n !== typed) {
+              typed = n;
+              if (n) sfx.key();
+            }
+          }
+          return;
+        }
+        const p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
       },
-      el,
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
     });
   }
 
@@ -9402,7 +9461,7 @@
       script();
     };
     slides.push({
-      group: "enterprise",
+      group: "security",
       sound: "vault",
       palette: ["#8957e5", "#1f6feb", "#238636", "#1b7c83"],
       notes:
@@ -9692,190 +9751,6 @@
     });
   }
 
-  // Patch to PR: the create-pull-request state machine; the agent packages a bundle or patch, detection scans it, the safe outputs job checks file policy, names a branch, applies (retrying at the original base), pushes signed commits through GraphQL and opens the PR, falling back to issues when it cannot
-  {
-    resetIndex();
-    const VW = 1800,
-      VH = 680;
-    // [id, kind (b box, d decision, t terminal), x, y, w, line1, line2, tone]
-    const NODES = [
-      ["c0", "b", 80, 330, 130, "agent", "commits"],
-      ["d1", "d", 240, 330, 150, "changes?", "excluded-files"],
-      ["t1", "t", 240, 560, 190, "no changes", "if-no-changes", "o"],
-      ["bun", "b", 415, 210, 150, "git bundle", "default"],
-      ["am", "b", 415, 450, 150, "format-patch", "patch-format: am"],
-      ["det", "d", 595, 330, 150, "threat?", "detection job"],
-      ["t2", "t", 595, 560, 170, "✗ stop", "nothing written", "r"],
-      ["pol", "d", 790, 330, 150, "files ok?", "protected-files"],
-      ["t4", "t", 790, 130, 200, "fallback-to-issue", "→ review issue", "o"],
-      ["t5", "t", 790, 560, 200, "✗ blocked", "or max-patch-size", "r"],
-      ["br", "b", 960, 330, 140, "branch", "+ hex suffix"],
-      ["ap", "d", 1145, 330, 150, "applies?", "am --3way"],
-      ["rb", "b", 1145, 520, 150, "retry at", "original base"],
-      ["t6", "t", 960, 600, 150, "✗ failed", "to apply", "r"],
-      ["sg", "d", 1405, 330, 150, "signed?", "signed-commits"],
-      ["gq", "b", 1405, 190, 210, "GraphQL commit", "✓ Verified"],
-      ["t7", "t", 1405, 86, 240, "✗ merge · submodule", "no unsigned fallback", "r"],
-      ["gp", "b", 1405, 470, 190, "git push", "unsigned"],
-      ["pr", "d", 1600, 330, 90, "PR?", ""],
-      ["done", "t", 1725, 330, 140, "PR open", "draft · labels", "g"],
-      ["t8", "t", 1695, 500, 200, "issue instead", "fallback-as-issue", "o"],
-    ];
-    const N = Object.fromEntries(NODES.map(([id, k, x, y, w]) => [id, { k, x, y, w, h: id === "t7" ? 52 : k === "d" ? 72 : k === "t" ? 60 : 64 }]));
-    const R = id => [N[id].x + N[id].w / 2, N[id].y],
-      L = id => [N[id].x - N[id].w / 2, N[id].y],
-      T = id => [N[id].x, N[id].y - N[id].h / 2],
-      B = id => [N[id].x, N[id].y + N[id].h / 2];
-    // [from, to, points, label, lx, ly, anchor]
-    const EDGES = [
-      ["c0", "d1", [R("c0"), L("d1")]],
-      ["d1", "t1", [B("d1"), T("t1")], "none", 250, 450],
-      ["d1", "bun", [R("d1"), [327, 330], [327, 210], L("bun")]],
-      ["d1", "am", [R("d1"), [327, 330], [327, 450], L("am")]],
-      ["bun", "det", [R("bun"), [505, 210], [505, 330], L("det")]],
-      ["am", "det", [R("am"), [505, 450], [505, 330], L("det")]],
-      ["det", "t2", [B("det"), T("t2")], "flagged", 605, 460],
-      ["det", "pol", [R("det"), L("pol")], "clean", 692, 316, "middle"],
-      ["pol", "t4", [T("pol"), B("t4")], "fallback", 800, 235],
-      ["pol", "t5", [B("pol"), T("t5")], "blocked", 800, 460],
-      ["pol", "br", [R("pol"), L("br")]],
-      ["br", "ap", [R("br"), L("ap")]],
-      ["ap", "rb", [B("ap"), T("rb")], "conflict", 1155, 440],
-      ["rb", "t6", [L("rb"), [960, 520], T("t6")]],
-      ["rb", "sg", [R("rb"), [1305, 520], [1305, 330], L("sg")]],
-      ["ap", "sg", [R("ap"), L("sg")], "re-check", 1262, 316, "middle"],
-      ["sg", "gq", [T("sg"), B("gq")], "true", 1395, 265, "end"],
-      ["sg", "gp", [B("sg"), T("gp")], "false", 1395, 400, "end"],
-      ["gq", "t7", [T("gq"), B("t7")]],
-      ["gq", "gp", [[1495, 222], [1495, 438]], "GraphQL error", 1488, 428, "end"],
-      ["gq", "pr", [R("gq"), [1540, 190], [1540, 330], L("pr")]],
-      ["gp", "pr", [R("gp"), [1540, 470], [1540, 330], L("pr")]],
-      ["pr", "done", [R("pr"), L("done")]],
-      ["pr", "t8", [B("pr"), [1600, 470]], "denied", 1610, 420],
-    ];
-    const PRE = ["c0", "d1", "bun", "det", "pol", "br", "ap", "sg", "gq"];
-    // [title, path, result, tone]
-    const RUNS = [
-      ["Happy path, signed", [...PRE, "pr", "done"], "● PR open · ✓ Verified commits", "g"],
-      ["Agent edits a protected file", ["c0", "d1", "am", "det", "pol", "t4"], "→ review issue instead of a PR", "o"],
-      ["Base moved, patch conflicts", ["c0", "d1", "bun", "det", "pol", "br", "ap", "rb", "sg", "gq", "pr", "done"], "● PR on the original base", "g"],
-      ["Bundle carries a merge commit", [...PRE, "t7"], "✗ refuses an unsigned push", "r"],
-      ["GraphQL unavailable", [...PRE, "gp", "pr", "done"], "● PR open · plain git push", "g"],
-      ["Actions may not open PRs", [...PRE, "pr", "t8"], "→ fallback issue, compare link", "o"],
-    ];
-    const pts = p => p.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
-    let g = `<defs><marker id="cprA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6e7681"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="50"/>`;
-    [
-      [0, 500, "AGENT · PACKAGE"],
-      [500, 690, "DETECT"],
-      [690, 1310, "SAFE OUTPUTS · APPLY"],
-      [1310, 1800, "PUSH · OPEN"],
-    ].forEach(([x0, x1, t]) => {
-      g += `<text class="fm-lane-t" x="${(x0 + x1) / 2}" y="33">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 20}"/>`;
-    });
-    EDGES.forEach(([a, b, p, lab, lx, ly, anc]) => {
-      g += `<path class="cpr-e" id="cprE_${a}_${b}" d="${pts(p)}" marker-end="url(#cprA)"/>`;
-      if (lab) g += `<text class="cpr-el" x="${lx}" y="${ly}" text-anchor="${anc || "start"}">${lab}</text>`;
-    });
-    NODES.forEach(([id, k, x, y, w, a, b, tone]) => {
-      const hh = N[id].h;
-      const shape =
-        k === "d"
-          ? `<polygon points="${x - w / 2},${y} ${x - w / 2 + 18},${y - hh / 2} ${x + w / 2 - 18},${y - hh / 2} ${x + w / 2},${y} ${x + w / 2 - 18},${y + hh / 2} ${x - w / 2 + 18},${y + hh / 2}"/>`
-          : `<rect x="${x - w / 2}" y="${y - hh / 2}" width="${w}" height="${hh}" rx="${k === "t" ? 30 : 12}"/>`;
-      g += `<g class="cpr-n ${k}${tone ? " " + tone : ""}" id="cprN_${id}">${shape}<text class="cpr-a" x="${x}" y="${b ? y - 2 : y + 7}">${a}</text>${b ? `<text class="cpr-b" x="${x}" y="${y + 19}">${b}</text>` : ""}</g>`;
-    });
-    g += `<text class="cpr-k" x="960" y="392">preserve-branch-name</text><text class="cpr-k" x="960" y="410">recreate-ref</text>`;
-    g += `<circle class="cpr-dot" r="9" cx="-50" cy="-50" style="opacity:0"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "cpr-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#79c0ff");
-    svg.innerHTML = g;
-    const nEl = Object.fromEntries(NODES.map(([id]) => [id, svg.querySelector("#cprN_" + id)])),
-      eEl = Object.fromEntries(EDGES.map(([a, b]) => [`${a}>${b}`, svg.querySelector(`#cprE_${a}_${b}`)])),
-      dot = svg.querySelector(".cpr-dot");
-    const runT = h("i", {}),
-      runB = h("b", {}),
-      runR = h("span", {});
-    const cap = h("div", { class: "cpr-cap" }, runT, runB, runR);
-    const INTRO = 500,
-      HOP = 360,
-      HOLD = 2600,
-      DUR = RUNS.map(([, p]) => INTRO + (p.length - 1) * HOP + HOLD),
-      CYC = DUR.reduce((a, b) => a + b, 0);
-    let t0 = 0,
-      cur = -1,
-      reached = -1,
-      lenCache = new Map();
-    const len = el => {
-      if (!lenCache.has(el)) lenCache.set(el, el.getTotalLength());
-      return lenCache.get(el);
-    };
-    const start = i => {
-      cur = i;
-      reached = -1;
-      svg.querySelectorAll(".on, .hit").forEach(x => x.classList.remove("on", "hit"));
-      const [title, , result, tone] = RUNS[i];
-      runT.textContent = `RUN ${i + 1} / ${RUNS.length}`;
-      runB.textContent = title;
-      runR.textContent = result;
-      runR.className = tone;
-      cap.classList.remove("swap");
-      void cap.offsetWidth;
-      cap.classList.add("swap");
-    };
-    slides.push({
-      group: "enterprise",
-      sound: "patch",
-      palette: ["#1f6feb", "#8957e5", "#238636", "#9e6a03"],
-      notes:
-        "Patch to PR: an approximate, illustrative decision diagram of gh-aw's create-pull-request safe output, simplified from its handler code; the six runs are synthetic. The agent only commits locally. Its changes are packaged as a git bundle by default, which keeps commit history, or as a format-patch series with patch-format: am; excluded-files are stripped first, and no changes at all follows if-no-changes (warn, error or ignore). The package travels as an artifact and the detection job scans it. The safe outputs job then checks file policy: allowed-files is an allowlist, protected-files can block, request review, or fall back to a review issue, and max-patch-size caps the size. It names a branch from the agent's suggestion plus a random hex suffix, unless preserve-branch-name is set, with recreate-ref deciding whether an existing branch is replaced. It applies the bundle or runs git am --3way; on a conflict it retries at the original base commit, so the PR shows the conflict, then re-checks the files actually written. With signed-commits on, the default, every commit is replayed through the GraphQL createCommitOnBranch mutation so GitHub marks it Verified; if GraphQL fails it falls back to git push, but merge commits, submodules and symlinks refuse the unsigned fallback. Finally it opens the PR with draft, labels, reviewers and auto-merge; if Actions may not open pull requests, fallback-as-issue files an issue with a compare link instead.",
-      enter() {
-        t0 = 0;
-        cur = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        let u = (t - t0) % CYC,
-          i = 0;
-        while (u >= DUR[i]) u -= DUR[i++];
-        if (i !== cur) start(i);
-        const [, path, , tone] = RUNS[i];
-        if (u < INTRO) {
-          dot.style.opacity = 0;
-          return;
-        }
-        const k = Math.floor((u - INTRO) / HOP),
-          f = ((u - INTRO) % HOP) / HOP;
-        const at = Math.min(k, path.length - 1);
-        while (reached < at) {
-          reached++;
-          const id = path[reached];
-          nEl[id].classList.add("on");
-          if (reached) eEl[`${path[reached - 1]}>${id}`].classList.add("on");
-          if (reached === path.length - 1) {
-            nEl[id].classList.add("hit");
-            runR.classList.add("on");
-            if (tone === "g") sfx.notify(false);
-            else if (tone === "r") sfx.bug();
-            else sfx.pop(6);
-          } else sfx.pop(reached);
-        }
-        if (k < path.length - 1) {
-          const e = eEl[`${path[k]}>${path[k + 1]}`],
-            p = e.getPointAtLength(len(e) * (f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2));
-          dot.style.opacity = 1;
-          dot.setAttribute("cx", p.x);
-          dot.setAttribute("cy", p.y);
-        } else dot.style.opacity = 0;
-      },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "create-pull-request, decoded"), h("h2", {}, letters("Patch to "), letters("PR", "l-grad"))), cap, svg),
-    });
-  }
-
   // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
   {
     resetIndex();
@@ -10118,7 +9993,8 @@
     });
   }
 
-  // Illustrative centralized campaigns
+  // 11. Central Agentic Ops (githubnext/gh-cao): a control repo lists its registered campaigns, which dispatch
+  // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
   {
     resetIndex();
     const steps = [
@@ -10126,197 +10002,271 @@
       ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#ab7df8"],
       ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#d29922"],
       ["04", "Work", "One target per worker, bounded mission, correlated results", "#3fb950"],
-      ["05", "Evolve", "Outcomes feed back; agents improve each cycle", "#f778ba"],
+      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#f778ba"],
     ];
-    const cv = h("canvas", { class: "cao-canvas", width: 2280, height: 1280 });
+    const CW = 1180, CH = 690, MONO = "'Monaspace Neon', ui-monospace, Menlo, monospace";
+    const cv = h("canvas", { class: "cao-canvas", width: CW * 2, height: CH * 2 });
     const ctx = cv.getContext("2d");
     const stages = ["review", "limited live", "scheduled live"].map(s => h("em", {}, s));
-    const CW = 1140,
-      CH = 640,
-      hub = { x: 170, y: CH / 2 };
+    // The control repo lists its registered ops, one row per campaign installed from the catalog and tracked by a
+    // manifest under .github/aw/campaigns/. The host org owns the repo; an enterprise account owns no repos itself.
+    const C = { x: 590, y: 345 };
+    const ICON = 16, GEAR = 24;
+    const campaigns = [
+      { name: "Dependabot", c: "#4493f8", rate: 1.3 },
+      { name: "Repo Assist", c: "#39c5cf", rate: 1.1 },
+      { name: "ESLint Factory", c: "#e3b341", rate: .9 },
+      { name: "EU CRA", c: "#b083f0", rate: .7 },
+    ].map(k => ({ ...k, v: 1 }));
+    const CA = 124, CHD = 40, ROW_H = 32, CR = 10, CHH = (CHD + 8 + campaigns.length * ROW_H) / 2;
+    const cx0 = C.x - CA, cy0 = C.y - CHH;
+    campaigns.forEach((k, i) => (k.y = cy0 + CHD + 4 + ROW_H * (i + .5)));
+    const PX = 26, PT = 30, PB = 26;
+    const edge = (ang, a, top, bottom, r) => {
+      const c = Math.abs(Math.cos(ang)), s = Math.abs(Math.sin(ang)), H = Math.sin(ang) < 0 ? top : bottom;
+      let d = Math.min(c > 1e-9 ? a / c : Infinity, s > 1e-9 ? H / s : Infinity);
+      if (d * c > a - r && d * s > H - r) {
+        const qx = a - r, qy = H - r, p = c * qx + s * qy;
+        d = p + Math.sqrt(p * p - (qx * qx + qy * qy - r * r));
+      }
+      return d;
+    };
+    const RY = 212, RX = 1.6 * RY;
+    const BW = 196, ROWS = [0, -44, 44];
+    const orgs = [
+      { name: "web", n: 9, side: -1, row: -1 },
+      { name: "data", n: 8, side: -1, row: 0 },
+      { name: "labs", n: 5, side: -1, row: 1, off: true },
+      { name: "mobile", n: 8, side: 1, row: -1 },
+      { name: "payments", n: 9, side: 1, row: 0 },
+      { name: "infra", n: 8, side: 1, row: 1 },
+    ];
+    const halfW = dy => RX * Math.sqrt(Math.max(0, 1 - (dy / RY) ** 2));
     const repos = [];
-    for (let c = 0; c < 6; c++) for (let r = 0; r < 7; r++) repos.push({ x: 470 + c * 110 + (r % 2) * 55, y: 70 + r * 84, state: 0, t: 0 });
-    let packets = [],
-      lastSpawn = 0,
-      t0 = 0,
-      stage = 0,
-      gen = 1,
-      evolvedAt = -1e9,
-      ok = 0,
-      tried = 0,
-      spin = 0;
-    const failP = () => Math.max(0.04, 0.5 - (gen - 1) * 0.16);
+    for (const o of orgs) {
+      o.y = C.y + o.row * 200; o.y0 = o.y - 72; o.y1 = o.y + 72; o.heat = 0; o.reps = []; o.cols = [];
+      const near = o.row ? Math.min(Math.abs(o.y0 - C.y), Math.abs(o.y1 - C.y)) : 0;
+      o.inner = C.x + o.side * (halfW(near) + 14); o.outer = o.inner + o.side * BW; o.x = o.inner + o.side * 28;
+      for (let j = 0; j < o.n; j++) {
+        const c = (j / 3) | 0, p = { o, x: o.x + o.side * (52 + c * 44), y: o.y + ROWS[j % 3], state: 0, t: 0 };
+        const col = (o.cols[c] ??= { x: p.x, y0: p.y, y1: p.y });
+        col.y0 = Math.min(col.y0, p.y); col.y1 = Math.max(col.y1, p.y);
+        o.reps.push(p);
+        if (!o.off) repos.push(p);
+      }
+      o.a = Math.atan2(o.y - C.y, o.x - C.x);
+      o.cos = Math.cos(o.a); o.sin = Math.sin(o.a); o.dist = Math.hypot(o.x - C.x, o.y - C.y);
+      const r = edge(o.a, CA, CHH, CHH, CR);
+      o.tap = [C.x + o.cos * r, C.y + o.sin * r];
+    }
+    const P = (o, r) => [C.x + o.cos * r, C.y + o.sin * r];
+    const path = pts => {
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      return { pts, cum, L: cum[cum.length - 1] };
+    };
+    const route = p => {
+      const o = p.o, r = path([o.tap, [o.x, o.y], [p.x, o.y], [p.x, p.y]]);
+      r.dOrg = r.cum[1];
+      return r;
+    };
+    const at = (r, d) => {
+      d = Math.max(0, Math.min(r.L, d));
+      let i = 1;
+      while (i < r.pts.length - 1 && r.cum[i] < d) i++;
+      const [ax, ay] = r.pts[i - 1], [bx, by] = r.pts[i], f = (d - r.cum[i - 1]) / (r.cum[i] - r.cum[i - 1] || 1);
+      return [ax + (bx - ax) * f, ay + (by - ay) * f];
+    };
+    const trace = (r, d0, d1) => {
+      ctx.beginPath(); ctx.moveTo(...at(r, d0));
+      for (let i = 1; i < r.pts.length - 1; i++) if (r.cum[i] > d0 && r.cum[i] < d1) ctx.lineTo(...r.pts[i]);
+      ctx.lineTo(...at(r, d1)); ctx.stroke();
+    };
+    const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+    const box = (g, x0, y0, x1, y1, o) => {
+      const r = o.r ?? 18, lx = x0 + 22;
+      g.font = `600 16px ${MONO}`;
+      let w = g.measureText(o.main).width + (o.icon ? 22 : 0);
+      if (o.sub) { g.font = `500 14px ${MONO}`; w += 10 + g.measureText(o.sub).width; }
+      if (o.fill) { g.fillStyle = o.fill; g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, r); g.fill(); }
+      g.strokeStyle = o.stroke; g.lineWidth = 1.5; g.setLineDash(o.dash || []);
+      g.beginPath(); g.moveTo(lx + w + 8, y0);
+      g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
+      g.lineTo(lx - 8, y0); g.stroke(); g.setLineDash([]);
+      let x = lx;
+      if (o.icon) { octicon(g, o.icon, x + 8, y0, ICON, o.col); x += 22; }
+      g.textAlign = "left"; g.font = `600 16px ${MONO}`; g.fillStyle = o.col; g.fillText(o.main, x, y0);
+      if (o.sub) { x += g.measureText(o.main).width + 10; g.font = `500 14px ${MONO}`; g.fillStyle = "#6e7681"; g.fillText(o.sub, x, y0); }
+    };
+    // Boxes, labels, org wiring and the unenrolled spoke never change, so they are drawn once into an offscreen layer
+    // (redrawn after web fonts load, since the labels are measured).
+    let bg = null;
+    document.fonts?.ready.then(() => (bg = null));
+    const background = () => {
+      const c = document.createElement("canvas");
+      c.width = cv.width; c.height = cv.height;
+      const g = c.getContext("2d");
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.textBaseline = "middle"; g.lineCap = "round"; g.lineJoin = "round";
+      box(g, 12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
+      box(g, cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
+        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
+      });
+      for (const o of orgs) {
+        box(g, Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
+          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
+          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
+        });
+        if (o.off) {
+          const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
+          g.strokeStyle = "#ffffff24"; g.lineWidth = 2; g.setLineDash([3, 5]);
+          g.beginPath(); g.moveTo(...P(o, o.dist - 15)); g.lineTo(...P(o, r0 + 11)); g.stroke(); g.setLineDash([]);
+          octicon(g, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
+        }
+        g.globalAlpha = o.off ? .45 : 1;
+        g.strokeStyle = "#ffffff30"; g.lineWidth = 1.5; g.beginPath();
+        g.moveTo(o.x, o.y); g.lineTo(o.cols[o.cols.length - 1].x, o.y);
+        for (const c of o.cols) { g.moveTo(c.x, c.y0); g.lineTo(c.x, c.y1); }
+        g.stroke(); g.globalAlpha = 1;
+      }
+      return c;
+    };
+    let packets = [], recent = [], last = 0, t0 = 0, stage = 0, spin = 0, kick = 0;
+    let turn = 0, volley = 0, shooter = null, nextShot = 0;
+    const failP = v => Math.max(0.04, 0.5 - (v - 1) * 0.16);
+    const evolve = (k, t) => { k.v++; k.got = 0; k.evolvedAt = t; k.hold = t + 1100; kick = 1; };
     const draw = t => {
       ctx.setTransform(2, 0, 0, 2, 0, 0);
       ctx.clearRect(0, 0, CW, CH);
-      for (const p of repos) {
-        ctx.strokeStyle = "#ffffff10";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(hub.x, hub.y);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
+      ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.drawImage(bg ??= background(), 0, 0, CW, CH);
+      for (const o of orgs) if (!o.off) {
+        ctx.strokeStyle = "#8b949e"; ctx.globalAlpha = .4 + .5 * o.heat; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(...o.tap); ctx.lineTo(...P(o, o.dist - 15)); ctx.stroke();
       }
-      for (const p of repos) {
-        const col = p.state === 3 ? "#f85149" : p.state === 2 ? "#3fb950" : p.state === 1 ? "#d29922" : "#3d444d";
-        ctx.fillStyle = col;
-        ctx.shadowColor = col;
-        ctx.shadowBlur = p.state ? 18 : 0;
-        ctx.beginPath();
-        ctx.roundRect(p.x - 22, p.y - 16, 44, 32, 7);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = "#0d1117";
-        ctx.fillRect(p.x - 12, p.y - 6, 24, 3);
-        ctx.fillRect(p.x - 12, p.y + 2, 16, 3);
+      // Packets go under the nodes so their dots and trails never cover an icon.
+      for (const q of packets) {
+        if (q.u >= 1) continue;
+        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
+        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
+        trace(q.r, d - 34, d);
+        const [x, y] = at(q.r, d);
+        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
       }
-      for (const k of packets) {
-        const e = k.u < 0.5 ? 2 * k.u * k.u : 1 - (-2 * k.u + 2) ** 2 / 2;
-        const [a, b] = k.back ? [k.to, hub] : [hub, k.to];
-        const x = a.x + (b.x - a.x) * e,
-          y = a.y + (b.y - a.y) * e;
-        ctx.fillStyle = k.back ? (k.fail ? "#f85149" : "#3fb950") : "#ab7df8";
-        ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = 16;
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, 7);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+      for (const o of orgs) {
+        ctx.globalAlpha = o.off ? .45 : 1;
+        for (const p of o.reps) {
+          const col = p.state === 1 ? p.camp.c : p.state === 2 ? "#3fb950" : null;
+          ctx.fillStyle = "#0d1117"; ctx.strokeStyle = col || "#30363d"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 13, 26, 26, 6); ctx.fill(); ctx.stroke();
+          octicon(ctx, "repo-16", p.x, p.y, ICON, col || "#6e7681");
+        }
+        ctx.fillStyle = "#161b22"; ctx.strokeStyle = o.off ? "#484f58" : "#8b949e"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(o.x - 15, o.y - 15, 30, 30, 8); ctx.fill(); ctx.stroke();
+        if (!o.off && o.heat > .01) { ctx.globalAlpha = o.heat; ctx.strokeStyle = "#e6edf3"; ctx.stroke(); ctx.globalAlpha = 1; }
+        octicon(ctx, "organization-16", o.x, o.y, ICON, o.off ? "#6e7681" : "#e6edf3");
       }
-      const pulse = 1 + 0.06 * Math.sin(t / 300);
-      const g = ctx.createRadialGradient(hub.x, hub.y, 10, hub.x, hub.y, 130 * pulse);
-      g.addColorStop(0, "#ab7df860");
-      g.addColorStop(1, "#ab7df800");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(hub.x, hub.y, 130 * pulse, 0, 7);
-      ctx.fill();
-      // feedback loop: three arrows orbit the control repo, faster right after an evolution
-      const flash = Math.max(0, 1 - (t - evolvedAt) / 1400);
-      ctx.lineWidth = 5;
-      ctx.lineCap = "round";
-      for (let i = 0; i < 3; i++) {
-        const a0 = spin + i * 2.094,
-          a1 = a0 + 1.5,
-          rr = 104;
-        ctx.strokeStyle = "#f778ba";
-        ctx.shadowColor = "#f778ba";
-        ctx.shadowBlur = 10 + 30 * flash;
-        ctx.beginPath();
-        ctx.arc(hub.x, hub.y, rr, a0, a1);
-        ctx.stroke();
-        const hx = hub.x + rr * Math.cos(a1),
-          hy = hub.y + rr * Math.sin(a1),
-          d = a1 + Math.PI / 2;
-        ctx.fillStyle = "#f778ba";
-        ctx.beginPath();
-        ctx.moveTo(hx + 13 * Math.cos(d), hy + 13 * Math.sin(d));
-        ctx.lineTo(hx + 9 * Math.cos(d + 2.4), hy + 9 * Math.sin(d + 2.4));
-        ctx.lineTo(hx + 9 * Math.cos(d - 2.4), hy + 9 * Math.sin(d - 2.4));
-        ctx.fill();
+      ctx.globalAlpha = 1;
+      const cardW = 2 * CA, cardH = 2 * CHH, hy = cy0 + CHD / 2;
+      ctx.fillStyle = "#0d1117"; ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.fillStyle = "#161b22"; ctx.fillRect(cx0, cy0, cardW, CHD);
+      for (const k of campaigns) if (k.fire > .02) {
+        ctx.fillStyle = k.c;
+        ctx.globalAlpha = .16 * k.fire; ctx.fillRect(cx0, k.y - ROW_H / 2, cardW, ROW_H);
+        ctx.globalAlpha = k.fire; ctx.beginPath(); ctx.roundRect(cx0 + 4, k.y - 10, 3, 20, 1.5); ctx.fill();
       }
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "#161b22";
-      ctx.strokeStyle = "#ab7df8";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(hub.x, hub.y, 74 * (1 + 0.12 * flash), 0, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#f0f6fc";
+      ctx.restore();
+      ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx0, cy0 + CHD); ctx.lineTo(cx0 + cardW, cy0 + CHD); ctx.stroke();
+      ctx.strokeStyle = "#8b949e"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.stroke();
+      octicon(ctx, "repo-16", cx0 + 20, hy, ICON, "#e6edf3");
+      ctx.textAlign = "left"; ctx.font = `600 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText("control repo", cx0 + 36, hy);
+      ctx.save(); ctx.translate(cx0 + cardW - 24, hy); ctx.rotate(spin);
+      octicon(ctx, "gear-24", 0, 0, GEAR, "#c9d1d9");
+      ctx.restore();
+      for (const k of campaigns) {
+        const pop = Math.max(0, 1 - (t - k.evolvedAt) / 1600), vx = cx0 + cardW - 14, vt = `v${k.v}`;
+        octicon(ctx, "workflow-16", cx0 + 20, k.y, ICON, k.c);
+        ctx.textAlign = "left"; ctx.font = `500 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText(k.name, cx0 + 36, k.y + 1);
+        ctx.font = `600 13px ${MONO}`; const vw = ctx.measureText(vt).width;
+        if (pop > 0) {
+          ctx.globalAlpha = pop; ctx.fillStyle = "#f778ba";
+          ctx.beginPath(); ctx.roundRect(vx - vw - 7, k.y - 9, vw + 14, 18, 9); ctx.fill(); ctx.globalAlpha = 1;
+        }
+        ctx.textAlign = "right"; ctx.fillStyle = pop > .5 ? "#0d1117" : "#9198a1"; ctx.fillText(vt, vx, k.y + 1);
+      }
       ctx.textAlign = "center";
-      ctx.font = "800 22px 'Mona Sans'";
-      ctx.fillText("control", hub.x, hub.y - 14);
-      ctx.fillText("repo", hub.x, hub.y + 12);
-      ctx.fillStyle = "#f778ba";
-      ctx.font = "700 17px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText(`agents v${gen}`, hub.x, hub.y + 38);
-      ctx.fillStyle = "#9198a1";
-      ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText("FEEDBACK LOOP", hub.x, hub.y - 132);
-      const rate = tried ? Math.round((100 * ok) / tried) : 0;
-      ctx.fillText("SUCCESS", hub.x, hub.y + 150);
-      ctx.fillStyle = rate > 85 ? "#3fb950" : rate > 65 ? "#d29922" : "#f85149";
-      ctx.font = "800 34px 'Mona Sans'";
-      ctx.fillText(tried ? `${rate}%` : "—", hub.x, hub.y + 186);
-      if (flash > 0) {
-        ctx.globalAlpha = flash;
-        ctx.fillStyle = "#f778ba";
-        ctx.font = "800 20px 'Mona Sans'";
-        ctx.fillText("evolved ↑", hub.x, hub.y - 160 - 20 * (1 - flash));
-        ctx.globalAlpha = 1;
-      }
-      ctx.fillStyle = "#9198a1";
-      ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText("WORKERS · ONE TARGET EACH", 470 + 2.5 * 110 + 27, CH - 6);
+      ctx.font = `600 16px ${MONO}`;
+      const sw = 22 + ctx.measureText("success").width, sx = C.x - sw / 2, sy = C.y + RY + 30;
+      octicon(ctx, "north-star-16", sx + 8, sy, ICON, "#9198a1");
+      ctx.textAlign = "left"; ctx.fillStyle = "#9198a1"; ctx.fillText("success", sx + 22, sy); ctx.textAlign = "center";
+      const rate = recent.length ? Math.round((100 * recent.reduce((a, b) => a + b, 0)) / recent.length) : 0;
+      ctx.fillStyle = recent.length ? "#e6edf3" : "#6e7681";
+      ctx.font = "800 40px 'Mona Sans'"; ctx.fillText(recent.length ? `${rate}%` : "—", C.x, sy + 40);
     };
     slides.push({
-      group: "scale",
+      group: "enterprise",
       sound: "radar",
       palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
-      notes:
-        "An illustrative multi-repository feedback loop, not an internal system or roadmap. A control repository coordinates bounded workers, reviews outcomes and updates shared workflows. The repositories, success rates and rollout stages in this animation are simulated, not operational data.",
+      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops (githubnext/gh-cao) is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
       enter() {
-        repos.forEach(p => (p.state = 0));
-        packets = [];
-        t0 = 0;
-        stage = 0;
-        gen = 1;
-        ok = tried = 0;
-        evolvedAt = -1e9;
+        repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
+        campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
+        packets = []; recent = []; t0 = 0; stage = 0; kick = 0; turn = volley = 0; shooter = null;
         stages.forEach((s, i) => s.classList.toggle("on", i === 0));
       },
       tick(t) {
-        if (!t0) t0 = lastSpawn = t;
-        const dt = Math.min(50, t - (this._last || t));
-        this._last = t;
-        spin += dt * (0.0016 + 0.01 * Math.max(0, 1 - (t - evolvedAt) / 1400));
-        if (t - lastSpawn > 120) {
-          lastSpawn = t;
+        if (!t0) { t0 = last = t; nextShot = t + 500; }
+        const dt = Math.min(50, t - last); last = t;
+        kick *= Math.exp(-dt / 600);
+        spin += dt * (0.0014 + 0.008 * kick);
+        for (const o of orgs) o.heat *= Math.exp(-dt / 600);
+        for (const k of campaigns) k.fire *= Math.exp(-dt / 300);
+        for (const p of repos) if (p.state >= 2 && t - p.t > 2600) p.state = 0;
+        if (t >= nextShot) {
+          if (!volley) {
+            shooter = null;
+            for (let i = 0; i < campaigns.length && !shooter; i++) {
+              const k = campaigns[turn++ % campaigns.length];
+              if (t >= k.hold) shooter = k;
+            }
+            volley = shooter ? Math.max(1, Math.round((2 + Math.random() * 3) * shooter.rate)) : 0;
+          }
           const idle = repos.filter(p => p.state === 0);
-          if (idle.length) {
-            const to = idle[(Math.random() * idle.length) | 0];
-            to.state = 1;
-            packets.push({ to, u: 0, back: false });
-          } else if (!packets.length) {
-            gen++;
-            ok = tried = 0;
-            evolvedAt = t;
-            repos.forEach(p => (p.state = 0));
+          if (shooter && t >= shooter.hold && idle.length) {
+            const p = idle[(Math.random() * idle.length) | 0];
+            p.state = 1; p.camp = shooter; shooter.fire = 1;
+            packets.push({ k: shooter, v: shooter.v, p, r: route(p), u: 0, work: 0 });
+            nextShot = --volley ? t + 70 : t + 150 + Math.random() * 120;
+          } else {
+            volley = 0; nextShot = t + 120;
           }
         }
-        for (const k of packets) {
-          k.u += dt / 800;
-          if (k.u >= 1 && !k.back) {
-            k.back = true;
-            k.u = 0;
-            k.fail = Math.random() < failP();
-            k.to.state = k.fail ? 3 : 2;
-          } else if (k.u >= 1 && k.back) {
-            tried++;
-            if (!k.fail) ok++;
+        for (const q of packets) {
+          if (q.u < 1) {
+            q.u = Math.min(1, q.u + dt / (220 + q.r.L * .9));
+            if (Math.abs(q.r.L * ease(q.u) - q.r.dOrg) < 24) q.p.o.heat = Math.max(q.p.o.heat, .9);
+            if (q.u >= 1) q.work = 200 + Math.random() * 600;
+            continue;
           }
+          if ((q.work -= dt) > 0) continue;
+          q.fail = Math.random() < failP(q.v); q.p.state = q.fail ? 3 : 2; q.p.t = t; q.done = true;
+          recent.push(q.fail ? 0 : 1); if (recent.length > 24) recent.shift();
+          if (q.v === q.k.v && ++q.k.got >= 8 + 5 * q.k.v) evolve(q.k, t);
         }
-        packets = packets.filter(k => k.u < 1);
-        const s = Math.min(2, gen - 1);
-        if (s !== stage) {
-          stage = s;
-          stages.forEach((e, i) => e.classList.toggle("on", i === s));
-        }
+        packets = packets.filter(q => !q.done);
+        const st = Math.min(2, Math.min(...campaigns.map(k => k.v)) - 1);
+        if (st !== stage) { stage = st; stages.forEach((e, i) => e.classList.toggle("on", i === st)); }
         draw(t);
       },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative multi-repository pattern"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
-        h(
-          "div",
-          { class: "cao-steps" },
-          steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))
-        ),
+      el: h("section", { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "githubnext/gh-cao · Central Agentic Ops"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
+        h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
         cv,
-        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])
-      ),
+        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),
     });
   }
 
@@ -10409,7 +10359,7 @@
       return [u * u * ax + 2 * u * f * mx + f * f * bx, u * u * ay + 2 * u * f * my + f * f * by];
     };
     slides.push({
-      group: "scale",
+      group: "finale",
       sound: "finale",
       palette: ["#0fbf3e", "#1f6feb", "#8957e5", "#238636"],
       notes:
@@ -10753,7 +10703,7 @@
       TILES.forEach(([, fn], k) => (tileVals[k].textContent = fmt(k, fn(p))));
     };
     slides.push({
-      group: "scale",
+      group: "data",
       sound: "history",
       palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
       notes:
@@ -10925,7 +10875,7 @@
         )
       );
     slides.push({
-      group: "scale",
+      group: "data",
       sound: "land",
       palette: ["#ab7df8", "#db61a2", "#3fb950", "#4493f8"],
       notes:
@@ -11079,7 +11029,7 @@
       ["G = 0.52", "Gini of edits over 527 workflow files", "#ab7df8"],
     ];
     slides.push({
-      group: "scale",
+      group: "data",
       sound: "evolve",
       palette: ["#3fb950", "#ab7df8", "#db61a2", "#4493f8"],
       notes:
@@ -11132,24 +11082,303 @@
     });
   }
 
+  // Patch to PR: the create-pull-request state machine; the agent packages a bundle or patch, detection scans it, the safe outputs job checks file policy, names a branch, applies (retrying at the original base), pushes signed commits through GraphQL and opens the PR, falling back to issues when it cannot
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 680;
+    // [id, kind (b box, d decision, t terminal), x, y, w, line1, line2, tone]
+    const NODES = [
+      ["c0", "b", 80, 330, 130, "agent", "commits"],
+      ["d1", "d", 240, 330, 150, "changes?", "excluded-files"],
+      ["t1", "t", 240, 560, 190, "no changes", "if-no-changes", "o"],
+      ["bun", "b", 415, 210, 150, "git bundle", "default"],
+      ["am", "b", 415, 450, 150, "format-patch", "patch-format: am"],
+      ["det", "d", 595, 330, 150, "threat?", "detection job"],
+      ["t2", "t", 595, 560, 170, "✗ stop", "nothing written", "r"],
+      ["pol", "d", 790, 330, 150, "files ok?", "protected-files"],
+      ["t4", "t", 790, 130, 200, "fallback-to-issue", "→ review issue", "o"],
+      ["t5", "t", 790, 560, 200, "✗ blocked", "or max-patch-size", "r"],
+      ["br", "b", 960, 330, 140, "branch", "+ hex suffix"],
+      ["ap", "d", 1145, 330, 150, "applies?", "am --3way"],
+      ["rb", "b", 1145, 520, 150, "retry at", "original base"],
+      ["t6", "t", 960, 600, 150, "✗ failed", "to apply", "r"],
+      ["sg", "d", 1405, 330, 150, "signed?", "signed-commits"],
+      ["gq", "b", 1405, 190, 210, "GraphQL commit", "✓ Verified"],
+      ["t7", "t", 1405, 86, 240, "✗ merge · submodule", "no unsigned fallback", "r"],
+      ["gp", "b", 1405, 470, 190, "git push", "unsigned"],
+      ["pr", "d", 1600, 330, 90, "PR?", ""],
+      ["done", "t", 1725, 330, 140, "PR open", "draft · labels", "g"],
+      ["t8", "t", 1695, 500, 200, "issue instead", "fallback-as-issue", "o"],
+    ];
+    const N = Object.fromEntries(NODES.map(([id, k, x, y, w]) => [id, { k, x, y, w, h: id === "t7" ? 52 : k === "d" ? 72 : k === "t" ? 60 : 64 }]));
+    const R = id => [N[id].x + N[id].w / 2, N[id].y],
+      L = id => [N[id].x - N[id].w / 2, N[id].y],
+      T = id => [N[id].x, N[id].y - N[id].h / 2],
+      B = id => [N[id].x, N[id].y + N[id].h / 2];
+    // [from, to, points, label, lx, ly, anchor]
+    const EDGES = [
+      ["c0", "d1", [R("c0"), L("d1")]],
+      ["d1", "t1", [B("d1"), T("t1")], "none", 250, 450],
+      ["d1", "bun", [R("d1"), [327, 330], [327, 210], L("bun")]],
+      ["d1", "am", [R("d1"), [327, 330], [327, 450], L("am")]],
+      ["bun", "det", [R("bun"), [505, 210], [505, 330], L("det")]],
+      ["am", "det", [R("am"), [505, 450], [505, 330], L("det")]],
+      ["det", "t2", [B("det"), T("t2")], "flagged", 605, 460],
+      ["det", "pol", [R("det"), L("pol")], "clean", 692, 316, "middle"],
+      ["pol", "t4", [T("pol"), B("t4")], "fallback", 800, 235],
+      ["pol", "t5", [B("pol"), T("t5")], "blocked", 800, 460],
+      ["pol", "br", [R("pol"), L("br")]],
+      ["br", "ap", [R("br"), L("ap")]],
+      ["ap", "rb", [B("ap"), T("rb")], "conflict", 1155, 440],
+      ["rb", "t6", [L("rb"), [960, 520], T("t6")]],
+      ["rb", "sg", [R("rb"), [1305, 520], [1305, 330], L("sg")]],
+      ["ap", "sg", [R("ap"), L("sg")], "re-check", 1262, 316, "middle"],
+      ["sg", "gq", [T("sg"), B("gq")], "true", 1395, 265, "end"],
+      ["sg", "gp", [B("sg"), T("gp")], "false", 1395, 400, "end"],
+      ["gq", "t7", [T("gq"), B("t7")]],
+      ["gq", "gp", [[1495, 222], [1495, 438]], "GraphQL error", 1488, 428, "end"],
+      ["gq", "pr", [R("gq"), [1540, 190], [1540, 330], L("pr")]],
+      ["gp", "pr", [R("gp"), [1540, 470], [1540, 330], L("pr")]],
+      ["pr", "done", [R("pr"), L("done")]],
+      ["pr", "t8", [B("pr"), [1600, 470]], "denied", 1610, 420],
+    ];
+    const PRE = ["c0", "d1", "bun", "det", "pol", "br", "ap", "sg", "gq"];
+    // [title, path, result, tone]
+    const RUNS = [
+      ["Happy path, signed", [...PRE, "pr", "done"], "● PR open · ✓ Verified commits", "g"],
+      ["Agent edits a protected file", ["c0", "d1", "am", "det", "pol", "t4"], "→ review issue instead of a PR", "o"],
+      ["Base moved, patch conflicts", ["c0", "d1", "bun", "det", "pol", "br", "ap", "rb", "sg", "gq", "pr", "done"], "● PR on the original base", "g"],
+      ["Bundle carries a merge commit", [...PRE, "t7"], "✗ refuses an unsigned push", "r"],
+      ["GraphQL unavailable", [...PRE, "gp", "pr", "done"], "● PR open · plain git push", "g"],
+      ["Actions may not open PRs", [...PRE, "pr", "t8"], "→ fallback issue, compare link", "o"],
+    ];
+    const pts = p => p.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+    let g = `<defs><marker id="cprA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6e7681"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="50"/>`;
+    [
+      [0, 500, "AGENT · PACKAGE"],
+      [500, 690, "DETECT"],
+      [690, 1310, "SAFE OUTPUTS · APPLY"],
+      [1310, 1800, "PUSH · OPEN"],
+    ].forEach(([x0, x1, t]) => {
+      g += `<text class="fm-lane-t" x="${(x0 + x1) / 2}" y="33">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 20}"/>`;
+    });
+    EDGES.forEach(([a, b, p, lab, lx, ly, anc]) => {
+      g += `<path class="cpr-e" id="cprE_${a}_${b}" d="${pts(p)}" marker-end="url(#cprA)"/>`;
+      if (lab) g += `<text class="cpr-el" x="${lx}" y="${ly}" text-anchor="${anc || "start"}">${lab}</text>`;
+    });
+    NODES.forEach(([id, k, x, y, w, a, b, tone]) => {
+      const hh = N[id].h;
+      const shape =
+        k === "d"
+          ? `<polygon points="${x - w / 2},${y} ${x - w / 2 + 18},${y - hh / 2} ${x + w / 2 - 18},${y - hh / 2} ${x + w / 2},${y} ${x + w / 2 - 18},${y + hh / 2} ${x - w / 2 + 18},${y + hh / 2}"/>`
+          : `<rect x="${x - w / 2}" y="${y - hh / 2}" width="${w}" height="${hh}" rx="${k === "t" ? 30 : 12}"/>`;
+      g += `<g class="cpr-n ${k}${tone ? " " + tone : ""}" id="cprN_${id}">${shape}<text class="cpr-a" x="${x}" y="${b ? y - 2 : y + 7}">${a}</text>${b ? `<text class="cpr-b" x="${x}" y="${y + 19}">${b}</text>` : ""}</g>`;
+    });
+    g += `<text class="cpr-k" x="960" y="392">preserve-branch-name</text><text class="cpr-k" x="960" y="410">recreate-ref</text>`;
+    g += `<circle class="cpr-dot" r="9" cx="-50" cy="-50" style="opacity:0"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "cpr-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#79c0ff");
+    svg.innerHTML = g;
+    const nEl = Object.fromEntries(NODES.map(([id]) => [id, svg.querySelector("#cprN_" + id)])),
+      eEl = Object.fromEntries(EDGES.map(([a, b]) => [`${a}>${b}`, svg.querySelector(`#cprE_${a}_${b}`)])),
+      dot = svg.querySelector(".cpr-dot");
+    const runT = h("i", {}),
+      runB = h("b", {}),
+      runR = h("span", {});
+    const cap = h("div", { class: "cpr-cap" }, runT, runB, runR);
+    const INTRO = 500,
+      HOP = 360,
+      HOLD = 2600,
+      DUR = RUNS.map(([, p]) => INTRO + (p.length - 1) * HOP + HOLD),
+      CYC = DUR.reduce((a, b) => a + b, 0);
+    let t0 = 0,
+      cur = -1,
+      reached = -1,
+      lenCache = new Map();
+    const len = el => {
+      if (!lenCache.has(el)) lenCache.set(el, el.getTotalLength());
+      return lenCache.get(el);
+    };
+    const start = i => {
+      cur = i;
+      reached = -1;
+      svg.querySelectorAll(".on, .hit").forEach(x => x.classList.remove("on", "hit"));
+      const [title, , result, tone] = RUNS[i];
+      runT.textContent = `RUN ${i + 1} / ${RUNS.length}`;
+      runB.textContent = title;
+      runR.textContent = result;
+      runR.className = tone;
+      cap.classList.remove("swap");
+      void cap.offsetWidth;
+      cap.classList.add("swap");
+    };
+    slides.push({
+      group: "data",
+      sound: "patch",
+      palette: ["#1f6feb", "#8957e5", "#238636", "#9e6a03"],
+      notes:
+        "Patch to PR: an approximate, illustrative decision diagram of gh-aw's create-pull-request safe output, simplified from its handler code; the six runs are synthetic. The agent only commits locally. Its changes are packaged as a git bundle by default, which keeps commit history, or as a format-patch series with patch-format: am; excluded-files are stripped first, and no changes at all follows if-no-changes (warn, error or ignore). The package travels as an artifact and the detection job scans it. The safe outputs job then checks file policy: allowed-files is an allowlist, protected-files can block, request review, or fall back to a review issue, and max-patch-size caps the size. It names a branch from the agent's suggestion plus a random hex suffix, unless preserve-branch-name is set, with recreate-ref deciding whether an existing branch is replaced. It applies the bundle or runs git am --3way; on a conflict it retries at the original base commit, so the PR shows the conflict, then re-checks the files actually written. With signed-commits on, the default, every commit is replayed through the GraphQL createCommitOnBranch mutation so GitHub marks it Verified; if GraphQL fails it falls back to git push, but merge commits, submodules and symlinks refuse the unsigned fallback. Finally it opens the PR with draft, labels, reviewers and auto-merge; if Actions may not open pull requests, fallback-as-issue files an issue with a compare link instead.",
+      enter() {
+        t0 = 0;
+        cur = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        let u = (t - t0) % CYC,
+          i = 0;
+        while (u >= DUR[i]) u -= DUR[i++];
+        if (i !== cur) start(i);
+        const [, path, , tone] = RUNS[i];
+        if (u < INTRO) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const k = Math.floor((u - INTRO) / HOP),
+          f = ((u - INTRO) % HOP) / HOP;
+        const at = Math.min(k, path.length - 1);
+        while (reached < at) {
+          reached++;
+          const id = path[reached];
+          nEl[id].classList.add("on");
+          if (reached) eEl[`${path[reached - 1]}>${id}`].classList.add("on");
+          if (reached === path.length - 1) {
+            nEl[id].classList.add("hit");
+            runR.classList.add("on");
+            if (tone === "g") sfx.notify(false);
+            else if (tone === "r") sfx.bug();
+            else sfx.pop(6);
+          } else sfx.pop(reached);
+        }
+        if (k < path.length - 1) {
+          const e = eEl[`${path[k]}>${path[k + 1]}`],
+            p = e.getPointAtLength(len(e) * (f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2));
+          dot.style.opacity = 1;
+          dot.setAttribute("cx", p.x);
+          dot.setAttribute("cy", p.y);
+        } else dot.style.opacity = 0;
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "create-pull-request, decoded"), h("h2", {}, letters("Patch to "), letters("PR", "l-grad"))), cap, svg),
+    });
+  }
+
+  // ---------- bands ----------
+  // The deck is a table: each group is one horizontal band (row) led by a header slide.
+  // The title and the finale (last) are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
+  const BANDS = {
+    platform: ["Workflows", "Markdown in, GitHub Actions out"],
+    security: ["Security", "Assume the agent is compromised"],
+    process: ["Human agent processes", "Engineer processes, not code", ["#58a6ff", "#1f6feb", "#a5d6ff", "#cae8ff"]],
+    cost: ["Cost & context", "Debug, spend less, route smarter"],
+    engineering: ["Agentic Engineering", "Remember, expire, search, measure"],
+    enterprise: ["Enterprise", "Any agent, any provider, any scale"],
+    data: ["AW factory", "Measured on gh-aw's own history"],
+  };
+  // Header-less rows of a single slide.
+  const SOLO = { intro: "Title", mindset: "Factory mindset", finale: "Finale" };
+  // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
+  const rows = [];
+  for (const s of slides) {
+    const row = rows.find(r => r.group === s.group);
+    if (row) row.items.push(s);
+    else rows.push({ group: s.group, items: [s] });
+  }
+  // The finale closes the deck, after the data band.
+  rows.push(...rows.splice(rows.findIndex(r => r.group === "finale"), 1));
+  {
+    const label = s => {
+      const hd = s.el.querySelector("h1, h2, h3");
+      const ls = hd ? [...hd.querySelectorAll(".line")] : [];
+      const t = (ls.length ? ls.map(l => l.textContent).join(" ") : hd?.textContent || "").replace(/\s+/g, " ").replace(/ ([,.])/g, "$1").trim();
+      const k = s.el.querySelector(".kicker")?.textContent.trim();
+      return t.length > 32 && k ? k : t;
+    };
+    const parts = rows.filter(r => BANDS[r.group]);
+    let num = 1;
+    for (const r of rows) {
+      if (BANDS[r.group]) num++;
+      r.first = num;
+      num += r.items.length;
+    }
+    for (const r of parts) {
+      resetIndex();
+      const [title, sub] = BANDS[r.group],
+        part = parts.indexOf(r) + 1,
+        c = BANDS[r.group][2] || r.items[0].palette;
+      const map = h(
+        "div",
+        { class: "bh-map", "aria-hidden": "true" },
+        rows.map((o, i) =>
+          h(
+            "div",
+            { class: `bh-mrow${o === r ? " on" : ""}`, "--i": i },
+            h("span", { class: "bh-ml" }, BANDS[o.group]?.[0] || SOLO[o.group]),
+            BANDS[o.group] ? h("i", { class: "hd" }) : null,
+            o.items.map(() => h("i"))
+          )
+        )
+      );
+      r.header = {
+        group: r.group,
+        header: true,
+        red: r.items[0].red,
+        sound: "band",
+        palette: c,
+        notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${r.items.map(label).join(", ")}.`,
+        el: h(
+          "section",
+          { class: "slide bh", "--bh": c[0], "--bh2": c[2] },
+          h(
+            "div",
+            { class: "bh-head" },
+            h("div", { class: "kicker" }, `Part ${String(part).padStart(2, "0")} / ${String(parts.length).padStart(2, "0")}`),
+            h("h2", {}, title.split(" ").flatMap((w, i) => (i ? [" ", letters(w, "l-grad")] : [letters(w, "l-grad")]))),
+            h("p", { class: "bh-sub" }, sub)
+          ),
+          map,
+          h(
+            "ol",
+            { class: `bh-row${r.items.length > 8 ? " many" : ""}${r.items.length > 14 ? " lots" : ""}` },
+            r.items.map((s, i) => h("li", { "--i": i, "data-go": r.first + i - 1 }, h("span", { class: "bh-n" }, String(r.first + i).padStart(2, "0")), h("span", { class: "bh-t" }, label(s))))
+          )
+        ),
+      };
+    }
+    slides.length = 0;
+    rows.forEach((r, ri) => {
+      r.start = slides.length;
+      for (const s of r.header ? [r.header, ...r.items] : r.items) {
+        s.band = ri;
+        slides.push(s);
+      }
+    });
+  }
+
   const stage = h(
     "div",
     { class: "stage" },
     slides.map(s => s.el)
   );
   const progress = h("div", { class: "progress" });
+  // the dots are a mini-map of the table: one row of dots per band
+  const dotBtns = slides.map((s, i) =>
+    h("button", {
+      class: s.header ? "hd" : "",
+      "aria-label": `Slide ${i + 1}`,
+      onclick: e => {
+        e.stopPropagation();
+        go(i);
+      },
+    })
+  );
   const dots = h(
     "div",
     { class: "dots" },
-    slides.map((_, i) =>
-      h("button", {
-        "aria-label": `Slide ${i + 1}`,
-        onclick: e => {
-          e.stopPropagation();
-          go(i);
-        },
-      })
-    )
+    rows.map(r => h("div", { class: "drow", title: BANDS[r.group]?.[0] || SOLO[r.group] || "" }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
   );
   const arrowBtn = (label, d, fn) => {
     const b = h("button", {
@@ -11185,8 +11414,8 @@
   const gridc = h("canvas", { class: "gridc" });
   document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
 
-  // Dot row: left offset + 12px dots + 12px gaps + 28px for the wide active dot; sound/count need ~170px on the right.
-  const dotsWidth = 28 + slides.length * 24 - 12 + 28;
+  // Dot map: left offset + the longest band of 8px dots with 5px gaps + 16px for the wide active dot; sound/count need ~170px on the right.
+  const dotsWidth = 28 + Math.max(...rows.map(r => r.items.length + (r.header ? 1 : 0))) * 13 + 16 + 400;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
@@ -11421,6 +11650,12 @@
         g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       });
     const THEMES = {
+      // band header: a rising arpeggio over a soft open-fifth pad, like the camera pulling back to the next row
+      band: t => {
+        pad([48, 55, 62], t + 0.1, 1.8, 0.03, "triangle", 2200);
+        [60, 67, 72, 76, 79].forEach((m, i) => tone(m, t + 0.18 + i * 0.09, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 3200 }));
+        bell(84, t + 0.66, 0.04, 1.4);
+      },
       // title: wide major swell with a rising shimmer
       title: t => {
         pad([48, 55, 64, 71], t + 0.1, 3.2, 0.045);
@@ -12223,13 +12458,19 @@
     cur = n;
     slides[n].enter?.(dir);
     progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
-    [...dots.children].forEach((d, i) => d.classList.toggle("on", i === n));
+    dotBtns.forEach((d, i) => d.classList.toggle("on", i === n));
+    [...dots.children].forEach((r, i) => r.classList.toggle("on", i === slides[n].band));
     prevBtn.disabled = n === 0;
     nextBtn.disabled = n === slides.length - 1;
     count.textContent = `${String(n + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
   }
+  // Left/right move one slide and wrap across bands; up/down jump to the first slide (header) of the band above/below.
+  const band = d => {
+    const b = slides[cur].band + d;
+    if (b >= 0 && b < rows.length) go(rows[b].start);
+  };
   const next = () => {
       if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
       else go(cur + 1);
@@ -12247,12 +12488,15 @@
       e.preventDefault();
       return;
     }
-    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) {
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) {
       e.preventDefault();
       next();
-    } else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) {
+    } else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) {
       e.preventDefault();
       prev();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      band(e.key === "ArrowDown" ? 1 : -1);
     } else if (e.key === "Home") go(0);
     else if (e.key === "End") go(slides.length - 1);
     else if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
@@ -12261,21 +12505,35 @@
   });
   addEventListener("click", e => {
     if (e.target.closest("a, button")) return;
+    const tile = e.target.closest("[data-go]");
+    if (tile) return go(+tile.dataset.go);
     e.clientX < innerWidth / 3 ? prev() : next();
   });
-  let tx = null;
-  addEventListener("touchstart", e => (tx = e.touches[0].clientX), { passive: true });
+  let tx = null,
+    ty = null;
+  addEventListener("touchstart", e => ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY)), { passive: true });
   addEventListener("touchend", e => {
     if (tx == null) return;
-    const dx = e.changedTouches[0].clientX - tx;
-    tx = null;
-    if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+    const dx = e.changedTouches[0].clientX - tx,
+      dy = e.changedTouches[0].clientY - ty;
+    tx = ty = null;
+    if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && band(dy < 0 ? 1 : -1);
+    else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
   });
   addEventListener("hashchange", () => go((parseInt(location.hash.slice(1), 10) || 1) - 1));
 
   // ---------- animated background ----------
   const ctx = canvas.getContext("2d");
   const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  // Per-band backgrounds: base fill, glow palette, grid rgb + minor/major alpha, grid angle.
+  const INK = { base: [13, 17, 23], grid: [240, 246, 252, 0.028, 0.07], ang: 0 };
+  const BG = {
+    // Human agent processes: dark blueprint blue, straight grid.
+    process: { base: [3, 10, 24], pal: ["#06285e", "#082048", "#03122c", "#0b3166"], grid: [170, 210, 255, 0.018, 0.045], ang: 0 },
+    // Cost & context: the usual gray, gold grid lines turned 45° to the left (the inverse of the security wash).
+    cost: { base: INK.base, grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4 },
+  };
+  let bgv = [...INK.base, ...INK.grid];
   let colors = slides[0].palette.map(hex),
     gAng = 0;
   const blobs = [0, 1, 2, 3].map(i => ({ a: Math.random() * 6.28, b: Math.random() * 6.28, s: 0.00007 + i * 0.00003 }));
@@ -12297,11 +12555,15 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const target = (slides[cur] || slides[0]).palette.map(hex);
+    const cs = slides[cur] || slides[0],
+      th = BG[cs.group] || INK,
+      target = (th.pal || cs.palette).map(hex),
+      bgt = [...th.base, ...th.grid];
+    bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * 0.04);
     colors = REDUCED ? target : colors.map((c, i) => c.map((v, k) => v + (target[i][k] - v) * 0.03));
 
     ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "#0d1117";
+    ctx.fillStyle = `rgb(${bgv[0] | 0},${bgv[1] | 0},${bgv[2] | 0})`;
     ctx.fillRect(0, 0, cw, ch);
     ctx.globalCompositeOperation = "lighter";
     const R = Math.max(cw, ch) * 0.55,
@@ -12318,7 +12580,7 @@
     });
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red security wash is up.
+    // It turns to 45° (around the screen centre) while the red security wash is up, or on a band whose theme sets `ang`.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -12326,7 +12588,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : 0;
+    const gTarget = BG[cs.group] ? th.ang : wash.classList.contains("on") ? Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),
@@ -12334,7 +12596,10 @@
       D = Math.hypot(cw, ch) / 2 + minor;
     g.translate(cw / 2, ch / 2);
     g.rotate(gAng);
-    const line = i => (((i % 5) + 5) % 5 ? "rgba(240,246,252,0.028)" : "rgba(240,246,252,0.07)");
+    const gc = `${bgv[3] | 0},${bgv[4] | 0},${bgv[5] | 0}`,
+      lmin = `rgba(${gc},${bgv[6]})`,
+      lmaj = `rgba(${gc},${bgv[7]})`;
+    const line = i => (((i % 5) + 5) % 5 ? lmin : lmaj);
     const snap = gAng ? v => v : v => Math.round(v);
     for (let i = -Math.ceil(D / minor); i * minor <= D; i++) {
       g.fillStyle = line(i);

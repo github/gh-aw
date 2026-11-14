@@ -26,6 +26,7 @@ engine:
     mode: balanced
 max-tool-denials: 3
 imports:
+  - shared/reporting.md
   - shared/mcp-pagination.md
   - uses: shared/skip-if-issue-open.md
     with:

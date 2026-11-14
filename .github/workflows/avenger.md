@@ -121,6 +121,7 @@ safe-outputs:
   missing-tool:
 timeout-minutes: 45
 imports:
+  - shared/reporting.md
   - shared/pr-safe-output-defaults.md
   - shared/otlp.md
   - shared/graders.md

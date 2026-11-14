@@ -24,6 +24,7 @@ tools:
   bash:
     - "*"
 imports:
+  - shared/reporting.md
   - shared/pr-safe-output-defaults.md
 safe-outputs:
   create-pull-request:

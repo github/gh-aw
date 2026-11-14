@@ -248,7 +248,11 @@ function normalizeDefaultRuntimeVersions(content) {
 // new normalization steps only need to be added in one place.
 // Mirrors normalizeOutput() in pkg/workflow/wasm_golden_test.go.
 function normalize(content) {
-  return normalizeAWFConfigPayload(normalizeCheckoutPin(normalizeDefaultRuntimeVersions(normalizeCopilotDefaultModel(normalizeProjectUTC(normalizeAWFImageTagDigests(normalizeContainerPins(normalizeHeredocDelimiters(content))))))));
+  const normalized = normalizeAWFConfigPayload(
+    normalizeCheckoutPin(normalizeDefaultRuntimeVersions(normalizeCopilotDefaultModel(normalizeProjectUTC(normalizeAWFImageTagDigests(normalizeContainerPins(normalizeHeredocDelimiters(content)))))))
+  );
+  // Keep GitHub token environment names stable, matching wasm_golden_test.go.
+  return normalized.replace(/GH_AW_MCP_SCRIPTS_ENV_[0-9a-f]+_47485f544f4b454e/g, "GH_AW_MCP_SCRIPTS_ENV_TOKEN");
 }
 
 // ── Load golden file ─────────────────────────────────────────────────

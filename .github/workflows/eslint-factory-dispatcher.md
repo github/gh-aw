@@ -5,6 +5,7 @@ on:
   schedule: daily
   workflow_dispatch:
 imports:
+  - shared/reporting.md
   - shared/work-queue-staged-plan.md
 permissions:
   contents: read
