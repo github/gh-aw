@@ -1284,10 +1284,46 @@
   /* --- chrome --- */
   .progress { position: fixed; left: 0; bottom: 0; height: 5px; width: 100%; transform-origin: 0 50%;
     background: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950); transition: transform .8s cubic-bezier(.7,0,.2,1); z-index: 5; }
-  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; gap: 12px; z-index: 5; }
-  .dots button { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
+  /* dot map: one row per band, header dot outlined; the band you are in is bright, others dim until hovered */
+  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; flex-direction: column; gap: 5px; z-index: 5; }
+  .dots .drow { display: flex; gap: 5px; opacity: .45; transition: opacity .3s; }
+  .dots .drow.on, .dots:hover .drow { opacity: 1; }
+  .dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
     transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
-  .dots button.on { width: 40px; background: #f0f6fc; }
+  .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
+  .dots button.kept { background: #ffffff90; }
+  .dots button.on { width: 24px; background: #f0f6fc; box-shadow: none; }
+  /* --- band header --- */
+  .bh-head { position: absolute; left: 140px; top: 170px; width: 1080px; }
+  .bh-head h2 { margin: 26px 0 0; font-size: 150px; line-height: .95; }
+  .bh-head h2 .line { display: inline-block; white-space: nowrap; }
+  .bh .l-grad .ch { background-image: linear-gradient(90deg, var(--bh), var(--bh2), #f0f6fc, var(--bh2), var(--bh)); }
+  .active.bh .ch { animation: settle .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 30ms + .15s); }
+  .bh-sub { margin: 34px 0 0; font-size: 40px; line-height: 1.25; color: #c9d1d9; font-variation-settings: "wght" 500, "wdth" 100; }
+  .active .bh-sub { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .45s; }
+  .bh-map { position: absolute; right: 140px; top: 182px; display: flex; flex-direction: column; gap: 9px; }
+  .bh-mrow { display: flex; align-items: center; gap: 5px; opacity: .4; }
+  .bh-mrow.on { opacity: 1; }
+  .active .bh-mrow { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 45ms + .2s); }
+  .active .bh-mrow:not(.on) { animation-name: dimrise; }
+  @keyframes dimrise { from { opacity: 0; transform: translateY(.3em); } to { opacity: .4; transform: none; } }
+  .bh-ml { width: 230px; font: 500 15px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9198a1; text-align: right; margin-right: 14px; }
+  .bh-mrow.on .bh-ml { color: #f0f6fc; }
+  .bh-mrow i { width: 16px; height: 12px; border-radius: 3px; background: #ffffff30; }
+  .bh-mrow i.hd { background: transparent; box-shadow: inset 0 0 0 2px #ffffff60; }
+  .bh-mrow.on i { background: var(--bh); box-shadow: 0 0 14px var(--bh); }
+  .bh-mrow.on i.hd { background: transparent; box-shadow: inset 0 0 0 2px var(--bh2); }
+  .bh-row { position: absolute; left: 140px; right: 140px; bottom: 190px; margin: 0; padding: 0; list-style: none; display: flex; gap: 22px; }
+  .bh-row li { cursor: pointer; flex: 1; min-width: 0; height: 170px; padding: 26px 28px; border: 1px solid #3d444d; border-top: 4px solid var(--bh); border-radius: 14px;
+    background: #151b23cc; display: flex; flex-direction: column; justify-content: space-between; }
+  .bh-row li:hover { border-color: var(--bh2); background: #1f2630cc; }
+  .active .bh-row li { animation: rowin .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 90ms + .5s); }
+  @keyframes rowin { from { opacity: 0; transform: translateX(120px); } to { opacity: 1; transform: none; } }
+  .bh-n { font: 600 22px/1 var(--mono); color: var(--bh2); letter-spacing: .1em; }
+  .bh-row.many { display: grid; grid-template-columns: repeat(7, 1fr); bottom: 140px; }
+  .bh-row.many li { height: 150px; padding: 18px 22px; }
+  .bh-row.many .bh-t { font-size: 25px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  .bh-t { font-size: 28px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
   .arrows { position: fixed; left: 16px; bottom: 10px; display: none; gap: 8px; z-index: 5; }
   .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
     color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; }
@@ -1309,6 +1345,7 @@
   .notes { position: fixed; left: 24px; right: 24px; bottom: 50px; max-width: 900px; margin: 0 auto; padding: 18px 22px;
     background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
   .notes.on { display: block; }
+  body:not(.compact-nav) .notes { left: 270px; }
 
   /* --- any engine --- */
   .ae .slide-head .ae-agent .ch { background-image: linear-gradient(90deg, #ab7df8, #d2b8ff, #ab7df8); }
@@ -3371,7 +3408,7 @@
     }
     let last = 0;
     slides.push({
-      group: "factory",
+      group: "process",
       sound: "factory",
       palette: ["#bf3989", "#238636", "#9e6a03", "#8957e5"],
       notes:
@@ -3804,7 +3841,7 @@
       });
     };
     slides.push({
-      group: "factory",
+      group: "process",
       sound: "loop",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
@@ -3932,7 +3969,7 @@
         thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
       };
       slides.push({
-        group: "factory",
+        group: "process",
         sound: "reviews",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
@@ -4110,7 +4147,7 @@
         $("ctLane" + LANE[nid]).classList.add("on");
       };
       slides.push({
-        group: "factory",
+        group: "process",
         sound: "contrib",
         palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
         notes:
@@ -4174,7 +4211,7 @@
     }
     resetIndex();
     slides.push({
-      group: "factory",
+      group: "process",
       sound: "assist",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
@@ -4340,7 +4377,7 @@
       $("rpaLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "research",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
@@ -4455,7 +4492,7 @@
       fired = new Set();
     const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "unslop",
       palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
       notes:
@@ -4771,7 +4808,7 @@
     };
     let prevT = 0;
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "telemetry",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
@@ -5014,7 +5051,7 @@
       dot.style.color = col;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "grow",
       palette: ["#8957e5", "#f0883e", "#238636", "#1f6feb"],
       notes:
@@ -5228,7 +5265,7 @@
     const nums = STATS.map(() => h("div", { class: "ct-num" }, "0"));
     const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "mine",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
@@ -5505,7 +5542,7 @@
       coverage();
     };
     slides.push({
-      group: "loops",
+      group: "quality",
       sound: "explore",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
@@ -5660,7 +5697,7 @@
       fired = 0;
     };
     slides.push({
-      group: "loops",
+      group: "quality",
       sound: "dedupe",
       palette: ["#8957e5", "#d29922", "#1f6feb", "#238636"],
       notes:
@@ -5848,7 +5885,7 @@
       return s;
     };
     slides.push({
-      group: "loops",
+      group: "quality",
       sound: "formal",
       palette: ["#1f6feb", "#8957e5", "#238636", "#bf3989"],
       notes:
@@ -6082,7 +6119,7 @@
       $("gfShipT").textContent = title;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "gofan",
       palette: ["#238636", "#1f6feb", "#8957e5", "#3fb950"],
       notes:
@@ -6312,7 +6349,7 @@
       script();
     };
     slides.push({
-      group: "loops",
+      group: "knowledge",
       sound: "spec",
       palette: ["#8957e5", "#238636", "#1f6feb", "#d29922"],
       notes:
@@ -6532,7 +6569,7 @@
       script();
     };
     slides.push({
-      group: "loops",
+      group: "knowledge",
       sound: "docs",
       palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
       notes:
@@ -6702,7 +6739,7 @@
       $("dgNewI").textContent = ri;
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "dictate",
       palette: ["#1f6feb", "#8957e5", "#3fb950", "#79c0ff"],
       notes:
@@ -6885,7 +6922,7 @@
       $("sflLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "cihealth",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
       notes:
@@ -7107,7 +7144,7 @@
       });
     };
     slides.push({
-      group: "loops",
+      group: "cost",
       sound: "mcp",
       palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
       notes:
@@ -7382,7 +7419,7 @@
       });
     };
     slides.push({
-      group: "loops",
+      group: "process",
       sound: "audit",
       palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
       notes:
@@ -10251,7 +10288,7 @@
       ctx.fillText("WORKERS · ONE TARGET EACH", 470 + 2.5 * 110 + 27, CH - 6);
     };
     slides.push({
-      group: "scale",
+      group: "enterprise",
       sound: "radar",
       palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
       notes:
@@ -10409,7 +10446,7 @@
       return [u * u * ax + 2 * u * f * mx + f * f * bx, u * u * ay + 2 * u * f * my + f * f * by];
     };
     slides.push({
-      group: "scale",
+      group: "finale",
       sound: "finale",
       palette: ["#0fbf3e", "#1f6feb", "#8957e5", "#238636"],
       notes:
@@ -10753,7 +10790,7 @@
       TILES.forEach(([, fn], k) => (tileVals[k].textContent = fmt(k, fn(p))));
     };
     slides.push({
-      group: "scale",
+      group: "data",
       sound: "history",
       palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
       notes:
@@ -10925,7 +10962,7 @@
         )
       );
     slides.push({
-      group: "scale",
+      group: "data",
       sound: "land",
       palette: ["#ab7df8", "#db61a2", "#3fb950", "#4493f8"],
       notes:
@@ -11079,7 +11116,7 @@
       ["G = 0.52", "Gini of edits over 527 workflow files", "#ab7df8"],
     ];
     slides.push({
-      group: "scale",
+      group: "data",
       sound: "evolve",
       palette: ["#3fb950", "#ab7df8", "#db61a2", "#4493f8"],
       notes:
@@ -11132,24 +11169,116 @@
     });
   }
 
+  // ---------- bands ----------
+  // The deck is a table: each group is one horizontal band (row) led by a header slide.
+  // The title and the finale are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
+  const BANDS = {
+    platform: ["The platform", "Markdown in, GitHub Actions out"],
+    security: ["Security", "Assume the agent is compromised"],
+    process: ["Human agent processes", "Engineer processes, not code"],
+    quality: ["Code quality", "Mine patterns, turn them into checks"],
+    knowledge: ["Specs & docs", "Words that stay true to the code"],
+    cost: ["Cost & context", "Debug, spend less, remember more, measure everything"],
+    enterprise: ["Enterprise", "Any agent, any provider, any scale"],
+    data: ["By the numbers", "Measured on gh-aw's own history"],
+  };
+  // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
+  const rows = [];
+  for (const s of slides) {
+    const row = rows.find(r => r.group === s.group);
+    if (row) row.items.push(s);
+    else rows.push({ group: s.group, items: [s] });
+  }
+  {
+    const label = s => {
+      const hd = s.el.querySelector("h1, h2, h3");
+      const ls = hd ? [...hd.querySelectorAll(".line")] : [];
+      const t = (ls.length ? ls.map(l => l.textContent).join(" ") : hd?.textContent || "").replace(/\s+/g, " ").replace(/ ([,.])/g, "$1").trim();
+      const k = s.el.querySelector(".kicker")?.textContent.trim();
+      return t.length > 32 && k ? k : t;
+    };
+    const parts = rows.filter(r => BANDS[r.group]);
+    let num = 1;
+    for (const r of rows) {
+      if (BANDS[r.group]) num++;
+      r.first = num;
+      num += r.items.length;
+    }
+    for (const r of parts) {
+      resetIndex();
+      const [title, sub] = BANDS[r.group],
+        part = parts.indexOf(r) + 1,
+        c = r.items[0].palette;
+      const map = h(
+        "div",
+        { class: "bh-map", "aria-hidden": "true" },
+        rows.map((o, i) =>
+          h(
+            "div",
+            { class: `bh-mrow${o === r ? " on" : ""}`, "--i": i },
+            h("span", { class: "bh-ml" }, BANDS[o.group]?.[0] || (i ? "Finale" : "Title")),
+            BANDS[o.group] ? h("i", { class: "hd" }) : null,
+            o.items.map(() => h("i"))
+          )
+        )
+      );
+      r.header = {
+        group: r.group,
+        header: true,
+        red: r.items[0].red,
+        sound: "band",
+        palette: c,
+        notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${r.items.map(label).join(", ")}.`,
+        el: h(
+          "section",
+          { class: "slide bh", "--bh": c[0], "--bh2": c[2] },
+          h(
+            "div",
+            { class: "bh-head" },
+            h("div", { class: "kicker" }, `Part ${String(part).padStart(2, "0")} / ${String(parts.length).padStart(2, "0")}`),
+            h("h2", {}, title.split(" ").flatMap((w, i) => (i ? [" ", letters(w, "l-grad")] : [letters(w, "l-grad")]))),
+            h("p", { class: "bh-sub" }, sub)
+          ),
+          map,
+          h(
+            "ol",
+            { class: `bh-row${r.items.length > 8 ? " many" : ""}` },
+            r.items.map((s, i) => h("li", { "--i": i, "data-go": r.first + i - 1 }, h("span", { class: "bh-n" }, String(r.first + i).padStart(2, "0")), h("span", { class: "bh-t" }, label(s))))
+          )
+        ),
+      };
+    }
+    slides.length = 0;
+    rows.forEach((r, ri) => {
+      r.start = slides.length;
+      for (const s of r.header ? [r.header, ...r.items] : r.items) {
+        s.band = ri;
+        slides.push(s);
+      }
+    });
+  }
+
   const stage = h(
     "div",
     { class: "stage" },
     slides.map(s => s.el)
   );
   const progress = h("div", { class: "progress" });
+  // the dots are a mini-map of the table: one row of dots per band
+  const dotBtns = slides.map((s, i) =>
+    h("button", {
+      class: s.header ? "hd" : "",
+      "aria-label": `Slide ${i + 1}`,
+      onclick: e => {
+        e.stopPropagation();
+        go(i);
+      },
+    })
+  );
   const dots = h(
     "div",
     { class: "dots" },
-    slides.map((_, i) =>
-      h("button", {
-        "aria-label": `Slide ${i + 1}`,
-        onclick: e => {
-          e.stopPropagation();
-          go(i);
-        },
-      })
-    )
+    rows.map(r => h("div", { class: "drow", title: BANDS[r.group]?.[0] || "" }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
   );
   const arrowBtn = (label, d, fn) => {
     const b = h("button", {
@@ -11185,8 +11314,8 @@
   const gridc = h("canvas", { class: "gridc" });
   document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
 
-  // Dot row: left offset + 12px dots + 12px gaps + 28px for the wide active dot; sound/count need ~170px on the right.
-  const dotsWidth = 28 + slides.length * 24 - 12 + 28;
+  // Dot map: left offset + the longest band of 8px dots with 5px gaps + 16px for the wide active dot; sound/count need ~170px on the right.
+  const dotsWidth = 28 + Math.max(...rows.map(r => r.items.length + (r.header ? 1 : 0))) * 13 + 16 + 400;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
@@ -11421,6 +11550,12 @@
         g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       });
     const THEMES = {
+      // band header: a rising arpeggio over a soft open-fifth pad, like the camera pulling back to the next row
+      band: t => {
+        pad([48, 55, 62], t + 0.1, 1.8, 0.03, "triangle", 2200);
+        [60, 67, 72, 76, 79].forEach((m, i) => tone(m, t + 0.18 + i * 0.09, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 3200 }));
+        bell(84, t + 0.66, 0.04, 1.4);
+      },
       // title: wide major swell with a rising shimmer
       title: t => {
         pad([48, 55, 64, 71], t + 0.1, 3.2, 0.045);
@@ -12221,15 +12356,24 @@
     void el.offsetWidth; // restart CSS animations on re-entry
     el.classList.add("active");
     cur = n;
+    kept[slides[n].band] = n;
     slides[n].enter?.(dir);
     progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
-    [...dots.children].forEach((d, i) => d.classList.toggle("on", i === n));
+    dotBtns.forEach((d, i) => d.classList.toggle("on", i === n));
+    dotBtns.forEach((d, i) => d.classList.toggle("kept", kept.includes(i) && !slides[i].header));
+    [...dots.children].forEach((r, i) => r.classList.toggle("on", i === slides[n].band));
     prevBtn.disabled = n === 0;
     nextBtn.disabled = n === slides.length - 1;
     count.textContent = `${String(n + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
   }
+  // up/down jump to the neighbouring band, landing on the slide last shown there (its header the first time)
+  const kept = rows.map(r => r.start);
+  const band = d => {
+    const b = slides[cur].band + d;
+    if (b >= 0 && b < rows.length) go(kept[b]);
+  };
   const next = () => {
       if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
       else go(cur + 1);
@@ -12247,12 +12391,15 @@
       e.preventDefault();
       return;
     }
-    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) {
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) {
       e.preventDefault();
       next();
-    } else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) {
+    } else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) {
       e.preventDefault();
       prev();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      band(e.key === "ArrowDown" ? 1 : -1);
     } else if (e.key === "Home") go(0);
     else if (e.key === "End") go(slides.length - 1);
     else if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
@@ -12261,15 +12408,20 @@
   });
   addEventListener("click", e => {
     if (e.target.closest("a, button")) return;
+    const tile = e.target.closest("[data-go]");
+    if (tile) return go(+tile.dataset.go);
     e.clientX < innerWidth / 3 ? prev() : next();
   });
-  let tx = null;
-  addEventListener("touchstart", e => (tx = e.touches[0].clientX), { passive: true });
+  let tx = null,
+    ty = null;
+  addEventListener("touchstart", e => ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY)), { passive: true });
   addEventListener("touchend", e => {
     if (tx == null) return;
-    const dx = e.changedTouches[0].clientX - tx;
-    tx = null;
-    if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+    const dx = e.changedTouches[0].clientX - tx,
+      dy = e.changedTouches[0].clientY - ty;
+    tx = ty = null;
+    if (Math.abs(dy) > Math.abs(dx)) Math.abs(dy) > 50 && band(dy < 0 ? 1 : -1);
+    else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
   });
   addEventListener("hashchange", () => go((parseInt(location.hash.slice(1), 10) || 1) - 1));
 
