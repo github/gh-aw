@@ -223,6 +223,7 @@ interface UpdateIssueConfig extends SafeOutputConfig {
   target?: string;
   title?: boolean;
   body?: boolean;
+  operation?: "append" | "prepend" | "replace" | "replace-island";
   footer?: boolean;
 }
 
