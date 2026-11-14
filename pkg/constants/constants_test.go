@@ -432,7 +432,7 @@ func TestIsEngineExecutionStepName(t *testing.T) {
 	tests := map[string]bool{
 		"Execute Claude Code CLI":           true,
 		"Execute GitHub Copilot CLI":        true,
-		"Execute threat detection with AWF": true,
+		"Execute Threat Detection with AWF": true,
 		"Execute DeepSeek Harness":          true,
 		"Execute ":                          false,
 		"Install Claude Code CLI":           false,

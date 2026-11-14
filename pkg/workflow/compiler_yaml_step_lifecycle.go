@@ -388,7 +388,7 @@ func providerScopedSubagentPatterns(model string, patterns []string, provider st
 func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *WorkflowData, protectedSessionCapture bool) error { //nolint:largefunc // Existing artifact collection keeps related output paths and ordering together.
 	// Copy the raw safe-output NDJSON to a /tmp/gh-aw/ path so it can be included in the
 	// unified agent artifact together with all other /tmp/gh-aw/ outputs.
-	yaml.WriteString("      - name: Copy Safe Outputs\n")
+	yaml.WriteString("      - name: Copy raw safe-output NDJSON to /tmp/gh-aw\n")
 	yaml.WriteString("        if: always()\n")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}\n")

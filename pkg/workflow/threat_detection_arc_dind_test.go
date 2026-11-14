@@ -58,7 +58,7 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 					reset, resetStep := find("Reset ARC/DinD threat detection staging")
 					prepare, _ := find("Prepare threat detection files")
 					install, installation := find("Install threat-detect binary")
-					execute, execution := find("Execute threat detection with AWF")
+					execute, execution := find("Execute Threat Detection with AWF")
 					collect, collection := find("Collect ARC/DinD threat detection results")
 					upload, _ := find("Upload threat detection artifact")
 					_, conclusion := find("Conclude threat detection")

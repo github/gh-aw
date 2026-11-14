@@ -44,7 +44,7 @@ Add a label safely.
 
 	assert.Contains(t, compiled, "-c features.shell_tool=false",
 		"Codex should receive the no-shell runtime setting when bash is disabled")
-	assert.Contains(t, compiled, "Mount MCP servers as CLIs",
+	assert.Contains(t, compiled, "Mount MCP Servers as CLIs",
 		"safeoutputs should still be mounted as a CLI for command-based harnesses")
 	assert.Contains(t, compiled, `"safeoutputs": {`,
 		"safeoutputs must remain available in the gateway MCP server config")

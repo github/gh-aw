@@ -85,7 +85,7 @@ const UpdateDriveMemoryJobName JobName = "update_drive_memory"
 const AgentFailureStepName = "Handle agent failure"
 
 // ThreatDetectionExecutionStepName is the external threat-detect engine step in the detection job.
-const ThreatDetectionExecutionStepName = "Execute threat detection with AWF"
+const ThreatDetectionExecutionStepName = "Execute Threat Detection with AWF"
 
 // EngineExecutionStepNamePrefix starts the name of every engine execution step that
 // the compiler emits in the evals and detection jobs. The jobs API does not expose

@@ -65,12 +65,12 @@ Test workflow to verify audit step order.
 	require.NoError(t, err, "reading lock file")
 	lockContent := string(content)
 
-	mountMCPIndex := indexInNonCommentLines(lockContent, "- name: Mount MCP servers as CLIs")
+	mountMCPIndex := indexInNonCommentLines(lockContent, "- name: Mount MCP Servers as CLIs")
 	cleanCredsIndex := indexInNonCommentLines(lockContent, "- name: Clean credentials")
 	auditIndex := indexInNonCommentLines(lockContent, "- name: Audit pre-agent workspace")
 	agentIndex := indexInNonCommentLines(lockContent, "- name: Execute GitHub Copilot CLI")
 
-	require.NotEqual(t, -1, mountMCPIndex, "Mount MCP servers step should be present")
+	require.NotEqual(t, -1, mountMCPIndex, "Mount MCP Servers step should be present")
 	require.NotEqual(t, -1, cleanCredsIndex, "Clean credentials step should be present")
 	require.NotEqual(t, -1, auditIndex, "Audit pre-agent workspace step should be present")
 	require.NotEqual(t, -1, agentIndex, "Agent execution step should be present")

@@ -1131,7 +1131,7 @@ jobs:
             }
           }
           GH_AW_MCP_CONFIG_ec9de7272c34f251_EOF
-      - name: Mount MCP servers as CLIs
+      - name: Mount MCP Servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true
         env:
@@ -1405,7 +1405,7 @@ jobs:
       - name: Append agent step summary
         if: always() && steps.redact_secrets.outcome == 'success'
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
-      - name: Copy Safe Outputs
+      - name: Copy raw safe-output NDJSON to /tmp/gh-aw
         if: always()
         env:
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}

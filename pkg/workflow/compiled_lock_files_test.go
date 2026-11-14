@@ -372,7 +372,7 @@ func TestCompiledLockFiles_SmokePiUsesNativeMCPSafeoutputsWiring(t *testing.T) {
 	require.NoError(t, err, "should read smoke-pi lock file")
 
 	lockContent := string(lockBytes)
-	assert.Contains(t, lockContent, "Mount MCP servers as CLIs",
+	assert.Contains(t, lockContent, "Mount MCP Servers as CLIs",
 		"the infrastructure CLI fallback remains available alongside native MCP")
 	assert.Contains(t, lockContent, "export GH_AW_PI_NATIVE_MCP=1",
 		"native Pi must retain infrastructure servers even when CLI fallbacks are mounted")
