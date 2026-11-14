@@ -222,6 +222,33 @@
   .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
   .fm-wire.classic { stroke: #9198a1; stroke-dasharray: 6 8; opacity: .4; }
   .mra-l.classic { fill: #9198a1; font: 500 19px var(--mono); opacity: .8; }
+  .ct-svg { left: 150px; top: 282px; width: 1620px; height: 572px; }
+  .ct-svg .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
+  .ct-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .ct-svg .mra-l.g { fill: #3fb950; }
+  .ct-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
+  .ct-round { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
+  .ct-svg .fm-wire.o { stroke: #d29922; } .ct-svg .fm-wire.r { stroke: #f85149; stroke-dasharray: 4 6; } .ct-svg .mra-l.r { fill: #ff7b72; }
+  .ct-prem { fill: #d2992208; stroke: #d29922; stroke-width: 2; stroke-dasharray: 12 8; opacity: .8; }
+  .ct-prem-t { fill: #d29922; font: 600 16px var(--mono); letter-spacing: .08em; }
+  .ct-lock path { stroke: #d29922; } .ct-lock rect { fill: #d29922; }
+  .ct-run .ct-x { fill: none; stroke: #f85149; stroke-width: 5; stroke-linecap: round; }
+  .ct-run.on rect { stroke: #f85149; filter: drop-shadow(0 0 14px #f85149); }
+  .ct-data { opacity: .45; transition: opacity .4s; }
+  .ct-data.on { opacity: 1; }
+  .ct-data-b { fill: #0d1117; stroke: #d29922; stroke-width: 2; }
+  .ct-data.on .ct-data-b { filter: drop-shadow(0 0 14px #d2992299); }
+  .ct-data-t { fill: #d29922; font: 700 15px var(--mono); letter-spacing: .14em; }
+  .ct-data-l { fill: #9198a1; font: 500 17px var(--mono); }
+  .ct-bar { fill: #3d444d; }
+  .ct-data.on .ct-bar { animation: ct-scan .9s ease-in-out infinite alternate; }
+  @keyframes ct-scan { from { fill: #3d444d; } to { fill: #d29922; } }
+  .ct-stats { position: absolute; left: 150px; right: 150px; top: 878px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; }
+  .ct-stat { padding: 20px 28px 22px; border-radius: 18px; background: #0d1117d9; border: 2px solid #3d444d; }
+  .active .ct-stat { animation: rise .9s cubic-bezier(.2,.9,.2,1) both; }
+  .active .ct-stat:nth-child(2) { animation-delay: .15s; } .active .ct-stat:nth-child(3) { animation-delay: .3s; } .active .ct-stat:nth-child(4) { animation-delay: .45s; }
+  .ct-num { font: 800 64px/1 "Mona Sans"; font-variant-numeric: tabular-nums; background: linear-gradient(90deg, var(--a), var(--b)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ct-lab { margin-top: 10px; font: 500 22px/1.2 "Mona Sans"; color: #9198a1; }
+  .ct-src { position: absolute; right: 150px; top: 846px; font: 500 16px var(--mono); color: #6e7681; letter-spacing: .06em; }
   .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
   .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
@@ -300,6 +327,31 @@
   @keyframes fm-pop { from { transform: scale(.4); } }
   .ra-flow { left: 60px; top: 340px; width: 880px; height: 512px; }
   .ra-chart { left: 990px; top: 340px; width: 880px; height: 512px; }
+  .us-svg { position: absolute; left: 110px; top: 330px; width: 1700px; height: 660px; overflow: visible; font-family: "Mona Sans"; }
+  .us-lane { font: 600 32px "Mona Sans"; fill: #9198a1; } .us-lane.good { fill: #3fb950; }
+  .us-main { stroke: #30363d; stroke-width: 6; stroke-linecap: round; }
+  .us-mainl { font: 500 18px var(--mono); fill: #6e7681; }
+  .us-div { stroke: #30363d; stroke-width: 2; stroke-dasharray: 4 10; }
+  .us-card rect.c { fill: #161b22; stroke: #9198a1; stroke-width: 2; }
+  .us-card text { font: 600 26px "Mona Sans"; fill: #e6edf3; }
+  .us-card text.us-diff { font: 500 19px var(--mono); fill: #9198a1; }
+  .us-card text.us-round { font: 500 20px var(--mono); fill: #d29922; }
+  .us-diff { font: 500 18px var(--mono); fill: #6e7681; } .us-diff .add { fill: #3fb950; } .us-diff .del { fill: #f85149; }
+  .us-nit rect { fill: #2b2111; stroke: #d29922; stroke-width: 1.5; }
+  .us-nit text { font: 500 20px var(--mono); fill: #f0c46a; }
+  .us-commit { fill: #0d1117; stroke: #9198a1; stroke-width: 4; opacity: 0; transition: opacity .3s, stroke .5s, fill .5s; }
+  .us-commit.on { opacity: 1; } .us-commit.clean { stroke: #3fb950; fill: #12361f; }
+  .us-slop { fill: #d29922; opacity: 0; transform-box: fill-box; transform-origin: center; transition: opacity .3s, transform .3s; }
+  .us-slop.on { opacity: 1; } .us-slop.on.eaten { opacity: 0; transform: scale(0); }
+  .us-pr { opacity: 0; transform: translateY(-60px); transition: opacity .3s, transform .45s cubic-bezier(.2,.9,.2,1); }
+  .us-pr.on { opacity: 1; transform: none; }
+  .us-pr rect { fill: #161b22; stroke: #ab7df8; stroke-width: 2; }
+  .us-chomp { opacity: 0; transition: opacity .3s; } .us-chomp.on { opacity: 1; }
+  .us-chomp text { font: 600 20px var(--mono); fill: #ab7df8; text-anchor: middle; }
+  .us-bots { font: 500 19px var(--mono); fill: #8957e5; }
+  .us-num { font: 700 68px "Mona Sans"; fill: #e6edf3; text-anchor: middle; }
+  .us-cap { font: 500 20px var(--mono); fill: #9198a1; text-anchor: middle; }
+  .us-cap.bad { fill: #d29922; } .us-cap.ok { fill: #3fb950; }
   .ra-cap-flow { left: 62px; top: 282px; }
   .ra-cap-chart { left: 992px; top: 282px; }
   .bd-grid { stroke: #ffffff12; stroke-width: 1; }
@@ -2954,6 +3006,185 @@
     const BD_PERIOD = 15000;
     let bdT0 = 0,
       bdRun = -1;
+    // Issues as intent: how gh-aw itself is built; an on-prem failure is investigated privately with the debug.md agent, an anonymized issue is filed, triaged, assigned to Copilot, reviewed by agents and merged, with real repository counts
+    {
+      resetIndex();
+      const VW = 1800,
+        VH = 600;
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+      const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#ctAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+      const user = (id, x, y, w) => `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/><image href="assets/avatars/ievangelist.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+      const lock = (x, y, s = 1) =>
+        `<g class="ct-lock" transform="translate(${x},${y}) scale(${s})"><path d="M-7 -2 V-8 A7 7 0 0 1 7 -8 V-2" fill="none" stroke-width="3"/><rect x="-11" y="-3" width="22" height="17" rx="3"/></g>`;
+      // the failing on-prem run
+      const run = (id, x, y) =>
+        `<g class="fm-out ct-run" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/><path class="ct-x" d="M${x - 11} ${y - 11}L${x + 11} ${y + 11}M${x + 11} ${y - 11}L${x - 11} ${y + 11}"/></g>`;
+      // live data the debug agent investigates on prem: always redacted, never shown or filed
+      const data = (id, x, y) =>
+        `<g class="ct-data" id="${id}"><rect class="ct-data-b" x="${x}" y="${y}" width="170" height="160" rx="14"/><text class="ct-data-t" x="${x + 14}" y="${y + 30}">LIVE DATA</text>${lock(x + 148, y + 22, 0.8)}` +
+        ["logs", "audit", "config"].map((l, i) => `<text class="ct-data-l" x="${x + 14}" y="${y + 70 + i * 34}">${l}</text><rect class="ct-bar" x="${x + 90}" y="${y + 58 + i * 34}" width="${66 - i * 12}" height="15" rx="3" style="animation-delay:${i * 0.18}s"/>`).join("") +
+        `</g>`;
+      const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+      const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+      // [edge id, path, color, label, lx, ly, anchor]; g = user, o = private on-prem investigation, r = failure, b = maintainer, p = Copilot and agents
+      const EDGES = [
+        ["r1", "M106 170 H248", "r", ["run fails"], 177, 148, "middle"],
+        ["r2", "M290 206 V388", "g", ["runs it on", "the failed run"], 306, 290, "start"],
+        ["r3", "M256 416 H214", "o", [], 0, 0, "start"],
+        ["r4", "M206 446 H248", "o", [], 0, 0, "start"],
+        ["e1", "M520 430 H545 V170 H686", "g", ["anonymized", "issue"], 572, 112, "start"],
+        ["e2", "M730 206 V397", "b", ["triages", "& plans"], 746, 300, "start"],
+        ["e3", "M858 430 H905 V170 H918", "b", ["assigns", "to Copilot"], 917, 300, "start"],
+        ["e4", "M1060 196 V430 H1206", "p", ["writes code,", "opens PR"], 1076, 300, "start"],
+        ["e5", "M1250 394 V170 H1368", "p", ["ready for", "review"], 1264, 300, "start"],
+        ["e6", "M1555 145 V100 H1020 V137", "p", ["comments → Copilot pushes fixes"], 1288, 90, "middle"],
+        ["e7", "M1410 206 V388", "p", ["threads", "resolved"], 1426, 300, "start"],
+        ["e8", "M1628 430 H1706", "b", ["merges"], 1667, 408, "middle"],
+      ];
+      const SEQ = [
+        ["r1", "nUser"],
+        ["r2", "nDebug"],
+        ["r3", "nData"],
+        ["r4", "nDebug"],
+        ["e1", "nIssue", 1300],
+        ["e2", "nMaint"],
+        ["e3", "nCopilot"],
+        ["e4", "nPR"],
+        ["e5", "nReview"],
+        ["e6", "nCopilot"],
+        ["e4", "nPR"],
+        ["e5", "nReview"],
+        ["e7", "nLead"],
+        ["e8", "nMerge", 1600],
+      ];
+      const LANE = { nRun: 0, nUser: 0, nDebug: 0, nData: 0, nIssue: 1, nMaint: 1, nCopilot: 2, nPR: 2, nReview: 3, nLead: 3, nMerge: 3 };
+      const MK = { g: ["ctG", "#3fb950"], o: ["ctO", "#d29922"], r: ["ctR", "#f85149"], b: ["ctB", "#4493f8"], p: ["ctP", "#ab7df8"] };
+      let g = `<defs><clipPath id="ctClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ctAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>`;
+      for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+      g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+      g += `<rect class="ct-prem" x="4" y="78" width="518" height="470" rx="22"/>${lock(40, 520)}<text class="ct-prem-t" x="62" y="527">live data never leaves</text>`;
+      [
+        [0, 560, "ON PREM"],
+        [560, 900, "INTENT"],
+        [900, 1320, "CODE"],
+        [1320, VW, "REVIEW"],
+      ].forEach(([x0, x1, t], i) => {
+        g += `<text class="fm-lane-t mra-lane" id="ctLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+        if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 60}"/>`;
+      });
+      for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+        g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+        g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+      }
+      g += run("nRun", 70, 170) + user("nUser", 290, 170, 200) + agent("nDebug", 290, 430, 222, "debug.md agent") + data("nData", 36, 350);
+      g += box("nIssue", 730, 170, "issue") + dev("nMaint", 640, 430, 210, "Maintainer");
+      g += agent("nCopilot", 960, 170, 200, "Copilot") + box("nPR", 1250, 430, "pr");
+      g += agent("nReview", 1410, 170, 290, "Agentic reviewers") + dev("nLead", 1410, 430, 210, "Maintainer") + box("nMerge", 1750, 430, "merge");
+      g += `<text class="ct-round" id="ctRound" x="1250" y="500" text-anchor="middle"></text>`;
+      g += `<circle class="fm-dot mra-dot" r="8"/>`;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "fm-svg ct-svg");
+      svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      svg.style.setProperty("--c", "#ab7df8");
+      svg.innerHTML = g;
+      const $ = id => svg.querySelector("#" + id),
+        dot = svg.querySelector(".mra-dot");
+      // real counts for gh-aw issues labelled "community" and the merged pull requests that closed them, snapshot November 2026
+      const STATS = [
+        [450, "", "people filed community issues", "#3fb950", "#79c0ff"],
+        [1383, "", "community issues closed as completed", "#79c0ff", "#4493f8"],
+        [1039, "", "pull requests merged to close them", "#4493f8", "#ab7df8"],
+        [96, "%", "of those pull requests authored by Copilot", "#ab7df8", "#d2a8ff"],
+      ];
+      const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
+      const stats = h(
+        "div",
+        { class: "ct-stats" },
+        ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+      );
+      const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+      const STEP = 1000,
+        START = 900,
+        HOLD = 1200,
+        T = [];
+      let END = START;
+      for (const s of SEQ) {
+        T.push(END);
+        END += s[2] || STEP;
+      }
+      const CYC = END + HOLD;
+      let t0 = 0,
+        cyc = -1,
+        popK = -1;
+      const light = nid => {
+        $(nid).classList.add("on");
+        $("ctLane" + LANE[nid]).classList.add("on");
+      };
+      slides.push({
+        group: "factory",
+        sound: "contrib",
+        palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
+        notes:
+          "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative, with simulated data; David Pine stands in for the community. A workflow run fails on an on-prem, self-hosted setup. He points our debug.md agent at the failing run, and the agent investigates with the live logs, audit data and configuration right there on prem. That evidence never leaves the enclave and we never need to see it: what comes out is an anonymized issue describing the bug and the intent, with no private names, payloads or secrets. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Users contribute intent, not their data; Copilot turns it into code and maintainers review.",
+        enter() {
+          t0 = 0;
+          cyc = -1;
+          nums.forEach((n, i) => (n.textContent = "0" + STATS[i][1]));
+        },
+        tick(t) {
+          if (!t0) t0 = t;
+          const e = t - t0,
+            c = Math.floor(e / CYC),
+            u = e % CYC,
+            f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+          nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * f).toLocaleString("en-US") + STATS[i][1]));
+          if (c !== cyc) {
+            cyc = c;
+            svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+            $("ctRound").textContent = "";
+            light("nRun");
+            popK = -1;
+          }
+          svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+          if (u < START || u >= END) {
+            dot.style.opacity = 0;
+            return;
+          }
+          let k = 0;
+          while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+          const [eid, nid, dur = STEP] = SEQ[k],
+            fr = (u - T[k]) / dur,
+            p = $(eid),
+            n = p.getTotalLength(),
+            q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+          p.classList.add("hot");
+          if (dot.style.opacity !== "1") sfx.pop(0);
+          dot.style.opacity = 1;
+          dot.setAttribute("cx", q.x);
+          dot.setAttribute("cy", q.y);
+          dot.setAttribute("fill", MK[p.classList[1]][1]);
+          for (let j = 0; j < k; j++) light(SEQ[j][1]);
+          if (k >= 8) $("ctRound").textContent = `review round ${k >= 11 ? 2 : 1}`;
+          if (fr >= 0.8) {
+            if (popK !== k) {
+              popK = k;
+              sfx.pop(k);
+            }
+            light(nid);
+          }
+        },
+        el: h(
+          "section",
+          { class: "slide" },
+          h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Intent is all you need"), h("h2", {}, letters("Issues as "), letters("intent", "l-grad"))),
+          svg,
+          stats,
+          h("div", { class: "ct-src" }, "gh-aw issues labelled community · counts as of November 2026")
+        ),
+      });
+    }
+    resetIndex();
     slides.push({
       group: "factory",
       sound: "assist",
@@ -2988,7 +3219,7 @@
     });
   }
 
-  // Research → Assign → Refine: deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
+  // Daily Unsloppers (research → assign → refine): deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
     resetIndex();
     const VW = 1700,
@@ -3125,7 +3356,7 @@
       sound: "research",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
+        "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -3177,7 +3408,145 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Daily "), letters("Unsloppers", "l-grad"))), svg),
+    });
+  }
+
+  // Merge fast, unslop daily: three slow pull requests polished through many nit rounds (each still merging slop) vs many fast pull requests, agentic reviewers and background unsloppers that eat the slop
+  {
+    resetIndex();
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const CYC = 12800,
+      A_N = 3,
+      A_SPAN = 3800,
+      A_AT = k => 200 + k * A_SPAN,
+      A_X = k => 440 + k * 440,
+      NITS = ["nit: rename this", "nit: typo", "nit: extract helper", "nit: blank line", "nit: reword comment", "nit: early return", "nit: sort imports", "nit: one more test", "nit: naming again", "nit: inline this", "nit: fix wording", "nit: lgtm, but…"],
+      ROUND = (A_SPAN - 400) / (NITS.length / A_N),
+      B_N = 30,
+      B_AT = i => 300 + i * 290,
+      B_X = i => 50 + i * 48,
+      SWEEPS = [3600, 7200, 10200],
+      SWEEP_D = 1200,
+      LA = 230,
+      LB = 560;
+    // a couple of synthetic slop specks per fast commit
+    const SPECKS = Array.from({ length: B_N }, (_, i) => (i % 3 === 1 ? [[0, -24]] : [[-10, -22], [10, -26]]));
+    let g = `<line class="us-main" x1="0" y1="${LA}" x2="1500" y2="${LA}"/><text class="us-mainl" x="0" y="${LA + 38}">main</text>
+      <line class="us-main" x1="0" y1="${LB}" x2="1500" y2="${LB}"/><text class="us-mainl" x="0" y="${LB + 38}">main</text>
+      <line class="us-div" x1="0" y1="300" x2="1700" y2="300"/>
+      <text class="us-lane" x="0" y="34">Slow · polished · nit after nit</text>
+      <text class="us-lane good" x="0" y="356">Fast · good enough · unslopped in the background</text><text class="us-diff" x="1500" y="356" text-anchor="end">each <tspan class="add">+40</tspan> <tspan class="del">−8</tspan></text>
+      ${Array.from({ length: A_N }, (_, k) => `<circle class="us-commit" id="usA${k}" cx="${A_X(k)}" cy="${LA}" r="26"/><circle class="us-slop" id="usAS${k}" cx="${A_X(k) + 26}" cy="${LA - 34}" r="11"/>`).join("")}
+      <g id="usCard"><g class="us-nit" id="usNit"><rect x="0" y="-80" width="290" height="44" rx="10"/><text id="usNitT" x="16" y="-50"></text></g>
+        <g class="us-card"><rect class="c" x="0" y="-20" width="350" height="104" rx="14"/>${ico("pr", 36, 32, 34, "#9198a1")}<text id="usPrN" x="68" y="14">PR #1</text><text class="us-round" id="usRound" x="68" y="42">round 0</text><text class="us-diff" x="68" y="70"><tspan class="add">+1,240</tspan> <tspan class="del">−380</tspan> · 46 files</text><circle cx="334" cy="-6" r="8" fill="#d29922"/></g></g>`;
+    for (let i = 0; i < B_N; i++) {
+      const x = B_X(i);
+      g += `<g transform="translate(${x - 20},${LB - 112})"><g class="us-pr" id="usP${i}"><rect x="0" y="0" width="40" height="40" rx="8"/>${ico("pr", 20, 20, 22, "#e6edf3")}<circle cx="38" cy="2" r="9" fill="#8957e5"/>${ico("copilot", 38, 2, 13)}</g></g>`;
+      g += `<circle class="us-commit" id="usC${i}" cx="${x}" cy="${LB}" r="11"/>`;
+      SPECKS[i].forEach(([dx, dy], j) => (g += `<circle class="us-slop" id="usS${i}_${j}" cx="${x + dx}" cy="${LB + dy}" r="5"/>`));
+    }
+    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily unsloppers</text></g>
+      <text class="us-bots" x="0" y="${LB + 100}">code-simplifier · dead-code-remover · duplicate-code-detector · daily-file-diet · unbloat-docs</text>
+      <text class="us-num" id="usNA" x="1620" y="${LA - 50}">0%</text><text class="us-cap" x="1620" y="${LA - 16}">of feature</text><text class="us-cap" id="usMA" x="1620" y="${LA + 16}"></text><text class="us-cap bad" id="usCA" x="1620" y="${LA + 44}"></text>
+      <text class="us-num" id="usNB" x="1620" y="${LB - 50}">0%</text><text class="us-cap" x="1620" y="${LB - 16}">of feature</text><text class="us-cap" id="usMB" x="1620" y="${LB + 16}"></text><text class="us-cap ok" id="usCB" x="1620" y="${LB + 44}"></text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "us-svg");
+    svg.setAttribute("viewBox", "0 0 1700 660");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id);
+    const card = $("usCard"),
+      nit = $("usNit"),
+      nitT = $("usNitT"),
+      round = $("usRound"),
+      prN = $("usPrN"),
+      chomp = $("usChomp");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    let t0 = 0,
+      cyc = -1,
+      fired = new Set();
+    const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
+    slides.push({
+      group: "loops",
+      sound: "unslop",
+      palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
+      notes:
+        "Merge fast, unslop daily. This is an illustrative, synthetic timeline. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: thirty fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. The feature ships a slice at a time, so its percentage climbs with every merge and the feature is complete while the polished lane is still in review. The slop that gets through is eaten by many background unsloppers, daily workflows such as code simplifier, dead code remover, duplicate code detector and file diet, which open their own small clean-up pull requests. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          fired = new Set();
+        }
+        // lane A: three big pull requests, each crawling through nit rounds before it merges, and each still merging some slop
+        const k = Math.min(A_N - 1, Math.max(0, Math.floor((u - 200) / A_SPAN))),
+          v = u - A_AT(k),
+          per = NITS.length / A_N,
+          r = Math.min(per, Math.floor(Math.max(0, v) / ROUND) + 1),
+          f = (Math.max(0, v) % ROUND) / ROUND,
+          review = v < A_SPAN - 400,
+          x0 = k ? A_X(k - 1) + 30 : 20;
+        let m = 0;
+        for (let j = 0; j < A_N; j++) {
+          const on = u >= A_AT(j) + A_SPAN - 200;
+          $("usA" + j).classList.toggle("on", on);
+          $("usAS" + j).classList.toggle("on", on);
+          if (on) (m++, once("am" + j, () => sfx.notify(false)));
+        }
+        card.setAttribute("transform", `translate(${x0 + (A_X(k) - 200 - x0) * ease(Math.min(1, Math.max(0, v) / (A_SPAN - 400)))},${LA - 140})`);
+        card.style.opacity = v < 0 || u >= A_AT(k) + A_SPAN - 200 ? 0 : 1;
+        prN.textContent = `PR #${k + 1}`;
+        round.textContent = `round ${r}`;
+        nitT.textContent = NITS[k * per + r - 1];
+        nit.style.opacity = !review || v < 0 ? 0 : f < 0.12 ? f / 0.12 : f > 0.85 ? (1 - f) / 0.15 : 1;
+        if (review && v >= 0) once(`n${k}_${r}`, () => sfx.key(0.5));
+        $("usNA").textContent = `${Math.round((m * 40) / A_N)}%`;
+        $("usMA").textContent = `${m} PR${m === 1 ? "" : "s"} merged`;
+        $("usCA").textContent = `${m} slop left`;
+        // lane B: a fast pull request every beat, reviewed by agents and merged; sweeps eat what slipped through
+        let n = 0,
+          eaten = 0,
+          cx = -1;
+        for (const s of SWEEPS) {
+          if (u < s) continue;
+          const last = SPECKS.reduce((m, _, i) => (B_AT(i) + 500 <= s ? i : m), -1),
+            end = B_X(last) + 40,
+            p = Math.min(1, (u - s) / SWEEP_D);
+          if (p < 1) cx = end * ease(p);
+          once("s" + s, () => sfx.review());
+        }
+        for (let i = 0; i < B_N; i++) {
+          const at = B_AT(i),
+            x = B_X(i),
+            on = u >= at + 500;
+          $("usP" + i).classList.toggle("on", u >= at && u < at + 520);
+          $("usC" + i).classList.toggle("on", on);
+          if (on) (n++, once("b" + i, () => sfx.pop(i)));
+          let clean = on;
+          SPECKS[i].forEach((_, j) => {
+            const sp = $(`usS${i}_${j}`),
+              gone = SWEEPS.some(s => u >= s && at + 500 <= s && (u >= s + SWEEP_D || x <= cx));
+            sp.classList.toggle("on", on);
+            sp.classList.toggle("eaten", gone);
+            if (gone) eaten++;
+            else clean = false;
+          });
+          $("usC" + i).classList.toggle("clean", clean);
+        }
+        chomp.classList.toggle("on", cx >= 0);
+        if (cx >= 0) chomp.setAttribute("transform", `translate(${cx},0)`);
+        $("usNB").textContent = `${Math.round((n / B_N) * 100)}%`;
+        $("usMB").textContent = `${n} PR${n === 1 ? "" : "s"} merged`;
+        $("usCB").textContent = `${eaten} slop eaten`;
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))), svg),
     });
   }
 
@@ -7000,12 +7369,27 @@
         click(t + 1.0, 600, 0.05, 4);
         pad([55, 62, 67, 71], t + 1.0, 2, 0.03, "triangle", 2000);
       },
+      // merge fast, unslop daily: a slow nit tick on the left, a quick run of merge pops on the right, then a downward gulp as the slop is eaten
+      unslop: t => {
+        [0, 0.3, 0.6].forEach(d => click(t + 0.15 + d, 1400, 0.04, 6));
+        [72, 74, 76, 79, 81, 84].forEach((m, i) => bell(m, t + 0.3 + i * 0.09, 0.03, 0.6));
+        osc("sine", hz(79), t + 1.0, 0.35, 0.04, { f1: hz(55) });
+        pad([53, 60, 64, 69], t + 1.2, 1.8, 0.025, "triangle", 1600);
+      },
       // repo assist: a scheduled tick-tock, then a calm descending line as the open-issue count falls, resolving home
       assist: t => {
         [0, 0.25].forEach((d, i) => click(t + 0.2 + d, i ? 2400 : 3200, 0.05, 10));
         [79, 76, 74, 72, 67].forEach((m, i) => tone(m, t + 0.7 + i * 0.15, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 2400, detune: 3 }));
         bell(72, t + 1.45, 0.04, 1.6);
         pad([48, 55, 64], t + 1.4, 1.8, 0.025, "triangle", 1400);
+      },
+      // issues as intent: a few typed keystrokes (the issue), a hand-off up to Copilot, review chirps, then a bright merge chord
+      contrib: t => {
+        [0, 0.09, 0.2, 0.27, 0.38].forEach((d, i) => click(t + 0.2 + d, 2600 + i * 180, 0.04, 12));
+        [67, 72, 79].forEach((m, i) => tone(m, t + 0.8 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.06, cutoff: 2600, detune: 3 }));
+        [84, 81, 84].forEach((m, i) => osc("sine", hz(m), t + 1.3 + i * 0.1, 0.12, 0.025));
+        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.75 + i * 0.05, 0.04, 1.5));
+        pad([48, 55, 64, 67], t + 1.75, 1.8, 0.025, "triangle", 2000);
       },
       // research → assign → refine: two sonar pings (the second finds something), a hand-off, then a refining back-and-forth
       research: t => {
