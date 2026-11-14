@@ -699,7 +699,8 @@
   /* --- experiments, graders & evals --- */
   .xp .slide-head h2 { font-size: 100px; }
   .xp .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #ab7df8, #3fb950, #4493f8); }
-  .xp { --a: #4493f8; --b: #ab7df8; --yes: #3fb950; --no: #f85149; }
+  /* yes/no use cyan vs orange plus fill and glyph, so they stay distinct for red-green colour blindness */
+  .xp { --a: #4493f8; --b: #ab7df8; --yes: #39c5cf; --no: #f0883e; }
   /* the run conveyor: five station columns, two variant lanes running through them */
   .xp-flow { position: absolute; left: 110px; top: 270px; width: 1700px; height: 250px; opacity: 0; }
   .active .xp-flow { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
@@ -720,7 +721,7 @@
   .xp-run em:empty, .xp-run u:empty { display: none; }
   .xp-run em, .xp-run u { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
   .xp-run u { margin-left: auto; text-decoration: none; padding: 4px 7px; border-radius: 6px; font-weight: 700; }
-  .xp-run u.yes { color: #0d1117; background: var(--yes); } .xp-run u.no { color: #fff; background: var(--no); }
+  .xp-run u.yes { color: #0d1117; background: var(--yes); } .xp-run u.no { color: var(--no); background: transparent; box-shadow: inset 0 0 0 2px var(--no); }
   .xp-run.gone { opacity: 0; }
   /* the workflow frontmatter: each block lights up as its stage acts on a run */
   .xp-code { position: absolute; left: 110px; top: 550px; width: 620px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
@@ -742,9 +743,11 @@
   .xp-row > i small { display: block; font: 500 14px/1.2 var(--mono); color: #9198a1; }
   .xp-row > i::before { content: attr(data-v); display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 10px; border-radius: 6px; background: var(--c); font: 700 15px/1 var(--mono); color: #0d1117; }
   .xp-cells { display: grid; grid-template-columns: repeat(25, 1fr); gap: 5px; }
-  .xp-cells b { height: 26px; border-radius: 5px; background: #ffffff10; }
-  .xp-cells b.yes { background: var(--yes); box-shadow: 0 0 10px -3px var(--yes); }
-  .xp-cells b.no { background: var(--no); opacity: .75; }
+  .xp-cells b { display: grid; place-items: center; height: 26px; border-radius: 5px; background: #ffffff10; font: 800 15px/1 var(--mono); }
+  .xp-cells b.yes { background: var(--yes); color: #0d1117; box-shadow: 0 0 10px -3px var(--yes); }
+  .xp-cells b.yes::after { content: "✓"; }
+  .xp-cells b.no { background: transparent; color: var(--no); box-shadow: inset 0 0 0 2px var(--no); }
+  .xp-cells b.no::after { content: "✗"; }
   .xp-cells b.yes, .xp-cells b.no { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
   .xp-rate { font: 700 34px/1 var(--mono); color: #f0f6fc; text-align: right; font-variant-numeric: tabular-nums; }
   .xp-m { display: flex; align-items: center; gap: 14px; height: 44px; border-top: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #9198a1; }
