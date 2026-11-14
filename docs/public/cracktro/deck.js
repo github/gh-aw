@@ -1096,7 +1096,12 @@
     ttaSvg.innerHTML = `<circle class="bg" cx="48" cy="48" r="40"/><circle class="fg" cx="48" cy="48" r="40" stroke-dasharray="${RC}" stroke-dashoffset="${RC}"/>`;
     const tta = h("div", { class: "pf-tta" }, ttaSvg, h("div", {}, h("i", {}, "Time to agent"), ttaT, h("small", {}, "min")));
     let t0 = 0,
+      now = 0,
       snd = { p: 0, m: -2, go: false, card: [] };
+    // → / space fast-forwards to the next stage: prompt sent, markdown written, lock file compiled, pull request done
+    const MD_END = 4.2 + MDLEN / 45,
+      YML_END = MD_END + 0.8 + YML.length / 22,
+      STAGES = [3.2, MD_END + 0.5, YML_END + 0.5, YML_END + 2.6];
     const renderMd = k => {
       pre.replaceChildren();
       for (const [a, ca, b, cb] of MD) {
@@ -1130,8 +1135,17 @@
         pre.replaceChildren();
         ypre.replaceChildren();
       },
+      onNext() {
+        if (!t0) return false;
+        const e = (now - t0) / 1000,
+          next = STAGES.find(s => s > e + 0.05);
+        if (next === undefined) return false;
+        t0 = now - next * 1000;
+        return true;
+      },
       tick(t) {
         if (!t0) t0 = t;
+        now = t;
         const e = (t - t0) / 1000,
           on = (el, at) => el.classList.toggle("on", e >= at);
         on(cards[0], 0.3);
@@ -1153,13 +1167,13 @@
             sfx.key(0.6);
           }
         }
-        const mdEnd = 4.2 + MDLEN / 45;
+        const mdEnd = MD_END;
         on(links[1], mdEnd + 0.3);
         on(tags[1], mdEnd + 0.5);
         on(cards[2], mdEnd + 0.5);
         const yk = Math.max(0, Math.min(YML.length, Math.floor((e - mdEnd - 0.8) * 22))); // compiles in a blink
         if (ypre.childElementCount !== yk) ypre.replaceChildren(...YML.slice(0, yk).flatMap(([l, c]) => [h("span", { style: { color: c } }, l), "\n"]));
-        const ymlEnd = mdEnd + 0.8 + YML.length / 22;
+        const ymlEnd = YML_END;
         on(go, ymlEnd + 0.1);
         if (go.classList.contains("on") && !snd.go) {
           snd.go = true;
@@ -1343,7 +1357,7 @@
     });
   }
 
-  // Automation hardening: the compiler threat detection spec as concentric layers around the lock file
+  // Supply chain hardening: the compiler threat detection spec as concentric layers around the lock file
   {
     resetIndex();
     const CX = 975,
@@ -1356,7 +1370,7 @@
       ["Pinned supply chain", "SHA pins · manifest drift", "CTR-002 · 016 · 018", "#ab7df8"],
       ["Package & arg hygiene", "install scripts · arg injection", "CTR-013 · 014 · 022", "#79c0ff"],
       ["Least privilege", "read-only token · safe outputs", "CTR-001 · 005 · 015", "#4493f8"],
-      ["Sandbox & egress", "egress allowlist · no bypass", "CTR-004 · 011 · 031", "#3fb950"],
+      ["Secret & content scans", "secret sinks · markdown · imports", "CTR-007 · 017 · 020", "#3fb950"],
     ].map(([title, sub, ids, c], i) => ({ title, sub, ids, c, r: 330 - i * 40, flash: 0, n: 0, rot: Math.random() * 6 }));
     const attacks = [
       [0, "fork PR pwn request"],
@@ -1374,9 +1388,9 @@
       [4, "contents: write"],
       [4, "direct push to main"],
       [4, "labels: *"],
-      [5, "curl | sh"],
-      [5, "egress to *.com"],
-      [5, "sandbox: false"],
+      [5, "echo ${{ secrets.TOKEN }}"],
+      [5, "hidden prompt in markdown"],
+      [5, "conditional import swap"],
     ];
     const rows = layers.map((l, i) => h("div", { class: "ch-row", "--c": l.c, "--i": i }, h("i", {}, String(i + 1).padStart(2, "0")), h("b", {}, l.title), h("em", {}, "0"), h("span", {}, l.sub, h("br"), l.ids)));
     const line = (...parts) =>
@@ -1396,7 +1410,7 @@
         line(["ch-k", "on"], [null, ":"]),
         line(["ch-k", "  issues"], [null, ": "], ["ch-v", "{ types: [opened] }"]),
         line(["ch-k", "permissions"], [null, ": "], ["ch-v", "read-all"]),
-        line(["ch-k", "network"], [null, ": "], ["ch-v", "defaults"]),
+        line(["ch-k", "strict"], [null, ": "], ["ch-v", "true"]),
         line(["ch-k", "safe-outputs"], [null, ":"]),
         line(["ch-k", "  add-labels"], [null, ": "], ["ch-v", "{ allowed: [bug] }"]),
         line([null, "---"]),
@@ -1415,7 +1429,7 @@
         line("g", ["ch-k", "uses"], [null, ": "], ["ch-v", "actions/checkout@de0fac2"], ["ch-c", " # v6"]),
         line("g", ["ch-k", "permissions"], [null, ": "], ["ch-v", "{ issues: read }"]),
         line("g", ["ch-k", "env"], [null, ": "], ["ch-v", "{ ISSUE_NUMBER: ${{ … }} }"]),
-        line("g", ["ch-k", "run"], [null, ": "], ["ch-v", 'awf --allow-domains "$ALLOW"']),
+        line("g", ["ch-k", "persist-credentials"], [null, ": "], ["ch-v", "false"]),
         line("g", ["ch-k", "needs"], [null, ": "], ["ch-v", "[agent, detection]"]),
         line("g", ["ch-k", "timeout-minutes"], [null, ": "], ["ch-v", "20"])
       )
@@ -1569,7 +1583,7 @@
       sound: "forge",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
-        "Automation hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and the sandbox with an egress firewall. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
+        "Supply chain hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and secret and content scans (secrets kept away from logs and telemetry, markdown scanned for hidden instructions, conditional imports checked). All of these are static checks on the authored file; the runtime sandbox and egress firewall are covered on the previous slide. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
       enter() {
         shots = [];
         bits = [];
@@ -1649,7 +1663,7 @@
         "section",
         { class: "slide ch-slide" },
         cv,
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Compiler threat detection spec"), h("h2", {}, letters("Automation "), letters("hardening", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Compiler threat detection spec"), h("h2", {}, letters("Supply chain "), letters("hardening", "l-grad"))),
         md,
         cmd,
         lock,

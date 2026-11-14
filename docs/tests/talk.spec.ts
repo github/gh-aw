@@ -18,7 +18,7 @@ test("presents the seventeen slides without the removed sections", async ({ page
     "Anatomy of a workflow",
     "Turn Intent to Automation",
     "Safety and control",
-    "Automation hardening",
+    "Supply chain hardening",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
     "Pull Request Review²",
