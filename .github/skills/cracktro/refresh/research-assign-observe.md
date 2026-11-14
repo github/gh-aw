@@ -14,12 +14,12 @@ Load `.github/skills/cracktro/SKILL.md` first. Never read `deck.js` whole; use `
 - Find the data: `grep -n 'FUNNEL = \[\|FIXES = \[\|rob-cap\|regression issues filed\|median 6.8 h' docs/public/cracktro/deck.js`.
 - Constants to update (baseline 14 Nov 2026):
   - Comment above `const RX`: `// Measured (gh-aw, 13 Mar to 25 Oct 2026): ...`.
-  - `FUNNEL` rows `[n, label, cls]`: `116 regression issues filed`, `105 assigned to Copilot`, `72 picked by Issue Monster` (`" m"`), `62 fixes merged`.
+  - `FUNNEL` rows `[n, label, cls]`: `116 regression issues filed`, `101 assigned to Copilot`, `72 picked by Issue Monster` (`" m"`), `62 fixes merged`.
   - Bar width divisor `/ 116` in `FUNNEL.forEach`: must equal the first FUNNEL count.
   - `FIXES` rows `[date, benchmark, slowdown, hours]`: `21 Mar CompileComplex +40% 2.9 h`, `25 Apr Validation +276% 5.1 h`, `03 May CompileMCP +77% 1.5 h`, `29 Jul CompileMCP +279% 6.3 h`, `25 Oct ExtractWorkflowName +131% 2.9 h`. Keep exactly 5 rows (panel height is fixed; `tick` cycles `robFix0..4`).
   - Subtitle `rob-s`: `regression issues filed 13 Mar – 25 Oct 2026`.
   - Stat line: `median 6.8 h to merged fix · 55 of 62 &lt; 1 day` (keep `&lt;`).
-  - Caption `rob-cap`: `Measured · issues filed 13 Mar – 25 Oct 2026 · 87 daily benchmarks 5 Apr – 13 Nov · snapshot 14 Nov 2026 · fleet and spans simulated`.
+  - Caption `rob-cap`: `Measured · issues filed 13 Mar – 25 Oct 2026 · 101 daily benchmarks 5 Apr – 13 Nov · snapshot 14 Nov 2026 · fleet and spans simulated`.
   - `notes:` string in the same slide block (repeats every number above).
 
 ## 2. Window & snapshot
@@ -62,17 +62,21 @@ Baseline (deck, 14 Nov) vs helper (run 14 Nov 2026):
 | Field | Deck | Helper |
 |---|---|---|
 | filed / completed / not planned / cookie | 116 / 62 / 54 / – | 116 / 62 / 54 / 116 |
-| assigned_copilot | 105 | **101** |
+| assigned_copilot | 101 | 101 |
 | issue_monster_picked | 72 | 72 |
 | fixes_merged / median_hours / within_24h | 62 / 6.8 / 55 | 62 / 6.8 / 55 |
-| benchmark snapshots | 87, 5 Apr – 13 Nov | **101**, 5 Apr – 13 Nov |
+| benchmark snapshots | 101, 5 Apr – 13 Nov | 101, 5 Apr – 13 Nov |
 
 Manual cross-checks:
 
 ```bash
 gh search issues --repo github/gh-aw '"[performance] Regression in"' in:title --limit 300 --json number,title,state \
   | jq '[.[]|select(.title|startswith("[performance] Regression in"))]|length'
-gh api repos/github/gh-aw/issues/N/timeline --paginate -q '.[]|select(.event=="assigned")|.assignee.login'
+# independent assigned_copilot count via REST (~2 min); must equal the helper
+gh search issues --repo github/gh-aw '"[performance] Regression in"' in:title --limit 300 --json number,title \
+  -q '.[]|select(.title|startswith("[performance] Regression in"))|.number' \
+  | while read -r n; do gh api "repos/github/gh-aw/issues/$n/timeline" --paginate \
+      -q '.[]|select(.event=="assigned")|.assignee.login' | grep -qi copilot && echo "$n"; done | wc -l
 ```
 
 Pick FIXES rows from `issues.fixes`: 5 rows spread across the window, sorted by date, distinct or large slowdowns. Benchmark name = title text after `Regression in ` minus `Workflow`/`FromFile` suffixes as space allows; slowdown = `N% slower` rounded to `+N%`.
@@ -98,8 +102,8 @@ Preview `http://127.0.0.1:4329/cracktro/#21` (see SKILL.md "Preview loop"): pane
 
 ## 7. Pitfalls
 
-- `assigned_copilot` gives 101, not the deck's 105: 15 issues have no assigned event at all (two only cross-referenced). Decide on 101 (reproducible) and fix notes and SKILL.md; do not reuse 105 unless you reproduce it.
-- Benchmark history has pretty-printed and one-line versions; parsing blobs line by line drops entries (that reproduces 87, from 23 Apr). The helper reads `"date"` from added diff lines instead → 101 dates. A stale copy also lives at `memory/cli-performance/benchmark_history.jsonl` on the same branch; ignore it.
+- Count only issues with an `assigned` event to a Copilot login. On 14 Nov 2026, 15 of 116 had none (two were only cross-referenced). GraphQL and the REST timeline both gave 101; an earlier 105 did not reproduce. Cross-check with the REST loop in section 4 before changing this row.
+- Benchmark history mixes pretty-printed and one-line versions. Parsing blobs line by line drops entries; that bug gave the earlier 87 snapshots starting 23 Apr. The helper reads `"date"` from added diff lines, giving 101 dates. A stale copy at `memory/cli-performance/benchmark_history.jsonl` on the same branch stops in early April; ignore it.
 - `gh search` matches 118 issues; always filter on the exact title prefix.
 - Search with `in:title` caps at 1,000 results; fine here, but paginate.
 - `stateReason` NOT_PLANNED issues are usually superseded duplicates; they still count as filed.
