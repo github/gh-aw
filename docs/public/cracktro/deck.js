@@ -1068,9 +1068,9 @@
   .hist-split-bar { display: flex; height: 18px; margin: 12px 0 10px; border-radius: 9px; overflow: hidden; gap: 3px; }
   .hist-split-l { display: flex; gap: 24px; font-size: 20px; color: #c9d1d9; }
   .hist-split-l em { font: 700 20px var(--mono); font-style: normal; color: var(--c); }
-  .hist-legend { position: absolute; left: 830px; top: 300px; display: flex; gap: 30px; opacity: 0; }
+  .hist-legend { position: absolute; left: 790px; top: 1012px; width: 1110px; display: flex; flex-wrap: wrap; gap: 10px 26px; opacity: 0; }
   .active .hist-legend { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
-  .hist-legend span { font: 600 19px/1 var(--mono); color: #ffffffd0; display: flex; align-items: center; gap: 10px; }
+  .hist-legend span { font: 600 17px/1 var(--mono); color: #ffffffd0; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
   .hist-legend span::before { content: ""; width: 16px; height: 16px; border-radius: 3px; background: var(--c); }
   .hist-legend span.ln::before { height: 4px; border-radius: 2px; }
   .hist-svg { position: absolute; left: 760px; top: 340px; width: 1150px; height: 700px; overflow: visible; font-family: "Mona Sans"; }
@@ -1080,6 +1080,7 @@
   .hist-ax-l { fill: #d29922; }
   .hist-yr { fill: #f0f6fc; font: 700 18px var(--mono); }
   .hist-b-copilot { fill: #ab7df8; } .hist-b-bot { fill: #3fb950; } .hist-b-other { fill: #4493f8; }
+  .hist-b-human { fill: #db61a2; } .hist-b-none { fill: #ab7df84d; }
   .hist-loc { fill: none; stroke: #d29922; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #d2992288); }
   .hist-loc-dot { fill: #d29922; filter: drop-shadow(0 0 12px #d29922); }
   .hist-head { stroke: #f0f6fc55; stroke-width: 2; stroke-dasharray: 4 6; }
@@ -6439,8 +6440,11 @@
     // Calendar months Aug 2025 – Oct 2026 (October ends at GA, 28 Oct 2026).
     const MON = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
     const PRS = [130, 553, 1249, 1137, 1766, 2402, 2048, 1580, 1987, 2575, 1983, 1889, 2279, 870, 1484];
-    const PR_COPILOT = [30, 330, 1016, 947, 1525, 2094, 1486, 1097, 1459, 1690, 1522, 1484, 1720, 557, 552];
-    const PR_BOT = [7, 123, 147, 138, 188, 155, 207, 359, 385, 774, 340, 345, 476, 230, 268];
+    // PR origin by source issue: workflow PRs carry a gh-aw marker; Copilot PRs are split by who wrote the linked issue
+    const PR_AW = [5, 122, 147, 138, 188, 155, 207, 345, 353, 765, 331, 337, 466, 230, 264];
+    const PR_CCA_AW = [0, 0, 112, 323, 528, 588, 414, 345, 704, 878, 331, 951, 1140, 96, 189];
+    const PR_CCA_HUMAN = [21, 10, 48, 31, 31, 65, 161, 256, 289, 210, 71, 181, 201, 168, 233];
+    const PR_CCA_NONE = [7, 320, 848, 564, 962, 1439, 899, 495, 462, 602, 1114, 349, 375, 292, 125];
     const ISSUES = [128, 253, 374, 644, 783, 1342, 2784, 1970, 2392, 2805, 3267, 3815, 4590, 5384, 5914];
     const COMMITS = [199, 435, 1209, 1016, 1372, 1835, 1727, 1272, 1568, 1838, 1649, 1459, 1810, 638, 1251];
     const RELEASES = [14, 25, 44, 20, 21, 47, 97, 52, 26, 30, 34, 22, 23, 34, 36];
@@ -6479,7 +6483,7 @@
     svg.setAttribute("class", "hist-svg");
     svg.setAttribute("viewBox", "0 0 1150 700");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "Measured gh-aw history: pull requests opened per month by the Copilot coding agent, the workflow bot and other accounts, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026");
+    svg.setAttribute("aria-label", "Measured gh-aw history: pull requests opened per month split by origin: workflow PRs, Copilot coding agent PRs from a workflow-written issue, from a human-written issue or with no linked issue, and other PRs, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026");
     let grid = "";
     for (const v of [0, 500, 1000, 1500, 2000, 2500]) grid += `<line x1="${CX - 10}" x2="${xs(N) + 6}" y1="${yP(v)}" y2="${yP(v)}" class="hist-grid"/><text x="${CX - 16}" y="${yP(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
     for (const v of [500000, 1000000, 1500000]) grid += `<text x="${xs(N) + 14}" y="${yL(v) + 6}" class="hist-ax hist-ax-l">${v / 1e6}M</text>`;
@@ -6506,7 +6510,7 @@
       <line class="hist-head" x1="${CX}" x2="${CX}" y1="${TOP - 10}" y2="${BASE}"/>`;
     const barsG = svg.querySelector(".hist-bars");
     const bars = MON.map((_, i) => {
-      const seg = ["hist-b-copilot", "hist-b-bot", "hist-b-other"].map(cls => {
+      const seg = ["hist-b-bot", "hist-b-copilot", "hist-b-human", "hist-b-none", "hist-b-other"].map(cls => {
         const r = document.createElementNS(NS, "rect");
         r.setAttribute("class", cls);
         r.setAttribute("x", xs(i + 0.5) - BW / 2);
@@ -6564,7 +6568,7 @@
       const pts = [];
       for (let i = 0; i < N; i++) {
         const g = Math.min(1, fr(i, p) * 1.4);
-        const vals = [PR_COPILOT[i], PR_BOT[i], PRS[i] - PR_COPILOT[i] - PR_BOT[i]];
+        const vals = [PR_AW[i], PR_CCA_AW[i], PR_CCA_HUMAN[i], PR_CCA_NONE[i], PRS[i] - PR_AW[i] - PR_CCA_AW[i] - PR_CCA_HUMAN[i] - PR_CCA_NONE[i]];
         let acc = 0;
         bars[i].forEach((r, j) => {
           const hgt = (BASE - yP(vals[j])) * g;
@@ -6589,7 +6593,7 @@
       sound: "history",
       palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
       notes:
-        "Not illustrative: these are measured figures from gh-aw's own public history, from the first commit on 12 August 2025 to general availability at GitHub Universe on 28 October 2026 (v1.0.0 was tagged two days earlier). Commits, release tags and lines of Go and JavaScript (including tests, excluding docs) come from git on main as of the end of 28 October, Pacific time. Pull requests and issues come from GitHub search by creation date; October is a partial month. Bars split pull requests by the account that opened them: the Copilot coding agent, the github-actions bot that agentic workflows use for safe outputs, and every other account, including people and Dependabot. Account attribution is not proof of AI use.",
+        "Not illustrative: these are measured figures from gh-aw's own public history, from the first commit on 12 August 2025 to general availability at GitHub Universe on 28 October 2026 (v1.0.0 was tagged two days earlier). Commits, release tags and lines of Go and JavaScript (including tests, excluding docs) come from git on main as of the end of 28 October, Pacific time. Pull requests and issues come from GitHub search by creation date; October is a partial month. Bars split pull requests by where they started. Workflow PRs (4,053) are opened by the github-actions bot with a gh-aw workflow marker. Copilot coding agent PRs (17,509) are traced to their source issue through the agent's issue reference, closing links or a closing keyword: 6,599 came from an issue written by an agentic workflow (bot author plus workflow marker), 1,976 from an issue written by a person, 8,853 had no linked issue, and 81 had mixed or other sources. Of the Copilot PRs with an attributed source issue, 77 percent started from a workflow-written issue. Merge rates: 74 percent from workflow issues, 82 percent from human issues. Other PRs (2,451) include people, Dependabot, unmarked bot PRs and the mixed cases. Account type and issue provenance are not proof of who started a session, or of AI use.",
       enter() {
         t0 = 0;
         lastMonth = lastFlag = -1;
@@ -6622,10 +6626,9 @@
         h(
           "div",
           { class: "hist-splits" },
-          split("Pull requests opened by", [
-            [73.2, "#ab7df8", "Copilot coding agent"],
-            [17.3, "#3fb950", "workflow bot"],
-            [9.5, "#4493f8", "other"],
+          split("Copilot PRs from an issue written by", [
+            [77.0, "#ab7df8", "an agentic workflow"],
+            [23.0, "#db61a2", "a person"],
           ]),
           split("Commits authored by", [
             [84.2, "#ab7df8", "agent & bot accounts"],
@@ -6635,9 +6638,11 @@
         h(
           "div",
           { class: "hist-legend" },
-          h("span", { "--c": "#ab7df8" }, "Copilot coding agent PRs"),
-          h("span", { "--c": "#3fb950" }, "workflow bot PRs"),
-          h("span", { "--c": "#4493f8" }, "other PRs"),
+          h("span", { "--c": "#3fb950" }, "workflow PRs"),
+          h("span", { "--c": "#ab7df8" }, "Copilot ← AW issue"),
+          h("span", { "--c": "#db61a2" }, "Copilot ← human issue"),
+          h("span", { "--c": "#ab7df84d" }, "Copilot, no issue"),
+          h("span", { "--c": "#4493f8" }, "other"),
           h("span", { "--c": "#d29922", class: "ln" }, "lines of code")
         ),
         svg
