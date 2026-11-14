@@ -95,8 +95,8 @@ remain accepted integration-level gaps; see the evidence index below.
 | P15 — HardErrorOnSetLabelsFail | `TestFormalHardErrorOnRESTFail` | REST failure yields success=false, non-nil error |
 | RL-009 — Common validation config | `TestFormalReplaceLabelRL009_CommonValidationConfig` | Shared validation-config output includes the configured replace-label entry |
 | RL-011 — Max expression | `TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime` | Expression is accepted during compilation and preserved for GitHub Actions |
-| RL-014 — Repository format | `TestFormalReplaceLabelRL014_RepositoryFormat` | Slugs require exactly one slash and non-empty owner/repository components |
-| RL-054 — Minimum token scope | `TestFormalSec_P8_TokenScopeMinimum` | Formal predicate requires `issues:write`; does not inspect a live token |
+| RL-014 — Repository format | `actions/setup/js/repo_helpers.test.cjs` (`parseRepoSlug`) | Runtime tests reject slugs without exactly one slash or with an empty owner/repository |
+| RL-054 — Minimum token scope | `TestFormalSec_P8_TokenScopeMinimum` (formal predicate only) | Does not establish the permissions of the token used by `replace-label` |
 | Q1 — TransitionSetEmpty | `TestFormalTransitionSetEmptyAllowsAny` | Empty/absent `allowed-transitions` permits any (from, to) pair |
 | Q2 — TransitionExactMatch | `TestFormalTransitionExactMatchRequired` | Only exact (from, to) pairs in the list are allowed; reverse/unrelated pairs rejected |
 | Q4 — TransitionRejectedYieldsSoftSkip | `TestFormalTransitionRejectedYieldsSoftSkip` | Disallowed transition yields `success=false` without a hard workflow failure |
@@ -193,9 +193,9 @@ or to a specific evidence gap. This index is complete when every requirement in
 explicit gap; completion does not depend on an owner or a review date.
 
 The remaining evidence gaps are **pipeline** (RL-033), **observability**
-(RL-027), **external guarantee** (RL-043), and **security** (RL-051, RL-055).
-Each accepted gap below has a rationale; RL-054 has formal predicate coverage
-but not live-token verification.
+(RL-027), **external guarantee** (RL-043), and **security** (RL-051, RL-054,
+RL-055). The RL-054 formal predicate is not implementation evidence. Each
+accepted gap below has a rationale.
 
 | Requirement | Test ID(s) or documented gap | Implementation evidence |
 |---|---|---|
@@ -206,7 +206,7 @@ but not live-token verification.
 | RL-011 | T-RL-013 | `TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime` verifies the compiler accepts and preserves the expression; GitHub Actions performs runtime resolution. |
 | RL-012 | T-RL-012 | `TestFormalReplaceLabelP3_DefaultMaxFive` |
 | RL-013 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
-| RL-014 | T-RL-073 | `TestFormalReplaceLabelRL014_RepositoryFormat`; `repo_helpers.test.cjs` checks malformed identifiers against the runtime repository helper. |
+| RL-014 | T-RL-073 | `actions/setup/js/repo_helpers.test.cjs` (`parseRepoSlug`) checks valid and malformed identifiers against the runtime helper. |
 | RL-015 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
 | RL-016 | T-RL-014–018 | `TestFormalReplaceLabelP15_TargetModeEnforcement` |
 | RL-017 | T-RL-019 | `T-RL-019 rejects when no item number is available` |
@@ -248,6 +248,6 @@ but not live-token verification.
 | RL-051 | **Accepted gap [Security]:** GitHub enforces token grants on the target repository at the write endpoint. Offline tests cannot inspect a live token's repository grant; a denied write is handled as a hard error, but no proactive scope check is performed. |
 | RL-052 | T-RL-041 | JS nonexistent-label hard-error test |
 | RL-053 | T-RL-030–031 | JS required-label gate test uses the REST response; the agent message has no label-state field. |
-| RL-054 | `TestFormalSec_P8_TokenScopeMinimum` | The formal predicate accepts `issues:write` and rejects read-only/unrelated scopes. It does not inspect a live token. |
+| RL-054 | **Accepted gap [Security]:** `TestFormalSec_P8_TokenScopeMinimum` checks a standalone predicate, not the credential path; no conformance test establishes that the token used by `replace-label` has `issues:write`. |
 | RL-055 | **Accepted gap [Security]:** the SHOULD applies only when the default token is broader; confirming per-type token selection and its relative grants requires workflow-level credential integration. |
 | RL-056 | T-RL-060 | `T-RL-060 does not call setLabels in staged mode` |

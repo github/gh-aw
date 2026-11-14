@@ -689,7 +689,7 @@ records the implementation test or remaining gap.
 | RL-011 | T-RL-013; `TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime` verifies compile-time acceptance and preservation; GitHub Actions resolves the expression at execution time. |
 | RL-012 | T-RL-012; `TestFormalReplaceLabelP3_DefaultMaxFive` |
 | RL-013 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
-| RL-014 | T-RL-073; `TestFormalReplaceLabelRL014_RepositoryFormat`; `repo_helpers.test.cjs` verifies malformed repository rejection in the runtime helper. |
+| RL-014 | T-RL-073; `actions/setup/js/repo_helpers.test.cjs` (`parseRepoSlug`) verifies valid and malformed repository slugs in the runtime helper. |
 | RL-015 | T-RL-070–072; `TestFormalCrossRepoRestriction` |
 | RL-016 | T-RL-014–018; `TestFormalReplaceLabelP15_TargetModeEnforcement` |
 | RL-017 | T-RL-019 |
@@ -731,7 +731,7 @@ records the implementation test or remaining gap.
 | RL-051 | **Accepted gap:** target-repository token grants are enforced by GitHub when `issues.setLabels` runs; the offline suite cannot verify an issued token's target-repository grant. A denied API call is a hard error, but there is no preflight permission check. |
 | RL-052 | T-RL-041; handler test for nonexistent `label_to_add` |
 | RL-053 | T-RL-030–031; **gap:** no test substitutes agent-provided label state for the REST response. |
-| RL-054 | `TestFormalSec_P8_TokenScopeMinimum` verifies the `issues:write` minimum as a formal predicate; it does not inspect a live workflow token. |
+| RL-054 | **Accepted gap [Security]:** `TestFormalSec_P8_TokenScopeMinimum` checks a standalone predicate, not the credential path; no conformance test establishes that the token used by `replace-label` has `issues:write`. |
 | RL-055 | **Accepted gap:** the SHOULD is conditional on the workflow token carrying broader grants; verifying token selection and relative scope requires workflow-level credential integration, not the offline handler suite. |
 | RL-056 | T-RL-060; `replace_label.test.cjs` asserts staged mode never calls `setLabels`. |
 
