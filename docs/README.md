@@ -56,11 +56,11 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone forty-three-slide deck, separate from the homepage slideshow, linked
+It is a standalone forty-five-slide deck, separate from the homepage slideshow, linked
 from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
 Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
 The navigation dots jump directly to a slide (on narrow screens they become
-previous/next arrow buttons); `#1` through `#43` are shareable
+previous/next arrow buttons); `#1` through `#45` are shareable
 slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
 Slides are grouped into sections: slides within a section push left, and
@@ -76,7 +76,10 @@ issues labelled `community` and the merged pull requests that closed them
 counts of Linter Miner analyzer pull requests, LintMonster issues and the
 merged pull requests that closed them (May to November 2026), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
-(February to November 2026, with shortened titles), the Semantic
+(February to November 2026, with shortened titles), the Continuous Security slide's
+counts and dates, measured from that red-team workflow's repository memory and
+the firewall fix it led to (its attack diagram is a simplified illustration),
+the Semantic
 clustering slide's functions, files and counts from one Semantic Function
 Refactoring report (7 May 2026) and the merged pull request that closed it, and the three data slides after the finale: "First
 commit to GA", which shows this repository's measured public history from its
