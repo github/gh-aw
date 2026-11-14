@@ -16,6 +16,7 @@ All functions emit debug output only when `DEBUG=fileutil:*` is active, and neve
 |----------|-----------|-------------|
 | `ValidateAbsolutePath` | `func(path string) (string, error)` | Validates that a file path is absolute and safe; rejects empty paths, cleans with `filepath.Clean`, and verifies the result is absolute |
 | `ValidatePathWithinBase` | `func(base, candidate string) error` | Checks that `candidate` is located within the `base` directory tree; resolves symlinks before comparison to prevent traversal and symlink escapes |
+| `ResolvePathWithinBase` | `func(base, candidate string) (string, error)` | Resolves the candidate path, including existing ancestor symlinks, and returns its absolute path only when it remains within the resolved base; preserves nonexistent path suffixes |
 | `FileExists` | `func(path string) bool` | Returns `true` if `path` exists and is a regular file (not a directory) |
 | `DirExists` | `func(path string) bool` | Returns `true` if `path` exists and is a directory |
 | `IsDirEmpty` | `func(path string) bool` | Returns `true` if the directory at `path` contains no entries; also returns `true` if the directory cannot be read |
