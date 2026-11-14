@@ -462,7 +462,8 @@
   .notes.on { display: block; }
 
   /* --- any engine --- */
-  .ae .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--ec, #3fb950), #f0f6fc, var(--ec, #3fb950)); }
+  .ae .slide-head .ae-agent .ch { background-image: linear-gradient(90deg, #ab7df8, #d2b8ff, #ab7df8); }
+  .ae .slide-head .ae-prov-t .ch { background-image: linear-gradient(90deg, #f0883e, #ffc28a, #f0883e); }
   .ae-ed { position: absolute; left: 110px; top: 330px; width: 760px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
   .active .ae-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
   .ae-tab { display: flex; align-items: center; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; }
@@ -2892,7 +2893,7 @@
     const el = h(
       "section",
       { class: "slide ae" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One workflow · swap the engine · pick the model provider"), h("h2", {}, letters("Any agent, "), letters("any provider", "l-grad"))),
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One workflow · swap the engine · pick the model provider"), h("h2", {}, letters("Any "), letters("agent", "l-grad ae-agent"), letters(", any "), letters("provider", "l-grad ae-prov-t"))),
       ed,
       arrow,
       h("div", { class: "ae-provs" }, provEls),
