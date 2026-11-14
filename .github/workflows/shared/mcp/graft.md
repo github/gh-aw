@@ -7,8 +7,11 @@ steps:
       set -euo pipefail
       mkdir -p "$GRAFT_DIR" /tmp/gh-aw/graft-empty-git
       npx -y @nanonets/graft@0.8.0 --dir "$GRAFT_DIR" build "$GITHUB_WORKSPACE"
-      test -s "$GRAFT_DIR/.graph/wiring.json" || { echo "::error::Graft wiring graph is missing" >&2; exit 1; }
-      npx -y @nanonets/graft@0.8.0 --dir "$GRAFT_DIR" check "$GITHUB_WORKSPACE"
+      if ! npx -y @nanonets/graft@0.8.0 --dir "$GRAFT_DIR" check "$GITHUB_WORKSPACE" --json \
+        | node -e 'const report = JSON.parse(require("node:fs").readFileSync(0, "utf8")); process.exitCode = report.graph?.ok === true ? 0 : 1'; then
+        echo "::error::Graft wiring graph is missing or stale" >&2
+        exit 1
+      fi
 mcp-servers:
   graft:
     command: "npx"
@@ -18,9 +21,11 @@ mcp-servers:
       - "--dir=/tmp/gh-aw/graft"
       - "mcp"
       - "${GITHUB_WORKSPACE}"
+    # Graft's MCP tools read source and the graph; their graph cache is in-memory.
     mounts:
-      - \${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:ro
-      - /tmp/gh-aw/graft-empty-git:\${GITHUB_WORKSPACE}/.git:ro
+      - ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:ro
+      # Graft needs source files, not Git metadata, so mask `.git` from the MCP server.
+      - /tmp/gh-aw/graft-empty-git:${GITHUB_WORKSPACE}/.git:ro
       - /tmp/gh-aw/graft:/tmp/gh-aw/graft:ro
     allowed:
       - graft_ask
