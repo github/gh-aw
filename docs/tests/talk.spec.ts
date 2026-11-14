@@ -17,7 +17,7 @@ test("presents the eleven slides without the removed sections", async ({ page })
     "Built onGitHubActions.",
     "Prompt to factory",
     "Safety and control",
-    "Compiler hardening",
+    "Automation hardening",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
     "Mine · Refine · Apply",

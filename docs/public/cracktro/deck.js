@@ -857,7 +857,7 @@
     });
   }
 
-  // Compiler hardening: the compiler threat detection spec as concentric layers around the lock file
+  // Automation hardening: the compiler threat detection spec as concentric layers around the lock file
   {
     resetIndex();
     const CX = 975,
@@ -1083,7 +1083,7 @@
       sound: "forge",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
-        "Compiler hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and the sandbox with an egress firewall. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
+        "Automation hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and the sandbox with an egress firewall. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
       enter() {
         shots = [];
         bits = [];
@@ -1163,7 +1163,7 @@
         "section",
         { class: "slide ch-slide" },
         cv,
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Compiler threat detection spec"), h("h2", {}, letters("Compiler "), letters("hardening", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Compiler threat detection spec"), h("h2", {}, letters("Automation "), letters("hardening", "l-grad"))),
         md,
         cmd,
         lock,
