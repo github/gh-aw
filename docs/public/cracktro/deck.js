@@ -259,6 +259,14 @@
   .fmm-cell.flip { transform: rotateY(90deg); }
   .fmm-cell.flop { transform: rotateY(0); transition: transform .26s cubic-bezier(.3,1.6,.4,1); }
   @keyframes fmm-in { from { transform: scale(0) rotate(-20deg); } }
+  /* factory mindset: copy slides in from the left, the grid from the right; both leave the way they came */
+  .slide.fmm.active .fmm-copy > * { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
+  .slide.fmm.active .fmm-copy > :nth-child(2) { animation-delay: .12s; } .slide.fmm.active .fmm-copy > :nth-child(3) { animation-delay: .24s; }
+  .slide.fmm.active .fmm-grid { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both .1s; }
+  .slide.fmm.up-in, .slide.fmm.down-in, .slide.fmm.leaving { animation: none; }
+  .slide.fmm.fadeout { opacity: 1; }
+  .slide.fmm:is(.fadeout, .leaving) .fmm-copy > * { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  .slide.fmm:is(.fadeout, .leaving) .fmm-grid { animation: tp-ro .55s cubic-bezier(.6,0,.85,.3) both !important; }
   .tp { display: grid; place-items: center; }
   .tp-copy { position: absolute; left: 160px; right: 160px; top: 150px; text-align: center; }
   .tp-copy h2 { margin: 0; font-variation-settings: "wght" 520, "wdth" 100; letter-spacing: -.02em; }
@@ -280,7 +288,6 @@
   body.light .fmm-go, body.light .tp-go { color: #116329; }
   body.light .fmm-grid { box-shadow: 0 30px 90px #1f232826, 0 0 0 1px #1f23281f; }
   body.light .fmm-cell, body.light .fmm-cell.g { background: #f6f8fa; }
-  body.light .fm-marquee span { border-color: #9ea7b3; background: #f6f8facc; color: #393f46; }
   body.light .tp-vs > b { color: #424a53; }
   body.light .tp-blue { --c: #0550ae; } body.light .tp-green { --c: #116329; }
   body.light .tp-pill i { opacity: .14; }
@@ -916,11 +923,6 @@
   .bd-bot { opacity: 0; transition: opacity .4s; } .bd-bot.on { opacity: 1; }
   .bd-res { opacity: 0; transition: opacity .6s; } .bd-res.on { opacity: 1; }
   .bd-res text { fill: #3fb950; font: 800 34px "Mona Sans"; } .bd-res text.s { font: 600 18px var(--mono); fill: #9198a1; }
-  .fm-marquee { position: absolute; left: 0; right: 0; bottom: 92px; overflow: hidden; white-space: nowrap;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
-  .fm-marquee div { display: inline-flex; gap: 14px; animation: fm-scroll 60s linear infinite; }
-  .fm-marquee span { padding: 8px 18px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 19px/1 var(--mono); color: #c9d1d9; }
-  @keyframes fm-scroll { to { transform: translateX(-50%); } }
   .cao-tag { position: absolute; font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
   /* centred under the CAO diagram (canvas left 700px + its centre 590px), right below its success rate */
   .rollout { position: absolute; left: 1290px; bottom: 70px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; font: 600 20px/1 var(--mono); }
@@ -3860,28 +3862,6 @@
   // The factory mindset: engineer processes, not code
   {
     resetIndex();
-    const flows = [
-      "repo-assist",
-      "issue-triage-agent",
-      "code-simplifier",
-      "dead-code-remover",
-      "duplicate-code-detector",
-      "semantic-function-refactor",
-      "daily-file-diet",
-      "unbloat-docs",
-      "daily-doc-healer",
-      "ci-coach",
-      "hourly-ci-cleaner",
-      "grumpy-reviewer",
-      "pr-sous-chef",
-      "mergefest",
-      "security-review",
-      "agentic-token-optimizer",
-      "issue-monster",
-      "necromancer",
-      "daily-team-status",
-      "poem-bot 🎭",
-    ];
     const PAL = ["#ff80ea", "#ff80ea", "#b0520f", "#0a8a2e", "#76f794", "#76f794", "#b9a00a", "#ab7df8", "#0d1117"];
     const GLY = ["=", "(", ")", "<", "{", "}", "/>", "pr", "branch", "check"];
     const SVGI = {
@@ -3934,7 +3914,7 @@
       },
       el: h(
         "section",
-        { class: "slide" },
+        { class: "slide fmm" },
         h(
           "div",
           { class: "fmm-copy" },
@@ -3942,16 +3922,7 @@
           h("h2", { class: "fmm-stop" }, "Stop manually translating intent into code."),
           h("h2", { class: "fmm-go" }, "Engineer processes that create trusted features.")
         ),
-        grid,
-        h(
-          "div",
-          { class: "fm-marquee" },
-          h(
-            "div",
-            {},
-            [...flows, ...flows].map(f => h("span", {}, f))
-          )
-        )
+        grid
       ),
     });
   }
