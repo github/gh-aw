@@ -7,7 +7,7 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 Use Claude Opus 5.5 (`claude-opus-5.5`) for deck work, including any subagents you delegate to.
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifty-one-slide deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifty-three-slide deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
@@ -16,7 +16,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fi
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-one slide headings (band headers included), so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-three slide headings (band headers included), so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -82,9 +82,9 @@ slides.push({
 - Exception: the Spec-driven testing slide (28) shows an illustrative excerpt of gh-aw's `pkg/ctxutil` change, README spec and spec tests, and names gh-aw's own spec workflows; its notes say so.
 - Exception: the Docs that heal slide (29, `dh-` classes) names gh-aw's own docs workflows; the workflow, page and noob tester report shown are illustrative and its notes say so.
 - Exception: the Speak · Map · Grep slide (30, `dg-` classes) shows spoken forms from gh-aw's real `DICTATION.md` and names its dictation and function-namer workflows; grep counts and renames are synthetic, the maintainer is the pelikhan avatar, and its notes say so.
-- Exception: the data slides before the finale. Slide 48, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 49, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record. Slide 50, "How workflows evolve" (`evo-` classes), shows measured first-parent commits on main that changed `.github/workflows/**/*.md` (monthly by author type, live workflow count, lines-changed histogram and statistical tests: Spearman, Mann–Whitney, Gini), 12 Aug 2025 to GA; its notes give the method.
+- Exception: the data slides before the finale. Slide 49, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 50, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record. Slide 51, "How workflows evolve" (`evo-` classes), shows measured first-parent commits on main that changed `.github/workflows/**/*.md` (monthly by author type, live workflow count, lines-changed histogram and statistical tests: Spearman, Mann–Whitney, Gini), 12 Aug 2025 to GA; its notes give the method.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 3, 4, 7, 9–12, 15–31, 33–35, 37–42, 44–46, 51 and 52 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 3, 4, 7, 9–12, 15–31, 33–35, 37–42, 44–47, 52 and 53 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop

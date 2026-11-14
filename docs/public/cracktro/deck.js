@@ -150,6 +150,69 @@
   .cao-step b { font-size: 40px; font-variation-settings: "wght" 700, "wdth" 100; }
   .cao-step span { font-size: 22px; color: #9198a1; line-height: 1.35; }
   .cao-canvas { position: absolute; left: 720px; top: 300px; width: 1140px; height: 640px; }
+  .psd .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8, #f778ba); }
+  .psd-tag { position: absolute; left: 110px; top: 300px; font-size: 30px; color: #9198a1; }
+  .psd-tag b { color: #f0f6fc; }
+  .psd-task { position: absolute; left: 110px; top: 380px; width: 520px; padding: 26px 30px; box-sizing: border-box; background: #161b22e6; border: 1px solid #3d444d; border-radius: 18px; opacity: 0; }
+  .active .psd-task { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
+  .psd-st { display: inline-flex; gap: 8px; align-items: center; font: 600 18px/1 var(--mono); color: #0d1117; background: #3fb950; padding: 7px 14px; border-radius: 999px; transition: background .4s; }
+  .psd-st svg { width: 18px; height: 18px; }
+  .psd-task.closed .psd-st { background: #ab7df8; }
+  .psd-task h3 { margin: 16px 0 12px; font-size: 36px; line-height: 1.1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .psd-lb { display: flex; gap: 8px; }
+  .psd-lb span { font: 500 16px/1 var(--mono); padding: 6px 12px; border-radius: 999px; border: 1px solid #3d444d; color: #9198a1; }
+  .psd-sq { margin-top: 20px; padding-top: 16px; border-top: 1px dashed #3d444d; }
+  .psd-sq > i { display: block; font: 600 15px/1 var(--mono); letter-spacing: .14em; color: #9198a1; font-style: normal; margin-bottom: 8px; }
+  .psd-sq > i b { color: #f778ba; }
+  .psd-m { display: grid; grid-template-columns: 40px 1fr; column-gap: 14px; align-items: center; padding: 6px 0; opacity: .35; transition: opacity .4s; }
+  .psd-m.on { opacity: 1; }
+  .psd-m em { grid-row: span 2; width: 40px; height: 40px; border-radius: 50%; background: var(--c); display: grid; place-items: center; font: 800 20px/1 "Mona Sans"; color: #0d1117; font-style: normal; }
+  .psd-m b { font-size: 24px; line-height: 1.1; }
+  .psd-m span { font-size: 18px; color: #9198a1; }
+  .psd-arrow { position: absolute; left: 650px; top: 590px; width: 150px; text-align: center; font: 600 20px/1 var(--mono); color: #656c76; transition: color .4s; }
+  .psd-arrow svg { display: block; width: 150px; height: 40px; margin: 6px 0; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .psd-arrow small { font-size: 16px; }
+  .psd-arrow.on { color: #f778ba; }
+  .psd-pkg { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 14px; background: #f778ba; box-shadow: 0 0 30px #f778ba; opacity: 0; display: grid; place-items: center; font: 800 13px/1 var(--mono); color: #0d1117; z-index: 2; }
+  .psd-repo { position: absolute; left: 820px; top: 380px; width: 990px; height: 560px; background: #0d1117e6; border: 1px solid #3d444d; border-radius: 18px; overflow: hidden; opacity: 0; }
+  .active .psd-repo { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .psd-rh { display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid #3d444d; font: 600 20px/1 var(--mono); color: #f0f6fc; background: #161b22; }
+  .psd-rh svg { width: 22px; height: 22px; fill: #9198a1; }
+  .psd-rh span { margin-left: auto; color: #9198a1; font-size: 16px; transition: color .4s; }
+  .psd-rh span.on { color: #f778ba; }
+  .psd-files { position: absolute; left: 24px; top: 84px; width: 290px; font: 500 18px/1 var(--mono); }
+  .psd-f { padding: 8px 10px; border-radius: 8px; color: #9198a1; white-space: nowrap; transition: opacity .4s, transform .4s, color .4s, background .4s; }
+  .psd-f.sq { opacity: 0; transform: translateX(-12px); color: #f778ba; }
+  .psd-f.sq.in { opacity: 1; transform: none; }
+  .psd-f.hot { background: #f778ba22; }
+  .psd-f.sq.gone { opacity: .25; text-decoration: line-through; }
+  .psd-f.sq.kept { color: #3fb950; background: #3fb95018; }
+  .psd-f.new { color: #4493f8; }
+  .psd-ring { position: absolute; left: 320px; top: 84px; width: 340px; height: 450px; overflow: visible; }
+  .psd-ln { stroke: #3d444d; stroke-width: 3; stroke-dasharray: 6 8; opacity: 0; transition: stroke .3s, opacity .4s; }
+  .psd-ln.up { opacity: 1; }
+  .psd-ln.on { stroke: var(--c); animation: psd-flow .6s linear infinite; }
+  @keyframes psd-flow { to { stroke-dashoffset: -28; } }
+  .psd-ag { opacity: 0; transition: opacity .5s; }
+  .psd-ag.up, .psd-dev { opacity: 1; }
+  .psd-ag.up.out { opacity: .12; }
+  .psd-ag circle, .psd-dev circle { fill: #161b22; stroke: var(--c); stroke-width: 3; transition: fill .3s, filter .3s; }
+  .psd-ag.on circle, .psd-dev.on circle { fill: color-mix(in srgb, var(--c) 30%, #161b22); filter: drop-shadow(0 0 14px var(--c)); }
+  .psd-ring text { fill: #f0f6fc; font: 700 18px "Mona Sans"; text-anchor: middle; }
+  .psd-todo { position: absolute; left: 680px; top: 84px; width: 290px; }
+  .psd-todo > i { display: block; font: 600 15px/1 var(--mono); letter-spacing: .14em; color: #9198a1; font-style: normal; margin: 8px 0 6px; }
+  .psd-t { display: grid; grid-template-columns: 30px 1fr; column-gap: 10px; padding: 8px 0; opacity: .4; transition: opacity .3s; }
+  .psd-t s { grid-row: span 2; width: 24px; height: 24px; box-sizing: border-box; border-radius: 6px; border: 2px solid #3d444d; text-decoration: none; display: grid; place-items: center; font: 800 16px/1 "Mona Sans"; color: #0d1117; margin-top: 2px; transition: all .3s; }
+  .psd-t b { font-size: 21px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
+  .psd-t span { font: 500 15px/1.3 var(--mono); color: var(--c); }
+  .psd-t.doing, .psd-t.done { opacity: 1; }
+  .psd-t.doing s { border-color: var(--c); box-shadow: 0 0 12px var(--c); }
+  .psd-t.done s { background: var(--c); border-color: var(--c); }
+  .psd-t.done s::after { content: "✓"; }
+  .psd-pr { position: absolute; right: 28px; bottom: 24px; white-space: nowrap; display: flex; gap: 10px; align-items: center; font: 600 18px/1 var(--mono); padding: 10px 16px; border-radius: 999px; border: 1px solid #3d444d; color: #9198a1; opacity: 0; transition: all .4s; }
+  .psd-pr svg { width: 18px; height: 18px; fill: currentColor; }
+  .psd-pr.draft { opacity: 1; }
+  .psd-pr.merged { opacity: 1; background: #ab7df8; border-color: #ab7df8; color: #0d1117; box-shadow: 0 0 24px #ab7df880; }
   .fm-quote { position: absolute; left: 114px; top: 318px; width: 600px; font: 700 44px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; opacity: 0; }
   .fm-quote em { font-style: normal; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8); }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
@@ -10175,6 +10238,203 @@
     });
   }
 
+  // Push SDLC: a task arrives with its own Squad (a lead, backend, tester and scribe agent team); the squad deploys into the repository as files, helps the developer through the task, then retires and leaves its decisions behind
+  {
+    resetIndex();
+    const svgIco = (n, sz = 24) => `<svg viewBox="0 0 ${sz} ${sz}" aria-hidden="true">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // [initial, role, what it does on this task, colour, ring position, label dy]
+    const SQUAD = [
+      ["L", "Lead", "plans, splits and reviews", "#ab7df8", [170, 70], -46],
+      ["B", "Backend", "implements the limiter", "#4493f8", [300, 230], 58],
+      ["T", "Tester", "writes the load tests", "#3fb950", [170, 390], 58],
+      ["S", "Scribe", "records the decisions", "#d29922", [40, 230], 58],
+    ];
+    const DEV = [170, 230];
+    // [task, owner index (4 = developer), file it touches]
+    const TODO = [
+      ["Plan the change", 0, null],
+      ["Token-bucket limiter", 1, "src/ratelimit.ts"],
+      ["Load tests: 429 at limit", 2, "tests/ratelimit.test.ts"],
+      ["Decision: per-key limits", 3, ".squad/decisions.md"],
+      ["Review & merge", 4, null],
+    ];
+    const ownerColor = o => (o === 4 ? "#f0f6fc" : SQUAD[o][3]);
+    const ownerName = o => (o === 4 ? "you" : SQUAD[o][1].toLowerCase());
+    const members = SQUAD.map(([n, r, d, c]) => h("div", { class: "psd-m", "--c": c }, h("em", {}, n), h("b", {}, r), h("span", {}, d)));
+    const stIco = h("span", { class: "psd-st" }, "open");
+    stIco.insertAdjacentHTML("afterbegin", svgIco("issue"));
+    const task = h(
+      "div",
+      { class: "psd-task" },
+      stIco,
+      h("h3", {}, "Add rate limiting to the public API"),
+      h("div", { class: "psd-lb" }, h("span", {}, "enhancement"), h("span", {}, "api")),
+      h("div", { class: "psd-sq" }, h("i", {}, "Squad · ", h("b", {}, "api-hardening")), members)
+    );
+    const arrow = h("div", { class: "psd-arrow" }, "deploy");
+    arrow.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.squad/</small>');
+    const pkg = h("div", { class: "psd-pkg" }, "squad");
+    const FILES = [
+      ["src/", 0],
+      ["tests/", 0],
+      [".squad/team.md", 1],
+      [".squad/agents/lead.md", 1],
+      [".squad/agents/backend.md", 1],
+      [".squad/agents/tester.md", 1],
+      [".squad/agents/scribe.md", 1],
+      [".squad/decisions.md", 1],
+      ["src/ratelimit.ts", 2],
+      ["tests/ratelimit.test.ts", 2],
+    ];
+    const files = FILES.map(([f, k]) => h("div", { class: "psd-f" + (k === 1 ? " sq" : k === 2 ? " new" : "") }, f));
+    const fileOf = name => files[FILES.findIndex(([f]) => f === name)];
+    const sqFiles = files.filter((_, i) => FILES[i][1] === 1);
+    const newFiles = files.filter((_, i) => FILES[i][1] === 2);
+    const rhState = h("span", {}, "no squad");
+    const rh = h("div", { class: "psd-rh" }, "payments-service", rhState);
+    rh.insertAdjacentHTML("afterbegin", svgIco("repo"));
+    const ring = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    ring.setAttribute("class", "psd-ring");
+    ring.setAttribute("viewBox", "0 0 340 450");
+    ring.innerHTML =
+      SQUAD.map(([, , , c, [x, y]], i) => `<line class="psd-ln" data-i="${i}" style="--c:${c}" x1="${DEV[0]}" y1="${DEV[1]}" x2="${x}" y2="${y}"/>`).join("") +
+      SQUAD.map(([, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/>${ico("copilot", x, y, 34, c)}<text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
+      `<g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/>${ico("person", DEV[0], DEV[1], 40, "#f0f6fc")}<text x="${DEV[0] + 74}" y="${DEV[1] - 34}">you</text></g>`;
+    const lines = [...ring.querySelectorAll(".psd-ln")];
+    const agents = [...ring.querySelectorAll(".psd-ag")];
+    const dev = ring.querySelector(".psd-dev");
+    const todos = TODO.map(([t, o]) => h("div", { class: "psd-t", "--c": ownerColor(o) }, h("s"), h("b", {}, t), h("span", {}, ownerName(o))));
+    const pr = h("div", { class: "psd-pr" }, h("span", {}, "pull request"));
+    pr.insertAdjacentHTML("afterbegin", svgIco("pr"));
+    const prText = pr.lastChild;
+    const repo = h("div", { class: "psd-repo" }, rh, h("div", { class: "psd-files" }, files), ring, h("div", { class: "psd-todo" }, h("i", {}, "Task plan"), todos), pr);
+    const STEP = 1500,
+      T_WORK = 4300,
+      T_CLOSE = T_WORK + TODO.length * STEP + 200,
+      T_RETIRE = T_CLOSE + 900,
+      LOOP = T_RETIRE + 2800;
+    const fly = () => {
+      pkg.style.transition = "none";
+      Object.assign(pkg.style, { left: "380px", top: "760px", opacity: "1", transform: "scale(.6)" });
+      void pkg.offsetWidth;
+      pkg.style.transition = "left .8s cubic-bezier(.5,0,.2,1), top .8s cubic-bezier(.5,0,.2,1), transform .8s, opacity .3s .8s";
+      Object.assign(pkg.style, { left: "990px", top: "570px", opacity: "0", transform: "scale(1)" });
+    };
+    const reset = () => {
+      members.forEach(m => m.classList.remove("on"));
+      task.classList.remove("closed");
+      stIco.lastChild.textContent = "open";
+      arrow.classList.remove("on");
+      pkg.style.transition = "none";
+      pkg.style.opacity = "0";
+      files.forEach(f => f.classList.remove("in", "hot", "gone", "kept"));
+      newFiles.forEach(f => (f.style.display = "none"));
+      rhState.textContent = "no squad";
+      rhState.classList.remove("on");
+      for (const e of [...lines, ...agents]) e.classList.remove("up", "on", "out");
+      dev.classList.remove("on");
+      todos.forEach(t => t.classList.remove("doing", "done"));
+      pr.classList.remove("draft", "merged");
+      prText.textContent = "pull request";
+    };
+    const work = k => {
+      const [, o, f] = TODO[k];
+      lines.forEach((l, i) => l.classList.toggle("on", i === o));
+      agents.forEach((a, i) => a.classList.toggle("on", i === o));
+      dev.classList.toggle("on", o === 4);
+      todos.forEach((t, i) => t.classList.toggle("doing", i === k));
+      files.forEach(x => x.classList.remove("hot"));
+      if (f) {
+        const el = fileOf(f);
+        el.style.display = "";
+        el.classList.add("in", "hot");
+      }
+      if (o === 4) sfx.review();
+      else sfx.pop(k * 2);
+    };
+    const done = k => {
+      todos[k].classList.remove("doing");
+      todos[k].classList.add("done");
+      if (k === 1) {
+        pr.classList.add("draft");
+        prText.textContent = "draft PR · rate limiting";
+      }
+      if (k === TODO.length - 1) {
+        pr.classList.add("merged");
+        prText.textContent = "merged · rate limiting";
+        sfx.notify(false);
+      }
+    };
+    const EV = [
+      ...members.map((m, i) => [500 + i * 260, () => (m.classList.add("on"), sfx.pop(i))]),
+      [1700, () => (arrow.classList.add("on"), fly())],
+      [2400, () => ((rhState.textContent = "squad deploying…"), rhState.classList.add("on"))],
+      ...sqFiles.map((f, i) => [2400 + i * 200, () => (f.classList.add("in"), sfx.key(0.8))]),
+      [3700, () => ((rhState.textContent = "squad · 4 agents"), [...lines, ...agents].forEach(e => e.classList.add("up")), sfx.pop(6))],
+      ...TODO.flatMap((_, k) => [
+        [T_WORK + k * STEP, () => work(k)],
+        [T_WORK + k * STEP + 1100, () => done(k)],
+      ]),
+      [
+        T_CLOSE,
+        () => {
+          for (const e of [...lines, ...agents]) e.classList.remove("on");
+          dev.classList.remove("on");
+          files.forEach(x => x.classList.remove("hot"));
+          task.classList.add("closed");
+          stIco.lastChild.textContent = "closed";
+        },
+      ],
+      [
+        T_RETIRE,
+        () => {
+          for (const e of [...lines, ...agents]) e.classList.add("out");
+          lines.forEach(l => l.classList.remove("up"));
+          sqFiles.forEach(f => f.classList.add(f.textContent === ".squad/decisions.md" ? "kept" : "gone"));
+          rhState.textContent = "squad retired · decisions kept";
+          rhState.classList.remove("on");
+          sfx.pop(0);
+        },
+      ],
+    ].sort((a, b) => a[0] - b[0]);
+    let t0 = 0,
+      ev = 0;
+    slides.push({
+      group: "enterprise",
+      sound: "squad",
+      palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
+      notes:
+        "Push SDLC. Today's SDLC is pull: a developer picks up a task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here the issue carries a Squad, a human-led AI agent team: a lead, a backend engineer, a tester and a scribe. Assigning the task deploys the squad into the repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad works alongside the developer: the lead plans, the backend agent writes the change, the tester adds load tests, the scribe records the decisions, and the developer reviews and merges. When the task closes the squad retires and its decisions stay in the repository for the next task. The task, repository, squad and file names are synthetic and the animation is illustrative.",
+      enter() {
+        t0 = 0;
+        ev = 0;
+        reset();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        let e = t - t0;
+        if (e > LOOP) {
+          t0 = t;
+          e = 0;
+          ev = 0;
+          reset();
+        }
+        while (ev < EV.length && EV[ev][0] <= e) EV[ev++][1]();
+      },
+      el: h(
+        "section",
+        { class: "slide psd" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative · the task ships with its team"), h("h2", {}, letters("Push "), letters("SDLC", "l-grad"))),
+        h("div", { class: "psd-tag" }, "Pull: you hunt for tools, docs and experts. ", h("b", {}, "Push: the task arrives with a squad that helps, then retires.")),
+        task,
+        arrow,
+        repo,
+        pkg
+      ),
+    });
+  }
+
   // Finale: one control repo dispatching work to hundreds of repos, each running a few agentic processes
   {
     resetIndex();
@@ -11785,6 +12045,16 @@
         const s = 0.14;
         [64, 67, 71, 67, 64, 67, 71, 74].forEach((m, i) => tone(m, t + 0.2 + i * s, { type: "triangle", dur: 0.22, vol: 0.09, cutoff: 2600 }));
         [0, 0.22, 0.56, 0.78].forEach(d => osc("sine", 70, t + 0.2 + d, 0.18, 0.35, { f1: 40 }));
+      },
+      // push SDLC: four members join one by one (one timbre each), the bundle whooshes into the repo, then the team chord
+      squad: t => {
+        [67, 71, 74, 79].forEach((m, i) => {
+          click(t + 0.5 + i * 0.26, 2200, 0.04, 6);
+          tone(m, t + 0.5 + i * 0.26, { type: ["triangle", "square", "sine", "sawtooth"][i], dur: 0.22, vol: 0.05, cutoff: 2400 });
+        });
+        osc("sine", 300, t + 1.7, 0.8, 0.02, { f1: 1400 });
+        pad([55, 62, 67, 71], t + 2.5, 2.2, 0.025, "triangle", 2200);
+        bell(86, t + 2.6, 0.04, 1.4);
       },
       // A soft bed of worker ticks around a gently breathing central hum
       radar: t => {
