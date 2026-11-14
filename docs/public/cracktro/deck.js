@@ -2948,8 +2948,8 @@
       const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
       // [id, path, color, label, lx, ly]
       const EDGES = [
-        ["geW1", "M300 200 H520", "b", ["CONNECT", "registry.npmjs.org"], 410, 140],
-        ["geW2", "M745 200 H950", "o", ["TLS ClientHello", "SNI = example.com"], 845, 140],
+        ["geW1", "M300 200 H520", "b", ["CONNECT", "registry.npmjs.org"], 410, 126],
+        ["geW2", "M745 200 H950", "o", ["TLS ClientHello", "SNI = example.com"], 850, 126],
         ["geW3", "M1210 186 C1290 186 1290 120 1360 120", "g", [], 0, 0],
         ["geW4", "M1210 214 C1290 214 1290 280 1360 280", "r", [], 0, 0],
       ];
@@ -2972,7 +2972,7 @@
       g += `<g class="ge-node" id="geCdn"><rect x="955" y="130" width="250" height="140" rx="70"/><text class="ge-k" x="1080" y="186">SHARED CDN EDGE</text><text class="ge-s" x="1080" y="226">routes by SNI</text></g>`;
       g += `<g class="ge-node ge-dest ok" id="geOk"><rect x="1365" y="88" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="129">registry.npmjs.org</text><text class="ge-tag g" x="1677" y="128">allowed</text></g>`;
       g += `<g class="ge-node ge-dest bad" id="geBad"><rect x="1365" y="248" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="289">example.com</text><text class="ge-tag r" x="1677" y="288">not allowed</text><text class="ge-hit" id="geHit" x="1530" y="350">ESCAPED · 200 OK</text></g>`;
-      g += `<g class="ge-cut" id="geCut"><circle cx="770" cy="200" r="26"/><path d="M758 188 L782 212 M782 188 L758 212"/></g>`;
+      g += `<g class="ge-cut" id="geCut"><circle cx="800" cy="200" r="22"/><path d="M790 190 L810 210 M810 190 L790 210"/></g>`;
       g += `<text class="ge-phase" id="gePhase" x="${VW - 60}" y="40"></text>`;
       g += `<text class="ge-h" x="${X0}" y="402">EACH SQUARE IS ONE ESCAPE TECHNIQUE, IN THE ORDER THE AGENT TRIED THEM</text><text class="ge-h ge-cnt" id="geCnt" x="${cx(N - 1) + CS}" y="402"></text>`;
       for (let i = 0; i < N; i++) g += `<rect class="ge-c${ESC.has(i) ? " x" : ""}" id="geC${i}" x="${cx(i)}" y="${CY0 + (i % ROWS) * PITCH}" width="${CS}" height="${CS}" rx="2"/>`;
