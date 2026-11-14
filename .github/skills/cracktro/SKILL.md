@@ -14,7 +14,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fi
 - `docs/public/cracktro/index.html`: loads `deck.js` and holds the SEO/Open Graph/Twitter meta (absolute `https://github.github.com/gh-aw/cracktro/` URLs).
 - `docs/public/cracktro/og-image.png`: 1200x630 social card rendered from slide 1 with the dots/count/sound/progress UI hidden. Keep it outside `assets/` (the asset test only allows avatars there).
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
-- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist,bradygaster}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
+- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist,mona}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
 - `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-three slide headings (band headers included), so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
@@ -71,7 +71,7 @@ slides.push({
 ## Content rules (enforced by tests)
 
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
-- Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, `ievangelist`, and `bradygaster` (Push SDLC slide only), as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
+- Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, `ievangelist`, and `mona` (Mona the Octocat, Push SDLC slide only), as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
 - Exception: the Continuous Security slide (11, `ge-` classes) shows measured counts and dates from The Great Escapi (`firewall-escape` workflow) repo memory (426 escape techniques, 15 Feb to 22 Sep 2026; #401 was the first escape) and the AWF firewall SNI-allowlist fix; the attack diagram is illustrative and its notes say so.
 - Exception: the Human Agent Processes slide (15, `hap-` classes) has a MEASURED column with gh-aw's own counts, 15 Oct to 14 Nov 2026: successful Actions runs of `auto-triage-issues` on issue events (366), `[cli-tools-test]` issues from `daily-cli-tools-tester` (30, 16 completed), pull requests reviewed by `pr-code-quality-reviewer` on ready for review (825) and labelled by `changeset` (9), plus workflow counts per trigger from `.github/workflows` as a 14 Nov 2026 snapshot (3 issues opened, 194 schedule, 8 ready for review, 6 label; smoke tests excluded). The column header says "30 DAYS" and the caption gives both windows; the flows are illustrative and its notes and caption say so.
