@@ -65,7 +65,7 @@ slides.push({
 - Follow https://brand.github.com/graphic-elements/mascots: use mascots sparingly, never as logos, and never on serious topics (security, enterprise, money). Use role icons there.
 - Never generate or redraw mascots. Both avatars are 160x160 clips of official brand.github.com art in the modern three-quarter 3D style: `mona.jpg` is the dark-mode purple Mona from `mona-2026-versions.png`, `ducky.jpg` the middle Ducky from `mascots-03.png`. Their backgrounds are recoloured to the deck's `#0d1117` (never white) so they blend into the dark avatar circles.
 
-Core rules (details in `content-rules.md`): everything is public; no real GitHub avatars, handles or people, only the fake users Mona and Ducky (per the brand mascot guidelines); no 40-hex SHAs or private repos; the only URL is `https://github.github.com/gh-aw/introduction/overview/`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
+Core rules (details in `content-rules.md`): everything is public; no real GitHub avatars, handles or people, only the fake users Mona and Ducky (per the brand mascot guidelines); no 40-hex SHAs or private repos; the only URLs are `https://github.github.com/gh-aw/introduction/overview/` and the For PMs source link `https://github.com/chrizbo/agentics-beyond-code`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
 
 ## Preview loop
 

@@ -703,6 +703,8 @@
   .sfm-m i { display: block; width: 100%; background: linear-gradient(#ab7df8, #8957e5); border-radius: 3px 3px 0 0; }
   .sfm-c { margin-top: 6px; color: #6e7681; font-size: 12.5px; white-space: nowrap; }
   .pm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #ab7df8, #3fb950, #4493f8, #d29922); }
+  .pm-src { color: #d29922; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+  .pm-src:hover { color: #f0f6fc; }
   .pm-tabs { position: absolute; left: 110px; top: 262px; display: flex; gap: 20px; opacity: 0; }
   .active .pm-tabs { animation: settle .6s .3s both; }
   .pm-tab { display: flex; align-items: center; gap: 16px; width: 560px; padding: 16px 22px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; color: #9198a1; text-align: left; cursor: pointer; font: inherit; transition: border-color .3s, background .3s, color .3s, box-shadow .3s; }
@@ -7765,7 +7767,7 @@
       el: h(
         "section",
         { class: "slide pm" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentics beyond code · patterns from chrizbo/agentics-beyond-code"), h("h2", {}, letters("For "), letters("PMs", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentics beyond code · patterns from ", h("a", { class: "pm-src", href: "https://github.com/chrizbo/agentics-beyond-code", target: "_blank", rel: "noopener" }, "chrizbo/agentics-beyond-code")), h("h2", {}, letters("For "), letters("PMs", "l-grad"))),
         h("div", { class: "pm-tabs" }, ...tabs),
         h("div", { class: "pm-flow" }, ...stepEls),
         h("div", { class: "pm-doc" }, h("div", { class: "pm-doc-h" }, docIco, docT, docS), docLines),
