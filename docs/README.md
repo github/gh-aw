@@ -68,7 +68,7 @@ Examples, review activity, repository counts, and cost figures are synthetic,
 except the model routing slide's results, which are measured on this
 repository's own workflows and say so in its speaker notes.
 Use role icons rather than employee profiles. The only exceptions are the
-local avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` in `public/cracktro/assets/avatars/`.
+local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` in `public/cracktro/assets/avatars/`.
 Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.

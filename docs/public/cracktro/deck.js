@@ -3792,7 +3792,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#sflAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const maint = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/ievangelist.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
     const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
@@ -3857,7 +3857,7 @@
       ["sflE6", "sflScan", 1800],
     ];
     const LANE = { sflScan: 0, sflPipes: 0, sflKbe: 1, sflFixer: 1, sflOut0: 1, sflOut1: 1, sflOut2: 1, sflDev: 1, sflFeed: 2, sflKpi: 2, sflRubric: 2, sflDev2: 2 };
-    let g = `<defs><radialGradient id="sflAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="sflClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="sflAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="sflP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="sflBeamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
       <marker id="sflB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
