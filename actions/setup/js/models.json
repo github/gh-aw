@@ -485,6 +485,24 @@
           "provider_type": "openai",
           "wire_api": "completions"
         },
+        "gemini-4-carbon": {
+          "cost": {
+            "input": "2e-06",
+            "output": "1e-05",
+            "cache_read": "1e-07"
+          },
+          "provider_type": "openai",
+          "wire_api": "completions"
+        },
+        "gemini-4-hydrogen": {
+          "cost": {
+            "input": "1.5e-06",
+            "output": "7.5e-06",
+            "cache_read": "7.5e-08"
+          },
+          "provider_type": "openai",
+          "wire_api": "completions"
+        },
         "gpt-4.1": {
           "cost": {
             "input": "2e-06",
