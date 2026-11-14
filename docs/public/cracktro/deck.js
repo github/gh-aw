@@ -205,6 +205,7 @@
   .fm-out.on { opacity: 1; animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
   .fm-out.on rect { stroke: var(--c); filter: drop-shadow(0 0 14px var(--c)); }
   .mra-svg { left: 60px; top: 290px; width: 1800px; height: 566px; }
+  .mra .mra-svg { top: 272px; }
   .mra-svg .fm-pill text { font-size: 26px; }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
@@ -374,7 +375,7 @@
   .mra-row.new { animation: mra-in .6s cubic-bezier(.2,.9,.2,1); }
   @keyframes mra-in { from { opacity: 0; } }
   .mra-who { fill: #79c0ff; font: 600 19px var(--mono); }
-  .mra-row.ag .mra-who { fill: #c297ff; }
+  .mra-row.m .mra-who, .mra-row.i .mra-who { fill: #c297ff; } .mra-row.c .mra-who { fill: #3fb950; }
   .mra-msg { fill: #e6edf3; font: 500 24px "Mona Sans"; }
   .mra-msg .pat { fill: #d29922; font-weight: 700; }
   .mra-beam { fill: none; stroke-width: 3; stroke-dasharray: 8 8; filter: drop-shadow(0 0 6px currentColor); animation: mra-beam 1.4s linear both; }
@@ -414,6 +415,14 @@
   .sdd-chips b { font: 600 17px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; margin-right: 6px; }
   .sdd-chips span { padding: 7px 13px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 16px/1 var(--mono); color: #c9d1d9; }
   .active .sdd-chips { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .dh-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dh-svg .mra-l.g { fill: #3fb950; }
+  .dh-svg .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
+  .dh-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
+  .dh-svg .sdd-panel.bad .sdd-card { stroke: #f85149; filter: drop-shadow(0 0 16px #da363399); }
+  .dh-svg .sdd-ln.gone { fill: #f85149; opacity: .4; text-decoration: line-through; }
+  .dh-svg .sdd-ln.fail { fill: #ff7b72; font-weight: 700; }
+  .dh-x { fill: #f85149; font: 700 24px var(--mono); text-anchor: end; opacity: 0; transition: opacity .25s; filter: drop-shadow(0 0 6px #f85149); }
+  .dh-x.on { opacity: 1; }
   .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
   .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
@@ -4824,7 +4833,7 @@
     });
   }
 
-  // Mine → Refine → Apply: harvesting developer interventions into linters
+  // Mine → Refine → Apply: Linter Miner turns recurring patterns into analyzers, review refines them, LintMonster applies them across the repo. Feed events and counts are mined from gh-aw's history
   {
     resetIndex();
     const RX = 460,
@@ -4835,22 +4844,22 @@
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#mraAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#mraClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
-      ["e0", "M200 168 V292", "p", ["mines patterns", "autonomously"], 222, 222, "start"],
-      ["e1", "M200 372 V500", "p", ["opens", "analyzer PR"], 222, 430, "start"],
-      ["e2", "M238 540 H606", "p", ["analyzer rules"], 420, 524, "middle"],
-      ["e3", "M640 506 V372", "b", ["reviews &", "merges"], 662, 436, "start"],
-      ["e4", "M678 338 H882", "p", ["challenge"], 780, 322, "middle"],
-      ["e5", "M920 300 V168", "p", ["autonomous", "hardening PR"], 942, 222, "start"],
-      ["e6", "M1060 140 H1258", "p", ["hardened rules → repo"], 1158, 120, "middle"],
-      ["e7", "M1300 168 V292", "p", ["groups findings,", "opens cleanup PRs"], 1322, 222, "start"],
-      ["e8", "M1300 372 V500", "p", ["assigns"], 1322, 442, "start"],
-      ["e9", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
-      ["e10", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+      ["e0", "M200 168 V292", "p", ["mines issues,", "discussions & code"], 222, 222, "start"],
+      ["e1", "M200 372 V500", "p", ["opens draft", "analyzer PR"], 222, 430, "start"],
+      ["e2", "M238 540 H606", "p", ["analyzer + tests"], 420, 524, "middle"],
+      ["e3", "M640 506 V372", "b", ["review", "threads"], 662, 436, "start"],
+      ["e4", "M640 304 V140 H762", "b", ["@copilot"], 662, 222, "start"],
+      ["e5", "M920 168 V300", "p", ["pushes", "fixes"], 942, 222, "start"],
+      ["e6", "M958 338 H1100 V140 H1258", "p", ["merged"], 1029, 318, "middle"],
+      ["e7", "M1300 168 V292", "p", ["scans daily, files", "finding issues"], 1322, 222, "start"],
+      ["e8", "M1300 372 V500", "b", ["assigned"], 1322, 442, "start"],
+      ["e9", "M1504 540 H1584", "b", ["cleanup PR", "merged"], 1544, 594, "middle"],
+      ["e10", "M1624 506 V140 H1540", "p", ["rescans", "daily"], 1606, 330, "end"],
     ];
     // the token's journey: [edge, node lit on arrival]
     const SEQ = [
@@ -4858,29 +4867,29 @@
       ["e1", "nPR1"],
       ["e2", "nDev1"],
       ["e3", "nIssue"],
-      ["e4", "nPR2"],
-      ["e5", "nRefiner"],
+      ["e4", "nRefiner"],
+      ["e5", "nPR2"],
       ["e6", "nMonster"],
       ["e7", "nPR3"],
       ["e8", "nDev2"],
-      ["e10", "nMonster"],
       ["e9", "nMerge"],
+      ["e10", "nMonster"],
     ];
     const LANE = { nComment: 0, nPR1: 0, nDev1: 1, nIssue: 1, nPR2: 1, nRefiner: 1, nMonster: 2, nPR3: 2, nDev2: 2, nMerge: 2 };
     let g = `<defs><clipPath id="mraClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mraAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="mraP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="mraB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    g += `<text class="fm-lane-t mra-lane on" x="${RX / 2}" y="40">HUMANS ↔ AGENTS</text><line class="fm-div" x1="${RX}" y1="0" x2="${RX}" y2="${VH}"/>
+    g += `<text class="fm-lane-t mra-lane on" x="${RX / 2}" y="40">MINED FROM GH-AW</text><line class="fm-div" x1="${RX}" y1="0" x2="${RX}" y2="${VH}"/>
       <clipPath id="mraFeedClip"><rect x="16" y="164" width="${RX - 32}" height="${VH - 172}"/></clipPath>
       <rect class="mra-repo" x="16" y="78" width="${RX - 32}" height="${VH - 82}" rx="16"/>
-      <text class="mra-repo-t" x="38" y="114">▣ example/repo · synthetic activity</text>
+      <text class="mra-repo-t" x="38" y="114">▣ gh-aw · May–Nov 2026</text>
       <g id="mraBeams"></g><g id="mraFeed" clip-path="url(#mraFeedClip)"></g>
       <text class="mra-seen" id="mraSeen" x="${MINX - 34}" y="92"></text>
       <g transform="translate(${RX},0)">`;
     [
       [0, 520, "MINE"],
-      [520, 1140, "CHALLENGE"],
+      [520, 1140, "REFINE"],
       [1140, 1700, "APPLY"],
     ].forEach(([x0, x1, t], i) => {
       g += `<text class="fm-lane-t mra-lane" id="lane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
@@ -4890,14 +4899,15 @@
       g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mra${c === "p" ? "P" : "B"})"/>`;
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
-    g += agent("nMiner", 120, 140, 230, "Linter Miner") + agent("nRefiner", 800, 140, 240, "Linter Refiner") + agent("nMonster", 1300, 140, 236, "LintMonster");
-    g += box("nComment", 200, 332, "comment") + box("nPR1", 200, 540, "pr") + box("nIssue", 640, 338, "issue") + box("nPR2", 920, 338, "pr") + box("nPR3", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
-    g += dev("nDev1", 640, 540) + dev("nDev2", 1300, 540);
+    g += agent("nMiner", 120, 140, 230, "Linter Miner") + agent("nRefiner", 800, 140, 200, "Copilot") + agent("nMonster", 1300, 140, 236, "LintMonster");
+    g += box("nComment", 200, 332, "discussion") + box("nPR1", 200, 540, "pr") + box("nIssue", 640, 338, "comment") + box("nPR2", 920, 338, "pr") + box("nPR3", 1300, 332, "issue") + box("nMerge", 1624, 540, "merge");
+    g += dev("nDev1", 640, 540) + agent("nDev2", 1300, 540, 200, "Copilot");
     g += `<circle class="fm-dot mra-dot" r="8"/></g>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg mra-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Linter Miner mines issues, discussions and code and opens a draft analyzer pull request; review threads and Copilot fixes refine it until it merges; LintMonster then scans daily, files finding issues, and Copilot cleanup pull requests apply the rule across the repository");
     svg.innerHTML = g;
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".mra-dot");
@@ -4909,21 +4919,25 @@
     let t0 = 0,
       cyc = -1,
       popK = -1;
-    // humans and agents interacting in the repo; the miner watches every exchange
+    // measured on gh-aw: [kind, date, text, analyzer ordinal]; m = analyzer merged from a Linter Miner PR, i = LintMonster finding issue, c = Copilot cleanup PR merged
     const FEED = [
-      ["reviewer", "review", "don't swallow this error", "error"],
-      [0, "fix", "wrapped with fmt.Errorf(%w)"],
-      ["maintainer", "review", "use errors.Is, not ==", "errors.Is"],
-      [0, "fix", "updated 3 call sites"],
-      ["reviewer", "issue", "flaky test in example_test.go"],
-      [0, "CI Doctor", "proposed a test fix"],
-      ["maintainer", "review", "again: errors.Is, not ==", "errors.Is"],
-      [0, "fix", "switched to errors.Is"],
-      ["reviewer", "review", "no context.TODO in handlers"],
-      [0, "fix", "threaded ctx through"],
-      ["maintainer", "review", "wrap this error with %w", "error"],
-      [0, "Repo Assist", "labelled 4 issues"],
+      ["m", "15 May", "osexitinlibrary", 1],
+      ["m", "17 May", "ctxbackground", 3],
+      ["m", "18 May", "errstringmatch", 4],
+      ["i", "24 May", "28 panics in library code"],
+      ["c", "24 May", "18 library panics removed"],
+      ["m", "8 Jun", "sortslice", 18],
+      ["c", "9 Jun", "sort.Slice → slices.SortFunc"],
+      ["m", "14 Jun", "errorfwrapv", 23],
+      ["m", "13 Jul", "ioutildeprecated", 37],
+      ["c", "21 Jul", "33 long functions → 0"],
+      ["m", "21 Sep", "unchecked-slice-index", 52],
+      ["i", "4 Oct", "3,561 unchecked errors"],
+      ["m", "13 Oct", "goroutineresourceleak", 59],
+      ["c", "25 Oct", "slice indexing guarded"],
+      ["m", "11 Nov", "ignoredlocalerror", 65],
     ];
+    const WHO = { m: "linter miner", i: "lintmonster", c: "copilot" };
     const feed = $("mraFeed"),
       beams = $("mraBeams"),
       seen = $("mraSeen"),
@@ -4931,18 +4945,21 @@
       FBOT = VH - 52;
     let rows = [],
       fi = 0,
-      lastAdd = 0,
-      hits = 0;
+      lastAdd = 0;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
     const addRow = instant => {
-      if (!instant) sfx.notify(!!FEED[fi % FEED.length][0]);
-      const [who, kind, msg, pat] = FEED[fi++ % FEED.length],
+      const [kind, date, msg, nth] = FEED[fi++ % FEED.length],
         el = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      const body = pat ? esc(msg).replace(esc(pat), `<tspan class="pat">${esc(pat)}</tspan>`) : esc(msg);
-      el.setAttribute("class", "mra-row" + (who ? "" : " ag") + (instant ? "" : " new"));
+      if (!instant) sfx.notify(kind !== "m");
+      const body = kind === "m" ? `+ <tspan class="pat">${esc(msg)}</tspan>` : esc(msg);
+      el.setAttribute("class", "mra-row " + kind + (instant ? "" : " new"));
       el.innerHTML =
-        (who ? `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#4493f8" stroke-width="2"/>${ico("person", 58, 0, 30)}` : `<circle cx="58" cy="0" r="26" fill="url(#mraAgent)"/>${ico("copilot", 58, 1, 30)}`) +
-        `<text class="mra-who" x="96" y="-8">${who || "copilot"} · ${kind}</text><text class="mra-msg" x="96" y="20">${body}</text>`;
+        (kind === "m"
+          ? `<circle cx="58" cy="0" r="26" fill="url(#mraAgent)"/>${ico("copilot", 58, 1, 30)}`
+          : kind === "i"
+            ? `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("issue", 58, 0, 28, "#c297ff")}`
+            : `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#3fb950" stroke-width="2"/>${ico("merge", 58, 0, 26, "#3fb950")}`) +
+        `<text class="mra-who" x="96" y="-8">${WHO[kind]} · ${date}</text><text class="mra-msg" x="96" y="20">${body}</text>`;
       feed.appendChild(el);
       rows.push(el);
       rows.forEach((r, k) => {
@@ -4951,7 +4968,7 @@
       if (rows.length > 8) rows.shift().remove();
       if (instant) return;
       const y = FBOT,
-        col = pat ? "#d29922" : who ? "#4493f8" : "#ab7df8";
+        col = kind === "m" ? "#d29922" : kind === "i" ? "#ab7df8" : "#3fb950";
       const b = document.createElementNS("http://www.w3.org/2000/svg", "path");
       b.setAttribute("class", "mra-beam");
       b.setAttribute("stroke", col);
@@ -4961,9 +4978,8 @@
       $("nMiner").classList.remove("blink");
       void $("nMiner").getBBox();
       $("nMiner").classList.add("blink");
-      if (pat) {
-        hits++;
-        seen.textContent = `pattern seen ×${hits}`;
+      if (nth) {
+        seen.textContent = `analyzer #${nth} of 65`;
         seen.classList.remove("pop");
         void seen.getBBox();
         seen.classList.add("pop");
@@ -4974,29 +4990,40 @@
       $("nMiner").classList.add("on");
       $("lane0").classList.add("on");
     };
+    // measured on gh-aw, 15 May to 11 November 2026
+    const STATS = [
+      [65, "analyzers merged from 73 Linter Miner PRs", "#d29922", "#ab7df8"],
+      [376, "reviews refining them before merge", "#79c0ff", "#ab7df8"],
+      [235, "LintMonster finding issues filed", "#ab7df8", "#d2a8ff"],
+      [92, "Copilot cleanup PRs merged · 54,128 lines", "#3fb950", "#79c0ff"],
+    ];
+    const nums = STATS.map(() => h("div", { class: "ct-num" }, "0"));
+    const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
       group: "loops",
       sound: "mine",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
-        "Mine, refine, apply: harvesting developer interventions into linters. All activity and review messages shown here are synthetic examples, not quotations or records of real people. Repeated corrections can become analyzer proposals, reviewed and refined by a developer, then applied across the repository through cleanup pull requests. Human corrections become deterministic checks.",
+        "Mine, refine, apply: harvesting recurring corrections into Go linters. The loop is illustrative of three of gh-aw's own workflows; the feed and numbers are mined from gh-aw's history, 15 May to 11 November 2026. Mine: every day Linter Miner reads recent issues, discussions and the Go code, picks one pattern no existing analyzer catches, and opens a draft pull request with a go/analysis analyzer and its tests under pkg/linters. It opened 73 such pull requests; 65 merged and 8 were closed. Refine: Copilot code review and a maintainer leave review threads, and Copilot pushes fixes; 58 of the 65 needed follow-up commits, 376 reviews in all, and the median analyzer merged about two hours after it was opened. Apply: once merged the analyzer runs in make golint-custom. Every day LintMonster runs it, groups the findings by root cause and keeps one tracking issue per category, 235 so far, some counting thousands of findings, such as 3,561 unchecked errors on 4 October. Maintainers assign them to Copilot, and 92 merged Copilot pull requests closed them, changing 54,128 lines. For example, the sortslice analyzer merged on 8 June and the next day a Copilot pull request moved every sort.Slice call to slices.SortFunc. Human corrections become deterministic checks.",
       enter() {
         t0 = 0;
         cyc = -1;
         lastAdd = 0;
-        hits = 0;
         seen.textContent = "";
         feed.innerHTML = "";
         beams.innerHTML = "";
         rows = [];
         fi = 0;
+        nums.forEach(n => (n.textContent = "0"));
         for (let i = 0; i < 5; i++) addRow(true);
       },
       tick(t) {
         if (!t0) t0 = t;
         const e = t - t0,
           c = Math.floor(e / CYC),
-          u = e % CYC;
+          u = e % CYC,
+          fn = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * fn).toLocaleString("en-US")));
         if (c !== cyc) {
           cyc = c;
           reset();
@@ -5036,7 +5063,14 @@
           $("lane" + LANE[nid]).classList.add("on");
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide mra" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "mined from gh-aw [linter-miner] PRs, [lint-monster] issues and the PRs that closed them · May–Nov 2026")
+      ),
     });
   }
 
@@ -5702,6 +5736,226 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Humans state intent, agents write the RFC spec, test it and extract it from every change"), h("h2", {}, letters("Spec-driven "), letters("testing", "l-grad"))),
         svg,
         h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["spec-extractor", "pr-specification-reviewer", "spec-librarian", "spec-enforcer", "w3c-specification-writer", "weekly-safe-outputs-spec-review"].map(n => h("span", {}, n))),
+      ),
+    });
+  }
+
+  // Docs that heal: an updater writes docs from merged code, unbloat and glossary agents simplify them, the noob tester reads them as a newcomer, and a healer fixes what was missed and teaches the updater a new rule
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372,
+      PW = 540,
+      PX = [40, 810, 1580],
+      AY = 300;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#${cls ? "dhHeal" : "dhAgent"})"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    };
+    // an illustrative, simplified example: the updater's own workflow, a docs page it edits and the noob tester's report
+    const PANELS = [
+      [
+        "daily-doc-updater.md",
+        "WORKFLOW",
+        [
+          ["q", "---"],
+          ["", "on: daily"],
+          ["", "safe-outputs: create-pull-request"],
+          ["q", "---"],
+          ["h", "# Daily Doc Updater"],
+          ["", "- Read PRs merged since yesterday"],
+          ["", "- Document new flags and examples"],
+          ["add", "+ - Explain value formats of flags"],
+        ],
+      ],
+      [
+        "docs/reference/frontmatter.md",
+        "DOCS",
+        [
+          ["h", "## stop-after"],
+          ["add", "+ Stop a schedule at a deadline,"],
+          ["add", "+ e.g. stop-after: +48h."],
+          ["", "  This is a really useful option"],
+          ["", "  that you can use whenever you"],
+          ["", "  want things to stop running."],
+          ["api", "  → glossary: stop-after"],
+          ["add", "+ Units: m, h, d, w (e.g. +48h)."],
+        ],
+      ],
+      [
+        "noob-tester-report.md",
+        "TEST",
+        [
+          ["fn", "walk the docs as a newcomer"],
+          ["", "  install the extension"],
+          ["", "  quick start, steps 1-3"],
+          ["", "  find stop-after"],
+          ["", "  what does +48h mean?"],
+          ["q", ""],
+          ["fail", "issue: explain the +48h format"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["dhE0", "M124 106 H232", "p", ["merged"], 178, 90, "middle"],
+      ["dhE1", `M${PX[0] + PW + 6} ${AY} H${PX[1] - 8}`, "p", ["docs PR from", "merged code"], 695, AY - 56, "middle"],
+      ["dhE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["read it as a", "newcomer would"], 1465, AY - 56, "middle"],
+      ["dhE3", `M${PX[2] + PW / 2} ${PY + PH + 4} V618 H1214`, "g", ["missed gaps"], 1560, 600, "middle"],
+      ["dhE5", `M1104 590 V${PY + PH + 10}`, "g", [], 0, 0, "middle"],
+      ["dhE4", `M950 618 H${PX[0] + PW / 2} V${PY + PH + 10}`, "g", ["fix the gap, teach the updater"], 600, 600, "middle"],
+    ];
+    let g = `<defs><radialGradient id="dhAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <radialGradient id="dhHeal" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#7ee787"/><stop offset=".55" stop-color="#238636"/><stop offset="1" stop-color="#0f3d1c"/></radialGradient>
+      <marker id="dhP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="dhG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 695, "WRITE"],
+      [695, 1465, "SIMPLIFY"],
+      [1465, VW, "TEST · HEAL"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dhLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([file, tag, lines], i) => {
+      const x = PX[i];
+      g += `<g class="sdd-panel" id="dhP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${PW}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + PW}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + PW - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => {
+        const y = PY + 88 + j * 32;
+        g += `<text class="sdd-ln ${c}" id="dhL${i}_${j}" x="${x + 24}" y="${y}">${sp(s)}</text>`;
+        if (i === 2 && j >= 1 && j <= 4) g += `<text class="sdd-ck" id="dhCk${j}" x="${x + PW - 26}" y="${y + 1}">✓</text>`;
+        if (i === 2 && j === 4) g += `<text class="dh-x" id="dhX4" x="${x + PW - 26}" y="${y + 1}">✗</text>`;
+      });
+      g += `</g>`;
+    });
+    g += `<rect class="sdd-scan" id="dhScan" x="${PX[1] + 4}" y="${PY + 56}" width="${PW - 8}" height="5" rx="2"/>`;
+    g += `<text class="sdd-stamp" id="dhStamp" x="${PX[1] + PW - 24}" y="${PY + PH - 22}">Unbloat: −3 lines</text>`;
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#dh${c === "g" ? "G" : "P"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += `<g class="fm-task" id="dhMerge"><circle cx="88" cy="106" r="32" fill="#8957e5"/>${ico("merge", 88, 106, 30)}</g>`;
+    g += agent("dhUpdater", 400, 106, 240, "Doc Updater") + agent("dhUnbloat", 1080, 106, 300, "Unbloat · Glossary") + agent("dhTester", 1850, 106, 240, "Noob Tester");
+    g += agent("dhHealer", 1080, 618, 220, "Doc Healer", "g");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      scan = $("dhScan");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const CYC = 18000;
+    let t0 = 0,
+      cyc = -1,
+      ev = [],
+      evI = 0,
+      fly = null,
+      scanAt = 0;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("dhLane0"), on("dhP0"), on("dhMerge")));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(400 + j * 170, () => (on(`dhL0_${j}`), sfx.key(0.5))));
+      flight(1500, "dhE0", 500, "#ab7df8", 0);
+      at(2000, () => on("dhUpdater"));
+      flight(2200, "dhE1", 1000, "#ab7df8", 1);
+      at(3200, () => (on("dhLane1"), on("dhP1"), [0, 3, 4, 5].forEach(j => on(`dhL1_${j}`))));
+      at(3600, () => (on("dhL1_1"), sfx.key(0.6)));
+      at(3850, () => (on("dhL1_2"), sfx.key(0.6)));
+      at(4300, () => on("dhUnbloat"));
+      at(4400, () => (scanAt = 4400));
+      [3, 4, 5].forEach((j, k) => at(4800 + k * 300, () => (on(`dhL1_${j}`, "gone"), sfx.pop(2 + k))));
+      at(5800, () => ((scanAt = 0), (scan.style.opacity = 0), on("dhStamp"), on("dhL1_6"), sfx.key(0.7)));
+      at(6300, () => on("dhTester"));
+      flight(6400, "dhE2", 1000, "#ab7df8", 5);
+      at(7400, () => (on("dhLane2"), on("dhP2"), on("dhL2_0"), sfx.key(0.6)));
+      [1, 2, 3, 4].forEach((j, k) => {
+        at(7700 + k * 420, () => (on(`dhL2_${j}`), sfx.key(0.5)));
+        at(7950 + k * 420, () => (j === 4 ? (on("dhX4"), sfx.omen()) : (on(`dhCk${j}`), sfx.pop(5 + k))));
+      });
+      at(9700, () => (on("dhL2_6"), on("dhP2", "bad"), sfx.notify()));
+      flight(10000, "dhE3", 1100, "#3fb950", 6);
+      at(11100, () => (on("dhHealer"), sfx.key(0.8)));
+      flight(11300, "dhE5", 500, "#3fb950", 7);
+      at(11800, () => (on("dhL1_7"), on("dhP1", "ok"), sfx.pop(8)));
+      flight(12100, "dhE4", 1300, "#3fb950", 8);
+      at(13400, () => (on("dhL0_7"), on("dhP0", "ok"), sfx.review()));
+      at(14000, () => ($("dhX4").classList.remove("on"), on("dhCk4"), $("dhP2").classList.remove("bad"), on("dhP2", "ok"), sfx.pop(9)));
+    };
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone"));
+      scan.style.opacity = 0;
+      dot.style.opacity = 0;
+      fly = null;
+      scanAt = 0;
+      script();
+    };
+    slides.push({
+      group: "loops",
+      sound: "docs",
+      palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
+      notes:
+        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The workflow, page and noob tester report shown are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (scanAt) {
+          const f = Math.min(1, (u - scanAt) / 1300);
+          scan.style.opacity = 1;
+          scan.setAttribute("y", PY + 56 + f * (PH - 66));
+        }
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
+        svg,
+        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["daily-doc-updater", "unbloat-docs", "glossary-maintainer", "daily-documentation-diagram", "docs-noob-tester", "daily-multi-device-docs-tester", "enterprise-docs-audit", "daily-doc-healer"].map(n => h("span", {}, n))),
       ),
     });
   }
@@ -9992,6 +10246,14 @@
         osc("sine", 420, t + 0.65, 0.3, 0.02, { f1: 1300, a: 0.04 });
         [72, 76, 79, 84].forEach((m, i) => tone(m, t + 1.0 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.5 : 0.12, vol: 0.05, cutoff: 2800, detune: 3 }));
         bell(88, t + 1.5, 0.03, 1.2);
+      },
+      // docs that heal: a page typed in, two scissor snips as it is trimmed, then a warm healing chord rising to a bell
+      docs: t => {
+        for (let i = 0; i < 5; i++) click(t + 0.15 + i * 0.08, 2400 + (i % 2) * 600, 0.035, 5);
+        [0, 0.12].forEach(d => click(t + 0.7 + d, 5200, 0.05, 12));
+        pad([60, 64, 67, 72], t + 1.0, 1.4, 0.02, "triangle", 2000);
+        [72, 76, 79].forEach((m, i) => tone(m, t + 1.1 + i * 0.13, { type: "triangle", dur: 0.18, vol: 0.05, cutoff: 2600, detune: 3 }));
+        bell(84, t + 1.55, 0.035, 1.3);
       },
       // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
       cihealth: t => {
