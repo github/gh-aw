@@ -37,6 +37,7 @@ network:
     - node
 
 imports:
+  - shared/reporting.md
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[docs-noob-tester] "
