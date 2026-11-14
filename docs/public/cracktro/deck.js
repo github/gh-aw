@@ -273,6 +273,22 @@
   .tp-tray svg { width: 30px; height: 30px; fill: var(--c); animation: tp-pop .35s cubic-bezier(.3,1.6,.4,1) both; }
   .tp-blue { --c: #4493f8; } .tp-green { --c: #3fb950; }
   .tp-go { font-size: 112px !important; line-height: 1.04; color: #3fb950; }
+  /* light concept bands (THEME light): dark text and chrome on white */
+  body.light .kicker { color: #59636e; }
+  body.light .fmm-stop, body.light .tp-q { color: #1f2328; }
+  body.light .fmm-go, body.light .tp-go { color: #1a7f37; }
+  body.light .fmm-grid { box-shadow: 0 30px 90px #1f232826, 0 0 0 1px #1f23281f; }
+  body.light .fmm-cell, body.light .fmm-cell.g { background: #f6f8fa; }
+  body.light .fm-marquee span { border-color: #d1d9e0; background: #f6f8facc; color: #393f46; }
+  body.light .tp-vs > b { color: #59636e; }
+  body.light .tp-blue { --c: #0969da; } body.light .tp-green { --c: #1a7f37; }
+  body.light .tp-pill i { opacity: .14; }
+  body.light .dots button { background: #1f232833; }
+  body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
+  body.light .dots button.on { background: #1f2328; box-shadow: none; }
+  body.light .count { color: #59636e; }
+  body.light .snd, body.light .arrows button { border-color: #d1d9e0; background: #ffffffcc; color: #59636e; }
+  body.light .snd:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   .active .tp-copy > * { animation: tp-up .7s cubic-bezier(.2,.8,.2,1) both; }
   .active .tp-copy > :nth-child(2) { animation-delay: .1s; } .active .tp-copy > :nth-child(3) { animation-delay: .35s; }
   .active .tp-copy > :nth-child(4) { animation-delay: .6s; } .active .tp-copy > :nth-child(5) { animation-delay: .8s; }
@@ -12589,19 +12605,20 @@
   //   grid   rgb + minor/major line alpha; ang = grid angle (radians); cell = minor grid step (px at 1920x1080)
   //   accent header colours (heading gradient runs accent[0] → accent[2]); light, for contrast on the base
   //   red    the full-screen red wash (security)
+  //   light  white concept band: dark text and chrome (body.light), no grid, no glow
   //   music  synth MUSIC key played on every slide of the band; prog = semitone shift per slide, cycled along the band
   const THEME = {
-    intro: { base: [13, 17, 23], pal: ["#0a8a2e", "#08602b", "#1f8f4a", "#0a241b"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "title", prog: [0] },
-    // Agentic Workflows: Actions teal, grid tilted 15°.
-    platform: { base: [4, 17, 20], pal: ["#0b4f57", "#08363d", "#116329", "#03191c"], grid: [86, 212, 221, 0.03, 0.075], ang: Math.PI / 12, cell: 32, accent: ["#56d4dd", "#1b7c83", "#b3f0ff", "#7ee787"], music: "platform", prog: [0, 5, 7, 2, -3] },
+    intro: { base: [6, 24, 14], pal: ["#0fbf3e", "#08872b", "#104c35", "#0a241b"], grid: [95, 237, 131, 0.03, 0.075], ang: Math.PI / 12, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "title", prog: [0] },
+    // Title and Agentic Workflows: one GitHub brand green look, grid tilted 15°.
+    platform: { base: [6, 24, 14], pal: ["#0fbf3e", "#08872b", "#104c35", "#0a241b"], grid: [95, 237, 131, 0.03, 0.075], ang: Math.PI / 12, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "platform", prog: [0, 5, 7, 2, -3] },
     // Security: the red wash, grid turned 45°, a dark drone and alarm.
     security: { base: [16, 2, 4], pal: ["#5e0e11", "#33070a", "#7a1718", "#290709"], grid: [255, 225, 220, 0.03, 0.075], ang: Math.PI / 4, cell: 32, accent: ["#ff7b72", "#da3633", "#ffc1ba", "#ffa198"], red: true, music: "security", prog: [0, -2, 1, -1, 3] },
-    // Factory mindset: ember orange, grid tilted -15°, rhythmic machinery.
-    mindset: { base: [20, 11, 5], pal: ["#9a3412", "#5c2008", "#bd561d", "#2a1204"], grid: [255, 166, 87, 0.03, 0.08], ang: -Math.PI / 12, cell: 32, accent: ["#ffa657", "#bd561d", "#ffdfb6", "#f0883e"], music: "factory", prog: [0] },
+    // Factory mindset: a concept slide, plain white with no grid (light), rhythmic machinery.
+    mindset: { light: true, base: [255, 255, 255], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [255, 255, 255, 0, 0], ang: -Math.PI / 12, cell: 32, accent: ["#ffa657", "#bd561d", "#ffdfb6", "#f0883e"], music: "factory", prog: [0] },
     // Human agent processes: dark blueprint blue, straight grid, a looping sequencer over a heartbeat.
     process: { base: [3, 10, 24], pal: ["#06285e", "#082048", "#03122c", "#0b3166"], grid: [170, 210, 255, 0.018, 0.045], ang: 0, cell: 32, accent: ["#58a6ff", "#1f6feb", "#a5d6ff", "#cae8ff"], music: "process", prog: [0, -4, 5, -2, 3, -5] },
-    // Trust the process: forest green, a grid tilted 22.5°, one heavy review bell against quick merge blips.
-    trust: { base: [5, 17, 10], pal: ["#0f5323", "#0a3069", "#196c2e", "#04260f"], grid: [86, 211, 100, 0.03, 0.075], ang: Math.PI / 8, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#4493f8"], music: "trust", prog: [0] },
+    // Trust the process: a concept slide, plain white with no grid (light), one heavy review bell against quick merge blips.
+    trust: { light: true, base: [255, 255, 255], pal: ["#000000", "#000000", "#000000", "#000000"], grid: [255, 255, 255, 0, 0], ang: Math.PI / 8, cell: 32, accent: ["#56d364", "#2ea043", "#aff5b4", "#4493f8"], music: "trust", prog: [0] },
     // Cost & context: gray base, gold grid turned 45° the other way (-π/4), coins.
     cost: { base: [13, 17, 23], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4, cell: 32, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "cost", prog: [0, 2, 4, -3] },
     // Agentic Engineering: Copilot purple, grid tilted 30°, an engine rev.
@@ -13454,6 +13471,7 @@
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
     const th = THEME[slides[n].group];
+    document.body.classList.toggle("light", !!th.light);
     if (cur >= 0) sfx.slide(dir, th.music, th.prog[slides[n].step % th.prog.length]);
     const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : null;
     const TR = ["up-in", "up-out", "down-in", "down-out"];
@@ -13580,7 +13598,8 @@
       th = THEME[cs.group],
       target = th.pal.map(hex),
       bgt = bgOf(th);
-    bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * 0.04);
+    // light <-> dark swaps the base quickly so text never sits on the wrong background for long
+    bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * (i < 3 && Math.abs(bgt[0] - bgv[0]) > 90 ? 0.2 : 0.04));
     colors = REDUCED ? target : colors.map((c, i) => c.map((v, k) => v + (target[i][k] - v) * 0.03));
 
     ctx.globalCompositeOperation = "source-over";
