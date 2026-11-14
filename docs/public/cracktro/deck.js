@@ -581,6 +581,17 @@
   .sfl-badge { fill: #ff7b72; font: 600 17px var(--mono); opacity: 0; transition: opacity .4s; } .sfl-badge.on { opacity: 1; }
   .sfl-scan { opacity: 0; } .sfl-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
   .sfl-rule { fill: #ff7b72; font: 600 18px var(--mono); }
+  .sfm { position: absolute; left: 1160px; top: 62px; width: 660px; padding: 12px 20px 10px; border: 2px solid #3d444d; border-radius: 12px; background: #0d1117e0; font-family: var(--mono); opacity: 0; }
+  .active .sfm { animation: settle .8s .5s both; }
+  .sfm-t { color: #ab7df8; font-size: 15px; letter-spacing: .08em; }
+  .sfm-k { display: flex; gap: 14px; margin: 8px 0 6px; }
+  .sfm-k div { flex: 1; color: #9198a1; font-size: 13px; line-height: 1.3; }
+  .sfm-k b { display: block; color: #f0f6fc; font: 700 36px "Mona Sans"; line-height: 1; }
+  .sfm-k em { color: #3fb950; font-style: normal; }
+  .sfm-m { display: flex; align-items: flex-end; gap: 8px; height: 40px; }
+  .sfm-m div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; color: #6e7681; font-size: 12px; }
+  .sfm-m i { display: block; width: 100%; background: linear-gradient(#ab7df8, #8957e5); border-radius: 3px 3px 0 0; }
+  .sfm-c { margin-top: 6px; color: #6e7681; font-size: 12.5px; letter-spacing: .03em; }
   .ao-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .ao-run .sfl-card { transition: stroke .4s, filter .4s; }
   .ao-run.bad .sfl-card { stroke: #f85149; filter: drop-shadow(0 0 10px #f8514966); }
@@ -7142,12 +7153,36 @@
       $(nid).classList.add("on");
       $("sflLane" + LANE[nid]).classList.add("on");
     };
+    // measured: the public .NET runtime repo's three CI workflows, 5 May to 14 Nov 2026 (scanner issues per month; Nov is partial)
+    const KBE_MONTHS = [
+      ["May", 65],
+      ["Jun", 56],
+      ["Jul", 36],
+      ["Aug", 54],
+      ["Sep", 71],
+      ["Oct", 4],
+      ["Nov", 19],
+    ];
+    const KPIS = [
+      ["305", "issues filed", "270 closed"],
+      ["22", "fixer PRs", "5 merged"],
+      ["12", "prompt edits", "merged"],
+      ["882", "workflow runs", "since May"],
+    ];
+    const measured = h(
+      "div",
+      { class: "sfm" },
+      h("div", { class: "sfm-t" }, "MEASURED · .NET RUNTIME · MAY → NOV 2026"),
+      h("div", { class: "sfm-k" }, ...KPIS.map(([n, l, s]) => h("div", {}, h("b", {}, n), l, h("br"), h("em", {}, s)))),
+      h("div", { class: "sfm-m" }, ...KBE_MONTHS.map(([m, n]) => h("div", {}, h("i", { style: `height:${Math.max(2, Math.round((n / 71) * 24))}px` }), m))),
+      h("div", { class: "sfm-c" }, "issues per month · 14 Nov 2026 snapshot · loop is illustrative")
+    );
     slides.push({
       group: "process",
       sound: "cihealth",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
       notes:
-        "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three agentic workflows. The pipelines, failures and rubric results shown are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
+        "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three public agentic workflows, ci-failure-scan, ci-failure-fix and ci-failure-scan-feedback. The panel at the top right is measured from the public .NET runtime repository on 14 November 2026: since 5 May the scanner filed 305 issues, 280 of them labelled Known Build Error, and 270 are closed, with a median of four days open; per month that is 65, 56, 36, 54, 71, 4 and 19 so far in November. Since 10 June the fixer opened 22 pull requests, 19 of them help-wanted ones that ask the owners for help, and 5 were merged. The feedback loop produced 12 merged prompt-edit pull requests, 7 of them by the Copilot coding agent, and the three workflows ran 882 times: 429 scans, 292 fix passes and 161 feedback ticks. The pipelines, failures and rubric results in the animated loop are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -7202,7 +7237,7 @@
           light(at(nid, o));
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))), svg, measured),
     });
   }
 
