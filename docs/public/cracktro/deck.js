@@ -391,6 +391,29 @@
   .fm-wire.hot { opacity: 1; stroke-width: 3; }
   .fm-wire.hot + .mra-l { opacity: 1; }
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
+  .exr-svg { left: 60px; top: 290px; width: 1800px; height: 600px; }
+  .exr-svg .fm-pill text { font-size: 26px; }
+  .exr-card { fill: #0d111799; stroke: #3d444d; stroke-width: 2; }
+  .exr-card-t { fill: #9198a1; font: 600 20px var(--mono); }
+  .exr-cell { fill: #ffffff08; stroke: #3d444d; stroke-width: 2; transform-box: fill-box; transform-origin: center; transition: fill .4s, stroke .4s; }
+  .exr-cell.miss { fill: #ffffff1c; stroke: #6e7681; }
+  .exr-cell.hit { fill: #d2992240; stroke: #d29922; filter: drop-shadow(0 0 8px #d2992299); animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
+  .exr-cell.r { stroke: #ab7df8; stroke-width: 4; filter: drop-shadow(0 0 12px #ab7df8); }
+  .exr-cell.e { stroke: #3fb950; stroke-width: 4; filter: drop-shadow(0 0 12px #3fb950); }
+  .exr-rl { fill: #9198a1; font: 500 19px var(--mono); text-anchor: end; transition: fill .3s; }
+  .exr-rl.on { fill: #f0f6fc; }
+  .exr-leg { font: 600 19px var(--mono); }
+  .exr-day { fill: #f0f6fc; font: 700 30px var(--mono); text-anchor: end; }
+  .exr-log text { fill: #9198a1; font: 500 18px var(--mono); }
+  .exr-log .m-r { fill: #c297ff; } .exr-log .m-e { fill: #3fb950; } .exr-log .s { fill: #e6edf3; } .exr-log .hit { fill: #d29922; font-weight: 700; }
+  .exr-lint text { fill: #9198a1; font: 600 19px var(--mono); transition: fill .6s; }
+  .exr-lint.hot text { fill: #d29922; }
+  .exr-n { fill: #d29922; font: 700 26px var(--mono); text-anchor: end; }
+  .exr-bar { fill: #ffffff14; } .exr-fill { fill: url(#exrGrad); }
+  .exr-cov { fill: #9198a1; font: 500 19px var(--mono); }
+  .exr-done { fill: #3fb950; font: 700 19px var(--mono); text-anchor: end; opacity: 0; transition: opacity .5s; } .exr-done.on { opacity: 1; }
+  #nSergo.blink circle { animation: mra-blink .7s ease-out; }
+  .exr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #3fb950, #d29922, #ab7df8); }
   .sdd-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .sdd-svg .mra-l.g { fill: #3fb950; }
   .sdd-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .sdd-panel.on .sdd-card { stroke: #ab7df8; filter: drop-shadow(0 0 14px #8957e566); }
@@ -5119,6 +5142,246 @@
         svg,
         stats,
         h("div", { class: "ct-src" }, "mined from gh-aw [linter-miner] PRs, [lint-monster] issues and the PRs that closed them · May–Nov 2026")
+      ),
+    });
+  }
+
+  // Explore → Reuse → Lint: Sergo's daily run reads its strategy cache, spends half its effort reusing what found patterns before and half on untried corners, until the model's pattern space is exhausted; every pattern found becomes a linter
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 600;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // illustrative pattern space: [strategy family, targets where a pattern worth a linter hides (x), the linters those patterns yield]
+    const ROWS = [
+      ["symbols", "...xx..x..", ["largefunc", "excessivefuncparams", "seenmapbool"]],
+      ["types", "xx......x.", ["errortypeassertion", "sortslice", "slicemakezerolength"]],
+      ["call graph", "..xxx....x", ["ctxbackground", "nilctxpassed", "httpnoctx", "execcommandwithoutcontext"]],
+      ["diagnostics", "xx....xx..", ["closeerrorunchecked", "ignoredlocalerror", "bufioscannererunchecked", "fprintferrorunchecked"]],
+      ["refactor", ".....xxx..", ["deferinloop", "manualmutexunlock", "fileclosenotdeferred"]],
+      ["AST shapes", ".xx...xx..", ["regexpcompileinfunction", "lenstringzero", "splitindexzero", "fmterrorfnoverbs"]],
+    ];
+    const NR = ROWS.length,
+      NC = 10,
+      ALL = NR * NC;
+    // plan every day up front (seeded, so each loop is the same): [mode, row, col, hit, linter, score]
+    const DAYS = (() => {
+      let seed = 302;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const seen = ROWS.map(() => Array(NC).fill(false)),
+        hits = ROWS.map(() => []),
+        tries = Array(NR).fill(0),
+        out = [];
+      const free = r => [...Array(NC).keys()].filter(c => !seen[r][c]);
+      const take = (mode, r, c) => {
+        seen[r][c] = true;
+        tries[r]++;
+        const hit = ROWS[r][1][c] === "x",
+          lint = hit ? ROWS[r][2][hits[r].length] : "";
+        if (hit) hits[r].push(c);
+        return [mode, r, c, hit, lint, hit ? 7 + ((r + c) % 3) : 1 + ((r + c) % 3)];
+      };
+      for (;;) {
+        const day = [],
+          open = [...Array(NR).keys()].filter(r => free(r).length);
+        if (!open.length) break;
+        // reuse: a strategy that already found something, adapted to the untried target closest to one of its hits (best score breaks ties)
+        const near = (r, c) => Math.min(...hits[r].map(h => Math.abs(h - c))),
+          rate = r => hits[r].length / tries[r],
+          best = open
+            .filter(r => hits[r].length)
+            .flatMap(r => free(r).map(c => [r, c]))
+            .sort(([ra, ca], [rb, cb]) => near(ra, ca) - near(rb, cb) || rate(rb) - rate(ra) || ra - rb)[0];
+        if (best) day.push(take("reuse", ...best));
+        // explore: the least-tried strategy, at a random untried target
+        while (day.length < 2) {
+          const left = [...Array(NR).keys()].filter(r => free(r).length);
+          if (!left.length) break;
+          const r = left.sort((a, b) => tries[a] - tries[b] || rnd() - 0.5)[0],
+            f = free(r);
+          day.push(take("explore", r, f[Math.floor(rnd() * f.length)]));
+        }
+        out.push(day);
+      }
+      return out;
+    })();
+    const GX = 690,
+      GY = 168,
+      CW = 61,
+      CH = 60,
+      CS = 50,
+      LOGY = 160,
+      LOGH = 36,
+      MAXLOG = 12,
+      LINTY = 160,
+      LINTH = 36,
+      MAXLINT = 12;
+    const cell = (r, c) => [GX + c * CW + CS / 2, GY + r * CH + CS / 2];
+    let g = `<defs><radialGradient id="exrAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <linearGradient id="exrGrad"><stop offset="0" stop-color="#ab7df8"/><stop offset=".6" stop-color="#3fb950"/><stop offset="1" stop-color="#d29922"/></linearGradient></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 440, "CACHE"],
+      [440, 1360, "PATTERN SPACE"],
+      [1360, VW, "LINTERS"],
+    ].forEach(([x0, x1, t]) => {
+      g += `<text class="fm-lane-t mra-lane on" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    g += `<rect class="exr-card" x="16" y="78" width="408" height="${VH - 88}" rx="16"/><text class="exr-card-t" x="36" y="116">▣ sergo-strategies.jsonl</text><g class="exr-log" id="exrLog"></g>`;
+    g += `<rect class="exr-card" x="1376" y="78" width="408" height="${VH - 88}" rx="16"/><text class="exr-card-t" x="1396" y="116">▣ pkg/linters</text><text class="exr-n" id="exrN" x="1764" y="117">0</text><g class="exr-lint-l" id="exrLint"></g>`;
+    g += `<g id="exrBeams"></g>`;
+    g += `<g class="fm-task on" id="nSergo"><g class="fm-pill"><rect x="500" y="87" width="150" height="50" rx="25"/><text x="593" y="120">Sergo</text></g><circle cx="500" cy="112" r="34" fill="url(#exrAgent)"/>${ico("copilot", 500, 113, 38)}</g>`;
+    g += `<text class="exr-leg" x="700" y="120"><tspan fill="#c297ff">◆ reuse 50%</tspan><tspan dx="28" fill="#3fb950">◆ explore 50%</tspan><tspan dx="28" fill="#d29922">◆ pattern</tspan></text>`;
+    g += `<text class="exr-day" id="exrDay" x="${GX + NC * CW - 11}" y="122"></text>`;
+    ROWS.forEach(([lab], r) => {
+      g += `<text class="exr-rl" id="exrRl${r}" x="${GX - 16}" y="${GY + r * CH + CS / 2 + 7}">${lab}</text>`;
+      for (let c = 0; c < NC; c++) g += `<rect class="exr-cell" id="exrC${r}_${c}" x="${GX + c * CW}" y="${GY + r * CH}" width="${CS}" height="${CS}" rx="10"/>`;
+    });
+    const BW = NC * CW - 11;
+    g += `<rect class="exr-bar" x="${GX}" y="${GY + NR * CH + 14}" width="${BW}" height="10" rx="5"/><rect class="exr-fill" id="exrFill" x="${GX}" y="${GY + NR * CH + 14}" width="0" height="10" rx="5"/>`;
+    g += `<text class="exr-cov" id="exrCov" x="${GX}" y="${GY + NR * CH + 54}"></text><text class="exr-done" id="exrDone" x="${GX + BW}" y="${GY + NR * CH + 54}">exhaustive ✓ every target tried</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg exr-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Explore, reuse, lint: each day Sergo reads its strategy cache, reuses its best strategy on a nearby target and explores an untried one, logs the result, and turns every pattern it finds into a linter until the whole pattern space has been tried");
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      NS = "http://www.w3.org/2000/svg";
+    const mk = (cls, html) => {
+      const el = document.createElementNS(NS, "g");
+      el.setAttribute("class", cls);
+      el.innerHTML = html;
+      return el;
+    };
+    const beam = (d, col) => {
+      const b = document.createElementNS(NS, "path");
+      b.setAttribute("class", "mra-beam");
+      b.setAttribute("stroke", col);
+      b.setAttribute("d", d);
+      $("exrBeams").appendChild(b);
+      setTimeout(() => b.remove(), 1400);
+    };
+    let log = [],
+      lints = [],
+      tried = 0,
+      found = 0;
+    const flow = (rows, y0, step, newestFirst) =>
+      rows.forEach((r, k) => {
+        r.style.transform = `translateY(${y0 + (newestFirst ? rows.length - 1 - k : k) * step}px)`;
+      });
+    const coverage = () => {
+      $("exrFill").setAttribute("width", (BW * tried) / ALL);
+      $("exrCov").textContent = `tried ${tried}/${ALL} · patterns ${found}`;
+      $("exrN").textContent = found;
+    };
+    // three beats per day: read the cache, aim both halves, reveal and record
+    const beat = (d, s) => {
+      const day = DAYS[d];
+      if (s === 0) {
+        svg.querySelectorAll(".exr-rl.on").forEach(x => x.classList.remove("on"));
+        $("exrDay").textContent = "day " + String(d + 1).padStart(2, "0");
+        const y = log.length ? LOGY + (log.length - 1) * LOGH - 6 : 140;
+        beam(`M424 ${y} C460 ${y}, 440 112, 466 112`, "#ab7df8");
+        $("nSergo").classList.remove("blink");
+        void $("nSergo").getBBox();
+        $("nSergo").classList.add("blink");
+        return;
+      }
+      if (s === 1) {
+        day.forEach(([mode, r, c], i) => {
+          const [x, y] = cell(r, c);
+          $(`exrC${r}_${c}`).classList.add(mode === "reuse" ? "r" : "e");
+          $("exrRl" + r).classList.add("on");
+          beam(`M${520 + i * 20} 146 C${540 + i * 20} ${y - 40}, ${x - 80} ${y}, ${x - CS / 2 - 4} ${y}`, mode === "reuse" ? "#ab7df8" : "#3fb950");
+        });
+        sfx.pop(d);
+        return;
+      }
+      day.forEach(([mode, r, c, hit, lint, score]) => {
+        const el = $(`exrC${r}_${c}`);
+        el.classList.remove("r", "e");
+        el.classList.add(hit ? "hit" : "miss");
+        tried++;
+        const row = mk(
+          "mra-row new",
+          `<text x="36" y="0">d${String(d + 1).padStart(2, "0")}</text><text class="${mode === "reuse" ? "m-r" : "m-e"}" x="94" y="0">${mode}</text><text class="s" x="194" y="0">${ROWS[r][0]}</text><text class="${hit ? "hit" : ""}" x="404" y="0" text-anchor="end">★${score}</text>`
+        );
+        $("exrLog").appendChild(row);
+        log.push(row);
+        if (log.length > MAXLOG) log.shift().remove();
+        if (!hit) return;
+        found++;
+        const [x, y] = cell(r, c);
+        beam(`M${x} ${y} C${x + 220} ${y}, 1300 ${LINTY - 6}, 1384 ${LINTY - 6}`, "#d29922");
+        lints.forEach(l => l.classList.remove("hot"));
+        const li = mk("mra-row new exr-lint hot", `<text x="1400" y="0">+ ${lint}</text>`);
+        $("exrLint").appendChild(li);
+        lints.push(li);
+        if (lints.length > MAXLINT) lints.shift().remove();
+        sfx.notify(false);
+      });
+      flow(log, LOGY, LOGH, false);
+      flow(lints, LINTY, LINTH, true);
+      coverage();
+      if (d === DAYS.length - 1) $("exrDone").classList.add("on");
+    };
+    const DAY = 1500,
+      BEATS = [0, 300, 800],
+      START = 700,
+      HOLD = 4000,
+      END = START + DAYS.length * DAY,
+      CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      done = 0;
+    const reset = () => {
+      svg.querySelectorAll(".r, .e, .hit, .miss, .on:not(.fm-task):not(.mra-lane)").forEach(x => x.classList.remove("r", "e", "hit", "miss", "on"));
+      $("exrLog").innerHTML = "";
+      $("exrLint").innerHTML = "";
+      $("exrBeams").innerHTML = "";
+      $("exrDay").textContent = "";
+      log = [];
+      lints = [];
+      tried = found = done = 0;
+      coverage();
+    };
+    slides.push({
+      group: "loops",
+      sound: "explore",
+      palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
+      notes:
+        "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+        reset();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        if (u < START) return;
+        const v = Math.min(u, END - 1) - START,
+          d = Math.floor(v / DAY),
+          target = d * 3 + BEATS.filter(b => v % DAY >= b).length;
+        while (done < target) {
+          beat(Math.floor(done / 3), done % 3);
+          done++;
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide exr" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Exhaust the model's patterns · cache what worked, reuse it, explore the rest"), h("h2", {}, letters("Explore · Reuse · "), letters("Lint", "l-grad"))),
+        svg
       ),
     });
   }
@@ -10631,6 +10894,12 @@
           click(t + 1.25 + i * 0.1, 3000, 0.04, 6);
           tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
         });
+      },
+      // explore → reuse → lint: scattered sonar pings across the pattern space, a found pattern ringing, then a settling chord
+      explore: t => {
+        [0, 7, 2, 9, 4, 11].forEach((d, i) => osc("sine", hz(72 + d), t + 0.2 + i * 0.11, 0.18, 0.02, { a: 0.003 }));
+        [76, 79, 83, 88].forEach((m, i) => bell(m, t + 1.0 + i * 0.06, 0.03, 1.1));
+        pad([52, 59, 64, 71], t + 1.1, 1.8, 0.025, "triangle", 1800);
       },
       // spec → model → test: a rising run of explored states, a counterexample's buzz, then the trace resolving into a test
       formal: t => {
