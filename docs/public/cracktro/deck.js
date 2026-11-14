@@ -379,16 +379,6 @@
     font: 700 18px/28px var(--mono); border: 2px solid #3d444d; color: #3d444d; transition: all .3s; }
   .so-checks li.ok { color: #f0f6fc; }
   .so-checks li.ok::before { content: "✓"; border-color: #3fb950; background: #3fb950; color: #0d1117; box-shadow: 0 0 16px #3fb950aa; }
-  .so-gears { display: block; margin: 14px auto 0; width: 300px; height: 150px; }
-  .so-gear { transform-box: fill-box; transform-origin: center; animation: so-spin 9s linear infinite; }
-  .so-gear.r { animation-direction: reverse; animation-duration: 6s; }
-  .so.p-run .so-gear { animation-duration: 1.6s; }
-  .so.p-run .so-gear.r { animation-duration: 1.07s; }
-  .so.p-done .so-gear { animation-duration: 9s; }
-  .so.p-done .so-gear.r { animation-duration: 6s; }
-  @keyframes so-spin { to { transform: rotate(360deg); } }
-  .so-gears path { fill: #21262d; stroke: #4493f8; stroke-width: 3; transition: fill .4s; }
-  .so.p-run:not(.p-done) .so-gears path { fill: #4493f833; }
   .so-arrow { position: absolute; top: 560px; width: 100px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
   .active .so-arrow { animation: sec-arr .5s ease-out both calc(var(--i) * 500ms + 900ms), nudge 1.6s ease-in-out infinite calc(var(--i) * 500ms + 1400ms); }
   .so-call { position: absolute; top: 508px; width: 100px; text-align: center; white-space: nowrap; font: 600 12px/1.2 var(--mono); color: #9198a1; opacity: 0; }
@@ -1752,21 +1742,6 @@
     resetIndex();
     const BX = [110, 710, 1310];
     const CMD = 'gh issue create -t "Flaky test"';
-    // a cogwheel as one even-odd path: toothed rim plus axle hole
-    const gear = (cx, cy, r, n) => {
-      let d = "";
-      for (let i = 0; i < n * 4; i++) {
-        const a = (i / (n * 4)) * Math.PI * 2,
-          rr = i % 4 < 2 ? r : r * 0.8;
-        d += `${i ? "L" : "M"}${(cx + rr * Math.cos(a)).toFixed(1)} ${(cy + rr * Math.sin(a)).toFixed(1)}`;
-      }
-      const hr = r * 0.28;
-      return `${d}Z M${cx + hr} ${cy} A${hr} ${hr} 0 1 0 ${cx - hr} ${cy} A${hr} ${hr} 0 1 0 ${cx + hr} ${cy}Z`;
-    };
-    const gears = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    gears.setAttribute("class", "so-gears");
-    gears.setAttribute("viewBox", "0 0 300 150");
-    gears.innerHTML = `<path class="so-gear" fill-rule="evenodd" d="${gear(96, 76, 66, 10)}"/><path class="so-gear r" fill-rule="evenodd" d="${gear(205, 76, 46, 7)}"/>`;
     const typed = h("span", { class: "cur" });
     const status = h("span", { class: "st" }, "proposed");
     const card = h(
@@ -1805,7 +1780,6 @@
         { class: "so-box so-b2", "--c": "#4493f8", "--i": 2, style: { left: `${BX[2]}px` } },
         h("i", {}, "03 · WRITE · SCOPED"),
         h("h3", {}, "Safe output job"),
-        gears,
         h("div", { class: "so-note" }, "Holds ", h("code", {}, "issues: write"), ", applies only declared outputs")
       ),
     ];
