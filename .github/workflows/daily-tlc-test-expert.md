@@ -24,6 +24,7 @@ timeout-minutes: 45
 network:
   allowed: [defaults, go, node]
 imports:
+  - shared/reporting.md
   - shared/tla-plus.md
 tools:
   github:

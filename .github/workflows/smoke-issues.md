@@ -11,6 +11,7 @@ permissions:
   actions: read
 engine: copilot
 imports:
+  - shared/reporting.md
   - uses: ".github/workflows/connectors/jira.md"
     with:
       site: https://pelidehalleux.atlassian.net

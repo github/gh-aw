@@ -52,6 +52,7 @@ tools:
 timeout-minutes: 30
 
 imports:
+  - shared/reporting.md
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[claude-code-user-docs-review] "

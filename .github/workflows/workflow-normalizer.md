@@ -55,34 +55,12 @@ Daily review agentic workflow prompts (markdown files) that have been active in 
 - **Repository**: ${{ github.repository }}
 - **Review Period**: Last 24 hours of workflow activity
 
-## Style Guidelines to Enforce
+## Shared Reporting Guidance
 
-Based on the agentic workflows guidelines and Airbnb's design principles of creating delightful, user-focused experiences:
-
-### Markdown Formatting Standards
-
-1. **Headers**: Always start at h3 (###) or lower to maintain proper document hierarchy
-   - ❌ Bad: `# Main Section` or `## Subsection`
-   - ✅ Good: `### Main Section` and `#### Subsection`
-
-2. **Progressive Disclosure**: Use HTML `<details>` and `<summary>` tags to collapse long content
-   - ❌ Bad: Long lists of items that force scrolling
-   - ✅ Good: `<details><summary>View Full Details</summary>` wrapping content
-   - Make summaries bold: `<b>Text</b>`
-
-3. **Checkboxes**: Use proper markdown checkbox syntax
-   - ✅ Good: `- [ ]` for unchecked, `- [x]` for checked
-
-4. **Workflow Run Links**: Format as `[§12345](https://github.com/owner/repo/actions/runs/12345)`
-
-### Report Structure Best Practices
-
-Inspired by Airbnb's design principles (trust, clarity, delight):
-
-1. **User-Focused**: Present information that helps users make decisions quickly
-2. **Trust Through Clarity**: Important information visible, details collapsible
-3. **Exceeding Expectations**: Add helpful context, trends, and recommendations
-4. **Consistent Experience**: Use the same formatting patterns across all reports
+This workflow imports `shared/reporting.md`. Use its `reporting` skill when
+writing reports. Do not copy those formatting rules into individual workflow
+prompts. Treat a missing `shared/reporting.md` import as a formatting gap;
+matching its style in prose is not a substitute for the import.
 
 ### Target Workflows
 
@@ -108,18 +86,14 @@ Do not use GitHub search or read tools to inspect individual issues, pull reques
 files; those calls return redundant payloads and can exhaust the context budget. Use the local
 checkout or one `gh`/`bash` command to collect only the fields needed for the report.
 For each file, return a structured compliance table with:
-- `header_guidelines`: whether the file enforces h3 (`###`) or lower
-- `progressive_disclosure`: whether `<details>` usage is mentioned
-- `report_structure`: whether report structure recommendations are present
+- `shared_reporting_import`: whether the workflow imports `shared/reporting.md`
 - `status`: `compliant`, `non-compliant`, or `skip`
 
 ### Step 3: Identify Non-Compliant Workflows
 
-From the compliance table, document workflows that are `non-compliant` because they:
-- Don't specify proper header levels in their instructions
-- Don't mention using `<details>` tags for long content
-- Have unclear or inconsistent report formatting instructions
-- Could benefit from progressive disclosure patterns
+From the compliance table, document reporting workflows that are `non-compliant`
+because they do not import `shared/reporting.md`. Do not ask them to duplicate
+the shared formatting guidance in their prompts.
 
 ### Step 4: Create One Consolidated Improvement Issue
 
@@ -138,10 +112,14 @@ If any normalized title matches the candidate and `mergedAt` is null, do **not**
 
 **Issue Body Requirements**:
 - Include a table of non-compliant workflow files with specific issues found.
-- List required changes for each workflow: h3+ header guidance, `<details>` usage, and clear report structure.
-- Include one concise example of progressive disclosure formatting.
+- For each workflow, request an import of `shared/reporting.md`, not copied formatting prose.
+- Include this concise example:
+  ```yaml
+  imports:
+    - shared/reporting.md
+  ```
 - Reference good examples (for example `daily-repo-chronicle` or `audit-workflows`).
-- Follow the design principles described in the Style Guidelines above.
+- Preserve all other prompt instructions and machine-readable output formats.
 
 ### Step 5: Summary Report
 
@@ -175,16 +153,16 @@ Create a summary comment or discussion showing:
 
 ### Compliance Status
 
-- ✅ **Compliant**: [NUMBER] workflows follow style guidelines
-- ⚠️ **Needs Improvement**: [NUMBER] workflows need updates
+- **Compliant**: [NUMBER] workflows import the shared reporting guidance
+- **Needs Improvement**: [NUMBER] workflows need the shared import
 
 <details>
 <summary>View Detailed Findings</summary>
 
 ### Non-Compliant Workflows
 
-1. **workflow-name-1**: Missing header level guidelines
-2. **workflow-name-2**: No progressive disclosure instructions
+1. **workflow-name-1**: Missing `shared/reporting.md` import
+2. **workflow-name-2**: Missing `shared/reporting.md` import
 3. ...
 
 ### Issues Created
