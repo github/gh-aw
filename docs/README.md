@@ -74,7 +74,9 @@ repository's own workflows, the Issues as intent slide's counts of
 issues labelled `community` and the merged pull requests that closed them
 (November 2026 snapshot), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
-(February to November 2026, with shortened titles), and the two data slides after the finale: "First
+(February to November 2026, with shortened titles), the Semantic
+clustering slide's functions, files and counts from one Semantic Function
+Refactoring report (7 May 2026) and the merged pull request that closed it, and the two data slides after the finale: "First
 commit to GA", which shows this repository's measured public history from its
 first commit to general availability at GitHub Universe, and "How PRs land",
 which shows measured time-to-merge and lines-changed distributions of its

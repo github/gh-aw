@@ -31,7 +31,7 @@ test("presents the thirty-eight slides without the removed sections", async ({ p
     "Research · Assign · Observe",
     "Query · Ask · Grow",
     "Mine · Refine · Apply",
-    "Semantic duplicates",
+    "Semantic clustering",
     "Spec · Model · Test",
     "Go Fan",
     "Spec-driven testing",

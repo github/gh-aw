@@ -365,6 +365,8 @@
   .sd-file { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .04em; }
   .sd-code { fill: #e6edf3; font: 500 13px var(--mono); white-space: pre; }
   .sd-code .k { fill: #ff7b72; } .sd-code .f { fill: #d2a8ff; }
+  .sd-code .c { fill: #8b949e; } .sd-to { fill: var(--k); font: 600 17px var(--mono) !important; }
+  .sd-cap { fill: #9198a1; font: 500 15px "Mona Sans"; }
   .sd-intent { fill: var(--k); font: 600 19px "Mona Sans"; opacity: 0; transition: opacity .4s; }
   .sd-card.read .sd-intent { opacity: 1; }
   .sd-scan { stroke: #79c0ff; stroke-width: 3; filter: drop-shadow(0 0 10px #79c0ff); opacity: 0; }
@@ -384,8 +386,7 @@
   .sd-chip.on { opacity: 1; }
   .sd-chip.snap { transition: none; }
   .sd-chip rect { fill: #0d1117; stroke: var(--k); stroke-width: 2; }
-  .sd-chip text { fill: #f0f6fc; font: 600 15px var(--mono); text-anchor: middle; }
-  .sd-lone text { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  .sd-chip text { fill: #f0f6fc; font: 600 14px var(--mono); text-anchor: middle; }
   .sd-out { opacity: 0; transition: opacity .5s; } .sd-out.on { opacity: 1; animation: mra-in .6s cubic-bezier(.2,.9,.2,1); }
   .sd-out rect { fill: #0d1117d9; stroke: #3fb950; stroke-width: 2; filter: drop-shadow(0 0 12px #3fb95066); }
   .sd-out-m { fill: #ab7df8; font: 600 17px var(--mono); letter-spacing: .06em; }
@@ -4863,40 +4864,39 @@
     });
   }
 
-  // Semantic duplicates: static clone detection finds nothing because the code looks different; an agent reads each function's intent, clusters by meaning and consolidates the biggest cluster
+  // Semantic clustering: gh-aw's Semantic Function Refactoring report of 7 May 2026 found no copies, but grouping functions by intent exposed code filed in the wrong place; Copilot moved it the same day
   {
     resetIndex();
     const VW = 1800,
       VH = 680,
       AX = 1100,
       AY = 500;
-    const KC = ["#d29922", "#79c0ff", "#3fb950", "#9198a1"],
-      INTENT = ["retry with backoff", "slugify a title", "parse a duration", "hash a file"];
-    // synthetic snippets: same intent, different names, loops and libraries
+    const KC = ["#d29922", "#79c0ff"],
+      INTENT = ["YAML generation", "validation"];
+    // real signatures named in the report (pkg/workflow)
     const CARDS = [
-      ["fetch/retry.go", 0, ["for i := 0; i < 3; i++ {", "  if fetch() == nil { break }", "  time.Sleep(backoff(i))", "}"]],
-      ["text/slug.go", 1, ["s = strings.ToLower(s)", "return nonAlnum.", '  ReplaceAllString(s, "-")']],
-      ["cli/timeout.go", 2, ["n, _ := strconv.Atoi(", '  strings.TrimRight(v, "m"))', "return time.Duration(n) *", "  time.Minute"]],
-      ["mcp/client.go", 0, ["return retry.Do(call,", "  retry.Attempts(4),", "  retry.Delay(time.Second))"]],
-      ["util/hash.go", 3, ["h := sha256.New()", "io.Copy(h, f)", "return hex.EncodeToString(", "  h.Sum(nil))"]],
-      ["workflow/name.go", 1, ["for _, r := range title {", "  if !unicode.IsLetter(r) {", "    r = '-' }", "  b.WriteRune(r) }"]],
-      ["cli/download.go", 0, ["for n := range 5 {", "  if err = dl(); err == nil {", "    return nil }", "  wait(1 << n) }"]],
-      ["parse/ttl.go", 2, ["d, err :=", "  time.ParseDuration(v)", "if err != nil { return 0 }", "return d"]],
+      ["env.go", 0, ["func writeYAMLEnv(", "  b *strings.Builder,", "  indent, key, value string)"], "writeYAMLEnv"],
+      ["env.go", 0, ["func formatYAMLEnv(", "  indent, key, value string,", ") string"], "formatYAMLEnv"],
+      ["env.go", 0, ["func writeHeadersToYAML(", "  yaml *strings.Builder,", "  headers map[string]string,", "  indent string)"], "writeHeadersToYAML"],
+      ["model_identifier.go", 1, ["func ValidateEffortParam(", "  value string) error", "// low | medium | high"], "ValidateEffortParam"],
+      ["model_identifier.go", 1, ["func ValidateTemperatureParam(", "  value string) error", "// range [0.0, 2.0]"], "ValidateTemperatureParam"],
+      ["model_identifier.go", 1, ["func ValidateKnownParams(", "  params map[string]string,", ") error"], "ValidateKnownParams"],
+      ["action_sha_checker.go", 1, ["ValidateActionSHAsInLockFile(", "  lockFilePath string,", "  cache *ActionCache,", "  verbose bool) error"], "ValidateActionSHAsInLockFile"],
+      ["engine_helpers.go", 1, ["EngineHasValidateSecretStep(", "  engine CodingAgentEngine,", "  data *WorkflowData) bool"], "EngineHasValidateSecretStep"],
     ];
     const CL = [
-      { cx: 1290, cy: 245, r: 140, ly: 160, ys: [-30, 20, 70] },
-      { cx: 1655, cy: 178, r: 112, ly: 128, ys: [-5, 43] },
-      { cx: 1655, cy: 420, r: 112, ly: 370, ys: [-5, 43] },
+      { cx: 1645, cy: 280, r: 150, ly: 116, ys: [-48, 0, 48], to: "→ yaml_env_helpers.go" },
+      { cx: 1310, cy: 280, r: 175, ly: 91, ys: [-100, -50, 0, 50, 100], to: "→ *_validation.go" },
     ];
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-    const code = line => esc(line.replace(/^ +/, s => "\u00a0".repeat(s.length))).replace(/\b(for|if|return|range|break)\b/g, '<tspan class="k">$1</tspan>');
+    const code = line => (line.startsWith("//") ? `<tspan class="c">${esc(line)}</tspan>` : esc(line.replace(/^ +/, s => "\u00a0".repeat(s.length))).replace(/\b(func|return)\b/g, '<tspan class="k">$1</tspan>'));
     const pos = CARDS.map((_, i) => [10 + (i % 4) * 270, 80 + Math.floor(i / 4) * 190]);
-    const seen = [0, 0, 0];
-    const target = CARDS.map(([, k]) => (k === 3 ? [1290, 440] : [CL[k].cx, CL[k].cy + CL[k].ys[seen[k]++]]));
+    const seen = [0, 0];
+    const target = CARDS.map(([, k]) => [CL[k].cx, CL[k].cy + CL[k].ys[seen[k]++]]);
     let g = `<defs><radialGradient id="sdAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>
-      <text class="fm-lane-t" x="545" y="40">CODE · AS WRITTEN</text><text class="fm-lane-t" x="1455" y="40">CODE · BY INTENT</text>
+      <text class="fm-lane-t" x="545" y="40">CODE · BY FILE</text><text class="fm-lane-t" x="1455" y="40">CODE · BY INTENT</text>
       <line class="fm-div" x1="${AX}" y1="0" x2="${AX}" y2="${AY - 50}"/>`;
     CARDS.forEach(([file, k, lines], i) => {
       const [x, y] = pos[i];
@@ -4908,24 +4908,24 @@
     });
     g += `<line class="sd-scan" id="sdScan" x1="0" y1="70" x2="0" y2="450"/>
       <g class="sd-static"><rect x="10" y="470" width="950" height="180" rx="14"/>
-        <text class="sd-static-t" x="34" y="506">STATIC CLONE DETECTION · TOKENS + AST</text>
-        <text class="sd-cmd" x="34" y="550">$ clone-scan --tokens --ast ./pkg</text>
-        <g class="sd-res" id="sdRes"><text x="34" y="598">0 clones found</text>
-        <text class="sd-out-s" x="34" y="632">different names, loops and libraries: nothing matches line by line</text></g></g>`;
-    CL.forEach(({ cx, cy, r, ly }, k) => {
-      g += `<g class="sd-cl" id="sdCl${k}" style="--k:${KC[k]}"><circle cx="${cx}" cy="${cy}" r="${r}"/><text x="${cx}" y="${ly}">${INTENT[k]}</text></g>`;
+        <text class="sd-static-t" x="34" y="506">LOOKING FOR COPIES · pkg/ · 762 FILES · 3,727 FUNCTIONS</text>
+        <text class="sd-cmd" x="34" y="550">file names say: env, model identifier, sha checker, engine</text>
+        <g class="sd-res" id="sdRes"><text x="34" y="598">0 true duplicates</text>
+        <text class="sd-out-s" x="34" y="632">nothing is copied, yet some functions live in the wrong file</text></g></g>
+      <text class="sd-cap" x="10" y="676">Real report from gh-aw's Semantic Function Refactoring workflow, 7 May 2026, and the PR that closed it</text>`;
+    CL.forEach(({ cx, cy, r, ly, to }, k) => {
+      g += `<g class="sd-cl" id="sdCl${k}" style="--k:${KC[k]}"><circle cx="${cx}" cy="${cy}" r="${r}"/><text x="${cx}" y="${ly}">${INTENT[k]}</text><text class="sd-to" x="${cx}" y="${cy + r + 30}">${to}</text></g>`;
     });
-    g += `<g class="sd-cl sd-lone" id="sdCl3" style="--k:${KC[3]}"><text x="1290" y="485">unique · left alone</text></g>`;
-    CARDS.forEach(([file, k], i) => {
-      g += `<g class="sd-chip" id="sdChip${i}" style="--k:${KC[k]}"><rect x="-90" y="-18" width="180" height="36" rx="18"${k === 3 ? ' stroke-dasharray="6 5"' : ""}/><text x="0" y="6">${file}</text></g>`;
+    CARDS.forEach(([, k, , fn], i) => {
+      g += `<g class="sd-chip" id="sdChip${i}" style="--k:${KC[k]}"><rect x="-135" y="-18" width="270" height="36" rx="18"/><text x="0" y="5">${fn}</text></g>`;
     });
     g += `<g id="sdBeams"></g>
       <g id="nSdAgent"><circle cx="${AX}" cy="${AY}" r="34" fill="url(#sdAgent)"/>${ico("copilot", AX, AY + 1, 38)}
-        <text class="sd-agent-t" x="${AX}" y="${AY + 62}">Duplicate Code</text><text class="sd-agent-t" x="${AX}" y="${AY + 86}">Detector</text></g>
+        <text class="sd-agent-t" x="${AX}" y="${AY + 62}">Semantic Function</text><text class="sd-agent-t" x="${AX}" y="${AY + 86}">Refactoring</text></g>
       <g class="sd-out" id="sdOut"><rect x="1240" y="555" width="550" height="112" rx="14"/>
-        <text class="sd-out-m" x="1262" y="587">DRAFT PR · [duplicate-code]</text>
-        <text class="sd-out-t" x="1262" y="623">One retry helper, 3 call sites</text>
-        <text class="sd-out-s" x="1262" y="653"><tspan fill="#3fb950">+24</tspan> <tspan fill="#f85149">−71</tspan> · 2 more clusters queued</text></g>`;
+        <text class="sd-out-m" x="1262" y="587">[refactor] #30711 → PR #30770 · MERGED</text>
+        <text class="sd-out-t" x="1262" y="623">Rename env.go, move 5 validators</text>
+        <text class="sd-out-s" x="1262" y="653"><tspan fill="#3fb950">+149</tspan> <tspan fill="#f85149">−142</tspan> · 8 files · same day</text></g>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg sd-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
@@ -4953,7 +4953,7 @@
       sfx.pop(i);
     };
     const cluster = () => {
-      [0, 1, 2, 3].forEach(k => $("sdCl" + k).classList.add("on"));
+      [0, 1].forEach(k => $("sdCl" + k).classList.add("on"));
       CARDS.forEach((_, i) => {
         const c = $("sdChip" + i);
         c.style.transitionDelay = `${i * 0.09}s`;
@@ -4986,7 +4986,7 @@
       sound: "dedupe",
       palette: ["#8957e5", "#d29922", "#1f6feb", "#238636"],
       notes:
-        "Semantic duplicates: static clone detection compares tokens and syntax trees, so code that does the same thing with different names, loops and libraries slips through. An agent instead reads what each function is for, writes its intent down, and clusters functions by meaning; only clusters become consolidation work, and unique code is left alone. gh-aw runs this daily as its Duplicate Code Detector workflow, using Serena's semantic code analysis, and opens draft pull requests. The code snippets, file names and diff counts on this slide are synthetic and illustrative.",
+        "Semantic clustering: instead of matching text, an agent reads what each function is for and groups functions by intent. This is a real report from gh-aw's Semantic Function Refactoring workflow, issue 30711 of 7 May 2026. It catalogued 762 non-test Go files and 3,727 functions in pkg/ using naming patterns, Serena LSP analysis and code review, and found 0 true duplicates. Clustering by intent still exposed misplaced code: env.go held only YAML-writing helpers, and five public validation functions sat in parser, checker and helper files. The Copilot coding agent merged PR 30770 the same day (+149 −142, 8 files), renaming env.go to yaml_env_helpers.go and moving the validators into *_validation.go files. Function names, signatures, files and counts are real; the scan, beams and chip animation are illustrative. The workflow now reviews a small rotating slice of functions each day rather than the whole package tree.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -5009,7 +5009,7 @@
         }
         while (fired < EVENTS.length && u >= EVENTS[fired][0]) EVENTS[fired++][1]();
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cluster code by intent, not by syntax"), h("h2", {}, letters("Semantic "), letters("duplicates", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cluster code by intent, not by file name"), h("h2", {}, letters("Semantic "), letters("clustering", "l-grad"))), svg),
     });
   }
 
