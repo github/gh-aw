@@ -608,6 +608,18 @@
   .us-num { font: 700 68px "Mona Sans"; fill: #e6edf3; text-anchor: middle; }
   .us-cap { font: 500 20px var(--mono); fill: #9198a1; text-anchor: middle; }
   .us-cap.bad { fill: #d29922; } .us-cap.ok { fill: #3fb950; }
+  .us-bots tspan.n { fill: #e6edf3; font-weight: 700; }
+  .us-meas { font: 500 17px var(--mono); fill: #7d8590; }
+  .mfu-panel { position: absolute; left: 1440px; top: 70px; width: 390px; padding: 16px 20px 14px; border: 1.5px solid #30363d; border-radius: 16px; background: rgba(13,17,23,.78); font: 500 16px var(--mono); color: #9198a1; }
+  .mfu-k { letter-spacing: .12em; text-transform: uppercase; font-size: 13px; color: #3fb950; }
+  .mfu-big { font: 700 40px "Mona Sans"; color: #e6edf3; margin: 2px 0 0; } .mfu-big small { font: 500 18px var(--mono); color: #9198a1; margin-left: 8px; }
+  .mfu-row { margin-top: 4px; } .mfu-row b { color: #e6edf3; }
+  .mfu-panel svg { display: block; margin-top: 10px; width: 350px; height: 64px; }
+  .mfu-bar { fill: #238636; transform-box: fill-box; transform-origin: bottom; transform: scaleY(0); }
+  .active .mfu-bar { animation: mfuGrow .6s cubic-bezier(.2,.9,.2,1) forwards; animation-delay: var(--d); }
+  .mfu-dot { fill: #ab7df8; opacity: 0; } .active .mfu-dot { animation: mfuIn .3s forwards; animation-delay: var(--d); }
+  .mfu-leg { font-size: 14px; margin-top: 4px; } .mfu-leg i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #ab7df8; margin-right: 6px; }
+  @keyframes mfuGrow { to { transform: scaleY(1); } } @keyframes mfuIn { to { opacity: 1; } }
   .ra-cap-flow { left: 62px; top: 282px; }
   .ra-cap-chart { left: 992px; top: 282px; }
   .bd-grid { stroke: #ffffff12; stroke-width: 1; }
@@ -4502,6 +4514,18 @@
       SWEEP_D = 1200,
       LA = 230,
       LB = 560;
+    // measured on gh-aw (snapshot 14 Nov 2026): merged clean-up PRs per unslopper, all time, by title prefix
+    const UNSLOP = [["jsweep", 144], ["dead-code-remover", 117], ["code-simplifier", 89], ["tidy", 66], ["daily-file-diet", 7], ["duplicate-code-detector", 4]];
+    // measured: merged PRs per UTC day, 15 Oct to 13 Nov 2026, and how many of them came from the unsloppers above
+    const DAY_ALL = [31, 77, 25, 31, 42, 41, 51, 49, 17, 36, 41, 24, 35, 12, 26, 32, 28, 38, 38, 69, 72, 37, 37, 64, 63, 60, 46, 63, 31, 47],
+      DAY_UN = [1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 0, 3, 0, 1, 2, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 1, 0];
+    const panel = document.createElement("div");
+    panel.className = "mfu-panel";
+    panel.innerHTML = `<div class="mfu-k">gh-aw · measured · 15 Oct–13 Nov</div>
+      <div class="mfu-big">1,263 <small>PRs merged · 42/day</small></div>
+      <div class="mfu-row">median <b>166</b> lines · <b>1h54m</b> to merge</div>
+      <svg viewBox="0 0 350 64">${DAY_ALL.map((v, i) => `<rect class="mfu-bar" style="--d:${0.3 + i * 0.03}s" x="${i * 11.7}" y="${50 - v * 0.6}" width="9" height="${v * 0.6}" rx="2"/>${DAY_UN[i] ? `<circle class="mfu-dot" style="--d:${1.3 + i * 0.03}s" cx="${i * 11.7 + 4.5}" cy="58" r="${2.5 + DAY_UN[i]}"/>` : ""}`).join("")}</svg>
+      <div class="mfu-leg"><i></i>unslop PRs merged on 25 of 30 days</div>`;
     // a couple of synthetic slop specks per fast commit
     const SPECKS = Array.from({ length: B_N }, (_, i) => (i % 3 === 1 ? [[0, -24]] : [[-10, -22], [10, -26]]));
     let g = `<line class="us-main" x1="0" y1="${LA}" x2="1500" y2="${LA}"/><text class="us-mainl" x="0" y="${LA + 38}">main</text>
@@ -4519,7 +4543,8 @@
       SPECKS[i].forEach(([dx, dy], j) => (g += `<circle class="us-slop" id="usS${i}_${j}" cx="${x + dx}" cy="${LB + dy}" r="5"/>`));
     }
     g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily unsloppers</text></g>
-      <text class="us-bots" x="0" y="${LB + 100}">code-simplifier · dead-code-remover · duplicate-code-detector · daily-file-diet · unbloat-docs</text>
+      <text class="us-bots" x="0" y="${LB + 100}">${UNSLOP.map(([n, c]) => `${n} <tspan class="n">${c}</tspan>`).join(" · ")}</text>
+      <text class="us-meas" x="0" y="${LB + 132}">measured on gh-aw: 427 merged clean-up PRs (+34,691 −44,700 lines) on 261 days, 26 Sep 2025 – 12 Nov 2026 · lanes above illustrative</text>
       <text class="us-num" id="usNA" x="1620" y="${LA - 50}">0%</text><text class="us-cap" x="1620" y="${LA - 16}">of feature</text><text class="us-cap" id="usMA" x="1620" y="${LA + 16}"></text><text class="us-cap bad" id="usCA" x="1620" y="${LA + 44}"></text>
       <text class="us-num" id="usNB" x="1620" y="${LB - 50}">0%</text><text class="us-cap" x="1620" y="${LB - 16}">of feature</text><text class="us-cap" id="usMB" x="1620" y="${LB + 16}"></text><text class="us-cap ok" id="usCB" x="1620" y="${LB + 44}"></text>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -4543,7 +4568,7 @@
       sound: "unslop",
       palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
       notes:
-        "Merge fast, unslop daily. This is an illustrative, synthetic timeline. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: thirty fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. The feature ships a slice at a time, so its percentage climbs with every merge and the feature is complete while the polished lane is still in review. The slop that gets through is eaten by many background unsloppers, daily workflows such as code simplifier, dead code remover, duplicate code detector and file diet, which open their own small clean-up pull requests. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
+        "Merge fast, unslop daily. The two lanes are an illustrative, synthetic timeline; the panel at the top right and the counts along the bottom are measured on gh-aw's public history, snapshot 14 November 2026. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. In the illustration the feature ships a slice at a time, so its percentage climbs with every merge and it is complete while the polished lane is still in review. The measured panel shows what that looks like: in the thirty days from 15 October to 13 November 2026, 1,263 pull requests merged, about 42 a day, with a median of 166 lines changed and a median of one hour fifty-four minutes from opening to merge; the bars are merged pull requests per day. The slop that gets through is eaten by background unsloppers, daily workflows that open their own small clean-up pull requests. The purple dots mark days on which an unslopper pull request merged: 25 of those 30 days. Along the bottom are their all-time merged clean-up pull requests, counted by title prefix: jsweep 144, dead code remover 117, code simplifier 89, tidy 66, daily file diet 7 and duplicate code detector 4, which mostly files issues instead. Together that is 427 merged clean-up pull requests, adding 34,691 lines and removing 44,700, on 261 different days between 26 September 2025 and 12 November 2026. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -4618,7 +4643,7 @@
         $("usMB").textContent = `${n} PR${n === 1 ? "" : "s"} merged`;
         $("usCB").textContent = `${eaten} slop eaten`;
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))), panel, svg),
     });
   }
 
