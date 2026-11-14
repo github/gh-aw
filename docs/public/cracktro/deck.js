@@ -797,6 +797,59 @@
   .ae-tag em { font-style: normal; color: var(--ec); }
   .active .ae-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.1s; }
 
+  /* --- connectors --- */
+  .cn { --r: #3fb950; --w: #ab7df8; }
+  .cn .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #ab7df8, #79c0ff); }
+  .cn-col { position: absolute; top: 290px; opacity: 0; }
+  .active .cn-col { animation: rise .8s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .cn-col b { display: flex; align-items: center; gap: 14px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
+  .cn-col b i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 99px; background: #f0f6fc; color: #0d1117; font: normal 800 20px/1 "Mona Sans"; }
+  .cn-col span { display: block; margin: 10px 0 0 50px; font: 500 17px/1 var(--mono); color: #9198a1; letter-spacing: .04em; white-space: nowrap; }
+  .cn-card, .cn-ed { position: absolute; top: 380px; height: 520px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .cn-card { left: 110px; width: 460px; }
+  .cn-ed { left: 600px; width: 730px; }
+  .active .cn-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
+  .active .cn-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .cn-tab { display: flex; align-items: center; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; white-space: nowrap; }
+  .cn-tab em { font-style: normal; color: var(--pc); transition: color .4s; }
+  .cn-tab > span { margin-left: auto; color: #656c76; font-size: 16px; letter-spacing: .1em; }
+  .cn-body { padding: 4px 22px; }
+  .cn-body.swap { animation: cn-swap .5s cubic-bezier(.3,1.4,.4,1); }
+  @keyframes cn-swap { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: none; } }
+  .cn-sec { padding: 13px 0; border-bottom: 1px solid #21262d; }
+  .cn-sec:last-child { border: 0; }
+  .cn-sec > small { display: block; margin-bottom: 10px; font: 600 14px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #656c76; }
+  .cn-host { font: 500 19px/1 var(--mono); color: var(--pc); }
+  .cn-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cn-chip { padding: 6px 11px; border-radius: 99px; border: 1.5px solid #3d444d; font: 500 14px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .35s calc(var(--i, 0) * .15s); }
+  .cn-chip.more { border-style: dashed; }
+  .cn-chip.r { --k: var(--r); } .cn-chip.w { --k: var(--w); }
+  .lit .cn-chip.pick { color: var(--k); border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); box-shadow: 0 0 22px -6px var(--k); }
+  .lit .cn-chip.pick::before { content: "✓ "; }
+  .cn-code { padding: 12px 0 16px; font: 500 19px/33px var(--mono); }
+  .cn-row { display: flex; white-space: pre; }
+  .cn-row .no { width: 62px; padding-right: 22px; text-align: right; color: #656c76; flex: none; }
+  .cn-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 20%, transparent), transparent 80%); }
+  .cn-v { color: var(--k); text-shadow: 0 0 16px var(--k); }
+  .cn-rt { position: absolute; left: 1360px; top: 380px; width: 450px; height: 520px; overflow: visible; opacity: 0; }
+  .active .cn-rt { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .8s; }
+  .cn-rt .box { fill: #0d1117; stroke-width: 2.5; transition: filter .3s; }
+  .cn-rt .box.pv { stroke: var(--pc); transition: stroke .4s; }
+  .cn-rt .box.ag { stroke: var(--r); } .cn-rt .box.so { stroke: var(--w); }
+  .cn-rt .box.hot { filter: drop-shadow(0 0 16px var(--k)); }
+  .cn-rt .t { font: 700 26px/1 "Mona Sans"; fill: #f0f6fc; }
+  .cn-rt .s { font: 500 15px/1 var(--mono); fill: #9198a1; }
+  .cn-rt .m { font: 500 15px/1 var(--mono); }
+  .cn-rt .pvt { fill: var(--pc); transition: fill .4s; }
+  .cn-rt .e { fill: none; stroke-width: 3; stroke-dasharray: 8 7; }
+  .cn-rt .e.r { stroke: var(--r); } .cn-rt .e.w { stroke: var(--w); } .cn-rt .e.p { stroke: #9198a1; }
+  .cn-rt .pk { opacity: 0; }
+  .cn-cat { position: absolute; left: 110px; top: 940px; display: flex; align-items: center; gap: 10px; opacity: 0; }
+  .active .cn-cat { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .cn-cat small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
+  .cn-p { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .4s; }
+  .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px var(--pc); }
+
   /* --- enterprise ready --- */
   .er { --ec: #4493f8; }
   .er .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #a5d6ff, #d29922, #4493f8); }
@@ -5015,6 +5068,260 @@
     });
   }
 
+  // Connectors: a declaration lists everything a service offers; a workflow imports it and selects a few reads and one write; only that selection reaches the run
+  {
+    resetIndex();
+    // [label, kind] where kind 1 = selected by the workflow, "+" = collapsed remainder
+    const PV = [
+      {
+        id: "linear", name: "Linear", host: "api.linear.app", c: "#79c0ff",
+        trig: [["issue-created"], ["+6 more", "+"]],
+        tools: [["get-issue", 1], ["list-comments", 1], ["+27 more", "+"]],
+        safe: [["add-comment", 1], ["create-issue"], ["+6 more", "+"]],
+        sel: "[get-issue, list-comments]", reads: ["get-issue", "list-comments"], fx: "add-comment",
+      },
+      {
+        id: "jira", name: "Jira", host: "<site>.atlassian.net", c: "#4c9aff",
+        trig: [["issue-created"], ["+6 more", "+"]],
+        tools: [["getJiraIssue", 1], ["get-issue-remote-links"], ["+ MCP readers", "+"]],
+        safe: [["add-comment", 1], ["add-label"], ["+4 more", "+"]],
+        sel: "{personal: [getJiraIssue]}", reads: ["getJiraIssue"], fx: "add-comment",
+      },
+      {
+        id: "azure-devops", name: "Azure DevOps", host: "dev.azure.com", c: "#39c5cf",
+        trig: [["work-item-created"], ["+7 more", "+"]],
+        tools: [["get-work-item-description", 1], ["get-work-item"], ["+10 more", "+"]],
+        safe: [["comment-on-work-item", 1], ["create-work-item"], ["+21 more", "+"]],
+        sel: "[get-work-item-description]", reads: ["get-work-item-description"], fx: "comment-on-work-item",
+      },
+      {
+        id: "gitlab", name: "GitLab", host: "gitlab.com · self-managed", c: "#f0883e",
+        trig: [["merge-request-opened"], ["pipeline-updated"]],
+        tools: [["get-merge-request", 1], ["get-pipeline"]],
+        safe: [["add-merge-request-note", 1]],
+        sel: "[get-merge-request]", reads: ["get-merge-request"], fx: "add-merge-request-note",
+      },
+    ];
+    const CATALOG = ["Linear", "Jira", "Azure DevOps", "Slack", "Teams", "Confluence", "Sentry", "ServiceNow", "GitLab", "PagerDuty", "Datadog", "Zendesk", "Notion", "Asana"];
+    const K = "#ff7b72", D = "#656c76", T = "#f0f6fc", V = "#a5d6ff";
+    const R = "var(--r)", Wr = "var(--w)";
+
+    // declaration card
+    const cardFile = h("em");
+    const body = h("div", { class: "cn-body" });
+    const card = h("div", { class: "cn-card" }, h("div", { class: "cn-tab" }, "connectors/", cardFile, ".md"), body);
+    let pick = 0;
+    const chips = (list, k) => h("div", { class: "cn-chips" }, list.map(([l, s]) => h("span", { class: `cn-chip ${k}${s === 1 ? " pick" : ""}${s === "+" ? " more" : ""}`, "--i": s === 1 ? pick++ : 0 }, l)));
+    const sec = (label, ...kids) => h("div", { class: "cn-sec" }, h("small", {}, label), ...kids);
+    const buildCard = p => {
+      pick = 0;
+      cardFile.textContent = p.id;
+      body.replaceChildren(
+        sec("endpoint", h("div", { class: "cn-host" }, p.host)),
+        // reader secret serves the reads, writer secret only the safe-outputs job
+        sec("credentials", h("div", { class: "cn-chips" }, h("span", { class: "cn-chip r pick", "--i": 0 }, "reader"), h("span", { class: "cn-chip w pick", "--i": 3 }, "writer"))),
+        sec("triggers · not selected", chips(p.trig, "")),
+        sec("tools · read", chips(p.tools, "r")),
+        sec("safe-outputs · write", chips(p.safe, "w"))
+      );
+      body.classList.remove("swap");
+      void body.offsetWidth;
+      body.classList.add("swap");
+    };
+
+    // workflow editor: five slots retype per provider
+    const slot = k => h("span", { class: "cn-v", "--k": k });
+    const S = [slot("var(--pc)"), slot(R), slot(R), slot(Wr), slot(Wr)];
+    const LINES = [
+      [["---", D]],
+      [["on: ", K], ["workflow_dispatch", V]],
+      [["imports:", K]],
+      [["  - ", K], [".github/workflows/connectors/", V], S[0], [".md", V]],
+      [["tools:", K]],
+      [["  ", K], S[1], [": ", K], S[2]],
+      [["safe-outputs:", K]],
+      [["  staged: ", K], ["true", V]],
+      [["  ", K], S[3], ["-", K], S[4], [":", K]],
+      [["---", D]],
+      [["# Intake handoff", T]],
+      [["Read the approved item. Propose one update.", T]],
+    ];
+    const HOT = { 3: "var(--pc)", 5: R, 8: Wr };
+    const rows = LINES.map((parts, i) =>
+      h("div", { class: "cn-row" + (HOT[i] ? " hot" : ""), "--k": HOT[i] || "transparent" }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0])))))
+    );
+    const ed = h("div", { class: "cn-ed" }, h("div", { class: "cn-tab" }, "intake.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cn-code" }, rows));
+    const target = p => [p.id, p.id, p.sel, p.id, p.fx];
+
+    // run time: provider ← reads ← agent → proposal → safe-outputs job → write → provider
+    const rt = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    rt.setAttribute("class", "cn-rt");
+    rt.setAttribute("viewBox", "0 0 450 520");
+    rt.innerHTML = `
+      <path class="e r" id="cnRead" d="M150 100 C150 190 98 210 98 300"/>
+      <path class="e p" id="cnProp" d="M195 410 H255"/>
+      <path class="e w" id="cnWrite" d="M352 300 C352 210 300 190 300 100"/>
+      <rect class="box pv" x="70" y="0" width="310" height="100" rx="18" style="--k:var(--pc)"/>
+      <text class="t pvt" x="225" y="46" text-anchor="middle"></text>
+      <text class="s" x="225" y="76" text-anchor="middle"></text>
+      <text class="m" x="20" y="196" style="fill:var(--r)">read</text>
+      <text class="m" x="430" y="196" text-anchor="end" style="fill:var(--w)">write</text>
+      <text class="m" x="225" y="438" text-anchor="middle" style="fill:#9198a1;font-size:12px">propose</text>
+      <rect class="box ag" x="0" y="300" width="195" height="220" rx="18" style="--k:var(--r)"/>
+      <text class="t" x="20" y="340">Agent</text>
+      <text class="s" x="20" y="366">sandbox</text>
+      <text class="m tl" x="20" y="404" style="fill:var(--r)"></text>
+      <text class="m tl" x="20" y="430" style="fill:var(--r)"></text>
+      <text class="s cnt" x="20" y="472"></text>
+      <text class="s" x="20" y="500" style="fill:#ff7b72">no writer secret</text>
+      <rect class="box so" x="255" y="300" width="195" height="220" rx="18" style="--k:var(--w)"/>
+      <text class="t" x="275" y="340">Safe outputs</text>
+      <text class="s" x="275" y="366">separate job</text>
+      <text class="m fx" x="275" y="404" style="fill:var(--w)"></text>
+      <text class="m fx" x="275" y="430" style="fill:var(--w)"></text>
+      <text class="s" x="275" y="472">writer secret</text>
+      <text class="s" x="275" y="500" style="fill:#d29922">staged · max 1</text>
+      <circle class="pk" r="9" style="fill:var(--r);filter:drop-shadow(0 0 8px var(--r))"/>
+      <circle class="pk" r="9" style="fill:#f0f6fc;filter:drop-shadow(0 0 8px #f0f6fc)"/>
+      <circle class="pk" r="9" style="fill:var(--w);filter:drop-shadow(0 0 8px var(--w))"/>`;
+    const [pvName, pvHost] = rt.querySelectorAll("text");
+    const toolEls = rt.querySelectorAll(".tl"),
+      fxEls = rt.querySelectorAll(".fx"),
+      cnt = rt.querySelector(".cnt"),
+      boxes = rt.querySelectorAll(".box"),
+      pks = rt.querySelectorAll(".pk"),
+      paths = ["cnRead", "cnProp", "cnWrite"].map(id => rt.querySelector("#" + id));
+    // fit a mono label into a box by shrinking its font (about 0.66em per glyph)
+    const fitText = (t, s, w = 160) => {
+      t.textContent = s;
+      t.style.fontSize = `${Math.min(16, Math.max(11, w / (s.length * 0.66)))}px`;
+    };
+    // a single long name wraps over both lines at its last hyphen that keeps the head short
+    const wrap = names => {
+      if (names.length > 1 || names[0].length <= 15) return names;
+      const n = names[0],
+        i = n.lastIndexOf("-", 14);
+      return [n.slice(0, i + 1), n.slice(i + 1)];
+    };
+    const buildRt = p => {
+      pvName.textContent = p.name;
+      pvHost.textContent = p.host;
+      const tl = wrap(p.reads);
+      toolEls.forEach((t, i) => fitText(t, tl[i] || ""));
+      cnt.textContent = `${p.reads.length} reader${p.reads.length > 1 ? "s" : ""} exposed`;
+      fitText(fxEls[0], p.id + "-");
+      fitText(fxEls[1], p.fx);
+    };
+
+    const cols = [
+      [110, "1", "Declare once", "endpoint · credentials · capabilities", ".2s"],
+      [600, "2", "Select per workflow", "importing alone grants nothing", ".3s"],
+      [1360, "3", "Expose only the selection", "reads in the sandbox · writes in a job", ".4s"],
+    ].map(([x, n, t, s, d]) => h("div", { class: "cn-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
+    const cat = CATALOG.map(n => h("span", { class: "cn-p" }, n));
+    const el = h(
+      "section",
+      { class: "slide cn" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring any service in · one reviewable YAML contract"), h("h2", {}, letters("Connectors", "l-grad"))),
+      cols,
+      card,
+      ed,
+      rt,
+      h("div", { class: "cn-cat" }, h("small", {}, "14 declarations"), cat)
+    );
+
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      holdAt = 0,
+      typed = [],
+      lens = null;
+    const setProvider = i => {
+      cur = i;
+      const p = PV[i];
+      el.style.setProperty("--pc", p.c);
+      buildCard(p);
+      buildRt(p);
+      cat.forEach(c => c.classList.toggle("on", c.textContent === p.name));
+    };
+    const paint = () => S.forEach((s, i) => (s.textContent = typed[i]));
+    const SEG = [
+      [300, 1300],
+      [1600, 2300],
+      [2600, 3700],
+    ];
+    const HOLD = 5200;
+    const packets = t => {
+      lens ??= paths.map(p => p.getTotalLength());
+      const e = phase === "hold" ? t - holdAt : -1;
+      SEG.forEach(([a, b], i) => {
+        const u = (e - a) / (b - a),
+          on = u >= 0 && u <= 1;
+        pks[i].style.opacity = on ? 1 : 0;
+        if (on) {
+          const pt = paths[i].getPointAtLength(u * lens[i]);
+          pks[i].setAttribute("cx", pt.x);
+          pks[i].setAttribute("cy", pt.y);
+        }
+      });
+      // light the box a packet just reached: agent after the read, job after the proposal, provider after the write
+      const near = at => e >= at && e < at + 700;
+      boxes[1].classList.toggle("hot", near(SEG[0][1]));
+      boxes[2].classList.toggle("hot", near(SEG[1][1]));
+      boxes[0].classList.toggle("hot", near(SEG[2][1]));
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "connectors",
+      palette: ["#1f6feb", "#238636", "#8957e5", "#1b7c83"],
+      notes:
+        "Connectors. A connector is an ordinary Markdown file under .github/workflows/connectors whose frontmatter declares one service: a fixed endpoint, separate reader and writer credential secret names, exact resource grants, and every capability the service offers, meaning triggers, read tools and safe-output writes. A workflow imports the declaration and then selects only what it needs: a reader or two under tools, and one write under safe-outputs, prefixed with the connector id. Importing alone grants nothing. At run time only the selection is exposed: the agent sees just the chosen readers inside the sandbox and holds no writer secret; it can only propose the write, which a separate safe-outputs job performs, staged here so it is only previewed. The same shape covers Linear, Jira, Azure DevOps, GitLab and ten more declarations. Connectors are experimental. The workflow is a synthetic example, capability names come from the declarations, and the request flow is illustrative.",
+      enter() {
+        phase = "hold";
+        since = 0;
+        holdAt = 0;
+        setProvider(0);
+        typed = target(PV[0]);
+        paint();
+        card.classList.add("lit");
+      },
+      tick(t) {
+        if (!since) since = holdAt = t;
+        const e = t - since;
+        if (phase === "hold" && e > HOLD) {
+          phase = "del";
+          since = t;
+          card.classList.remove("lit");
+        } else if (phase === "del" && e > 14) {
+          since = t;
+          const i = typed.findLastIndex(s => s.length);
+          if (i >= 0) typed[i] = typed[i].slice(0, -1);
+          else {
+            phase = "type";
+            setProvider((cur + 1) % PV.length);
+            sfx.pop(cur * 2);
+          }
+          paint();
+        } else if (phase === "type" && e > 40) {
+          since = t;
+          const goal = target(PV[cur]),
+            i = typed.findIndex((s, j) => s !== goal[j]);
+          if (i >= 0) {
+            typed[i] = goal[i].slice(0, typed[i].length + 1);
+            sfx.key(0.6);
+          } else {
+            phase = "hold";
+            holdAt = t;
+            card.classList.add("lit");
+          }
+          paint();
+        }
+        packets(t);
+      },
+      el,
+    });
+  }
+
   // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
   {
     resetIndex();
@@ -6229,6 +6536,16 @@
         tone(36, t + 0.1, { type: "sine", dur: 0.9, vol: 0.18, cutoff: 500 });
         bell(84, t + 0.75, 0.06);
         bell(91, t + 0.9, 0.05, 1.8);
+      },
+      // connectors: two latch clicks as the service plugs in, then a read note (left) and a write note (right) over a soft chord
+      connectors: t => {
+        [0, 0.12].forEach((d, i) => {
+          click(t + 0.2 + d, 1800 + i * 900, 0.08, 6);
+          osc("sine", 140 - i * 30, t + 0.2 + d, 0.12, 0.12, { f1: 60 });
+        });
+        bell(76, t + 0.6, 0.04, 1.0, panTo(-0.6));
+        bell(83, t + 0.85, 0.04, 1.2, panTo(0.6));
+        pad([52, 59, 64, 68], t + 0.6, 2, 0.022, "triangle", 1800);
       },
       // model routing: a filtered-noise riser into a rising A major arpeggio over a soft pad
       router: t => {
