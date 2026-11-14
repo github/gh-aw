@@ -318,6 +318,12 @@
   @keyframes tp-ro { to { opacity: 0; transform: translateX(1500px); } }
   @keyframes tp-vso { to { opacity: 0; transform: scale(0); } }
   @keyframes tp-pop { from { transform: scale(0); } }
+  /* Mona leans in from the left edge to watch the race; she slides in and out with the copy */
+  .tp-mona { position: absolute; left: 0; bottom: 0; width: 440px; height: 900px; overflow: hidden; pointer-events: none; }
+  .tp-mona svg { position: absolute; left: -240px; bottom: -80px; width: 480px; height: 660px; overflow: visible; }
+  .active .tp-mona svg { animation: tp-l 1s cubic-bezier(.2,.9,.25,1) both .3s, tp-bob 3.2s ease-in-out infinite 1.3s; }
+  .tp:is(.fadeout, .leaving) .tp-mona svg { animation: tp-lo .55s cubic-bezier(.6,0,.85,.3) both !important; }
+  @keyframes tp-bob { 50% { transform: translateY(-14px); } }
   .fm-svg { position: absolute; left: 760px; top: 330px; width: 1100px; height: 640px; overflow: visible; font-family: "Mona Sans"; }
   .fm-cap { position: absolute; left: 762px; top: 272px; font: 500 30px/1 "Mona Sans"; color: #9198a1; }
   .fm-cap b { font-weight: 700; font-stretch: 100%; }
@@ -7872,7 +7878,12 @@
           h("div", { class: "tp-vs" }, slow.el, h("b", {}, "VS"), fast.el),
           h("h2", { class: "tp-go" }, "Improve your process."),
           h("h2", { class: "tp-go" }, "Accelerate your factory.")
-        )
+        ),
+        (() => {
+          const m = h("div", { class: "tp-mona", "aria-hidden": "true" });
+          m.innerHTML = '<svg viewBox="0 0 411 565"><image href="assets/avatars/mona-full.png" width="411" height="565" transform="rotate(14 120 565)"/></svg>';
+          return m;
+        })()
       ),
     });
   }
