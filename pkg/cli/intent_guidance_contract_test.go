@@ -5,7 +5,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/gitutil"
@@ -40,12 +39,7 @@ func TestIntentGuidanceContract(t *testing.T) {
 	creatorContent, err := os.ReadFile(filepath.Join(repoRoot, ".github", "aw", "create-agentic-workflow.md"))
 	require.NoError(t, err, "Should read workflow creator")
 	creatorText := string(creatorContent)
-	assert.True(
-		t,
-		strings.Contains(creatorText, "When the request already states a goal") ||
-			strings.Contains(creatorText, "Otherwise skip the opener."),
-		"Workflow creator must keep explicit requests lightweight",
-	)
+	assert.Contains(t, creatorText, "When a goal is stated, reuse supplied facts; skip the opener.")
 
 	for _, name := range []string{
 		"designer.md",
