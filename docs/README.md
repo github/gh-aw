@@ -52,6 +52,27 @@ availability does not guarantee that the feed can serve a package's tarball.
 After updating dependencies, run `make check-npm-1es` from the repository root
 to verify that the locked versions can be downloaded.
 
+## Interactive talk
+
+The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
+`public/cracktro/` and ships with the normal docs build and Pages deployment.
+It is a standalone sixteen-slide deck, separate from the homepage slideshow, linked
+from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
+Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
+The navigation dots jump directly to a slide; `#1` through `#16` are shareable
+slide links. Clicking the left third goes back; clicking elsewhere advances.
+On touch screens, swipe left or right.
+
+Examples, review activity, repository counts, and cost figures are synthetic.
+Use role icons rather than employee profiles. The only exceptions are the
+local avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` in `public/cracktro/assets/avatars/`.
+Keep private repository
+references, source commit identifiers, and internal attributions out of the
+public assets. Speaker notes and source comments are public too.
+The workflow illustration, avatars, and fonts are local.
+Mona Sans reuses `public/fonts/`; Monaspace Neon and its SIL Open Font License
+are in `public/cracktro/fonts/`.
+
 ## Homepage slideshow
 
 On desktop, select the presentation icon in the homepage header to present the

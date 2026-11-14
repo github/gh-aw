@@ -299,7 +299,7 @@ func (e *CodexEngine) GetHarnessScriptName() string {
 
 // GetExecutionSteps returns the GitHub Actions steps for executing Codex
 func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string) []GitHubActionStep {
-	modelConfigured := workflowData.Model != "" && !isModelRoutingEnabled(workflowData)
+	modelConfigured := workflowData.Model != "" && !isModelRoutingUnconditional(workflowData)
 	firewallEnabled := isFirewallEnabled(workflowData)
 	codexEngineLog.Printf("Building Codex execution steps: workflow=%s, modelConfigured=%v, firewall=%v",
 		workflowData.Name, modelConfigured, firewallEnabled)
@@ -560,6 +560,7 @@ func applyCodexModelEnv(env map[string]string, workflowData *WorkflowData, model
 		model := codexModelID(workflowData.Model)
 		codexEngineLog.Printf("Setting %s env var for model: %s", modelEnvVar, model)
 		env[modelEnvVar] = model
+		guardImplicitRoutingModelEnv(env, workflowData, modelEnvVar)
 		return
 	}
 	env[modelEnvVar] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)

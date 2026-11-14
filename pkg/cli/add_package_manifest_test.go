@@ -1663,6 +1663,98 @@ func TestExtractManifestIncludes(t *testing.T) {
 	assert.Empty(t, warnings)
 }
 
+func TestExtractManifestIncludesSliceNormalization(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		include    string
+		wantSource string
+		wantError  bool
+	}{
+		{
+			name:       "trims whitespace",
+			include:    " workflows/review.md ",
+			wantSource: "workflows/review.md",
+		},
+		{
+			name:       "cleans manifest import",
+			include:    " nested/../aw.yml ",
+			wantSource: "aw.yml",
+		},
+		{
+			name:    "warns for unsupported path",
+			include: "README.md",
+		},
+		{
+			name:      "rejects invalid manifest import",
+			include:   "/tmp/aw.yml",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		for _, useStringSlice := range []bool{false, true} {
+			sliceType := "[]any"
+			if useStringSlice {
+				sliceType = "[]string"
+			}
+			t.Run(tt.name+"/"+sliceType, func(t *testing.T) {
+				t.Parallel()
+				var value any = []any{tt.include}
+				if useStringSlice {
+					value = []string{tt.include}
+				}
+
+				includes, warnings, err := extractManifestIncludes(value, "aw.yml")
+				if tt.wantError {
+					require.Error(t, err)
+					assert.Nil(t, includes)
+					assert.Nil(t, warnings)
+					return
+				}
+
+				require.NoError(t, err)
+				if tt.wantSource != "" {
+					assert.Equal(t, []string{tt.wantSource}, manifestIncludeSources(includes))
+					assert.Empty(t, warnings)
+				} else {
+					assert.Empty(t, includes)
+					require.Len(t, warnings, 1)
+					assert.Contains(t, warnings[0], "Ignoring includes entry")
+				}
+			})
+		}
+	}
+}
+
+func TestExtractManifestIncludesNormalizedDuplicates(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name  string
+		value any
+	}{
+		{
+			name:  "[]any",
+			value: []any{"workflows/review.md", " workflows/review.md "},
+		},
+		{
+			name:  "[]string",
+			value: []string{"workflows/review.md", " workflows/review.md "},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			includes, warnings, err := extractManifestIncludes(test.value, "aw.yml")
+			require.NoError(t, err)
+			assert.Equal(t, []string{"workflows/review.md"}, manifestIncludeSources(includes))
+			assert.Empty(t, warnings)
+		})
+	}
+}
+
 func TestCodemodManifestFilesToIncludes(t *testing.T) {
 	t.Parallel()
 	converted := codemodManifestFilesToIncludes([]string{
