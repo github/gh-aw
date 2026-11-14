@@ -74,7 +74,7 @@ repository's own workflows, the Issues as intent slide's counts of
 issues labelled `community` and the merged pull requests that closed them
 (November 2026 snapshot), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
-(February to November 2026, with shortened titles), the Great Escapi slide's
+(February to November 2026, with shortened titles), the Continuous Security slide's
 counts and dates, measured from that red-team workflow's repository memory and
 the firewall fix it led to (its attack diagram is a simplified illustration),
 and the two data slides after the finale: "First

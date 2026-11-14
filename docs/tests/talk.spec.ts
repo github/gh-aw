@@ -21,7 +21,7 @@ test("presents the thirty-eight slides without the removed sections", async ({ p
     "Safety and control",
     "Supply chain hardening",
     "Safe outputs",
-    "The Great Escapi",
+    "Continuous Security",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
     "Pull Request Review²",
