@@ -499,11 +499,14 @@
   .ae-ring { position: absolute; border-radius: 26px; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 7%, transparent); }
   .ae-ring > b { position: absolute; left: 22px; top: 14px; font: 600 17px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
   .ae-ring > i { position: absolute; right: 22px; top: 12px; font: normal 600 15px/1 var(--mono); color: #3fb950; letter-spacing: .08em; }
-  .ae-core { position: absolute; left: 50%; top: 50%; width: 320px; height: 150px; margin: -50px 0 0 -160px; border-radius: 22px; background: #0d1117; border: 3px solid var(--ec);
+  .ae-core { position: absolute; left: 50%; top: 50%; width: 320px; height: 150px; margin: -75px 0 0 -160px; border-radius: 22px; background: #0d1117; border: 3px solid var(--ec);
     box-shadow: 0 0 var(--gl, 60px) -6px var(--ec), inset 0 0 40px -18px var(--ec); display: grid; grid-template-columns: 88px 1fr; align-items: center; gap: 20px; padding: 0 28px;
     transition: border-color .4s, box-shadow .4s; }
   .ae-core.swap { animation: ae-swap .55s cubic-bezier(.3,1.5,.4,1); }
   @keyframes ae-swap { 0% { transform: rotateX(0); } 45% { transform: rotateX(90deg) scale(.92); } 100% { transform: none; } }
+  .ae-facts { position: absolute; left: 0; right: 0; top: 350px; display: flex; justify-content: center; gap: 14px; }
+  .ae-facts span { padding: 7px 16px; border-radius: 99px; border: 1.5px solid #3fb95066; background: #3fb95014; color: #7ee787; font: 600 17px/1 var(--mono); letter-spacing: .04em; }
+  .ae-facts b { font-weight: 800; }
   .ae-mono { display: grid; place-items: center; width: 88px; height: 88px; border-radius: 22px; background: var(--ec); color: #0d1117; font: 800 50px/1 "Mona Sans"; transition: background .4s; }
   .ae-core small { display: block; font: 500 16px/1 var(--mono); color: #9198a1; letter-spacing: .12em; text-transform: uppercase; }
   .ae-core strong { display: block; margin-top: 8px; font: 700 40px/1 "Mona Sans"; color: #f0f6fc; }
@@ -2815,7 +2818,7 @@
     });
   }
 
-  // Any agent: one Markdown workflow retargets engine + model provider; tokens stream from the provider through the same guardrails
+  // Any agent, any provider: one Markdown workflow retargets engine + model provider; tokens stream from the provider through the same guardrails
   {
     resetIndex();
     const PROV = {
@@ -2879,7 +2882,7 @@
     const tokN = h("em", { class: "ae-tokn" }, "0");
     const core = h("div", { class: "ae-core" }, mono, h("div", {}, h("small", {}, "agent engine"), nm, tokN));
     const ring = (label, c, inset) => h("div", { class: "ae-ring", "--c": c, style: { inset: `${inset}px` } }, h("b", {}, label), h("i", {}, "✓ same"));
-    const run = h("div", { class: "ae-run" }, ring("Actions runner · lock file", "#4493f8", 0), ring("Network firewall", "#d29922", 44), ring("Sandboxed container", "#f85149", 88), core);
+    const run = h("div", { class: "ae-run" }, ring("Actions runner · lock file", "#4493f8", 0), ring("Network firewall", "#d29922", 44), ring("Sandboxed container", "#f85149", 88), core, h("div", { class: "ae-facts" }, h("span", {}, h("b", {}, "0"), " secrets"), h("span", {}, "read-only tokens")));
     const TW = 744,
       TH = 640;
     const tc = h("canvas", { class: "ae-toks", width: TW, height: TH });
@@ -2889,7 +2892,7 @@
     const el = h(
       "section",
       { class: "slide ae" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Any engine · any model provider"), h("h2", {}, letters("Any "), letters("agent", "l-grad"))),
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One workflow · swap the engine · pick the model provider"), h("h2", {}, letters("Any agent, "), letters("any provider", "l-grad"))),
       ed,
       arrow,
       h("div", { class: "ae-provs" }, provEls),
@@ -2923,7 +2926,7 @@
       core.classList.add("swap");
     };
     // token stream: from the active provider card (top) down into the agent core
-    const CORE = { x: TW / 2, y: 120 + 270 };
+    const CORE = { x: TW / 2, y: 120 + 245 };
     const drawToks = (t, dt) => {
       tx.clearRect(0, 0, TW, TH);
       const pid = COMBOS[cur][1],
@@ -2932,38 +2935,31 @@
         sy = 70,
         c = PROV[pid].c;
       if (phase === "hold" && t > spawnAt) {
-        spawnAt = t + 8 + Math.random() * 18;
-        toks.push({ p: 0, v: 0.0011 + Math.random() * 0.0009, o: (Math.random() - 0.5) * 200, sx: sx + (Math.random() - 0.5) * 120, sy, c, w: 2 + Math.random() * 3 });
+        spawnAt = t + 90;
+        toks.push({ p: 0, sx, sy: sy + 40, c });
       }
-      const at = (q, u) => {
-        const a = 1 - u,
-          cx1 = q.sx + q.o,
-          cy1 = q.sy + 200,
-          cx2 = CORE.x + q.o * 0.5,
-          cy2 = CORE.y - 190;
-        return [a ** 3 * q.sx + 3 * a * a * u * cx1 + 3 * a * u * u * cx2 + u ** 3 * CORE.x, a ** 3 * q.sy + 3 * a * a * u * cy1 + 3 * a * u * u * cy2 + u ** 3 * CORE.y];
-      };
-      tx.lineCap = "round";
-      tx.shadowBlur = 14;
+      tx.globalAlpha = 0.25;
+      tx.strokeStyle = c;
+      tx.setLineDash([2, 10]);
+      tx.lineWidth = 2;
+      tx.beginPath();
+      tx.moveTo(sx, sy + 40);
+      tx.lineTo(CORE.x, CORE.y - 75);
+      tx.stroke();
+      tx.setLineDash([]);
+      tx.globalAlpha = 1;
       for (const q of toks) {
-        q.p += q.v * dt * (1 + q.p * 1.5);
-        const u = Math.min(1, q.p),
-          [x, y] = at(q, u),
-          [x0, y0] = at(q, Math.max(0, u - 0.09));
-        tx.globalAlpha = u > 0.9 ? (1 - u) / 0.1 : Math.min(1, u * 8);
-        tx.strokeStyle = tx.shadowColor = q.c;
-        tx.lineWidth = q.w;
+        q.p += dt / 900;
+        const u = Math.min(1, q.p);
+        tx.fillStyle = q.c;
         tx.beginPath();
-        tx.moveTo(x0, y0);
-        tx.lineTo(x, y);
-        tx.stroke();
+        tx.arc(q.sx + (CORE.x - q.sx) * u, q.sy + (CORE.y - 75 - q.sy) * u, 5, 0, Math.PI * 2);
+        tx.fill();
         if (q.p >= 1) {
-          tokens += 40 + ((Math.random() * 260) | 0);
-          gulp = Math.min(1, gulp + 0.06);
+          tokens += 100 + ((Math.random() * 200) | 0);
+          gulp = Math.min(1, gulp + 0.15);
         }
       }
-      tx.globalAlpha = 1;
-      tx.shadowBlur = 0;
       toks = toks.filter(q => q.p < 1);
       gulp *= 0.94 ** (dt / 16);
       core.style.setProperty("--gl", `${40 + gulp * 90}px`);
@@ -2974,7 +2970,7 @@
       sound: "engine",
       palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
       notes:
-        "Any agent: any engine, any provider. The same Markdown workflow can target different coding agents and model providers by changing two frontmatter lines: engine id copilot, claude, codex or pi, and model-provider github, anthropic or openai. Claude can run on Anthropic or on GitHub Copilot inference; Codex on OpenAI or GitHub. The agent pulls tokens from whichever provider you pick, but the compiler keeps the same guardrails around it: the Actions runner and lock file, the network firewall, and the sandboxed container. Token counts are simulated and the workflow is a synthetic example; see the engines and model routing reference for setup and availability.",
+        "Any agent, any provider. The same Markdown workflow can target different coding agents and model providers by changing two frontmatter lines: engine id copilot, claude, codex or pi, and model-provider github, anthropic or openai. Claude can run on Anthropic or on GitHub Copilot inference; Codex on OpenAI or GitHub. The agent pulls tokens from whichever provider you pick, but the compiler keeps the same guardrails around it: the Actions runner and lock file, the network firewall, and the sandboxed container, which holds zero secrets and only read-only tokens. Token counts are simulated and the workflow is a synthetic example; see the engines and model routing reference for setup and availability.",
       enter() {
         tId = COMBOS[0][0];
         tPv = COMBOS[0][1];

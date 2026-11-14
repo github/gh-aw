@@ -25,7 +25,7 @@ test("presents the fifteen slides without the removed sections", async ({ page }
     "Research · Assign · Observe",
     "Mine · Refine · Apply",
     "Cost management",
-    "Any agent",
+    "Any agent, any provider",
     "Centralized campaigns",
     "G\u0131tHub",
   ];
