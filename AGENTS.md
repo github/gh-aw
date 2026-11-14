@@ -70,6 +70,7 @@ Paths below are relative to `.github/skills/`; load only the matching `SKILL.md`
 | Documentation | `documentation` |
 | Issue/comment/review Markdown | `issue-markdown` |
 | Docs-site layout, spacing, colour, navigation | `docs-design` |
+| Cracktro talk deck (`docs/public/cracktro/`) | `cracktro` |
 | Git/gh checkout operations: credentials, sparse/shallow, credential-free MCP | `checkout-credential-review` |
 | Canvas extensions: actions, inputs, rendering, state, themes | `create-canvas` |
 | Instruction/skill wording and 8,000-byte prefix packing | `prompt-token-efficiency` |

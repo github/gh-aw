@@ -36,6 +36,8 @@ Find the likely cause of issue #${{ github.event.issue.number }} and comment wit
 
 The router classifies each task as economy, balanced, or robust, then chooses the cheapest model and effort likely to succeed at that level. If classification is unavailable or unknown, it uses balanced. The example uses GitHub Copilot inference and needs [Copilot authentication](/gh-aw/reference/auth/#copilot-requests-write-permission). Routing also needs the AWF firewall, enabled by default.
 
+Routing runs on the default Docker sandbox runtime, or on `sandbox.agent.runtime: cloud-hypervisor` with AWF v0.29.12 or later, on a Linux AWF host. Compilation fails for explicit routing with another runtime such as `nvx`, `runner.topology: arc-dind`, a `sandbox.agent.mounts` entry that exposes the Docker socket to the agent, or a native Windows or macOS runner; `runs-on: windows-latest` runs AWF in WSL and is supported. Support for other runtimes is tracked in [gh-aw-firewall#10335](https://github.com/github/gh-aw-firewall/issues/10335).
+
 > [!NOTE]
 > `model: auto` uses the engine or provider's own model selection, not gh-aw's per-task router. Use `model: router` for gh-aw routing.
 
@@ -53,6 +55,26 @@ Use a router level when the workflow's tasks have a known risk or complexity:
 
 These are estimated success rates from benchmarks, not guarantees. The router may choose below the target if no candidate meets it or if a choice just below it costs much less. `model: router` chooses a level for each run instead.
 
+## Choosing the level at run time
+
+The model can be an expression that resolves to a router value when the run starts, so a dispatch input, a pre-activation step, or an experiment can choose the level:
+
+```aw wrap
+---
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        type: string
+engine: copilot
+model: ${{ inputs.level || 'router/balanced' }}
+---
+```
+
+The activation job resolves the expression once, and later jobs use its result, so the expression can read pre-activation step outputs. A router value routes the run at that level; any other value, such as a model name, runs that model without routing, as before. An empty value uses the model variables and the engine's default without routing, so write a default into the expression if you want one. A value that looks like a router value but isn't one, such as `router/fast`, `Router/Economy`, or `router/economy?effort=high`, stops the run before the agent starts.
+
+This applies when the whole model is one expression, such as `${{ inputs.level }}` but not `${{ inputs.model }}?effort=high`, that reads only `inputs`, `vars`, run-wide `github` properties such as `github.event` or `github.run_attempt`, experiments, or pre-activation step outputs, and the workflow would otherwise be eligible for [default routing](#default-routing-for-workflows-without-a-model). Other expressions, such as ones that read an agent step's outputs or `github.job`, or call `hashFiles()`, run without routing as before. Pi isn't supported yet. Threat detection never receives the router value: when the run is routed, it uses its own default model. Router values in the `GH_AW_MODEL_AGENT_<ENGINE>` and `GH_AW_DEFAULT_MODEL_<ENGINE>` variables are still not accepted.
+
 ## Default routing for workflows without a model
 
 Eligible workflows without a model already behave like `model: router`. For Copilot, Claude, and Codex, a nonempty `GH_AW_MODEL_AGENT_<ENGINE>` or `GH_AW_DEFAULT_MODEL_<ENGINE>` repository or organization variable overrides this default at run time; the agent variable wins. Pi has no such variables. Set `engine.model-routing: false` to opt out without pinning a model, or set a specific model.
@@ -62,6 +84,7 @@ Eligible workflows without a model already behave like `model: router`. For Copi
 
 - The engine is `copilot`, `claude`, `codex`, or `pi`, using GitHub Copilot inference. Claude and Codex require `model-provider: github`; `copilot-requests: write` alone doesn't switch providers.
 - Neither the workflow nor its imports set a top-level `model`, `engine.model` (including aliases, `auto`, and expressions), explicit routing settings, `engine.fallback-models`, or an `engine.env` model variable such as `COPILOT_MODEL` or `GH_AW_DEFAULT_MODEL_COPILOT`.
+- The workflow's sandbox runtime, topology, mounts, and runner support routing, and the workflow doesn't use the `docker-sudo-iptables` runtime.
 - The workflow uses a routing-capable AWF version and images and doesn't otherwise customize model selection or inference, for example through a custom engine command, model or effort arguments in `engine.args`, a custom agent, sub-agent models, a custom API target, or custom sandbox images.
 
 The default applies only to the main agent, not threat detection, evals, or sub-agents. If eligibility isn't met or is uncertain, compilation preserves the previous behavior. When it applies, compilation prints an informational notice. Explicit router values aren't bypassed by model variables.
@@ -257,7 +280,7 @@ An importing workflow uses those settings. It must omit `engine` or use its obje
 
 ### Router value restrictions
 
-Router values are not model names. Unknown or differently cased values such as `router/fast` or `router/Economy`, and parameters such as `router/economy?effort=high`, are rejected. The router chooses effort; pin a model to set it. Router values can't appear in model policies, fallbacks, model aliases, sub-agents, threat detection, or evals, and can't be combined with a routing block or `engine.fallback-models`. Write the value directly in the workflow: an expression or variable that resolves to a router value at run time stops the run before the agent starts.
+Router values are not model names. Unknown or differently cased values such as `router/fast` or `router/Economy`, and parameters such as `router/economy?effort=high`, are rejected. The router chooses effort; pin a model to set it. Router values can't appear in model policies, fallbacks, model aliases, sub-agents, threat detection, or evals, and can't be combined with a routing block or `engine.fallback-models`. Write the value in the workflow, or in a model expression as described in [Choosing the level at run time](#choosing-the-level-at-run-time). Otherwise, a variable or expression that resolves to a router value at run time stops the run before the agent starts.
 
 ## Known limitations
 

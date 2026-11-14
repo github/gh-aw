@@ -102,6 +102,10 @@ const DefaultRouterVersion Version = "0.1.3"
 // selections through /reflect and accepts apiProxy.routing.
 const AWFModelRoutingMinVersion Version = "v0.28.29"
 
+// AWFCloudHypervisorModelRoutingMinVersion is the first AWF release whose
+// primary-agent model routing supports the cloud-hypervisor runtime.
+const AWFCloudHypervisorModelRoutingMinVersion Version = "v0.29.12"
+
 // AWFRoutingCandidateModelsMinVersion separates router candidates from request policy.
 const AWFRoutingCandidateModelsMinVersion Version = "v0.28.33"
 

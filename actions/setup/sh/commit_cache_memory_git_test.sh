@@ -102,6 +102,28 @@ assert "symlinked metadata was not replaced" test -L "${D}/.git"
 assert "existing history was preserved" test "$(git -C "${D}" rev-parse HEAD)" = "${INITIAL_COMMIT}"
 echo ""
 
+echo "Test 3b: Symlinked cache root is rejected"
+REAL_CACHE="${WORKSPACE}/test3b-cache"
+LINKED_CACHE="${WORKSPACE}/test3b-link"
+mkdir -p "${REAL_CACHE}"
+git -C "${REAL_CACHE}" init -q
+git -C "${REAL_CACHE}" config user.email "test@example.com"
+git -C "${REAL_CACHE}" config user.name "Test"
+touch "${REAL_CACHE}/initial"
+git -C "${REAL_CACHE}" add initial
+git -C "${REAL_CACHE}" commit -qm initial
+INITIAL_COMMIT="$(git -C "${REAL_CACHE}" rev-parse HEAD)"
+ln -s "${REAL_CACHE}" "${LINKED_CACHE}"
+if run_script "${LINKED_CACHE}///" >/dev/null; then
+  SYMLINK_CACHE_REJECTED=false
+else
+  SYMLINK_CACHE_REJECTED=true
+fi
+assert "symlinked cache root was rejected" test "${SYMLINK_CACHE_REJECTED}" = true
+assert "symlinked cache root was preserved" test -L "${LINKED_CACHE}"
+assert "symlinked cache history was preserved" test "$(git -C "${REAL_CACHE}" rev-parse HEAD)" = "${INITIAL_COMMIT}"
+echo ""
+
 test_private_commit_diagnostics() (
   local scenario="$1"
   local case_root="${WORKSPACE}/diagnostics-${scenario}"

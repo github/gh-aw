@@ -58,13 +58,13 @@ func run(pass *analysis.Pass) (any, error) {
 		if filecheck.ShouldSkipFilename(pos.Filename, generatedFiles) {
 			return
 		}
-		inspectBody(pass, body, noLintIndex)
+		reportSeenMapBoolCandidates(pass, body, noLintIndex)
 	})
 }
 
-// inspectBody walks a function body and reports map[string]bool variables
+// reportSeenMapBoolCandidates walks a function body and reports map[string]bool variables
 // that are only ever assigned the literal true (i.e., used as a set).
-func inspectBody(pass *analysis.Pass, body *ast.BlockStmt, noLintIndex nolint.DirectiveIndex) {
+func reportSeenMapBoolCandidates(pass *analysis.Pass, body *ast.BlockStmt, noLintIndex nolint.DirectiveIndex) {
 	candidates := collectSeenMapCandidates(pass, body)
 	if len(candidates) == 0 {
 		return

@@ -163,6 +163,19 @@ assert "Summary remains below the 1 MiB limit" "[ \"\$(wc -c < '${SUMMARY10}')\"
 assert "Reported line count matches audit" "grep -Fxq \"pre-agent-audit-line-count=\$(wc -l < /tmp/gh-aw/pre-agent-audit.txt | tr -d ' ')\" '${GH_OUT10}'"
 echo ""
 
+# ── Test 11: Rejects a symlinked GitHub output file ───────────────────────────
+echo "Test 11: Symlinked GitHub output is not written"
+SENTINEL11="${TEST_ROOT}/sentinel11"
+GH_OUT11="${TEST_ROOT}/github_output11"
+printf 'external sentinel\n' > "${SENTINEL11}"
+ln -s "${SENTINEL11}" "${GH_OUT11}"
+if GITHUB_WORKSPACE="${TEST_ROOT}/workspace-8" HOME="${TEST_ROOT}/home11" RUNNER_TEMP="${TEST_ROOT}/tmp11" GITHUB_OUTPUT="${GH_OUT11}" bash "${SCRIPT_PATH}" >/dev/null 2>&1; then
+  assert "rejects symlinked GITHUB_OUTPUT" "false"
+else
+  assert "rejects symlinked GITHUB_OUTPUT" "[ \"\$(cat '${SENTINEL11}')\" = 'external sentinel' ] && [ -L '${GH_OUT11}' ]"
+fi
+echo ""
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 if [ "${TESTS_FAILED}" -gt 0 ]; then

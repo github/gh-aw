@@ -178,6 +178,7 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 		BuildStringLiteral("skipped"),
 	)
 	jobConditionNode := BuildAnd(alwaysFunc, agentNotSkipped)
+	jobConditionNode = requireSafeOutputsAgentSuccess(jobConditionNode, data.SafeOutputs)
 
 	// When detection is expression-controlled, add the caller expression to the condition so
 	// GitHub Actions skips the detection job at runtime when the expression evaluates to false.
