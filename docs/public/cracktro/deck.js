@@ -3258,6 +3258,7 @@
     slides.push({
       group: "security",
       sound: "vault",
+      red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The next two principles are controlling untrusted reads and auditing all writes. The request flows animated here are illustrative.",
