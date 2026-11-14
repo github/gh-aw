@@ -265,6 +265,20 @@
   .rao-led { animation: rao-led 1.1s steps(2) infinite; }
   @keyframes rao-led { 50% { opacity: .25; } }
   .rao-pkt { opacity: 0; }
+  .otg-svg .fm-wire.o { stroke: #f0883e; } .otg-svg .mra-l.o { fill: #f0883e; }
+  .otg-row { fill: transparent; transition: fill .4s; } .otg-row.hot { fill: #ab7df826; }
+  .otg-a { fill: #e6edf3; font: 500 17px var(--mono); }
+  .otg-c { font: 700 20px var(--mono); text-anchor: middle; transition: fill .4s; transform-box: fill-box; transform-origin: center; }
+  .otg-c.no { fill: #f85149; } .otg-c.yes { fill: #3fb950; } .otg-c.flip { animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
+  .otg-q { fill: #f0f6fc; font: 700 30px "Mona Sans"; }
+  .otg-v { font: 700 22px var(--mono); } .otg-v.no { fill: #d29922; } .otg-v.yes { fill: #3fb950; }
+  .otg-m { fill: #c9d1d9; font: 500 17px var(--mono); }
+  .otg-d { opacity: 0; transition: opacity .3s; } .otg-d.on { opacity: 1; }
+  .otg-d.s { fill: #ab7df8; } .otg-d.g { fill: #f0883e; } .otg-d.x { fill: none; stroke-width: 2; }
+  .otg-d.s.x { stroke: #ab7df8; } .otg-d.g.x { stroke: #f0883e; }
+  .otg-n { fill: #f0f6fc; font: 800 48px "Mona Sans"; }
+  .otg-ax { fill: #9198a1; font: 500 15px var(--mono); }
+  .otg-mark { stroke: #ffffff40; stroke-dasharray: 4 5; }
   .mra-repo { fill: #0d111799; stroke: #3d444d; stroke-width: 2; }
   .mra-repo-t { fill: #9198a1; font: 600 20px var(--mono); }
   .mra-row { transition: transform .6s cubic-bezier(.2,.9,.2,1); }
@@ -3945,6 +3959,232 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic feedback loop"), h("h2", {}, letters("Research · Assign · "), letters("Observe", "l-grad"))), svg),
+    });
+  }
+
+  // Query → Ask → Grow: how OpenTelemetry was built; an expert DevOps agent read live spans through the Sentry and Grafana MCP servers, asked whether they held enough data, and filed one gap a day
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    const agent = (id, x, y, name, sub) => `<g class="fm-task" id="${id}"><circle cx="${x}" cy="${y}" r="34" fill="url(#otgAgent)"/>${ico("copilot", x, y + 1, 38)}
+      <text class="rao-h" x="${x}" y="${y + 66}" text-anchor="middle">${name}</text>${sub ? `<text class="rao-sub" x="${x}" y="${y + 90}" text-anchor="middle">${sub}</text>` : ""}</g>`;
+    // [attribute, DevOps question it unblocks, already visible in Grafana before the fix]
+    const ROWS = [
+      ["service.version", "Which release broke it?", 0],
+      ["github.run_id", "Which run emitted this span?", 0],
+      ["exception events", "Why did this run fail?", 0],
+      ["gh-aw.job.agent span", "How slow is the AI step?", 0],
+      ["gen_ai.usage.*", "What did this run cost?", 0],
+      ["deployment.environment", "Is staging or prod failing?", 1],
+    ];
+    // Measured: every [otel-advisor] / [grafana-otel-advisor] issue, as day offset from 5 Apr 2026,
+    // s = Sentry advisor, g = Grafana advisor, m = closed by a merged PR, x = closed as not planned.
+    const DAYS = (
+      "0sm 0sm 0sm 0sm 0sm 0sm 0sm 0sm 0sm 1sm 2sm 4sm 5sm 6sm 7sm 7sm 8sm 9sm 10sm 11sm 12sm 14sm 15sm 16sm 17sm 18sm 19sm 20sm 21sm 22sx " +
+      "23sm 24sm 27sm 28sm 29sx 29gm 29gm 30gm 30gx 30sm 31gm 31sx 31sm 32sx 33gm 33sm 34gm 34sm 35gm 35sm 36gx 36sx 37gx 37sm 38gm 38sm " +
+      "40gx 40sm 41gm 41sm 42gm 42sm 43gm 43sm 44gm 44sm 45gx 45sx 45sx 45sx 47sm 48sm 49sm 50sm 51sm 52sx 53sx 54sx 55sx 56sx 57sx 58sx " +
+      "59sx 60sx 61sx 62sx 63sx 64sx 65sx"
+    )
+      .split(" ")
+      .map(s => [+s.slice(0, -2), s.at(-2), s.at(-1)]);
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["qS", "M472 175 C540 175 540 222 602 226", "p", ["Sentry MCP"], 538, 150, "middle"],
+      ["qG", "M472 300 C540 300 540 248 602 244", "o", ["Grafana MCP"], 548, 372, "middle"],
+      ["eAsk", "M676 235 H736", "p", ["asks"], 706, 218, "middle"],
+      ["eIssue", "M1182 235 H1264", "p", ["files", "1 issue"], 1223, 192, "middle"],
+      ["eAssign", "M1340 235 H1418", "p", ["assigns"], 1380, 218, "middle"],
+      ["ePR", "M1492 235 H1580", "b", ["PR"], 1536, 218, "middle"],
+      ["eExp", "M1620 271 V412 H245 V396", "b", ["merged · the next run exports richer spans over OTLP"], 930, 400, "middle"],
+    ];
+    const STEPS = ["qS", "eAsk", "eIssue", "eAssign", "ePR", "eExp"];
+    const LANE = [0, 1, 2, 2, 2, 2];
+    let g = `<defs><radialGradient id="otgAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="otgP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="otgO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f0883e"/></marker>
+      <marker id="otgB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 700, "QUERY"],
+      [700, 1220, "ASK"],
+      [1220, VW, "GROW"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="otgLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="428"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#otg${c.toUpperCase()})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    // live spans as the two backends see them
+    g += `<g id="otgTable"><rect class="rao-card on" x="20" y="80" width="452" height="312" rx="14" style="--rc:#ab7df8"/>
+      <text class="rao-h" x="40" y="114">live gh-aw spans</text>
+      <text class="rao-k" x="40" y="146">attribute</text><text class="rao-k" x="350" y="146" text-anchor="middle">Sentry</text><text class="rao-k" x="430" y="146" text-anchor="middle">Grafana</text>`;
+    ROWS.forEach(([a], i) => {
+      const y = 186 + i * 36;
+      g += `<rect class="otg-row" id="otgRow${i}" x="30" y="${y - 24}" width="432" height="34" rx="6"/>
+        <text class="otg-a" x="40" y="${y}">${a}</text><text class="otg-c" id="otgS${i}" x="350" y="${y}"></text><text class="otg-c" id="otgG${i}" x="430" y="${y}"></text>`;
+    });
+    g += `</g>`;
+    g += agent("otgAdv", 640, 235, "OTel Advisor", "DevOps expert");
+    g += `<g class="fm-task" id="otgAsk"><rect class="rao-card on" id="otgAskCard" x="740" y="120" width="442" height="230" rx="14" style="--rc:#d29922"/>
+      <text class="rao-k" x="762" y="160">can these spans answer:</text>
+      <text class="otg-q" id="otgQ" x="762" y="206"></text>
+      <line class="fm-div" x1="756" y1="230" x2="1166" y2="230"/>
+      <text class="otg-v" id="otgV" x="762" y="274"></text>
+      <text class="otg-m" id="otgM" x="762" y="310"></text></g>`;
+    g += box("otgIssue", 1304, 235, "issue") + agent("otgCop", 1456, 235, "Copilot") + box("otgMerge", 1620, 235, "merge");
+    // measured timeline of the advisors' issues
+    const X0 = 300,
+      X1 = 1660,
+      BY = 650,
+      dx = (X1 - X0) / 65,
+      seen = {};
+    g += `<line class="fm-div" x1="0" y1="430" x2="${VW}" y2="430"/>
+      <text class="rao-h" x="20" y="470">Grown one gap a day</text><text class="rao-sub" x="20" y="494">measured · gh-aw issues</text>
+      <text class="otg-n" id="otgN" x="20" y="552">0</text><text class="rao-sub" id="otgNl" x="90" y="552">issues</text>
+      <circle class="otg-d s on" cx="28" cy="578" r="6"/><text class="rao-sub" x="42" y="583">Sentry advisor</text>
+      <circle class="otg-d g on" cx="28" cy="602" r="6"/><text class="rao-sub" x="42" y="607">Grafana advisor</text>
+      <circle class="otg-d s x on" cx="28" cy="626" r="6"/><text class="rao-sub" x="42" y="631">not planned</text>
+      <text class="rao-sub" x="20" y="660">62 fixed by merged PRs</text>
+      <line class="otg-mark" x1="${X0 + 29 * dx}" y1="480" x2="${X0 + 29 * dx}" y2="${BY + 8}"/>
+      <text class="otg-ax" x="${X0 + 29 * dx + 8}" y="476">4 May · Grafana advisor joins</text>
+      <line class="otg-mark" x1="${X0 + 52 * dx - dx / 2}" y1="480" x2="${X0 + 52 * dx - dx / 2}" y2="${BY + 8}"/>
+      <text class="otg-ax" x="${X1}" y="476" text-anchor="end">findings stop landing · retired 9 Jun</text>
+      <text class="otg-ax" x="${X0}" y="476">5 Apr · Sentry advisor starts</text>
+      <line class="fm-div" x1="${X0 - 10}" y1="${BY + 10}" x2="${X1 + 10}" y2="${BY + 10}"/>
+      <text class="otg-ax" x="${X0}" y="676" text-anchor="middle">Apr</text><text class="otg-ax" x="${X0 + 26 * dx}" y="676" text-anchor="middle">May</text><text class="otg-ax" x="${X0 + 57 * dx}" y="676" text-anchor="middle">Jun</text>`;
+    DAYS.forEach(([d, who, how], i) => {
+      const k = (seen[d] = (seen[d] || 0) + 1) - 1;
+      g += `<circle class="otg-d ${who}${how === "x" ? " x" : ""}" id="otgD${i}" cx="${(X0 + d * dx).toFixed(1)}" cy="${BY - k * 14}" r="5.5"/>`;
+    });
+    g += `<circle class="fm-dot otg-dot" r="8"/><circle class="fm-dot otg-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg rpa-svg otg-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      [dotA, dotB] = svg.querySelectorAll(".otg-dot"),
+      ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 820,
+      START = 900,
+      R = ROWS.length,
+      TOTAL = R * STEPS.length + 2,
+      HOLD = 4200,
+      CYC = START + TOTAL * STEP + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1,
+      shown = 0;
+    const cell = (el, ok, flip) => {
+      el.textContent = ok ? "✓" : "✗";
+      el.setAttribute("class", `otg-c ${ok ? "yes" : "no"}`);
+      if (flip) {
+        void el.getBBox();
+        el.classList.add("flip");
+      }
+    };
+    const reset = () => {
+      svg.querySelectorAll(".fm-task.on, .fm-out.on, .mra-lane.on, .otg-row.hot, .otg-d.on[id]").forEach(x => x.classList.remove("on", "hot"));
+      ROWS.forEach(([, , gr], i) => {
+        cell($("otgS" + i), 0);
+        cell($("otgG" + i), gr);
+      });
+      $("otgQ").textContent = "waiting for spans…";
+      $("otgV").textContent = $("otgM").textContent = "";
+      shown = 0;
+      $("otgN").textContent = "0";
+    };
+    const ask = r => {
+      const done = r >= R,
+        [a, q, gr] = ROWS[Math.min(r, R - 1)];
+      $("otgQ").textContent = done ? "Can we run DevOps on this?" : q;
+      $("otgV").textContent = done ? "✓ enough data" : "✗ not enough data";
+      $("otgV").setAttribute("class", `otg-v ${done ? "yes" : "no"}`);
+      $("otgM").textContent = done ? "every question above is answerable" : `missing${gr ? " in Sentry" : ""}: ${a}`;
+      $("otgAskCard").style.setProperty("--rc", done ? "#3fb950" : "#d29922");
+    };
+    const arrive = (r, s) => {
+      $("otgLane" + LANE[s]).classList.add("on");
+      if (s === 0) {
+        $("otgAdv").classList.add("on");
+        svg.querySelectorAll(".otg-row.hot").forEach(x => x.classList.remove("hot"));
+        if (r < R) $("otgRow" + r).classList.add("hot");
+        ["otgIssue", "otgCop", "otgMerge"].forEach(id => $(id).classList.remove("on"));
+      } else if (s === 1) {
+        $("otgAsk").classList.add("on");
+        ask(r);
+        sfx.notify(r >= R);
+      } else if (s === 2) $("otgIssue").classList.add("on");
+      else if (s === 3) $("otgCop").classList.add("on");
+      else if (s === 4) $("otgMerge").classList.add("on");
+      else {
+        cell($("otgS" + r), 1, 1);
+        if (!ROWS[r][2]) cell($("otgG" + r), 1, 1);
+        sfx.review();
+      }
+    };
+    const grow = n => {
+      for (; shown < n; shown++) $("otgD" + shown).classList.add("on");
+      $("otgN").textContent = shown;
+    };
+    const move = (dot, p, f, col) => {
+      const q = p.getPointAtLength(p.getTotalLength() * ease(Math.min(1, f / 0.8)));
+      dot.style.opacity = 1;
+      dot.setAttribute("cx", q.x);
+      dot.setAttribute("cy", q.y);
+      dot.setAttribute("fill", col);
+      dot.style.color = col;
+    };
+    slides.push({
+      group: "loops",
+      sound: "grow",
+      palette: ["#8957e5", "#f0883e", "#238636", "#1f6feb"],
+      notes:
+        "Query, ask, grow: how gh-aw's OpenTelemetry support was built. The loop at the top is illustrative; the timeline at the bottom is measured from gh-aw's own issues. OTLP export landed on 4 April 2026. From 5 April a daily OTel Instrumentation Advisor, prompted as a senior DevOps engineer, read live gh-aw spans through the Sentry MCP server, and from 4 May a second advisor did the same through the Grafana MCP server. Each run asked one question: do these spans hold enough data to answer operational questions, such as why did this run fail, which release, which environment, how slow is the agent, what did it cost? It filed the single most impactful gap as one issue for Copilot, so the feature grew one small, reviewable increment at a time, the feature grower pattern. Measured: 89 advisor issues between 5 April and 9 June 2026, 17 from the Grafana advisor; 62 were closed by merged pull requests and 25 as not planned. When two weeks of findings stopped landing, the advisors were retired; a smoke workflow still checks that both backends accept spans and can be queried.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          popK = -1;
+          reset();
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        const k = Math.floor((u - START) / STEP),
+          f = ((u - START) % STEP) / STEP;
+        grow(Math.round(DAYS.length * Math.max(0, Math.min(1, (u - START) / ((R * STEPS.length - 1) * STEP)))));
+        if (u < START || k >= TOTAL) {
+          dotA.style.opacity = dotB.style.opacity = 0;
+          return;
+        }
+        const r = Math.floor(k / STEPS.length),
+          s = k % STEPS.length,
+          p = $(STEPS[s]);
+        p.classList.add("hot");
+        if (dotA.style.opacity !== "1") sfx.pop(0);
+        move(dotA, p, f, s === 0 ? "#ab7df8" : p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        if (s === 0) {
+          $("qG").classList.add("hot");
+          move(dotB, $("qG"), f, "#f0883e");
+        } else dotB.style.opacity = 0;
+        if (f >= 0.8 && popK !== k) {
+          popK = k;
+          sfx.pop(k);
+          arrive(r, s);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How OpenTelemetry was built"), h("h2", {}, letters("Query · Ask · "), letters("Grow", "l-grad"))), svg),
     });
   }
 
@@ -8283,6 +8523,12 @@
         for (let i = 0; i < 10; i++) osc("sine", hz(84 + P[(i * 3) % 5]), t + 0.2 + i * 0.07, 0.05, 0.015);
         [78, 72].forEach((m, i) => tone(m, t + 1.0 + i * 0.16, { type: "square", dur: 0.16, vol: 0.04, cutoff: 1800, detune: 12 }));
         [72, 76, 79].forEach((m, i) => bell(m, t + 1.5 + i * 0.07, 0.035, 1.2));
+      },
+      // query → ask → grow: two backend queries, a questioning interval, then a sprouting arpeggio
+      grow: t => {
+        [79, 74].forEach((m, i) => osc("sine", hz(m), t + 0.2 + i * 0.3, 0.5, 0.04, { a: 0.003 }));
+        [72, 78].forEach((m, i) => tone(m, t + 0.9 + i * 0.18, { type: "triangle", dur: 0.2, vol: 0.05, cutoff: 2200, detune: 4 }));
+        [67, 71, 74, 79, 83].forEach((m, i) => bell(m, t + 1.4 + i * 0.09, 0.03, 1.1));
       },
       // mine → refine → apply: pickaxe strikes, a crystal forming (the rule), then stamped across the repo one PR at a time
       mine: t => {

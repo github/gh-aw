@@ -5,7 +5,7 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 # Cracktro talk deck
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a thirty-one-slide deck with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a thirty-two-slide deck with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
@@ -14,7 +14,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a th
 - `docs/public/cracktro/deck.js`: about 200 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of thirty-one slide headings, so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of thirty-two slide headings, so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -68,9 +68,10 @@ slides.push({
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
 - Exception: the Issues as intent slide (11) shows real counts for gh-aw issues labelled `community` and the merged PRs that closed them (November 2026 snapshot); its notes and caption say so.
-- Exception: the data slides after the finale. Slide 30, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 31, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record.
+- Exception: the Query · Ask · Grow slide (16, `otg-` classes) has a bottom timeline of gh-aw's measured `[otel-advisor]`/`[grafana-otel-advisor]` issues (5 Apr to 9 Jun 2026, day offsets in `DAYS`); the loop above it is illustrative and its notes say so.
+- Exception: the data slides after the finale. Slide 31, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 32, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 2, 3, 6, 7, and 9–29 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 2, 3, 6, 7, and 9–30 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop

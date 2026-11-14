@@ -3,13 +3,13 @@ import { readdirSync } from "node:fs";
 
 test.use({ reducedMotion: "reduce" });
 
-test("presents the thirty-one slides without the removed sections", async ({ page }) => {
+test("presents the thirty-two slides without the removed sections", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/gh-aw/cracktro/");
   await expect(page).toHaveTitle("GitHub Agentic Workflows Talk");
-  await expect(page.locator(".slide")).toHaveCount(31);
+  await expect(page.locator(".slide")).toHaveCount(32);
   await expect(page.locator(".stage")).not.toContainText(/the crew|the story|akeso|security at (?:hyper)?scale/i);
 
   const headings = [
@@ -28,6 +28,7 @@ test("presents the thirty-one slides without the removed sections", async ({ pag
     "Daily Unsloppers",
     "Merge fast, unslop daily",
     "Research · Assign · Observe",
+    "Query · Ask · Grow",
     "Mine · Refine · Apply",
     "Scan · Fix · Learn",
     "Agents that debug agents",
@@ -47,7 +48,7 @@ test("presents the thirty-one slides without the removed sections", async ({ pag
   ];
   for (const [index, heading] of headings.entries()) {
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
-    await expect(page.locator(".count")).toHaveText(`${String(index + 1).padStart(2, "0")} / 31`);
+    await expect(page.locator(".count")).toHaveText(`${String(index + 1).padStart(2, "0")} / 32`);
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(heading);
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
@@ -56,7 +57,7 @@ test("presents the thirty-one slides without the removed sections", async ({ pag
 
 test("preserves navigation, slide links, speaker notes, and sound controls", async ({ page }) => {
   await page.goto("/gh-aw/cracktro/#9");
-  await expect(page.locator(".count")).toHaveText("09 / 31");
+  await expect(page.locator(".count")).toHaveText("09 / 32");
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
   await expect(page.locator(".notes")).toContainText("LabelOps");
@@ -72,15 +73,15 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.keyboard.press("Space");
   await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#10$/);
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("09 / 31");
+  await expect(page.locator(".count")).toHaveText("09 / 32");
   await page.reload();
-  await expect(page.locator(".count")).toHaveText("09 / 31");
+  await expect(page.locator(".count")).toHaveText("09 / 32");
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("01 / 31");
+  await expect(page.locator(".count")).toHaveText("01 / 32");
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator(".count")).toHaveText("31 / 31");
+  await expect(page.locator(".count")).toHaveText("32 / 32");
 });
 
 test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
@@ -91,9 +92,9 @@ test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
   const next = page.getByRole("button", { name: "Next slide", exact: true });
   await expect(prev).toBeDisabled();
   await next.click();
-  await expect(page.locator(".count")).toHaveText("02 / 31");
+  await expect(page.locator(".count")).toHaveText("02 / 32");
   await prev.click();
-  await expect(page.locator(".count")).toHaveText("01 / 31");
+  await expect(page.locator(".count")).toHaveText("01 / 32");
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeVisible();
@@ -146,7 +147,7 @@ test("publishes synthetic examples without profile assets or private source refe
     return route.abort();
   });
   await page.clock.install();
-  await page.goto("/gh-aw/cracktro/#16");
+  await page.goto("/gh-aw/cracktro/#17");
   await page.clock.runFor(15_000);
   for (const author of await page.locator(".mra-who").allTextContents()) {
     expect(author).toMatch(/^(?:reviewer|maintainer|copilot) · /);
@@ -156,7 +157,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
   await page.keyboard.press("n");
-  for (const slide of [2, 3, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]) {
+  for (const slide of [2, 3, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
