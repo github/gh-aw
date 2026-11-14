@@ -358,6 +358,39 @@
   @keyframes mra-pop { 0% { opacity: 0; } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: .5; } }
   #nMiner.blink circle { animation: mra-blink .7s ease-out; }
   @keyframes mra-blink { 30% { filter: drop-shadow(0 0 24px #c297ff) brightness(1.4); } }
+  .sd-svg { left: 60px; top: 290px; width: 1800px; height: 680px; }
+  .sd-card rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
+  .sd-card.read rect { stroke: var(--k); filter: drop-shadow(0 0 12px var(--k)); }
+  .sd-card .sd-sep { stroke: #3d444d; stroke-width: 1.5; }
+  .sd-file { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .04em; }
+  .sd-code { fill: #e6edf3; font: 500 13px var(--mono); white-space: pre; }
+  .sd-code .k { fill: #ff7b72; } .sd-code .f { fill: #d2a8ff; }
+  .sd-intent { fill: var(--k); font: 600 19px "Mona Sans"; opacity: 0; transition: opacity .4s; }
+  .sd-card.read .sd-intent { opacity: 1; }
+  .sd-scan { stroke: #79c0ff; stroke-width: 3; filter: drop-shadow(0 0 10px #79c0ff); opacity: 0; }
+  .sd-static rect { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
+  .sd-static-t { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .1em; }
+  .sd-cmd { fill: #e6edf3; font: 500 20px var(--mono); }
+  .sd-res { fill: #ff7b72; font: 600 22px "Mona Sans"; opacity: 0; transition: opacity .4s; }
+  .sd-res.on { opacity: 1; }
+  #nSdAgent { opacity: .5; transition: opacity .4s; } #nSdAgent.on { opacity: 1; }
+  #nSdAgent.blink circle { animation: mra-blink .7s ease-out; }
+  .sd-agent-t { fill: #c297ff; font: 600 19px "Mona Sans"; text-anchor: middle; }
+  .sd-cl { opacity: 0; transform-box: fill-box; transform-origin: center; transition: opacity .5s; }
+  .sd-cl.on { opacity: 1; animation: fm-pop .6s cubic-bezier(.3,1.6,.4,1); }
+  .sd-cl circle { fill: color-mix(in srgb, var(--k) 10%, transparent); stroke: var(--k); stroke-width: 2; stroke-dasharray: 8 6; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--k) 50%, transparent)); }
+  .sd-cl text { fill: var(--k); font: 700 21px "Mona Sans"; text-anchor: middle; }
+  .sd-chip { opacity: 0; transition: transform 1.1s cubic-bezier(.2,.9,.2,1), opacity .4s; }
+  .sd-chip.on { opacity: 1; }
+  .sd-chip.snap { transition: none; }
+  .sd-chip rect { fill: #0d1117; stroke: var(--k); stroke-width: 2; }
+  .sd-chip text { fill: #f0f6fc; font: 600 15px var(--mono); text-anchor: middle; }
+  .sd-lone text { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  .sd-out { opacity: 0; transition: opacity .5s; } .sd-out.on { opacity: 1; animation: mra-in .6s cubic-bezier(.2,.9,.2,1); }
+  .sd-out rect { fill: #0d1117d9; stroke: #3fb950; stroke-width: 2; filter: drop-shadow(0 0 12px #3fb95066); }
+  .sd-out-m { fill: #ab7df8; font: 600 17px var(--mono); letter-spacing: .06em; }
+  .sd-out-t { fill: #f0f6fc; font: 600 24px "Mona Sans"; }
+  .sd-out-s { fill: #9198a1; font: 500 18px var(--mono); }
   .mra-l { font: 600 21px "Mona Sans"; fill: #ab7df8; opacity: .55; transition: opacity .4s; }
   .mra-l.b { fill: #79c0ff; }
   .mra-lane { transition: fill .4s; } .mra-lane.on { fill: #f0f6fc; }
@@ -4827,6 +4860,156 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+    });
+  }
+
+  // Semantic duplicates: static clone detection finds nothing because the code looks different; an agent reads each function's intent, clusters by meaning and consolidates the biggest cluster
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 680,
+      AX = 1100,
+      AY = 500;
+    const KC = ["#d29922", "#79c0ff", "#3fb950", "#9198a1"],
+      INTENT = ["retry with backoff", "slugify a title", "parse a duration", "hash a file"];
+    // synthetic snippets: same intent, different names, loops and libraries
+    const CARDS = [
+      ["fetch/retry.go", 0, ["for i := 0; i < 3; i++ {", "  if fetch() == nil { break }", "  time.Sleep(backoff(i))", "}"]],
+      ["text/slug.go", 1, ["s = strings.ToLower(s)", "return nonAlnum.", '  ReplaceAllString(s, "-")']],
+      ["cli/timeout.go", 2, ["n, _ := strconv.Atoi(", '  strings.TrimRight(v, "m"))', "return time.Duration(n) *", "  time.Minute"]],
+      ["mcp/client.go", 0, ["return retry.Do(call,", "  retry.Attempts(4),", "  retry.Delay(time.Second))"]],
+      ["util/hash.go", 3, ["h := sha256.New()", "io.Copy(h, f)", "return hex.EncodeToString(", "  h.Sum(nil))"]],
+      ["workflow/name.go", 1, ["for _, r := range title {", "  if !unicode.IsLetter(r) {", "    r = '-' }", "  b.WriteRune(r) }"]],
+      ["cli/download.go", 0, ["for n := range 5 {", "  if err = dl(); err == nil {", "    return nil }", "  wait(1 << n) }"]],
+      ["parse/ttl.go", 2, ["d, err :=", "  time.ParseDuration(v)", "if err != nil { return 0 }", "return d"]],
+    ];
+    const CL = [
+      { cx: 1290, cy: 245, r: 140, ly: 160, ys: [-30, 20, 70] },
+      { cx: 1655, cy: 178, r: 112, ly: 128, ys: [-5, 43] },
+      { cx: 1655, cy: 420, r: 112, ly: 370, ys: [-5, 43] },
+    ];
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const code = line => esc(line.replace(/^ +/, s => "\u00a0".repeat(s.length))).replace(/\b(for|if|return|range|break)\b/g, '<tspan class="k">$1</tspan>');
+    const pos = CARDS.map((_, i) => [10 + (i % 4) * 270, 80 + Math.floor(i / 4) * 190]);
+    const seen = [0, 0, 0];
+    const target = CARDS.map(([, k]) => (k === 3 ? [1290, 440] : [CL[k].cx, CL[k].cy + CL[k].ys[seen[k]++]]));
+    let g = `<defs><radialGradient id="sdAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>
+      <text class="fm-lane-t" x="545" y="40">CODE · AS WRITTEN</text><text class="fm-lane-t" x="1455" y="40">CODE · BY INTENT</text>
+      <line class="fm-div" x1="${AX}" y1="0" x2="${AX}" y2="${AY - 50}"/>`;
+    CARDS.forEach(([file, k, lines], i) => {
+      const [x, y] = pos[i];
+      g += `<g class="sd-card" id="sdCard${i}" style="--k:${KC[k]}"><rect x="${x}" y="${y}" width="258" height="170" rx="12"/>
+        <text class="sd-file" x="${x + 12}" y="${y + 26}">${file}</text>
+        ${lines.map((l, j) => `<text class="sd-code" x="${x + 12}" y="${y + 52 + j * 20}">${code(l)}</text>`).join("")}
+        <line class="sd-sep" x1="${x}" y1="${y + 128}" x2="${x + 258}" y2="${y + 128}"/>
+        <text class="sd-intent" x="${x + 12}" y="${y + 156}">intent · ${INTENT[k]}</text></g>`;
+    });
+    g += `<line class="sd-scan" id="sdScan" x1="0" y1="70" x2="0" y2="450"/>
+      <g class="sd-static"><rect x="10" y="470" width="950" height="180" rx="14"/>
+        <text class="sd-static-t" x="34" y="506">STATIC CLONE DETECTION · TOKENS + AST</text>
+        <text class="sd-cmd" x="34" y="550">$ clone-scan --tokens --ast ./pkg</text>
+        <g class="sd-res" id="sdRes"><text x="34" y="598">0 clones found</text>
+        <text class="sd-out-s" x="34" y="632">different names, loops and libraries: nothing matches line by line</text></g></g>`;
+    CL.forEach(({ cx, cy, r, ly }, k) => {
+      g += `<g class="sd-cl" id="sdCl${k}" style="--k:${KC[k]}"><circle cx="${cx}" cy="${cy}" r="${r}"/><text x="${cx}" y="${ly}">${INTENT[k]}</text></g>`;
+    });
+    g += `<g class="sd-cl sd-lone" id="sdCl3" style="--k:${KC[3]}"><text x="1290" y="485">unique · left alone</text></g>`;
+    CARDS.forEach(([file, k], i) => {
+      g += `<g class="sd-chip" id="sdChip${i}" style="--k:${KC[k]}"><rect x="-90" y="-18" width="180" height="36" rx="18"${k === 3 ? ' stroke-dasharray="6 5"' : ""}/><text x="0" y="6">${file}</text></g>`;
+    });
+    g += `<g id="sdBeams"></g>
+      <g id="nSdAgent"><circle cx="${AX}" cy="${AY}" r="34" fill="url(#sdAgent)"/>${ico("copilot", AX, AY + 1, 38)}
+        <text class="sd-agent-t" x="${AX}" y="${AY + 62}">Duplicate Code</text><text class="sd-agent-t" x="${AX}" y="${AY + 86}">Detector</text></g>
+      <g class="sd-out" id="sdOut"><rect x="1240" y="555" width="550" height="112" rx="14"/>
+        <text class="sd-out-m" x="1262" y="587">DRAFT PR · [duplicate-code]</text>
+        <text class="sd-out-t" x="1262" y="623">One retry helper, 3 call sites</text>
+        <text class="sd-out-s" x="1262" y="653"><tspan fill="#3fb950">+24</tspan> <tspan fill="#f85149">−71</tspan> · 2 more clusters queued</text></g>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg sd-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      scan = $("sdScan"),
+      agentEl = $("nSdAgent"),
+      beams = $("sdBeams");
+    const chipAt = (i, [x, y]) => ($("sdChip" + i).style.transform = `translate(${x}px,${y}px)`);
+    const read = i => {
+      const [x, y] = pos[i],
+        cx = x + 129,
+        cy = y + 85;
+      $("sdCard" + i).classList.add("read");
+      agentEl.classList.add("on");
+      agentEl.classList.remove("blink");
+      void agentEl.getBBox();
+      agentEl.classList.add("blink");
+      const b = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      b.setAttribute("class", "mra-beam");
+      b.setAttribute("stroke", KC[CARDS[i][1]]);
+      b.setAttribute("d", `M${AX - 30} ${AY - 10} C${AX - 120} ${AY - 40}, ${cx} ${cy + 140}, ${cx} ${cy + 40}`);
+      beams.appendChild(b);
+      setTimeout(() => b.remove(), 1400);
+      sfx.pop(i);
+    };
+    const cluster = () => {
+      [0, 1, 2, 3].forEach(k => $("sdCl" + k).classList.add("on"));
+      CARDS.forEach((_, i) => {
+        const c = $("sdChip" + i);
+        c.style.transitionDelay = `${i * 0.09}s`;
+        c.classList.add("on");
+        chipAt(i, target[i]);
+      });
+      sfx.notify(false);
+    };
+    const EVENTS = [[2050, () => ($("sdRes").classList.add("on"), sfx.bug())], ...CARDS.map((_, i) => [2600 + i * 480, () => read(i)]), [6900, cluster], [8700, () => ($("sdOut").classList.add("on"), sfx.review())]];
+    const CYC = 12500;
+    let t0 = 0,
+      cyc = -1,
+      fired = 0;
+    const reset = () => {
+      svg.querySelectorAll(".read, .on, .blink").forEach(x => x.classList.remove("read", "on", "blink"));
+      beams.innerHTML = "";
+      CARDS.forEach((_, i) => {
+        const c = $("sdChip" + i),
+          [x, y] = pos[i];
+        c.classList.add("snap");
+        c.style.transitionDelay = "0s";
+        chipAt(i, [x + 129, y + 85]);
+        void c.getBBox();
+        c.classList.remove("snap");
+      });
+      fired = 0;
+    };
+    slides.push({
+      group: "loops",
+      sound: "dedupe",
+      palette: ["#8957e5", "#d29922", "#1f6feb", "#238636"],
+      notes:
+        "Semantic duplicates: static clone detection compares tokens and syntax trees, so code that does the same thing with different names, loops and libraries slips through. An agent instead reads what each function is for, writes its intent down, and clusters functions by meaning; only clusters become consolidation work, and unique code is left alone. gh-aw runs this daily as its Duplicate Code Detector workflow, using Serena's semantic code analysis, and opens draft pull requests. The code snippets, file names and diff counts on this slide are synthetic and illustrative.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        const s = (u - 400) / 1600;
+        scan.style.opacity = s > 0 && s < 1 ? 1 : 0;
+        if (s > 0 && s < 1) {
+          const x = 1080 * s;
+          scan.setAttribute("x1", x);
+          scan.setAttribute("x2", x);
+        }
+        while (fired < EVENTS.length && u >= EVENTS[fired][0]) EVENTS[fired++][1]();
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cluster code by intent, not by syntax"), h("h2", {}, letters("Semantic "), letters("duplicates", "l-grad"))), svg),
     });
   }
 
@@ -9753,6 +9936,12 @@
           click(t + 1.25 + i * 0.1, 3000, 0.04, 6);
           tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
         });
+      },
+      // semantic duplicates: scattered blips from different corners of the repo, then they settle into one shared chord
+      dedupe: t => {
+        [74, 81, 77, 86, 79, 72].forEach((m, i) => tone(m, t + 0.2 + i * 0.09, { type: "triangle", dur: 0.1, vol: 0.04, cutoff: 2600, detune: 4 }));
+        [60, 64, 67, 72].forEach(m => tone(m, t + 0.85, { type: "sine", dur: 0.9, vol: 0.04, cutoff: 1800 }));
+        bell(84, t + 1.15, 0.03, 1.2);
       },
       // spec → model → test: a rising run of explored states, a counterexample's buzz, then the trace resolving into a test
       formal: t => {
