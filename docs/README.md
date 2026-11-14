@@ -69,7 +69,9 @@ jump directly to a slide (on narrow screens they become previous/next slide arro
 flanked by track-style previous/next band buttons); `#1` through `#53` are shareable slide links. Clicking the left third
 goes back; clicking elsewhere advances. On touch screens, swipe left or right
 within a band and up or down between bands. Slides within a band push left, and
-moving to a later band slides up (reversed when going back).
+moving to a later band slides up (reversed when going back). Slides built on a gh-aw
+workflow show its original `/agentic-workflows` prompt along the top; click it to
+open the full prompt in a phone-style dialog (Escape or Done closes it).
 Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
 1200x630 render of the title slide; regenerate it if the title slide changes.
 

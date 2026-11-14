@@ -56,6 +56,7 @@ slides.push({
 |---|---|
 | `mechanics.md` | Changing bands, slide order or `group`, navigation, transitions, backgrounds, audio, or animated SVG flows (`EDGES`/`SEQ`/`LANE`). |
 | `content-rules.md` | Adding any public text, data, avatar or image; contains the per-slide Exception bullets for measured data. |
+| `workflow-prompts.md` | Adding or refreshing a slide's `/agentic-workflows` prompt line (`PROMPTS` table and phone dialog); holds the prompt-mining algorithm and the exact PR/task/session references. |
 | `data-refresh.md` | Adding, changing or refreshing a data slide; holds the refresh mini-skill convention and the slide→`refresh/<slug>.md` index. |
 
 Core rules (details in `content-rules.md`): everything is public; no people except the allowed avatars; no 40-hex SHAs or private repos; the only URL is `https://github.github.com/gh-aw/introduction/overview/`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.

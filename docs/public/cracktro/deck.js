@@ -334,6 +334,29 @@
   .ct-num { font: 800 64px/1 "Mona Sans"; font-variant-numeric: tabular-nums; background: linear-gradient(90deg, var(--a), var(--b)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .ct-lab { margin-top: 10px; font: 500 22px/1.2 "Mona Sans"; color: #9198a1; }
   .ct-src { position: absolute; right: 150px; top: 846px; font: 500 16px var(--mono); color: #6e7681; letter-spacing: .06em; }
+  .awp { position: absolute; left: 110px; right: 110px; top: 30px; font: 500 17px/1.3 var(--mono); color: #6e7681; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .awp button { all: unset; cursor: pointer; color: #a371f7; font-weight: 600; margin-right: .6em; border-bottom: 1px dashed #a371f780; }
+  .awp button:hover, .awp button:focus-visible { color: #d2a8ff; border-bottom-color: #d2a8ff; }
+  .awd { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #010409b3; backdrop-filter: blur(14px); opacity: 0; transition: opacity .25s; }
+  .awd.on { opacity: 1; }
+  .awd-ph { position: relative; display: flex; flex-direction: column; height: min(92vh, 900px); aspect-ratio: 9 / 19.5; background: #0d1117; border: 12px solid #1c1c1e; border-radius: 58px; box-shadow: 0 0 0 2px #3d444d, 0 40px 120px #000c; overflow: hidden; font: 400 15px/1.45 "Mona Sans", system-ui, sans-serif; color: #f0f6fc; transform: translateY(40px) scale(.96); transition: transform .35s cubic-bezier(.2,.9,.2,1); }
+  .awd.on .awd-ph { transform: none; }
+  .awd-st { display: flex; justify-content: space-between; align-items: center; padding: 14px 28px 6px; font-weight: 600; font-size: 14px; }
+  .awd-di { width: 110px; height: 30px; border-radius: 20px; background: #000; }
+  .awd-sig { font-size: 11px; letter-spacing: .1em; }
+  .awd-nav { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 8px 16px 12px; border-bottom: 1px solid #262c36; }
+  .awd-bk { color: #4493f8; font-size: 15px; }
+  .awd-tt { text-align: center; display: grid; } .awd-tt b { font-size: 15px; } .awd-tt small { color: #9198a1; font-size: 11px; }
+  .awd-x { all: unset; justify-self: end; color: #4493f8; font-weight: 600; cursor: pointer; }
+  .awd-chat { flex: 1; overflow-y: auto; padding: 18px 14px; display: flex; flex-direction: column; gap: 16px; scrollbar-width: thin; }
+  .awd-me { align-self: flex-end; max-width: 90%; background: #1f6feb; color: #fff; padding: 12px 14px; border-radius: 20px 20px 6px 20px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+  .awd-chip { display: inline-block; margin: 0 6px 4px 0; padding: 1px 8px; border-radius: 8px; background: #ffffff2e; font: 600 12px var(--mono); }
+  .awd-bot { display: flex; gap: 10px; align-items: flex-start; color: #9198a1; font-size: 13px; } .awd-bot b { color: #f0f6fc; } .awd-bot p { margin: 0; }
+  .awd-av { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #8957e5; color: #fff; }
+  .awd-in { display: flex; justify-content: space-between; align-items: center; margin: 8px 14px 30px; padding: 10px 10px 10px 16px; border: 1px solid #3d444d; border-radius: 22px; color: #6e7681; }
+  .awd-in i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #262c36; color: #9198a1; font-style: normal; }
+  .awd-home { position: absolute; left: 50%; bottom: 8px; width: 130px; height: 5px; margin-left: -65px; border-radius: 3px; background: #f0f6fc; }
+  .active .awp { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.2s; }
   .gf-svg { left: 150px; top: 282px; width: 1620px; height: 540px; }
   .gf-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .gf-svg .mra-l.g { fill: #3fb950; }
   .gf-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
@@ -11919,6 +11942,70 @@
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "create-pull-request, decoded"), h("h2", {}, letters("Patch to "), letters("PR", "l-grad"))), cap, svg),
     });
   }
+
+  // ---------- workflow prompts ----------
+  // First user message of the Copilot session whose PR created each slide's workflow.
+  // [workflow, abridged line, full first user message]; the line opens the full prompt in a phone-style dialog.
+  const PROMPTS = {
+    "Pull Request Review²": ["pr-sous-chef", "Create a PR that adds a new scheduled agentic workflow, pr-sous-chef, which is in charge of finishing the PR … runs every 15min",
+      "Create a PR that adds a new scheduled agentic workflow, pr-sous-chef, which is in charge of finishing the PR up to a state where the maintainer should\nInvestigate.\n\nThe pr-sous-chef runs every 15min uses copilot gpt-mini size models\n\n- skip if no PR opened (non-draft)\n- skip PRs that have checks/actions running on the branch\n- skip if the last comment is from pr-sous-chef itself\n\nNudges:\n- update PR branch if possible\n- if the PR has pull request review comments that are still active or not commented, nudge copilot to work on the by posting \"@copilot review all comments\"\n- implement any other strategy to move PR forward\n\nGuidance:\n- Use subagent to process individual PR\n- maximize token efficiency"],
+    "Daily Unsloppers": ["duplicate-code-detector", "Add agentic workflow that uses Serena MCP docker … to analyze the changes in commits to main and detect duplicated code.",
+      "Add agentic workflow that uses Serena MCP docker (using container feature) to analyze the changes in commits to main and detect duplicated code."],
+    "Merge fast, unslop daily": ["jsweep", "Create a JavaScript unbloater daily agent that focuses on cleaning one .cjs file per day. Call it jsweep … just cleaner leaner code",
+      "Create a JavaScript unbloater daily agent that focuses on cleaning one .cjs file per day. Call it jsweep\"\n\nThe agent is an expert at creating and maintaining solid, simple JavaScript (commonjs)\n\n- use cache and timestamps to find the next .cjs to cleanup\n\nPrincipals:\n\n- determines if the file runs in github-script context or node.js context. Expert in actions/github-script\n- always increase testing when cleaning\n- remove try/catch unless the exception is handled with control flow. Let errors bubble up otherwise.\n- leverage spread operators, map, reduce, lambda syntax, ?. operator\n- do not change logic, just cleaner leaner code\n\nProvides a pull request with label \"unbloat\" and title \"[jsweep] \""],
+    "Query · Ask · Grow": ["daily-otel-instrumentation-advisor", "Create a daily agentic workflows that reviews the open telemetry instrumentation in the JavaScript code and suggests 1 improvement…",
+      "Create a daily agentic workflows that reviews the open telemetry instrumentation in the JavaScript code and suggests 1 improvement to provide a better otel. Use best judgement from a DevOps perspective.\nUse Claude. Create issue."],
+    "Mine · Refine · Apply": ["linter-miner", "Create a PR that adds daily a agentic workflow that mines the sergo repo memory to generate new Go linters in the pkg/linters pkg",
+      "Create a PR that adds daily a agentic workflow that mines the sergo repo memory to generate new Go linters in the pkg/linters pkg\n\n- mine sergo or other discussions or devise new linter to help with common errors in the repo\n- use subagents for research, use idnexers"],
+    "Explore · Reuse · Lint": ["sergo", "add a new agentic workload, sergo, the serena go expert … picks a static analysis strategy using the serena tools (cached 50% reuse, 50% new)",
+      "add a new agentic workload , sergo, the serena go expert\n\nSergo, is the ultimate expert in golang, code quality and the Serena MCP (Language service protocol expert)\n\nruns daily\n\nuses serena\n\nscans the list of tools in serena\n\ndetects and reports changes in the tools list of any (use cache)\n\npicks a static analysis strategy using the serena tools (cached 50% reuse, 50% new)\n\nexplain strategy\n\nruns a deep research using strategy and serena to generate 1-3 improvements agentic tasks\n\ntrack success in cache\n\ncreate discussion"],
+    "Semantic clustering": ["semantic-function-refactor", "Generate an agentic workflow that clusters functions semantically by name and tries to refactor similar functionalities.",
+      "Generate an agentic workflow that clusters functions semantically by name and tries to refactor similar functionalities.\n\n- imports Serena.md\n- enables github tool\n- uses Claude\n- has edit tool\n- bash *\n\n- only works on.go file.\n\nThe agent starts by collecting all the function names per file, then it tries to cluster them.\n\nThe functions should have been organized as 1 file per feature (file is named after the gesture). Look for outliers of that rule.\n\nAfter that, use Serena and reasoning to detect potential duplicates and suggest fixes."],
+    "Go Fan": ["go-fan", "The \"go fan\" is an agentic workflow that runs daily and does a deep review of the usage of a go module … by the project.",
+      "The \"go fan\" is an agentic workflow that runs daily and does a deep review of the usage of a go module régence by the project.\n\n- picks a go module (use cache to circle through each module in round robin)\n- generate a summary of the usage pattern of this module by researching its github repo (also focus on recent features), save it under specs/mods folder\n- do a deep review of the usages of this module in the go code and identify potential better usage or improvements\n- do a general review of the code to identify if other better use of the module are available.\n\nUse Serena MCP, cache memory."],
+    "Spec-driven testing": ["spec-extractor", "Create a PR that add multiple agentic workflows to maintain the compiler codebase through specification extraction, … and enforcement.",
+      "Create a PR that add multiple agentic workflows to maintain the compiler codebase through specification extraction, maintenance and enforcement.\n\nThere should be a a specification extractor, maintainer for each Go package. The README.md of each package becomes the specification.\n\nThe specification agent should extract the most important elements of each package. Use cache-memory for round robin. Use w3c-spec-writer agent and copilot. Creates a PR with changes.\n\nThe specification enforcement agent should generate and maintain a test suite for the specification. It is minimally allow to read the source code and should rely on the specification. Use cache-memory for round robin. Use Claude. Creates a PR with changes.\n\nThe specification librarian does a all-specification daily review and looks for in inconsistencies. Creates issue if fixes are needed.\n\nCreate a plan and execute.\n- all generated outputs should have a common label"],
+    "Docs that heal": ["daily-doc-updater", "Generate an agentic workflow that runs daily and update docs with features from the last 24h",
+      "Generate an agentic workflow that runs daily and update docs with features from the last 24h\n\n- scan merged PRs and code changes from the last 24h\n- summarize features added, removed, modified\n- for each missing docs feature, update docs following the documenation instructions (tell LLM to load th instructions file)"],
+    "Speak · Map · Grep": ["dictation-prompt", "Create an agentic workflow … generates a dictation prompt … designed to rephrase text generated by text-to-speech recognition",
+      "Create an agentic workflow that runs on workflow dispatch and generates a dictation prompt.\n\nThe prompt is designed to rephrase text generated by text-to-speech recognition and optimize it for the context of this repository.\n\n- scan the repository and extract a 100 words glossary specific to the project, on top of known technical terms for software engineering. Provide glossary in prompt (no descriptions)\n- fix ambiguous sentences by correcting the terminology to use the glossary or technical/software development.\n- rephrase the tone to create a planning Agentic prompt that will be used on GitHub copilot agentic tasks.\n\nWrite results in a pull request to .github/instructions/dictation.instructions.md"],
+  };
+  for (const s of slides) {
+    const ls = [...(s.el.querySelector("h2")?.querySelectorAll(".line") ?? [])];
+    const p = PROMPTS[ls.map(l => l.textContent).join("").replace(/\s+/g, " ").trim()];
+    if (p) s.el.append(h("div", { class: "awp" }, h("button", { type: "button", "aria-haspopup": "dialog", title: "Show the full prompt", onclick: () => openPrompt(...p) }, "/agentic-workflows"), p[1]));
+  }
+  // Full-screen phone (GitHub app) dialog showing the full prompt; swallows keys, clicks and swipes while open.
+  const phone = h("div", { class: "awd", role: "dialog", "aria-modal": "true", "aria-label": "Original prompt" });
+  let phoneBack = null;
+  function openPrompt(wf, _, full) {
+    phoneBack = document.activeElement;
+    const close = h("button", { type: "button", class: "awd-x", "aria-label": "Close", onclick: closePrompt }, "Done");
+    phone.replaceChildren(h("div", { class: "awd-ph" },
+      h("div", { class: "awd-st" }, h("span", {}, "9:41"), h("i", { class: "awd-di" }), h("span", { class: "awd-sig" }, "▂▄▆ ◔")),
+      h("div", { class: "awd-nav" }, h("span", { class: "awd-bk" }, "‹ Agents"), h("div", { class: "awd-tt" }, h("b", {}, wf), h("small", {}, "gh-aw · Copilot session")), close),
+      h("div", { class: "awd-chat" },
+        h("div", { class: "awd-me" }, h("span", { class: "awd-chip" }, "/agentic-workflows"), full),
+        h("div", { class: "awd-bot" }, h("span", { class: "awd-av" }, "✦"), h("div", {}, h("b", {}, "Copilot"), h("p", {}, `Started work on ${wf}…`)))),
+      h("div", { class: "awd-in" }, h("span", {}, "Ask Copilot"), h("i", {}, "↑")),
+      h("i", { class: "awd-home" })));
+    document.body.append(phone);
+    requestAnimationFrame(() => phone.classList.add("on"));
+    close.focus();
+  }
+  function closePrompt() {
+    phone.classList.remove("on");
+    phone.remove();
+    phoneBack?.focus?.();
+  }
+  phone.addEventListener("click", e => (e.stopPropagation(), e.target === phone && closePrompt()));
+  for (const t of ["touchstart", "touchend"]) phone.addEventListener(t, e => e.stopPropagation(), { passive: true });
+  addEventListener("keydown", e => {
+    if (!phone.isConnected) return;
+    if (e.key === "Escape") closePrompt();
+    if (e.key !== "Tab" && !(e.key === "Enter" && e.target.closest?.("button"))) (e.stopImmediatePropagation(), e.preventDefault());
+    else e.stopImmediatePropagation();
+  }, true);
 
   // ---------- bands ----------
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
