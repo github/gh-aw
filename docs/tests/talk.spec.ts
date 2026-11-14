@@ -233,7 +233,7 @@ test("publishes synthetic examples without profile assets or private source refe
   const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
-  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/"]);
+  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://github.com/chrizbo/agentics-beyond-code"]);
 
   const externalRequests: string[] = [];
   const errors: string[] = [];

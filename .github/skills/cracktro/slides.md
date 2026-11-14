@@ -41,6 +41,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Docs that heal | illustrative |
 | Speak · Map · Grep | illustrative |
 | Scan · Fix · Learn | illustrative |
+| For PMs | illustrative |
 | Cost & context |  |
 | Cost management | illustrative |
 | Model routing | illustrative |
