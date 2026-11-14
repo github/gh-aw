@@ -1,8 +1,8 @@
 # ADR-77588: Let a Model Expression Choose the Routing Level at Run Time
 
-**Date**: 2026-11-14
-**Status**: Draft
-**Deciders**: Ryan Beckett (PR author, rabeckett); other deciders [TODO: verify]
+**Date**: 2026-11-13
+**Status**: Proposed
+**Deciders**: rabeckett; pending maintainer review (pelikhan)
 
 ---
 
@@ -39,7 +39,7 @@ Allow `GH_AW_MODEL_AGENT_<ENGINE>` and `GH_AW_DEFAULT_MODEL_<ENGINE>` to hold ro
 #### Negative
 
 - A router value that is malformed at run time (for example `router/fast`, `Router/Economy` or `router/economy?effort=high`) is caught only in activation, so the run stops after dispatch instead of failing at compile time.
-- Eligible workflows compile both a routed and a non-routed path. This enlarges the generated YAML and the test matrix, which adds 368 lines of tests in this PR.
+- Eligible workflows compile both a routed and a non-routed path, which enlarges the generated YAML and the test matrix.
 - Expressions are not restricted to safe contexts. Input that reaches the expression can raise the level, and so the spend, up to what `models.allowed` and the model policy permit. Authors should prefer comparisons to passing input through.
 - On a routed run, threat detection uses its own default model rather than the main agent's model, so detection does not run on the same model as the agent.
 
@@ -52,4 +52,4 @@ Allow `GH_AW_MODEL_AGENT_<ENGINE>` and `GH_AW_DEFAULT_MODEL_<ENGINE>` to hold ro
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*ADR drafted by [adr-writer agent] and reviewed by the PR author. Change the status to Accepted once a maintainer approves.*
