@@ -3186,7 +3186,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How gh-aw itself is built"), h("h2", {}, letters("Issues as "), letters("intent", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Intent is all you need"), h("h2", {}, letters("Issues as "), letters("intent", "l-grad"))),
         svg,
         stats,
         h("div", { class: "ct-src" }, "gh-aw issues labelled community · counts as of November 2026")
