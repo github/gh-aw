@@ -9,6 +9,8 @@ Use the `runs-on` frontmatter field to target a self-hosted runner instead of th
 
 Runners must be Linux with Docker support. macOS and Windows are not supported.
 
+For AWF v0.29.5 and later, installation requires [GitHub CLI (`gh`)](https://cli.github.com/) with `gh attestation verify` support on the runner's `PATH`. This applies to rootless and privileged installs, including ARC/DinD. Provision it in the runner image or before the generated **Install AWF binary** step. Attestation verification is required and cannot be skipped. GitHub-hosted runners include `gh`; custom self-hosted images may not.
+
 > [!IMPORTANT]
 > **Runner configuration is not a product availability statement.** Choose your GitHub deployment separately from your runner topology in the [deployment and runner applicability summary](/gh-aw/reference/enterprise-configuration/#deployment-and-runner-applicability). GHES, data-residency tenant, and Kubernetes ARC end-to-end combinations remain unconfirmed unless explicitly confirmed by the product owners. See also [AWF applicability and CI boundaries](https://github.com/github/gh-aw-firewall/blob/main/docs/compatibility.md#environment-and-runner-applicability) and [AWF ARC/DinD requirements](https://github.com/github/gh-aw-firewall/blob/main/docs/arc-dind.md).
 

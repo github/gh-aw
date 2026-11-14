@@ -21,6 +21,8 @@ Before starting, confirm you have a Kubernetes cluster, `helm` and `kubectl` ins
 
 The runner needs working Docker and Compose access, Node.js for framework scripts, and separate Copilot inference credentials/licensing/policy authorization. See [component prerequisites](/gh-aw/reference/enterprise-configuration/#component-versions-and-validation-evidence). The example chart commands do not pin or certify a chart version; validate and pin the chart, runner image, and pod configuration for your cluster.
 
+For AWF v0.29.5 and later, install [GitHub CLI (`gh`)](https://cli.github.com/) with `gh attestation verify` support in the **runner container**, on its `PATH` before the generated **Install AWF binary** step. This applies to rootless and privileged installs; installing `gh` only in the DinD sidecar is insufficient. Attestation verification cannot be skipped.
+
 > [!IMPORTANT]
 > DinD (`containerMode.type="dind"`) is required for this gh-aw ARC execution path. Kubernetes mode (`containerMode.type="kubernetes"`) without a Docker daemon does not satisfy this setup.
 
