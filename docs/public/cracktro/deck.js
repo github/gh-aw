@@ -425,7 +425,23 @@
   .fm-wire.hot { opacity: 1; stroke-width: 3; }
   .fm-wire.hot + .mra-l { opacity: 1; }
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
-  .exr-svg { left: 60px; top: 290px; width: 1800px; height: 600px; }
+  .exr-svg { left: 180px; top: 268px; width: 1560px; height: 520px; }
+  .exm-svg { position: absolute; left: 470px; top: 802px; width: 1400px; height: 210px; overflow: visible; }
+  .exm-t { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .1em; }
+  .exm-t b, .exm-t .v { fill: #c297ff; }
+  .exm-b { fill: #d29922; transform-box: fill-box; transform-origin: bottom; }
+  .active .exm-b { animation: exm-grow .9s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes exm-grow { from { transform: scaleY(0); } }
+  .exm-bv { fill: #f0f6fc; font: 700 17px var(--mono); text-anchor: middle; }
+  .exm-bm { fill: #9198a1; font: 500 15px var(--mono); text-anchor: middle; }
+  .exm-ax { stroke: #3d444d; stroke-width: 2; }
+  .exm-d { fill: #3fb950; } .exm-d.o { fill: #6e7681; } .exm-d.x { fill: none; stroke: #6e7681; stroke-width: 2; }
+  .active .exm-d { animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1) both; }
+  .exm-l { fill: #9198a1; font: 500 14px var(--mono); }
+  .exm-l .c { fill: #c297ff; } .exm-l .n { fill: #3fb950; }
+  .exm-n { fill: #f0f6fc; font: 800 34px "Mona Sans"; }
+  .exm-k { fill: #9198a1; font: 500 14px var(--mono); }
+  .exm-cap { fill: #6e7681; font: 500 14px var(--mono); letter-spacing: .04em; }
   .exr-svg .fm-pill text { font-size: 26px; }
   .exr-card { fill: #0d111799; stroke: #3d444d; stroke-width: 2; }
   .exr-card-t { fill: #9198a1; font: 600 20px var(--mono); }
@@ -5443,6 +5459,81 @@
     svg.setAttribute("aria-label", "Explore, reuse, lint: each day Sergo reads its strategy cache, reuses its best strategy on a nearby target and explores an untried one, logs the result, and turns every pattern it finds into a linter until the whole pattern space has been tried");
     svg.style.setProperty("--c", "#ab7df8");
     svg.innerHTML = g;
+    // measured: findings per run by month from sergo-stats.json in the memory/sergo branch (no runs were cached in August)
+    const FPR = [
+        ["May", 8.3],
+        ["Jun", 5.9],
+        ["Jul", 5.8],
+        ["Aug", 0],
+        ["Sep", 4.5],
+        ["Oct", 3.3],
+        ["Nov", 3.7],
+      ],
+      // measured: Sergo's own merged PRs, day offsets from 28 Oct 2026; v = from the cached paren_unwrap_gap strategy, x = closed unmerged
+      PRS = [
+        [0, "x"],
+        [2, "o"],
+        [3, "v"],
+        [4, "v"],
+        [5, "v"],
+        [6, "v"],
+        [6, "v"],
+        [7, "v"],
+        [8, "v"],
+        [9, "v"],
+        [9, "o"],
+        [10, "v"],
+        [11, "v"],
+        [12, "v"],
+        [14, "v"],
+        [15, "v"],
+        [16, "o"],
+        [17, "o"],
+      ],
+      // measured: real strategy-cache entries, shortened
+      CACHE = [
+        ["11-05", "paren_unwrap_gap", "paren ancestor gap"],
+        ["11-08", "paren_unwrap_gap", "labeled loops skipped"],
+        ["11-13", "builtin name match", "Universe guard gap"],
+      ],
+      STATS = [
+        ["128", "runs"],
+        ["667", "findings"],
+        ["287", "issues filed"],
+        ["164", "fix PRs merged"],
+        ["17", "own PRs merged"],
+        ["8.5", "avg self-score"],
+      ];
+    let m = `<text class="exm-t" x="0" y="16">FINDINGS PER RUN</text>`;
+    FPR.forEach(([mo, v], i) => {
+      const x = 8 + i * 58,
+        bh = v * 12;
+      if (v) m += `<rect class="exm-b" style="animation-delay:${0.2 + i * 0.08}s" x="${x}" y="${150 - bh}" width="40" height="${bh}" rx="4"/><text class="exm-bv" x="${x + 20}" y="${143 - bh}">${v}</text>`;
+      else m += `<text class="exm-bv" x="${x + 20}" y="143" fill="#6e7681">·</text>`;
+      m += `<text class="exm-bm" x="${x + 20}" y="174">${mo}</text>`;
+    });
+    m += `<text class="exm-t" x="470" y="16">ONE CACHED VEIN · <tspan class="v">paren_unwrap_gap</tspan></text><line class="exm-ax" x1="476" y1="84" x2="996" y2="84"/>`;
+    const seen = {};
+    PRS.forEach(([d, k], i) => {
+      const n = (seen[d] = (seen[d] || 0) + 1);
+      m += `<circle class="exm-d ${k === "v" ? "" : k}" style="animation-delay:${0.3 + i * 0.06}s" cx="${480 + d * 30}" cy="${84 - n * 20 + 4}" r="8"/>`;
+    });
+    m += `<text class="exm-k" x="476" y="106">28 Oct</text><text class="exm-k" x="996" y="106" text-anchor="end">14 Nov</text><text class="exm-k" x="736" y="106" text-anchor="middle"><tspan fill="#3fb950">● 13 merged from the vein</tspan>  ● 4 other  ○ closed</text>`;
+    CACHE.forEach(([d, c, n], i) => {
+      m += `<text class="exm-l" x="476" y="${134 + i * 21}">${d} <tspan class="c">cached: ${c}</tspan> + <tspan class="n">new: ${n}</tspan></text>`;
+    });
+    STATS.forEach(([n, k], i) => {
+      const x = 1060 + (i % 2) * 180,
+        y = 42 + Math.floor(i / 2) * 52;
+      m += `<text class="exm-n" x="${x}" y="${y}">${n}</text><text class="exm-k" x="${x}" y="${y + 18}">${k}</text>`;
+    });
+    m += `<text class="exm-cap" x="0" y="204">measured · Sergo's repo memory and gh-aw issues and PRs labelled sergo, 16 Apr to 14 Nov 2026 · grid above illustrative</text>`;
+    const meas = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    meas.setAttribute("class", "exm-svg");
+    meas.setAttribute("viewBox", "0 0 1400 210");
+    meas.setAttribute("role", "img");
+    meas.setAttribute("aria-label", "Measured: Sergo's findings per run fell from 8.3 in May to 3.3 in October 2026; one cached strategy, paren_unwrap_gap, was reused for 13 merged pull requests between 31 October and 12 November; 128 runs, 667 findings, 287 issues, 164 merged fix pull requests");
+    meas.innerHTML = m;
     const $ = id => svg.querySelector("#" + id),
       NS = "http://www.w3.org/2000/svg";
     const mk = (cls, html) => {
@@ -5548,7 +5639,7 @@
       sound: "explore",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
-        "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces.",
+        "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces. The strip at the bottom is measured, not illustrative: it comes from Sergo's repo memory in gh-aw (the memory/sergo branch: its run statistics and the history of its strategy cache) and from gh-aw issues and pull requests labelled sergo, 16 April to 14 November 2026. Over 128 cached runs Sergo logged 667 findings, and findings per run fell from 8.3 in May to 3.3 in October: the easy patterns run out, which is the exhaustion the grid shows. No runs were cached in August. It filed 287 issues; 164 merged pull requests closed 172 of them, 158 of those authored by Copilot. Since late October Sergo opens its own pull requests: 17 merged. Thirteen of them, 31 October to 12 November, came from one cached strategy, paren_unwrap_gap, linters that missed calls wrapped in parentheses: each day's cache entry reads cached: paren_unwrap_gap plus new: some untried corner, reuse and explore in the same run. The three cache lines are real entries, shortened.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -5576,7 +5667,8 @@
         "section",
         { class: "slide exr" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Exhaust the model's patterns · cache what worked, reuse it, explore the rest"), h("h2", {}, letters("Explore · Reuse · "), letters("Lint", "l-grad"))),
-        svg
+        svg,
+        meas
       ),
     });
   }
