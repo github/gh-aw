@@ -93,7 +93,7 @@ which shows measured time-to-merge and lines-changed distributions of its
 merged pull requests, and "How workflows evolve", which shows a statistical
 study of the commits that changed its own workflow Markdown. All say so in their speaker notes.
 Use role icons rather than employee profiles. The only exceptions are the
-local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` in `public/cracktro/assets/avatars/`.
+local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, `ievangelist`, and `bradygaster` in `public/cracktro/assets/avatars/`.
 Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.

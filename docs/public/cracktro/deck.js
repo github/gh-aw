@@ -10302,7 +10302,7 @@
     ring.innerHTML =
       SQUAD.map(([, , , c, [x, y]], i) => `<line class="psd-ln" data-i="${i}" style="--c:${c}" x1="${DEV[0]}" y1="${DEV[1]}" x2="${x}" y2="${y}"/>`).join("") +
       SQUAD.map(([n, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/><text class="psd-in" x="${x}" y="${y + 10}">${n}</text><text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
-      `<g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/>${ico("person", DEV[0], DEV[1], 40, "#f0f6fc")}<text x="${DEV[0] + 74}" y="${DEV[1] - 34}">you</text></g>`;
+      `<defs><clipPath id="psdClip"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="37"/></clipPath></defs><g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/><image href="assets/avatars/bradygaster.jpg" x="${DEV[0] - 37}" y="${DEV[1] - 37}" width="74" height="74" clip-path="url(#psdClip)"/></g>`;
     const lines = [...ring.querySelectorAll(".psd-ln")];
     const agents = [...ring.querySelectorAll(".psd-ag")];
     const dev = ring.querySelector(".psd-dev");
@@ -10407,7 +10407,7 @@
       sound: "squad",
       palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
       notes:
-        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project, a human-led AI agent team: a designer, a frontend engineer, an accessibility reviewer and a scribe. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad retires and its decisions stay in the repository for the next task. The task, repository, squad and file names are synthetic and the animation is illustrative.",
+        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project, a human-led AI agent team: a designer, a frontend engineer, an accessibility reviewer and a scribe. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad retires and its decisions stay in the repository for the next task. The developer is shown with the avatar of bradygaster, creator of Squad. The task, repository, squad and file names are synthetic and the animation is illustrative.",
       enter() {
         t0 = 0;
         ev = 0;
