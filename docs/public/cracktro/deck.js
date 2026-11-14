@@ -1321,6 +1321,9 @@
   @keyframes rowin { from { opacity: 0; transform: translateX(120px); } to { opacity: 1; transform: none; } }
   .bh-n { font: 600 22px/1 var(--mono); color: var(--bh2); letter-spacing: .1em; }
   .bh-row.many { display: grid; grid-template-columns: repeat(7, 1fr); bottom: 140px; }
+  .bh-row.many.lots { grid-template-columns: repeat(10, 1fr); gap: 14px; }
+  .bh-row.many.lots li { padding: 16px 14px; }
+  .bh-row.many.lots .bh-t { font-size: 21px; }
   .bh-row.many li { height: 150px; padding: 18px 22px; }
   .bh-row.many .bh-t { font-size: 25px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
   .bh-t { font-size: 28px; line-height: 1.15; font-variation-settings: "wght" 600, "wdth" 100; }
@@ -1345,7 +1348,7 @@
   .notes { position: fixed; left: 24px; right: 24px; bottom: 50px; max-width: 900px; margin: 0 auto; padding: 18px 22px;
     background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
   .notes.on { display: block; }
-  body:not(.compact-nav) .notes { left: 270px; }
+  body:not(.compact-nav) .notes { left: 330px; }
 
   /* --- any engine --- */
   .ae .slide-head .ae-agent .ch { background-image: linear-gradient(90deg, #ab7df8, #d2b8ff, #ab7df8); }
@@ -5542,7 +5545,7 @@
       coverage();
     };
     slides.push({
-      group: "quality",
+      group: "process",
       sound: "explore",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
@@ -5697,7 +5700,7 @@
       fired = 0;
     };
     slides.push({
-      group: "quality",
+      group: "process",
       sound: "dedupe",
       palette: ["#8957e5", "#d29922", "#1f6feb", "#238636"],
       notes:
@@ -5885,7 +5888,7 @@
       return s;
     };
     slides.push({
-      group: "quality",
+      group: "process",
       sound: "formal",
       palette: ["#1f6feb", "#8957e5", "#238636", "#bf3989"],
       notes:
@@ -6349,7 +6352,7 @@
       script();
     };
     slides.push({
-      group: "knowledge",
+      group: "process",
       sound: "spec",
       palette: ["#8957e5", "#238636", "#1f6feb", "#d29922"],
       notes:
@@ -6569,7 +6572,7 @@
       script();
     };
     slides.push({
-      group: "knowledge",
+      group: "process",
       sound: "docs",
       palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
       notes:
@@ -11173,11 +11176,9 @@
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
   // The title and the finale are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
   const BANDS = {
-    platform: ["The platform", "Markdown in, GitHub Actions out"],
+    platform: ["Workflows", "Markdown in, GitHub Actions out"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
-    quality: ["Code quality", "Mine patterns, turn them into checks"],
-    knowledge: ["Specs & docs", "Words that stay true to the code"],
     cost: ["Cost & context", "Debug, spend less, remember more, measure everything"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     data: ["By the numbers", "Measured on gh-aw's own history"],
@@ -11242,7 +11243,7 @@
           map,
           h(
             "ol",
-            { class: `bh-row${r.items.length > 8 ? " many" : ""}` },
+            { class: `bh-row${r.items.length > 8 ? " many" : ""}${r.items.length > 14 ? " lots" : ""}` },
             r.items.map((s, i) => h("li", { "--i": i, "data-go": r.first + i - 1 }, h("span", { class: "bh-n" }, String(r.first + i).padStart(2, "0")), h("span", { class: "bh-t" }, label(s))))
           )
         ),
