@@ -3791,8 +3791,8 @@
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#sflAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const maint = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/ievangelist.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
+    const maint = (id, x, y, avatar = "assets/avatars/ievangelist.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
     const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
@@ -3878,7 +3878,7 @@
     g += pipes + box("sflKbe", 640, 340, "issue");
     g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
     g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
-    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580);
+    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580, "assets/avatars/pelikhan.jpg");
     g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
