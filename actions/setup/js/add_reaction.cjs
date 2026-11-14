@@ -204,6 +204,10 @@ function handleReactionError(error, removing = false) {
     core.warning(`Cannot ${operation} reaction due to GitHub API rate limiting: ${errorMessage}`);
     return;
   }
+  if (removing) {
+    core.warning(`${ERR_API}: Failed to remove reaction: ${errorMessage}`);
+    return;
+  }
   core.setFailed(`${ERR_API}: Failed to ${operation} reaction: ${errorMessage}`);
 }
 

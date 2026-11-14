@@ -94,6 +94,33 @@ func TestReactionCleanupConclusion(t *testing.T) {
 	assert.Contains(t, steps, "owner: ${{ github.repository_owner }}")
 }
 
+func TestReactionCleanupRunsAfterConclusionReporting(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		workQueue bool
+	}{
+		{name: "standard conclusion"},
+		{name: "work queue conclusion", workQueue: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: "copilot", On: "on:\n  issues:\n    types: [opened]",
+				AIReaction: ReactionTypeEyes, ReactionRemoveOnComplete: true,
+				SafeOutputs: &SafeOutputsConfig{},
+			}
+			if tc.workQueue {
+				data.Tools = map[string]any{"work-queue": map[string]any{"worker": true}}
+			}
+			steps, err := NewCompiler().buildConclusionJobSteps(data, "agent", nil)
+			require.NoError(t, err)
+			allSteps := strings.Join(steps, "")
+			cleanupIndex := strings.Index(allSteps, "Remove trigger reaction on completion")
+			require.NotEqual(t, -1, cleanupIndex)
+			assert.Greater(t, cleanupIndex, strings.Index(allSteps, "Retry upload usage artifact"))
+		})
+	}
+}
+
 func TestReactionCleanupTargetPermissions(t *testing.T) {
 	for _, tc := range []struct {
 		trigger string

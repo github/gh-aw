@@ -626,7 +626,7 @@ on:
   status-comment: false
 ```
 
-Cleanup uses the same authentication configuration as activation (`on.github-token` or `on.github-app`) and works independently of status comments. It only runs if activation recorded a reaction ID. Cancellation that prevents conclusion from running cannot guarantee cleanup. Dry-run mode does not modify reactions.
+Cleanup uses the same authentication configuration as activation (`on.github-token` or `on.github-app`) and works independently of status comments. For issues, pull requests, and comments, it removes the reaction ID recorded during activation. For discussions and discussion comments, GitHub's GraphQL API removes the authenticated user's reaction matching the configured content type; it does not accept a reaction ID. Cleanup only runs if activation recorded a reaction. Removal errors are warnings and do not fail the workflow. Cancellation that prevents conclusion from running cannot guarantee cleanup. Dry-run mode does not modify reactions.
 
 ### Status Comments (`status-comment:`)
 

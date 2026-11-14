@@ -67,10 +67,10 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 
 // buildConclusionJobSteps assembles the ordered step list for the conclusion job: setup and
 // usage-artifact steps, noop/missing-tool/incomplete reporting, agent-failure and
-// failed-jobs reporting, the optional status-comment update, and the steering-issue step.
+// failed-jobs reporting, the optional status-comment update, steering-issue step, and
+// trigger-reaction cleanup.
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
-	steps = append(steps, c.buildReactionCleanupSteps(data)...)
 	steps = append(steps, c.buildWorkQueueTerminationStep(data)...)
 	steps = append(steps, c.buildWorkQueueIssuesStep(data)...)
 	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)
@@ -147,6 +147,7 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	if c.actionMode.IsScript() {
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
+	steps = append(steps, c.buildReactionCleanupSteps(data)...)
 	return steps, nil
 }
 

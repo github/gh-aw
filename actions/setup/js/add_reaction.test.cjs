@@ -260,12 +260,13 @@ describe("add_reaction", () => {
       expect(mockCore.setFailed).toHaveBeenCalledWith(`${ERR_API}: Failed to add reaction: Not Found`);
     });
 
-    it("preserves cleanup API failures for unexpected errors", async () => {
+    it("warns but does not fail the job for unexpected cleanup API errors", async () => {
       mockGithub.request.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), { status: 403 }));
 
       await runScript();
 
-      expect(mockCore.setFailed).toHaveBeenCalledWith(`${ERR_API}: Failed to remove reaction: Forbidden`);
+      expect(mockCore.warning).toHaveBeenCalledWith(`${ERR_API}: Failed to remove reaction: Forbidden`);
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
     it("retains bounded connection retry behavior for cleanup", async () => {
