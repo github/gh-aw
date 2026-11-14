@@ -25,8 +25,8 @@ test("presents the fifty-two slides in bands without the removed sections", asyn
     "Safe outputs",
     "Continuous Security",
     "Private enclaves",
-    "Human agent processes",
     "Stop manually translating intent into code.",
+    "Human agent processes",
     "Human Agent Processes",
     "Pull Request Review²",
     "Issues as intent",
@@ -44,7 +44,6 @@ test("presents the fifty-two slides in bands without the removed sections", asyn
     "Docs that heal",
     "Speak · Map · Grep",
     "Scan · Fix · Learn",
-    "Audit & Optimize",
     "Cost & context",
     "Cost management",
     "Model routing",
@@ -55,6 +54,7 @@ test("presents the fifty-two slides in bands without the removed sections", asyn
     "Ephemerals",
     "Index & search",
     "Experiments, graders & evals",
+    "Audit & Optimize",
     "Enterprise",
     "Connectors",
     "Enterprise ready",
@@ -196,7 +196,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("gh-aw · May–Nov 2026");
   await page.keyboard.press("n");
-  for (const slide of [3, 4, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 34, 35, 36, 38, 39, 40, 41, 42, 44, 45, 46, 51, 52]) {
+  for (const slide of [3, 4, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 44, 45, 46, 51, 52]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }

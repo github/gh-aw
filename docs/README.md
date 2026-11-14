@@ -56,9 +56,9 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone fifty-one-slide deck, separate from the homepage slideshow, linked
+It is a standalone fifty-two-slide deck, separate from the homepage slideshow, linked
 from the site footer. The deck is laid out as a table of horizontal bands: the
-title and the finale are rows of their own, and every other band (Workflows,
+title, the factory mindset and the finale are rows of their own, and every other band (Workflows,
 Security, Human agent processes, Cost & context, Agentic Engineering, Enterprise, AW factory) starts with a header
 slide that lists the band's slides (click a tile to jump) and a map of all bands.
 Left/Right (or Space, Page Up/Page Down) step through the slides in reading

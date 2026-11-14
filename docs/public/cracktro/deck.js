@@ -3410,7 +3410,7 @@
     }
     let last = 0;
     slides.push({
-      group: "process",
+      group: "mindset",
       sound: "factory",
       palette: ["#bf3989", "#238636", "#9e6a03", "#8957e5"],
       notes:
@@ -6987,289 +6987,6 @@
     });
   }
 
-  // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
-  {
-    resetIndex();
-    const VW = 1700,
-      VH = 680;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
-    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
-    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    // synthetic run metrics: [label, before, after, format]
-    const MET = [
-      ["turns", 41, 17, v => `${Math.round(v)}`],
-      ["tokens", 412, 138, v => `${Math.round(v)}k`],
-      ["tool calls", 96, 22, v => `${Math.round(v)}`],
-      ["denied", 3, 0, v => `${Math.round(v)}`],
-    ];
-    // what the scheduled health agent sees across the repository's workflows: [name, score, ok]
-    const HEALTH = [
-      ["daily-report", 97, 1],
-      ["pr-review", 94, 1],
-      ["issue-triage", 58, 0],
-      ["docs-sync", 91, 1],
-    ];
-    let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="298" rx="12"/><text class="sfl-title" x="40" y="116">HEALTH · ${HEALTH.length} WORKFLOWS</text>`;
-    HEALTH.forEach(([n, sc, ok], i) => {
-      const y = 146 + i * 26;
-      run += `<g class="ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
-    });
-    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
-    MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${292 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${292 + i * 26}"></text>`));
-    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
-    // what the audit downloads, typed into the terminal
-    const TERM = [
-      ["cmd", "$ gh aw audit 1842"],
-      ["dl", "↓ agent logs · firewall log"],
-      ["dl", "↓ token usage · tool calls"],
-      ["dl", "↓ aw_session.jsonl (unified)"],
-      ["ok", "✓ 214 events · 41 turns"],
-      ["ko", "✕ conclusion: failure"],
-    ];
-    let term = `<g class="sfl-box" id="aoTerm"><rect class="sfl-card" x="398" y="90" width="404" height="300" rx="12"/><text class="sfl-title" x="414" y="116">AUDIT · RUN 1842</text>`;
-    TERM.forEach(([c, t], i) => (term += `<g class="sfl-row ao-term"><text class="${c}" x="414" y="${158 + i * 36}">${esc(t)}</text></g>`));
-    term += `</g>`;
-    // the unified session: one bar per turn (height = tokens); r repeated search, x firewall denial, f oversized read, t tool, m model
-    const REP = [8, 11, 14, 17, 20, 23, 26, 29, 33],
-      DEN = [12, 27, 35],
-      BIG = [31, 36, 38],
-      NB = 41,
-      BX = 858,
-      BW = 380 / NB,
-      BASE = 256;
-    const KIND = [...Array(NB)].map((_, i) => (REP.includes(i) ? "r" : DEN.includes(i) ? "x" : BIG.includes(i) ? "f" : i % 2 ? "t" : "m"));
-    const HT = KIND.map((k, i) => (k === "f" ? 100 : k === "x" ? 22 : k === "r" ? 34 : 14 + ((i * 37) % 23) + (i >= 30 ? 36 : 0)));
-    const FIND = [
-      ["ed", "r", n => `⚠ ${n}× identical issue search`],
-      ["ko", "x", n => `✕ ${n} fetches denied by firewall`],
-      ["ed", "f", n => `⚠ ${n} files > 20 KB read whole`],
-      ["ed", "late", () => "⚠ 61% of tokens after turn 30"],
-    ];
-    let sess = `<g class="sfl-box" id="aoSess"><rect class="sfl-card" x="838" y="90" width="420" height="380" rx="12"/><text class="sfl-title" x="854" y="116">UNIFIED SESSION · aw_session.jsonl</text>`;
-    sess += `<rect class="rpa-dup" id="aoLate" x="${BX + 30 * BW - 3}" y="132" width="${11 * BW + 4}" height="${BASE - 128}" rx="6"/>`;
-    KIND.forEach((k, i) => (sess += `<rect class="ao-bar ${k}" x="${(BX + i * BW).toFixed(1)}" y="${BASE - HT[i]}" width="${(BW - 3).toFixed(1)}" height="${HT[i]}" rx="2"/>`));
-    sess += `<line class="ao-axis" x1="${BX - 4}" y1="${BASE + 2}" x2="${BX + 384}" y2="${BASE + 2}"/>`;
-    [
-      ["#8957e5", "model"],
-      ["#1f6feb", "tool"],
-      ["#f85149", "denied"],
-      ["#d29922", "waste"],
-    ].forEach(([c, t], i) => (sess += `<text class="ao-leg" x="${BX + i * 98}" y="${BASE + 28}" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
-    FIND.forEach(([c], i) => (sess += `<g class="sfl-row ao-find"><text class="${c}" id="aoF${i}" x="854" y="${330 + i * 34}"></text></g>`));
-    sess += `<g class="sfl-scan" id="aoBeam"><rect x="-28" y="128" width="28" height="${BASE - 124}" fill="url(#aoBeamG)"/><line x1="0" y1="128" x2="0" y2="${BASE + 4}"/></g></g>`;
-    // the fix, as a diff of the workflow markdown
-    const DIFF = [
-      ["ctx", "  tools:"],
-      ["ctx", "    github: { toolsets: [issues] }"],
-      ["add", "+   web-fetch:"],
-      ["add", "+ network:"],
-      ["add", "+   allowed: [docs.contoso.com]"],
-      ["add", "+ cache-memory: true"],
-      ["ctx", "  ---"],
-      ["add", "+ Search once, then reuse the results."],
-      ["ok", "✓ gh aw compile · lock refreshed"],
-    ];
-    let diff = `<g class="sfl-box ao-diff" id="aoDiff"><rect class="sfl-card" x="1288" y="90" width="404" height="330" rx="12"/><text class="sfl-title" x="1304" y="116">issue-triage.md</text>`;
-    DIFF.forEach(([c, t], i) => (diff += `<g class="sfl-row ao-dl ${c}"><rect x="1296" y="${134 + i * 30}" width="388" height="28" rx="4" fill="none"/><text x="1304" y="${154 + i * 30}">${esc(t)}</text></g>`));
-    diff += `</g>`;
-    // [edge id, path, color, label, lx, ly, anchor]
-    const EDGES = [
-      ["aoE0", "M90 400 V542", "p", ["on schedule · gh aw health", "picks issue-triage"], 112, 446, "start"],
-      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 522, "middle"],
-      ["aoE2", "M450 544 V396", "p", ["audit"], 472, 478, "start"],
-      ["aoE3", "M804 240 H834", "p", [], 0, 0, "start"],
-      ["aoE4", "M1260 240 H1284", "p", [], 0, 0, "start"],
-      ["aoE5", "M1330 424 V542", "p", ["opens PR"], 1352, 490, "start"],
-      ["aoE7", "M1368 580 H1402", "b", ["✓ approves"], 1500, 534, "middle"],
-      ["aoE6", "M1440 616 V652 H8 V200 H20", "b day", ["merged · health keeps watching the next runs"], 760, 640, "middle"],
-    ];
-    // the token's journey: [edge, node lit on arrival, duration]; TYPE, SCAN, DIFF and RERUN are in-place steps
-    const SEQ = [
-      ["aoE0", "aoHealth"],
-      ["aoE1", "aoCop"],
-      ["aoE2", "aoTerm"],
-      ["TYPE", "aoTerm", 2200],
-      ["aoE3", "aoSess", 700],
-      ["SCAN", "aoSess", 3400],
-      ["aoE4", "aoDiff", 700],
-      ["DIFF", "aoDiff", 2600],
-      ["aoE5", "aoPR"],
-      ["aoE7", "aoDev", 900],
-      ["aoE6", "aoRun", 1800],
-      ["RERUN", "aoRun", 2200],
-    ];
-    const LANE = { aoRun: 0, aoHealth: 0, aoCop: 1, aoTerm: 1, aoSess: 2, aoDiff: 3, aoPR: 3, aoDev: 3 };
-    let g = `<defs><clipPath id="aoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="aoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
-      <marker id="aoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <linearGradient id="aoBeamG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
-      <marker id="aoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    [
-      [0, 380, "HEALTH"],
-      [380, 820, "AUDIT"],
-      [820, 1270, "AGENT · ANALYZE"],
-      [1270, VW, "AGENT · OPTIMIZE · FIX"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="aoLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
-    });
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#ao${c.startsWith("p") ? "P" : "B"})"/>`;
-      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${esc(l)}</tspan>`).join("")}</text>`;
-    }
-    g += run + term + sess + diff;
-    const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 20)}</g>`;
-    g += badge(1232, 444) + badge(1666, 394);
-
-    g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
-    g += `<g class="ao-badge"><circle cx="62" cy="548" r="17" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("calendar", 62, 548, 18, "#ab7df8")}</g>`;
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg ao-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot"),
-      bars = [...svg.querySelectorAll(".ao-bar")],
-      finds = [...svg.querySelectorAll(".ao-find")];
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 1050,
-      START = 900,
-      HOLD = 2400,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1,
-      typed = 0,
-      done = 0;
-    const light = nid => {
-      $(nid).classList.add("on");
-      $("aoLane" + LANE[nid]).classList.add("on");
-      if (nid === "aoHealth") $("aoPick").classList.add("on");
-    };
-    const setRun = (f, state) => {
-      const r = $("aoRun");
-      r.classList.toggle("bad", state === "bad");
-      r.classList.toggle("good", state === "good");
-      const st = $("aoStat");
-      st.textContent = state === "bad" ? "issue-triage #1842 · ✕" : state === "good" ? "issue-triage #1843 · ✓" : "issue-triage #1843 · ◌";
-      st.setAttribute("class", "ao-stat" + (state === "bad" ? " ko" : state === "good" ? " ok" : ""));
-      MET.forEach(([, a, b, fmt], i) => ($("aoV" + i).textContent = fmt(a + (b - a) * f)));
-    };
-    const reveal = (rows, f) => rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.4) / rows.length));
-    const scan = f => {
-      const b = $("aoBeam"),
-        x = BX + Math.min(1, f / 0.8) * (NB * BW + 4),
-        n = Math.floor((x - BX) / BW);
-      b.setAttribute("transform", `translate(${x},0)`);
-      b.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
-      bars.forEach((r, i) => r.classList.toggle("seen", i < n));
-      FIND.forEach(([, k, txt], i) => {
-        const c = k === "late" ? +(n >= NB) : KIND.slice(0, n).filter(x => x === k).length;
-        if (!c) return;
-        const el = $("aoF" + i),
-          s = txt(c);
-        if (el.textContent !== s) el.textContent = s;
-        if (!finds[i].classList.contains("seen")) {
-          finds[i].classList.add("seen");
-          sfx.pop(4 + i);
-        }
-        if (k === "late") $("aoLate").classList.add("on");
-      });
-    };
-    slides.push({
-      group: "process",
-      sound: "audit",
-      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
-      notes:
-        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
-          FIND.forEach((_, i) => ($("aoF" + i).textContent = ""));
-          $("aoBeam").style.opacity = 0;
-          setRun(0, "bad");
-          light("aoRun");
-          popK = -1;
-          typed = 0;
-          done = 0;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP] = SEQ[k],
-          f = (u - T[k]) / dur;
-        if (["TYPE", "SCAN", "DIFF", "RERUN"].includes(eid)) {
-          dot.style.opacity = 0;
-          for (let j = 0; j <= k; j++) light(SEQ[j][1]);
-          if (eid === "TYPE") reveal([...svg.querySelectorAll(".ao-term")], f / 0.9);
-          else if (eid === "SCAN") scan(f);
-          else if (eid === "DIFF") reveal([...svg.querySelectorAll(".ao-dl")], f / 0.9);
-          else {
-            const g2 = Math.min(1, Math.max(0, (f - 0.15) / 0.6));
-            setRun(g2, f < 0.8 ? "run" : "good");
-            if (f >= 0.8 && !done) {
-              done = 1;
-              $("aoDelta").classList.add("on");
-              sfx.pop(9);
-            }
-          }
-          const rows = eid === "TYPE" ? ".ao-term.seen" : eid === "DIFF" ? ".ao-dl.seen" : null;
-          if (rows) {
-            const n = svg.querySelectorAll(rows).length;
-            if (n !== typed) {
-              typed = n;
-              if (n) sfx.key();
-            }
-          }
-          return;
-        }
-        const p = $(eid),
-          n = p.getTotalLength(),
-          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
-        p.classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
-        if (f >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          light(nid);
-        }
-      },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
-    });
-  }
-
   // Cost management: guard, measure, optimize (+ model routing)
   {
     resetIndex();
@@ -9255,6 +8972,289 @@
     });
   }
 
+  // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // synthetic run metrics: [label, before, after, format]
+    const MET = [
+      ["turns", 41, 17, v => `${Math.round(v)}`],
+      ["tokens", 412, 138, v => `${Math.round(v)}k`],
+      ["tool calls", 96, 22, v => `${Math.round(v)}`],
+      ["denied", 3, 0, v => `${Math.round(v)}`],
+    ];
+    // what the scheduled health agent sees across the repository's workflows: [name, score, ok]
+    const HEALTH = [
+      ["daily-report", 97, 1],
+      ["pr-review", 94, 1],
+      ["issue-triage", 58, 0],
+      ["docs-sync", 91, 1],
+    ];
+    let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="298" rx="12"/><text class="sfl-title" x="40" y="116">HEALTH · ${HEALTH.length} WORKFLOWS</text>`;
+    HEALTH.forEach(([n, sc, ok], i) => {
+      const y = 146 + i * 26;
+      run += `<g class="ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
+    });
+    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
+    MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${292 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${292 + i * 26}"></text>`));
+    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
+    // what the audit downloads, typed into the terminal
+    const TERM = [
+      ["cmd", "$ gh aw audit 1842"],
+      ["dl", "↓ agent logs · firewall log"],
+      ["dl", "↓ token usage · tool calls"],
+      ["dl", "↓ aw_session.jsonl (unified)"],
+      ["ok", "✓ 214 events · 41 turns"],
+      ["ko", "✕ conclusion: failure"],
+    ];
+    let term = `<g class="sfl-box" id="aoTerm"><rect class="sfl-card" x="398" y="90" width="404" height="300" rx="12"/><text class="sfl-title" x="414" y="116">AUDIT · RUN 1842</text>`;
+    TERM.forEach(([c, t], i) => (term += `<g class="sfl-row ao-term"><text class="${c}" x="414" y="${158 + i * 36}">${esc(t)}</text></g>`));
+    term += `</g>`;
+    // the unified session: one bar per turn (height = tokens); r repeated search, x firewall denial, f oversized read, t tool, m model
+    const REP = [8, 11, 14, 17, 20, 23, 26, 29, 33],
+      DEN = [12, 27, 35],
+      BIG = [31, 36, 38],
+      NB = 41,
+      BX = 858,
+      BW = 380 / NB,
+      BASE = 256;
+    const KIND = [...Array(NB)].map((_, i) => (REP.includes(i) ? "r" : DEN.includes(i) ? "x" : BIG.includes(i) ? "f" : i % 2 ? "t" : "m"));
+    const HT = KIND.map((k, i) => (k === "f" ? 100 : k === "x" ? 22 : k === "r" ? 34 : 14 + ((i * 37) % 23) + (i >= 30 ? 36 : 0)));
+    const FIND = [
+      ["ed", "r", n => `⚠ ${n}× identical issue search`],
+      ["ko", "x", n => `✕ ${n} fetches denied by firewall`],
+      ["ed", "f", n => `⚠ ${n} files > 20 KB read whole`],
+      ["ed", "late", () => "⚠ 61% of tokens after turn 30"],
+    ];
+    let sess = `<g class="sfl-box" id="aoSess"><rect class="sfl-card" x="838" y="90" width="420" height="380" rx="12"/><text class="sfl-title" x="854" y="116">UNIFIED SESSION · aw_session.jsonl</text>`;
+    sess += `<rect class="rpa-dup" id="aoLate" x="${BX + 30 * BW - 3}" y="132" width="${11 * BW + 4}" height="${BASE - 128}" rx="6"/>`;
+    KIND.forEach((k, i) => (sess += `<rect class="ao-bar ${k}" x="${(BX + i * BW).toFixed(1)}" y="${BASE - HT[i]}" width="${(BW - 3).toFixed(1)}" height="${HT[i]}" rx="2"/>`));
+    sess += `<line class="ao-axis" x1="${BX - 4}" y1="${BASE + 2}" x2="${BX + 384}" y2="${BASE + 2}"/>`;
+    [
+      ["#8957e5", "model"],
+      ["#1f6feb", "tool"],
+      ["#f85149", "denied"],
+      ["#d29922", "waste"],
+    ].forEach(([c, t], i) => (sess += `<text class="ao-leg" x="${BX + i * 98}" y="${BASE + 28}" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
+    FIND.forEach(([c], i) => (sess += `<g class="sfl-row ao-find"><text class="${c}" id="aoF${i}" x="854" y="${330 + i * 34}"></text></g>`));
+    sess += `<g class="sfl-scan" id="aoBeam"><rect x="-28" y="128" width="28" height="${BASE - 124}" fill="url(#aoBeamG)"/><line x1="0" y1="128" x2="0" y2="${BASE + 4}"/></g></g>`;
+    // the fix, as a diff of the workflow markdown
+    const DIFF = [
+      ["ctx", "  tools:"],
+      ["ctx", "    github: { toolsets: [issues] }"],
+      ["add", "+   web-fetch:"],
+      ["add", "+ network:"],
+      ["add", "+   allowed: [docs.contoso.com]"],
+      ["add", "+ cache-memory: true"],
+      ["ctx", "  ---"],
+      ["add", "+ Search once, then reuse the results."],
+      ["ok", "✓ gh aw compile · lock refreshed"],
+    ];
+    let diff = `<g class="sfl-box ao-diff" id="aoDiff"><rect class="sfl-card" x="1288" y="90" width="404" height="330" rx="12"/><text class="sfl-title" x="1304" y="116">issue-triage.md</text>`;
+    DIFF.forEach(([c, t], i) => (diff += `<g class="sfl-row ao-dl ${c}"><rect x="1296" y="${134 + i * 30}" width="388" height="28" rx="4" fill="none"/><text x="1304" y="${154 + i * 30}">${esc(t)}</text></g>`));
+    diff += `</g>`;
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["aoE0", "M90 400 V542", "p", ["on schedule · gh aw health", "picks issue-triage"], 112, 446, "start"],
+      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 522, "middle"],
+      ["aoE2", "M450 544 V396", "p", ["audit"], 472, 478, "start"],
+      ["aoE3", "M804 240 H834", "p", [], 0, 0, "start"],
+      ["aoE4", "M1260 240 H1284", "p", [], 0, 0, "start"],
+      ["aoE5", "M1330 424 V542", "p", ["opens PR"], 1352, 490, "start"],
+      ["aoE7", "M1368 580 H1402", "b", ["✓ approves"], 1500, 534, "middle"],
+      ["aoE6", "M1440 616 V652 H8 V200 H20", "b day", ["merged · health keeps watching the next runs"], 760, 640, "middle"],
+    ];
+    // the token's journey: [edge, node lit on arrival, duration]; TYPE, SCAN, DIFF and RERUN are in-place steps
+    const SEQ = [
+      ["aoE0", "aoHealth"],
+      ["aoE1", "aoCop"],
+      ["aoE2", "aoTerm"],
+      ["TYPE", "aoTerm", 2200],
+      ["aoE3", "aoSess", 700],
+      ["SCAN", "aoSess", 3400],
+      ["aoE4", "aoDiff", 700],
+      ["DIFF", "aoDiff", 2600],
+      ["aoE5", "aoPR"],
+      ["aoE7", "aoDev", 900],
+      ["aoE6", "aoRun", 1800],
+      ["RERUN", "aoRun", 2200],
+    ];
+    const LANE = { aoRun: 0, aoHealth: 0, aoCop: 1, aoTerm: 1, aoSess: 2, aoDiff: 3, aoPR: 3, aoDev: 3 };
+    let g = `<defs><clipPath id="aoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="aoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="aoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="aoBeamG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
+      <marker id="aoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 380, "HEALTH"],
+      [380, 820, "AUDIT"],
+      [820, 1270, "AGENT · ANALYZE"],
+      [1270, VW, "AGENT · OPTIMIZE · FIX"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="aoLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#ao${c.startsWith("p") ? "P" : "B"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${esc(l)}</tspan>`).join("")}</text>`;
+    }
+    g += run + term + sess + diff;
+    const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 20)}</g>`;
+    g += badge(1232, 444) + badge(1666, 394);
+
+    g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
+    g += `<g class="ao-badge"><circle cx="62" cy="548" r="17" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("calendar", 62, 548, 18, "#ab7df8")}</g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot"),
+      bars = [...svg.querySelectorAll(".ao-bar")],
+      finds = [...svg.querySelectorAll(".ao-find")];
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 2400,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1,
+      typed = 0,
+      done = 0;
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("aoLane" + LANE[nid]).classList.add("on");
+      if (nid === "aoHealth") $("aoPick").classList.add("on");
+    };
+    const setRun = (f, state) => {
+      const r = $("aoRun");
+      r.classList.toggle("bad", state === "bad");
+      r.classList.toggle("good", state === "good");
+      const st = $("aoStat");
+      st.textContent = state === "bad" ? "issue-triage #1842 · ✕" : state === "good" ? "issue-triage #1843 · ✓" : "issue-triage #1843 · ◌";
+      st.setAttribute("class", "ao-stat" + (state === "bad" ? " ko" : state === "good" ? " ok" : ""));
+      MET.forEach(([, a, b, fmt], i) => ($("aoV" + i).textContent = fmt(a + (b - a) * f)));
+    };
+    const reveal = (rows, f) => rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.4) / rows.length));
+    const scan = f => {
+      const b = $("aoBeam"),
+        x = BX + Math.min(1, f / 0.8) * (NB * BW + 4),
+        n = Math.floor((x - BX) / BW);
+      b.setAttribute("transform", `translate(${x},0)`);
+      b.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      bars.forEach((r, i) => r.classList.toggle("seen", i < n));
+      FIND.forEach(([, k, txt], i) => {
+        const c = k === "late" ? +(n >= NB) : KIND.slice(0, n).filter(x => x === k).length;
+        if (!c) return;
+        const el = $("aoF" + i),
+          s = txt(c);
+        if (el.textContent !== s) el.textContent = s;
+        if (!finds[i].classList.contains("seen")) {
+          finds[i].classList.add("seen");
+          sfx.pop(4 + i);
+        }
+        if (k === "late") $("aoLate").classList.add("on");
+      });
+    };
+    slides.push({
+      group: "engineering",
+      sound: "audit",
+      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
+      notes:
+        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          FIND.forEach((_, i) => ($("aoF" + i).textContent = ""));
+          $("aoBeam").style.opacity = 0;
+          setRun(0, "bad");
+          light("aoRun");
+          popK = -1;
+          typed = 0;
+          done = 0;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (["TYPE", "SCAN", "DIFF", "RERUN"].includes(eid)) {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(SEQ[j][1]);
+          if (eid === "TYPE") reveal([...svg.querySelectorAll(".ao-term")], f / 0.9);
+          else if (eid === "SCAN") scan(f);
+          else if (eid === "DIFF") reveal([...svg.querySelectorAll(".ao-dl")], f / 0.9);
+          else {
+            const g2 = Math.min(1, Math.max(0, (f - 0.15) / 0.6));
+            setRun(g2, f < 0.8 ? "run" : "good");
+            if (f >= 0.8 && !done) {
+              done = 1;
+              $("aoDelta").classList.add("on");
+              sfx.pop(9);
+            }
+          }
+          const rows = eid === "TYPE" ? ".ao-term.seen" : eid === "DIFF" ? ".ao-dl.seen" : null;
+          if (rows) {
+            const n = svg.querySelectorAll(rows).length;
+            if (n !== typed) {
+              typed = n;
+              if (n) sfx.key();
+            }
+          }
+          return;
+        }
+        const p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
+    });
+  }
+
   // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
   {
     resetIndex();
@@ -11183,6 +11183,8 @@
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     data: ["AW factory", "Measured on gh-aw's own history"],
   };
+  // Header-less rows of a single slide.
+  const SOLO = { intro: "Title", mindset: "Factory mindset", finale: "Finale" };
   // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
   const rows = [];
   for (const s of slides) {
@@ -11219,7 +11221,7 @@
           h(
             "div",
             { class: `bh-mrow${o === r ? " on" : ""}`, "--i": i },
-            h("span", { class: "bh-ml" }, BANDS[o.group]?.[0] || (i ? "Finale" : "Title")),
+            h("span", { class: "bh-ml" }, BANDS[o.group]?.[0] || SOLO[o.group]),
             BANDS[o.group] ? h("i", { class: "hd" }) : null,
             o.items.map(() => h("i"))
           )
@@ -11281,7 +11283,7 @@
   const dots = h(
     "div",
     { class: "dots" },
-    rows.map(r => h("div", { class: "drow", title: BANDS[r.group]?.[0] || "" }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
+    rows.map(r => h("div", { class: "drow", title: BANDS[r.group]?.[0] || SOLO[r.group] || "" }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
   );
   const arrowBtn = (label, d, fn) => {
     const b = h("button", {
