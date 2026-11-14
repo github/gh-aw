@@ -222,6 +222,18 @@
   .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
   .fm-wire.classic { stroke: #9198a1; stroke-dasharray: 6 8; opacity: .4; }
   .mra-l.classic { fill: #9198a1; font: 500 19px var(--mono); opacity: .8; }
+  .ct-svg { left: 150px; top: 282px; width: 1620px; height: 572px; }
+  .ct-svg .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
+  .ct-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .ct-svg .mra-l.g { fill: #3fb950; }
+  .ct-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
+  .ct-round { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
+  .ct-stats { position: absolute; left: 150px; right: 150px; top: 878px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; }
+  .ct-stat { padding: 20px 28px 22px; border-radius: 18px; background: #0d1117d9; border: 2px solid #3d444d; }
+  .active .ct-stat { animation: rise .9s cubic-bezier(.2,.9,.2,1) both; }
+  .active .ct-stat:nth-child(2) { animation-delay: .15s; } .active .ct-stat:nth-child(3) { animation-delay: .3s; } .active .ct-stat:nth-child(4) { animation-delay: .45s; }
+  .ct-num { font: 800 64px/1 "Mona Sans"; font-variant-numeric: tabular-nums; background: linear-gradient(90deg, var(--a), var(--b)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ct-lab { margin-top: 10px; font: 500 22px/1.2 "Mona Sans"; color: #9198a1; }
+  .ct-src { position: absolute; right: 150px; top: 846px; font: 500 16px var(--mono); color: #6e7681; letter-spacing: .06em; }
   .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
   .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
@@ -3009,6 +3021,166 @@
         raSvg,
         h("div", { class: "fm-cap ra-cap-chart" }, h("b", { style: "color:#3fb950" }, "Backlog burndown"), h("span", {}, " · open issues after adoption")),
         bdSvg
+      ),
+    });
+  }
+
+  // Issues as intent: how gh-aw itself is built; a community issue is triaged, assigned to Copilot, reviewed by agents and merged by a maintainer, with real repository counts
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 600;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#ctAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const user = (id, x, y, w) => `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/>${ico("person", x, y, 36, "#3fb950")}</g>`;
+    const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // [edge id, path, color, label, lx, ly, anchor]; g = community, b = maintainer, p = Copilot and agents
+    const EDGES = [
+      ["e1", "M298 170 H426", "g", ["files issue"], 362, 148, "middle"],
+      ["e2", "M470 206 V300 H185 V397", "b", ["triages & plans"], 327, 288, "middle"],
+      ["e3", "M298 430 H620 V170 H658", "b", ["assigns", "to Copilot"], 640, 300, "start"],
+      ["e4", "M800 196 V430 H956", "p", ["writes code,", "opens PR"], 822, 300, "start"],
+      ["e5", "M1000 394 V170 H1188", "p", ["ready for", "review"], 1022, 300, "start"],
+      ["e6", "M1375 145 V100 H800 V137", "p", ["comments → Copilot pushes fixes"], 1090, 90, "middle"],
+      ["e7", "M1230 206 V388", "p", ["threads", "resolved"], 1252, 300, "start"],
+      ["e8", "M1448 430 H1576", "b", ["merges"], 1512, 408, "middle"],
+      ["e9", "M1620 466 V570 H24 V170 H38", "g", ["issue closed as completed · intent shipped"], 860, 556, "middle"],
+    ];
+    const SEQ = [
+      ["e1", "nIssue"],
+      ["e2", "nMaint"],
+      ["e3", "nCopilot"],
+      ["e4", "nPR"],
+      ["e5", "nReview"],
+      ["e6", "nCopilot"],
+      ["e4", "nPR"],
+      ["e5", "nReview"],
+      ["e7", "nLead"],
+      ["e8", "nMerge"],
+      ["e9", "nUser", 1600],
+    ];
+    const LANE = { nUser: 0, nIssue: 0, nMaint: 0, nCopilot: 1, nPR: 1, nReview: 2, nLead: 2, nMerge: 2 };
+    const MK = { g: ["ctG", "#3fb950"], b: ["ctB", "#4493f8"], p: ["ctP", "#ab7df8"] };
+    let g = `<defs><clipPath id="ctClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ctAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>`;
+    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 580, "INTENT"],
+      [580, 1140, "CODE"],
+      [1140, VW, "REVIEW"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="ctLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 60}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += user("nUser", 80, 170, 210) + box("nIssue", 470, 170, "issue") + dev("nMaint", 80, 430, 210, "Maintainer");
+    g += agent("nCopilot", 700, 170, 200, "Copilot") + box("nPR", 1000, 430, "pr");
+    g += agent("nReview", 1230, 170, 290, "Agentic reviewers") + dev("nLead", 1230, 430, 210, "Maintainer") + box("nMerge", 1620, 430, "merge");
+    g += `<text class="ct-round" id="ctRound" x="1000" y="500" text-anchor="middle"></text>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ct-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    // real counts for gh-aw issues labelled "community" and the merged pull requests that closed them, snapshot November 2026
+    const STATS = [
+      [450, "", "people filed community issues", "#3fb950", "#79c0ff"],
+      [1383, "", "community issues closed as completed", "#79c0ff", "#4493f8"],
+      [1039, "", "pull requests merged to close them", "#4493f8", "#ab7df8"],
+      [96, "%", "of those pull requests authored by Copilot", "#ab7df8", "#d2a8ff"],
+    ];
+    const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
+    const stats = h(
+      "div",
+      { class: "ct-stats" },
+      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+    );
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1000,
+      START = 900,
+      HOLD = 1200,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("ctLane" + LANE[nid]).classList.add("on");
+    };
+    slides.push({
+      group: "factory",
+      sound: "contrib",
+      palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
+      notes:
+        "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative and uses a role icon for the community member. Anyone files an issue describing what they want, the intent, rather than a patch. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Once it is ready for review, agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer reviews and merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Community members contribute intent; Copilot turns it into code and maintainers review.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+        nums.forEach((n, i) => (n.textContent = "0" + STATS[i][1]));
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * f).toLocaleString("en-US") + STATS[i][1]));
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          $("ctRound").textContent = "";
+          light("nUser");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          fr = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", MK[p.classList[1]][1]);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (k >= 4) $("ctRound").textContent = `review round ${k >= 7 ? 2 : 1}`;
+        if (fr >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How gh-aw itself is built"), h("h2", {}, letters("Issues as "), letters("intent", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "gh-aw issues labelled community · counts as of November 2026")
       ),
     });
   }
@@ -7176,6 +7348,14 @@
         [79, 76, 74, 72, 67].forEach((m, i) => tone(m, t + 0.7 + i * 0.15, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 2400, detune: 3 }));
         bell(72, t + 1.45, 0.04, 1.6);
         pad([48, 55, 64], t + 1.4, 1.8, 0.025, "triangle", 1400);
+      },
+      // issues as intent: a few typed keystrokes (the issue), a hand-off up to Copilot, review chirps, then a bright merge chord
+      contrib: t => {
+        [0, 0.09, 0.2, 0.27, 0.38].forEach((d, i) => click(t + 0.2 + d, 2600 + i * 180, 0.04, 12));
+        [67, 72, 79].forEach((m, i) => tone(m, t + 0.8 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.06, cutoff: 2600, detune: 3 }));
+        [84, 81, 84].forEach((m, i) => osc("sine", hz(m), t + 1.3 + i * 0.1, 0.12, 0.025));
+        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.75 + i * 0.05, 0.04, 1.5));
+        pad([48, 55, 64, 67], t + 1.75, 1.8, 0.025, "triangle", 2000);
       },
       // research → assign → refine: two sonar pings (the second finds something), a hand-off, then a refining back-and-forth
       research: t => {
