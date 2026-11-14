@@ -702,6 +702,45 @@
   .sfm-m div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; color: #6e7681; font-size: 12px; }
   .sfm-m i { display: block; width: 100%; background: linear-gradient(#ab7df8, #8957e5); border-radius: 3px 3px 0 0; }
   .sfm-c { margin-top: 6px; color: #6e7681; font-size: 12.5px; white-space: nowrap; }
+  .pm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #ab7df8, #3fb950, #4493f8, #d29922); }
+  .pm-tabs { position: absolute; left: 110px; top: 262px; display: flex; gap: 20px; opacity: 0; }
+  .active .pm-tabs { animation: settle .6s .3s both; }
+  .pm-tab { display: flex; align-items: center; gap: 16px; width: 560px; padding: 16px 22px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; color: #9198a1; text-align: left; cursor: pointer; font: inherit; transition: border-color .3s, background .3s, color .3s, box-shadow .3s; }
+  .pm-tab:hover { border-color: #6e7681; color: #f0f6fc; }
+  .pm-tab:focus-visible { outline: 3px solid #4493f8; outline-offset: 3px; }
+  .pm-tab i { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 2px solid currentColor; font: 600 20px var(--mono); font-style: normal; }
+  .pm-tab b { display: block; font: 600 28px/1.15 "Mona Sans"; }
+  .pm-tab em { display: block; margin-top: 4px; font: normal 16px var(--mono); color: #6e7681; }
+  .pm-tab.on { border-color: #d29922; background: #161b22f0; color: #f0f6fc; box-shadow: 0 0 30px #d2992240; }
+  .pm-tab.on i { color: #d29922; }
+  .pm-flow { position: absolute; left: 110px; top: 400px; width: 1700px; display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 56px; }
+  .pm-st { position: relative; height: 126px; padding: 16px 20px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; transition: border-color .3s, box-shadow .3s, background .3s; }
+  .pm-st + .pm-st::before { content: ""; position: absolute; left: -54px; top: 50%; width: 46px; height: 2px; background: #3d444d; transition: background .3s; }
+  .pm-st + .pm-st::after { content: ""; position: absolute; left: -14px; top: calc(50% - 6px); border: 7px solid transparent; border-left-color: #3d444d; border-right: 0; transition: border-color .3s; }
+  .pm-st small { display: flex; align-items: center; gap: 10px; font: 500 14px var(--mono); letter-spacing: .12em; color: #6e7681; }
+  .pm-st svg { width: 22px; height: 22px; fill: #6e7681; transition: fill .3s; }
+  .pm-st b { display: block; margin-top: 12px; color: #f0f6fc; font: 600 27px/1.15 "Mona Sans"; }
+  .pm-st em { display: block; margin-top: 6px; color: #9198a1; font: normal 16px/1.25 var(--mono); }
+  .pm-st.k1 b { font-family: var(--mono); font-size: 25px; color: #c297ff; }
+  .pm-st.lit { border-color: var(--c); background: #161b22f0; box-shadow: 0 0 28px color-mix(in srgb, var(--c) 40%, transparent); }
+  .pm-st.lit small { color: var(--c); }
+  .pm-st.lit svg { fill: var(--c); }
+  .pm-st.lit::before { background: var(--c); }
+  .pm-st.lit::after { border-left-color: var(--c); }
+  .pm-doc { position: absolute; left: 110px; top: 580px; width: 1050px; height: 420px; padding: 22px 28px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117e8; }
+  .pm-doc-h { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #21262d; color: #f0f6fc; font: 600 26px "Mona Sans"; }
+  .pm-doc-h svg { width: 28px; height: 28px; fill: #3fb950; }
+  .pm-doc-h .pm-when { margin-left: auto; color: #6e7681; font: 15px var(--mono); }
+  .pm-ln { display: grid; grid-template-columns: 34px 270px 1fr; align-items: baseline; padding: 11px 0; border-bottom: 1px solid #161b22; color: #9198a1; font: 21px var(--mono); opacity: 0; transform: translateX(-12px); transition: opacity .35s, transform .35s; }
+  .pm-ln.on { opacity: 1; transform: none; }
+  .pm-ln i { font-style: normal; font-weight: 700; }
+  .pm-ln b { color: #f0f6fc; font: 600 22px "Mona Sans"; }
+  .pm-ln.ok i { color: #3fb950; } .pm-ln.bad i, .pm-ln.bad b { color: #f85149; } .pm-ln.warn i { color: #d29922; } .pm-ln.hl b { color: #d29922; }
+  .pm-idea { position: absolute; left: 1210px; top: 580px; width: 600px; height: 420px; padding: 26px 30px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117e0; }
+  .pm-idea small { font: 500 15px var(--mono); letter-spacing: .12em; color: #d29922; }
+  .pm-idea b { display: block; margin-top: 18px; color: #f0f6fc; font: 700 44px/1.1 "Mona Sans"; }
+  .pm-idea p { margin: 20px 0 0; color: #9198a1; font: 22px/1.4 "Mona Sans"; }
+  .pm-cap { position: absolute; left: 110px; right: 100px; bottom: 34px; color: #6e7681; font: 15px var(--mono); }
   .ao-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .ao-run .sfl-card { transition: stroke .4s, filter .4s; }
   .ao-run.bad .sfl-card { stroke: #f85149; filter: drop-shadow(0 0 10px #f8514966); }
@@ -7621,6 +7660,121 @@
     });
   }
 
+  // For PMs: two clickable PM processes (feature intake, launch readiness) from the public chrizbo/agentics-beyond-code repo (MIT): habit → agent → artifact → human, with a synthetic artifact
+  {
+    resetIndex();
+    const icon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    const COLS = ["#d29922", "#ab7df8", "#3fb950", "#4493f8"];
+    const KINDS = ["HABIT", "AGENT", "ARTIFACT", "HUMAN"];
+    // steps: [title, detail, icon] × 4; doc lines: [mark, label, value, cls]
+    const PROCS = [
+      {
+        tab: ["Feature intake", "a Slack reaction becomes a scored issue"],
+        steps: [
+          ["React 📥 in Slack", "on any message · no form", "comment"],
+          ["intake-triage", "scores it against strategy.md", "copilot"],
+          ["Scored intake issue", "RICE · Kano · strategy fit", "issue"],
+          ["PM decides", "accept · ask for more · park", "person"],
+        ],
+        doc: ["issue", "Intake: bulk export for workspace admins", "opened by the agent"],
+        lines: [
+          ["→", "Source", "Slack · #customer-feedback · 3 reactions", ""],
+          ["R", "Reach", "~340 admins / quarter", ""],
+          ["I", "Impact · Confidence", "2 (high) · 80%", ""],
+          ["E", "Effort", "3 person-weeks", ""],
+          ["=", "RICE score", "181 · top 10% of the backlog", "hl"],
+          ["✓", "Kano · strategy fit", "Performance · pillar 2, admin self-serve", "ok"],
+        ],
+        idea: ["Your habits are already triggers", "Nobody fills in a form. The emoji the team already uses is the trigger; the agent does the paperwork and the PM keeps the decision."],
+      },
+      {
+        tab: ["Launch readiness", "every Monday, against the policy"],
+        steps: [
+          ["Monday morning", "every launch in flight", "calendar"],
+          ["launch-readiness", "reads launch-ready.md", "copilot"],
+          ["Readiness report", "blockers · risk · sign-offs", "tasklist"],
+          ["DRI unblocks", "chases the one missing sign-off", "person"],
+        ],
+        doc: ["tasklist", "Readiness: bulk export · GA in 2 weeks", "posted Monday"],
+        lines: [
+          ["✓", "Docs", "published to staging", "ok"],
+          ["✓", "Security review", "approved", "ok"],
+          ["!", "Support runbook", "draft · no owner yet", "warn"],
+          ["✗", "Legal sign-off", "missing · blocks GA", "bad"],
+          ["✓", "Metrics dashboard", "live", "ok"],
+          ["=", "Overall risk", "medium · 1 blocker, 1 at risk", "hl"],
+        ],
+        idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
+      },
+    ];
+    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
+    const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
+    const docIco = h("span", {}),
+      docT = h("div", {}),
+      docS = h("span", { class: "pm-when" }),
+      docLines = h("div", {});
+    const ideaB = h("b", {}),
+      ideaP = h("p", {});
+    const STEP = 650;
+    let sel = 0,
+      t0 = 0,
+      shown = -1;
+    function pick(i) {
+      sel = i;
+      const p = PROCS[i];
+      tabs.forEach((t, j) => (t.classList.toggle("on", j === i), t.setAttribute("aria-pressed", String(j === i))));
+      stepEls.forEach((el, j) => {
+        const [b, em, ic] = p.steps[j];
+        el.classList.remove("lit");
+        el.querySelector("small span").replaceWith(h("span", {}, icon(ic)));
+        el.querySelector("b").textContent = b;
+        el.querySelector("em").textContent = em;
+      });
+      docIco.replaceChildren(icon(p.doc[0]));
+      docT.textContent = p.doc[1];
+      docS.textContent = p.doc[2];
+      docLines.replaceChildren(...p.lines.map(([m, l, v, c]) => h("div", { class: `pm-ln ${c}` }, h("i", {}, m), h("b", {}, l), h("span", {}, v))));
+      ideaB.textContent = p.idea[0];
+      ideaP.textContent = p.idea[1];
+      t0 = 0;
+      shown = -1;
+    }
+    slides.push({
+      group: "process",
+      sound: "pm",
+      palette: ["#d29922", "#8957e5", "#2da44e", "#1f6feb"],
+      notes:
+        "For PMs. Agentic workflows are not only for code. These two processes come from the public, MIT-licensed agentics-beyond-code repository (chrizbo/agentics-beyond-code), a collection of gh-aw workflows for product managers, DRIs and leaders; the workflow names, inputs, outputs and ideas are taken from it. The issue and report contents are synthetic and illustrative. Click a process, or press right, to switch. Each one has the same shape: a habit the team already has, an agent, an artifact left in the repo, and a human who decides. One, feature intake: someone reacts with an inbox emoji on a Slack message; the intake triage agent turns it into an issue scored with RICE and Kano against the strategy doc, and the PM accepts it, asks for more or parks it. The repo's idea: your habits are already triggers. Two, launch readiness: every Monday the agent reads the launch-ready policy, itself a Markdown file, checks every launch in flight and reports blockers, risk and sign-offs; the DRI chases the one missing sign-off. The idea: process as code. The repo has more, a decision log, an adversarial PM, a Friday leadership post and a process analyzer that opens a pull request when the team drifts from how-we-work.md.",
+      enter(dir) {
+        pick(dir < 0 ? 1 : 0);
+      },
+      onNext() {
+        if (sel === 0) return pick(1), sfx.step(), true;
+      },
+      onPrev() {
+        if (sel === 1) return pick(0), sfx.step(), true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const n = Math.floor((t - t0 - 500) / STEP);
+        if (n < 0 || n === shown || n > 4 + PROCS[sel].lines.length) return;
+        shown = n;
+        if (n < 4) (stepEls[n].classList.add("lit"), sfx.pop(n));
+        else if (n > 4) docLines.children[n - 5]?.classList.add("on");
+      },
+      el: h(
+        "section",
+        { class: "slide pm" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentics beyond code · patterns from chrizbo/agentics-beyond-code"), h("h2", {}, letters("For "), letters("PMs", "l-grad"))),
+        h("div", { class: "pm-tabs" }, ...tabs),
+        h("div", { class: "pm-flow" }, ...stepEls),
+        h("div", { class: "pm-doc" }, h("div", { class: "pm-doc-h" }, docIco, docT, docS), docLines),
+        h("div", { class: "pm-idea" }, h("small", {}, "THE IDEA · FROM THE REPO"), ideaB, ideaP),
+        h("div", { class: "pm-cap" }, "Workflows and ideas from chrizbo/agentics-beyond-code (MIT) · issue and report contents synthetic")
+      ),
+    });
+  }
+
   // Cost management: guard, measure, optimize (+ model routing)
   {
     resetIndex();
@@ -12664,6 +12818,14 @@
         [64, 67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.11, { type: "triangle", dur: 0.22, vol: 0.06, cutoff: 2600, detune: 3 }));
         bell(76, t + 1.45, 0.04, 1.2);
         bell(79, t + 1.57, 0.035, 1.4);
+      },
+      // for PMs: a notification blip (the habit), a hand-off up to the agent, a page stamp (the artifact), then a warm nod resolving home
+      pm: t => {
+        [84, 88].forEach((m, i) => osc("sine", hz(m), t + 0.2 + i * 0.09, 0.14, 0.03, { a: 0.003 }));
+        [67, 71, 74].forEach((m, i) => tone(m, t + 0.65 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.055, cutoff: 2600, detune: 3 }));
+        click(t + 1.1, 1800, 0.06, 6);
+        [72, 76, 79].forEach((m, i) => bell(m, t + 1.35 + i * 0.07, 0.035, 1.3));
+        pad([48, 55, 64, 67], t + 1.35, 1.8, 0.025, "triangle", 1800);
       },
       // agents that debug agents: three call/response pings (one per MCP tool call), then findings resolving upward
       mcp: t => {
