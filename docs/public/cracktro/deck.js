@@ -10271,7 +10271,7 @@
       stIco,
       h("h3", {}, "Dark mode for the settings screen"),
       h("div", { class: "psd-lb" }, h("span", {}, "sprint 14"), h("span", {}, "mobile"), h("span", {}, "ui")),
-      h("div", { class: "psd-sq" }, h("i", {}, "Squad · ", h("b", {}, "theme-crew")), members)
+      h("div", { class: "psd-sq" }, h("i", {}, "github/squad · ", h("b", {}, "theme-crew")), members)
     );
     const arrow = h("div", { class: "psd-arrow" }, "deploy");
     arrow.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.squad/</small>');
@@ -10407,7 +10407,7 @@
       sound: "squad",
       palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
       notes:
-        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad, a human-led AI agent team: a designer, a frontend engineer, an accessibility reviewer and a scribe. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad retires and its decisions stay in the repository for the next task. The task, repository, squad and file names are synthetic and the animation is illustrative.",
+        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project, a human-led AI agent team: a designer, a frontend engineer, an accessibility reviewer and a scribe. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad retires and its decisions stay in the repository for the next task. The task, repository, squad and file names are synthetic and the animation is illustrative.",
       enter() {
         t0 = 0;
         ev = 0;
