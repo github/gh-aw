@@ -45,9 +45,6 @@
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
   .wash.cover { z-index: 4; }
-  /* green wash for "Private enclaves": the inverse of the red one, with the grid tilted the other way */
-  .wash.green { background: radial-gradient(ellipse 80% 75% at 50% 55%, #0b4a2a 0%, #04261a 55%, #01100a 100%); }
-  .wash.green::after { background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #031f13aa 70%, #000503f0 100%); }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
@@ -2273,229 +2270,6 @@
             status.textContent = "● open · #42";
             sfx.notify(false);
           });
-      },
-      el,
-    });
-  }
-
-  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
-  {
-    resetIndex();
-    const BUDGET = 8;
-    const ROUNDS = [
-      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
-      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
-      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
-      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
-    ];
-    const CODE = [
-      "// billing/client.ts",
-      'import { charge } from "./v1/billing";',
-      "export async function renew(acct) {",
-      "  const plan = await lookup(acct);",
-      '  return charge(plan, { api: "v1" });',
-      "}",
-      "// auth/session.ts",
-      'import { sign } from "auth-lib@2.3.0";',
-      "// tests/integration/sync.test.ts",
-      'test.retry(3)("sync settles", run);',
-    ];
-    const PX = 560,
-      GX = 800,
-      VX = 1040;
-    const qTask = h("div", { class: "en-task" });
-    const qSchema = h("div", { class: "en-schema" });
-    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
-    const log = h("ul", { class: "en-log" });
-    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
-    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
-    const vaultStatus = h("div", { class: "en-status" });
-    const vault = h(
-      "div",
-      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
-      h("b", { class: "en-lock" }, "🔒 enclave"),
-      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
-      h("h3", {}, "octo-org/private-service"),
-      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
-      h("div", { class: "en-code" }, lines),
-      vaultStatus
-    );
-    const gNote = h("div", { class: "en-gnote" });
-    const fill = h("div", { class: "en-fill" });
-    const leftN = h("b");
-    const invN = h("span", { class: "en-left" });
-    const el = h(
-      "section",
-      { class: "slide en" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
-      h(
-        "div",
-        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
-        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
-        h("h3", {}, "Asks, never reads"),
-        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
-        call,
-        log,
-        out
-      ),
-      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
-      vault,
-      h(
-        "div",
-        { class: "en-ledger" },
-        h("i", {}, "Information budget"),
-        h("div", { class: "en-bar" }, fill),
-        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
-        invN,
-        h(
-          "div",
-          { class: "en-sens" },
-          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
-        )
-      )
-    );
-    let ev = [],
-      evI = 0,
-      pks = [],
-      used = 0,
-      calls = 0,
-      t0 = 0,
-      now = 0,
-      fresh = true;
-    const fmt = n => (Math.round(n * 10) / 10).toString();
-    const ledger = () => {
-      const left = BUDGET - used;
-      fill.style.width = `${(left / BUDGET) * 100}%`;
-      fill.classList.toggle("low", left < 3);
-      leftN.textContent = fmt(left);
-      invN.textContent = `· ${calls} / 4 invocations`;
-    };
-    const say = (txt, ok) => {
-      gNote.textContent = txt;
-      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
-    };
-    const launch = (txt, cls, x0, x1, dur, blocked) => {
-      const p = h("div", { class: `en-pk ${cls}` }, txt);
-      el.append(p);
-      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
-    };
-    const script = () => {
-      ev = [];
-      evI = 0;
-      const at = (ms, fn) => ev.push([ms, fn]);
-      let T = 600;
-      ROUNDS.forEach((r, k) => {
-        const s = T;
-        at(s, () => {
-          qTask.textContent = r.q;
-          qSchema.textContent = r.schema;
-          call.classList.remove("flash");
-          void call.offsetWidth;
-          call.classList.add("flash");
-          lines.forEach(l => l.classList.remove("hot"));
-          gNote.classList.remove("show");
-          sfx.key();
-        });
-        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
-        if (r.over) {
-          at(s + 1400, () => {
-            say(`✗ over budget · needs ${r.bits} bits`, 0);
-            sfx.route(0);
-          });
-          T = s + 3200;
-          return;
-        }
-        at(s + 1350, () => say("✓ masked capability", 1));
-        at(s + 2000, () => {
-          calls++;
-          ledger();
-          vault.classList.add("busy");
-          vaultStatus.textContent = "sub-agent reading ";
-          gNote.classList.remove("show");
-        });
-        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
-        let u = s + 3600;
-        at(u, () => {
-          vault.classList.remove("busy");
-          vaultStatus.textContent = "answer ready";
-        });
-        if (r.leak) {
-          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
-          at(u + 800, () => {
-            say("✗ free-form string · denied", 0);
-            sfx.route(0);
-          });
-          u += 1800;
-        }
-        at(u, () => launch(r.a, "a", VX, PX, 1400));
-        at(u + 700, () => {
-          used += r.bits;
-          ledger();
-          say(`✓ schema · −${r.bits} bits`, 1);
-          sfx.route(2);
-        });
-        at(u + 1400, () => {
-          log.append(h("li", {}, r.log));
-          sfx.pop(k * 2);
-        });
-        T = u + 2200;
-      });
-      at(T, () => {
-        out.classList.add("show");
-        gNote.classList.remove("show");
-        sfx.review();
-      });
-      at(T + 4000, () => (fresh = true));
-    };
-    const reset = () => {
-      pks.forEach(p => p.el.remove());
-      pks = [];
-      used = calls = 0;
-      log.replaceChildren();
-      out.classList.remove("show");
-      vault.classList.remove("busy");
-      vaultStatus.textContent = "";
-      gNote.className = "en-gnote";
-      qTask.textContent = "";
-      qSchema.textContent = "";
-      lines.forEach(l => l.classList.remove("hot"));
-      ledger();
-      t0 = now;
-      script();
-    };
-    slides.push({
-      group: "security",
-      sound: "vault",
-      green: true,
-      palette: ["#238636", "#0e3a1f", "#8957e5", "#0b2f3a"],
-      notes:
-        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
-      enter() {
-        fresh = true;
-      },
-      tick(t) {
-        now = t;
-        if (fresh) {
-          fresh = false;
-          reset();
-        }
-        const e = t - t0;
-        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
-        for (const p of pks) {
-          if (p.dead) continue;
-          const u = Math.min(1, (t - p.start) / p.dur);
-          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
-          if (u >= 1) {
-            p.dead = t + 600;
-            if (p.blocked) p.el.classList.add("burst");
-            else p.dead = t;
-          }
-        }
-        pks = pks.filter(p => {
-          if (p.dead && t >= p.dead) p.el.remove();
-          return !p.dead || t < p.dead;
-        });
       },
       el,
     });
@@ -5689,6 +5463,228 @@
     });
   }
 
+  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
+  {
+    resetIndex();
+    const BUDGET = 8;
+    const ROUNDS = [
+      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
+      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
+      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
+      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
+    ];
+    const CODE = [
+      "// billing/client.ts",
+      'import { charge } from "./v1/billing";',
+      "export async function renew(acct) {",
+      "  const plan = await lookup(acct);",
+      '  return charge(plan, { api: "v1" });',
+      "}",
+      "// auth/session.ts",
+      'import { sign } from "auth-lib@2.3.0";',
+      "// tests/integration/sync.test.ts",
+      'test.retry(3)("sync settles", run);',
+    ];
+    const PX = 560,
+      GX = 800,
+      VX = 1040;
+    const qTask = h("div", { class: "en-task" });
+    const qSchema = h("div", { class: "en-schema" });
+    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
+    const log = h("ul", { class: "en-log" });
+    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
+    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
+    const vaultStatus = h("div", { class: "en-status" });
+    const vault = h(
+      "div",
+      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
+      h("b", { class: "en-lock" }, "🔒 enclave"),
+      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
+      h("h3", {}, "octo-org/private-service"),
+      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
+      h("div", { class: "en-code" }, lines),
+      vaultStatus
+    );
+    const gNote = h("div", { class: "en-gnote" });
+    const fill = h("div", { class: "en-fill" });
+    const leftN = h("b");
+    const invN = h("span", { class: "en-left" });
+    const el = h(
+      "section",
+      { class: "slide en" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
+      h(
+        "div",
+        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
+        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
+        h("h3", {}, "Asks, never reads"),
+        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
+        call,
+        log,
+        out
+      ),
+      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
+      vault,
+      h(
+        "div",
+        { class: "en-ledger" },
+        h("i", {}, "Information budget"),
+        h("div", { class: "en-bar" }, fill),
+        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
+        invN,
+        h(
+          "div",
+          { class: "en-sens" },
+          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
+        )
+      )
+    );
+    let ev = [],
+      evI = 0,
+      pks = [],
+      used = 0,
+      calls = 0,
+      t0 = 0,
+      now = 0,
+      fresh = true;
+    const fmt = n => (Math.round(n * 10) / 10).toString();
+    const ledger = () => {
+      const left = BUDGET - used;
+      fill.style.width = `${(left / BUDGET) * 100}%`;
+      fill.classList.toggle("low", left < 3);
+      leftN.textContent = fmt(left);
+      invN.textContent = `· ${calls} / 4 invocations`;
+    };
+    const say = (txt, ok) => {
+      gNote.textContent = txt;
+      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
+    };
+    const launch = (txt, cls, x0, x1, dur, blocked) => {
+      const p = h("div", { class: `en-pk ${cls}` }, txt);
+      el.append(p);
+      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
+    };
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      let T = 600;
+      ROUNDS.forEach((r, k) => {
+        const s = T;
+        at(s, () => {
+          qTask.textContent = r.q;
+          qSchema.textContent = r.schema;
+          call.classList.remove("flash");
+          void call.offsetWidth;
+          call.classList.add("flash");
+          lines.forEach(l => l.classList.remove("hot"));
+          gNote.classList.remove("show");
+          sfx.key();
+        });
+        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
+        if (r.over) {
+          at(s + 1400, () => {
+            say(`✗ over budget · needs ${r.bits} bits`, 0);
+            sfx.route(0);
+          });
+          T = s + 3200;
+          return;
+        }
+        at(s + 1350, () => say("✓ masked capability", 1));
+        at(s + 2000, () => {
+          calls++;
+          ledger();
+          vault.classList.add("busy");
+          vaultStatus.textContent = "sub-agent reading ";
+          gNote.classList.remove("show");
+        });
+        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
+        let u = s + 3600;
+        at(u, () => {
+          vault.classList.remove("busy");
+          vaultStatus.textContent = "answer ready";
+        });
+        if (r.leak) {
+          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
+          at(u + 800, () => {
+            say("✗ free-form string · denied", 0);
+            sfx.route(0);
+          });
+          u += 1800;
+        }
+        at(u, () => launch(r.a, "a", VX, PX, 1400));
+        at(u + 700, () => {
+          used += r.bits;
+          ledger();
+          say(`✓ schema · −${r.bits} bits`, 1);
+          sfx.route(2);
+        });
+        at(u + 1400, () => {
+          log.append(h("li", {}, r.log));
+          sfx.pop(k * 2);
+        });
+        T = u + 2200;
+      });
+      at(T, () => {
+        out.classList.add("show");
+        gNote.classList.remove("show");
+        sfx.review();
+      });
+      at(T + 4000, () => (fresh = true));
+    };
+    const reset = () => {
+      pks.forEach(p => p.el.remove());
+      pks = [];
+      used = calls = 0;
+      log.replaceChildren();
+      out.classList.remove("show");
+      vault.classList.remove("busy");
+      vaultStatus.textContent = "";
+      gNote.className = "en-gnote";
+      qTask.textContent = "";
+      qSchema.textContent = "";
+      lines.forEach(l => l.classList.remove("hot"));
+      ledger();
+      t0 = now;
+      script();
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "vault",
+      palette: ["#8957e5", "#1f6feb", "#238636", "#1b7c83"],
+      notes:
+        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
+      enter() {
+        fresh = true;
+      },
+      tick(t) {
+        now = t;
+        if (fresh) {
+          fresh = false;
+          reset();
+        }
+        const e = t - t0;
+        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
+        for (const p of pks) {
+          if (p.dead) continue;
+          const u = Math.min(1, (t - p.start) / p.dur);
+          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
+          if (u >= 1) {
+            p.dead = t + 600;
+            if (p.blocked) p.el.classList.add("burst");
+            else p.dead = t;
+          }
+        }
+        pks = pks.filter(p => {
+          if (p.dead && t >= p.dead) p.el.remove();
+          return !p.dead || t < p.dead;
+        });
+      },
+      el,
+    });
+  }
+
   // Connectors: a declaration lists everything a service offers; a workflow imports it and selects a few reads and one write; only that selection reaches the run
   {
     resetIndex();
@@ -6713,9 +6709,8 @@
     '<g class="x"><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></g></svg>';
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
-  const gwash = h("div", { class: "wash green" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, gwash, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
+  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
 
   // Dot row: left offset + 12px dots + 12px gaps + 28px for the wide active dot; sound/count need ~170px on the right.
   const dotsWidth = 28 + slides.length * 24 - 12 + 28;
@@ -7565,7 +7560,6 @@
   function show(n, covered) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
-    gwash.classList.toggle("on", !!slides[n].green);
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
@@ -7692,8 +7686,7 @@
     });
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red security wash is up,
-    // and to -45° while the green "Private enclaves" wash is up.
+    // It turns to 45° (around the screen centre) while the red security wash is up.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -7701,7 +7694,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : gwash.classList.contains("on") ? -Math.PI / 4 : 0;
+    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),

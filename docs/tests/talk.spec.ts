@@ -20,7 +20,6 @@ test("presents the twenty-three slides without the removed sections", async ({ p
     "Safety and control",
     "Supply chain hardening",
     "Safe outputs",
-    "Private enclaves",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
     "Pull Request Review²",
@@ -34,6 +33,7 @@ test("presents the twenty-three slides without the removed sections", async ({ p
     "Model routing",
     "Experiments, graders & evals",
     "Any agent, any provider",
+    "Private enclaves",
     "Connectors",
     "Enterprise ready",
     "Centralized campaigns",
@@ -150,7 +150,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
   await page.keyboard.press("n");
-  for (const slide of [2, 3, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]) {
+  for (const slide of [2, 3, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
