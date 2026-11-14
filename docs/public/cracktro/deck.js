@@ -10083,21 +10083,53 @@
       ctx.lineTo(...at(r, d1)); ctx.stroke();
     };
     const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-    const box = (x0, y0, x1, y1, o) => {
+    const box = (g, x0, y0, x1, y1, o) => {
       const r = o.r ?? 18, lx = x0 + 22;
-      ctx.font = `600 16px ${MONO}`;
-      let w = ctx.measureText(o.main).width + (o.icon ? 22 : 0);
-      if (o.sub) { ctx.font = `500 14px ${MONO}`; w += 10 + ctx.measureText(o.sub).width; }
-      if (o.fill) { ctx.fillStyle = o.fill; ctx.beginPath(); ctx.roundRect(x0, y0, x1 - x0, y1 - y0, r); ctx.fill(); }
-      ctx.strokeStyle = o.stroke; ctx.lineWidth = 1.5; ctx.setLineDash(o.dash || []);
-      ctx.beginPath(); ctx.moveTo(lx + w + 8, y0);
-      ctx.arcTo(x1, y0, x1, y1, r); ctx.arcTo(x1, y1, x0, y1, r); ctx.arcTo(x0, y1, x0, y0, r); ctx.arcTo(x0, y0, x1, y0, r);
-      ctx.lineTo(lx - 8, y0); ctx.stroke(); ctx.setLineDash([]);
+      g.font = `600 16px ${MONO}`;
+      let w = g.measureText(o.main).width + (o.icon ? 22 : 0);
+      if (o.sub) { g.font = `500 14px ${MONO}`; w += 10 + g.measureText(o.sub).width; }
+      if (o.fill) { g.fillStyle = o.fill; g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, r); g.fill(); }
+      g.strokeStyle = o.stroke; g.lineWidth = 1.5; g.setLineDash(o.dash || []);
+      g.beginPath(); g.moveTo(lx + w + 8, y0);
+      g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
+      g.lineTo(lx - 8, y0); g.stroke(); g.setLineDash([]);
       let x = lx;
-      if (o.icon) { octicon(ctx, o.icon, x + 8, y0, ICON, o.col); x += 22; }
-      ctx.textAlign = "left"; ctx.font = `600 16px ${MONO}`; ctx.fillStyle = o.col; ctx.fillText(o.main, x, y0);
-      if (o.sub) { x += ctx.measureText(o.main).width + 10; ctx.font = `500 14px ${MONO}`; ctx.fillStyle = "#6e7681"; ctx.fillText(o.sub, x, y0); }
-      ctx.textAlign = "center";
+      if (o.icon) { octicon(g, o.icon, x + 8, y0, ICON, o.col); x += 22; }
+      g.textAlign = "left"; g.font = `600 16px ${MONO}`; g.fillStyle = o.col; g.fillText(o.main, x, y0);
+      if (o.sub) { x += g.measureText(o.main).width + 10; g.font = `500 14px ${MONO}`; g.fillStyle = "#6e7681"; g.fillText(o.sub, x, y0); }
+    };
+    // Boxes, labels, org wiring and the unenrolled spoke never change, so they are drawn once into an offscreen layer
+    // (redrawn after web fonts load, since the labels are measured).
+    let bg = null;
+    document.fonts?.ready.then(() => (bg = null));
+    const background = () => {
+      const c = document.createElement("canvas");
+      c.width = cv.width; c.height = cv.height;
+      const g = c.getContext("2d");
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.textBaseline = "middle"; g.lineCap = "round"; g.lineJoin = "round";
+      box(g, 12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
+      box(g, cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
+        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
+      });
+      for (const o of orgs) {
+        box(g, Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
+          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
+          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
+        });
+        if (o.off) {
+          const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
+          g.strokeStyle = "#ffffff24"; g.lineWidth = 2; g.setLineDash([3, 5]);
+          g.beginPath(); g.moveTo(...P(o, o.dist - 15)); g.lineTo(...P(o, r0 + 11)); g.stroke(); g.setLineDash([]);
+          octicon(g, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
+        }
+        g.globalAlpha = o.off ? .45 : 1;
+        g.strokeStyle = "#ffffff30"; g.lineWidth = 1.5; g.beginPath();
+        g.moveTo(o.x, o.y); g.lineTo(o.cols[o.cols.length - 1].x, o.y);
+        for (const c of o.cols) { g.moveTo(c.x, c.y0); g.lineTo(c.x, c.y1); }
+        g.stroke(); g.globalAlpha = 1;
+      }
+      return c;
     };
     let packets = [], recent = [], last = 0, t0 = 0, stage = 0, spin = 0, kick = 0;
     let turn = 0, volley = 0, shooter = null, nextShot = 0;
@@ -10107,33 +10139,23 @@
       ctx.setTransform(2, 0, 0, 2, 0, 0);
       ctx.clearRect(0, 0, CW, CH);
       ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
-      box(12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
-      box(cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
-        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
-      });
-      for (const o of orgs) {
-        box(Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
-          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
-          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
-        });
-      }
+      ctx.drawImage(bg ??= background(), 0, 0, CW, CH);
       for (const o of orgs) if (!o.off) {
         ctx.strokeStyle = "#8b949e"; ctx.globalAlpha = .4 + .5 * o.heat; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(...o.tap); ctx.lineTo(...P(o, o.dist - 15)); ctx.stroke();
       }
-      ctx.globalAlpha = 1;
-      for (const o of orgs) if (o.off) {
-        const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
-        ctx.strokeStyle = "#ffffff24"; ctx.lineWidth = 2; ctx.setLineDash([3, 5]);
-        ctx.beginPath(); ctx.moveTo(...P(o, o.dist - 15)); ctx.lineTo(...P(o, r0 + 11)); ctx.stroke(); ctx.setLineDash([]);
-        octicon(ctx, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
+      // Packets go under the nodes so their dots and trails never cover an icon.
+      for (const q of packets) {
+        if (q.u >= 1) continue;
+        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
+        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
+        trace(q.r, d - 34, d);
+        const [x, y] = at(q.r, d);
+        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
       }
       for (const o of orgs) {
         ctx.globalAlpha = o.off ? .45 : 1;
-        ctx.strokeStyle = "#ffffff30"; ctx.lineWidth = 1.5; ctx.beginPath();
-        ctx.moveTo(o.x, o.y); ctx.lineTo(o.cols[o.cols.length - 1].x, o.y);
-        for (const c of o.cols) { ctx.moveTo(c.x, c.y0); ctx.lineTo(c.x, c.y1); }
-        ctx.stroke();
         for (const p of o.reps) {
           const col = p.state === 1 ? p.camp.c : p.state === 2 ? "#3fb950" : null;
           ctx.fillStyle = "#0d1117"; ctx.strokeStyle = col || "#30363d"; ctx.lineWidth = 1.5;
@@ -10177,16 +10199,6 @@
         ctx.textAlign = "right"; ctx.fillStyle = pop > .5 ? "#0d1117" : "#9198a1"; ctx.fillText(vt, vx, k.y + 1);
       }
       ctx.textAlign = "center";
-      for (const q of packets) {
-        if (q.u >= 1) continue;
-        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
-        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
-        trace(q.r, d - 34, d);
-        const [x, y] = at(q.r, d);
-        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
       ctx.font = `600 16px ${MONO}`;
       const sw = 22 + ctx.measureText("success").width, sx = C.x - sw / 2, sy = C.y + RY + 30;
       octicon(ctx, "north-star-16", sx + 8, sy, ICON, "#9198a1");
