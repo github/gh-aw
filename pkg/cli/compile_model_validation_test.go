@@ -14,7 +14,6 @@ func TestBuildActiveModelInventoryDoesNothingWithoutObservedData(t *testing.T) {
 	t.Parallel()
 
 	assert.Nil(t, buildActiveModelInventory(modelsReport{
-		Catalog: []modelCatalogRow{{Provider: "openai", Model: "gpt-5.4"}},
 		Aliases: []modelAliasRow{{Alias: "large"}},
 	}))
 }

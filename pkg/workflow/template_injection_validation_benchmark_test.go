@@ -53,8 +53,8 @@ jobs:
 	b.ResetTimer()
 	b.ReportAllocs()
 	for b.Loop() {
-		if err := validateNoGitHubExpressionsInRunScriptsFromParsed(parsed); err != nil {
-			b.Fatalf("validateNoGitHubExpressionsInRunScriptsFromParsed() error = %v", err)
+		if err := validateRunScriptExpressions(parsed, true); err != nil {
+			b.Fatalf("validateRunScriptExpressions(, true) error = %v", err)
 		}
 	}
 }

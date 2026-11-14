@@ -31,7 +31,7 @@ func TestIssueSyncCancelledCallerReleasesOnlyKnownWrites(t *testing.T) {
 				}
 				return base(ctx, query, variables, response)
 			}
-			report, err := branch.synchronizeIssueTransition(ctx, "cancel-mirror", &IssuesSettings{Label: "work"}, graph)
+			report, err := branch.synchronizeCheckedIssueTransition(ctx, "cancel-mirror", &IssuesSettings{Label: "work"}, graph, nil)
 			if phase == "acknowledged-write" {
 				if err != nil || report.Synchronized != 1 {
 					t.Fatalf("acknowledged mutation lost its result to caller cancellation: %+v %v", report, err)
@@ -127,7 +127,7 @@ func TestIssueSyncDefinitiveLabelRejectionReleasesCoordination(t *testing.T) {
 		}
 		return base(ctx, query, variables, response)
 	}
-	if _, err := branch.synchronizeIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, graph); err == nil || len(server.projectionRefs) != 0 {
+	if _, err := branch.synchronizeCheckedIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, graph, nil); err == nil || len(server.projectionRefs) != 0 {
 		t.Fatalf("definitive no-write retained a fence: %v %v", server.projectionRefs, err)
 	}
 }
@@ -273,7 +273,7 @@ func TestIssueSyncPendingReceiptsDoNotBlockValidMirrors(t *testing.T) {
 		mustOp(t, map[string]any{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "operator_cancelled"}),
 		mustOp(t, map[string]any{"kind": "WorkCancellation", "work_id": workID, "reason": "operator_cancelled"}))
 	installMockLog(t, server, commits)
-	result, err := branch.synchronizeIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, syncGraph(t, nil, nil))
+	result, err := branch.synchronizeCheckedIssueTransition(context.Background(), "cancel-mirror", &IssuesSettings{Label: "work"}, syncGraph(t, nil, nil), nil)
 	if err == nil || result.Synchronized != 1 || len(result.Pending) != 1 || result.Pending[0].WorkID != work.WorkID ||
 		result.Pending[0].Reason != "projection_receipt_pending" || len(server.projectionRefs) != 0 || server.refWrites != 0 {
 		t.Fatalf("missing receipts blocked valid synchronization or disappeared: %+v %v", result, err)
@@ -286,7 +286,7 @@ func TestIssueTransitionSummaryRetainsCheckedRunsClaimsAndVerifiedOutcomes(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	targets, err := state.issueTransitionTargets("cancel-mirror")
+	targets, _, err := state.issueTransitionSelection("cancel-mirror")
 	if err != nil {
 		t.Fatal(err)
 	}

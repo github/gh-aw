@@ -3,7 +3,7 @@ name: cracktro-refresh-research-assign-observe
 description: Recompute the measured data on the cracktro "Research · Assign · Observe" slide and update deck.js.
 ---
 
-# Refresh: Research · Assign · Observe (slide 22)
+# Refresh: Research · Assign · Observe
 
 Load `.github/skills/cracktro/SKILL.md` first. Never read `deck.js` whole; use `grep -n` plus `view_range`.
 
@@ -106,7 +106,7 @@ grep -c 'Research · Assign · Observe' docs/tests/talk.spec.ts   # heading unch
 cd docs && npx playwright test tests/talk.spec.ts                 # needs npm ci; say so if not run
 ```
 
-Preview `http://127.0.0.1:4329/cracktro/#22` (see SKILL.md "Preview loop"): panel bars fit inside the card, the longest FIXES row does not overlap the `+N%` column, the caption fits on one line at 1920 px, and rows highlight in turn.
+Preview `http://127.0.0.1:4329/cracktro/#N` (N = its row in `slides.md`; see SKILL.md "Preview loop"): panel bars fit inside the card, the longest FIXES row does not overlap the `+N%` column, the caption fits on one line at 1920 px, and rows highlight in turn.
 
 ## 7. Pitfalls
 

@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const {
   buildCatalogFromReflect,
   globMatch,
-  isBundledModelId,
+  isExplicitModelId,
   loadBuiltinModelAliases,
   loadModelAliasMap,
   ModelAliasResolutionError,
@@ -317,14 +317,39 @@ describe("resolve_model_alias", () => {
   });
 });
 
-// Without AWF no /reflect catalogue can exist. A name listed in the bundled model catalogue
-// (models.json) is a plausible model id and passes through as exact; pure aliases fail.
+// Without AWF, only explicit overlay metadata can disambiguate aliases from exact IDs.
 describe("resolveEngineModel without a possible catalogue", () => {
   const run = (configuredModel, env = {}) => resolveEngineModel({ engine: "test", configuredModel, aliasMap: ALIAS_MAP, reflectData: null, env, record: false });
+  const { _resetModelCostsCache } = require("./model_costs.cjs");
+  let directory;
+  let previousPath;
+  beforeEach(() => {
+    previousPath = process.env.GH_AW_MODELS_JSON_PATH;
+    directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "gh-aw-alias-models-"));
+    process.env.GH_AW_MODELS_JSON_PATH = path.join(directory, "models.json");
+    fs.writeFileSync(process.env.GH_AW_MODELS_JSON_PATH, JSON.stringify({ providers: { "github-copilot": { models: { "gpt-5-mini": {}, "gpt-5.4": {}, "gpt-5.5": {}, "gpt-5": {} } } } }));
+    _resetModelCostsCache();
+  });
+  afterEach(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+    if (previousPath === undefined) delete process.env.GH_AW_MODELS_JSON_PATH;
+    else process.env.GH_AW_MODELS_JSON_PATH = previousPath;
+    _resetModelCostsCache();
+  });
 
-  it("defines plausible model ids by the bundled catalogue", () => {
-    for (const id of ["gpt-5-mini", "gpt-5.4", "gpt-5.5", "gpt-5"]) expect(isBundledModelId(id)).toBe(true);
-    for (const alias of ["small", "opus", "auto", "sonnet", "mini"]) expect(isBundledModelId(alias)).toBe(false);
+  it("recognizes only explicitly configured model ids", () => {
+    for (const id of ["gpt-5-mini", "gpt-5.4", "gpt-5.5", "gpt-5"]) expect(isExplicitModelId(id)).toBe(true);
+    for (const alias of ["small", "opus", "auto", "sonnet", "mini"]) expect(isExplicitModelId(alias)).toBe(false);
+  });
+
+  it("preserves native model-shaped IDs without a pricing overlay", async () => {
+    delete process.env.GH_AW_MODELS_JSON_PATH;
+    _resetModelCostsCache();
+    expect(isExplicitModelId("gpt-5-mini")).toBe(false);
+    for (const model of ["copilot/gpt-5-mini", "gpt-5.5", "gpt-5", "openai/gpt-5.4?effort=high"]) {
+      expect(await run(model)).toMatchObject({ engineModel: model, status: "exact", alias: false });
+    }
+    expect(await run("custom-exact-model")).toMatchObject({ engineModel: "custom-exact-model", status: "exact" });
   });
 
   it.each(["copilot/gpt-5.4", "copilot/gpt-5-mini", "gpt-5.5", "gpt-5", "copilot/gpt-5"])("passes %s through as exact", async model => {
@@ -333,6 +358,13 @@ describe("resolveEngineModel without a possible catalogue", () => {
 
   it.each(["small", "copilot/opus", "auto"])("fails pure alias %s with catalog_unavailable", async model => {
     await expect(run(model)).rejects.toMatchObject({ reason: "catalog_unavailable", message: `model-catalog retrieval prevented alias resolution for '${model}'` });
+  });
+
+  it("does not mistake user-defined version-shaped glob aliases for native model IDs", async () => {
+    delete process.env.GH_AW_MODELS_JSON_PATH;
+    _resetModelCostsCache();
+    await expect(resolveEngineModel({ engine: "test", configuredModel: "custom-5", aliasMap: { "custom-5": ["copilot/custom-5*"] }, reflectData: null, env: {}, record: false })).rejects.toMatchObject({ reason: "catalog_unavailable" });
+    await expect(resolveEngineModel({ engine: "test", configuredModel: "gpt-5", aliasMap: { "gpt-5": ["copilot/other-model*"] }, reflectData: null, env: {}, record: false })).rejects.toMatchObject({ reason: "catalog_unavailable" });
   });
 
   it("keeps the with-AWF rule: incomplete discovery fails an alias that is also a model id", async () => {

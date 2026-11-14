@@ -7,7 +7,7 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 Use Claude Opus 5.5 (`claude-opus-5.5`) for deck work, including any subagents you delegate to.
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifty-five-slide deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
@@ -16,7 +16,8 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fi
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
 - `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg`: the fake users Mona and Ducky (GitHub's mascots), the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-five slide headings (band headers included), so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They read `.github/skills/cracktro/slides.md`.
+- `.github/skills/cracktro/slides.md`: the single ordered slide list (headings, band headers included, and which notes must say illustrative). A slide's number is its row; never write slide numbers or counts anywhere else. Edit one row per slide in the same change as `deck.js`.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -56,6 +57,7 @@ slides.push({
 |---|---|
 | `mechanics.md` | Changing bands, slide order or `group`, navigation, transitions, backgrounds, audio, or animated SVG flows (`EDGES`/`SEQ`/`LANE`). |
 | `content-rules.md` | Adding any public text, data, avatar or image; contains the per-slide Exception bullets for measured data. |
+| `workflow-prompts.md` | Adding or refreshing a slide's `/agentic-workflows` prompt line (`PROMPTS` table and phone dialog); holds the prompt-mining algorithm and the exact PR/task/session references. |
 | `data-refresh.md` | Adding, changing or refreshing a data slide; holds the refresh mini-skill convention and the slide→`refresh/<slug>.md` index. |
 
 ## People and mascots
@@ -73,7 +75,7 @@ There is no build step. Serve the static folder and open it in the browser canva
 
 ```bash
 python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public   # run async + detached
-# open http://127.0.0.1:4329/cracktro/#11   (#N = slide N)
+# open http://127.0.0.1:4329/cracktro/#11   (#N = row N of slides.md)
 ```
 
 After each edit:
