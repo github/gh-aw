@@ -630,6 +630,39 @@
   .mem-arrow.hot { color: #f0f6fc; text-shadow: 0 0 24px #79c0ff; }
   .mem-foot { position: absolute; left: 110px; top: 948px; font: 500 20px/1 var(--mono); color: #9198a1; opacity: 0; }
   .active .mem-foot { animation: rise .6s ease-out both 2s; }
+
+  /* --- index & search: a non-agentic indexing job writes the index; the agent job only searches a read-only copy --- */
+  .ix .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8); }
+  .ix-lane, .ix-shared { position: absolute; box-sizing: border-box; border: 2px solid var(--c); background: #0d1117ee; opacity: 0; border-radius: 22px;
+    box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); transition: box-shadow .5s; }
+  .active .ix-lane, .active .ix-shared { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 260ms + 400ms); }
+  .ix-lane.hot { box-shadow: 0 0 110px -10px var(--c), inset 0 0 90px -40px var(--c); }
+  .ix-lane { top: 300px; width: 700px; height: 540px; padding: 26px 30px; }
+  .ix-lane > i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
+  .ix-lane h3 { margin: 14px 0 0; font-size: 54px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .ix-tags { margin: 18px 0 22px; display: flex; gap: 10px; }
+  .ix-tags span { padding: 7px 12px; border-radius: 99px; border: 1px solid var(--tc); color: var(--tc); font: 600 18px/1 var(--mono); }
+  .ix-step { margin-top: 12px; padding: 14px 18px; border-radius: 12px; border: 1px solid #30363d; background: #161b22; font: 500 22px/1.25 var(--mono); color: #6e7681;
+    white-space: nowrap; transition: color .3s, border-color .3s, background .3s; }
+  .ix-step.on { color: #f0f6fc; border-color: var(--c); background: #ffffff08; }
+  .ix-step.no.on { color: #ff7b72; border-color: #f85149; background: #f8514914; text-decoration: line-through; text-decoration-color: #f85149; }
+  .ix-step.ok.on { color: #3fb950; border-color: #3fb950; background: #3fb95014; }
+  .ix-wall { position: absolute; left: 960px; top: 300px; height: 540px; border-left: 3px dashed #3d444d; opacity: 0; }
+  .active .ix-wall { animation: rise .6s ease-out both 1.2s; }
+  .ix-wall span { position: absolute; top: -34px; left: 0; transform: translateX(-50%); font: 600 16px/1 var(--mono); letter-spacing: .16em; color: #6e7681; white-space: nowrap; }
+  .ix-cache { position: absolute; left: 836px; top: 420px; width: 248px; box-sizing: border-box; padding: 18px 16px; border-radius: 18px; border: 2px solid #e3b341;
+    background: #0d1117; text-align: center; opacity: 0; transition: box-shadow .4s; }
+  .active .ix-cache { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .ix-cache.hot { box-shadow: 0 0 70px -6px #e3b341; }
+  .ix-cache > i { font: 600 16px/1 var(--mono); letter-spacing: .16em; color: #e3b341; font-style: normal; }
+  .ix-cache svg { display: block; width: 64px; height: 64px; margin: 14px auto 8px; }
+  .ix-cache .n { font: 600 22px/1 var(--mono); color: #f0f6fc; }
+  .ix-cache .k { margin-top: 8px; font: 500 16px/1 var(--mono); color: #9198a1; }
+  .ix-cache .io { margin-top: 12px; padding: 8px 0; border-radius: 10px; border: 1px solid #30363d; font: 600 18px/1 var(--mono); color: #6e7681; transition: color .3s, border-color .3s, background .3s; }
+  .ix-cache .io.on { color: #e3b341; border-color: #e3b341; background: #e3b3411a; }
+  .ix-shared { left: 110px; top: 870px; width: 1700px; height: 76px; padding: 0 30px; display: flex; align-items: center; gap: 22px; font: 500 22px/1 var(--mono); color: #9198a1; }
+  .ix-shared b { color: #79c0ff; font-weight: 600; }
+  .ix-shared i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: #79c0ff; font-style: normal; white-space: nowrap; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
   .so.p-pass .so-card .st { color: #3fb950; }
   .so.p-done .so-card { border-style: solid; border-color: #3fb950; box-shadow: 0 0 60px -6px #3fb95088; }
@@ -6871,6 +6904,126 @@
     });
   }
 
+  // Index & search: a non-agentic indexing job (contents: read) writes the index; the agent job (contents: none) gets a read-only copy and a query/get-only search server; one shared import adds both
+  {
+    resetIndex();
+    const tags = list => h("div", { class: "ix-tags" }, list.map(([t, c]) => h("span", { "--tc": c }, t)));
+    const IDX = ["$ checkout docs", "$ qmd update   # ", "$ qmd embed    # new vectors", "↑ save index to Actions cache"];
+    const AGT = ["↓ restore index from cache", "→ qmd.query  lex + vec → 2 hits", "→ qmd.get    permissions.md:40-80", "✕ qmd embed  not allowed", "✓ ~9k tokens, not ~180k"];
+    const idxSteps = IDX.map(s => h("div", { class: "ix-step" }, s));
+    const agtSteps = AGT.map((s, i) => h("div", { class: `ix-step${i === 3 ? " no" : i === 4 ? " ok" : ""}` }, s));
+    const idxChanged = h("span", {});
+    idxSteps[1].append(idxChanged);
+    const idx = h(
+      "div",
+      { class: "ix-lane", "--c": "#3fb950", "--i": 0, style: { left: "110px" } },
+      h("i", {}, "JOB 1 · INDEXING · NO AGENT"),
+      h("h3", {}, "Index"),
+      tags([
+        ["deterministic steps", "#3fb950"],
+        ["contents: read", "#e3b341"],
+        ["writes", "#f0f6fc"],
+      ]),
+      idxSteps
+    );
+    const agt = h(
+      "div",
+      { class: "ix-lane", "--c": "#ab7df8", "--i": 1, style: { left: "1110px" } },
+      h("i", {}, "JOB 2 · AGENT · SANDBOXED"),
+      h("h3", {}, "Search"),
+      tags([
+        ["🔒 restore-only", "#ab7df8"],
+        ["contents: none", "#3fb950"],
+        ["no checkout", "#f0f6fc"],
+      ]),
+      agtSteps
+    );
+    const wall = h("div", { class: "ix-wall" }, h("span", {}, "JOB BOUNDARY"));
+    const cyl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    cyl.setAttribute("viewBox", "0 0 64 64");
+    cyl.innerHTML = '<g fill="none" stroke="#e3b341" stroke-width="3"><ellipse cx="32" cy="14" rx="22" ry="8"/><path d="M10 14v36c0 4.4 9.8 8 22 8s22-3.6 22-8V14"/><path d="M10 32c0 4.4 9.8 8 22 8s22-3.6 22-8"/></g>';
+    const ioSave = h("div", { class: "io" }, "→ save"),
+      ioRestore = h("div", { class: "io" }, "restore →");
+    const cache = h(
+      "div",
+      { class: "ix-cache" },
+      h("i", {}, "ACTIONS CACHE"),
+      cyl,
+      h("div", { class: "n" }, "index.sqlite"),
+      h("div", { class: "k" }, "key: qmd-docs"),
+      ioSave,
+      ioRestore
+    );
+    const shared = h(
+      "div",
+      { class: "ix-shared", "--c": "#79c0ff", "--i": 2 },
+      h("i", {}, "SHARED AGENTIC WORKFLOW"),
+      h("span", {}, h("b", {}, "imports"), ": [shared/qmd.md] adds both jobs · one cache key links them, run after run")
+    );
+    const el = h(
+      "section",
+      { class: "slide ix" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A plain job writes the index · the agent only reads it"), h("h2", {}, letters("Index "), letters("& search", "l-grad"))),
+      idx,
+      wall,
+      cache,
+      agt,
+      shared
+    );
+    // ms into the cycle when each indexing step, the handoff and each agent step light up
+    const IDX_AT = [700, 1500, 2300, 3100],
+      AGT_AT = [4400, 5300, 6100, 7000, 7900],
+      CYC = 12000,
+      CHANGED = [3, 7, 2, 5];
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    slides.push({
+      group: "cost",
+      sound: "index",
+      palette: ["#2da44e", "#1f6feb", "#8957e5", "#0a3069"],
+      notes:
+        "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          idxChanged.textContent = c === 0 ? "all 1,240 docs" : `+${CHANGED[c % CHANGED.length]} changed docs`;
+          [...idxSteps, ...agtSteps, ioSave, ioRestore].forEach(x => x.classList.remove("on"));
+        }
+        IDX_AT.forEach((ms, i) => u >= ms && fire("i" + i, () => (idxSteps[i].classList.add("on"), sfx.key(0.7))));
+                AGT_AT.forEach((ms, i) =>
+          u >= ms &&
+          fire("a" + i, () => {
+            agtSteps[i].classList.add("on");
+            if (i === 3) sfx.step(-1);
+            else if (i === 4) sfx.notify(false);
+            else sfx.key(0.7);
+          })
+        );
+        if (u >= IDX_AT[3]) fire("cs", () => (ioSave.classList.add("on"), sfx.pop(3)));
+        if (u >= AGT_AT[0]) fire("cr", () => (ioRestore.classList.add("on"), sfx.pop(5)));
+        idx.classList.toggle("hot", u >= IDX_AT[0] && u < IDX_AT[3] + 600);
+        cache.classList.toggle("hot", u >= IDX_AT[3] && u < AGT_AT[0] + 700);
+        agt.classList.toggle("hot", u >= AGT_AT[0] && u < CYC - 1500);
+      },
+      el,
+    });
+  }
+
   // Experiments, graders & evals: each run is assigned an A/B variant, graders measure it, evals judge it, and the analysis decides
   {
     resetIndex();
@@ -9503,6 +9656,14 @@
         [64, 67, 71, 76].forEach((m, i) => bell(m, t + 0.2 + i * 0.16, 0.045, 1.2));
         [64, 67, 71, 76].forEach((m, i) => bell(m + 12, t + 1.0 + i * 0.16, 0.02, 1.0, panTo(0.5)));
         pad([40, 47, 52, 56], t + 0.2, 2.6, 0.022, "triangle", 1400);
+      },
+      // index & search: a quick indexing sweep of ticks, then a bright two-note "found" chime
+      index: t => {
+        osc("sine", 600, t + 0.15, 0.7, 0.012, { f1: 2400 });
+        [0, 1, 2, 3, 4, 5].forEach(i => click(t + 0.2 + i * 0.1, 2200 + i * 200, 0.035, 8));
+        bell(79, t + 0.95, 0.045, 1.2);
+        bell(86, t + 1.08, 0.04, 1.4);
+        pad([45, 52, 57, 64], t + 0.3, 2.2, 0.022, "triangle", 1500);
       },
       // first commit to GA: a climbing arpeggio that keeps rising, landing on a bright major chord
       history: t => {
