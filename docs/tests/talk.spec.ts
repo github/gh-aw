@@ -16,7 +16,7 @@ test("presents the seventeen slides without the removed sections", async ({ page
     "GitHubAgenticWorkflows",
     "AI-poweredworkflowsfor GitHub",
     "Anatomy of a workflow",
-    "Spec Driven Automation",
+    "Turn Intent to Automation",
     "Safety and control",
     "Automation hardening",
     "Stop manually translating intent into code.",
