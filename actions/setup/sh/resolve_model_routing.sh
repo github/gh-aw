@@ -7,12 +7,12 @@ set -euo pipefail
 # value, including an empty one, keeps the non-routed path.
 if [[ -n "${GH_AW_MODEL_SELECTOR+set}" ]]; then
   selector="$GH_AW_MODEL_SELECTOR"
-  selector="${selector#"${selector%%[![:space:]]*}"}"
-  selector="${selector%"${selector##*[![:space:]]}"}"
   if [[ "$selector" == *$'\n'* || "$selector" == *$'\r'* ]]; then
     echo "ERR_CONFIG: the workflow's model resolved to a value containing a line break." >&2
     exit 1
   fi
+  selector="${selector#"${selector%%[![:space:]]*}"}"
+  selector="${selector%"${selector##*[![:space:]]}"}"
   mode=""
   case "$selector" in
     router) mode="auto" ;;

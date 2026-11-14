@@ -96,6 +96,7 @@ Report.
 		{name: "router value with parameters", level: "router/economy?effort=high", wantError: "ERR_CONFIG"},
 		{name: "unknown router value", level: "router/fast", wantError: "ERR_CONFIG"},
 		{name: "line break", level: "gpt-5.6-luna\nmodel-routing=true", wantError: "ERR_CONFIG"},
+		{name: "trailing line break", level: "router/robust\n", wantError: "ERR_CONFIG"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			contexts := map[string]string{"inputs.level": tc.level}
