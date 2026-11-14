@@ -46,6 +46,9 @@
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
   .wash.cover { z-index: 4; }
+  /* green wash for "Private enclaves": the inverse of the red one, with the grid tilted the other way */
+  .wash.green { background: radial-gradient(ellipse 80% 75% at 50% 55%, #0b4a2a 0%, #04261a 55%, #01100a 100%); }
+  .wash.green::after { background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #031f13aa 70%, #000503f0 100%); }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
@@ -1776,7 +1779,7 @@
       h("b", { class: "en-lock" }, "🔒 enclave"),
       h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
       h("h3", {}, "octo-org/private-service"),
-      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "microVM")),
+      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
       h("div", { class: "en-code" }, lines),
       vaultStatus
     );
@@ -1925,9 +1928,10 @@
     };
     slides.push({
       sound: "vault",
+      green: true,
       palette: ["#238636", "#0e3a1f", "#8957e5", "#0b2f3a"],
       notes:
-        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (container or microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
+        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
       enter() {
         fresh = true;
       },
@@ -4434,8 +4438,9 @@
     '<g class="x"><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></g></svg>';
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
+  const gwash = h("div", { class: "wash green" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, count, snd, notes);
+  document.body.append(canvas, gwash, wash, gridc, stage, progress, dots, count, snd, notes);
 
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
@@ -5072,6 +5077,7 @@
   function show(n, horiz) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
+    gwash.classList.toggle("on", !!slides[n].green);
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
@@ -5198,7 +5204,8 @@
     });
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up.
+    // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up,
+    // and to -45° while the green "Private enclaves" wash is up.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -5206,7 +5213,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : 0;
+    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : gwash.classList.contains("on") ? -Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),
