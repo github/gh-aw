@@ -36,7 +36,7 @@
   .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   /* full-screen red wash for "Agentic attacks", "Safety and control", "Supply chain hardening" and "Safe outputs": fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
-    background: radial-gradient(ellipse 80% 75% at 50% 55%, #6e0b12 0%, #3a0408 55%, #140103 100%); }
+    background: radial-gradient(ellipse 80% 75% at 50% 55%, #4e070c 0%, #280205 55%, #0e0102 100%); }
   /* blueprint grid on its own layer above the wash, so it can rotate to 45° as the red fades in */
   canvas.gridc { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
   .wash.cover + canvas.gridc { z-index: 4; }
@@ -929,10 +929,10 @@
   .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
   .ek .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #f778ba, #3fb950); }
   .ek-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
-  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 200ms + 300ms); }
   .ek-hd { font: 600 15px var(--mono); letter-spacing: .12em; } .ek-hd.b { fill: #79c0ff; } .ek-hd.g { fill: #7ee787; } .ek-hd.o { fill: #ffa657; }
-  .ek-card { fill: #0d1117d9; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
-  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #3fb95014; transition: filter .3s; }
+  .ek-card { fill: #0d1117f5; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
+  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #0e1a13f5; transition: filter .3s; }
   .ek-iss circle:first-child { fill: none; stroke: #3fb950; stroke-width: 2.5; }
   .ek-t { fill: #f0f6fc; font: 800 24px "Mona Sans"; } .ek-t.s { font-size: 20px; }
   .ek-ti { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
@@ -944,15 +944,15 @@
   .ek-pill.b rect { stroke: #4493f8; fill: #4493f81f; } .ek-pill.b text { fill: #79c0ff; }
   .ek-pill.o rect { stroke: #f0883e; fill: #f0883e1f; } .ek-pill.o text { fill: #ffa657; }
   .ek-pill.y rect { stroke: #d29922; fill: #d299221f; } .ek-pill.y text { fill: #e3b341; }
-  .ek-task { fill: none; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
-  .ek-wall { fill: #f0883e0d; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
+  .ek-task { fill: #0e1a13; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
+  .ek-wall { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
   .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e99); } }
   .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
-  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x { opacity: 0; transition: opacity .4s, transform .4s; }
-  .ek-resp rect { fill: #3fb9501a; stroke: #3fb950; stroke-width: 2; }
+  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x, .ek-ft { opacity: 0; transition: opacity .4s, transform .4s; }
+  .ek-resp rect { fill: #0e1a13; stroke: #3fb950; stroke-width: 2; }
   .ek-shield { fill: #0d1117; stroke: #3fb950; stroke-width: 2.5; stroke-linejoin: round; opacity: 0; transition: opacity .3s .4s; }
-  .ek-leak rect { fill: #f851491a; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
-  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s6 .ek-cmt, .s7 .ek-clean { opacity: 1; }
+  .ek-leak rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
+  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s5 .ek-ft.f5, .s6 .ek-cmt, .s6 .ek-ft.f6, .s7 .ek-clean, .s7 .ek-ft.f7 { opacity: 1; }
   .s5 .ek-shield { opacity: 1; filter: drop-shadow(0 0 8px #3fb950); }
   .s5 .ek-leak text { text-decoration: line-through; } .s5 .ek-leak { opacity: .45; }
   .ek-x circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; } .ek-x path { stroke: #ff7b72; stroke-width: 3.5; stroke-linecap: round; }
@@ -965,15 +965,15 @@
   .ek-lock circle { fill: #0d1117; stroke: #f0883e; stroke-width: 2.5; } .ek-lock rect { fill: #ffa657; } .ek-lock path { fill: none; stroke: #ffa657; stroke-width: 3; }
   .ek-file rect { fill: #161b22; stroke: #30363d; stroke-width: 1.5; transition: stroke .3s, filter .3s; }
   .s3 .ek-f2 rect { stroke: #f0883e; filter: drop-shadow(0 0 10px #f0883e88); }
-  .ek-note rect { fill: #3fb95014; stroke: #3fb95088; stroke-width: 1.5; }
-  .ek-conf rect { fill: #f8514914; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
+  .ek-note rect { fill: #0e1a13; stroke: #3fb95088; stroke-width: 1.5; }
+  .ek-conf rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
   .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; transition: opacity .3s; } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; }
   .ek-wire.hot { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
   .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; } .ek-wl.o { fill: #ffa657; }
   .ek-dot { fill: #7ee787; opacity: 0; filter: drop-shadow(0 0 10px #3fb950); } .ek-dot.o { fill: #ffa657; filter: drop-shadow(0 0 10px #f0883e); } .ek-dot.r { fill: #ff7b72; filter: drop-shadow(0 0 10px #f85149); }
   .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
-  .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
-  .zs-vm { fill: #8957e52a; stroke: #a371f7; stroke-width: 4; }
+  .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .zs-vm { fill: #1c1233f2; stroke: #a371f7; stroke-width: 4; }
   .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
   .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 2.6s; }
   @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f7aa); } }
@@ -981,21 +981,17 @@
   .zs-lock rect { fill: #d2a8ff; } .zs-lock path { fill: none; stroke: #d2a8ff; stroke-width: 3.5; stroke-linecap: round; }
   .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
   .zs-port { fill: #0d1117; stroke: #d2a8ff; stroke-width: 3; }
-  .zs-bars { opacity: 0; } .active .zs-bars { animation: zs-dim .8s ease both 2.5s; }
-  @keyframes zs-dim { from { opacity: 1; } to { opacity: .2; } }
-  .zs-bar { fill: url(#zsSteel); stroke: #0d1117; stroke-width: 1.5; transform: translateY(-470px); }
-  .active .zs-bar { animation: zs-slam .42s cubic-bezier(.5,0,1,1) both calc(var(--b) * 70ms + 950ms); }
-  @keyframes zs-slam { 0% { transform: translateY(-470px); } 78% { transform: translateY(8px); } 90% { transform: translateY(-5px); } 100% { transform: none; } }
-  .zs-cross { fill: url(#zsSteelH); stroke: #0d1117; stroke-width: 1.5; transform: scaleX(0); transform-box: fill-box; transform-origin: left; }
-  .active .zs-cross { animation: zs-cross .3s cubic-bezier(.2,.9,.2,1) both calc(var(--b) * 90ms + 1620ms); }
-  @keyframes zs-cross { to { transform: none; } }
-  .zs-lock path { transform: translateY(-7px); } .active .zs-lock path { animation: zs-shackle .18s ease-in both 2.05s; }
+  /* sealed boundary: a glowing perimeter traces around the micro-VM, then the lock snaps shut */
+  .zs-ring { fill: none; stroke: #d2a8ff; stroke-width: 4; stroke-dasharray: 1536; stroke-dashoffset: 1536; filter: drop-shadow(0 0 10px #a371f7); }
+  .active .zs-ring { animation: zs-ring .8s cubic-bezier(.6,0,.4,1) both .9s; }
+  @keyframes zs-ring { to { stroke-dashoffset: 0; } }
+  .zs-lock path { transform: translateY(-7px); } .active .zs-lock path { animation: zs-shackle .18s ease-in both 1.9s; }
   @keyframes zs-shackle { to { transform: none; } }
-  .active .zs-lock circle { animation: zs-snap .5s ease-out both 2.05s; transform-box: fill-box; transform-origin: center; }
+  .active .zs-lock circle { animation: zs-snap .5s ease-out both 1.9s; transform-box: fill-box; transform-origin: center; }
   @keyframes zs-snap { 0% { transform: scale(1); } 35% { transform: scale(1.3); filter: drop-shadow(0 0 22px #f778ba); stroke: #f778ba; } 100% { transform: scale(1); } }
-  .zs-host { fill: #3fb95012; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
-  .zs-kern.g { fill: #8957e526; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #3fb9501f; stroke: #2ea043; stroke-width: 2; }
-  .zs-kern.r { fill: #3fb95014; stroke: #3fb95088; stroke-width: 2; }
+  .zs-host { fill: #0e1a13eb; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
+  .zs-kern.g { fill: #1c1233f2; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #0e1a13f2; stroke: #2ea043; stroke-width: 2; }
+  .zs-kern.r { fill: #0d1117eb; stroke: #3fb95088; stroke-width: 2; }
   .zs-kt { font: 700 26px "Mona Sans"; text-anchor: middle; } .zs-kt.g { fill: #d2a8ff; } .zs-kt.h, .zs-kt.r { fill: #7ee787; }
   .zs-at { font: 600 15px var(--mono); letter-spacing: .1em; text-anchor: middle; } .zs-at.g { fill: #d2a8ff; } .zs-at.h { fill: #7ee787; text-anchor: start; }
   .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; transition: opacity .3s, stroke .3s; }
@@ -1003,7 +999,7 @@
   .zs-l { fill: #7ee787; font: 600 17px var(--mono); }
   .zs-l.m { text-anchor: middle; }
   .zs-node rect { fill: #0d1117; stroke: #3fb950; stroke-width: 2; transition: stroke .3s, filter .3s; }
-  .zs-node.key rect { fill: #8957e533; stroke: #a371f7; }
+  .zs-node.key rect { fill: #24173f; stroke: #a371f7; }
   .zs-node.hot rect { filter: drop-shadow(0 0 16px #3fb950); stroke: #7ee787; }
   .zs-node.key.hot rect { filter: drop-shadow(0 0 18px #a371f7); stroke: #d2a8ff; }
   .zs-n { fill: #f0f6fc; font: 700 22px "Mona Sans"; text-anchor: middle; }
@@ -3160,15 +3156,13 @@
           isKey ? key(x + w / 2 - 15, y + ht - 28) : sub ? `<text class="zs-s" x="${x + w / 2}" y="${y + ht / 2 + 24}">${sub}</text>` : ""
         }</g>`;
       let g = `<defs><marker id="zsM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>`;
-      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient>`;
-      g += `<linearGradient id="zsSteel"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
-      g += `<linearGradient id="zsSteelH" x2="0" y2="1"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
-      g += `<clipPath id="zsCell"><rect x="0" y="0" width="300" height="450" rx="18"/></clipPath></defs>`;
-      // runner VM, kernels and the two areas
-      g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
-      g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
+      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient></defs>`;
+      // build order: the agent's micro-VM seals first, then the host and its services, the wires between them, the exits, and finally the kernels and runner underneath
+      g += `<g class="zs-area" style="--d:3.1s"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
+      g += `<g class="zs-area" style="--d:2.9s"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
       g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
-      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
+      g += `<g class="zs-area" style="--d:2.1s"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
+      g += `<g class="zs-area zs-vm-g" style="--d:.3s"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
       g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
       g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/><g class="zs-bot" fill="none" stroke="#f0f6fc" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M150 128 V138"/><circle cx="150" cy="125" r="4" fill="#f0f6fc"/><rect x="126" y="138" width="48" height="38" rx="10"/><path d="M121 150 V164 M179 150 V164"/><circle cx="140" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><circle cx="160" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><path d="M142 166 H158"/></g><text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
       [
@@ -3179,18 +3173,16 @@
       g += `<g class="zs-nokey" transform="translate(138,340)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
       g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text>`;
       g += `<rect class="zs-port" x="290" y="226" width="20" height="28" rx="5"/>`;
-      // jail cell: bars slam down, crossbars slide in, then the lock snaps shut and the bars dim
-      g += `<g class="zs-bars" clip-path="url(#zsCell)">${[0, 1, 2, 3, 4, 5, 6].map(b => `<rect class="zs-bar" style="--b:${b}" x="${26 + b * 40}" y="-4" width="10" height="458" rx="5"/>`).join("")}`;
-      g += `${[94, 303].map((y, b) => `<rect class="zs-cross" style="--b:${b}" x="-4" y="${y}" width="308" height="10" rx="5"/>`).join("")}</g>`;
+      // sealed boundary: a glowing perimeter traces around the VM, then the lock snaps shut
+      g += `<rect class="zs-ring" x="-10" y="-10" width="320" height="470" rx="26"/>`;
       g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g></g>`;
-      g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
       // wires and labels
-      g += `<g class="zs-area" style="--i:4">`;
+      g += `<g class="zs-area" style="--d:2.5s">`;
       for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" marker-end="url(#zsM)"/>`;
       g += `<text class="zs-l" x="392" y="85">virtiofs</text><text class="zs-l" x="392" y="230">MCP</text><text class="zs-l" x="392" y="335">LLM API</text><text class="zs-l m" x="860" y="410">internet traffic</text>`;
       g += `</g>`;
       // host services
-      g += `<g class="zs-area" style="--i:5">`;
+      g += `<g class="zs-area" style="--d:2.3s">`;
       g += `<g class="zs-node" id="zsNFs">${folder(500, 56, 170, 80, "h")}<text class="zs-ft" x="585" y="98">workspace</text><text class="zs-ft" x="585" y="121">tool cache</text></g>`;
       g += box("zsNGw", 490, 200, 190, 80, "MCP gateway", "routes tools");
       g += box("zsNProxy", 490, 305, 190, 84, "API proxy", "", true);
@@ -3201,7 +3193,7 @@
       g += `<g class="zs-cut" id="zsCut"><circle cx="1512" cy="240" r="20"/><path d="M1503 231 L1521 249 M1521 231 L1503 249"/><text x="1512" y="290">not allowed</text></g>`;
       g += `</g>`;
       // destinations outside the runner
-      g += `<g class="zs-area" style="--i:6">`;
+      g += `<g class="zs-area" style="--d:2.7s">`;
       g += `<g class="zs-dest-g" id="zsDGh" transform="translate(1650,95)"><path class="zs-dest gh" d="M0 -34 L28 -23 V2 C28 20 13 30 0 36 C-13 30 -28 20 -28 2 V-23 Z"/><path class="zs-dest gh" d="M-11 0 L-3 9 L12 -8"/></g>`;
       g += `<text class="zs-dl" x="1650" y="158">allow/deny</text><text class="zs-dl" x="1650" y="180">GitHub updates</text>`;
       g += `<g class="zs-dest-g" id="zsDNet" transform="translate(1650,240)"><path class="zs-dest net" d="M-34 16 H32 A16 16 0 0 0 28 -14 A22 22 0 0 0 -12 -20 A18 18 0 0 0 -34 16 Z"/></g>`;
@@ -3214,8 +3206,8 @@
       t0 = 0,
       cyc = -1,
       state = "",
-      jail = 0;
-    const JAIL = 1300;
+      seal = 0;
+    const SEAL = 2400;
     const $ = id => svg.querySelector("#" + id);
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     slides.push({
@@ -3224,7 +3216,7 @@
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
-        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
+        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; a sealed boundary traces around it and locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
       enter() {
         if (!built) {
           built = true;
@@ -3233,19 +3225,19 @@
         t0 = 0;
         cyc = -1;
         state = "";
-        jail = 0;
+        seal = 0;
       },
       tick(t) {
         if (!t0) t0 = t;
         const raw = t - t0;
-        if (jail === 0 && raw >= 1330) {
-          jail = 1;
+        if (seal === 0 && raw >= 1700) {
+          seal = 1;
           sfx.block();
-        } else if (jail === 1 && raw >= 2050) {
-          jail = 2;
+        } else if (seal === 1 && raw >= 1900) {
+          seal = 2;
           sfx.key(1);
         }
-        const e = Math.max(0, raw - JAIL),
+        const e = Math.max(0, raw - SEAL),
           c = Math.floor(e / CYC),
           u = e % CYC;
         if (c !== cyc) {
@@ -10206,7 +10198,7 @@
       g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}</g>`;
       g += `<g class="ek-cmt"><rect class="ek-card c" x="0" y="340" width="380" height="200" rx="16"/>${bot(34, 380, 0.5, "#d2a8ff")}<text class="ek-t s" x="58" y="386">AI agent commented</text>${pill(24, 406, 190, "Visible to everyone", "b")}`;
       g += `<text class="ek-tx" x="24" y="470">v2 is <tspan class="ek-hl">compatible</tspan> with our</text><text class="ek-tx" x="24" y="496">internal integration.</text><text class="ek-tx" x="24" y="522"><tspan class="ek-hl">No migration</tspan> is required.</text></g>`;
-      g += `<text class="ek-ft" x="190" y="582">✓ no project name · no launch date</text>`;
+      g += `<text class="ek-ft f6" x="190" y="582">✓ no project name · no launch date</text>`;
       // B: primary agent + output gate
       g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="url(#ekBotA)"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
       g += `<text class="ek-t" x="556" y="112">Primary agent</text><text class="ek-s" x="556" y="140">public repo · untrusted</text>`;
@@ -10214,7 +10206,7 @@
       g += `<g class="ek-area ek-gate" style="--i:3"><rect class="ek-card gt" x="440" y="300" width="380" height="240" rx="16"/><text class="ek-t" x="460" y="338">Output gate</text><text class="ek-s" x="460" y="364">only schema values leave</text>`;
       g += `<text class="ek-m k" x="460" y="408">compatibility</text><text class="ek-m" x="460" y="434"><tspan class="ek-opt">compatible</tspan> | incompatible | unknown</text>`;
       g += `<text class="ek-m k" x="460" y="478">migrationRequired</text><text class="ek-m" x="460" y="504">true | <tspan class="ek-opt">false</tspan></text></g>`;
-      g += `<text class="ek-ft" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
+      g += `<text class="ek-ft f5" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
       // C: enclave
       g += `<g class="ek-area" style="--i:4"><rect class="ek-wall" x="880" y="40" width="420" height="510" rx="24"/><g class="ek-in">`;
       g += `<rect class="ek-card o" x="910" y="70" width="360" height="150" rx="16"/><circle cx="970" cy="143" r="36" fill="url(#ekBotB)"/>${bot(970, 145, 0.75, "#f0f6fc")}`;
@@ -10224,7 +10216,7 @@
       g += `<path class="ek-shield" d="M1252 286 l16 6 v12 c0 10 -7 16 -16 20 c-9 -4 -16 -10 -16 -20 v-12 z M1245 305 l5 5 l9 -9"/></g>`;
       g += `<g class="ek-leak"><rect x="910" y="406" width="360" height="110" rx="14"/><text class="ek-tx r" x="930" y="446">"Project Orchid launches</text><text class="ek-tx r" x="930" y="472">June 12…"</text><text class="ek-m x" x="930" y="502">✗ not in schema · dropped</text></g></g>`;
       g += `<g class="ek-clean"><rect x="975" y="372" width="230" height="60" rx="10"/><text x="1090" y="411">CLEANED UP</text></g></g>`;
-      g += `<text class="ek-ft" x="1090" y="582">launched per question · destroyed after</text>`;
+      g += `<text class="ek-ft f7" x="1090" y="582">launched per question · destroyed after</text>`;
       // D: private repo
       g += `<g class="ek-area" style="--i:5"><rect class="ek-card o" x="1360" y="50" width="400" height="490" rx="16"/>`;
       g += `<g class="ek-lock"><circle cx="1396" cy="92" r="20"/><path d="M1389 92 V85 a7 7 0 0 1 14 0 V92"/><rect x="1385" y="91" width="22" height="14" rx="3"/></g>`;
@@ -10234,11 +10226,12 @@
       g += `<g class="ek-note"><rect x="1380" y="276" width="360" height="74" rx="10"/><text class="ek-tx" x="1398" y="306">v2: compatible with integration</text><text class="ek-tx" x="1398" y="334">migration: not required</text></g>`;
       g += `<g class="ek-conf"><rect x="1380" y="366" width="360" height="94" rx="10"/><text class="ek-m x" x="1398" y="398">CONFIDENTIAL</text><text class="ek-tx" x="1398" y="434">Project Orchid launches June 12</text></g>`;
       g += `${pill(1460, 484, 200, "authorized read access", "o")}</g>`;
-      // wires
+      // wires appear once both ends are on screen
+      g += `<g class="ek-area" style="--i:6">`;
       g += Object.entries(PATHS)
         .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"/>`)
         .join("");
-      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text>`;
+      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text></g>`;
       g += `<g class="ek-x"><circle cx="830" cy="461" r="14"/><path d="M823 454 l14 14 M837 454 l-14 14"/></g>`;
       g += `<circle id="ekDot" class="ek-dot" r="9"/>`;
       svg.innerHTML = g;
@@ -10281,7 +10274,9 @@
       },
       tick(t) {
         if (!t0) t0 = t;
-        const u = (t - t0) % CYC;
+        // hold the flow until every card and wire has risen in
+        const LEAD = 1900,
+          u = t - t0 < LEAD ? -1 : (t - t0 - LEAD) % CYC;
         let k = -1;
         for (let i = 0; i < STEPS.length; i++) if (u >= STEPS[i][0]) k = i;
         if (k !== stage) {
