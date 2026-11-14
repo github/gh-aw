@@ -834,6 +834,40 @@
   .ix-shared { left: 110px; top: 870px; width: 1700px; height: 76px; padding: 0 30px; display: flex; align-items: center; gap: 22px; font: 500 22px/1 var(--mono); color: #9198a1; }
   .ix-shared b { color: #79c0ff; font-weight: 600; }
   .ix-shared i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: #79c0ff; font-style: normal; white-space: nowrap; }
+  .eph .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #79c0ff, #3fb950, #d29922); }
+  .eph-board, .eph-side, .eph-foot { position: absolute; box-sizing: border-box; border: 2px solid var(--c); background: #0d1117ee; opacity: 0; border-radius: 22px; }
+  .active .eph-board, .active .eph-side, .active .eph-foot { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 260ms + 400ms); }
+  .eph-board { left: 110px; top: 300px; width: 1100px; height: 540px; padding: 24px 28px; }
+  .eph-board > i, .eph-side i, .eph-foot i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; white-space: nowrap; }
+  .eph-axis { position: absolute; left: 378px; top: 24px; width: 672px; height: 18px; font: 500 16px/1 var(--mono); color: #6e7681; }
+  .eph-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+  .eph-lane { position: absolute; left: 28px; width: 1044px; height: 76px; border-top: 1px solid #21262d; }
+  .eph-lane .k { position: absolute; left: 0; top: 16px; font: 600 16px/1 var(--mono); color: var(--c); }
+  .eph-lane .f { position: absolute; left: 0; top: 40px; font: 500 20px/1 var(--mono); color: #f0f6fc; white-space: nowrap; }
+  .eph-bar { position: absolute; top: 18px; height: 40px; width: 0; box-sizing: border-box; border: 2px solid var(--c); border-radius: 8px; overflow: hidden; display: none;
+    font: 600 16px/36px var(--mono); color: #f0f6fc; padding: 0 9px; white-space: nowrap; transition: opacity .4s, border-color .4s; }
+  .eph-bar::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: .22; }
+  .eph-bar.on { display: block; }
+  .eph-bar.exp { border-color: #f85149; opacity: .4; text-decoration: line-through; text-decoration-color: #f85149; }
+  .eph-bar.rep { border-style: dashed; opacity: .4; }
+  .eph-bar.dup { z-index: 2; top: 10px; background: #1a0c0e; border-color: #f85149; border-style: dashed; color: #ff7b72; opacity: .9; text-decoration: line-through; text-decoration-color: #f85149; box-shadow: 0 0 24px -6px #f85149; }
+  .eph-bar.dup::before { display: none; }
+  .eph-bar.hid { opacity: .25; background: repeating-linear-gradient(135deg, transparent 0 6px, #ffffff22 6px 8px); }
+  .eph-run { position: absolute; top: 31px; width: 14px; height: 14px; border-radius: 50%; background: var(--c); opacity: 0; transform: scale(.4); transition: opacity .25s, transform .25s; }
+  .eph-run.on { opacity: .85; transform: none; }
+  .eph-stop { position: absolute; top: 20px; padding: 0 10px; height: 36px; box-sizing: border-box; border: 2px solid #f85149; border-radius: 8px; color: #ff7b72; background: #f8514918;
+    font: 600 16px/32px var(--mono); white-space: nowrap; opacity: 0; transform: translateX(-12px); transition: opacity .3s, transform .3s; }
+  .eph-stop.on { opacity: 1; transform: none; }
+  .eph-now { position: absolute; top: 52px; bottom: 26px; width: 0; border-left: 2px solid #f0f6fc; opacity: .55; box-shadow: 0 0 18px #f0f6fc; }
+  .eph-side { left: 1250px; top: 300px; width: 560px; height: 540px; padding: 24px 30px; }
+  .eph-side h3 { margin: 12px 0 18px; font-size: 54px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .eph-stat { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 0; border-top: 1px solid #21262d; font: 500 21px/1 var(--mono); color: #9198a1; }
+  .eph-stat b { font-family: "Mona Sans", sans-serif; font-size: 64px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; color: var(--sc); }
+  .eph-log { margin-top: 14px; }
+  .eph-log div { margin-top: 9px; font: 500 18px/1.2 var(--mono); color: #6e7681; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eph-log div:first-child { color: #f0f6fc; }
+  .eph-foot { left: 110px; top: 870px; width: 1700px; height: 76px; padding: 0 30px; display: flex; align-items: center; gap: 22px; font: 500 22px/1 var(--mono); color: #9198a1; white-space: nowrap; }
+  .eph-foot b { color: #3fb950; font-weight: 600; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
   .so.p-pass .so-card .st { color: #3fb950; }
   .so.p-done .so-card { border-style: solid; border-color: #3fb950; box-shadow: 0 0 60px -6px #3fb95088; }
@@ -8440,6 +8474,159 @@
     });
   }
 
+  // Ephemerals: agent output carries its own end; close-older replaces reports, expires closes discussions and draft PRs, hide-older collapses comments and stop-after ends a schedule, so open agent items stay flat
+  {
+    resetIndex();
+    const DAYS = 21,
+      DW = 32,
+      TX = 350,
+      START = 1200,
+      DAY = 560,
+      CYC = START + DAYS * DAY + 3400,
+      STOP = 18;
+    // lanes: [safe output or trigger, front matter, colour]
+    const LANES = [
+      ["create-issue", "close-older-issues: true", "#ab7df8"],
+      ["create-issue", "deduplicate-by-title: 1", "#e3b341"],
+      ["create-discussion", "expires: 3", "#79c0ff"],
+      ["add-comment", "hide-older-comments: true", "#d29922"],
+      ["create-pull-request", "expires: 14", "#3fb950"],
+      ["on: daily", `stop-after: +${STOP}d`, "#ff7b72"],
+    ];
+    // items: [lane, start day, end day (null = still open), end kind, label, cleanup log line]
+    const ITEMS = [
+      [0, 0, 7, "rep", "weekly report #31", "⇢ #38 closes #31 · not planned"],
+      [0, 7, 14, "rep", "weekly report #38", "⇢ #45 closes #38 · not planned"],
+      [0, 14, null, "", "weekly report #45"],
+      [1, 3, null, "", "flaky test: cart"],
+      [1, 8, 8.5, "dup", "flaky test: carts", "⊘ duplicate title dropped · distance 1"],
+      [1, 15, 15.5, "dup", "Flaky test: cart", "⊘ duplicate title dropped · exact"],
+      [4, 2, 16, "exp", "draft: bump deps", "✕ draft PR closed · 14 days"],
+      [4, 17, null, "", "draft: bump deps"],
+      ...[1, 5, 9, 13, 17].map(d => [2, d, d + 3, "exp", "status", "✕ discussion closed · OUTDATED"]),
+      ...[2, 6, 10, 12, 16, 19].map((d, i, a) => [3, d, a[i + 1] ?? null, a[i + 1] ? "hid" : "", "💬", "▽ older comment hidden · outdated"]),
+    ];
+    const lanes = LANES.map(([k, f, c], i) => h("div", { class: "eph-lane", "--c": c, style: { top: `${56 + i * 76}px` } }, h("div", { class: "k" }, k), h("div", { class: "f" }, f)));
+    const bars = ITEMS.map(([ln, s, , , label]) => {
+      const b = h("div", { class: "eph-bar", style: { left: `${TX + s * DW}px` } }, label);
+      lanes[ln].append(b);
+      return b;
+    });
+    const runs = Array.from({ length: STOP }, (_, d) => {
+      const r = h("div", { class: "eph-run", style: { left: `${TX + d * DW + 9}px` } });
+      lanes[5].append(r);
+      return r;
+    });
+    const stop = h("div", { class: "eph-stop", style: { left: `${TX + STOP * DW + 4}px` } }, "■ stopped");
+    lanes[5].append(stop);
+    const now = h("div", { class: "eph-now" });
+    const board = h(
+      "div",
+      { class: "eph-board", "--c": "#8b949e", "--i": 0 },
+      h("i", {}, "SAFE OUTPUTS · 21 DAYS"),
+      h(
+        "div",
+        { class: "eph-axis" },
+        [0, 7, 14, 21].map(d => h("span", { style: { left: `${d * DW}px` } }, d ? `day ${d}` : "day 0"))
+      ),
+      lanes,
+      now
+    );
+    const dayNo = h("span", {}, "0");
+    const without = h("b", { "--sc": "#ff7b72" }, "0"),
+      withE = h("b", { "--sc": "#3fb950" }, "0");
+    const log = h("div", { class: "eph-log" });
+    const side = h(
+      "div",
+      { class: "eph-side", "--c": "#3fb950", "--i": 1 },
+      h("i", {}, "ASKING FOR HUMAN ATTENTION"),
+      h("h3", {}, "Day ", dayNo),
+      h("div", { class: "eph-stat" }, "without ephemerals", without),
+      h("div", { class: "eph-stat" }, "with ephemerals", withE),
+      h("i", { style: { display: "block", marginTop: "18px" } }, "CLEANUP LOG"),
+      log
+    );
+    const el = h(
+      "section",
+      { class: "slide eph" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Human attention is precious · don't waste it"), h("h2", {}, letters("Ephemerals", "l-grad"))),
+      board,
+      side,
+      h("div", { class: "eph-foot", "--c": "#3fb950", "--i": 2 }, h("i", {}, "MARKER"), h("span", {}, "- [", h("b", {}, "x"), "] expires <!-- gh-aw-expires: … --> · uncheck to keep it · agentics-maintenance.yml closes it"))
+    );
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const say = line => {
+      log.prepend(h("div", {}, line));
+      while (log.children.length > 5) log.lastChild.remove();
+    };
+    slides.push({
+      group: "cost",
+      sound: "ephemeral",
+      palette: ["#8957e5", "#1f6feb", "#2da44e", "#9a6700"],
+      notes:
+        "Ephemerals, an illustrative three weeks with synthetic issue numbers, titles and counts. Human attention is the scarcest resource in a repository, so agents must not waste it. Agents are tireless writers: a daily report, the same flaky-test issue filed again, a status discussion, a comment on every push, a draft pull request nobody picked up. Left alone, that output piles up, buries human work and steals attention. gh-aw lets each safe output carry its own end. close-older-issues: a new weekly report closes the previous one as not planned, with a link forward, so only the latest is open. deduplicate-by-title drops a new issue whose title matches an open or recently closed one, exactly or within an edit distance, before it is ever created, and tells the agent it was a duplicate. expires on create-discussion, create-issue and create-pull-request writes a visible checked expiry marker into the body; the compiler then generates agentics-maintenance.yml, which runs as often as the shortest expiry needs and closes what is due, discussions as outdated. Uncheck the box and the item stays. hide-older-comments minimizes the previous comment from the same workflow before posting a new one; hidden, not deleted. And stop-after on the trigger ends a schedule at a deadline, so an experiment cannot run, and spend, forever. The same maintenance workflow also prunes old cache-memory entries. Over these twenty-one days the agents tried to write nineteen items, but only four are still asking for attention. For low-stakes reports, prefer discussions, or a side repository, to keep the main repo quiet.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          bars.forEach(b => {
+            b.className = "eph-bar";
+            b.style.width = "0px";
+          });
+          runs.forEach(r => r.classList.remove("on"));
+          stop.classList.remove("on");
+          log.replaceChildren();
+        }
+        const day = Math.max(0, Math.min(DAYS, (u - START) / DAY));
+        let made = 0,
+          open = 0;
+        ITEMS.forEach(([, s, end, kind, , line], i) => {
+          if (day < s) return;
+          made++;
+          const b = bars[i],
+            done = end !== null && day >= end;
+          if (!done && kind !== "dup") open++;
+          b.style.width = kind === "dup" ? `${5.5 * DW}px` : `${Math.max(DW * 0.8, ((done ? end : day) - s) * DW)}px`;
+          fire("c" + i, () => (b.classList.add("on"), sfx.pop(i % 8)));
+          if (done)
+            fire("e" + i, () => {
+              b.classList.add(kind);
+              say(line);
+              if (kind === "exp" || kind === "dup") sfx.step(-1);
+              else sfx.key(0.7);
+            });
+        });
+        runs.forEach((r, d) => day >= d && fire("r" + d, () => r.classList.add("on")));
+        if (day >= STOP)
+          fire("stop", () => {
+            stop.classList.add("on");
+            say("■ daily schedule stopped · stop-after");
+            sfx.notify(false);
+          });
+        dayNo.textContent = Math.floor(day);
+        without.textContent = made;
+        withE.textContent = open;
+        now.style.left = `${378 + day * DW}px`;
+      },
+      el,
+    });
+  }
+
   // Index & search: a non-agentic indexing job (contents: read) writes the index; the agent job (contents: none) gets a read-only copy and a query/get-only search server; one shared import adds both
   {
     resetIndex();
@@ -11609,6 +11796,12 @@
         bell(79, t + 0.95, 0.045, 1.2);
         bell(86, t + 1.08, 0.04, 1.4);
         pad([45, 52, 57, 64], t + 0.3, 2.2, 0.022, "triangle", 1500);
+      },
+      // ephemerals: a bell motif that steps down and fades out to the right, over a soft pad
+      ephemeral: t => {
+        [88, 84, 79, 76, 72].forEach((m, i) => bell(m, t + 0.2 + i * 0.2, 0.05 - i * 0.008, 1.4 - i * 0.18, panTo(i / 5)));
+        osc("sine", 1600, t + 0.15, 1.1, 0.01, { f1: 320 });
+        pad([45, 52, 57, 60], t + 0.2, 2.6, 0.02, "triangle", 1200);
       },
       // first commit to GA: a climbing arpeggio that keeps rising, landing on a bright major chord
       history: t => {
