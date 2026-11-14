@@ -201,6 +201,12 @@ function normalizeCopilotDefaultModel(content) {
     .replace(/\|\| 'gpt-[\d.][\w.-]*'/g, "|| 'default'");
 }
 
+// ── Normalize MCP GitHub token environment names ────────────────────────────
+// Mirrors testMCPGitHubTokenEnvRE in pkg/workflow/wasm_golden_test.go.
+function normalizeMCPGitHubTokenEnv(content) {
+  return content.replace(/GH_AW_MCP_SCRIPTS_ENV_[0-9a-f]+_47485f544f4b454e/g, "GH_AW_MCP_SCRIPTS_ENV_TOKEN");
+}
+
 // ── Normalize AWF config payload ─────────────────────────────────────────
 // Keep golden fixtures stable across AWF config payload changes (model aliases,
 // domain allowlists, container image tags). The entire JSON body is replaced with
@@ -248,7 +254,9 @@ function normalizeDefaultRuntimeVersions(content) {
 // new normalization steps only need to be added in one place.
 // Mirrors normalizeOutput() in pkg/workflow/wasm_golden_test.go.
 function normalize(content) {
-  return normalizeAWFConfigPayload(normalizeCheckoutPin(normalizeDefaultRuntimeVersions(normalizeCopilotDefaultModel(normalizeProjectUTC(normalizeAWFImageTagDigests(normalizeContainerPins(normalizeHeredocDelimiters(content))))))));
+  return normalizeAWFConfigPayload(
+    normalizeCheckoutPin(normalizeDefaultRuntimeVersions(normalizeCopilotDefaultModel(normalizeProjectUTC(normalizeMCPGitHubTokenEnv(normalizeAWFImageTagDigests(normalizeContainerPins(normalizeHeredocDelimiters(content))))))))
+  );
 }
 
 // ── Load golden file ─────────────────────────────────────────────────

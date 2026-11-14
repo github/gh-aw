@@ -175,8 +175,10 @@ function selectLatestGlobMatch(pattern, catalog) {
     return null;
   }
   matches.sort((left, right) => {
-    const leftToken = left.includes("/") ? left.split("/", 2)[1] : left;
-    const rightToken = right.includes("/") ? right.split("/", 2)[1] : right;
+    const leftSlash = left.indexOf("/");
+    const rightSlash = right.indexOf("/");
+    const leftToken = leftSlash >= 0 ? left.slice(leftSlash + 1) : left;
+    const rightToken = rightSlash >= 0 ? right.slice(rightSlash + 1) : right;
     return compareVersionTuples(extractVersionTuple(rightToken), extractVersionTuple(leftToken));
   });
   return matches[0];

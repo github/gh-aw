@@ -155,6 +155,13 @@ func firstForbiddenCharInParamValue(s string) rune {
 
 func isAlpha(r rune) bool { return isLetter(r) }
 
+func firstRune(s string) rune {
+	for _, r := range s {
+		return r
+	}
+	return 0
+}
+
 // ParseModelIdentifier parses a model identifier string into its components.
 //
 // The identifier format follows the ABNF grammar in Section 4.1 of the spec.
@@ -175,40 +182,8 @@ func ParseModelIdentifier(s string) (*ParsedModelIdentifier, error) {
 		Params: map[string]string{},
 	}
 
-	// ── Validate base identifier ─────────────────────────────────────────────
-	if strings.Contains(base, "/") {
-		// Provider-scoped or glob pattern.
-		provider, modelPart, _ := strings.Cut(base, "/")
-
-		if err := validateProviderToken(provider); err != nil {
-			modelIdentifierLog.Printf("Invalid provider token %q: %v", provider, err)
-			return nil, err
-		}
-
-		p.Provider = provider
-
-		if strings.Contains(modelPart, "*") {
-			// Glob pattern.
-			modelIdentifierLog.Printf("Parsing as glob pattern: provider=%q model-glob=%q", provider, modelPart)
-			if err := validateModelGlobToken(modelPart); err != nil {
-				return nil, err
-			}
-			p.ModelToken = modelPart
-			p.IsGlob = true
-		} else {
-			// Exact provider-scoped name.
-			modelIdentifierLog.Printf("Parsing as provider-scoped: provider=%q model=%q", provider, modelPart)
-			if err := validateModelToken(modelPart); err != nil {
-				return nil, err
-			}
-			p.ModelToken = modelPart
-		}
-	} else {
-		// Bare name.
-		modelIdentifierLog.Printf("Parsing as bare name: %q", base)
-		if err := validateBareName(base); err != nil {
-			return nil, err
-		}
+	if err := parseModelIdentifierBase(base, p); err != nil {
+		return nil, err
 	}
 
 	// ── Parse and validate query string ─────────────────────────────────────
@@ -226,6 +201,37 @@ func ParseModelIdentifier(s string) (*ParsedModelIdentifier, error) {
 	return p, nil
 }
 
+func parseModelIdentifierBase(base string, p *ParsedModelIdentifier) error {
+	if !strings.Contains(base, "/") {
+		modelIdentifierLog.Printf("Parsing as bare name: %q", base)
+		return validateBareName(base)
+	}
+
+	provider, modelPart, _ := strings.Cut(base, "/")
+	if err := validateProviderToken(provider); err != nil {
+		modelIdentifierLog.Printf("Invalid provider token %q: %v", provider, err)
+		return err
+	}
+	p.Provider = provider
+
+	if strings.Contains(modelPart, "*") {
+		modelIdentifierLog.Printf("Parsing as glob pattern: provider=%q model-glob=%q", provider, modelPart)
+		if err := validateModelGlobToken(modelPart); err != nil {
+			return err
+		}
+		p.ModelToken = modelPart
+		p.IsGlob = true
+		return nil
+	}
+
+	modelIdentifierLog.Printf("Parsing as provider-scoped: provider=%q model=%q", provider, modelPart)
+	if err := validateModelToken(modelPart); err != nil {
+		return err
+	}
+	p.ModelToken = modelPart
+	return nil
+}
+
 // ─── Segment validators ───────────────────────────────────────────────────────
 
 // validateProviderToken validates a provider token per the ABNF grammar.
@@ -237,7 +243,7 @@ func validateProviderToken(token string) error {
 		if r := firstForbiddenCharInProviderOrParam(token); r != 0 {
 			return fmt.Errorf("model identifier: character %q is not allowed in provider token %q (segment type: provider)", r, token)
 		}
-		if !isAlpha(rune(token[0])) {
+		if !isAlpha(firstRune(token)) {
 			return fmt.Errorf("model identifier: provider token %q must start with a letter (segment type: provider). Example: model: openai/gpt-4o", token)
 		}
 	}
@@ -286,7 +292,7 @@ func validateBareName(name string) error {
 		return errors.New("model identifier: bare name must not be empty (segment type: alias). Expected an alias name. Example: model: gpt-4o")
 	}
 	// Must not start with "-" or ".".
-	if name[0] == '-' || name[0] == '.' {
+	if first := firstRune(name); first == '-' || first == '.' {
 		return fmt.Errorf("model identifier: bare name %q must not start with '-' or '.' (segment type: alias). Expected a name starting with a letter or digit. Example: model: gpt-4o", name)
 	}
 	if !reBareName.MatchString(name) {
@@ -333,7 +339,7 @@ func validateParamKey(key string) error {
 		if r := firstForbiddenCharInProviderOrParam(key); r != 0 {
 			return fmt.Errorf("model identifier: character %q is not allowed in parameter key %q (segment type: parameter key)", r, key)
 		}
-		if !isAlpha(rune(key[0])) {
+		if !isAlpha(firstRune(key)) {
 			return fmt.Errorf("model identifier: parameter key %q must start with a letter (segment type: parameter key). Example: model: openai/gpt-4o?effort=high", key)
 		}
 	}
