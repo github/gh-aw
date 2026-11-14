@@ -56,15 +56,22 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone forty-five-slide deck, separate from the homepage slideshow, linked
-from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
-Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
-The navigation dots jump directly to a slide (on narrow screens they become
-previous/next arrow buttons); `#1` through `#45` are shareable
-slide links. Clicking the left third goes back; clicking elsewhere advances.
-On touch screens, swipe left or right.
-Slides are grouped into sections: slides within a section push left, and
-moving to the next section slides up (reversed when going back).
+It is a standalone slide deck, separate from the homepage slideshow, linked
+from the site footer. The deck is laid out as a table of horizontal bands: the
+title, the factory mindset and the finale are rows of their own, and every other band (Workflows,
+Security, Human agent processes, Cost & context, Agentic Engineering, Enterprise, AW factory) starts with a header
+slide that lists the band's slides (click a tile to jump) and a map of all bands.
+Left/Right (or Space, Page Up/Page Down) step through the slides in reading
+order and wrap between bands, and Up/Down jump to the first slide of the band
+above or below. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
+and M to toggle sound. The navigation dots form a map with one row per band and
+jump directly to a slide (on narrow screens they become previous/next slide arrows
+flanked by track-style previous/next band buttons); `#N` hashes are shareable slide links. Clicking the left third
+goes back; clicking elsewhere advances. On touch screens, swipe left or right
+within a band and up or down between bands. Slides within a band push left, and
+moving to a later band slides up (reversed when going back). Slides built on a gh-aw
+workflow show its original `/agentic-workflows` prompt along the top; click it to
+open the full prompt in a phone-style dialog (Escape or Done closes it).
 Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
 1200x630 render of the title slide; regenerate it if the title slide changes.
 
@@ -81,14 +88,16 @@ counts and dates, measured from that red-team workflow's repository memory and
 the firewall fix it led to (its attack diagram is a simplified illustration),
 the Semantic
 clustering slide's functions, files and counts from one Semantic Function
-Refactoring report (7 May 2026) and the merged pull request that closed it, and the three data slides after the finale: "First
+Refactoring report (7 May 2026) and the merged pull request that closed it, and the three data slides before the finale: "First
 commit to GA", which shows this repository's measured public history from its
 first commit to general availability at GitHub Universe, and "How PRs land",
 which shows measured time-to-merge and lines-changed distributions of its
 merged pull requests, and "How workflows evolve", which shows a statistical
 study of the commits that changed its own workflow Markdown. All say so in their speaker notes.
-Use role icons rather than employee profiles. The only exceptions are the
-local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` in `public/cracktro/assets/avatars/`.
+Use role icons rather than employee profiles, and never real GitHub avatars or
+handles. The only people shown are the fake users `mona` (Mona the Octocat) and
+`ducky` (the rubber duck), GitHub's two mascots, as local avatars in
+`public/cracktro/assets/avatars/`.
 Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.
