@@ -1023,7 +1023,7 @@
       el: h(
         "section",
         { class: "slide an" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Inside one file"), h("h2", { class: "pf-h" }, letters("Anatomy of a "), letters("workflow", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agent as code"), h("h2", { class: "pf-h" }, letters("Anatomy of a "), letters("workflow", "l-grad"))),
         h("div", { class: "an-file" }, h("div", { class: "file" }, "📄 .github/workflows/docs-audit.md"), h("div", { class: "an-code" }, bands, lines, lock, bot)),
         braces,
         wires,
