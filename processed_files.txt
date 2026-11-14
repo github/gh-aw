@@ -2,6 +2,7 @@
 ./pkg/actionpins/spec_test.go|2026-06-30
 ./pkg/agentdrain/anomaly_test.go|2026-07-03
 ./pkg/agentdrain/miner_test.go|2026-04-19
+./pkg/atif/convert_test.go|2026-11-14
 ./pkg/cli/access_log_test.go|2026-09-14
 ./pkg/cli/actionlint_test.go|2026-05-13
 ./pkg/cli/actions_test.go|2026-05-02
@@ -12,6 +13,7 @@
 ./pkg/cli/health_command_test.go|2026-04-26
 ./pkg/cli/logs_formatting_test.go|2026-04-30
 ./pkg/cli/mcp_server_add_test.go|2026-05-20
+./pkg/cli/scanner_findings_test.go|2026-10-11
 ./pkg/cli/update_cooldown_test.go|2026-05-01
 ./pkg/constants/constants_test.go|2026-04-21
 ./pkg/constants/permissions_policy_test.go|2026-06-17
@@ -31,5 +33,4 @@
 ./pkg/workflow/resolve_test.go|2026-05-24
 ./pkg/workflow/time_delta_test.go|2026-05-10
 ./pkg/workflow/unquote_uses_test.go|2026-10-04
-./pkg/cli/scanner_findings_test.go|2026-10-11
 ./pkg/workflow/workflow_run_validation_test.go|2026-11-08
