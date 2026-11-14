@@ -7,16 +7,16 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 Use Claude Opus 5.5 (`claude-opus-5.5`) for deck work, including any subagents you delegate to.
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifty-one-slide deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifty-three-slide deck laid out as horizontal bands (Prezi-style) with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
 - `docs/public/cracktro/index.html`: loads `deck.js` and holds the SEO/Open Graph/Twitter meta (absolute `https://github.github.com/gh-aw/cracktro/` URLs).
 - `docs/public/cracktro/og-image.png`: 1200x630 social card rendered from slide 1 with the dots/count/sound/progress UI hidden. Keep it outside `assets/` (the asset test only allows avatars there).
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
-- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
+- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist,bradygaster}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-one slide headings (band headers included), so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-three slide headings (band headers included), so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -71,7 +71,7 @@ slides.push({
 ## Content rules (enforced by tests)
 
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
-- Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
+- Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, `ievangelist`, and `bradygaster` (Push SDLC slide only), as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
 - Exception: the Continuous Security slide (11, `ge-` classes) shows measured counts and dates from The Great Escapi (`firewall-escape` workflow) repo memory (426 escape techniques, 15 Feb to 22 Sep 2026; #401 was the first escape) and the AWF firewall SNI-allowlist fix; the attack diagram is illustrative and its notes say so.
 - Exception: the Human Agent Processes slide (15, `hap-` classes) has a MEASURED column with gh-aw's own counts, 15 Oct to 14 Nov 2026: successful Actions runs of `auto-triage-issues` on issue events (366), `[cli-tools-test]` issues from `daily-cli-tools-tester` (30, 16 completed), pull requests reviewed by `pr-code-quality-reviewer` on ready for review (825) and labelled by `changeset` (9), plus workflow counts per trigger from `.github/workflows` as a 14 Nov 2026 snapshot (3 issues opened, 194 schedule, 8 ready for review, 6 label; smoke tests excluded). The column header says "30 DAYS" and the caption gives both windows; the flows are illustrative and its notes and caption say so.
@@ -89,10 +89,11 @@ slides.push({
 - Exception: the Spec-driven testing slide (28, `sdd-`/`sdm-` classes) has a bottom strip of measured gh-aw counts, 30 Mar to 14 Nov 2026: merged PRs by title prefix (83 `[spec-extractor]`, 69 `[spec-enforcer]` adding 12,731 lines, 22 `[spec-review]`), 68 `[spec-librarian]` audit issues and 38 merged Copilot fix PRs, and `TestSpec_` functions in `pkg/` on main growing from 0 to 415 (48 `spec_test.go` files). The `pkg/ctxutil` change, README spec and spec tests in the flow are an illustrative excerpt; its notes and caption say so.
 - Exception: the Docs that heal slide (29, `dh-`/`dhm-` classes) has a bottom strip of measured gh-aw data (14 Nov 2026 snapshot): merged `[docs]` PRs per agent attributed by workflow marker, footer or title (189 daily-doc-updater, 250 unbloat-docs cutting a net 22,043 lines, 146 glossary-maintainer, 64 daily-doc-healer, 10 Oct 2025 to 14 Nov 2026) and a timeline of all 29 `[doc-healer]` issues (26 Feb to 30 Oct 2026; caption states both windows; 13 closed by merged PRs, 9 changing the updater's prompt). The workflow, page and noob tester report in the loop are illustrative; notes and caption say so.
 - Exception: the Speak · Map · Grep slide (30, `dg-` classes) shows spoken forms from gh-aw's real `DICTATION.md` and names its dictation and function-namer workflows; grep counts and renames are synthetic, the maintainer is the pelikhan avatar, and its notes say so.
+- Exception: the Push SDLC slide (47, `psd-` classes) names the public `github/squad` project; the test's repo-reference regex allows only `github/squad`. Its task, repo and files are synthetic and its notes say so.
 - Exception: the Scan · Fix · Learn slide (31, `sfm-` panel) shows measured counts from the public .NET runtime repository's `ci-failure-scan`, `ci-failure-fix` and `ci-failure-scan-feedback` workflows (window 5 May to 14 Nov 2026, 193 days, labelled on the panel: 305 `[ci-scan]` issues, 270 closed; 22 `[ci-fix]` PRs, 5 merged; 12 merged `[ci-scan-feedback]` prompt-edit PRs; 882 runs; issues per month). The loop below it is illustrative; its notes and caption say so.
-- Exception: the data slides before the finale. Slide 48, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 49, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record. Slide 50, "How workflows evolve" (`evo-` classes), shows measured first-parent commits on main that changed `.github/workflows/**/*.md` (monthly by author type, live workflow count, lines-changed histogram and statistical tests: Spearman, Mann–Whitney, Gini), 12 Aug 2025 to GA; its notes give the method.
+- Exception: the data slides before the finale. Slide 49, "First commit to GA" (`hist-` classes), shows gh-aw's measured public history (git on main plus GitHub search counts, 12 Aug 2025 to GA on 28 Oct 2026); its speaker notes give the sources and say account attribution is not proof of AI use. Slide 50, "How PRs land" (`land-` classes), shows measured time-to-merge and lines-changed distributions of merged PRs, split by the same origins; issues opened under a person's account may still have been drafted in the Copilot app or CLI, which GitHub does not record. Slide 51, "How workflows evolve" (`evo-` classes), shows measured first-parent commits on main that changed `.github/workflows/**/*.md` (monthly by author type, live workflow count, lines-changed histogram and statistical tests: Spearman, Mann–Whitney, Gini), 12 Aug 2025 to GA; its notes give the method.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 3, 4, 7, 9–12, 15–31, 33–35, 37–42, 44–46, 51 and 52 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 3, 4, 7, 9–12, 15–31, 33–35, 37–42, 44–47, 52 and 53 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop
