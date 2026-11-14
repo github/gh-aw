@@ -421,6 +421,39 @@
   .pf-tag.on { opacity: 1; }
   .pf-tag em { display: block; font-style: normal; color: #f0f6fc; font-size: 23px; margin-bottom: 6px; }
 
+  /* --- anatomy of a workflow --- */
+  .an .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #4493f8, #39c5cf, #3fb950, #ab7df8); }
+  .an-file { position: absolute; left: 200px; top: 270px; width: 780px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; }
+  .an-file .file { height: 56px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .an-code { position: relative; padding: 18px 0; font: 500 21px/30px var(--mono); white-space: pre; }
+  .an-ln { position: relative; z-index: 1; padding: 0 26px; height: 30px; opacity: .38; transition: opacity .5s; }
+  .an-ln.on { opacity: 1; }
+  .an-band { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--c) 9%, transparent); border-left: 4px solid var(--c); opacity: 0; transition: opacity .5s, background .5s, box-shadow .5s; }
+  .an-band.on { opacity: 1; }
+  .an-band.hot { background: color-mix(in srgb, var(--c) 22%, transparent); box-shadow: inset 0 0 40px -12px var(--c); }
+  .an-tok { border-radius: 6px; transition: background .4s, box-shadow .4s; }
+  .an-tok.hot { background: color-mix(in srgb, var(--c) 30%, transparent); box-shadow: 0 0 0 2px var(--c), 0 0 24px var(--c); }
+  .an-brace { position: absolute; left: 150px; width: 26px; border: 3px solid var(--c); border-right: 0; border-radius: 14px 0 0 14px; opacity: 0; transform: translateX(-16px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), box-shadow .5s; }
+  .an-brace.on { opacity: 1; transform: none; }
+  .an-brace.hot { box-shadow: -10px 0 30px -12px var(--c); }
+  .an-brace span { position: absolute; left: -24px; top: 50%; transform: translate(-50%, -50%) rotate(-90deg); white-space: nowrap; font: 600 18px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: var(--c); }
+  .an-wires { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; overflow: visible; }
+  .an-wires path { fill: none; stroke: var(--c); stroke-width: 2.5; opacity: 0; stroke-dasharray: 6 8; transition: opacity .5s; }
+  .an-wires path.on { opacity: .55; }
+  .an-wires path.hot { opacity: 1; animation: an-flow .8s linear infinite; }
+  .an-wires circle { fill: var(--c); opacity: 0; transition: opacity .5s; }
+  .an-wires circle.on { opacity: 1; }
+  @keyframes an-flow { to { stroke-dashoffset: -28; } }
+  .an-call { position: absolute; left: 1140px; width: 670px; height: 126px; box-sizing: border-box; padding: 18px 24px 0 96px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d;
+    opacity: 0; transform: translateX(30px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), border-color .5s, box-shadow .5s; }
+  .an-call.on { opacity: 1; transform: none; }
+  .an-call.hot { border-color: var(--c); box-shadow: 0 0 50px -16px var(--c); }
+  .an-call .an-num { position: absolute; left: 24px; top: 22px; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font: 700 22px/1 var(--mono); color: #0d1117; background: var(--c); }
+  .an-call h3 { margin: 0 0 10px; display: flex; align-items: center; gap: 14px; font-size: 32px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .an-call h3 code { font: 500 16px/1 var(--mono); color: var(--c); padding: 6px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); }
+  .an-call p { margin: 0; font-size: 21px; line-height: 1.3; color: #d1d7e0; }
+  .an-call p code { font: 500 18px var(--mono); color: var(--c); }
+
   /* --- cost management --- */
   .cm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
   .cm-ed { position: absolute; left: 110px; top: 290px; width: 1010px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
@@ -997,6 +1030,134 @@
         n3.textContent = Math.round(212 * ez);
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Spec Driven "), letters("Automation", "l-grad"))), tta, links, tags, cards),
+    });
+  }
+
+  // Anatomy of a workflow: one synthetic .md dissected into front matter, schedule, inputs, steps, safe outputs and prompt
+  {
+    resetIndex();
+    const YAML = [
+      "---",
+      "on:",
+      "  schedule: daily on weekdays",
+      "  workflow_dispatch:",
+      "    inputs:",
+      "      focus:",
+      "        description: Area to audit",
+      "        default: docs",
+      "permissions: read-all",
+      "steps:",
+      "  - run: npm ci",
+      "  - run: npm run lint -- --json > lint.json",
+      "safe-outputs:",
+      "  create-issue:",
+      '    title-prefix: "[audit] "',
+      "    max: 1",
+      "---",
+    ];
+    const C = { fm: "#d1d7e0", sch: "#d29922", in: "#4493f8", st: "#39c5cf", so: "#3fb950", pr: "#ab7df8" };
+    const tok = (k, text) => h("span", { class: `an-tok an-tok-${k}`, "--c": C[k], style: { color: C[k] } }, text);
+    const yamlLine = l => {
+      if (l === "---") return [h("span", { style: { color: "#656c76" } }, l)];
+      const [, ind, key, val] = l.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
+      return [ind, h("span", { style: { color: ind ? "#7ee787" : "#ff7b72" } }, key), h("span", { style: { color: "#a5d6ff" } }, val)];
+    };
+    const BODY = [
+      [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, "# Docs audit")],
+      ["Audit ", tok("in", "${{ inputs.focus }}"), " using ", tok("st", "lint.json"), "."],
+      ["Group findings by severity, then open"],
+      [tok("so", "one issue"), " with a checklist of fixes."],
+    ];
+    const lines = [...YAML.map(yamlLine), ...BODY].map(kids => h("div", { class: "an-ln" }, kids));
+    const LH = 30,
+      CODE_TOP = 345;
+    const CALLS = [
+      ["sch", [2, 3], "Schedule", "on: schedule", "Fuzzy schedule in plain words; the compiler scatters it to a concrete cron."],
+      ["in", [4, 8], "Inputs", "workflow_dispatch", ["Typed parameters for manual runs; the prompt reads ", h("code", {}, "inputs.focus"), "."]],
+      ["st", [10, 12], "Steps", "deterministic", ["Plain shell runs before the agent and leaves ", h("code", {}, "lint.json"), " in the workspace."]],
+      ["so", [13, 16], "Safe outputs", "max: 1", "The agent stays read-only. It can only request one issue; a separate job writes it."],
+      ["pr", [18, 21], "Prompt", "markdown body", "Plain-English instructions the coding agent follows on every run."],
+    ];
+    const CALL_TOP = [295, 440, 585, 730, 875];
+    const bands = CALLS.map(([k, [a, b]]) => h("div", { class: "an-band", "--c": C[k], style: { top: `${18 + (a - 1) * LH}px`, height: `${(b - a + 1) * LH}px` } }));
+    const calls = CALLS.map(([k, , title, chip, text], i) =>
+      h("div", { class: "an-call", "--c": C[k], style: { top: `${CALL_TOP[i]}px` } }, h("div", { class: "an-num" }, String(i + 1).padStart(2, "0")), h("h3", {}, title, h("code", {}, chip)), h("p", {}, text))
+    );
+    const brace = (k, [a, b], label) => h("div", { class: "an-brace", "--c": C[k], style: { top: `${CODE_TOP + (a - 1) * LH + 2}px`, height: `${(b - a + 1) * LH - 4}px` } }, h("span", {}, label));
+    const braces = [brace("fm", [1, 17], "Front matter · YAML"), brace("pr", [18, 21], "Body")];
+    const wires = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    wires.setAttribute("class", "an-wires");
+    wires.setAttribute("viewBox", "0 0 1920 1080");
+    wires.innerHTML = CALLS.map(([k, [a, b]], i) => {
+      const ry = CODE_TOP + (a - 1) * LH + ((b - a + 1) * LH) / 2,
+        cy = CALL_TOP[i] + 63;
+      return `<path style="--c:${C[k]}" d="M 984 ${ry} H 1050 C 1095 ${ry} 1095 ${cy} 1140 ${cy}"/><circle style="--c:${C[k]}" cx="984" cy="${ry}" r="6"/>`;
+    }).join("");
+    const paths = [...wires.querySelectorAll("path")],
+      dots = [...wires.querySelectorAll("circle")];
+    const toks = { in: lines[18].querySelector(".an-tok-in"), st: lines[18].querySelector(".an-tok-st"), so: lines[20].querySelector(".an-tok-so") };
+    // reveal order: front matter brace, then each callout (the prompt callout also brings the body brace)
+    const REVEAL = 0.6,
+      GAP = 1,
+      CYCLE = REVEAL + GAP * 6,
+      HOT = 2.4;
+    let t0 = 0,
+      seen = -1,
+      skip = false;
+    const lit = (idx, on) => {
+      if (idx === 0) {
+        braces[0].classList.toggle("on", on);
+        [0, 8, 16].forEach(n => lines[n].classList.toggle("on", on));
+        return;
+      }
+      const [, [a, b]] = CALLS[idx - 1];
+      for (let n = a - 1; n < b; n++) lines[n].classList.toggle("on", on);
+      [bands, calls, paths, dots].forEach(list => list[idx - 1].classList.toggle("on", on));
+      if (idx === 5) braces[1].classList.toggle("on", on);
+    };
+    slides.push({
+      sound: "ship",
+      palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
+      notes:
+        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: YAML the compiler reads. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. workflow_dispatch inputs give manual runs a typed parameter that the prompt reads as inputs.focus. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the prompt, natural-language instructions the coding agent follows on every run.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        skip = false;
+        [...lines, ...bands, ...calls, ...paths, ...dots, ...braces, ...Object.values(toks)].forEach(e => e.classList.remove("on", "hot"));
+      },
+      onNext() {
+        if (seen >= 5) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.min(5, Math.floor((e - REVEAL) / GAP));
+        while (seen < n) {
+          seen++;
+          lit(seen, true);
+          sfx.pop(seen * 2);
+        }
+        const hot = e >= CYCLE ? Math.floor((e - CYCLE) / HOT) % 6 : -1;
+        braces[0].classList.toggle("hot", hot === 0);
+        braces[1].classList.toggle("hot", hot === 5);
+        [bands, calls, paths].forEach(list => list.forEach((el, i) => el.classList.toggle("hot", hot === i + 1)));
+        toks.in.classList.toggle("hot", hot === 2);
+        toks.st.classList.toggle("hot", hot === 3);
+        toks.so.classList.toggle("hot", hot === 4);
+      },
+      el: h(
+        "section",
+        { class: "slide an" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Inside one file"), h("h2", { class: "pf-h" }, letters("Anatomy of a "), letters("workflow", "l-grad"))),
+        h("div", { class: "an-file" }, h("div", { class: "file" }, "📄 .github/workflows/docs-audit.md"), h("div", { class: "an-code" }, bands, lines)),
+        braces,
+        wires,
+        calls
+      ),
     });
   }
 
