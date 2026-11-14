@@ -1764,10 +1764,42 @@
   .cn-p { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .4s; }
   .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px var(--pc); }
 
+  /* --- enterprise operations: OpenTelemetry, governance, infrastructure (shared static visuals from ops-visuals.js) --- */
+  .ops .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--oc), #a5d6ff, var(--oc)); }
+  .ops-tag { position: absolute; left: 110px; right: 110px; top: 252px; font: 500 28px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
+  .ops-tag b { color: #f0f6fc; font-weight: 700; }
+  .active .ops-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .ops-fig { position: absolute; left: 110px; top: 326px; width: 1000px; margin: 0; opacity: 0; }
+  .active .ops-fig { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .ops-fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .ops-fig .ov-card { fill: #161b22e8; stroke: #3d444d; stroke-width: 1.5; }
+  .ops-fig .ov-key { stroke: var(--oc); fill: color-mix(in srgb, var(--oc) 12%, #0d1117); }
+  .ops-fig .ov-pill { fill: #0d1117; stroke: #3d444d; stroke-width: 1.5; }
+  .ops-fig .ov-bar { fill: var(--oc); opacity: .8; }
+  .ops-fig .ov-line { fill: none; stroke: #9198a1; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ops-fig .ov-dash { stroke-dasharray: 6 5; }
+  .ops-fig .ov-hot { fill: #f85149; opacity: 1; }
+  .ops-fig .ov-cap { stroke: #f85149; }
+  .ops-fig text { fill: #9198a1; font: 500 12px "Mona Sans", sans-serif; }
+  .ops-fig .ov-t { fill: #e6edf3; font-size: 15px; }
+  .ops-fig .ov-b { fill: #f0f6fc; font-size: 16px; font-weight: 700; }
+  .ops-fig .ov-m { font: 500 13px var(--mono); }
+  .ops-fig .ov-c { fill: var(--oc); font: 500 13px var(--mono); }
+  .ops-fig .ov-k { fill: var(--oc); font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  .ops-facts { position: absolute; left: 1180px; right: 110px; top: 326px; display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+  .ops-facts li { padding: 18px 22px; border-left: 4px solid var(--oc); border-radius: 0 14px 14px 0; background: #161b22c8; opacity: 0; }
+  .active .ops-facts li { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(.7s + var(--i) * 120ms); }
+  .ops-facts i { display: block; font: normal 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--oc); }
+  .ops-facts span { display: block; margin-top: 10px; font: 500 23px/1.3 "Mona Sans"; color: #c9d1d9; }
+  .ops-own { position: absolute; left: 110px; right: 110px; top: 990px; font: 500 21px/1.3 var(--mono); color: #9198a1; opacity: 0; }
+  .ops-own b { color: #d29922; font-weight: 600; }
+  .active .ops-own { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.3s; }
+
   /* --- enterprise ready --- */
   .er { --ec: #4493f8; }
   .er .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #a5d6ff, #d29922, #4493f8); }
-  .er-tag { position: absolute; right: 110px; top: 118px; width: 600px; text-align: right; font: 500 30px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
+  .er .slide-head h2 { font-size: 96px; }
+  .er-tag { position: absolute; left: 110px; right: 110px; top: 250px; font: 500 30px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
   .er-tag b { color: #f0f6fc; font-weight: 700; }
   .active .er-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
   .er-ed { position: absolute; left: 110px; top: 330px; width: 720px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
@@ -10400,6 +10432,803 @@
     });
   }
 
+  // Enterprise infrastructure as code: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  {
+    resetIndex();
+    const RUN = [
+      { k: "[self-hosted, linux]", c: "#d29922" },
+      { k: "[self-hosted, arm64]", c: "#ab7df8" },
+      { k: "[self-hosted, gpu]", c: "#4493f8" },
+    ];
+    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
+    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
+    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
+    const STEPS = ["checkout", "setup-node", "cache"];
+    const CHIPS = [
+      ["GitHub Apps", [6, 7, 8]],
+      ["OIDC", [4, 5]],
+      ["Runner groups", [3]],
+      ["Environments", []],
+      ["Org secrets", [8]],
+      ["OpenTelemetry", [13, 14, 15]],
+      ["Rulesets", []],
+      ["Audit log", []],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff",
+      E = "#d2a8ff";
+    const vRun = h("span", { class: "ae-val" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [["runs-on: ", K], vRun],
+      [["permissions:", K]],
+      [
+        ["  id-token: ", K],
+        ["write", V],
+      ],
+      [["github-app:", K]],
+      [
+        ["  client-id: ", K],
+        ["${{ vars.APP_ID }}", E],
+      ],
+      [
+        ["  private-key: ", K],
+        ["${{ secrets.APP_KEY }}", E],
+      ],
+      [["network:", K]],
+      [
+        ["  allowed: ", K],
+        ["[defaults, node]", V],
+      ],
+      [["steps:", K]],
+      [
+        ["  - uses: ", K],
+        ["actions/setup-node@v4", V],
+      ],
+      [["observability:", K]],
+      [["  otlp:", K]],
+      [
+        ["    endpoint: ", K],
+        ["${{ secrets.OTLP_ENDPOINT }}", E],
+      ],
+      [["---", D]],
+      [["# Triage new issues for the platform team", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
+    const SB = 1,
+      RN = 2,
+      EC = 3;
+    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
+    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
+    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
+    const card = (i, c, tag, title, code, ic, extra) => {
+      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
+      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
+      return el;
+    };
+    const spans = h(
+      "div",
+      { class: "er-spans" },
+      [
+        [0, 100],
+        [8, 46],
+        [30, 58],
+        [62, 30],
+      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
+    );
+    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
+    otel.classList.add("otel");
+    const cRun = h("span");
+    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
+    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
+    fw.classList.add("fw");
+    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
+    eco.classList.add("eco");
+    const job = h("div", { class: "er-job" });
+    const trace = h("div", { class: "er-job er-trace" });
+    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
+    const el = h(
+      "section",
+      { class: "slide er" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("infrastructure as code", "l-grad"))),
+      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
+      ed,
+      arrow,
+      otel,
+      fw,
+      runner,
+      eco,
+      job,
+      trace,
+      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
+    );
+    const fly = (dot, [x0, y0], [x1, y1]) => {
+      dot.style.transition = "none";
+      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
+      void dot.offsetWidth;
+      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
+      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
+    };
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      typed = "",
+      arriveAt = 0,
+      otelAt = 0,
+      chipAt = 0,
+      sbAt = 0,
+      chip = -1;
+    const setRunner = (i, t) => {
+      cur = i;
+      el.style.setProperty("--ec", RUN[i].c);
+      runner.style.setProperty("--rc", RUN[i].c);
+      cRun.textContent = RUN[i].k;
+      runner.classList.add("on");
+      for (const c of [runner, eco, fw]) c.classList.remove("run");
+      eco.classList.remove("on");
+      fw.classList.remove("on");
+      steps.forEach(p => p.classList.remove("up"));
+      fly(job, [840, 460], MID(RN));
+      arriveAt = t + 700;
+      sbAt = otelAt = Infinity;
+    };
+    const setChip = i => {
+      chip = i;
+      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
+      const lit = CHIPS[i][1];
+      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "enterprise",
+      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
+      notes:
+        "Enterprise infrastructure as code. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+      enter() {
+        typed = RUN[0].k;
+        vRun.textContent = typed;
+        phase = "hold";
+        since = chipAt = 0;
+        chip = -1;
+        chips.forEach(c => c.classList.remove("lit"));
+        rows.forEach(r => r.classList.remove("lit"));
+        otel.classList.remove("on", "run");
+        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
+        steps.forEach(p => p.classList.remove("up"));
+        cRun.textContent = RUN[0].k;
+        sbAt = Infinity;
+        for (const d of [job, trace]) {
+          d.style.transition = "none";
+          d.style.opacity = "0";
+        }
+        cur = 0;
+        arriveAt = otelAt = Infinity;
+      },
+      tick(t) {
+        if (!since) {
+          since = t;
+          chipAt = t + 1800;
+          setRunner(0, t + 900);
+        }
+        if (t > arriveAt && !runner.classList.contains("run")) {
+          runner.classList.add("run");
+          sbAt = t + 900;
+        }
+        if (t > sbAt) {
+          sbAt = Infinity;
+          fw.classList.remove("run");
+          void fw.offsetWidth;
+          fw.classList.add("on", "run");
+          fly(trace, MID(SB), MID(0));
+          otelAt = t + 700;
+        }
+        if (t > otelAt) {
+          otelAt = Infinity;
+          otel.classList.remove("run");
+          void otel.offsetWidth;
+          otel.classList.add("on", "run");
+        }
+        if (t > arriveAt) {
+          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
+          steps.forEach((p, j) => p.classList.toggle("up", j < n));
+          eco.classList.add("on");
+          eco.classList.toggle("run", n === steps.length);
+        }
+        if (t > chipAt) {
+          chipAt = t + 1500;
+          setChip((chip + 1) % CHIPS.length);
+        }
+        const el2 = t - since;
+        const next = RUN[(cur + 1) % RUN.length].k;
+        if (phase === "hold" && el2 > 3400) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 28) {
+          since = t;
+          typed = typed.slice(0, -1);
+          vRun.textContent = typed;
+          if (!typed) phase = "type";
+        } else if (phase === "type" && el2 > 70) {
+          since = t;
+          typed = next.slice(0, typed.length + 1);
+          vRun.textContent = typed;
+          sfx.key(0.7);
+          if (typed === next) {
+            setRunner((cur + 1) % RUN.length, t);
+            sfx.pop(cur * 2);
+            phase = "hold";
+          }
+        }
+      },
+      el,
+    });
+  }
+
+  // Enterprise operations: three static slides whose diagrams come from ops-visuals.js, the same source the
+  // docs landing page renders, so the deck and the site show one picture of observability, governance and infrastructure.
+  for (const s of [
+    {
+      key: "observability",
+      color: "#f0883e",
+      kicker: "Observability",
+      head: [["OpenTelemetry", "l-grad"]],
+      tag: ["Traces and ", h("b", {}, "AI credit burn"), " stream to your OTLP backend."],
+      facts: [
+        ["Traces", "Job spans, firewall requests and MCP tool calls over OTLP/HTTP."],
+        ["AI credit burn", "Agent spans carry gh-aw.aic; conclusion flags max_ai_credits_exceeded."],
+        ["Secrets", "Collector headers stay in secrets, masked in logs."],
+      ],
+      own: [h("b", {}, "Your collector: "), "chart, alert and cap credits. Export errors never fail runs."],
+      notes:
+        "OpenTelemetry. Agentic workflows export OpenTelemetry over OTLP/HTTP to collectors you run. In the workflow, observability.otlp lists one or more endpoints, each with headers that come from secrets, and the credentials are masked in logs. Organizations can set a default instead: GH_AW_DEFAULT_OTLP_ENDPOINT as a variable or secret, plus GH_AW_DEFAULT_OTLP_HEADERS, which must be a secret; an endpoint without headers is treated as unconfigured, nothing is exported from any job, and the agent job fails with a visible error so the misconfiguration is not silent. Spans follow the run across its jobs, and the firewall's allowed and blocked request counts ride on them as gh-aw.firewall.* attributes. AI credit burn rides on the spans: the agent job span carries gh-aw.aic, the AI credits the run consumed, and the conclusion span records gh-aw.max_ai_credits and gh-aw.max_ai_credits_exceeded, so the backend can chart burn per workflow, alert on spikes and see which runs hit the cap. The hosted MCP gateway has its own traces-only exporter that emits one span per MCP tool call; it reads headers only from the OTEL_EXPORTER_OTLP_HEADERS environment variable, never from its JSON configuration. Logs are opt-in: GH_AW_OTLP_LOGS_ENABLED=true exports compact unified-session logs from the conclusion job, bounded by GH_AW_OTLP_LOGS_MAX_BYTES. These defaults are cooperative configuration, not a locked policy. Transport failures, such as a rejected or unreachable collector, never fail the functional workflow; missing or invalid credentials are configuration errors to fix, and 401 or 403 responses are not retried with unchanged credentials. The diagram, span bars and credit chart are illustrative; see the OpenTelemetry and MCP gateway reference.",
+    },
+    {
+      key: "governance",
+      color: "#ab7df8",
+      kicker: "Governance stays in GitHub",
+      head: [["GitHub-native "], ["governance", "l-grad"]],
+      tag: ["The rules you already enforce in GitHub ", h("b", {}, "apply to every agentic job"), "."],
+      facts: [
+        ["Org / repo variables", "gh aw env sets GH_AW_DEFAULT_* defaults at enterprise, org or repo scope; frontmatter still wins."],
+        ["Protected environments", "manual-approval and safe-outputs.environment add required reviewers, wait timers and branch policies."],
+        ["Branch rulesets", "Require agentic review checks or a central compile check before merge."],
+        ["Actions policies", "Allowed actions, runner groups and SHA-pinned lock files apply like any other job."],
+      ],
+      own: [h("b", {}, "Cooperative defaults: "), "variables guide; environments, rulesets and policies enforce."],
+      notes:
+        "GitHub-native governance. Enforcement stays where your organization already keeps it. gh aw env manages GH_AW_DEFAULT_* Actions variables at enterprise, organization or repository scope; precedence runs frontmatter, then repository, organization, enterprise, then the compiler fallback. GH_AW_POLICY_* variables gate runtime capabilities, for example turning off pull request creation. These variables are cooperative defaults, not locked policy, so pair them with real enforcement: protected environments, reached through on.manual-approval or safe-outputs.environment, carry required reviewers, wait timers and branch policies, and naming an environment without protection rules adds no review. Branch rulesets require checks, such as agentic review or a centrally managed compile check that rejects jobs without self-hosted runners. Actions policies, allowed actions, runner groups and SHA-pinned lock files apply to agentic jobs like any other. The diagram is illustrative; see the governance and enterprise environment controls reference.",
+    },
+    {
+      key: "infrastructure",
+      color: "#3fb950",
+      kicker: "Your runners, mirrors and registries",
+      head: [["Operator-owned "], ["infrastructure", "l-grad"]],
+      tag: ["Compile-time substitutions ", h("b", {}, "point every pin at infrastructure you run"), "."],
+      facts: [
+        ["Self-hosted Linux", "Linux runners with Docker, selected through runs-on with the self-hosted label or a runner group."],
+        ["ARC + DinD", "runner.topology: arc-dind with a privileged Docker-in-Docker sidecar and a shared work volume."],
+        ["Mirrors and registries", "aw.json action_pins, action_pin_prefixes and container_pins rewrite the lock file to your mirrors."],
+        ["Pinned versions", "Upgrading the CLI alone never upgrades lock pins; recompile, then validate on your runners."],
+      ],
+      own: [h("b", {}, "Operator owned: "), "runners, mirrors, images and upgrades. ARC and GHES end to end remain unconfirmed."],
+      notes:
+        "Operator-owned infrastructure. Agentic jobs run on Linux runners with Docker; macOS and Windows runners are not supported. Choose self-hosted runners through runs-on with the self-hosted label or a runner group. On Kubernetes, ARC with a Docker-in-Docker sidecar needs runner.topology: arc-dind, a privileged DinD sidecar, a shared work volume and DOCKER_HOST, and the compiler stages the sysroot. For air-gapped or controlled networks, aw.json maps actions to your mirrors with action_pins or action_pin_prefixes, whose mirrors must contain the same commits, and maps container images to an internal registry with container_pins, by digest. Substitutions are baked into the lock file when you run gh aw compile. Pinned versions are the compatibility boundary: upgrading the CLI alone does not upgrade the pins already in compiled lock files, so recompile, record versions and validate on your own runners. You own the runners, mirrors, images and upgrades, and ARC and GHES end-to-end support remains unconfirmed. The diagram is illustrative; see the self-hosted runners and enterprise configuration reference.",
+    },
+  ]) {
+    resetIndex();
+    const fig = h("figure", { class: "ops-fig" });
+    const svg = window.AW_OPS_VISUALS?.[s.key];
+    if (svg) fig.innerHTML = svg;
+    const el = h(
+      "section",
+      { class: `slide ops ops-${s.key}`, "--oc": s.color },
+      h(
+        "div",
+        { class: "slide-head" },
+        h("div", { class: "kicker" }, s.kicker),
+        h(
+          "h2",
+          {},
+          s.head.map(([t, c]) => letters(t, c))
+        )
+      ),
+      h("div", { class: "ops-tag" }, ...s.tag),
+      fig,
+      h(
+        "ul",
+        { class: "ops-facts" },
+        s.facts.map(([k, v], i) => h("li", { "--i": i }, h("i", {}, k), h("span", {}, v)))
+      ),
+      h("div", { class: "ops-own" }, ...s.own)
+    );
+    slides.push({ group: "enterprise", sound: "enterprise", palette: [s.color, "#1f6feb", "#d29922", "#0a1a33"], notes: s.notes, el });
+  }
+
+  // 11. Central Agentic Ops: a control repo lists its registered campaigns, which dispatch
+  // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
+  {
+    resetIndex();
+    const steps = [
+      ["01", "Observe", "Runs, costs and outcomes from every repo in one dashboard", "#4493f8"],
+      ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#ab7df8"],
+      ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#d29922"],
+      ["04", "Work", "One target per worker, bounded mission, correlated results", "#3fb950"],
+      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#f778ba"],
+    ];
+    const CW = 1180, CH = 690, MONO = "'Monaspace Neon', ui-monospace, Menlo, monospace";
+    const cv = h("canvas", { class: "cao-canvas", width: CW * 2, height: CH * 2 });
+    const ctx = cv.getContext("2d");
+    const stages = ["review", "limited live", "scheduled live"].map(s => h("em", {}, s));
+    // The control repo lists its registered ops, one row per campaign installed from the catalog and tracked by a
+    // manifest under .github/aw/campaigns/. The host org owns the repo; an enterprise account owns no repos itself.
+    const C = { x: 590, y: 345 };
+    const ICON = 16, GEAR = 24;
+    const campaigns = [
+      { name: "Dependabot", c: "#4493f8", rate: 1.3 },
+      { name: "Repo Assist", c: "#39c5cf", rate: 1.1 },
+      { name: "ESLint Factory", c: "#e3b341", rate: .9 },
+      { name: "EU CRA", c: "#b083f0", rate: .7 },
+    ].map(k => ({ ...k, v: 1 }));
+    const CA = 124, CHD = 40, ROW_H = 32, CR = 10, CHH = (CHD + 8 + campaigns.length * ROW_H) / 2;
+    const cx0 = C.x - CA, cy0 = C.y - CHH;
+    campaigns.forEach((k, i) => (k.y = cy0 + CHD + 4 + ROW_H * (i + .5)));
+    const PX = 26, PT = 30, PB = 26;
+    const edge = (ang, a, top, bottom, r) => {
+      const c = Math.abs(Math.cos(ang)), s = Math.abs(Math.sin(ang)), H = Math.sin(ang) < 0 ? top : bottom;
+      let d = Math.min(c > 1e-9 ? a / c : Infinity, s > 1e-9 ? H / s : Infinity);
+      if (d * c > a - r && d * s > H - r) {
+        const qx = a - r, qy = H - r, p = c * qx + s * qy;
+        d = p + Math.sqrt(p * p - (qx * qx + qy * qy - r * r));
+      }
+      return d;
+    };
+    const RY = 212, RX = 1.6 * RY;
+    const BW = 196, ROWS = [0, -44, 44];
+    const orgs = [
+      { name: "web", n: 9, side: -1, row: -1 },
+      { name: "data", n: 8, side: -1, row: 0 },
+      { name: "labs", n: 5, side: -1, row: 1, off: true },
+      { name: "mobile", n: 8, side: 1, row: -1 },
+      { name: "payments", n: 9, side: 1, row: 0 },
+      { name: "infra", n: 8, side: 1, row: 1 },
+    ];
+    const halfW = dy => RX * Math.sqrt(Math.max(0, 1 - (dy / RY) ** 2));
+    const repos = [];
+    for (const o of orgs) {
+      o.y = C.y + o.row * 200; o.y0 = o.y - 72; o.y1 = o.y + 72; o.heat = 0; o.reps = []; o.cols = [];
+      const near = o.row ? Math.min(Math.abs(o.y0 - C.y), Math.abs(o.y1 - C.y)) : 0;
+      o.inner = C.x + o.side * (halfW(near) + 14); o.outer = o.inner + o.side * BW; o.x = o.inner + o.side * 28;
+      for (let j = 0; j < o.n; j++) {
+        const c = (j / 3) | 0, p = { o, x: o.x + o.side * (52 + c * 44), y: o.y + ROWS[j % 3], state: 0, t: 0 };
+        const col = (o.cols[c] ??= { x: p.x, y0: p.y, y1: p.y });
+        col.y0 = Math.min(col.y0, p.y); col.y1 = Math.max(col.y1, p.y);
+        o.reps.push(p);
+        if (!o.off) repos.push(p);
+      }
+      o.a = Math.atan2(o.y - C.y, o.x - C.x);
+      o.cos = Math.cos(o.a); o.sin = Math.sin(o.a); o.dist = Math.hypot(o.x - C.x, o.y - C.y);
+      const r = edge(o.a, CA, CHH, CHH, CR);
+      o.tap = [C.x + o.cos * r, C.y + o.sin * r];
+    }
+    const P = (o, r) => [C.x + o.cos * r, C.y + o.sin * r];
+    const path = pts => {
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      return { pts, cum, L: cum[cum.length - 1] };
+    };
+    const route = p => {
+      const o = p.o, r = path([o.tap, [o.x, o.y], [p.x, o.y], [p.x, p.y]]);
+      r.dOrg = r.cum[1];
+      return r;
+    };
+    const at = (r, d) => {
+      d = Math.max(0, Math.min(r.L, d));
+      let i = 1;
+      while (i < r.pts.length - 1 && r.cum[i] < d) i++;
+      const [ax, ay] = r.pts[i - 1], [bx, by] = r.pts[i], f = (d - r.cum[i - 1]) / (r.cum[i] - r.cum[i - 1] || 1);
+      return [ax + (bx - ax) * f, ay + (by - ay) * f];
+    };
+    const trace = (r, d0, d1) => {
+      ctx.beginPath(); ctx.moveTo(...at(r, d0));
+      for (let i = 1; i < r.pts.length - 1; i++) if (r.cum[i] > d0 && r.cum[i] < d1) ctx.lineTo(...r.pts[i]);
+      ctx.lineTo(...at(r, d1)); ctx.stroke();
+    };
+    const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+    const box = (g, x0, y0, x1, y1, o) => {
+      const r = o.r ?? 18, lx = x0 + 22;
+      g.font = `600 16px ${MONO}`;
+      let w = g.measureText(o.main).width + (o.icon ? 22 : 0);
+      if (o.sub) { g.font = `500 14px ${MONO}`; w += 10 + g.measureText(o.sub).width; }
+      if (o.fill) { g.fillStyle = o.fill; g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, r); g.fill(); }
+      g.strokeStyle = o.stroke; g.lineWidth = 1.5; g.setLineDash(o.dash || []);
+      g.beginPath(); g.moveTo(lx + w + 8, y0);
+      g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
+      g.lineTo(lx - 8, y0); g.stroke(); g.setLineDash([]);
+      let x = lx;
+      if (o.icon) { octicon(g, o.icon, x + 8, y0, ICON, o.col); x += 22; }
+      g.textAlign = "left"; g.font = `600 16px ${MONO}`; g.fillStyle = o.col; g.fillText(o.main, x, y0);
+      if (o.sub) { x += g.measureText(o.main).width + 10; g.font = `500 14px ${MONO}`; g.fillStyle = "#6e7681"; g.fillText(o.sub, x, y0); }
+    };
+    // Boxes, labels, org wiring and the unenrolled spoke never change, so they are drawn once into an offscreen layer
+    // (redrawn after web fonts load, since the labels are measured).
+    let bg = null;
+    document.fonts?.ready.then(() => (bg = null));
+    const background = () => {
+      const c = document.createElement("canvas");
+      c.width = cv.width; c.height = cv.height;
+      const g = c.getContext("2d");
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.textBaseline = "middle"; g.lineCap = "round"; g.lineJoin = "round";
+      box(g, 12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
+      box(g, cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
+        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
+      });
+      for (const o of orgs) {
+        box(g, Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
+          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
+          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
+        });
+        if (o.off) {
+          const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
+          g.strokeStyle = "#ffffff24"; g.lineWidth = 2; g.setLineDash([3, 5]);
+          g.beginPath(); g.moveTo(...P(o, o.dist - 15)); g.lineTo(...P(o, r0 + 11)); g.stroke(); g.setLineDash([]);
+          octicon(g, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
+        }
+        g.globalAlpha = o.off ? .45 : 1;
+        g.strokeStyle = "#ffffff30"; g.lineWidth = 1.5; g.beginPath();
+        g.moveTo(o.x, o.y); g.lineTo(o.cols[o.cols.length - 1].x, o.y);
+        for (const c of o.cols) { g.moveTo(c.x, c.y0); g.lineTo(c.x, c.y1); }
+        g.stroke(); g.globalAlpha = 1;
+      }
+      return c;
+    };
+    let packets = [], recent = [], last = 0, t0 = 0, stage = 0, spin = 0, kick = 0;
+    let turn = 0, volley = 0, shooter = null, nextShot = 0;
+    const failP = v => Math.max(0.04, 0.5 - (v - 1) * 0.16);
+    const evolve = (k, t) => { k.v++; k.got = 0; k.evolvedAt = t; k.hold = t + 1100; kick = 1; };
+    const draw = t => {
+      ctx.setTransform(2, 0, 0, 2, 0, 0);
+      ctx.clearRect(0, 0, CW, CH);
+      ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.drawImage(bg ??= background(), 0, 0, CW, CH);
+      for (const o of orgs) if (!o.off) {
+        ctx.strokeStyle = "#8b949e"; ctx.globalAlpha = .4 + .5 * o.heat; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(...o.tap); ctx.lineTo(...P(o, o.dist - 15)); ctx.stroke();
+      }
+      // Packets go under the nodes so their dots and trails never cover an icon.
+      for (const q of packets) {
+        if (q.u >= 1) continue;
+        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
+        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
+        trace(q.r, d - 34, d);
+        const [x, y] = at(q.r, d);
+        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
+      }
+      for (const o of orgs) {
+        ctx.globalAlpha = o.off ? .45 : 1;
+        for (const p of o.reps) {
+          const col = p.state === 1 ? p.camp.c : p.state === 2 ? "#3fb950" : null;
+          ctx.fillStyle = "#0d1117"; ctx.strokeStyle = col || "#30363d"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 13, 26, 26, 6); ctx.fill(); ctx.stroke();
+          octicon(ctx, "repo-16", p.x, p.y, ICON, col || "#6e7681");
+        }
+        ctx.fillStyle = "#161b22"; ctx.strokeStyle = o.off ? "#484f58" : "#8b949e"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(o.x - 15, o.y - 15, 30, 30, 8); ctx.fill(); ctx.stroke();
+        if (!o.off && o.heat > .01) { ctx.globalAlpha = o.heat; ctx.strokeStyle = "#e6edf3"; ctx.stroke(); ctx.globalAlpha = 1; }
+        octicon(ctx, "organization-16", o.x, o.y, ICON, o.off ? "#6e7681" : "#e6edf3");
+      }
+      ctx.globalAlpha = 1;
+      const cardW = 2 * CA, cardH = 2 * CHH, hy = cy0 + CHD / 2;
+      ctx.fillStyle = "#0d1117"; ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.fillStyle = "#161b22"; ctx.fillRect(cx0, cy0, cardW, CHD);
+      for (const k of campaigns) if (k.fire > .02) {
+        ctx.fillStyle = k.c;
+        ctx.globalAlpha = .16 * k.fire; ctx.fillRect(cx0, k.y - ROW_H / 2, cardW, ROW_H);
+        ctx.globalAlpha = k.fire; ctx.beginPath(); ctx.roundRect(cx0 + 4, k.y - 10, 3, 20, 1.5); ctx.fill();
+      }
+      ctx.restore();
+      ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx0, cy0 + CHD); ctx.lineTo(cx0 + cardW, cy0 + CHD); ctx.stroke();
+      ctx.strokeStyle = "#8b949e"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.stroke();
+      octicon(ctx, "repo-16", cx0 + 20, hy, ICON, "#e6edf3");
+      ctx.textAlign = "left"; ctx.font = `600 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText("control repo", cx0 + 36, hy);
+      ctx.save(); ctx.translate(cx0 + cardW - 24, hy); ctx.rotate(spin);
+      octicon(ctx, "gear-24", 0, 0, GEAR, "#c9d1d9");
+      ctx.restore();
+      for (const k of campaigns) {
+        const pop = Math.max(0, 1 - (t - k.evolvedAt) / 1600), vx = cx0 + cardW - 14, vt = `v${k.v}`;
+        octicon(ctx, "workflow-16", cx0 + 20, k.y, ICON, k.c);
+        ctx.textAlign = "left"; ctx.font = `500 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText(k.name, cx0 + 36, k.y + 1);
+        ctx.font = `600 13px ${MONO}`; const vw = ctx.measureText(vt).width;
+        if (pop > 0) {
+          ctx.globalAlpha = pop; ctx.fillStyle = "#f778ba";
+          ctx.beginPath(); ctx.roundRect(vx - vw - 7, k.y - 9, vw + 14, 18, 9); ctx.fill(); ctx.globalAlpha = 1;
+        }
+        ctx.textAlign = "right"; ctx.fillStyle = pop > .5 ? "#0d1117" : "#9198a1"; ctx.fillText(vt, vx, k.y + 1);
+      }
+      ctx.textAlign = "center";
+      ctx.font = `600 16px ${MONO}`;
+      const sw = 22 + ctx.measureText("success").width, sx = C.x - sw / 2, sy = C.y + RY + 30;
+      octicon(ctx, "north-star-16", sx + 8, sy, ICON, "#9198a1");
+      ctx.textAlign = "left"; ctx.fillStyle = "#9198a1"; ctx.fillText("success", sx + 22, sy); ctx.textAlign = "center";
+      const rate = recent.length ? Math.round((100 * recent.reduce((a, b) => a + b, 0)) / recent.length) : 0;
+      ctx.fillStyle = recent.length ? "#e6edf3" : "#6e7681";
+      ctx.font = "800 40px 'Mona Sans'"; ctx.fillText(recent.length ? `${rate}%` : "—", C.x, sy + 40);
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "radar",
+      palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
+      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
+      enter() {
+        repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
+        campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
+        packets = []; recent = []; t0 = 0; stage = 0; kick = 0; turn = volley = 0; shooter = null;
+        stages.forEach((s, i) => s.classList.toggle("on", i === 0));
+      },
+      tick(t) {
+        if (!t0) { t0 = last = t; nextShot = t + 500; }
+        const dt = Math.min(50, t - last); last = t;
+        kick *= Math.exp(-dt / 600);
+        spin += dt * (0.0014 + 0.008 * kick);
+        for (const o of orgs) o.heat *= Math.exp(-dt / 600);
+        for (const k of campaigns) k.fire *= Math.exp(-dt / 300);
+        for (const p of repos) if (p.state >= 2 && t - p.t > 2600) p.state = 0;
+        if (t >= nextShot) {
+          if (!volley) {
+            shooter = null;
+            for (let i = 0; i < campaigns.length && !shooter; i++) {
+              const k = campaigns[turn++ % campaigns.length];
+              if (t >= k.hold) shooter = k;
+            }
+            volley = shooter ? Math.max(1, Math.round((2 + Math.random() * 3) * shooter.rate)) : 0;
+          }
+          const idle = repos.filter(p => p.state === 0);
+          if (shooter && t >= shooter.hold && idle.length) {
+            const p = idle[(Math.random() * idle.length) | 0];
+            p.state = 1; p.camp = shooter; shooter.fire = 1;
+            packets.push({ k: shooter, v: shooter.v, p, r: route(p), u: 0, work: 0 });
+            nextShot = --volley ? t + 70 : t + 150 + Math.random() * 120;
+          } else {
+            volley = 0; nextShot = t + 120;
+          }
+        }
+        for (const q of packets) {
+          if (q.u < 1) {
+            q.u = Math.min(1, q.u + dt / (220 + q.r.L * .9));
+            if (Math.abs(q.r.L * ease(q.u) - q.r.dOrg) < 24) q.p.o.heat = Math.max(q.p.o.heat, .9);
+            if (q.u >= 1) q.work = 200 + Math.random() * 600;
+            continue;
+          }
+          if ((q.work -= dt) > 0) continue;
+          q.fail = Math.random() < failP(q.v); q.p.state = q.fail ? 3 : 2; q.p.t = t; q.done = true;
+          recent.push(q.fail ? 0 : 1); if (recent.length > 24) recent.shift();
+          if (q.v === q.k.v && ++q.k.got >= 8 + 5 * q.k.v) evolve(q.k, t);
+        }
+        packets = packets.filter(q => !q.done);
+        const st = Math.min(2, Math.min(...campaigns.map(k => k.v)) - 1);
+        if (st !== stage) { stage = st; stages.forEach((e, i) => e.classList.toggle("on", i === st)); }
+        draw(t);
+      },
+      el: h("section", { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Central Agentic Ops · campaigns"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
+        h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
+        cv,
+        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),
+    });
+  }
+
+  // Push SDLC: a sprint task arrives with its own Squad (designer, frontend, accessibility and scribe agents); the squad deploys into the developer's repository as files, pairs with them in their own session, then steps back and leaves its decisions behind
+  {
+    resetIndex();
+    const svgIco = (n, sz = 24) => `<svg viewBox="0 0 ${sz} ${sz}" aria-hidden="true">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // [initial, role, what it does on this task, colour, ring position, label dy]
+    const SQUAD = [
+      ["D", "Designer", "picks tokens and contrast", "#ab7df8", [170, 70], -46],
+      ["F", "Frontend", "builds the toggle", "#4493f8", [300, 230], 58],
+      ["A", "A11y", "checks screen readers", "#3fb950", [170, 390], 58],
+      ["S", "Scribe", "records the decisions", "#d29922", [40, 230], 58],
+    ];
+    const DEV = [170, 230];
+    // [task, owner index (4 = developer), file it touches]
+    const TODO = [
+      ["Dark colour tokens", 0, "src/theme/dark.ts"],
+      ["Settings toggle", 1, "src/ui/ThemeToggle.tsx"],
+      ["Contrast 4.5:1 + labels", 2, "tests/a11y.test.ts"],
+      ["Decision: use OS theme", 3, ".squad/decisions.md"],
+      ["Try on device & ship", 4, null],
+    ];
+    const ownerColor = o => (o === 4 ? "#f0f6fc" : SQUAD[o][3]);
+    const ownerName = o => (o === 4 ? "you" : SQUAD[o][1].toLowerCase());
+    const members = SQUAD.map(([n, r, d, c]) => h("div", { class: "psd-m", "--c": c }, h("em", {}, n), h("b", {}, r), h("span", {}, d)));
+    const stIco = h("span", { class: "psd-st" }, "assigned to you");
+    stIco.insertAdjacentHTML("afterbegin", svgIco("tasklist"));
+    const task = h(
+      "div",
+      { class: "psd-task" },
+      stIco,
+      h("h3", {}, "Dark mode for the settings screen"),
+      h("div", { class: "psd-lb" }, h("span", {}, "sprint 14"), h("span", {}, "mobile"), h("span", {}, "ui")),
+      h("div", { class: "psd-sq" }, h("i", {}, "github/squad · ", h("b", {}, "theme-crew")), members)
+    );
+    const arrow = h("div", { class: "psd-arrow" }, "deploy");
+    arrow.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.squad/</small>');
+    const pkg = h("div", { class: "psd-pkg" }, "squad");
+    const FILES = [
+      ["src/", 0],
+      ["tests/", 0],
+      [".squad/team.md", 1],
+      [".squad/agents/designer.md", 1],
+      [".squad/agents/frontend.md", 1],
+      [".squad/agents/a11y.md", 1],
+      [".squad/agents/scribe.md", 1],
+      [".squad/decisions.md", 1],
+      ["src/theme/dark.ts", 2],
+      ["src/ui/ThemeToggle.tsx", 2],
+      ["tests/a11y.test.ts", 2],
+    ];
+    const files = FILES.map(([f, k]) => h("div", { class: "psd-f" + (k === 1 ? " sq" : k === 2 ? " new" : "") }, f));
+    const fileOf = name => files[FILES.findIndex(([f]) => f === name)];
+    const sqFiles = files.filter((_, i) => FILES[i][1] === 1);
+    const newFiles = files.filter((_, i) => FILES[i][1] === 2);
+    const rhState = h("span", {}, "no squad");
+    const rh = h("div", { class: "psd-rh" }, "mobile-app", rhState);
+    rh.insertAdjacentHTML("afterbegin", svgIco("repo"));
+    const ring = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    ring.setAttribute("class", "psd-ring");
+    ring.setAttribute("viewBox", "0 0 340 450");
+    ring.innerHTML =
+      SQUAD.map(([, , , c, [x, y]], i) => `<line class="psd-ln" data-i="${i}" style="--c:${c}" x1="${DEV[0]}" y1="${DEV[1]}" x2="${x}" y2="${y}"/>`).join("") +
+      SQUAD.map(([n, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/><text class="psd-in" x="${x}" y="${y + 10}">${n}</text><text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
+      `<defs><clipPath id="psdClip"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="37"/></clipPath></defs><g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/><image href="assets/avatars/mona.jpg" x="${DEV[0] - 37}" y="${DEV[1] - 37}" width="74" height="74" clip-path="url(#psdClip)"/></g>`;
+    const lines = [...ring.querySelectorAll(".psd-ln")];
+    const agents = [...ring.querySelectorAll(".psd-ag")];
+    const dev = ring.querySelector(".psd-dev");
+    const todos = TODO.map(([t, o]) => h("div", { class: "psd-t", "--c": ownerColor(o) }, h("s"), h("b", {}, t), h("span", {}, ownerName(o))));
+    const pr = h("div", { class: "psd-pr" }, h("span", {}, "build"));
+    pr.insertAdjacentHTML("afterbegin", svgIco("tag"));
+    const prText = pr.lastChild;
+    const repo = h("div", { class: "psd-repo" }, rh, h("div", { class: "psd-files" }, files), ring, h("div", { class: "psd-todo" }, h("i", {}, "Task plan"), todos), pr);
+    const STEP = 1500,
+      T_WORK = 4300,
+      T_CLOSE = T_WORK + TODO.length * STEP + 200,
+      T_DONE = T_CLOSE + 900,
+      LOOP = T_DONE + 2800;
+    const fly = () => {
+      pkg.style.transition = "none";
+      Object.assign(pkg.style, { left: "380px", top: "760px", opacity: "1", transform: "scale(.6)" });
+      void pkg.offsetWidth;
+      pkg.style.transition = "left .8s cubic-bezier(.5,0,.2,1), top .8s cubic-bezier(.5,0,.2,1), transform .8s, opacity .3s .8s";
+      Object.assign(pkg.style, { left: "990px", top: "570px", opacity: "0", transform: "scale(1)" });
+    };
+    const reset = () => {
+      members.forEach(m => m.classList.remove("on"));
+      task.classList.remove("closed");
+      stIco.lastChild.textContent = "assigned to you";
+      arrow.classList.remove("on");
+      pkg.style.transition = "none";
+      pkg.style.opacity = "0";
+      files.forEach(f => f.classList.remove("in", "hot", "gone", "kept"));
+      newFiles.forEach(f => (f.style.display = "none"));
+      rhState.textContent = "no squad";
+      rhState.classList.remove("on");
+      for (const e of [...lines, ...agents]) e.classList.remove("up", "on", "out");
+      dev.classList.remove("on");
+      todos.forEach(t => t.classList.remove("doing", "done"));
+      pr.classList.remove("draft", "merged");
+      prText.textContent = "build";
+    };
+    const work = k => {
+      const [, o, f] = TODO[k];
+      lines.forEach((l, i) => l.classList.toggle("on", i === o));
+      agents.forEach((a, i) => a.classList.toggle("on", i === o));
+      dev.classList.toggle("on", o === 4);
+      todos.forEach((t, i) => t.classList.toggle("doing", i === k));
+      files.forEach(x => x.classList.remove("hot"));
+      if (f) {
+        const el = fileOf(f);
+        el.style.display = "";
+        el.classList.add("in", "hot");
+      }
+      if (o === 4) sfx.review();
+      else sfx.pop(k * 2);
+    };
+    const done = k => {
+      todos[k].classList.remove("doing");
+      todos[k].classList.add("done");
+      if (k === 1) {
+        pr.classList.add("draft");
+        prText.textContent = "preview build · dark mode";
+      }
+      if (k === TODO.length - 1) {
+        pr.classList.add("merged");
+        prText.textContent = "shipped · app v2.4";
+        sfx.notify(false);
+      }
+    };
+    const EV = [
+      ...members.map((m, i) => [500 + i * 260, () => (m.classList.add("on"), sfx.pop(i))]),
+      [1700, () => (arrow.classList.add("on"), fly())],
+      [2400, () => ((rhState.textContent = "squad deploying…"), rhState.classList.add("on"))],
+      ...sqFiles.map((f, i) => [2400 + i * 200, () => (f.classList.add("in"), sfx.key(0.8))]),
+      [3700, () => ((rhState.textContent = "squad · 4 agents"), [...lines, ...agents].forEach(e => e.classList.add("up")), sfx.pop(6))],
+      ...TODO.flatMap((_, k) => [
+        [T_WORK + k * STEP, () => work(k)],
+        [T_WORK + k * STEP + 1100, () => done(k)],
+      ]),
+      [
+        T_CLOSE,
+        () => {
+          for (const e of [...lines, ...agents]) e.classList.remove("on");
+          dev.classList.remove("on");
+          files.forEach(x => x.classList.remove("hot"));
+          task.classList.add("closed");
+          stIco.lastChild.textContent = "done";
+        },
+      ],
+      [
+        T_DONE,
+        () => {
+          for (const e of [...lines, ...agents]) e.classList.add("out");
+          lines.forEach(l => l.classList.remove("up"));
+          sqFiles.forEach(f => f.classList.add(f.textContent === ".squad/decisions.md" ? "kept" : "gone"));
+          rhState.textContent = "task done · decisions kept";
+          rhState.classList.remove("on");
+          sfx.pop(0);
+        },
+      ],
+    ].sort((a, b) => a[0] - b[0]);
+    let t0 = 0,
+      ev = 0;
+    slides.push({
+      group: "enterprise",
+      sound: "squad",
+      palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
+      notes:
+        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project: human-led AI agents with designer, frontend, accessibility and scribe roles. Squad does not replace people; it enhances the engineering process around them. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad steps back and its decisions stay in the repository for the next task. The developer stays in charge throughout, shown here as Mona. The task, repository, squad and file names are synthetic and the animation is illustrative.",
+      enter() {
+        t0 = 0;
+        ev = 0;
+        reset();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        let e = t - t0;
+        if (e > LOOP) {
+          t0 = t;
+          e = 0;
+          ev = 0;
+          reset();
+        }
+        while (ev < EV.length && EV[ev][0] <= e) EV[ev++][1]();
+      },
+      el: h(
+        "section",
+        { class: "slide psd" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative · the task ships with its team"), h("h2", {}, letters("Push "), letters("SDLC", "l-grad"))),
+        h("div", { class: "psd-tag" }, "Pull: you hunt for tools, docs and experts. ", h("b", {}, "Push: the task arrives with a squad that boosts your process.")),
+        task,
+        arrow,
+        repo,
+        pkg
+      ),
+    });
+  }
+
   // Connectors: a declaration lists everything a service offers; a workflow imports it and selects a few reads and one write; only that selection reaches the run
   {
     resetIndex();
@@ -10651,723 +11480,6 @@
         packets(t);
       },
       el,
-    });
-  }
-
-  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
-  {
-    resetIndex();
-    const RUN = [
-      { k: "[self-hosted, linux]", c: "#d29922" },
-      { k: "[self-hosted, arm64]", c: "#ab7df8" },
-      { k: "[self-hosted, gpu]", c: "#4493f8" },
-    ];
-    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
-    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
-    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
-    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
-    const STEPS = ["checkout", "setup-node", "cache"];
-    const CHIPS = [
-      ["GitHub Apps", [6, 7, 8]],
-      ["OIDC", [4, 5]],
-      ["Runner groups", [3]],
-      ["Environments", []],
-      ["Org secrets", [8]],
-      ["OpenTelemetry", [13, 14, 15]],
-      ["Rulesets", []],
-      ["Audit log", []],
-    ];
-    const K = "#ff7b72",
-      D = "#656c76",
-      T = "#f0f6fc",
-      V = "#a5d6ff",
-      E = "#d2a8ff";
-    const vRun = h("span", { class: "ae-val" });
-    const LINES = [
-      [["---", D]],
-      [
-        ["on: ", K],
-        ["issues", V],
-      ],
-      [["runs-on: ", K], vRun],
-      [["permissions:", K]],
-      [
-        ["  id-token: ", K],
-        ["write", V],
-      ],
-      [["github-app:", K]],
-      [
-        ["  client-id: ", K],
-        ["${{ vars.APP_ID }}", E],
-      ],
-      [
-        ["  private-key: ", K],
-        ["${{ secrets.APP_KEY }}", E],
-      ],
-      [["network:", K]],
-      [
-        ["  allowed: ", K],
-        ["[defaults, node]", V],
-      ],
-      [["steps:", K]],
-      [
-        ["  - uses: ", K],
-        ["actions/setup-node@v4", V],
-      ],
-      [["observability:", K]],
-      [["  otlp:", K]],
-      [
-        ["    endpoint: ", K],
-        ["${{ secrets.OTLP_ENDPOINT }}", E],
-      ],
-      [["---", D]],
-      [["# Triage new issues for the platform team", T]],
-    ];
-    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
-    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
-    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
-    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
-    const SB = 1,
-      RN = 2,
-      EC = 3;
-    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
-    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
-    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
-    const card = (i, c, tag, title, code, ic, extra) => {
-      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
-      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
-      return el;
-    };
-    const spans = h(
-      "div",
-      { class: "er-spans" },
-      [
-        [0, 100],
-        [8, 46],
-        [30, 58],
-        [62, 30],
-      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
-    );
-    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
-    otel.classList.add("otel");
-    const cRun = h("span");
-    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
-    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
-    fw.classList.add("fw");
-    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
-    eco.classList.add("eco");
-    const job = h("div", { class: "er-job" });
-    const trace = h("div", { class: "er-job er-trace" });
-    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
-    const el = h(
-      "section",
-      { class: "slide er" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
-      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
-      ed,
-      arrow,
-      otel,
-      fw,
-      runner,
-      eco,
-      job,
-      trace,
-      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
-    );
-    const fly = (dot, [x0, y0], [x1, y1]) => {
-      dot.style.transition = "none";
-      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
-      void dot.offsetWidth;
-      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
-      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
-    };
-    let cur = 0,
-      phase = "hold",
-      since = 0,
-      typed = "",
-      arriveAt = 0,
-      otelAt = 0,
-      chipAt = 0,
-      sbAt = 0,
-      chip = -1;
-    const setRunner = (i, t) => {
-      cur = i;
-      el.style.setProperty("--ec", RUN[i].c);
-      runner.style.setProperty("--rc", RUN[i].c);
-      cRun.textContent = RUN[i].k;
-      runner.classList.add("on");
-      for (const c of [runner, eco, fw]) c.classList.remove("run");
-      eco.classList.remove("on");
-      fw.classList.remove("on");
-      steps.forEach(p => p.classList.remove("up"));
-      fly(job, [840, 460], MID(RN));
-      arriveAt = t + 700;
-      sbAt = otelAt = Infinity;
-    };
-    const setChip = i => {
-      chip = i;
-      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
-      const lit = CHIPS[i][1];
-      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
-    };
-    slides.push({
-      group: "enterprise",
-      sound: "enterprise",
-      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
-      notes:
-        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
-      enter() {
-        typed = RUN[0].k;
-        vRun.textContent = typed;
-        phase = "hold";
-        since = chipAt = 0;
-        chip = -1;
-        chips.forEach(c => c.classList.remove("lit"));
-        rows.forEach(r => r.classList.remove("lit"));
-        otel.classList.remove("on", "run");
-        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
-        steps.forEach(p => p.classList.remove("up"));
-        cRun.textContent = RUN[0].k;
-        sbAt = Infinity;
-        for (const d of [job, trace]) {
-          d.style.transition = "none";
-          d.style.opacity = "0";
-        }
-        cur = 0;
-        arriveAt = otelAt = Infinity;
-      },
-      tick(t) {
-        if (!since) {
-          since = t;
-          chipAt = t + 1800;
-          setRunner(0, t + 900);
-        }
-        if (t > arriveAt && !runner.classList.contains("run")) {
-          runner.classList.add("run");
-          sbAt = t + 900;
-        }
-        if (t > sbAt) {
-          sbAt = Infinity;
-          fw.classList.remove("run");
-          void fw.offsetWidth;
-          fw.classList.add("on", "run");
-          fly(trace, MID(SB), MID(0));
-          otelAt = t + 700;
-        }
-        if (t > otelAt) {
-          otelAt = Infinity;
-          otel.classList.remove("run");
-          void otel.offsetWidth;
-          otel.classList.add("on", "run");
-        }
-        if (t > arriveAt) {
-          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
-          steps.forEach((p, j) => p.classList.toggle("up", j < n));
-          eco.classList.add("on");
-          eco.classList.toggle("run", n === steps.length);
-        }
-        if (t > chipAt) {
-          chipAt = t + 1500;
-          setChip((chip + 1) % CHIPS.length);
-        }
-        const el2 = t - since;
-        const next = RUN[(cur + 1) % RUN.length].k;
-        if (phase === "hold" && el2 > 3400) {
-          phase = "del";
-          since = t;
-        } else if (phase === "del" && el2 > 28) {
-          since = t;
-          typed = typed.slice(0, -1);
-          vRun.textContent = typed;
-          if (!typed) phase = "type";
-        } else if (phase === "type" && el2 > 70) {
-          since = t;
-          typed = next.slice(0, typed.length + 1);
-          vRun.textContent = typed;
-          sfx.key(0.7);
-          if (typed === next) {
-            setRunner((cur + 1) % RUN.length, t);
-            sfx.pop(cur * 2);
-            phase = "hold";
-          }
-        }
-      },
-      el,
-    });
-  }
-
-  // 11. Central Agentic Ops (githubnext/gh-cao): a control repo lists its registered campaigns, which dispatch
-  // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
-  {
-    resetIndex();
-    const steps = [
-      ["01", "Observe", "Runs, costs and outcomes from every repo in one dashboard", "#4493f8"],
-      ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#ab7df8"],
-      ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#d29922"],
-      ["04", "Work", "One target per worker, bounded mission, correlated results", "#3fb950"],
-      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#f778ba"],
-    ];
-    const CW = 1180, CH = 690, MONO = "'Monaspace Neon', ui-monospace, Menlo, monospace";
-    const cv = h("canvas", { class: "cao-canvas", width: CW * 2, height: CH * 2 });
-    const ctx = cv.getContext("2d");
-    const stages = ["review", "limited live", "scheduled live"].map(s => h("em", {}, s));
-    // The control repo lists its registered ops, one row per campaign installed from the catalog and tracked by a
-    // manifest under .github/aw/campaigns/. The host org owns the repo; an enterprise account owns no repos itself.
-    const C = { x: 590, y: 345 };
-    const ICON = 16, GEAR = 24;
-    const campaigns = [
-      { name: "Dependabot", c: "#4493f8", rate: 1.3 },
-      { name: "Repo Assist", c: "#39c5cf", rate: 1.1 },
-      { name: "ESLint Factory", c: "#e3b341", rate: .9 },
-      { name: "EU CRA", c: "#b083f0", rate: .7 },
-    ].map(k => ({ ...k, v: 1 }));
-    const CA = 124, CHD = 40, ROW_H = 32, CR = 10, CHH = (CHD + 8 + campaigns.length * ROW_H) / 2;
-    const cx0 = C.x - CA, cy0 = C.y - CHH;
-    campaigns.forEach((k, i) => (k.y = cy0 + CHD + 4 + ROW_H * (i + .5)));
-    const PX = 26, PT = 30, PB = 26;
-    const edge = (ang, a, top, bottom, r) => {
-      const c = Math.abs(Math.cos(ang)), s = Math.abs(Math.sin(ang)), H = Math.sin(ang) < 0 ? top : bottom;
-      let d = Math.min(c > 1e-9 ? a / c : Infinity, s > 1e-9 ? H / s : Infinity);
-      if (d * c > a - r && d * s > H - r) {
-        const qx = a - r, qy = H - r, p = c * qx + s * qy;
-        d = p + Math.sqrt(p * p - (qx * qx + qy * qy - r * r));
-      }
-      return d;
-    };
-    const RY = 212, RX = 1.6 * RY;
-    const BW = 196, ROWS = [0, -44, 44];
-    const orgs = [
-      { name: "web", n: 9, side: -1, row: -1 },
-      { name: "data", n: 8, side: -1, row: 0 },
-      { name: "labs", n: 5, side: -1, row: 1, off: true },
-      { name: "mobile", n: 8, side: 1, row: -1 },
-      { name: "payments", n: 9, side: 1, row: 0 },
-      { name: "infra", n: 8, side: 1, row: 1 },
-    ];
-    const halfW = dy => RX * Math.sqrt(Math.max(0, 1 - (dy / RY) ** 2));
-    const repos = [];
-    for (const o of orgs) {
-      o.y = C.y + o.row * 200; o.y0 = o.y - 72; o.y1 = o.y + 72; o.heat = 0; o.reps = []; o.cols = [];
-      const near = o.row ? Math.min(Math.abs(o.y0 - C.y), Math.abs(o.y1 - C.y)) : 0;
-      o.inner = C.x + o.side * (halfW(near) + 14); o.outer = o.inner + o.side * BW; o.x = o.inner + o.side * 28;
-      for (let j = 0; j < o.n; j++) {
-        const c = (j / 3) | 0, p = { o, x: o.x + o.side * (52 + c * 44), y: o.y + ROWS[j % 3], state: 0, t: 0 };
-        const col = (o.cols[c] ??= { x: p.x, y0: p.y, y1: p.y });
-        col.y0 = Math.min(col.y0, p.y); col.y1 = Math.max(col.y1, p.y);
-        o.reps.push(p);
-        if (!o.off) repos.push(p);
-      }
-      o.a = Math.atan2(o.y - C.y, o.x - C.x);
-      o.cos = Math.cos(o.a); o.sin = Math.sin(o.a); o.dist = Math.hypot(o.x - C.x, o.y - C.y);
-      const r = edge(o.a, CA, CHH, CHH, CR);
-      o.tap = [C.x + o.cos * r, C.y + o.sin * r];
-    }
-    const P = (o, r) => [C.x + o.cos * r, C.y + o.sin * r];
-    const path = pts => {
-      const cum = [0];
-      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
-      return { pts, cum, L: cum[cum.length - 1] };
-    };
-    const route = p => {
-      const o = p.o, r = path([o.tap, [o.x, o.y], [p.x, o.y], [p.x, p.y]]);
-      r.dOrg = r.cum[1];
-      return r;
-    };
-    const at = (r, d) => {
-      d = Math.max(0, Math.min(r.L, d));
-      let i = 1;
-      while (i < r.pts.length - 1 && r.cum[i] < d) i++;
-      const [ax, ay] = r.pts[i - 1], [bx, by] = r.pts[i], f = (d - r.cum[i - 1]) / (r.cum[i] - r.cum[i - 1] || 1);
-      return [ax + (bx - ax) * f, ay + (by - ay) * f];
-    };
-    const trace = (r, d0, d1) => {
-      ctx.beginPath(); ctx.moveTo(...at(r, d0));
-      for (let i = 1; i < r.pts.length - 1; i++) if (r.cum[i] > d0 && r.cum[i] < d1) ctx.lineTo(...r.pts[i]);
-      ctx.lineTo(...at(r, d1)); ctx.stroke();
-    };
-    const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-    const box = (g, x0, y0, x1, y1, o) => {
-      const r = o.r ?? 18, lx = x0 + 22;
-      g.font = `600 16px ${MONO}`;
-      let w = g.measureText(o.main).width + (o.icon ? 22 : 0);
-      if (o.sub) { g.font = `500 14px ${MONO}`; w += 10 + g.measureText(o.sub).width; }
-      if (o.fill) { g.fillStyle = o.fill; g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, r); g.fill(); }
-      g.strokeStyle = o.stroke; g.lineWidth = 1.5; g.setLineDash(o.dash || []);
-      g.beginPath(); g.moveTo(lx + w + 8, y0);
-      g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
-      g.lineTo(lx - 8, y0); g.stroke(); g.setLineDash([]);
-      let x = lx;
-      if (o.icon) { octicon(g, o.icon, x + 8, y0, ICON, o.col); x += 22; }
-      g.textAlign = "left"; g.font = `600 16px ${MONO}`; g.fillStyle = o.col; g.fillText(o.main, x, y0);
-      if (o.sub) { x += g.measureText(o.main).width + 10; g.font = `500 14px ${MONO}`; g.fillStyle = "#6e7681"; g.fillText(o.sub, x, y0); }
-    };
-    // Boxes, labels, org wiring and the unenrolled spoke never change, so they are drawn once into an offscreen layer
-    // (redrawn after web fonts load, since the labels are measured).
-    let bg = null;
-    document.fonts?.ready.then(() => (bg = null));
-    const background = () => {
-      const c = document.createElement("canvas");
-      c.width = cv.width; c.height = cv.height;
-      const g = c.getContext("2d");
-      g.setTransform(2, 0, 0, 2, 0, 0);
-      g.textBaseline = "middle"; g.lineCap = "round"; g.lineJoin = "round";
-      box(g, 12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
-      box(g, cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
-        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
-      });
-      for (const o of orgs) {
-        box(g, Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
-          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
-          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
-        });
-        if (o.off) {
-          const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
-          g.strokeStyle = "#ffffff24"; g.lineWidth = 2; g.setLineDash([3, 5]);
-          g.beginPath(); g.moveTo(...P(o, o.dist - 15)); g.lineTo(...P(o, r0 + 11)); g.stroke(); g.setLineDash([]);
-          octicon(g, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
-        }
-        g.globalAlpha = o.off ? .45 : 1;
-        g.strokeStyle = "#ffffff30"; g.lineWidth = 1.5; g.beginPath();
-        g.moveTo(o.x, o.y); g.lineTo(o.cols[o.cols.length - 1].x, o.y);
-        for (const c of o.cols) { g.moveTo(c.x, c.y0); g.lineTo(c.x, c.y1); }
-        g.stroke(); g.globalAlpha = 1;
-      }
-      return c;
-    };
-    let packets = [], recent = [], last = 0, t0 = 0, stage = 0, spin = 0, kick = 0;
-    let turn = 0, volley = 0, shooter = null, nextShot = 0;
-    const failP = v => Math.max(0.04, 0.5 - (v - 1) * 0.16);
-    const evolve = (k, t) => { k.v++; k.got = 0; k.evolvedAt = t; k.hold = t + 1100; kick = 1; };
-    const draw = t => {
-      ctx.setTransform(2, 0, 0, 2, 0, 0);
-      ctx.clearRect(0, 0, CW, CH);
-      ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.drawImage(bg ??= background(), 0, 0, CW, CH);
-      for (const o of orgs) if (!o.off) {
-        ctx.strokeStyle = "#8b949e"; ctx.globalAlpha = .4 + .5 * o.heat; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(...o.tap); ctx.lineTo(...P(o, o.dist - 15)); ctx.stroke();
-      }
-      // Packets go under the nodes so their dots and trails never cover an icon.
-      for (const q of packets) {
-        if (q.u >= 1) continue;
-        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
-        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
-        trace(q.r, d - 34, d);
-        const [x, y] = at(q.r, d);
-        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
-      }
-      for (const o of orgs) {
-        ctx.globalAlpha = o.off ? .45 : 1;
-        for (const p of o.reps) {
-          const col = p.state === 1 ? p.camp.c : p.state === 2 ? "#3fb950" : null;
-          ctx.fillStyle = "#0d1117"; ctx.strokeStyle = col || "#30363d"; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 13, 26, 26, 6); ctx.fill(); ctx.stroke();
-          octicon(ctx, "repo-16", p.x, p.y, ICON, col || "#6e7681");
-        }
-        ctx.fillStyle = "#161b22"; ctx.strokeStyle = o.off ? "#484f58" : "#8b949e"; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.roundRect(o.x - 15, o.y - 15, 30, 30, 8); ctx.fill(); ctx.stroke();
-        if (!o.off && o.heat > .01) { ctx.globalAlpha = o.heat; ctx.strokeStyle = "#e6edf3"; ctx.stroke(); ctx.globalAlpha = 1; }
-        octicon(ctx, "organization-16", o.x, o.y, ICON, o.off ? "#6e7681" : "#e6edf3");
-      }
-      ctx.globalAlpha = 1;
-      const cardW = 2 * CA, cardH = 2 * CHH, hy = cy0 + CHD / 2;
-      ctx.fillStyle = "#0d1117"; ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.fill();
-      ctx.save(); ctx.clip();
-      ctx.fillStyle = "#161b22"; ctx.fillRect(cx0, cy0, cardW, CHD);
-      for (const k of campaigns) if (k.fire > .02) {
-        ctx.fillStyle = k.c;
-        ctx.globalAlpha = .16 * k.fire; ctx.fillRect(cx0, k.y - ROW_H / 2, cardW, ROW_H);
-        ctx.globalAlpha = k.fire; ctx.beginPath(); ctx.roundRect(cx0 + 4, k.y - 10, 3, 20, 1.5); ctx.fill();
-      }
-      ctx.restore();
-      ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(cx0, cy0 + CHD); ctx.lineTo(cx0 + cardW, cy0 + CHD); ctx.stroke();
-      ctx.strokeStyle = "#8b949e"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.stroke();
-      octicon(ctx, "repo-16", cx0 + 20, hy, ICON, "#e6edf3");
-      ctx.textAlign = "left"; ctx.font = `600 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText("control repo", cx0 + 36, hy);
-      ctx.save(); ctx.translate(cx0 + cardW - 24, hy); ctx.rotate(spin);
-      octicon(ctx, "gear-24", 0, 0, GEAR, "#c9d1d9");
-      ctx.restore();
-      for (const k of campaigns) {
-        const pop = Math.max(0, 1 - (t - k.evolvedAt) / 1600), vx = cx0 + cardW - 14, vt = `v${k.v}`;
-        octicon(ctx, "workflow-16", cx0 + 20, k.y, ICON, k.c);
-        ctx.textAlign = "left"; ctx.font = `500 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText(k.name, cx0 + 36, k.y + 1);
-        ctx.font = `600 13px ${MONO}`; const vw = ctx.measureText(vt).width;
-        if (pop > 0) {
-          ctx.globalAlpha = pop; ctx.fillStyle = "#f778ba";
-          ctx.beginPath(); ctx.roundRect(vx - vw - 7, k.y - 9, vw + 14, 18, 9); ctx.fill(); ctx.globalAlpha = 1;
-        }
-        ctx.textAlign = "right"; ctx.fillStyle = pop > .5 ? "#0d1117" : "#9198a1"; ctx.fillText(vt, vx, k.y + 1);
-      }
-      ctx.textAlign = "center";
-      ctx.font = `600 16px ${MONO}`;
-      const sw = 22 + ctx.measureText("success").width, sx = C.x - sw / 2, sy = C.y + RY + 30;
-      octicon(ctx, "north-star-16", sx + 8, sy, ICON, "#9198a1");
-      ctx.textAlign = "left"; ctx.fillStyle = "#9198a1"; ctx.fillText("success", sx + 22, sy); ctx.textAlign = "center";
-      const rate = recent.length ? Math.round((100 * recent.reduce((a, b) => a + b, 0)) / recent.length) : 0;
-      ctx.fillStyle = recent.length ? "#e6edf3" : "#6e7681";
-      ctx.font = "800 40px 'Mona Sans'"; ctx.fillText(recent.length ? `${rate}%` : "—", C.x, sy + 40);
-    };
-    slides.push({
-      group: "enterprise",
-      sound: "radar",
-      palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
-      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops (githubnext/gh-cao) is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
-      enter() {
-        repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
-        campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
-        packets = []; recent = []; t0 = 0; stage = 0; kick = 0; turn = volley = 0; shooter = null;
-        stages.forEach((s, i) => s.classList.toggle("on", i === 0));
-      },
-      tick(t) {
-        if (!t0) { t0 = last = t; nextShot = t + 500; }
-        const dt = Math.min(50, t - last); last = t;
-        kick *= Math.exp(-dt / 600);
-        spin += dt * (0.0014 + 0.008 * kick);
-        for (const o of orgs) o.heat *= Math.exp(-dt / 600);
-        for (const k of campaigns) k.fire *= Math.exp(-dt / 300);
-        for (const p of repos) if (p.state >= 2 && t - p.t > 2600) p.state = 0;
-        if (t >= nextShot) {
-          if (!volley) {
-            shooter = null;
-            for (let i = 0; i < campaigns.length && !shooter; i++) {
-              const k = campaigns[turn++ % campaigns.length];
-              if (t >= k.hold) shooter = k;
-            }
-            volley = shooter ? Math.max(1, Math.round((2 + Math.random() * 3) * shooter.rate)) : 0;
-          }
-          const idle = repos.filter(p => p.state === 0);
-          if (shooter && t >= shooter.hold && idle.length) {
-            const p = idle[(Math.random() * idle.length) | 0];
-            p.state = 1; p.camp = shooter; shooter.fire = 1;
-            packets.push({ k: shooter, v: shooter.v, p, r: route(p), u: 0, work: 0 });
-            nextShot = --volley ? t + 70 : t + 150 + Math.random() * 120;
-          } else {
-            volley = 0; nextShot = t + 120;
-          }
-        }
-        for (const q of packets) {
-          if (q.u < 1) {
-            q.u = Math.min(1, q.u + dt / (220 + q.r.L * .9));
-            if (Math.abs(q.r.L * ease(q.u) - q.r.dOrg) < 24) q.p.o.heat = Math.max(q.p.o.heat, .9);
-            if (q.u >= 1) q.work = 200 + Math.random() * 600;
-            continue;
-          }
-          if ((q.work -= dt) > 0) continue;
-          q.fail = Math.random() < failP(q.v); q.p.state = q.fail ? 3 : 2; q.p.t = t; q.done = true;
-          recent.push(q.fail ? 0 : 1); if (recent.length > 24) recent.shift();
-          if (q.v === q.k.v && ++q.k.got >= 8 + 5 * q.k.v) evolve(q.k, t);
-        }
-        packets = packets.filter(q => !q.done);
-        const st = Math.min(2, Math.min(...campaigns.map(k => k.v)) - 1);
-        if (st !== stage) { stage = st; stages.forEach((e, i) => e.classList.toggle("on", i === st)); }
-        draw(t);
-      },
-      el: h("section", { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "githubnext/gh-cao · Central Agentic Ops"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
-        h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
-        cv,
-        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),
-    });
-  }
-
-  // Push SDLC: a sprint task arrives with its own Squad (designer, frontend, accessibility and scribe agents); the squad deploys into the developer's repository as files, pairs with them in their own session, then steps back and leaves its decisions behind
-  {
-    resetIndex();
-    const svgIco = (n, sz = 24) => `<svg viewBox="0 0 ${sz} ${sz}" aria-hidden="true">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
-    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    // [initial, role, what it does on this task, colour, ring position, label dy]
-    const SQUAD = [
-      ["D", "Designer", "picks tokens and contrast", "#ab7df8", [170, 70], -46],
-      ["F", "Frontend", "builds the toggle", "#4493f8", [300, 230], 58],
-      ["A", "A11y", "checks screen readers", "#3fb950", [170, 390], 58],
-      ["S", "Scribe", "records the decisions", "#d29922", [40, 230], 58],
-    ];
-    const DEV = [170, 230];
-    // [task, owner index (4 = developer), file it touches]
-    const TODO = [
-      ["Dark colour tokens", 0, "src/theme/dark.ts"],
-      ["Settings toggle", 1, "src/ui/ThemeToggle.tsx"],
-      ["Contrast 4.5:1 + labels", 2, "tests/a11y.test.ts"],
-      ["Decision: use OS theme", 3, ".squad/decisions.md"],
-      ["Try on device & ship", 4, null],
-    ];
-    const ownerColor = o => (o === 4 ? "#f0f6fc" : SQUAD[o][3]);
-    const ownerName = o => (o === 4 ? "you" : SQUAD[o][1].toLowerCase());
-    const members = SQUAD.map(([n, r, d, c]) => h("div", { class: "psd-m", "--c": c }, h("em", {}, n), h("b", {}, r), h("span", {}, d)));
-    const stIco = h("span", { class: "psd-st" }, "assigned to you");
-    stIco.insertAdjacentHTML("afterbegin", svgIco("tasklist"));
-    const task = h(
-      "div",
-      { class: "psd-task" },
-      stIco,
-      h("h3", {}, "Dark mode for the settings screen"),
-      h("div", { class: "psd-lb" }, h("span", {}, "sprint 14"), h("span", {}, "mobile"), h("span", {}, "ui")),
-      h("div", { class: "psd-sq" }, h("i", {}, "github/squad · ", h("b", {}, "theme-crew")), members)
-    );
-    const arrow = h("div", { class: "psd-arrow" }, "deploy");
-    arrow.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.squad/</small>');
-    const pkg = h("div", { class: "psd-pkg" }, "squad");
-    const FILES = [
-      ["src/", 0],
-      ["tests/", 0],
-      [".squad/team.md", 1],
-      [".squad/agents/designer.md", 1],
-      [".squad/agents/frontend.md", 1],
-      [".squad/agents/a11y.md", 1],
-      [".squad/agents/scribe.md", 1],
-      [".squad/decisions.md", 1],
-      ["src/theme/dark.ts", 2],
-      ["src/ui/ThemeToggle.tsx", 2],
-      ["tests/a11y.test.ts", 2],
-    ];
-    const files = FILES.map(([f, k]) => h("div", { class: "psd-f" + (k === 1 ? " sq" : k === 2 ? " new" : "") }, f));
-    const fileOf = name => files[FILES.findIndex(([f]) => f === name)];
-    const sqFiles = files.filter((_, i) => FILES[i][1] === 1);
-    const newFiles = files.filter((_, i) => FILES[i][1] === 2);
-    const rhState = h("span", {}, "no squad");
-    const rh = h("div", { class: "psd-rh" }, "mobile-app", rhState);
-    rh.insertAdjacentHTML("afterbegin", svgIco("repo"));
-    const ring = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    ring.setAttribute("class", "psd-ring");
-    ring.setAttribute("viewBox", "0 0 340 450");
-    ring.innerHTML =
-      SQUAD.map(([, , , c, [x, y]], i) => `<line class="psd-ln" data-i="${i}" style="--c:${c}" x1="${DEV[0]}" y1="${DEV[1]}" x2="${x}" y2="${y}"/>`).join("") +
-      SQUAD.map(([n, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/><text class="psd-in" x="${x}" y="${y + 10}">${n}</text><text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
-      `<defs><clipPath id="psdClip"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="37"/></clipPath></defs><g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/><image href="assets/avatars/mona.jpg" x="${DEV[0] - 37}" y="${DEV[1] - 37}" width="74" height="74" clip-path="url(#psdClip)"/></g>`;
-    const lines = [...ring.querySelectorAll(".psd-ln")];
-    const agents = [...ring.querySelectorAll(".psd-ag")];
-    const dev = ring.querySelector(".psd-dev");
-    const todos = TODO.map(([t, o]) => h("div", { class: "psd-t", "--c": ownerColor(o) }, h("s"), h("b", {}, t), h("span", {}, ownerName(o))));
-    const pr = h("div", { class: "psd-pr" }, h("span", {}, "build"));
-    pr.insertAdjacentHTML("afterbegin", svgIco("tag"));
-    const prText = pr.lastChild;
-    const repo = h("div", { class: "psd-repo" }, rh, h("div", { class: "psd-files" }, files), ring, h("div", { class: "psd-todo" }, h("i", {}, "Task plan"), todos), pr);
-    const STEP = 1500,
-      T_WORK = 4300,
-      T_CLOSE = T_WORK + TODO.length * STEP + 200,
-      T_DONE = T_CLOSE + 900,
-      LOOP = T_DONE + 2800;
-    const fly = () => {
-      pkg.style.transition = "none";
-      Object.assign(pkg.style, { left: "380px", top: "760px", opacity: "1", transform: "scale(.6)" });
-      void pkg.offsetWidth;
-      pkg.style.transition = "left .8s cubic-bezier(.5,0,.2,1), top .8s cubic-bezier(.5,0,.2,1), transform .8s, opacity .3s .8s";
-      Object.assign(pkg.style, { left: "990px", top: "570px", opacity: "0", transform: "scale(1)" });
-    };
-    const reset = () => {
-      members.forEach(m => m.classList.remove("on"));
-      task.classList.remove("closed");
-      stIco.lastChild.textContent = "assigned to you";
-      arrow.classList.remove("on");
-      pkg.style.transition = "none";
-      pkg.style.opacity = "0";
-      files.forEach(f => f.classList.remove("in", "hot", "gone", "kept"));
-      newFiles.forEach(f => (f.style.display = "none"));
-      rhState.textContent = "no squad";
-      rhState.classList.remove("on");
-      for (const e of [...lines, ...agents]) e.classList.remove("up", "on", "out");
-      dev.classList.remove("on");
-      todos.forEach(t => t.classList.remove("doing", "done"));
-      pr.classList.remove("draft", "merged");
-      prText.textContent = "build";
-    };
-    const work = k => {
-      const [, o, f] = TODO[k];
-      lines.forEach((l, i) => l.classList.toggle("on", i === o));
-      agents.forEach((a, i) => a.classList.toggle("on", i === o));
-      dev.classList.toggle("on", o === 4);
-      todos.forEach((t, i) => t.classList.toggle("doing", i === k));
-      files.forEach(x => x.classList.remove("hot"));
-      if (f) {
-        const el = fileOf(f);
-        el.style.display = "";
-        el.classList.add("in", "hot");
-      }
-      if (o === 4) sfx.review();
-      else sfx.pop(k * 2);
-    };
-    const done = k => {
-      todos[k].classList.remove("doing");
-      todos[k].classList.add("done");
-      if (k === 1) {
-        pr.classList.add("draft");
-        prText.textContent = "preview build · dark mode";
-      }
-      if (k === TODO.length - 1) {
-        pr.classList.add("merged");
-        prText.textContent = "shipped · app v2.4";
-        sfx.notify(false);
-      }
-    };
-    const EV = [
-      ...members.map((m, i) => [500 + i * 260, () => (m.classList.add("on"), sfx.pop(i))]),
-      [1700, () => (arrow.classList.add("on"), fly())],
-      [2400, () => ((rhState.textContent = "squad deploying…"), rhState.classList.add("on"))],
-      ...sqFiles.map((f, i) => [2400 + i * 200, () => (f.classList.add("in"), sfx.key(0.8))]),
-      [3700, () => ((rhState.textContent = "squad · 4 agents"), [...lines, ...agents].forEach(e => e.classList.add("up")), sfx.pop(6))],
-      ...TODO.flatMap((_, k) => [
-        [T_WORK + k * STEP, () => work(k)],
-        [T_WORK + k * STEP + 1100, () => done(k)],
-      ]),
-      [
-        T_CLOSE,
-        () => {
-          for (const e of [...lines, ...agents]) e.classList.remove("on");
-          dev.classList.remove("on");
-          files.forEach(x => x.classList.remove("hot"));
-          task.classList.add("closed");
-          stIco.lastChild.textContent = "done";
-        },
-      ],
-      [
-        T_DONE,
-        () => {
-          for (const e of [...lines, ...agents]) e.classList.add("out");
-          lines.forEach(l => l.classList.remove("up"));
-          sqFiles.forEach(f => f.classList.add(f.textContent === ".squad/decisions.md" ? "kept" : "gone"));
-          rhState.textContent = "task done · decisions kept";
-          rhState.classList.remove("on");
-          sfx.pop(0);
-        },
-      ],
-    ].sort((a, b) => a[0] - b[0]);
-    let t0 = 0,
-      ev = 0;
-    slides.push({
-      group: "enterprise",
-      sound: "squad",
-      palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
-      notes:
-        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project: human-led AI agents with designer, frontend, accessibility and scribe roles. Squad does not replace people; it enhances the engineering process around them. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad steps back and its decisions stay in the repository for the next task. The developer stays in charge throughout, shown here as Mona. The task, repository, squad and file names are synthetic and the animation is illustrative.",
-      enter() {
-        t0 = 0;
-        ev = 0;
-        reset();
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        let e = t - t0;
-        if (e > LOOP) {
-          t0 = t;
-          e = 0;
-          ev = 0;
-          reset();
-        }
-        while (ev < EV.length && EV[ev][0] <= e) EV[ev++][1]();
-      },
-      el: h(
-        "section",
-        { class: "slide psd" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative · the task ships with its team"), h("h2", {}, letters("Push "), letters("SDLC", "l-grad"))),
-        h("div", { class: "psd-tag" }, "Pull: you hunt for tools, docs and experts. ", h("b", {}, "Push: the task arrives with a squad that boosts your process.")),
-        task,
-        arrow,
-        repo,
-        pkg
-      ),
     });
   }
 
