@@ -186,6 +186,8 @@
   .rpa-badge { fill: #d29922; font: 600 17px var(--mono); }
   .rpa-dup.on, .rpa-link.on, .rpa-badge.on { opacity: 1; }
   .rpa-scan { opacity: 0; } .rpa-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
+  .fm-wire.day { stroke-dasharray: 10 8; }
+  .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .rao-card.on { stroke: var(--rc, #3fb950); filter: drop-shadow(0 0 12px var(--rc, #3fb950)); }
   .rao-h { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
@@ -1773,6 +1775,7 @@
       ["e5", "M1300 372 V500", "b", ["assigns"], 1322, 442, "start"],
       ["e6", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
       ["e7", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+      ["e8", "M1624 574 V650 H10 V140 H82", "p day", ["every day, the loop runs again"], 860, 636, "middle"],
     ];
     // the token's journey: [edge, node lit on arrival, duration]; a null edge is the duplicate-code scan
     const SEQ = [
@@ -1784,8 +1787,9 @@
       ["e5", "nDev"],
       ["e7", "nCopilot"],
       ["e6", "nMerge"],
+      ["e8", "nResearch", 1800],
     ];
-    const LANE = { nCode: 0, nIssue: 1, nCopilot: 2, nPR: 2, nDev: 2, nMerge: 2 };
+    const LANE = { nResearch: 0, nCode: 0, nIssue: 1, nCopilot: 2, nPR: 2, nDev: 2, nMerge: 2 };
     let g = `<defs><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="rpaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="rpaBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
@@ -1800,12 +1804,13 @@
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
     });
     for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rpa${c === "p" ? "P" : "B"})"/>`;
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rpa${c.startsWith("p") ? "P" : "B"})"/>`;
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
     g += agent("nResearch", 120, 140, 250, "Deep Research") + agent("nCopilot", 1300, 140, 236, "Copilot");
     g += codeScan() + box("nIssue", 860, 340, "issue") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
     g += dev("nDev", 1300, 540);
+    g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="rpaDay" x="52" y="101">DAY 1</text></g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg rpa-svg");
@@ -1817,7 +1822,7 @@
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     const STEP = 1050,
       START = 900,
-      HOLD = 2600,
+      HOLD = 800,
       T = [];
     let END = START;
     for (const s of SEQ) {
@@ -1836,7 +1841,7 @@
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge.",
+        "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -1848,6 +1853,7 @@
           u = e % CYC;
         if (c !== cyc) {
           cyc = c;
+          $("rpaDay").textContent = `DAY ${c + 1}`;
           svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
           $("rpaScan").style.opacity = 0;
           $("nResearch").classList.add("on");
