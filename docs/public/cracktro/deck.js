@@ -34,10 +34,10 @@
   .slide.leaving.up-out { animation: up-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.active.down-in { animation: down-in .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
-  /* full-screen red wash for "Agentic attacks", "Safety and control", "Supply chain hardening" and "Safe outputs": fades over the previous slide, then sits behind the stage */
+  /* full-screen red wash for the security band (THEME.security.red): fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
     background: radial-gradient(ellipse 80% 75% at 50% 55%, #6e0b12 0%, #3a0408 55%, #140103 100%); }
-  /* blueprint grid on its own layer above the wash, so it can rotate to 45° as the red fades in */
+  /* blueprint grid on its own layer above the wash, so it stays visible (and turns with the band theme) over the red */
   canvas.gridc { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
   .wash.cover + canvas.gridc { z-index: 4; }
   .wash.on { opacity: 1; }
@@ -2054,8 +2054,6 @@
     resetIndex();
     slides.push({
       group: "intro",
-      sound: "title",
-      palette: ["#0fbf3e", "#08872b", "#5fed83", "#0a241b"],
       notes: "GitHub Agentic Workflows. Coding agents running inside GitHub Actions, written in Markdown, with guardrails.",
       el: h("section", { class: "slide" }, h("div", { class: "title-wrap" }, h("h1", { class: "title" }, letters("GitHub"), letters("Agentic", "l-grad"), letters("Workflows", "l-out")))),
     });
@@ -2239,7 +2237,6 @@
     const gaLen = p => GA_RUNS[p][5].reduce((a, j) => a + j[3], 0) + GA_HOLD[p];
     slides.push({
       group: "platform",
-      sound: "actions",
       enter() {
         gaT0 = performance.now();
         gaM = -1;
@@ -2273,7 +2270,6 @@
         gaLayout(m);
         gaRender(p, e);
       },
-      palette: ["#238636", "#1f6feb", "#8957e5", "#2ea043"],
       notes:
         "GitHub Agentic Workflows runs on the GitHub Actions you already use. The same repository runs a familiar build, test and deploy workflow; then an agent step is inserted into that pipeline, giving activation, agent, threat detection, and safe outputs. Same runner, same logs, same checks. This diagram is a synthetic, illustrative example, not a real repository or workflow run. See the public documentation for setup and availability.",
       el: h(
@@ -2393,8 +2389,6 @@
     };
     slides.push({
       group: "platform",
-      sound: "anatomy",
-      palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
       notes:
         "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
       enter() {
@@ -2532,8 +2526,6 @@
     };
     slides.push({
       group: "platform",
-      sound: "typing",
-      palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
         "Turn Intent to Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning a pull request removing duplicated code shows up for review. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
       enter() {
@@ -2690,8 +2682,6 @@
       done = false;
     slides.push({
       group: "platform",
-      sound: "value",
-      palette: ["#238636", "#1f6feb", "#d29922", "#8957e5"],
       notes:
         "Turn Automation into Value: an illustrative dashboard with synthetic data for a sample repository, twelve weeks after switching on agentic workflows. The backlog burns down instead of following its growing trend, test coverage climbs while escaped bugs fall, and PR lead time drops as deploys per week rise. These numbers are not measured on a real repository; they show the kind of outcomes worth tracking. The AW factory band later shows gh-aw's own measured history.",
       enter() {
@@ -2923,9 +2913,6 @@
     };
     const self = {
       group: "security",
-      sound: "attacks",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Agentic attacks, five simulated attacks mapped to the OWASP Top 10 for LLM applications (LLM01 prompt injection, LLM02 sensitive information disclosure, LLM05 improper output handling, LLM06 excessive agency) and the OWASP Top 10 for agentic applications (ASI01 goal hijack, ASI02 tool misuse, ASI05 unexpected code execution, ASI07 insecure inter-agent communication). Step through them with the arrow keys. " +
         "One, inject malware: integrity filtering hides content from authors below min-integrity; if a trusted user quotes it, the agent still cannot push because its token is read-only, and a pull request that adds an install hook is caught by threat detection. " +
@@ -3046,15 +3033,11 @@
       last = 0;
     slides.push({
       group: "security",
-      sound: "omen",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Safety and control: the security architecture is a big selling point of gh-aw. Inputs are filtered and sanitized, the agent runs in a sandbox (container or NVX microVM, with enclaves scoping sub-agents by repo sensitivity and integrity filtering in the MCP gateway) with a read-only token, model calls routed through an API proxy so no keys live inside, behind an egress firewall and MCP gateway, and it can only request safe outputs, which are scanned by threat detection and applied by a separate job that holds the write permissions.",
       enter() {
         pk = [];
         lastSpawn = last = 0;
-        sfx.omen();
       },
       tick(t) {
         const dt = last ? Math.min(50, t - last) : 16;
@@ -3261,9 +3244,6 @@
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     slides.push({
       group: "security",
-      sound: "vault",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
       enter() {
@@ -3560,9 +3540,6 @@
     };
     slides.push({
       group: "security",
-      sound: "forge",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Supply chain hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and secret and content scans (secrets kept away from logs and telemetry, markdown scanned for hidden instructions, conditional imports checked). All of these are static checks on the authored file; the runtime sandbox and egress firewall were on the previous slide. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
       enter() {
@@ -3745,9 +3722,6 @@
     };
     slides.push({
       group: "security",
-      sound: "safe",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Safe outputs, an illustrative run with a synthetic issue. The agent runs boxed in: its token is read-only, so when it tries to create an issue directly the call is refused. Instead it calls the create-issue safe output, which only records a proposal. A separate threat detection job, an isolated agent with no tools, reads the proposed issue and looks for prompt injection, leaked secrets, malicious links and harmful code. Only when the verdict is clean does a third job, the only one holding issues: write, apply the declared output and actually create the issue. The agent never holds write credentials, and every write is limited to the outputs declared in the front matter.",
       enter() {
@@ -3949,8 +3923,6 @@
     };
     slides.push({
       group: "security",
-      sound: "escape",
-      palette: ["#8e1519", "#1f6feb", "#3d0a0d", "#238636"],
       notes:
         "The Great Escapi is gh-aw's own red-team workflow: every day an agent runs inside the agent workflow firewall (AWF) with instructions to escape it, reads repo memory of every technique already tried so it never repeats one, tries something new, and writes the result back. The squares are measured from that memory: 426 recorded techniques between 15 February and 22 September 2026, in order. The first 400 were all blocked: DNS tricks, IPv6, request smuggling, encoding games, container and kernel escapes, proxy bypasses. Attempt 401, on 14 September, escaped. The agent noticed that a newly allowed package registry sits on a shared CDN, opened a proxy tunnel to it, which the allowlist accepts, and then asked for a different site in the TLS handshake's SNI. The proxy only checked the CONNECT target, so the CDN served the forbidden site. Over the next eight days the agent logged 13 escapes, all variants of that one trick, through more allowed hosts. Its report on 22 September went to the firewall team, and the same day the firewall shipped a fix: the proxy now peeks at the TLS ClientHello without decrypting it and terminates the connection unless the SNI is on the allowlist. The attack diagram is illustrative and simplified; the counts and dates are measured from the workflow's memory and the firewall pull request.",
       enter() {
@@ -4104,8 +4076,6 @@
     let last = 0;
     slides.push({
       group: "mindset",
-      sound: "factory",
-      palette: ["#bf3989", "#238636", "#9e6a03", "#8957e5"],
       notes:
         "The factory mindset. Stop manually translating intent into code. Engineer processes that create trusted features. Use agentic workflows for recurring maintenance, documentation, testing and review. Design the factory; the factory builds the software.",
       enter() {
@@ -4544,8 +4514,6 @@
     };
     slides.push({
       group: "process",
-      sound: "loop",
-      palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
         "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself over a 30-day window, 15 October to 14 November 2026 (snapshot taken 14 November 2026): auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed 935 runs on 906 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals are a snapshot of the triggers in gh-aw's own workflow files on 14 November 2026, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
       enter() {
@@ -4686,8 +4654,6 @@
       };
       slides.push({
         group: "process",
-        sound: "reviews",
-        palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
           "Pull Request Review squared. The flow is illustrative and its open-thread counter is synthetic; the bottom strip is measured only on gh-aw pull requests merged in the 30 days from 15 October to 13 November 2026, snapshot taken 14 November, not on all pull requests. Of the 1,263 pull requests merged in that window, 938 were checked by the Matt Pocock Skills Reviewer, PR Code Quality Reviewer or Test Quality Sentinel workflows, which submitted 1,337 reviews and opened 1,612 inline review threads. PR Sous Chef posted 517 @copilot nudges on 336 pull requests, and Copilot pushed 965 fix commits after a nudge on 305 of them. 660 of the 682 reviewed pull requests merged after a single review round per reviewer, with a median of 1.8 hours from ready for review to merge. Reviewers are identified by their workflow footers and nudges by the Sous Chef workflow marker. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
         enter() {
@@ -4867,8 +4833,6 @@
       };
       slides.push({
         group: "process",
-        sound: "contrib",
-        palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
         notes:
           "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative, with simulated data; Ducky stands in for an external contributor and Mona for the maintainers. A workflow run fails on an on-prem, self-hosted setup. Ducky points our debug.md agent at the failing run, and the agent investigates with the live logs, audit data and configuration right there on prem. That evidence never leaves the enclave and we never need to see it: what comes out is an anonymized issue describing the bug and the intent, with no private names, payloads or secrets. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Users contribute intent, not their data; Copilot turns it into code and maintainers review.",
         enter() {
@@ -4931,8 +4895,6 @@
     resetIndex();
     slides.push({
       group: "process",
-      sound: "assist",
-      palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
       enter() {
@@ -5117,8 +5079,6 @@
     };
     slides.push({
       group: "process",
-      sound: "research",
-      palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
         "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Duplicate Code Detector, Daily Test Improver and Daily Perf Improver. The flow is illustrative, with synthetic files; the panel in the middle is measured on gh-aw itself. From 7 October 2025 to 26 October 2026 the Duplicate Code Detector filed 211 issues titled duplicate-code, 144 of them assigned to Copilot; 115 were closed by merged pull requests, 112 of them opened by Copilot, with a median of 3.8 hours from issue to merge. The data window, 7 October 2025 to 26 October 2026, 385 days, is printed on the panel. The bars show issues filed and pull requests merged per month; empty months are months it filed nothing. Since 27 October 2026 the detector opens its pull requests directly. Snapshot taken 14 November 2026 from GitHub issue search and each issue's closing event. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
@@ -5245,8 +5205,6 @@
     const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
     slides.push({
       group: "process",
-      sound: "unslop",
-      palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
       notes:
         "Merge fast, unslop daily. The two lanes are an illustrative, synthetic timeline; the panel at the top right is measured on gh-aw's merged pull requests over a 30-day window, 15 October to 13 November 2026, and the counts along the bottom are all-time merged unslopper pull requests from 26 September 2025 to 12 November 2026; both are a snapshot of 14 November 2026. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. In the illustration the feature ships a slice at a time, so its percentage climbs with every merge and it is complete while the polished lane is still in review. The measured panel shows what that looks like: in the thirty days from 15 October to 13 November 2026, 1,263 pull requests merged, about 42 a day, with a median of 166 lines changed and a median of one hour fifty-four minutes from opening to merge; the bars are merged pull requests per day. The slop that gets through is eaten by background unsloppers, daily workflows that open their own small clean-up pull requests. The purple dots mark days on which an unslopper pull request merged: 25 of those 30 days. Along the bottom are their all-time merged clean-up pull requests, counted by title prefix: jsweep 144, dead code remover 117, code simplifier 89, tidy 66, daily file diet 7 and duplicate code detector 4, which mostly files issues instead. Together that is 427 merged clean-up pull requests, adding 34,691 lines and removing 44,700, on 261 different days between 26 September 2025 and 12 November 2026. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
       enter() {
@@ -5595,8 +5553,6 @@
     let prevT = 0;
     slides.push({
       group: "process",
-      sound: "telemetry",
-      palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
         "Research, assign, observe: an agentic feedback loop. Measured: the green panel and caption are gh-aw's own daily-cli-performance data, 13 Mar to 25 Oct 2026. The workflow benchmarks the compiler every day, keeps its history in repo memory (101 daily snapshots, 5 Apr to 13 Nov) and files '[performance] Regression in ...' issues labelled cookie: 116 of them. 101 were assigned to Copilot, 72 picked by Issue Monster, and 62 were closed by merged Copilot fixes, with a median of 6.8 hours from issue to merge (55 within a day); the next daily run re-benchmarks and observes the result. The five rows are real regressions with their slowdown and hours to fix. Illustrative: the production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
       enter() {
@@ -5840,8 +5796,6 @@
     };
     slides.push({
       group: "process",
-      sound: "grow",
-      palette: ["#8957e5", "#f0883e", "#238636", "#1f6feb"],
       notes:
         "Query, ask, grow: how gh-aw's OpenTelemetry support was built. The loop at the top is illustrative; the timeline at the bottom is measured from gh-aw's own issues. OTLP export landed on 4 April 2026. From 5 April a daily OTel Instrumentation Advisor, prompted as a senior DevOps engineer, read live gh-aw spans through the Sentry MCP server, and from 4 May a second advisor did the same through the Grafana MCP server. Each run asked one question: do these spans hold enough data to answer operational questions, such as why did this run fail, which release, which environment, how slow is the agent, what did it cost? It filed the single most impactful gap as one issue for Copilot, so the feature grew one small, reviewable increment at a time, the feature grower pattern. Measured: 89 advisor issues between 5 April and 9 June 2026, 17 from the Grafana advisor; 62 were closed by merged pull requests and 25 as not planned. When two weeks of findings stopped landing, the advisors were retired; a smoke workflow still checks that both backends accept spans and can be queried.",
       enter() {
@@ -6054,8 +6008,6 @@
     const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
       group: "process",
-      sound: "mine",
-      palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
         "Mine, refine, apply: harvesting recurring corrections into Go linters. The loop is illustrative of three of gh-aw's own workflows; the feed and numbers are mined from gh-aw's history, 15 May to 11 November 2026. Mine: every day Linter Miner reads recent issues, discussions and the Go code, picks one pattern no existing analyzer catches, and opens a draft pull request with a go/analysis analyzer and its tests under pkg/linters. It opened 73 such pull requests; 65 merged and 8 were closed. Refine: Copilot code review and a maintainer leave review threads, and Copilot pushes fixes; 58 of the 65 needed follow-up commits, 376 reviews in all, and the median analyzer merged about two hours after it was opened. Apply: once merged the analyzer runs in make golint-custom. Every day LintMonster runs it, groups the findings by root cause and keeps one tracking issue per category, 235 so far, some counting thousands of findings, such as 3,561 unchecked errors on 4 October. Maintainers assign them to Copilot, and 92 merged Copilot pull requests closed them, changing 54,128 lines. For example, the sortslice analyzer merged on 8 June and the next day a Copilot pull request moved every sort.Slice call to slices.SortFunc. Human corrections become deterministic checks.",
       enter() {
@@ -6404,8 +6356,6 @@
     };
     slides.push({
       group: "process",
-      sound: "explore",
-      palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
         "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces. The strip at the bottom is measured, not illustrative, over 16 April to 14 November 2026 (213 days, snapshot 14 November 2026); each panel is labelled with its own window. It comes from Sergo's repo memory in gh-aw (the memory/sergo branch: its run statistics and the history of its strategy cache) and from gh-aw issues and pull requests labelled sergo, 16 April to 14 November 2026. Over 128 cached runs, 6 May to 14 November, Sergo logged 667 findings, and findings per run fell from 8.3 in May to 3.3 in October: the easy patterns run out, which is the exhaustion the grid shows. No runs were cached in August. It filed 287 issues, 16 April to 29 October; 164 merged pull requests closed 172 of them, 158 of those authored by Copilot. Since late October Sergo opens its own pull requests: 17 merged. Thirteen of them, 31 October to 12 November, came from one cached strategy, paren_unwrap_gap, linters that missed calls wrapped in parentheses: each day's cache entry reads cached: paren_unwrap_gap plus new: some untried corner, reuse and explore in the same run. The three cache lines are real entries, shortened.",
       enter() {
@@ -6560,8 +6510,6 @@
     };
     slides.push({
       group: "process",
-      sound: "dedupe",
-      palette: ["#8957e5", "#d29922", "#1f6feb", "#238636"],
       notes:
         "Semantic clustering: instead of matching text, an agent reads what each function is for and groups functions by intent. This is a real report from gh-aw's Semantic Function Refactoring workflow, issue 30711 of 7 May 2026. It catalogued 762 non-test Go files and 3,727 functions in pkg/ using naming patterns, Serena LSP analysis and code review, and found 0 true duplicates. Clustering by intent still exposed misplaced code: env.go held only YAML-writing helpers, and five public validation functions sat in parser, checker and helper files. The Copilot coding agent merged PR 30770 the same day (+149 −142, 8 files), renaming env.go to yaml_env_helpers.go and moving the validators into *_validation.go files. Function names, signatures, files and counts are real; the scan, beams and chip animation are illustrative. The workflow now reviews a small rotating slice of functions each day rather than the whole package tree.",
       enter() {
@@ -6750,8 +6698,6 @@
     };
     slides.push({
       group: "process",
-      sound: "formal",
-      palette: ["#1f6feb", "#8957e5", "#238636", "#bf3989"],
       notes:
         "Spec, model, test: formal methods as the backbone of spec-driven development, on gh-aw's own work queue. Measured, data window 2 Oct to 14 Nov 2026 (43 days), snapshot taken 14 Nov 2026: the top-right ledger counts the repository's specs/work-queue folder (16 TLA+ modules, 218 TLC configurations, of which 99 are Broken mutants and 55 are witnesses) and the 35 merged pull requests that changed it between 2 Oct and 14 Nov 2026 (file counts are as of the 14 Nov snapshot). The Daily Work Queue Formal Verification workflow re-runs the two expensive configurations every day; on its 11 Nov run FairDAGGitHub exhausted 1,055,182 distinct states at depth 20 in 16 min 33 s with Safety holding, while QueueOrdering was still open after 4 h 40 m with 178.9 million distinct states at depth 20, so it is reported as not established, not as a pass. The BrokenCAS mutant must fail TerminalPersistence (735 states) and the WeakOrderingWitness must reach an out-of-order Claim (756 states), from the 7 Oct 2026 verification record; that witness is why the spec says oldest-first is best effort, not strict FIFO. Shared fixtures replay against the real Go and JavaScript engines. Illustrative: the requirement wording, the abridged TLA+ excerpt, the small state graph and its animation are simplified; the invariant, mutant and witness names are real. Bounded checks are strong evidence, not a proof.",
       enter() {
@@ -6998,8 +6944,6 @@
     };
     slides.push({
       group: "process",
-      sound: "gofan",
-      palette: ["#238636", "#1f6feb", "#8957e5", "#3fb950"],
       notes:
         "Go Fan: learning the libraries you depend on and keeping up with their releases. The loop is illustrative of what the Go Fan workflow does. Every weekday it reads go.mod, picks the next direct dependency, most recently updated upstream first and skipping the ones it remembers reviewing in cache memory, then studies the module's README, release notes and changelog and compares them with how our code actually uses it: new APIs we ignore, deprecated calls we still make, defaults that changed. It files one review issue; a maintainer assigns the good ones to Copilot, which opens a pull request that a maintainer reviews and merges. Dependabot bumps the version; Go Fan teaches you what changed and how to use it. The numbers and pull request titles are mined from gh-aw's own history, February to November 2026: 121 daily review issues covering 28 modules, most often the MCP Go SDK (22) and x/tools (15); 43 merged pull requests closed those reviews, all authored by Copilot, changing 16,372 lines. Titles are shortened. Before February the reviews were posted as discussions and are not counted.",
       enter() {
@@ -7263,8 +7207,6 @@
     };
     slides.push({
       group: "process",
-      sound: "spec",
-      palette: ["#8957e5", "#238636", "#1f6feb", "#d29922"],
       notes:
         "Spec-driven testing, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt in the flow is an illustrative, simplified view of gh-aw's ctxutil package. The strip below is measured on gh-aw's public history over the whole life of these workflows, 30 March to 14 November 2026 (229 days, snapshot 14 November 2026): 83 merged spec-extractor pull requests updating package README specs; 69 merged spec-enforcer pull requests adding 12,731 lines of spec tests; 68 spec-librarian audit issues, which led to 38 merged Copilot fix pull requests; 22 merged pull requests from the weekly safe outputs spec review; and TestSpec functions in pkg on main growing from 0 at the start of April to 415 across 48 spec test files. The real ctxutil helper followed this path too: added on 3 August, spec tests on 14 August after a librarian audit, enforced on 6 October. Counts come from pull requests and issues matched by each workflow's title prefix, and from git history on main. pr-specification-reviewer and the W3C specification writer agent also take part.",
       enter() {
@@ -7507,8 +7449,6 @@
     };
     slides.push({
       group: "process",
-      sound: "docs",
-      palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
       notes:
         "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, from the first one on 10 October 2025 to 14 November 2026 (400 days): 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026 (246 days): 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
       enter() {
@@ -7678,8 +7618,6 @@
     };
     slides.push({
       group: "process",
-      sound: "dictate",
-      palette: ["#1f6feb", "#8957e5", "#3fb950", "#79c0ff"],
       notes:
         "Speak, map, grep: talking to agents instead of typing. The run is illustrative; the phrases and corrections come from gh-aw's real DICTATION.md, while the grep counts and the renamed functions are synthetic. When you dictate a prompt, speech-to-text hears words, not identifiers: you say cache-memory and it writes cash memory, you say Dependabot and it writes depend a bot. Agents search the codebase with grep, which matches exact tokens, so cash memory finds nothing. DICTATION.md is a prompt you paste into your voice dictation app: a project glossary plus a list of spoken forms and the exact identifiers they map to, hyphens, dots and casing included. The app's model rewrites the transcript, the agent receives cache-memory, and grep lands on every definition and call site. Two agentic workflows keep it true. A daily namer agent reviews one package at a time and proposes renames so functions say what they do, procSO becomes parseSafeOutputs, which is also how you would say it out loud; Copilot implements the rename. A weekly dictation prompt agent re-reads the docs and code, extracts the vocabulary and opens a pull request that adds the new terms to DICTATION.md; the maintainer, the same person who dictates, reviews and merges it, so the glossary only holds words they actually say. Names you can say map to names you can grep.",
       enter() {
@@ -7885,8 +7823,6 @@
     );
     slides.push({
       group: "process",
-      sound: "cihealth",
-      palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
       notes:
         "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three public agentic workflows, ci-failure-scan, ci-failure-fix and ci-failure-scan-feedback. The panel at the top right is measured from the public .NET runtime repository over a 193-day window, 5 May to 14 November 2026 (the snapshot date); every count is cumulative over that window: since 5 May the scanner filed 305 issues, 280 of them labelled Known Build Error, and 270 are closed, with a median of four days open; per month that is 65, 56, 36, 54, 71, 4 and 19 so far in November. Since 10 June the fixer opened 22 pull requests, 19 of them help-wanted ones that ask the owners for help, and 5 were merged. The feedback loop produced 12 merged prompt-edit pull requests, 7 of them by the Copilot coding agent, and the three workflows ran 882 times: 429 scans, 292 fix passes and 161 feedback ticks. The pipelines, failures and rubric results in the animated loop are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
       enter() {
@@ -8028,8 +7964,6 @@
     }
     slides.push({
       group: "process",
-      sound: "pm",
-      palette: ["#d29922", "#8957e5", "#2da44e", "#1f6feb"],
       notes:
         "For PMs. Agentic workflows are not only for code. These two processes come from the public, MIT-licensed agentics-beyond-code repository (chrizbo/agentics-beyond-code), a collection of gh-aw workflows for product managers, DRIs and leaders; the workflow names, inputs, outputs and ideas are taken from it. The issue and report contents are synthetic and illustrative. Click a process, or press right, to switch. Each one has the same shape: a habit the team already has, an agent, an artifact left in the repo, and a human who decides. One, feature intake: someone reacts with an inbox emoji on a Slack message; the intake triage agent turns it into an issue scored with RICE and Kano against the strategy doc, and the PM accepts it, asks for more or parks it. The repo's idea: your habits are already triggers. Two, launch readiness: every Monday the agent reads the launch-ready policy, itself a Markdown file, checks every launch in flight and reports blockers, risk and sign-offs; the DRI chases the one missing sign-off. The idea: process as code. The repo has more, a decision log, an adversarial PM, a Friday leadership post and a process analyzer that opens a pull request when the team drifts from how-we-work.md.",
       enter(dir) {
@@ -8366,8 +8300,6 @@
     };
     slides.push({
       group: "cost",
-      sound: "coins",
-      palette: ["#9e6a03", "#238636", "#1f6feb", "#8957e5"],
       notes:
         "Cost management: guard, measure, optimize. Start from a daily PR summary. 1) Scheduling: does it really need to run daily? Weekly cuts runs 7x. 2) Deterministic compute: fetch the PRs with a plain gh step instead of letting the agent explore with tools. 3) Guard: max-ai-credits per run and max-daily-ai-credits cap spend. 4) Sub-agents: fan per-PR summaries out to a pr-summary sub-agent on a smaller model. 5) Model routing: use the documented model: router modes to balance cost and quality for eligible main-agent runs. Numbers are illustrative, not internal usage or billing data: roughly 2,800 to 110 AIC a week. Keys: → next optimization.",
       enter() {
@@ -8786,8 +8718,6 @@
     };
     slides.push({
       group: "cost",
-      sound: "router",
-      palette: ["#8957e5", "#238636", "#1f6feb", "#6e40c9"],
       notes:
         "Model routing. Every workflow run pays for a model, and the usual habit is to pin one strong model for every run. With one line, model: router, the router reads each run's task before the agent starts, labels the kind of work, its scope and its difficulty, weighs what a mistake would cost (low, medium or high stakes, which gh-aw calls economy, balanced and robust), then picks the cheapest model and reasoning effort that is good enough, using benchmark results that ship with the AWF firewall. It runs inside the firewall, respects the workflow's model policy, and gh aw audit shows what it picked and why. The tasks, labels and picks in the animation are illustrative. The results are measured on gh-aw's own workflows: across 127 routed workflows and 3,097 routed runs through 12 Nov 2026, each compared with its own two weeks before routing, cost per run fell 75% (65 to 16 AI credits) while run success (87.6% to 88.5%) and judged quality (83.9 to 83.6 out of 100) held steady. Most routers pick a model for one prompt in a chat, with a person watching. This one is built for workflows that repeat: the same job runs on every schedule, issue and pull request with no one watching, so the router weighs the stakes of each run itself, and the saving repeats on every run. The week of runs is illustrative. Keys: → next step.",
       enter() {
@@ -9051,8 +8981,6 @@
     };
     slides.push({
       group: "cost",
-      sound: "mcp",
-      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
       notes:
         "Agents that debug agents: every run, number and finding on this slide is illustrative and synthetic. gh aw ships an MCP server, agentic-workflows (gh aw mcp-server), that exposes the CLI as tools: status, health, logs, audit, audit-diff, compile, checks, fix. Any agent that speaks MCP can call it, whether Copilot, Claude or Codex, in an IDE, a terminal or inside another agentic workflow. logs and audit are read-only: they download a run's logs, firewall log and token usage and normalize every engine's trace into one unified session, aw_session.jsonl, with each turn, tool call, token count and denial in one schema. So an agent can debug one failed run with audit, audit twenty runs across engines with logs, and optimize by comparing a run before and after a change with audit-diff. The next slide puts that on a schedule.",
       enter() {
@@ -9277,8 +9205,6 @@
     };
     slides.push({
       group: "engineering",
-      sound: "engine",
-      palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
       notes:
         "Any agent, any provider. The same Markdown workflow can target different coding agents and model providers by changing two frontmatter lines: engine id copilot, claude, codex or pi, and model-provider github, anthropic or openai. Claude can run on Anthropic or on GitHub Copilot inference; Codex on OpenAI or GitHub. The agent pulls tokens from whichever provider you pick, but the compiler keeps the same guardrails around it: the Actions runner and lock file, the network firewall, and the sandboxed container, which holds zero secrets and only read-only tokens. Token counts are simulated and the workflow is a synthetic example; see the engines and model routing reference for setup and availability.",
       enter() {
@@ -9427,8 +9353,6 @@
     const setNotes = n => (ledgerD.textContent = `${n} notes · queried read-only in SQLite`);
     slides.push({
       group: "engineering",
-      sound: "memory",
-      palette: ["#8957e5", "#1f6feb", "#2da44e", "#0a3069"],
       notes:
         "Agent memory, an illustrative run with synthetic files, notes and counts. Agents start every run with no memory, so gh-aw gives them four kinds, all plain files or queries the agent already knows how to use. Before the agent starts, each configured memory is restored read-only into the sandbox: cache-memory from the GitHub Actions cache, fast scratch state with seven-day retention; repo-memory cloned from a memory/ git branch with no expiry; comment-memory extracted from a managed issue or pull request comment into markdown files, so state lives right next to the work; and ledgers replayed from append-only JSONL into a disposable SQLite view. Cache-memory is split by the integrity of the run that wrote it: this approved run recalls what merged and approved runs wrote, while files written by contributor or stranger-triggered runs stay invisible, so a poisoned todo can never steer it. The agent then recalls: it reads what it already triaged, queries the ledger for the highest-voted notes (evidence-backed hints with citations that later runs vote up or down) and picks up open questions from the last run's comment. It edits plain files and proposes ledger entries through safe outputs; it never writes back itself. After the run, trusted jobs persist: the cache is saved only after threat detection, repo-memory is pushed by a separate job, the comment is upserted with its run history, and ledger mutations are validated and appended as a new immutable shard. Restored memory is untrusted data, never instructions. Each cycle the run number and the memory grow.",
       enter() {
@@ -9603,8 +9527,6 @@
     };
     slides.push({
       group: "engineering",
-      sound: "ephemeral",
-      palette: ["#8957e5", "#1f6feb", "#2da44e", "#9a6700"],
       notes:
         "Ephemerals, an illustrative three weeks with synthetic issue numbers, titles and counts. Human attention is the scarcest resource in a repository, so agents must not waste it. Agents are tireless writers: a daily report, the same flaky-test issue filed again, a status discussion, a comment on every push, a draft pull request nobody picked up. Left alone, that output piles up, buries human work and steals attention. gh-aw lets each safe output carry its own end. close-older-issues: a new weekly report closes the previous one as not planned, with a link forward, so only the latest is open. deduplicate-by-title drops a new issue whose title matches an open or recently closed one, exactly or within an edit distance, before it is ever created, and tells the agent it was a duplicate. expires on create-discussion, create-issue and create-pull-request writes a visible checked expiry marker into the body; the compiler then generates agentics-maintenance.yml, which runs as often as the shortest expiry needs and closes what is due, discussions as outdated. Uncheck the box and the item stays. hide-older-comments minimizes the previous comment from the same workflow before posting a new one; hidden, not deleted. And stop-after on the trigger ends a schedule at a deadline, so an experiment cannot run, and spend, forever. The same maintenance workflow also prunes old cache-memory entries. Over these twenty-one days the agents tried to write nineteen items, but only four are still asking for attention. For low-stakes reports, prefer discussions, or a side repository, to keep the main repo quiet.",
       enter() {
@@ -9743,8 +9665,6 @@
     };
     slides.push({
       group: "engineering",
-      sound: "index",
-      palette: ["#2da44e", "#1f6feb", "#8957e5", "#0a3069"],
       notes:
         "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs.",
       enter() {
@@ -9996,8 +9916,6 @@
 
     slides.push({
       group: "engineering",
-      sound: "lab",
-      palette: ["#1f6feb", "#8957e5", "#238636", "#0d419d"],
       notes:
         "Experiments, graders and evals. How do you know a change to a workflow makes the agent better, not just different? Declare an experiment in the frontmatter: here the prompt style, detailed (the control) against concise (the candidate). On every run the activation job assigns one variant, least-used first so the two stay balanced, and the prompt reads it as experiments.style. After the run, graders measure it: ten deterministic built-ins such as tool-success-rate, loops and duration are computed from the unified session with no model call, and you can add your own JavaScript graders. Evals then judge it: an LLM answers a yes or no question such as 'is the pull request focused?'. The experiment names one of those as its primary metric (eval:focused) and others as guardrails (grader:tool-success-rate at 0.95 or better). gh aw experiments analyze joins each run's scores to its assigned variant, waits for min_samples per variant, runs the statistical test, checks every guardrail, and decides: extend, promote, reject or inconclusive. It never edits the workflow itself; promotion stays a reviewed change. The workflow, runs, scores and decision in the animation are illustrative and synthetic. Keys: → next slide.",
       enter() {
@@ -10250,8 +10168,6 @@
     };
     slides.push({
       group: "engineering",
-      sound: "audit",
-      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
       notes:
         "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
       enter() {
@@ -10422,9 +10338,6 @@
     };
     slides.push({
       group: "security",
-      sound: "vault",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Need-to-know enclaves. GitLost was a real attack: a public issue prompted an agent with access to a private repository, and the agent's public reply leaked private contents. Enclaves stop private-to-public leaks in cross-repo flows. Here a public issue asks whether version 2 is compatible with an internal integration. The primary agent in the public repo never reads the private repo; it hands the repo, the task and a response schema to a trusted broker, which launches a single-use, isolated enclave agent with read-only access to the private repository. The enclave finds the answer, and also a confidential launch date. If it tries to return free text, the output gate drops it: only schema values leave. Compatibility is compatible, incompatible or unknown, and migrationRequired is true or false, so there are six possible answers, three bits, which together with timing and error bits fit an eight-bit confidential budget. The public comment says compatible, no migration required, and nothing else. Then the enclave is destroyed. The issue, repository, project name and date are synthetic, and the flow is illustrative.",
       enter() {
@@ -10623,8 +10536,6 @@
     };
     slides.push({
       group: "enterprise",
-      sound: "enterprise",
-      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
       notes:
         "Enterprise infrastructure as code. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
       enter() {
@@ -10784,7 +10695,7 @@
       ),
       h("div", { class: "ops-own" }, ...s.own)
     );
-    slides.push({ group: "enterprise", sound: "enterprise", palette: [s.color, "#1f6feb", "#d29922", "#0a1a33"], notes: s.notes, el });
+    slides.push({ group: "enterprise", notes: s.notes, el });
   }
 
   // 11. Central Agentic Ops: a control repo lists its registered campaigns, which dispatch
@@ -11003,8 +10914,6 @@
     };
     slides.push({
       group: "enterprise",
-      sound: "radar",
-      palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
       notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
       enter() {
         repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
@@ -11229,8 +11138,6 @@
       ev = 0;
     slides.push({
       group: "enterprise",
-      sound: "squad",
-      palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
       notes:
         "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project: human-led AI agents with designer, frontend, accessibility and scribe roles. Squad does not replace people; it enhances the engineering process around them. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad steps back and its decisions stay in the repository for the next task. The developer stays in charge throughout, shown here as Mona. The task, repository, squad and file names are synthetic and the animation is illustrative.",
       enter() {
@@ -11466,8 +11373,6 @@
     };
     slides.push({
       group: "enterprise",
-      sound: "connectors",
-      palette: ["#1f6feb", "#238636", "#8957e5", "#1b7c83"],
       notes:
         "Connectors. A connector is an ordinary Markdown file under .github/workflows/connectors whose frontmatter declares one service: a fixed endpoint, separate reader and writer credential secret names, exact resource grants, and every capability the service offers, meaning triggers, read tools and safe-output writes. A workflow imports the declaration and then selects only what it needs: a reader or two under tools, and one write under safe-outputs, prefixed with the connector id. Importing alone grants nothing. At run time only the selection is exposed: the agent sees just the chosen readers inside the sandbox and holds no writer secret; it can only propose the write, which a separate safe-outputs job performs, staged here so it is only previewed. The same shape covers Linear, Jira, Azure DevOps, GitLab and ten more declarations. Connectors are experimental. The workflow is a synthetic example, capability names come from the declarations, and the request flow is illustrative.",
       enter() {
@@ -11606,8 +11511,6 @@
     };
     slides.push({
       group: "finale",
-      sound: "finale",
-      palette: ["#0fbf3e", "#1f6feb", "#8957e5", "#238636"],
       notes:
         "An illustrative pattern: a control repository coordinates small agentic processes across repositories and receives proposed results as issues and pull requests. All repository and run counts are simulated, not production metrics or a product roadmap. Processes, not prompts: engineered, guarded and measured. That's GitHub Agentic Workflows.",
       enter() {
@@ -11950,8 +11853,6 @@
     };
     slides.push({
       group: "data",
-      sound: "history",
-      palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
       notes:
         "Not illustrative: these are measured figures from gh-aw's own public history, from the first commit on 12 August 2025 to general availability at GitHub Universe on 28 October 2026 (v1.0.0 was tagged two days earlier). Commits, release tags and lines of Go and JavaScript (including tests, excluding docs) come from git on main as of the end of 28 October, Pacific time. Pull requests and issues come from GitHub search by creation date; October is a partial month. Bars split pull requests by where they started. Workflow PRs (4,053) are opened by the github-actions bot with a gh-aw workflow marker. Copilot coding agent PRs (17,509) are traced to their source issue through the agent's issue reference, closing links or a closing keyword: 6,599 came from an issue written by an agentic workflow (bot author plus workflow marker), 1,976 from an issue opened under a person's account, 8,853 had no linked issue, and 81 had mixed or other sources. A person's account does not mean no AI: GitHub records no creating app for issues written through the Copilot app or Copilot CLI, so those count as human here. Of the 1,976, only 74 carry a visible machine signal: 48 trace to issues a workflow filed with a personal token (they carry a workflow marker but a user author, so the rules keep them on the human side), 21 to issues whose text says Copilot drafted them, and 5 to issues GitHub records as created by the Copilot coding agent app. Of the Copilot PRs with an attributed source issue, 77 percent started from a workflow-written issue. Merge rates: 74 percent from workflow issues, 82 percent from human issues. Other PRs (2,451) include people, Dependabot, unmarked bot PRs and the mixed cases. Account type and issue provenance are not proof of who started a session, or of AI use.",
       enter() {
@@ -12122,8 +12023,6 @@
       );
     slides.push({
       group: "data",
-      sound: "land",
-      palette: ["#ab7df8", "#db61a2", "#3fb950", "#4493f8"],
       notes:
         "Not illustrative: measured from all 18,137 gh-aw pull requests opened between the first commit and GA at Universe (12 August 2025 to 28 October 2026) that were merged by 13 November 2026, from the GitHub API. Time to merge is mergedAt minus createdAt; bands include the lower bound. Lines changed are GitHub's additions plus deletions for the whole PR, across all files, including regenerated workflow lock files. Origins use the same rules as the history slide: workflow PRs carry a gh-aw workflow marker; Copilot coding agent PRs are traced to their source issue, which counts as workflow-written when a bot opened it with a workflow marker. Median time to merge: 51 minutes overall, 58 minutes from workflow-written issues and 2.2 hours from human-written issues. Median size: 120 lines overall, 102 from workflow-written issues and 257 from human-written issues. Workflow PRs are the smallest, at 34 lines. Human-written means opened under a person's account; issues drafted in the Copilot app or CLI leave no trace and count as human. Account type and issue provenance are not proof of who started a session, or of AI use.",
       enter() {
@@ -12276,8 +12175,6 @@
     ];
     slides.push({
       group: "data",
-      sound: "evolve",
-      palette: ["#3fb950", "#ab7df8", "#db61a2", "#4493f8"],
       notes:
         "Not illustrative: measured from git on gh-aw's main branch, from the first commit on 12 August 2025 to the end of 28 October 2026 (GA at Universe), Pacific time. Commits are first-parent commits on main (squash merges, about one per merged pull request): 3,687 of 18,045 changed at least one Markdown file under .github/workflows, meaning workflows or their shared imports (497 files at GA); compiled lock files are excluded. Lines changed are lines added plus removed in those Markdown files only. Live workflows are top-level workflow Markdown files at each month end: 545 were created and 196 retired, leaving 349; September dips to 4 because 48 early examples were removed. 82 percent of these commits are authored by agent and bot accounts, mostly the Copilot coding agent; people's accounts may still have used AI. Size distribution: median 18 lines, mean 83, 90th percentile 209, 99th percentile 886. It is heavy-tailed: 38 percent change fewer than 10 lines, 71 percent touch one file, and the largest 10 percent of commits carry 61 percent of all lines changed. Statistical tests: the Spearman rank correlation between commit date and size is -0.03, so edit size shows no trend; a Mann-Whitney U test comparing sizes before and after 1 March 2026 (1,530 vs 2,157 commits) gives z = 1.23, p of about 0.22, with both medians at 18 lines and a common-language effect size of 0.51, so no detectable shift. Monthly commit volume is only weakly related to time (Spearman 0.32) while the fleet grew more than fivefold after October 2025, so commits per live workflow per month fell from 4.5 to 0.75: workflows settle after creation and are then tuned with small edits. Edits are concentrated: 527 workflow files were edited, a median of 15 times each, with a Gini coefficient of 0.52; the busiest are the engine smoke tests.",
       enter() {
@@ -12465,8 +12362,6 @@
     };
     slides.push({
       group: "data",
-      sound: "patch",
-      palette: ["#1f6feb", "#8957e5", "#238636", "#9e6a03"],
       notes:
         "Patch to PR: an approximate, illustrative decision diagram of gh-aw's create-pull-request safe output, simplified from its handler code; the six runs are synthetic. The agent only commits locally. Its changes are packaged as a git bundle by default, which keeps commit history, or as a format-patch series with patch-format: am; excluded-files are stripped first, and no changes at all follows if-no-changes (warn, error or ignore). The package travels as an artifact and the detection job scans it. The safe outputs job then checks file policy: allowed-files is an allowlist, protected-files can block, request review, or fall back to a review issue, and max-patch-size caps the size. It names a branch from the agent's suggestion plus a random hex suffix, unless preserve-branch-name is set, with recreate-ref deciding whether an existing branch is replaced. It applies the bundle or runs git am --3way; on a conflict it retries at the original base commit, so the PR shows the conflict, then re-checks the files actually written. With signed-commits on, the default, every commit is replayed through the GraphQL createCommitOnBranch mutation so GitHub marks it Verified; if GraphQL fails it falls back to git push, but merge commits, submodules and symlinks refuse the unsigned fallback. Finally it opens the PR with draft, labels, reviewers and auto-merge; if Actions may not open pull requests, fallback-as-issue files an issue with a compare link instead.",
       enter() {
@@ -12584,13 +12479,42 @@
     }
   }, true);
 
+  // ---------- band themes ----------
+  // One theme per band, applied uniformly to its header and every slide in it (slides set none of these):
+  //   base   background fill (keep it near black so the light slide text stays above 12:1)
+  //   pal    four glow colours drifting over the base
+  //   grid   rgb + minor/major line alpha; ang = grid angle (radians); cell = minor grid step (px at 1920x1080)
+  //   accent header colours (heading gradient runs accent[0] → accent[2]); light, for contrast on the base
+  //   red    the full-screen red wash (security)
+  //   music  synth MUSIC key played on every slide of the band; prog = semitone shift per slide, cycled along the band
+  const THEME = {
+    intro: { base: [13, 17, 23], pal: ["#0a8a2e", "#08602b", "#1f8f4a", "#0a241b"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "title", prog: [0] },
+    // Agentic Workflows: Actions teal, grid tilted 15°.
+    platform: { base: [4, 17, 20], pal: ["#0b4f57", "#08363d", "#116329", "#03191c"], grid: [86, 212, 221, 0.03, 0.075], ang: Math.PI / 12, cell: 32, accent: ["#56d4dd", "#1b7c83", "#b3f0ff", "#7ee787"], music: "platform", prog: [0, 5, 7, 2, -3] },
+    // Security: the red wash, grid turned 45°, a dark drone and alarm.
+    security: { base: [24, 3, 5], pal: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"], grid: [255, 225, 220, 0.03, 0.075], ang: Math.PI / 4, cell: 32, accent: ["#ff7b72", "#da3633", "#ffc1ba", "#ffa198"], red: true, music: "security", prog: [0, -2, 1, -1, 3] },
+    // Factory mindset: ember orange, grid tilted -15°, rhythmic machinery.
+    mindset: { base: [20, 11, 5], pal: ["#9a3412", "#5c2008", "#bd561d", "#2a1204"], grid: [255, 166, 87, 0.03, 0.08], ang: -Math.PI / 12, cell: 32, accent: ["#ffa657", "#bd561d", "#ffdfb6", "#f0883e"], music: "factory", prog: [0] },
+    // Human agent processes: dark blueprint blue, straight grid, a looping sequencer over a heartbeat.
+    process: { base: [3, 10, 24], pal: ["#06285e", "#082048", "#03122c", "#0b3166"], grid: [170, 210, 255, 0.018, 0.045], ang: 0, cell: 32, accent: ["#58a6ff", "#1f6feb", "#a5d6ff", "#cae8ff"], music: "process", prog: [0, -4, 5, -2, 3, -5] },
+    // Cost & context: gray base, gold grid turned 45° the other way (-π/4), coins.
+    cost: { base: [13, 17, 23], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4, cell: 32, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "cost", prog: [0, 2, 4, -3] },
+    // Agentic Engineering: Copilot purple, grid tilted 30°, an engine rev.
+    engineering: { base: [14, 8, 27], pal: ["#6e40c9", "#3c1e70", "#8957e5", "#1f0f3d"], grid: [210, 168, 255, 0.028, 0.07], ang: Math.PI / 6, cell: 32, accent: ["#d2a8ff", "#8957e5", "#eddeff", "#a371f7"], music: "engineering", prog: [0, 3, 5, -2, 7, -4] },
+    // Enterprise: slate steel, wide grid tilted -30°, a broad chord fanning across runners.
+    enterprise: { base: [9, 13, 19], pal: ["#0d419d", "#0a1a33", "#7d4e00", "#1c2128"], grid: [173, 186, 199, 0.03, 0.08], ang: -Math.PI / 6, cell: 48, accent: ["#79c0ff", "#1f6feb", "#e3b341", "#cae8ff"], music: "enterprise", prog: [0, 5, -5, 2, -3] },
+    // AW factory (measured data): plum graph paper, a fine straight grid, a rising arpeggio.
+    data: { base: [19, 7, 17], pal: ["#7d2457", "#3d1a5c", "#0f5323", "#0d2a5c"], grid: [255, 155, 206, 0.03, 0.08], ang: 0, cell: 20, accent: ["#ff9bce", "#db61a2", "#ffd3eb", "#ab7df8"], music: "data", prog: [0, 4, 7, 2] },
+    finale: { base: [13, 17, 23], pal: ["#0a8a2e", "#0d419d", "#5a32a3", "#196c2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "finale", prog: [0] },
+  };
+
   // ---------- bands ----------
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
   // The title and the finale (last) are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
   const BANDS = {
     platform: ["Agentic Workflows", "AI-Powered workflows for GitHub"],
     security: ["Security", "Assume the agent is compromised"],
-    process: ["Human agent processes", "Engineer processes, not code", ["#58a6ff", "#1f6feb", "#a5d6ff", "#cae8ff"]],
+    process: ["Human agent processes", "Engineer processes, not code"],
     cost: ["Cost & context", "Debug, spend less, route smarter"],
     engineering: ["Agentic Engineering", "Remember, expire, search, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
@@ -12626,7 +12550,7 @@
       resetIndex();
       const [title, sub] = BANDS[r.group],
         part = parts.indexOf(r) + 1,
-        c = BANDS[r.group][2] || r.items[0].palette;
+        c = THEME[r.group].accent;
       const map = h(
         "div",
         { class: "bh-map", "aria-hidden": "true" },
@@ -12643,9 +12567,6 @@
       r.header = {
         group: r.group,
         header: true,
-        red: r.items[0].red,
-        sound: "band",
-        palette: c,
         notes: `Part ${part} of ${parts.length}: ${title}. ${sub}. This band covers ${r.items.map(label).join(", ")}.`,
         el: h(
           "section",
@@ -12669,10 +12590,12 @@
     slides.length = 0;
     rows.forEach((r, ri) => {
       r.start = slides.length;
-      for (const s of r.header ? [r.header, ...r.items] : r.items) {
+      (r.header ? [r.header, ...r.items] : r.items).forEach((s, i) => {
         s.band = ri;
+        s.step = i;
+        s.red = !!THEME[s.group].red;
         slides.push(s);
-      }
+      });
     });
   }
 
@@ -12781,7 +12704,8 @@
       master = null,
       out = null,
       dry = null,
-      muted = localStorage.getItem("aw-mute") === "1";
+      muted = localStorage.getItem("aw-mute") === "1",
+      tr = 0; // semitone shift for tone/bell/pad while a band's music is scheduled
     const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
     const ROOTS = [57, 60, 62, 55, 64, 59, 61, 56, 58, 63, 53, 65];
     const hz = m => 440 * 2 ** ((m - 69) / 12);
@@ -12857,7 +12781,7 @@
       [-detune, detune].forEach(dt => {
         const o = ac.createOscillator();
         o.type = type;
-        o.frequency.value = hz(m);
+        o.frequency.value = hz(m + tr);
         o.detune.value = dt;
         o.connect(f);
         o.start(t);
@@ -12903,31 +12827,6 @@
       o.start(t + 0.1);
       o.stop(t + 0.6);
     };
-    let song = -1;
-    const SONG = [
-      { m: [73, 75, 77, 80, 77, 75, 73, 0], b: 49 },
-      { m: [70, 73, 75, 73, 70, 68, 70, 0], b: 46 },
-      { m: [73, 77, 80, 82, 80, 77, 75, 77], b: 54 },
-      { m: [80, 0, 78, 77, 75, 73, 75, 0], b: 51 },
-      { m: [68, 70, 73, 70, 75, 73, 77, 75], b: 49 },
-      { m: [80, 82, 80, 77, 73, 75, 77, 0], b: 46 },
-      { m: [82, 80, 77, 80, 75, 77, 73, 75], b: 54 },
-      { m: [73, 0, 80, 0, 85, 0, 0, 0], b: 56 },
-    ];
-    const hat = t => {
-      const src = ac.createBufferSource(),
-        f = ac.createBiquadFilter(),
-        g = ac.createGain();
-      src.buffer = noise();
-      f.type = "highpass";
-      f.frequency.value = 7000;
-      src.connect(f);
-      f.connect(g);
-      g.connect(out);
-      env(g, t, 0.002, 0.08, 0.05);
-      src.start(t, Math.random() * 0.5);
-      src.stop(t + 0.08);
-    };
     const osc = (type, f0, t, dur, vol, { f1 = f0, dest = out, a = 0.005 } = {}) => {
       const o = ac.createOscillator(),
         g = ac.createGain();
@@ -12946,7 +12845,7 @@
         [2.76, 0.4],
         [5.4, 0.18],
         [8.93, 0.08],
-      ].forEach(([r, v]) => osc("sine", hz(m) * r, t, dur / r ** 0.4, vol * v, { dest }));
+      ].forEach(([r, v]) => osc("sine", hz(m + tr) * r, t, dur / r ** 0.4, vol * v, { dest }));
     const panTo = p => {
       const n = ac.createStereoPanner?.();
       if (!n) return out;
@@ -12980,7 +12879,7 @@
         [-9, 9].forEach(d => {
           const o = ac.createOscillator();
           o.type = type;
-          o.frequency.value = hz(m);
+          o.frequency.value = hz(m + tr);
           o.detune.value = d;
           o.connect(f);
           o.start(t);
@@ -12992,20 +12891,16 @@
         g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.4);
         g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       });
-    const THEMES = {
-      // band header: a rising arpeggio over a soft open-fifth pad, like the camera pulling back to the next row
-      band: t => {
-        pad([48, 55, 62], t + 0.1, 1.8, 0.03, "triangle", 2200);
-        [60, 67, 72, 76, 79].forEach((m, i) => tone(m, t + 0.18 + i * 0.09, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 3200 }));
-        bell(84, t + 0.66, 0.04, 1.4);
-      },
-      // title: wide major swell with a rising shimmer
+    // One music theme per band (THEME[group].music), played on every slide of the band, header included.
+    // tone/bell/pad notes are shifted by the band's per-slide `prog` step so a band varies without changing character.
+    const MUSIC = {
+      // intro: a wide major swell with a rising shimmer
       title: t => {
         pad([48, 55, 64, 71], t + 0.1, 3.2, 0.045);
         [72, 76, 79, 83, 86, 91].forEach((m, i) => bell(m, t + 0.5 + i * 0.11, 0.05, 1.4));
       },
-      // built on Actions: build, test, deploy job ticks, then the agent step slots in with a shimmer and a green-check chime
-      actions: t => {
+      // Agentic Workflows: build, test, deploy job ticks, then the agent step slots in with a shimmer and a green-check chime
+      platform: t => {
         [60, 64, 67].forEach((m, i) => {
           click(t + 0.2 + i * 0.16, 1800, 0.06, 6);
           tone(m, t + 0.2 + i * 0.16, { type: "square", dur: 0.12, vol: 0.05, cutoff: 2400, detune: 3 });
@@ -13016,184 +12911,47 @@
         bell(84, t + 1.05, 0.05, 1.4);
         bell(91, t + 1.17, 0.04, 1.6);
       },
-      // anatomy: a scanning glide down the file, one tick per section (front matter … prompt), settling on a chord
-      anatomy: t => {
-        osc("sine", 1800, t + 0.15, 1.1, 0.012, { f1: 300, a: 0.05 });
-        [84, 81, 79, 76, 74, 72].forEach((m, i) => {
-          click(t + 0.2 + i * 0.17, 2600, 0.04, 8);
-          bell(m, t + 0.2 + i * 0.17, 0.025, 0.6);
+      // security: a low alarm pulse under a dissonant drone, then a vault bolt slides shut
+      security: t => {
+        [0, 0.5, 1].forEach(d => osc("sawtooth", hz(40), t + 0.15 + d, 0.35, 0.05, { f1: hz(34) }));
+        pad([37, 43, 44], t + 0.2, 3.2, 0.03, "sawtooth", 600);
+        [0, 0.18].forEach((d, i) => {
+          click(t + 1.5 + d, 900 - i * 300, 0.12, 5);
+          osc("sine", 90 - i * 20, t + 1.5 + d, 0.25, 0.25, { f1: 40 });
         });
-        pad([48, 55, 62, 64], t + 1.2, 1.8, 0.025, "triangle", 1400);
+        bell(86, t + 1.62, 0.025, 1.4);
       },
-      // safe outputs: the direct write is refused (dull buzz), a proposal slides out, a detection sweep, then the separate job writes it
-      safe: t => {
-        osc("square", 110, t + 0.2, 0.14, 0.04, { f1: 98 });
-        osc("square", 104, t + 0.36, 0.18, 0.035, { f1: 92 });
-        osc("sine", hz(72), t + 0.65, 0.3, 0.03, { f1: hz(79) });
-        osc("sine", 2400, t + 0.95, 0.35, 0.01, { f1: 600 });
-        bell(79, t + 1.35, 0.045, 1.2);
-        bell(84, t + 1.47, 0.04, 1.4);
+      // factory mindset: rhythmic metallic machinery
+      factory: t => {
+        for (let i = 0; i < 8; i++) {
+          const tt = t + 0.2 + i * 0.16;
+          if (i % 2 === 0) osc("sine", 120, tt, 0.18, 0.3, { f1: 45 });
+          click(tt + 0.08, 6000, 0.08, 1);
+          if (i % 4 === 2) [1, 1.48, 2.13].forEach(r => osc("square", 310 * r, tt, 0.12, 0.025));
+        }
       },
-      // patch to PR: the package is zipped (a run of ticks), scanned, applied, then a signed stamp and a bright chord
-      patch: t => {
-        [0, 1, 2, 3, 4].forEach(i => click(t + 0.2 + i * 0.07, 2200 + i * 300, 0.04, 6));
-        osc("sine", 2400, t + 0.6, 0.3, 0.01, { f1: 700 });
-        osc("triangle", 110, t + 1.0, 0.16, 0.05, { f1: 60 });
-        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.05 + i * 0.07, 0.03, 1));
-        pad([60, 67, 72, 76], t + 1.1, 1.6, 0.02, "triangle", 2200);
+      // human agent processes: a looping sequencer motif, human heartbeat underneath
+      process: t => {
+        const s = 0.14;
+        [64, 67, 71, 67, 64, 67, 71, 74].forEach((m, i) => tone(m, t + 0.2 + i * s, { type: "triangle", dur: 0.22, vol: 0.09, cutoff: 2600 }));
+        [0, 0.22, 0.56, 0.78].forEach(d => osc("sine", 70, t + 0.2 + d, 0.18, 0.35, { f1: 40 }));
       },
-      // review squared: "ready for review" fans out to agent reviewers (panned left, right, centre), then a human approves
-      reviews: t => {
-        tone(67, t + 0.2, { type: "triangle", dur: 0.2, vol: 0.06, cutoff: 2000, detune: 3 });
-        [
-          [-0.7, 76],
-          [0.7, 79],
-          [0, 83],
-        ].forEach(([p, m], i) => {
-          const d = panTo(p),
-            tt = t + 0.4 + i * 0.16;
-          bell(m, tt, 0.035, 0.7, d);
-          bell(m + 5, tt + 0.07, 0.025, 0.8, d);
-        });
-        osc("triangle", 110, t + 1.0, 0.18, 0.06, { f1: 55 });
-        click(t + 1.0, 600, 0.05, 4);
-        pad([55, 62, 67, 71], t + 1.0, 2, 0.03, "triangle", 2000);
+      // cost & context: coins dropping into a jar, then a gentle register "ding"
+      cost: t => {
+        for (let i = 0; i < 9; i++) {
+          const d = 0.2 + i * 0.09 + Math.random() * 0.03;
+          bell(84 + SCALE[(9 - i) % 6], t + d, 0.035, 0.5);
+          click(t + d, 5200, 0.05, 6);
+        }
+        bell(91, t + 1.2, 0.06, 1.6);
+        bell(96, t + 1.32, 0.04, 1.4);
       },
-      // merge fast, unslop daily: a slow nit tick on the left, a quick run of merge pops on the right, then a downward gulp as the slop is eaten
-      unslop: t => {
-        [0, 0.3, 0.6].forEach(d => click(t + 0.15 + d, 1400, 0.04, 6));
-        [72, 74, 76, 79, 81, 84].forEach((m, i) => bell(m, t + 0.3 + i * 0.09, 0.03, 0.6));
-        osc("sine", hz(79), t + 1.0, 0.35, 0.04, { f1: hz(55) });
-        pad([53, 60, 64, 69], t + 1.2, 1.8, 0.025, "triangle", 1600);
-      },
-      // repo assist: a scheduled tick-tock, then a calm descending line as the open-issue count falls, resolving home
-      assist: t => {
-        [0, 0.25].forEach((d, i) => click(t + 0.2 + d, i ? 2400 : 3200, 0.05, 10));
-        [79, 76, 74, 72, 67].forEach((m, i) => tone(m, t + 0.7 + i * 0.15, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 2400, detune: 3 }));
-        bell(72, t + 1.45, 0.04, 1.6);
-        pad([48, 55, 64], t + 1.4, 1.8, 0.025, "triangle", 1400);
-      },
-      // issues as intent: a few typed keystrokes (the issue), a hand-off up to Copilot, review chirps, then a bright merge chord
-      contrib: t => {
-        [0, 0.09, 0.2, 0.27, 0.38].forEach((d, i) => click(t + 0.2 + d, 2600 + i * 180, 0.04, 12));
-        [67, 72, 79].forEach((m, i) => tone(m, t + 0.8 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.06, cutoff: 2600, detune: 3 }));
-        [84, 81, 84].forEach((m, i) => osc("sine", hz(m), t + 1.3 + i * 0.1, 0.12, 0.025));
-        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.75 + i * 0.05, 0.04, 1.5));
-        pad([48, 55, 64, 67], t + 1.75, 1.8, 0.025, "triangle", 2000);
-      },
-      // research → assign → refine: two sonar pings (the second finds something), a hand-off, then a refining back-and-forth
-      research: t => {
-        [74, 79].forEach((m, i) => {
-          osc("sine", hz(m), t + 0.2 + i * 0.45, 0.7, 0.05, { a: 0.003 });
-          osc("sine", hz(m) * 2, t + 0.2 + i * 0.45, 0.2, 0.01);
-        });
-        [67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.15, { type: "triangle", dur: 0.18, vol: 0.06, cutoff: 2400, detune: 3 }));
-        [76, 74, 76, 79].forEach((m, i) => tone(m, t + 1.45 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.6 : 0.14, vol: 0.05, cutoff: 3000, detune: 3 }));
-      },
-      // research → assign → observe: a stream of span blips, a dissonant SLO-breach alert, then back under budget
-      telemetry: t => {
-        const P = [0, 2, 4, 7, 9];
-        for (let i = 0; i < 10; i++) osc("sine", hz(84 + P[(i * 3) % 5]), t + 0.2 + i * 0.07, 0.05, 0.015);
-        [78, 72].forEach((m, i) => tone(m, t + 1.0 + i * 0.16, { type: "square", dur: 0.16, vol: 0.04, cutoff: 1800, detune: 12 }));
-        [72, 76, 79].forEach((m, i) => bell(m, t + 1.5 + i * 0.07, 0.035, 1.2));
-      },
-      // query → ask → grow: two backend queries, a questioning interval, then a sprouting arpeggio
-      grow: t => {
-        [79, 74].forEach((m, i) => osc("sine", hz(m), t + 0.2 + i * 0.3, 0.5, 0.04, { a: 0.003 }));
-        [72, 78].forEach((m, i) => tone(m, t + 0.9 + i * 0.18, { type: "triangle", dur: 0.2, vol: 0.05, cutoff: 2200, detune: 4 }));
-        [67, 71, 74, 79, 83].forEach((m, i) => bell(m, t + 1.4 + i * 0.09, 0.03, 1.1));
-      },
-      // mine → refine → apply: pickaxe strikes, a crystal forming (the rule), then stamped across the repo one PR at a time
-      mine: t => {
-        [0, 0.22, 0.44].forEach((d, i) => {
-          click(t + 0.2 + d, 1400 - i * 200, 0.1, 3);
-          osc("triangle", 160, t + 0.2 + d, 0.1, 0.08, { f1: 70 });
-        });
-        [88, 91, 95, 100].forEach((m, i) => bell(m, t + 0.8 + i * 0.05, 0.02, 1.1));
-        [67, 69, 71, 74].forEach((m, i) => {
-          click(t + 1.25 + i * 0.1, 3000, 0.04, 6);
-          tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
-        });
-      },
-      // explore → reuse → lint: scattered sonar pings across the pattern space, a found pattern ringing, then a settling chord
-      explore: t => {
-        [0, 7, 2, 9, 4, 11].forEach((d, i) => osc("sine", hz(72 + d), t + 0.2 + i * 0.11, 0.18, 0.02, { a: 0.003 }));
-        [76, 79, 83, 88].forEach((m, i) => bell(m, t + 1.0 + i * 0.06, 0.03, 1.1));
-        pad([52, 59, 64, 71], t + 1.1, 1.8, 0.025, "triangle", 1800);
-      },
-      // semantic duplicates: scattered blips from different corners of the repo, then they settle into one shared chord
-      dedupe: t => {
-        [74, 81, 77, 86, 79, 72].forEach((m, i) => tone(m, t + 0.2 + i * 0.09, { type: "triangle", dur: 0.1, vol: 0.04, cutoff: 2600, detune: 4 }));
-        [60, 64, 67, 72].forEach(m => tone(m, t + 0.85, { type: "sine", dur: 0.9, vol: 0.04, cutoff: 1800 }));
-        bell(84, t + 1.15, 0.03, 1.2);
-      },
-      // spec → model → test: a rising run of explored states, a counterexample's buzz, then the trace resolving into a test
-      formal: t => {
-        [0, 2, 4, 7, 9, 12, 14, 16].forEach((d, i) => osc("sine", hz(72 + d), t + 0.2 + i * 0.06, 0.06, 0.016));
-        [52, 53].forEach(m => tone(m, t + 0.8, { type: "square", dur: 0.2, vol: 0.04, cutoff: 900, detune: 20 }));
-        [67, 71, 74].forEach((m, i) => tone(m, t + 1.1 + i * 0.11, { type: "triangle", dur: 0.2, vol: 0.055, cutoff: 2600, detune: 3 }));
-        bell(79, t + 1.5, 0.04, 1.3);
-      },
-      // go fan: a cheerful gopher hop, page-flips through the release notes, then a bright "new version" chime
-      gofan: t => {
-        [67, 72, 76].forEach((m, i) => tone(m, t + 0.2 + i * 0.13, { type: "square", dur: 0.1, vol: 0.04, cutoff: 2200, detune: 4 }));
-        [0, 0.1, 0.2, 0.3].forEach((d, i) => click(t + 0.75 + d, 3400 - i * 250, 0.035, 10));
-        [79, 84, 88].forEach((m, i) => bell(m, t + 1.25 + i * 0.08, 0.035, 1.2));
-        pad([52, 59, 64, 71], t + 1.25, 1.8, 0.025, "triangle", 1800);
-      },
-      // speak → map → grep: a vowel-like spoken glide, glossary lookup ticks snapping to the exact word, then a found-it chime
-      dictate: t => {
-        [67, 71, 69].forEach((m, i) => osc("sine", hz(m), t + 0.15 + i * 0.18, 0.2, 0.03, { f1: hz(m + 2), a: 0.03 }));
-        [0, 0.08, 0.16, 0.24].forEach((d, i) => click(t + 0.8 + d, 2400 + i * 300, 0.035, 10));
-        tone(72, t + 1.15, { type: "triangle", dur: 0.14, vol: 0.05, cutoff: 2600, detune: 3 });
-        [79, 84, 88].forEach((m, i) => bell(m, t + 1.4 + i * 0.07, 0.035, 1.2));
-      },
-      // spec-driven: the diff typed in, a page swish as the spec is written, then four rising test passes resolving on a bell
-      spec: t => {
-        for (let i = 0; i < 6; i++) click(t + 0.15 + i * 0.07, 2600 + (i % 2) * 500, 0.04, 5);
-        osc("sine", 420, t + 0.65, 0.3, 0.02, { f1: 1300, a: 0.04 });
-        [72, 76, 79, 84].forEach((m, i) => tone(m, t + 1.0 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.5 : 0.12, vol: 0.05, cutoff: 2800, detune: 3 }));
-        bell(88, t + 1.5, 0.03, 1.2);
-      },
-      // docs that heal: a page typed in, two scissor snips as it is trimmed, then a warm healing chord rising to a bell
-      docs: t => {
-        for (let i = 0; i < 5; i++) click(t + 0.15 + i * 0.08, 2400 + (i % 2) * 600, 0.035, 5);
-        [0, 0.12].forEach(d => click(t + 0.7 + d, 5200, 0.05, 12));
-        pad([60, 64, 67, 72], t + 1.0, 1.4, 0.02, "triangle", 2000);
-        [72, 76, 79].forEach((m, i) => tone(m, t + 1.1 + i * 0.13, { type: "triangle", dur: 0.18, vol: 0.05, cutoff: 2600, detune: 3 }));
-        bell(84, t + 1.55, 0.035, 1.3);
-      },
-      // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
-      cihealth: t => {
-        osc("sawtooth", 200, t + 0.2, 0.45, 0.02, { f1: 1600, a: 0.05 });
-        [52, 53].forEach(m => tone(m, t + 0.7, { type: "square", dur: 0.25, vol: 0.045, cutoff: 900, detune: 20 }));
-        [64, 67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.11, { type: "triangle", dur: 0.22, vol: 0.06, cutoff: 2600, detune: 3 }));
-        bell(76, t + 1.45, 0.04, 1.2);
-        bell(79, t + 1.57, 0.035, 1.4);
-      },
-      // for PMs: a notification blip (the habit), a hand-off up to the agent, a page stamp (the artifact), then a warm nod resolving home
-      pm: t => {
-        [84, 88].forEach((m, i) => osc("sine", hz(m), t + 0.2 + i * 0.09, 0.14, 0.03, { a: 0.003 }));
-        [67, 71, 74].forEach((m, i) => tone(m, t + 0.65 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.055, cutoff: 2600, detune: 3 }));
-        click(t + 1.1, 1800, 0.06, 6);
-        [72, 76, 79].forEach((m, i) => bell(m, t + 1.35 + i * 0.07, 0.035, 1.3));
-        pad([48, 55, 64, 67], t + 1.35, 1.8, 0.025, "triangle", 1800);
-      },
-      // agents that debug agents: three call/response pings (one per MCP tool call), then findings resolving upward
-      mcp: t => {
-        [0, 1, 2].forEach(i => {
-          tone(76 + i * 2, t + 0.2 + i * 0.42, { type: "square", dur: 0.07, vol: 0.035, cutoff: 2200, detune: 6 });
-          bell(83 + i * 2, t + 0.34 + i * 0.42, 0.03, 0.6);
-        });
-        [67, 71, 74, 79].forEach((m, i) => tone(m, t + 1.5 + i * 0.09, { type: "triangle", dur: i === 3 ? 0.5 : 0.12, vol: 0.05, cutoff: 2800, detune: 3 }));
-      },
-      // audit & optimize: artifacts trickling down, a scanner sweep, two warning taps, then the tuned run resolving upward
-      audit: t => {
-        for (let i = 0; i < 6; i++) osc("sine", hz(88 - i * 2), t + 0.2 + i * 0.06, 0.05, 0.015);
-        osc("sawtooth", 300, t + 0.65, 0.4, 0.015, { f1: 1400, a: 0.05 });
-        [70, 70].forEach((m, i) => tone(m, t + 1.1 + i * 0.12, { type: "square", dur: 0.08, vol: 0.035, cutoff: 1400, detune: 8 }));
-        [67, 71, 74, 79].forEach((m, i) => tone(m, t + 1.45 + i * 0.1, { type: "triangle", dur: i === 3 ? 0.5 : 0.14, vol: 0.05, cutoff: 2800, detune: 3 }));
-        bell(83, t + 1.85, 0.035, 1.3);
+      // agentic engineering: an ignition rev climbing into a bright two-note chime
+      engineering: t => {
+        [43, 48, 55, 60].forEach((m, i) => tone(m, t + 0.1 + i * 0.14, { type: "sawtooth", dur: 0.22, vol: 0.07, cutoff: 1200 + i * 700 }));
+        tone(36, t + 0.1, { type: "sine", dur: 0.9, vol: 0.18, cutoff: 500 });
+        bell(84, t + 0.75, 0.06);
+        bell(91, t + 0.9, 0.05, 1.8);
       },
       // enterprise: a solid low root, the same workflow fanning out across runners (left to right), on a broad chord
       enterprise: t => {
@@ -13207,222 +12965,11 @@
         pad([48, 55, 60, 64, 67], t + 0.3, 2.4, 0.025, "triangle", 1800);
         bell(91, t + 0.9, 0.04, 1.6);
       },
-      // prompt: keyboard typing then a compile whir and success chime
-      typing: () => {}, // live keystrokes + compile chime are played by the slide itself
-      // compiler hardening: anvil strikes ringing out, then a low shield hum
-      forge: t => {
-        [0, 0.34, 0.68].forEach((d, i) => {
-          click(t + 0.2 + d, 2400 + i * 400, 0.1, 6);
-          [1, 2.76, 5.4].forEach(r => osc("sine", 523 * r, t + 0.2 + d, 0.6 - i * 0.1, 0.03 / r));
-        });
-        pad([40, 47, 52], t + 1.1, 2.4, 0.03, "triangle", 900);
-      },
-      // factory mindset: rhythmic metallic machinery
-      factory: t => {
-        for (let i = 0; i < 8; i++) {
-          const tt = t + 0.2 + i * 0.16;
-          if (i % 2 === 0) osc("sine", 120, tt, 0.18, 0.3, { f1: 45 });
-          click(tt + 0.08, 6000, 0.08, 1);
-          if (i % 4 === 2) [1, 1.48, 2.13].forEach(r => osc("square", 310 * r, tt, 0.12, 0.025));
-        }
-      },
-      // human agent processes: looping sequencer motif, human heartbeat underneath
-      loop: t => {
-        const s = 0.14;
-        [64, 67, 71, 67, 64, 67, 71, 74].forEach((m, i) => tone(m, t + 0.2 + i * s, { type: "triangle", dur: 0.22, vol: 0.09, cutoff: 2600 }));
-        [0, 0.22, 0.56, 0.78].forEach(d => osc("sine", 70, t + 0.2 + d, 0.18, 0.35, { f1: 40 }));
-      },
-      // push SDLC: four members join one by one (one timbre each), the bundle whooshes into the repo, then the team chord
-      squad: t => {
-        [67, 71, 74, 79].forEach((m, i) => {
-          click(t + 0.5 + i * 0.26, 2200, 0.04, 6);
-          tone(m, t + 0.5 + i * 0.26, { type: ["triangle", "square", "sine", "sawtooth"][i], dur: 0.22, vol: 0.05, cutoff: 2400 });
-        });
-        osc("sine", 300, t + 1.7, 0.8, 0.02, { f1: 1400 });
-        pad([55, 62, 67, 71], t + 2.5, 2.2, 0.025, "triangle", 2200);
-        bell(86, t + 2.6, 0.04, 1.4);
-      },
-      // A soft bed of worker ticks around a gently breathing central hum
-      radar: t => {
-        const D = 7;
-        const eg = ac.createGain(),
-          lp = ac.createBiquadFilter(),
-          lfo = ac.createOscillator(),
-          lg = ac.createGain();
-        lp.type = "lowpass";
-        lp.frequency.value = 1400;
-        eg.gain.setValueAtTime(0.0001, t);
-        eg.gain.exponentialRampToValueAtTime(0.03, t + 1.5);
-        eg.gain.setValueAtTime(0.03, t + D - 2);
-        eg.gain.exponentialRampToValueAtTime(0.0001, t + D);
-        lfo.frequency.value = 0.9;
-        lg.gain.value = 0.012;
-        lfo.connect(lg);
-        lg.connect(eg.gain);
-        lp.connect(eg);
-        eg.connect(out);
-        [
-          [60, -4],
-          [64, 4],
-          [67, 0],
-          [72, 3],
-        ].forEach(([m, dt]) => {
-          const o = ac.createOscillator();
-          o.type = m === 60 ? "triangle" : "sine";
-          o.frequency.value = hz(m);
-          o.detune.value = dt;
-          o.connect(lp);
-          o.start(t);
-          o.stop(t + D + 0.1);
-        });
-        lfo.start(t);
-        lfo.stop(t + D + 0.1);
-        const PENTA = [0, 2, 4, 7, 9];
-        for (let i = 0; i < 70; i++) {
-          const d = 0.4 + Math.random() * (D - 1.6),
-            m = 79 + PENTA[(Math.random() * 5) | 0] + 12 * ((Math.random() * 2) | 0),
-            g = ac.createGain(),
-            pn = ac.createStereoPanner?.(),
-            o = ac.createOscillator();
-          o.type = "sine";
-          o.frequency.setValueAtTime(hz(m) * 1.04, t + d);
-          o.frequency.exponentialRampToValueAtTime(hz(m), t + d + 0.03);
-          o.connect(g);
-          if (pn) {
-            pn.pan.value = Math.random() * 1.6 - 0.8;
-            g.connect(pn);
-            pn.connect(out);
-          } else g.connect(out);
-          env(g, t + d, 0.004, 0.008 + Math.random() * 0.014, 0.09 + Math.random() * 0.08);
-          o.start(t + d);
-          o.stop(t + d + 0.25);
-        }
-      },
-      // turn automation into value: a rising walk up the scale as the charts climb, then a bright two-bell payoff
-      value: t => {
-        [60, 62, 64, 67, 69, 72, 74, 76].forEach((m, i) => tone(m, t + 0.15 + i * 0.12, { type: "triangle", dur: 0.2, vol: 0.045, cutoff: 2600 }));
-        pad([48, 55, 60, 64], t + 0.2, 2.4, 0.022, "triangle", 1800);
-        bell(84, t + 1.15, 0.05, 1.4);
-        bell(91, t + 1.28, 0.04, 1.6);
-      },
-      // cost management: coins dropping into a jar, then a gentle register "ding"
-      coins: t => {
-        for (let i = 0; i < 9; i++) {
-          const d = 0.2 + i * 0.09 + Math.random() * 0.03;
-          bell(84 + SCALE[(9 - i) % 6], t + d, 0.035, 0.5);
-          click(t + d, 5200, 0.05, 6);
-        }
-        bell(91, t + 1.2, 0.06, 1.6);
-        bell(96, t + 1.32, 0.04, 1.4);
-      },
-      // any engine: an ignition rev climbing into a bright two-note chime
-      engine: t => {
-        [43, 48, 55, 60].forEach((m, i) => tone(m, t + 0.1 + i * 0.14, { type: "sawtooth", dur: 0.22, vol: 0.07, cutoff: 1200 + i * 700 }));
-        tone(36, t + 0.1, { type: "sine", dur: 0.9, vol: 0.18, cutoff: 500 });
-        bell(84, t + 0.75, 0.06);
-        bell(91, t + 0.9, 0.05, 1.8);
-      },
-      // connectors: two latch clicks as the service plugs in, then a read note (left) and a write note (right) over a soft chord
-      connectors: t => {
-        [0, 0.12].forEach((d, i) => {
-          click(t + 0.2 + d, 1800 + i * 900, 0.08, 6);
-          osc("sine", 140 - i * 30, t + 0.2 + d, 0.12, 0.12, { f1: 60 });
-        });
-        bell(76, t + 0.6, 0.04, 1.0, panTo(-0.6));
-        bell(83, t + 0.85, 0.04, 1.2, panTo(0.6));
-        pad([52, 59, 64, 68], t + 0.6, 2, 0.022, "triangle", 1800);
-      },
-      // model routing: a filtered-noise riser into a rising A major arpeggio over a soft pad
-      router: t => {
-        const src = ac.createBufferSource(),
-          f = ac.createBiquadFilter(),
-          g = ac.createGain(),
-          s = 60 / 111 / 4;
-        src.buffer = noise();
-        f.type = "bandpass";
-        f.Q.value = 2;
-        f.frequency.setValueAtTime(300, t + 0.3);
-        f.frequency.exponentialRampToValueAtTime(6000, t + 0.9);
-        src.connect(f);
-        f.connect(g);
-        g.connect(out);
-        g.gain.setValueAtTime(0.0001, t + 0.3);
-        g.gain.exponentialRampToValueAtTime(0.08, t + 0.8);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 1);
-        src.start(t + 0.3, Math.random() * 0.2);
-        src.stop(t + 1.05);
-        [57, 61, 64, 69, 73].forEach((m, i) => tone(m, t + 0.9 + i * s, { type: "sawtooth", dur: i === 4 ? 0.9 : 0.16, vol: 0.05, cutoff: 3600, detune: 6 }));
-        bell(81, t + 0.9 + 5 * s, 0.04, 1.4);
-        pad([45, 52, 57, 61], t + 0.9, 2.2, 0.022, "triangle", 1600);
-      },
-      // experiments: control and candidate trade notes (A low, B high), then a resolving bell chord
-      lab: t => {
-        [60, 67, 60, 69, 60, 71].forEach((m, i) => tone(m, t + 0.2 + i * 0.13, { type: i % 2 ? "triangle" : "square", dur: 0.14, vol: 0.05, cutoff: 2400, detune: 4 }));
-        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.05 + i * 0.07, 0.035, 1.3));
-        pad([48, 55, 60, 64], t + 1, 2.2, 0.022, "triangle", 1600);
-      },
-      // agentic attacks: a low alarm pulse under a dissonant drone, then a shield clang
-      attacks: t => {
-        [0, 0.5, 1].forEach(d => osc("sawtooth", hz(40), t + 0.15 + d, 0.35, 0.05, { f1: hz(34) }));
-        pad([37, 43, 44], t + 0.2, 3.2, 0.03, "sawtooth", 600);
-        click(t + 1.6, 1200, 0.1, 6);
-        bell(80, t + 1.62, 0.03, 1.4);
-        bell(86, t + 1.66, 0.02, 1.2);
-      },
-      // the great escapi: muffled knocks on a locked door, a crack of light, then a bolt sliding shut
-      escape: t => {
-        [0, 0.22, 0.44, 0.66].forEach((d, i) => click(t + 0.2 + d, 700 + i * 120, 0.08, 6));
-        pad([38, 45, 49], t + 0.2, 2.6, 0.026, "sawtooth", 700);
-        [79, 83, 86].forEach((m, i) => bell(m, t + 1.2 + i * 0.09, 0.03, 1.1));
-        click(t + 1.9, 900, 0.12, 5);
-        osc("sine", 90, t + 1.9, 0.25, 0.2, { f1: 40 });
-      },
-      // enclaves: a heavy vault bolt sliding shut, then a low sealed hum
-      vault: t => {
-        [0, 0.18].forEach((d, i) => {
-          click(t + 0.2 + d, 900 - i * 300, 0.12, 5);
-          osc("sine", 90 - i * 20, t + 0.2 + d, 0.25, 0.25, { f1: 40 });
-        });
-        pad([38, 45, 50], t + 0.6, 2.6, 0.03, "triangle", 700);
-        bell(86, t + 0.7, 0.03, 1.6);
-      },
-      // memory: a recalled motif, then its softer echo from the right, over a low pad
-      memory: t => {
-        [64, 67, 71, 76].forEach((m, i) => bell(m, t + 0.2 + i * 0.16, 0.045, 1.2));
-        [64, 67, 71, 76].forEach((m, i) => bell(m + 12, t + 1.0 + i * 0.16, 0.02, 1.0, panTo(0.5)));
-        pad([40, 47, 52, 56], t + 0.2, 2.6, 0.022, "triangle", 1400);
-      },
-      // index & search: a quick indexing sweep of ticks, then a bright two-note "found" chime
-      index: t => {
-        osc("sine", 600, t + 0.15, 0.7, 0.012, { f1: 2400 });
-        [0, 1, 2, 3, 4, 5].forEach(i => click(t + 0.2 + i * 0.1, 2200 + i * 200, 0.035, 8));
-        bell(79, t + 0.95, 0.045, 1.2);
-        bell(86, t + 1.08, 0.04, 1.4);
-        pad([45, 52, 57, 64], t + 0.3, 2.2, 0.022, "triangle", 1500);
-      },
-      // ephemerals: a bell motif that steps down and fades out to the right, over a soft pad
-      ephemeral: t => {
-        [88, 84, 79, 76, 72].forEach((m, i) => bell(m, t + 0.2 + i * 0.2, 0.05 - i * 0.008, 1.4 - i * 0.18, panTo(i / 5)));
-        osc("sine", 1600, t + 0.15, 1.1, 0.01, { f1: 320 });
-        pad([45, 52, 57, 60], t + 0.2, 2.6, 0.02, "triangle", 1200);
-      },
-      // first commit to GA: a climbing arpeggio that keeps rising, landing on a bright major chord
-      history: t => {
+      // AW factory: a climbing arpeggio that keeps rising, landing on a bright major chord
+      data: t => {
         [48, 52, 55, 60, 64, 67, 72, 76].forEach((m, i) => tone(m, t + 0.15 + i * 0.22, { type: "triangle", dur: 0.3, vol: 0.05, cutoff: 2600, detune: 5 }));
         pad([48, 55, 60, 64], t + 0.1, 3.4, 0.022, "triangle", 1400);
         [79, 84, 88].forEach((m, i) => bell(m, t + 2 + i * 0.09, 0.035, 1.6));
-      },
-      // how PRs land: a burst of quick ticks that thins out, like a skewed merge-time distribution, then a settling chord
-      land: t => {
-        [0, 0.07, 0.13, 0.2, 0.28, 0.4, 0.58, 0.85, 1.25].forEach((d, i) => tone(76 - i * 2, t + 0.15 + d, { type: "square", dur: 0.08, vol: 0.04, cutoff: 3000, detune: 3 }));
-        pad([50, 57, 62, 66], t + 1.3, 2.4, 0.024, "triangle", 1500);
-        bell(86, t + 1.4, 0.035, 1.4);
-      },
-      // how workflows evolve: a walk that branches upward as the fleet grows, then settles into small repeated steps
-      evolve: t => {
-        [55, 59, 62, 67, 66, 67, 71, 74, 72, 74, 74, 74].forEach((m, i) => tone(m, t + 0.15 + i * 0.16, { type: "triangle", dur: 0.22, vol: 0.045, cutoff: 2400, detune: 4 }));
-        pad([43, 50, 55, 59, 62], t + 0.2, 3.2, 0.022, "triangle", 1400);
-        [79, 83].forEach((m, i) => bell(m, t + 2.1 + i * 0.12, 0.035, 1.5));
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
@@ -13707,18 +13254,16 @@
             }),
         };
       })(),
-      slide: (n, dir, theme) =>
+      // a slide change: the whoosh, then the band's music shifted by `shift` semitones
+      slide: (dir, music, shift = 0) =>
         play(t => {
-          if (theme === "omen") return; // security: only the dark drone (played on enter)
           whoosh(t, dir);
-          if (THEMES[theme]) return THEMES[theme](t);
-          // original 8-bit loop: each transition plays the next 2-beat phrase
-          const ph = SONG[(song = (song + (dir > 0 ? 1 : SONG.length - 1)) % SONG.length)],
-            s16 = 60 / 152 / 4,
-            t1 = t + 0.18;
-          ph.m.forEach((m, i) => m && tone(m, t1 + i * s16, { type: "square", dur: s16 * 1.6, vol: 0.07, cutoff: 5200, detune: 5 }));
-          for (let i = 0; i < 4; i++) tone(ph.b + (i % 2 ? 12 : 0), t1 + i * s16 * 2, { type: "triangle", dur: s16 * 1.8, vol: 0.16, cutoff: 1400, detune: 2 });
-          for (let i = 0; i < 8; i += 2) hat(t1 + (i + 1) * s16);
+          tr = shift;
+          try {
+            MUSIC[music]?.(t);
+          } finally {
+            tr = 0;
+          }
         }),
       omen: () =>
         play(t => {
@@ -13797,7 +13342,8 @@
     wash.classList.toggle("on", !!slides[n].red);
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
-    if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
+    const th = THEME[slides[n].group];
+    if (cur >= 0) sfx.slide(dir, th.music, th.prog[slides[n].step % th.prog.length]);
     const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : null;
     const TR = ["up-in", "up-out", "down-in", "down-out"];
     if (cur >= 0 && covered) {
@@ -13895,17 +13441,11 @@
   // ---------- animated background ----------
   const ctx = canvas.getContext("2d");
   const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
-  // Per-band backgrounds: base fill, glow palette, grid rgb + minor/major alpha, grid angle.
-  const INK = { base: [13, 17, 23], grid: [240, 246, 252, 0.028, 0.07], ang: 0 };
-  const BG = {
-    // Human agent processes: dark blueprint blue, straight grid.
-    process: { base: [3, 10, 24], pal: ["#06285e", "#082048", "#03122c", "#0b3166"], grid: [170, 210, 255, 0.018, 0.045], ang: 0 },
-    // Cost & context: the usual gray, gold grid lines turned 45° to the left (the inverse of the security wash).
-    cost: { base: INK.base, grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4 },
-  };
-  let bgv = [...INK.base, ...INK.grid];
-  let colors = slides[0].palette.map(hex),
-    gAng = 0;
+  // Each band's THEME sets the base fill, glow palette, grid colour, angle and cell size; values ease between bands.
+  const bgOf = th => [...th.base, ...th.grid, th.cell];
+  let bgv = bgOf(THEME[slides[0].group]);
+  let colors = THEME[slides[0].group].pal.map(hex),
+    gAng = THEME[slides[0].group].ang;
   const blobs = [0, 1, 2, 3].map(i => ({ a: Math.random() * 6.28, b: Math.random() * 6.28, s: 0.00007 + i * 0.00003 }));
   const rmq = matchMedia("(prefers-reduced-motion: reduce)");
   let REDUCED = rmq.matches;
@@ -13926,9 +13466,9 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const cs = slides[cur] || slides[0],
-      th = BG[cs.group] || INK,
-      target = (th.pal || cs.palette).map(hex),
-      bgt = [...th.base, ...th.grid];
+      th = THEME[cs.group],
+      target = th.pal.map(hex),
+      bgt = bgOf(th);
     bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * 0.04);
     colors = REDUCED ? target : colors.map((c, i) => c.map((v, k) => v + (target[i][k] - v) * 0.03));
 
@@ -13949,8 +13489,7 @@
       ctx.fillRect(0, 0, cw, ch);
     });
 
-    // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red security wash is up, or on a band whose theme sets `ang`.
+    // Blueprint grid: `cell` px minor lines, a major line every 5, anchored centre-top, turned (around the screen centre) to the band's `ang`.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -13958,11 +13497,11 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = BG[cs.group] ? th.ang : wash.classList.contains("on") ? Math.PI / 4 : 0;
+    const gTarget = th.ang;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),
-      minor = 32 * k,
+      minor = bgv[8] * k,
       D = Math.hypot(cw, ch) / 2 + minor;
     g.translate(cw / 2, ch / 2);
     g.rotate(gAng);
