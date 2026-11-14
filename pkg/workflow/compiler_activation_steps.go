@@ -32,6 +32,9 @@ func (c *Compiler) addActivationReactionStep(ctx *activationJobBuildContext) {
 	ctx.steps = append(ctx.steps, fmt.Sprintf("          github-token: %s\n", c.resolveActivationToken(ctx.data)))
 	ctx.steps = append(ctx.steps, "          script: |\n")
 	ctx.steps = append(ctx.steps, generateGitHubScriptWithRequire("add_reaction.cjs"))
+	if reactionCleanupEnabled(ctx.data) {
+		ctx.outputs["reaction_id"] = "${{ steps.react.outputs.reaction-id }}"
+	}
 }
 
 func (c *Compiler) addActivationSecretValidationStep(ctx *activationJobBuildContext) {

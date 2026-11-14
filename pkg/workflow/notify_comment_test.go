@@ -1646,7 +1646,8 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(script, "safe_copy /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json") {
 		t.Errorf("Expected collect script to copy detection execution evidence into usage artifact staging.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "safe_copy /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
+	if !strings.Contains(script, "safe_copy /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") ||
+		!strings.Contains(script, "safe_copy /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
 		t.Errorf("Expected collect script to copy evals execution evidence into usage artifact staging.\nScript:\n%s", script)
 	}
 	if !strings.Contains(generator, "calculateWorkingSetFromJSONL") || !strings.Contains(generator, "summary.working_set = workingSet") {

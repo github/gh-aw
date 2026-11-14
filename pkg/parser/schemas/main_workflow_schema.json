@@ -2619,6 +2619,11 @@
                       ],
                       "description": "Reaction type. Defaults to 'eyes' when omitted."
                     },
+                    "remove-on-complete": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Remove the trigger reaction in conclusion, including failed or skipped agent runs. Independent of status-comment."
+                    },
                     "issues": {
                       "type": "boolean",
                       "description": "Whether reactions are allowed for issue triggers (issues, issue_comment)."
