@@ -119,14 +119,17 @@ func TestBuildPreActivationPermissions(t *testing.T) {
 }
 
 func TestPreActivationSearchPermissions(t *testing.T) {
-	for _, gate := range []string{
-		`skip-if-match: 'is:issue is:open in:title "[airgap-guide-drift] "'`,
-		`skip-if-no-match: "is:pr is:open"`,
-		"skip-if-match: \"is:issue is:open\"\n  skip-if-no-match: \"is:pr is:open\"",
+	for _, tc := range []struct {
+		name string
+		gate string
+	}{
+		{"skip-if-match grants issues and pull-requests read", `skip-if-match: 'is:issue is:open in:title "[airgap-guide-drift] "'`},
+		{"skip-if-no-match grants issues and pull-requests read", `skip-if-no-match: "is:pr is:open"`},
+		{"both gates grant issues and pull-requests read", "skip-if-match: \"is:issue is:open\"\n  skip-if-no-match: \"is:pr is:open\""},
 	} {
-		t.Run(gate, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			workflowFile := filepath.Join(testutil.TempDir(t, "search-permissions"), "workflow.md")
-			content := "---\non:\n  pull_request:\n    types: [opened]\n  " + gate + "\nengine: claude\n---\n\nSearch gate workflow.\n"
+			content := "---\non:\n  pull_request:\n    types: [opened]\n  " + tc.gate + "\nengine: claude\n---\n\nSearch gate workflow.\n"
 			require.NoError(t, os.WriteFile(workflowFile, []byte(content), 0600))
 
 			compiler := NewCompiler()
