@@ -19,6 +19,7 @@ import (
 var testContainerPinRE = regexp.MustCompile(`@sha256:[0-9a-f]{64}`)
 var testAWFImageTagDigestRE = regexp.MustCompile(`,[a-z-]+=sha256:[0-9a-f]{64}`)
 var testProjectUTCEnvLineRE = regexp.MustCompile(`(?m)^\s*GH_AW_PROJECT_UTC:.*(?:\r?\n|$)`)
+var testMCPGitHubTokenEnvRE = regexp.MustCompile(`GH_AW_MCP_SCRIPTS_ENV_[0-9a-f]+_47485f544f4b454e`)
 
 // testAWFConfigPayloadRE matches the entire AWF config JSON payload written to awf-config.json.
 // The JSON contains model aliases, domain allowlists, and a container image tag that all change
@@ -78,6 +79,7 @@ func normalizeOutput(content string) string {
 	normalized := testContainerPinRE.ReplaceAllString(normalizeHeredocDelimiters(content), "")
 	// Keep golden fixtures stable across native-vs-wasm GH_AW_PROJECT_UTC emission differences.
 	normalized = testProjectUTCEnvLineRE.ReplaceAllString(normalized, "")
+	normalized = testMCPGitHubTokenEnvRE.ReplaceAllString(normalized, "GH_AW_MCP_SCRIPTS_ENV_TOKEN")
 	// Keep golden fixtures stable across claude default model fallback updates.
 	normalized = strings.ReplaceAll(normalized, fmt.Sprintf("|| '%s'", constants.SonnetDefaultModel), "|| 'default'")
 	// Keep golden fixtures stable across copilot default model fallback updates.
