@@ -1703,7 +1703,7 @@
     });
   }
 
-  // Research → Plan → Assign: deep research becomes a plan, the plan becomes assigned tasks
+  // Research → Assign → Refine: deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
     resetIndex();
     const VW = 1700,
@@ -1767,42 +1767,34 @@
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
       ["e0", "M200 168 V206", "p", ["scans for duplicate code"], 222, 196, "start"],
-      ["e1", "M380 418 V500", "p", ["creates", "artifact"], 402, 452, "start"],
-      ["e2", "M418 540 H636", "p", ["discussion"], 580, 524, "middle"],
-      ["e3", "M680 506 V376", "b", ["runs /plan", "on discussion"], 702, 436, "start"],
-      ["e4", "M718 338 H882", "p", ["sub-issues"], 800, 322, "middle"],
-      ["e5", "M920 300 V168", "p", ["picked", "up by"], 942, 222, "start"],
-      ["e6", "M1068 140 H1258", "p", ["dispatches", "tasks to"], 1163, 92, "middle"],
-      ["e7", "M1300 168 V292", "p", ["works on task,", "opens pull request"], 1322, 222, "start"],
-      ["e8", "M1300 372 V500", "b", ["assigns"], 1322, 442, "start"],
-      ["e9", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
-      ["e10", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+      ["e1", "M494 340 H816", "p", ["files issue"], 655, 324, "middle"],
+      ["e2", "M860 304 V140 H1258", "p", ["assigned", "to Copilot"], 882, 222, "start"],
+      ["e4", "M1300 168 V292", "p", ["works on issue,", "opens pull request"], 1322, 222, "start"],
+      ["e5", "M1300 372 V500", "b", ["assigns"], 1322, 442, "start"],
+      ["e6", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
+      ["e7", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
     ];
     // the token's journey: [edge, node lit on arrival, duration]; a null edge is the duplicate-code scan
     const SEQ = [
       ["e0", "nCode"],
       [null, "nCode", 3000],
-      ["e1", "nDisc"],
-      ["e2", "nDev1"],
-      ["e3", "nIssue"],
-      ["e4", "nTasks"],
-      ["e5", "nMonster"],
-      ["e6", "nCopilot"],
-      ["e7", "nPR"],
-      ["e8", "nDev2"],
-      ["e10", "nCopilot"],
-      ["e9", "nMerge"],
+      ["e1", "nIssue"],
+      ["e2", "nCopilot"],
+      ["e4", "nPR"],
+      ["e5", "nDev"],
+      ["e7", "nCopilot"],
+      ["e6", "nMerge"],
     ];
-    const LANE = { nCode: 0, nDisc: 0, nDev1: 1, nIssue: 1, nTasks: 1, nMonster: 1, nCopilot: 2, nPR: 2, nDev2: 2, nMerge: 2 };
+    const LANE = { nCode: 0, nIssue: 1, nCopilot: 2, nPR: 2, nDev: 2, nMerge: 2 };
     let g = `<defs><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="rpaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="rpaBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
       <marker id="rpaB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
-      [0, 520, "RESEARCH"],
-      [520, 1140, "PLAN"],
-      [1140, VW, "ASSIGN"],
+      [0, 560, "RESEARCH"],
+      [560, 1160, "ASSIGN"],
+      [1160, VW, "REFINE"],
     ].forEach(([x0, x1, t], i) => {
       g += `<text class="fm-lane-t mra-lane" id="rpaLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
@@ -1811,9 +1803,9 @@
       g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#rpa${c === "p" ? "P" : "B"})"/>`;
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
-    g += agent("nResearch", 120, 140, 250, "Deep Research") + agent("nMonster", 800, 140, 250, "Issue Monster") + agent("nCopilot", 1300, 140, 236, "Copilot");
-    g += codeScan() + box("nDisc", 380, 540, "discussion") + box("nIssue", 680, 338, "issue") + box("nTasks", 920, 338, "tasklist") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
-    g += dev("nDev1", 680, 540) + dev("nDev2", 1300, 540);
+    g += agent("nResearch", 120, 140, 250, "Deep Research") + agent("nCopilot", 1300, 140, 236, "Copilot");
+    g += codeScan() + box("nIssue", 860, 340, "issue") + box("nPR", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
+    g += dev("nDev", 1300, 540);
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg rpa-svg");
@@ -1844,7 +1836,7 @@
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Research, plan, assign: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is written to a discussion. A developer runs /plan on that discussion to turn it into an issue with sub-issues. Issue Monster picks up the tasks and dispatches them to Copilot, which works on each task and opens a pull request. The pull request is assigned back to the developer, who iterates with Copilot, then reviews and merges. Humans stay in the loop at the plan and at the merge.",
+        "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -1895,7 +1887,7 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Plan · "), letters("Assign", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
     });
   }
 

@@ -21,7 +21,7 @@ test("presents the fourteen slides without the removed sections", async ({ page 
     "Stop manually translating intent into code.",
     "Human Agent Processes",
     "Repo Assist",
-    "Research · Plan · Assign",
+    "Research · Assign · Refine",
     "Research · Assign · Observe",
     "Mine · Refine · Apply",
     "Cost management",
