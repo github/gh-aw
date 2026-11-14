@@ -53,7 +53,7 @@ slides.push({
 - **Transitions:** derived from each slide's `group` (intro, platform, security, factory, loops, cost, enterprise, scale). Siblings in a group use a reveal-style horizontal push (`slide-in`/`slide-out`); `show()` sets `--dx` to `100%` going forward, `-100%` going back, and `0%` on first load. Crossing into another group slides up (`up-in`/`up-out`) going forward and down (`down-in`/`down-out`) going back. All use the same 0.8 s curve. Every slide needs a `group`; never add per-slide transition overrides. The old slide keeps the `.leaving` class until a timeout clears it.
 - **Audio isolation:** `master` is a persistent gain that feeds the compressor and delay. `out` is a per-slide bus. `show()` calls `sfx.cut()`, which fades the current bus and replaces it, so long themes cannot leak into the next slide. Any new sound must connect to `out`, or to `master` if it must persist across slides (as techno does).
 - **CSS animations restart** through `void el.offsetWidth` before `.active` is added. Prefer `.active .x { animation: ... }` for entry effects.
-- **Animated SVG flow diagrams** (for example "Research · Assign · Refine"):
+- **Animated SVG flow diagrams** (for example "Daily Unsloppers"):
   - Built with helpers such as `agent()`, `dev()`, `box()`, `codeScan()` and `ico()`.
   - `EDGES` entries are `[id, svgPath, class, labelLines, lx, ly, anchor]`.
   - `SEQ` entries are `[edgeId|null, nodeLitOnArrival, durationMs?]`.

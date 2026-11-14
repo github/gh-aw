@@ -3013,7 +3013,7 @@
     });
   }
 
-  // Research → Assign → Refine: deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
+  // Daily Unsloppers (research → assign → refine): deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
     resetIndex();
     const VW = 1700,
@@ -3150,7 +3150,7 @@
       sound: "research",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
+        "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -3202,7 +3202,7 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Daily "), letters("Unsloppers", "l-grad"))), svg),
     });
   }
 

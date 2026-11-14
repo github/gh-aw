@@ -24,7 +24,7 @@ test("presents the twenty-six slides without the removed sections", async ({ pag
     "Human Agent Processes",
     "Pull Request Review²",
     "Repo Assist",
-    "Research · Assign · Refine",
+    "Daily Unsloppers",
     "Merge fast, unslop daily",
     "Research · Assign · Observe",
     "Mine · Refine · Apply",
