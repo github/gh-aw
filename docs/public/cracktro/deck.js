@@ -199,6 +199,7 @@
   .psd-ag circle, .psd-dev circle { fill: #161b22; stroke: var(--c); stroke-width: 3; transition: fill .3s, filter .3s; }
   .psd-ag.on circle, .psd-dev.on circle { fill: color-mix(in srgb, var(--c) 30%, #161b22); filter: drop-shadow(0 0 14px var(--c)); }
   .psd-ring text { fill: #f0f6fc; font: 700 18px "Mona Sans"; text-anchor: middle; }
+  .psd-ring .psd-in { fill: var(--c); font-size: 28px; }
   .psd-todo { position: absolute; left: 680px; top: 84px; width: 290px; }
   .psd-todo > i { display: block; font: 600 15px/1 var(--mono); letter-spacing: .14em; color: #9198a1; font-style: normal; margin: 8px 0 6px; }
   .psd-t { display: grid; grid-template-columns: 30px 1fr; column-gap: 10px; padding: 8px 0; opacity: .4; transition: opacity .3s; }
@@ -212,7 +213,7 @@
   .psd-pr { position: absolute; right: 28px; bottom: 24px; white-space: nowrap; display: flex; gap: 10px; align-items: center; font: 600 18px/1 var(--mono); padding: 10px 16px; border-radius: 999px; border: 1px solid #3d444d; color: #9198a1; opacity: 0; transition: all .4s; }
   .psd-pr svg { width: 18px; height: 18px; fill: currentColor; }
   .psd-pr.draft { opacity: 1; }
-  .psd-pr.merged { opacity: 1; background: #ab7df8; border-color: #ab7df8; color: #0d1117; box-shadow: 0 0 24px #ab7df880; }
+  .psd-pr.merged { opacity: 1; background: #3fb950; border-color: #3fb950; color: #0d1117; box-shadow: 0 0 24px #3fb95080; }
   .fm-quote { position: absolute; left: 114px; top: 318px; width: 600px; font: 700 44px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; opacity: 0; }
   .fm-quote em { font-style: normal; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8); }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
@@ -10238,39 +10239,39 @@
     });
   }
 
-  // Push SDLC: a task arrives with its own Squad (a lead, backend, tester and scribe agent team); the squad deploys into the repository as files, helps the developer through the task, then retires and leaves its decisions behind
+  // Push SDLC: a sprint task arrives with its own Squad (designer, frontend, accessibility and scribe agents); the squad deploys into the developer's repository as files, pairs with them in their own session, then retires and leaves its decisions behind
   {
     resetIndex();
     const svgIco = (n, sz = 24) => `<svg viewBox="0 0 ${sz} ${sz}" aria-hidden="true">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
     const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     // [initial, role, what it does on this task, colour, ring position, label dy]
     const SQUAD = [
-      ["L", "Lead", "plans, splits and reviews", "#ab7df8", [170, 70], -46],
-      ["B", "Backend", "implements the limiter", "#4493f8", [300, 230], 58],
-      ["T", "Tester", "writes the load tests", "#3fb950", [170, 390], 58],
+      ["D", "Designer", "picks tokens and contrast", "#ab7df8", [170, 70], -46],
+      ["F", "Frontend", "builds the toggle", "#4493f8", [300, 230], 58],
+      ["A", "A11y", "checks screen readers", "#3fb950", [170, 390], 58],
       ["S", "Scribe", "records the decisions", "#d29922", [40, 230], 58],
     ];
     const DEV = [170, 230];
     // [task, owner index (4 = developer), file it touches]
     const TODO = [
-      ["Plan the change", 0, null],
-      ["Token-bucket limiter", 1, "src/ratelimit.ts"],
-      ["Load tests: 429 at limit", 2, "tests/ratelimit.test.ts"],
-      ["Decision: per-key limits", 3, ".squad/decisions.md"],
-      ["Review & merge", 4, null],
+      ["Dark colour tokens", 0, "src/theme/dark.ts"],
+      ["Settings toggle", 1, "src/ui/ThemeToggle.tsx"],
+      ["Contrast 4.5:1 + labels", 2, "tests/a11y.test.ts"],
+      ["Decision: use OS theme", 3, ".squad/decisions.md"],
+      ["Try on device & ship", 4, null],
     ];
     const ownerColor = o => (o === 4 ? "#f0f6fc" : SQUAD[o][3]);
     const ownerName = o => (o === 4 ? "you" : SQUAD[o][1].toLowerCase());
     const members = SQUAD.map(([n, r, d, c]) => h("div", { class: "psd-m", "--c": c }, h("em", {}, n), h("b", {}, r), h("span", {}, d)));
-    const stIco = h("span", { class: "psd-st" }, "open");
-    stIco.insertAdjacentHTML("afterbegin", svgIco("issue"));
+    const stIco = h("span", { class: "psd-st" }, "assigned to you");
+    stIco.insertAdjacentHTML("afterbegin", svgIco("tasklist"));
     const task = h(
       "div",
       { class: "psd-task" },
       stIco,
-      h("h3", {}, "Add rate limiting to the public API"),
-      h("div", { class: "psd-lb" }, h("span", {}, "enhancement"), h("span", {}, "api")),
-      h("div", { class: "psd-sq" }, h("i", {}, "Squad · ", h("b", {}, "api-hardening")), members)
+      h("h3", {}, "Dark mode for the settings screen"),
+      h("div", { class: "psd-lb" }, h("span", {}, "sprint 14"), h("span", {}, "mobile"), h("span", {}, "ui")),
+      h("div", { class: "psd-sq" }, h("i", {}, "Squad · ", h("b", {}, "theme-crew")), members)
     );
     const arrow = h("div", { class: "psd-arrow" }, "deploy");
     arrow.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.squad/</small>');
@@ -10279,34 +10280,35 @@
       ["src/", 0],
       ["tests/", 0],
       [".squad/team.md", 1],
-      [".squad/agents/lead.md", 1],
-      [".squad/agents/backend.md", 1],
-      [".squad/agents/tester.md", 1],
+      [".squad/agents/designer.md", 1],
+      [".squad/agents/frontend.md", 1],
+      [".squad/agents/a11y.md", 1],
       [".squad/agents/scribe.md", 1],
       [".squad/decisions.md", 1],
-      ["src/ratelimit.ts", 2],
-      ["tests/ratelimit.test.ts", 2],
+      ["src/theme/dark.ts", 2],
+      ["src/ui/ThemeToggle.tsx", 2],
+      ["tests/a11y.test.ts", 2],
     ];
     const files = FILES.map(([f, k]) => h("div", { class: "psd-f" + (k === 1 ? " sq" : k === 2 ? " new" : "") }, f));
     const fileOf = name => files[FILES.findIndex(([f]) => f === name)];
     const sqFiles = files.filter((_, i) => FILES[i][1] === 1);
     const newFiles = files.filter((_, i) => FILES[i][1] === 2);
     const rhState = h("span", {}, "no squad");
-    const rh = h("div", { class: "psd-rh" }, "payments-service", rhState);
+    const rh = h("div", { class: "psd-rh" }, "mobile-app", rhState);
     rh.insertAdjacentHTML("afterbegin", svgIco("repo"));
     const ring = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     ring.setAttribute("class", "psd-ring");
     ring.setAttribute("viewBox", "0 0 340 450");
     ring.innerHTML =
       SQUAD.map(([, , , c, [x, y]], i) => `<line class="psd-ln" data-i="${i}" style="--c:${c}" x1="${DEV[0]}" y1="${DEV[1]}" x2="${x}" y2="${y}"/>`).join("") +
-      SQUAD.map(([, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/>${ico("copilot", x, y, 34, c)}<text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
+      SQUAD.map(([n, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/><text class="psd-in" x="${x}" y="${y + 10}">${n}</text><text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
       `<g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/>${ico("person", DEV[0], DEV[1], 40, "#f0f6fc")}<text x="${DEV[0] + 74}" y="${DEV[1] - 34}">you</text></g>`;
     const lines = [...ring.querySelectorAll(".psd-ln")];
     const agents = [...ring.querySelectorAll(".psd-ag")];
     const dev = ring.querySelector(".psd-dev");
     const todos = TODO.map(([t, o]) => h("div", { class: "psd-t", "--c": ownerColor(o) }, h("s"), h("b", {}, t), h("span", {}, ownerName(o))));
-    const pr = h("div", { class: "psd-pr" }, h("span", {}, "pull request"));
-    pr.insertAdjacentHTML("afterbegin", svgIco("pr"));
+    const pr = h("div", { class: "psd-pr" }, h("span", {}, "build"));
+    pr.insertAdjacentHTML("afterbegin", svgIco("tag"));
     const prText = pr.lastChild;
     const repo = h("div", { class: "psd-repo" }, rh, h("div", { class: "psd-files" }, files), ring, h("div", { class: "psd-todo" }, h("i", {}, "Task plan"), todos), pr);
     const STEP = 1500,
@@ -10324,7 +10326,7 @@
     const reset = () => {
       members.forEach(m => m.classList.remove("on"));
       task.classList.remove("closed");
-      stIco.lastChild.textContent = "open";
+      stIco.lastChild.textContent = "assigned to you";
       arrow.classList.remove("on");
       pkg.style.transition = "none";
       pkg.style.opacity = "0";
@@ -10336,7 +10338,7 @@
       dev.classList.remove("on");
       todos.forEach(t => t.classList.remove("doing", "done"));
       pr.classList.remove("draft", "merged");
-      prText.textContent = "pull request";
+      prText.textContent = "build";
     };
     const work = k => {
       const [, o, f] = TODO[k];
@@ -10358,11 +10360,11 @@
       todos[k].classList.add("done");
       if (k === 1) {
         pr.classList.add("draft");
-        prText.textContent = "draft PR · rate limiting";
+        prText.textContent = "preview build · dark mode";
       }
       if (k === TODO.length - 1) {
         pr.classList.add("merged");
-        prText.textContent = "merged · rate limiting";
+        prText.textContent = "shipped · app v2.4";
         sfx.notify(false);
       }
     };
@@ -10383,7 +10385,7 @@
           dev.classList.remove("on");
           files.forEach(x => x.classList.remove("hot"));
           task.classList.add("closed");
-          stIco.lastChild.textContent = "closed";
+          stIco.lastChild.textContent = "done";
         },
       ],
       [
@@ -10405,7 +10407,7 @@
       sound: "squad",
       palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
       notes:
-        "Push SDLC. Today's SDLC is pull: a developer picks up a task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here the issue carries a Squad, a human-led AI agent team: a lead, a backend engineer, a tester and a scribe. Assigning the task deploys the squad into the repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad works alongside the developer: the lead plans, the backend agent writes the change, the tester adds load tests, the scribe records the decisions, and the developer reviews and merges. When the task closes the squad retires and its decisions stay in the repository for the next task. The task, repository, squad and file names are synthetic and the animation is illustrative.",
+        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad, a human-led AI agent team: a designer, a frontend engineer, an accessibility reviewer and a scribe. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad retires and its decisions stay in the repository for the next task. The task, repository, squad and file names are synthetic and the animation is illustrative.",
       enter() {
         t0 = 0;
         ev = 0;
