@@ -13,9 +13,11 @@ import { createReducer } from "./ledger_builtin.cjs";
 test("collects validated appends and writes the versioned artifact", async () => {
   const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-"));
   const previousRunnerTemp = process.env.RUNNER_TEMP;
+  const previousTransactionPath = process.env.GH_AW_LEDGER_TRANSACTIONS;
   const previousRunId = process.env.GITHUB_RUN_ID;
   const previousRunAttempt = process.env.GITHUB_RUN_ATTEMPT;
   process.env.RUNNER_TEMP = runnerTemp;
+  process.env.GH_AW_LEDGER_TRANSACTIONS = path.join(runnerTemp, "gh-aw", "ledger-transactions.json");
   process.env.GITHUB_RUN_ID = "42";
   process.env.GITHUB_RUN_ATTEMPT = "1";
   try {
@@ -33,6 +35,7 @@ test("collects validated appends and writes the versioned artifact", async () =>
     await handler({ ledger: "findings", record: { subject: "follow-up", related_to: "#first" } });
     handler.finalize();
 
+    assert.equal(transactionPath(), path.join(runnerTemp, "gh-aw", "ledger-transactions.json"));
     const artifact = JSON.parse(fs.readFileSync(transactionPath(), "utf8"));
     assert.equal(artifact.version, 1);
     assert.equal(artifact.transaction_id, "42:1");
@@ -41,6 +44,8 @@ test("collects validated appends and writes the versioned artifact", async () =>
   } finally {
     if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
     else process.env.RUNNER_TEMP = previousRunnerTemp;
+    if (previousTransactionPath === undefined) delete process.env.GH_AW_LEDGER_TRANSACTIONS;
+    else process.env.GH_AW_LEDGER_TRANSACTIONS = previousTransactionPath;
     if (previousRunId === undefined) delete process.env.GITHUB_RUN_ID;
     else process.env.GITHUB_RUN_ID = previousRunId;
     if (previousRunAttempt === undefined) delete process.env.GITHUB_RUN_ATTEMPT;

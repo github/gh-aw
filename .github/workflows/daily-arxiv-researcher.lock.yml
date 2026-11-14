@@ -2609,6 +2609,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
+          GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: gh-aw-ledger-transactions
           GH_AW_LEDGER_CONFIG_BASE64: W3sibmFtZSI6ImFyeGl2LXBhcGVycyIsInR5cGUiOiJ0YWJsZSIsImtleSI6ImlkIiwic2NoZW1hIjp7ImFkZGl0aW9uYWxQcm9wZXJ0aWVzIjpmYWxzZSwicHJvcGVydGllcyI6eyJhbmFseXplZF9hdCI6eyJ0eXBlIjoic3RyaW5nIn0sImFyZWEiOnsidHlwZSI6InN0cmluZyJ9LCJjYXRlZ29yaWVzIjp7Iml0ZW1zIjp7InR5cGUiOiJzdHJpbmcifSwidHlwZSI6ImFycmF5In0sImlkIjp7InR5cGUiOiJzdHJpbmcifSwib3Bwb3J0dW5pdHkiOnsidHlwZSI6InN0cmluZyJ9LCJwdWJsaXNoZWQiOnsidHlwZSI6InN0cmluZyJ9LCJyZWxldmFudCI6eyJ0eXBlIjoiYm9vbGVhbiJ9LCJ0aXRsZSI6eyJ0eXBlIjoic3RyaW5nIn0sInVybCI6eyJ0eXBlIjoic3RyaW5nIn19LCJyZXF1aXJlZCI6WyJpZCIsInRpdGxlIiwidXJsIiwicHVibGlzaGVkIiwiY2F0ZWdvcmllcyIsInJlbGV2YW50IiwiYW5hbHl6ZWRfYXQiXSwidHlwZSI6Im9iamVjdCJ9LCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJtYXhfcGF0Y2hfa2IiOjUwLCJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXJ4aXYtcGFwZXJzIn1d
         with:
           script: |
@@ -2736,6 +2737,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"research\",\"expires\":336,\"fallback_to_issue\":true,\"max\":1},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"id\",\"max_patch_kb\":50,\"max_record_kb\":4,\"max_segment_kb\":100,\"name\":\"arxiv-papers\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"analyzed_at\":{\"type\":\"string\"},\"area\":{\"type\":\"string\"},\"categories\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"id\":{\"type\":\"string\"},\"opportunity\":{\"type\":\"string\"},\"published\":{\"type\":\"string\"},\"relevant\":{\"type\":\"boolean\"},\"title\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"}},\"required\":[\"id\",\"title\",\"url\",\"published\",\"categories\",\"relevant\",\"analyzed_at\"],\"type\":\"object\"},\"type\":\"table\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"arxiv-papers\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

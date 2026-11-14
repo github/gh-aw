@@ -2988,6 +2988,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
+          GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: gh-aw-ledger-transactions
           GH_AW_LEDGER_CONFIG_BASE64: W3sibmFtZSI6ImdpdC1zaW11bGF0b3ItbGVzc29ucyIsInR5cGUiOiJub3RlcyIsIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm1heF9wYXRjaF9rYiI6MTYsImJyYW5jaF9uYW1lIjoibGVkZ2Vycy9naXQtc2ltdWxhdG9yLWxlc3NvbnMifV0=
         with:
           script: |
@@ -3231,6 +3232,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"weekly-git-simulator-dreaming\"],\"max\":1,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[weekly-git-simulator-dreaming]\"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"\",\"max_patch_kb\":16,\"max_record_kb\":4,\"max_segment_kb\":100,\"name\":\"git-simulator-lessons\",\"schema\":null,\"type\":\"notes\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"git-simulator-lessons\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
