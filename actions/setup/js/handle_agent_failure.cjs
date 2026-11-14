@@ -2016,6 +2016,13 @@ async function getSecretRedactionError(jobId, step) {
 }
 
 /**
+ * @returns {string[]}
+ */
+function getStartupSecretValues() {
+  return Object.entries(process.env).flatMap(([name, value]) => (name.startsWith("SECRET_") && typeof value === "string" && value.trim() ? [value.trim()] : []));
+}
+
+/**
  * Extract a shell step's output without the runner's script and environment dump.
  * The runner's exit marker and group boundaries disambiguate steps that share
  * the same second in the Actions metadata.
@@ -2055,7 +2062,7 @@ async function getStartupStepLogTail(jobId, step, overlappingStep) {
     if (overlappingStep && (step.name !== "Install AWF binary" || !/^##\[group\]Run bash "\$\{RUNNER_TEMP\}\/gh-aw\/actions\/install_awf_binary\.sh"(?: |$)/.test(records[group] || ""))) return "";
     const output = records.findIndex((line, index) => index > group && line === "##[endgroup]");
     if (group < 0 || output < 0 || output >= exit) return "";
-    const maskedValues = collectAddMaskedValues(log);
+    const maskedValues = [...collectAddMaskedValues(log), ...getStartupSecretValues()];
     const exitCode = records[exit].match(/^##\[error\]Process completed with exit code (\d+)\./)?.[1];
     if (!exitCode) return "";
     const exitMarker = `##[error]Process completed with exit code ${exitCode}.`;
@@ -2190,8 +2197,10 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
       if (!Number.isFinite(end)) return true;
       return started < end + 1000 && completed + 1000 > start;
     });
+  const hasSecretInventory =
+    (process.env.GH_AW_SECRET_NAMES || "").split(",").some(name => name.trim().length > 0) || Object.entries(process.env).some(([name, value]) => name.startsWith("SECRET_") && typeof value === "string" && value.trim().length > 0);
   const startupLogTail =
-    startupFailure && process.env.GH_AW_STARTUP_LOG_EXCERPT_ALLOWED === "true" && !redactionStep && executionIndex >= 0 && failedIndex < executionIndex && isFailedStep(failedStep)
+    startupFailure && process.env.GH_AW_STARTUP_LOG_EXCERPT_ALLOWED === "true" && hasSecretInventory && !redactionStep && executionIndex >= 0 && failedIndex < executionIndex && isFailedStep(failedStep)
       ? await getStartupStepLogTail(agentJob.id, failedStep, overlappingStep)
       : "";
   return {
@@ -2244,6 +2253,7 @@ function buildFailureDiagnosticsContext({
     return checkoutContext;
   }
 
+  const safeStartupLogTail = startupLogTail && failureCategories.includes("agent_startup_failure") ? redactAndBoundDiagnostics(startupLogTail, { maskedValues: getStartupSecretValues(), maxLength: MAX_STARTUP_LOG_TAIL_LENGTH }) : "";
   const context = [...checkoutContext, nodes.heading("Failure Diagnostics")];
   /** @type {ReportInline[]} */
   const metadata = [nodes.strong([nodes.text("Agent job:")]), nodes.text(" "), nodes.code("agent"), { type: "hard_break" }];
@@ -2271,8 +2281,8 @@ function buildFailureDiagnosticsContext({
   }
   if (stepError) {
     context.push(...renderErrorDetails(stepError));
-  } else if (startupLogTail && failureCategories.includes("agent_startup_failure")) {
-    context.push(nodes.details("Startup step log tail (redacted)", [nodes.codeBlock(startupLogTail, "text")]));
+  } else if (safeStartupLogTail) {
+    context.push(nodes.details("Startup step log tail (redacted)", [nodes.codeBlock(safeStartupLogTail, "text")]));
   } else if (engineFailureContext.length) {
     context.push(...engineFailureContext);
   } else if (hasModelEndpointMismatch) {
@@ -2289,9 +2299,7 @@ function buildFailureDiagnosticsContext({
     nodes.paragraph([
       {
         type: "emphasis",
-        children: [
-          nodes.text(startupLogTail && failureCategories.includes("agent_startup_failure") ? "The startup step log is redacted; agent-generated text is excluded." : "Only runtime metadata is shown; agent-generated text is excluded."),
-        ],
+        children: [nodes.text(safeStartupLogTail ? "The startup step log is redacted; agent-generated text is excluded." : "Only runtime metadata is shown; agent-generated text is excluded.")],
         agentTainted: false,
       },
     ])

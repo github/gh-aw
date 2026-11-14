@@ -915,7 +915,7 @@ describe("handle_agent_failure", () => {
 
     it("redacts and bounds the failed startup step output without including adjacent steps or runner inputs", async () => {
       vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
-      vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "");
       vi.stubEnv("SECRET_STARTUP_TEST", "configured-value-for-test");
       const log = [
         "2026-10-10T10:00:02.010Z ##[group]Run previous step",
@@ -968,8 +968,52 @@ describe("handle_agent_failure", () => {
       vi.unstubAllEnvs();
     });
 
+    it("withholds startup log excerpts when no non-empty secret inventory is configured", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      vi.stubEnv("GH_AW_SECRET_NAMES", " , ");
+      for (const key of Object.keys(process.env)) {
+        if (key.startsWith("SECRET_")) vi.stubEnv(key, "");
+      }
+      const download = vi.fn();
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      expect(download).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it("redacts startup log excerpts again at the report-rendering boundary", () => {
+      const secret = "unmasked-startup-secret-for-test";
+      vi.stubEnv("GH_AW_SECRET_NAMES", "RENDER_TEST");
+      vi.stubEnv("SECRET_RENDER_TEST", secret);
+      const rendered = buildFailureDiagnosticsContext({
+        failureCategories: ["agent_startup_failure"],
+        failingStep: "Install AWF binary",
+        startupLogTail: `installer failed: ${secret}\n##[error]Process completed with exit code 1.`,
+        engineFailureContext: "",
+      });
+
+      expect(rendered).not.toContain(secret);
+      expect(rendered).toContain("##[error]Process completed with exit code 1.");
+      vi.unstubAllEnvs();
+    });
+
     it("preserves the startup cause and exit marker when sanitization expands the tail", async () => {
       vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
       const log = [
         '2026-10-10T10:00:02.010Z ##[group]Run bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v1 --rootless',
         "2026-10-10T10:00:02.020Z ##[endgroup]",
@@ -7844,6 +7888,8 @@ describe("handle_agent_failure", () => {
 
     it("publishes a redacted Install AWF binary log tail as a startup failure, not an agent failure", async () => {
       vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
+      vi.stubEnv("SECRET_STARTUP_TEST", "startup-secret-for-test");
       syncRuntimePromptTemplates(import.meta.url);
       fs.writeFileSync(path.join(tmpDir, "agent_execution.json"), JSON.stringify({ version: 1, component: "agent", run_id: 12345, run_attempt: 1, state: "not_started" }));
       fs.writeFileSync(
@@ -7878,6 +7924,7 @@ describe("handle_agent_failure", () => {
                 "2026-10-10T10:00:02.200Z ##[endgroup]",
                 "2026-10-10T10:00:02.300Z ::add-mask::masked-value-for-test",
                 "2026-10-10T10:00:02.400Z installer failed: masked-value-for-test",
+                "2026-10-10T10:00:02.450Z unmasked startup-secret-for-test",
                 "2026-10-10T10:00:02.500Z ##[error]Process completed with exit code 1.",
               ].join("\n"),
             }),
@@ -7897,6 +7944,7 @@ describe("handle_agent_failure", () => {
       expect(body).toContain("Startup step log tail (redacted)");
       expect(body).toContain("installer failed:");
       expect(body).not.toContain("masked-value-for-test");
+      expect(body).not.toContain("startup-secret-for-test");
       const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
       expect(categories).toContain("agent_startup_failure");
       expect(categories).not.toContain("agent_failure");

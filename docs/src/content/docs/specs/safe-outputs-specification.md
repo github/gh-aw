@@ -6446,7 +6446,7 @@ This section defines required behavior for unusual or boundary conditions.
 
 - Failure reporting MUST identify the failed startup step when attribution is available.
 - The reporter MAY parse that step's Actions log and include a bounded, redacted excerpt in the failure report.
-- The excerpt MUST be withheld when custom masking is configured, the secret-redaction step failed, step attribution is ambiguous, or log retrieval or parsing fails.
+- The excerpt MUST be withheld when no non-empty secret-redaction inventory is configured, custom masking is configured, the secret-redaction step failed, step attribution is ambiguous, or log retrieval or parsing fails.
 - Reports MUST NOT include raw engine logs or agent-generated output. Startup failures MUST remain distinct from agent failures and driver crashes.
 
 *Rationale*: A guarded excerpt provides actionable setup diagnostics without publishing unverified or insufficiently redacted logs.
