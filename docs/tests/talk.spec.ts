@@ -3,36 +3,62 @@ import { readdirSync } from "node:fs";
 
 test.use({ reducedMotion: "reduce" });
 
-test("presents the sixteen slides without the removed sections", async ({ page }) => {
+test("presents the forty-two slides without the removed sections", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/gh-aw/cracktro/");
   await expect(page).toHaveTitle("GitHub Agentic Workflows Talk");
-  await expect(page.locator(".slide")).toHaveCount(16);
+  await expect(page.locator(".slide")).toHaveCount(42);
   await expect(page.locator(".stage")).not.toContainText(/the crew|the story|akeso|security at (?:hyper)?scale/i);
 
   const headings = [
     "GitHubAgenticWorkflows",
     "AI-poweredworkflowsfor GitHub",
-    "Spec Driven Automation",
+    "Anatomy of a workflow",
+    "Turn Intent to Automation",
+    "Agentic attacks",
     "Safety and control",
-    "Automation hardening",
+    "Supply chain hardening",
+    "Safe outputs",
+    "Patch to PR",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
     "Pull Request Review²",
+    "Issues as intent",
     "Repo Assist",
-    "Research · Assign · Refine",
+    "Daily Unsloppers",
+    "Merge fast, unslop daily",
     "Research · Assign · Observe",
+    "Query · Ask · Grow",
     "Mine · Refine · Apply",
+    "Explore · Reuse · Lint",
+    "Spec · Model · Test",
+    "Go Fan",
+    "Spec-driven testing",
+    "Docs that heal",
+    "Speak · Map · Grep",
+    "Scan · Fix · Learn",
+    "Agents that debug agents",
+    "Audit & Optimize",
     "Cost management",
+    "Model routing",
+    "Agent memory",
+    "Index & search",
+    "Experiments, graders & evals",
     "Any agent, any provider",
+    "Private enclaves",
+    "Connectors",
+    "Enterprise ready",
     "Centralized campaigns",
-    "G\u0131tHub",
+    "G\u0131tHub Agentic Workflows",
+    "First commit to GA",
+    "How PRs land",
+    "How workflows evolve",
   ];
   for (const [index, heading] of headings.entries()) {
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
-    await expect(page.locator(".count")).toHaveText(`${String(index + 1).padStart(2, "0")} / 16`);
+    await expect(page.locator(".count")).toHaveText(`${String(index + 1).padStart(2, "0")} / 42`);
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(heading);
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
@@ -40,8 +66,8 @@ test("presents the sixteen slides without the removed sections", async ({ page }
 });
 
 test("preserves navigation, slide links, speaker notes, and sound controls", async ({ page }) => {
-  await page.goto("/gh-aw/cracktro/#7");
-  await expect(page.locator(".count")).toHaveText("07 / 16");
+  await page.goto("/gh-aw/cracktro/#11");
+  await expect(page.locator(".count")).toHaveText("11 / 42");
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
   await expect(page.locator(".notes")).toContainText("LabelOps");
@@ -55,17 +81,34 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#8$/);
+  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#12$/);
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("07 / 16");
+  await expect(page.locator(".count")).toHaveText("11 / 42");
   await page.reload();
-  await expect(page.locator(".count")).toHaveText("07 / 16");
+  await expect(page.locator(".count")).toHaveText("11 / 42");
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("01 / 16");
+  await expect(page.locator(".count")).toHaveText("01 / 42");
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator(".count")).toHaveText("16 / 16");
+  await expect(page.locator(".count")).toHaveText("42 / 42");
+});
+
+test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
+  await page.setViewportSize({ width: 480, height: 720 });
+  await page.goto("/gh-aw/cracktro/#1");
+  await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeHidden();
+  const prev = page.getByRole("button", { name: "Previous slide", exact: true });
+  const next = page.getByRole("button", { name: "Next slide", exact: true });
+  await expect(prev).toBeDisabled();
+  await next.click();
+  await expect(page.locator(".count")).toHaveText("02 / 42");
+  await prev.click();
+  await expect(page.locator(".count")).toHaveText("01 / 42");
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeVisible();
+  await expect(next).toBeHidden();
 });
 
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {
@@ -84,8 +127,19 @@ test("ships local assets with the docs and links to the talk from the footer", a
   expect(await page.evaluate(() => document.fonts.check('16px "Monaspace Neon"'))).toBe(true);
 });
 
+test("publishes a social card for link previews", async ({ page, request }) => {
+  await page.goto("/gh-aw/cracktro/");
+  const image = "https://github.github.com/gh-aw/cracktro/og-image.png";
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", image);
+  await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute("content", image);
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+  const response = await request.get("/gh-aw/cracktro/og-image.png");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toContain("image/png");
+});
+
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
-  const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer)\.jpg$/;
+  const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer|ievangelist)\.jpg$/;
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
     expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
   }
@@ -103,17 +157,17 @@ test("publishes synthetic examples without profile assets or private source refe
     return route.abort();
   });
   await page.clock.install();
-  await page.goto("/gh-aw/cracktro/#12");
+  await page.goto("/gh-aw/cracktro/#19");
   await page.clock.runFor(15_000);
   for (const author of await page.locator(".mra-who").allTextContents()) {
-    expect(author).toMatch(/^(?:reviewer|maintainer|copilot) · /);
+    expect(author).toMatch(/^(?:linter miner|lintmonster|copilot) · /);
   }
   for (const href of await page.locator("svg image").evaluateAll(images => images.map(image => image.getAttribute("href")))) {
     expect(href).toMatch(allowedAvatar);
   }
-  await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
+  await expect(page.locator(".mra-repo-t")).toContainText("gh-aw · May–Nov 2026");
   await page.keyboard.press("n");
-  for (const slide of [2, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
+  for (const slide of [2, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }

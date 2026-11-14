@@ -299,6 +299,7 @@ test("PR pagination includes human and draft PRs on subsequent pages", async t =
 
 for (const [name, options] of [
   ["health API error", { healthCollection: { partial: true, reason: "api_error" } }],
+  ["incomplete request-budget discovery", { healthCollection: { partial: true, reason: "request_budget", failure_listing_complete: true, failure_pass_complete: false } }],
   ["missing health completeness", { healthCollection: { partial: undefined } }],
   ["incomplete PR pagination", { prOverflow: true }],
   ["PR access denied", { prError: true }],
@@ -615,16 +616,18 @@ test("bounded health inventory keeps verified failures actionable and reports pa
   assert.equal(manifest.discovery.reason, "failure_listing_limit");
 });
 
-test("success sampling timeout does not block a verified failure inventory", async t => {
-  const f = await fixture(t, {
-    runs: [run(42)],
-    healthCollection: { partial: true, reason: "time_budget" },
+for (const reason of ["time_budget", "request_budget"]) {
+  test(`${reason} after failure passes does not block a verified failure inventory`, async t => {
+    const f = await fixture(t, {
+      runs: [run(42)],
+      healthCollection: { partial: true, reason },
+    });
+    await f.execute();
+    assert.equal(f.outputs.has_new_failures, "true");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).evidence_complete, true);
+    assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
   });
-  await f.execute();
-  assert.equal(f.outputs.has_new_failures, "true");
-  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).evidence_complete, true);
-  assert.equal(fs.existsSync(path.join(f.cache, "health-retry.json")), false);
-});
+}
 
 for (const incomplete of ["failure_listing_complete", "failure_pass_complete"]) {
   test(`timed-out ${incomplete} defers and retries without losing checkpoint state`, async t => {

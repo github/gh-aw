@@ -209,4 +209,6 @@ A successful run MUST:
 
 ### Output Format
 
-Wrap long content with `<details><summary><b>View Details</b></summary>...</details>`.
+- Use `###` or lower headings only in the report.
+- Keep the overview and key metrics/issues visible, and wrap long findings and supporting evidence in `<details><summary><b>View Details</b></summary>...</details>` blocks for progressive disclosure.
+- Structure the report as: overview → key metrics/issues → detailed evidence → next actions.

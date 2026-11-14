@@ -3118,6 +3118,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
+          GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: gh-aw-ledger-transactions
           GH_AW_LEDGER_CONFIG_BASE64: W3sibmFtZSI6ImNvbmN1cnJlbmN5LWF1ZGl0cyIsInNjaGVtYSI6eyJhZGRpdGlvbmFsUHJvcGVydGllcyI6ZmFsc2UsInByb3BlcnRpZXMiOnsiYW5hbHl6ZWRfdG9vbCI6eyJ0eXBlIjoic3RyaW5nIn0sImlzc3VlX251bWJlciI6eyJtaW5pbXVtIjoxLCJ0eXBlIjoiaW50ZWdlciJ9LCJyZWNvcmRfdHlwZSI6eyJlbnVtIjpbIm1jcF9jb25jdXJyZW5jeV9hdWRpdCJdfSwicnVuX2lkIjp7InR5cGUiOiJzdHJpbmcifSwic3RhdHVzIjp7InR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbInJlY29yZF90eXBlIiwicnVuX2lkIiwiYW5hbHl6ZWRfdG9vbCIsInN0YXR1cyJdLCJ0eXBlIjoib2JqZWN0In0sIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm1heF9wYXRjaF9rYiI6MTAsImJyYW5jaF9uYW1lIjoibGVkZ2Vycy9jb25jdXJyZW5jeS1hdWRpdHMifV0=
         with:
           script: |
@@ -3250,6 +3251,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_agent_session\":{\"max\":3},\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[mcp-concurrency] \"},\"create_issue\":{\"expires\":168,\"labels\":[\"bug\",\"concurrency\",\"thread-safety\",\"automated-analysis\",\"cookie\"],\"max\":5,\"max_issue_artifact_size\":1048576,\"max_issue_artifacts\":10,\"title_prefix\":\"[concurrency] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":4,\"max_segment_kb\":100,\"name\":\"concurrency-audits\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"analyzed_tool\":{\"type\":\"string\"},\"issue_number\":{\"minimum\":1,\"type\":\"integer\"},\"record_type\":{\"enum\":[\"mcp_concurrency_audit\"]},\"run_id\":{\"type\":\"string\"},\"status\":{\"type\":\"string\"}},\"required\":[\"record_type\",\"run_id\",\"analyzed_tool\",\"status\"],\"type\":\"object\"},\"type\":\"\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"concurrency-audits\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json
           GH_AW_AGENT_SESSION_TOKEN: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:

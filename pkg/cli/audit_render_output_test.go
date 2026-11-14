@@ -224,14 +224,14 @@ func TestRenderAuditCompletion(t *testing.T) {
 
 func TestParseAuditLogsIfRequestedSkipsWhenParseDisabled(t *testing.T) {
 	output := testutil.CaptureStderr(t, func() {
-		parseAuditLogsIfRequested(1, t.TempDir(), AuditOptions{Parse: false})
+		parseAuditLogsIfRequested(t.Context(), 1, t.TempDir(), AuditOptions{Parse: false})
 	})
 	assert.Empty(t, output)
 }
 
 func TestParseAgentLogIfRequestedWithoutEngine(t *testing.T) {
 	output := testutil.CaptureStderr(t, func() {
-		parseAgentLogIfRequested(1, t.TempDir(), true)
+		parseAgentLogIfRequested(t.Context(), 1, t.TempDir(), true)
 	})
 	assert.Contains(t, output, "No engine detected")
 }
