@@ -198,6 +198,27 @@
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
   @keyframes fm-pop { from { transform: scale(.4); } }
+  .ra-flow { left: 60px; top: 340px; width: 880px; height: 512px; }
+  .ra-chart { left: 990px; top: 340px; width: 880px; height: 512px; }
+  .ra-cap-flow { left: 62px; top: 282px; }
+  .ra-cap-chart { left: 992px; top: 282px; }
+  .bd-grid { stroke: #ffffff12; stroke-width: 1; }
+  .bd-yl { fill: #9198a1; font: 500 18px var(--mono); text-anchor: end; }
+  .bd-xl { fill: #9198a1; font: 500 18px var(--mono); text-anchor: middle; }
+  .bd-at { fill: #9198a1; font: 500 20px "Mona Sans"; text-anchor: middle; }
+  .bd-note { fill: #6e7681; font: 500 15px var(--mono); text-anchor: middle; }
+  .bd-line { fill: none; stroke: #c9d1d9; stroke-width: 1.6; opacity: .4; }
+  .bd-line.d { stroke-dasharray: 7 6; opacity: .55; }
+  .bd-med { fill: none; stroke: #3fb950; stroke-width: 4; filter: drop-shadow(0 0 8px #3fb950); }
+  .bd-head { stroke: #3fb950; stroke-width: 2; opacity: 0; filter: drop-shadow(0 0 8px #3fb950); }
+  .bd-adopt { stroke: #ab7df8; stroke-width: 3; stroke-dasharray: 1; stroke-dashoffset: 1; filter: drop-shadow(0 0 8px #8957e5); }
+  .bd-pill { opacity: 0; transform-box: fill-box; transform-origin: center; }
+  .bd-pill.on { opacity: 1; animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
+  .bd-pill rect { fill: #0d1117; stroke: #ab7df8; stroke-width: 2; filter: drop-shadow(0 0 14px #8957e5aa); }
+  .bd-pill text { fill: #f0f6fc; font: 600 22px "Mona Sans"; text-anchor: middle; }
+  .bd-bot { opacity: 0; transition: opacity .4s; } .bd-bot.on { opacity: 1; }
+  .bd-res { opacity: 0; transition: opacity .6s; } .bd-res.on { opacity: 1; }
+  .bd-res text { fill: #3fb950; font: 800 34px "Mona Sans"; } .bd-res text.s { font: 600 18px var(--mono); fill: #9198a1; }
   .fm-marquee { position: absolute; left: 0; right: 0; bottom: 92px; overflow: hidden; white-space: nowrap;
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
   .fm-marquee div { display: inline-flex; gap: 14px; animation: fm-scroll 60s linear infinite; }
@@ -1297,6 +1318,9 @@
       "M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z",
     ],
     person: ["M12 2.5a5.5 5.5 0 0 1 3.096 10.047 9.005 9.005 0 0 1 5.9 8.181.75.75 0 1 1-1.499.044 7.5 7.5 0 0 0-14.993 0 .75.75 0 0 1-1.5-.045 9.005 9.005 0 0 1 5.9-8.18A5.5 5.5 0 0 1 12 2.5ZM8 8a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z"],
+    calendar: [
+      "M6.75 0a.75.75 0 0 1 .75.75V3h9V.75a.75.75 0 0 1 1.5 0V3h2.75c.966 0 1.75.784 1.75 1.75v16a1.75 1.75 0 0 1-1.75 1.75H3.25a1.75 1.75 0 0 1-1.75-1.75v-16C1.5 3.784 2.284 3 3.25 3H6V.75A.75.75 0 0 1 6.75 0ZM21 9.5H3v11.25c0 .138.112.25.25.25h17.5a.25.25 0 0 0 .25-.25Zm-17.75-5a.25.25 0 0 0-.25.25V8h18V4.75a.25.25 0 0 0-.25-.25Z",
+    ],
   };
   // Human Agent Processes: Repo Assist & unslopper swimlanes
   {
@@ -1343,12 +1367,12 @@
       MX = 930,
       MY = 330,
       OX = 790;
-    const agent = (x, y, r = 30) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#fmAgent)"/>${ico("copilot", x, y + 1, r * 1.15)}`;
+    const agent = (p, x, y, r = 30) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#${p}Agent)"/>${ico("copilot", x, y + 1, r * 1.15)}`;
     const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 23}" width="${w}" height="46" rx="23"/><text x="${x + 15 + w / 2}" y="${y + 8}">${label}</text></g>`;
-    const svgFor = L => {
-      let g = `<defs><radialGradient id="fmAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
-        <marker id="fmArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-        <marker id="fmArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    const svgFor = (L, p) => {
+      let g = `<defs><radialGradient id="${p}Agent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+        <marker id="${p}ArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+        <marker id="${p}ArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
       g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
       [
         [0, 250, "SCHEDULE"],
@@ -1360,105 +1384,217 @@
       });
       g += `<path class="fm-wire p" d="M240 ${SY} H272"/><path class="fm-wire p" d="M272 ${TY[0]} V${TY[4]}"/>`;
       TY.forEach((y, i) => {
-        g += `<path class="fm-wire p" id="fmIn${i}" d="M240 ${SY} H272 V${y} H${300 - 4}" marker-end="url(#fmArrP)" style="opacity:${y === SY ? 1 : 0}"/>`;
-        g += `<path class="fm-wire p" d="M272 ${y} H296" marker-end="url(#fmArrP)"/>`;
-        g += `<path class="fm-wire p" id="fmOut${i}" d="M610 ${y} H${OX - 2}" marker-end="url(#fmArrP)"/>`;
-        g += `<path class="fm-wire b" id="fmRev${i}" d="M${OX + 58} ${y} H${OX + 72} V${MY} H${MX - 42}" marker-end="url(#fmArrB)"/>`;
-        g += `<g class="fm-task" id="fmTask${i}">${pill(320, y, 290, L.tasks[i][0])}${agent(320, y)}</g>`;
+        g += `<path class="fm-wire p" id="fmIn${i}" d="M240 ${SY} H272 V${y} H${300 - 4}" marker-end="url(#${p}ArrP)" style="opacity:${y === SY ? 1 : 0}"/>`;
+        g += `<path class="fm-wire p" d="M272 ${y} H296" marker-end="url(#${p}ArrP)"/>`;
+        g += `<path class="fm-wire p" id="fmOut${i}" d="M610 ${y} H${OX - 2}" marker-end="url(#${p}ArrP)"/>`;
+        g += `<path class="fm-wire b" id="fmRev${i}" d="M${OX + 58} ${y} H${OX + 72} V${MY} H${MX - 42}" marker-end="url(#${p}ArrB)"/>`;
+        g += `<g class="fm-task" id="fmTask${i}">${pill(320, y, 290, L.tasks[i][0])}${agent(p, 320, y)}</g>`;
         g += `<g class="fm-out" id="fmOutI${i}"><rect x="${OX}" y="${y - 30}" width="58" height="60" rx="12"/>${ico(L.tasks[i][1], OX + 29, y, 30)}</g>`;
       });
-      g += `<path class="fm-wire b" id="fmLoop" d="M${MX} ${MY + 38} V${VH - 20} H52 V${SY + 36}" marker-end="url(#fmArrB)"/>`;
-      g += `<g class="fm-sched">${pill(40, SY, 200, L.pick)}${agent(40, SY)}</g>`;
+      g += `<path class="fm-wire b" id="fmLoop" d="M${MX} ${MY + 38} V${VH - 20} H52 V${SY + 36}" marker-end="url(#${p}ArrB)"/>`;
+      g += `<g class="fm-sched">${pill(40, SY, 200, L.pick)}${agent(p, 40, SY)}</g>`;
       g += `<g class="fm-watch">${ico("stopwatch", 150, 530, 64, "#f0f6fc")}<line id="fmHand" x1="150" y1="532" x2="150" y2="512" stroke="#f0f6fc" stroke-width="4" stroke-linecap="round"/></g>`;
       g += `<g class="fm-maint"><g class="fm-pill b"><rect x="${MX}" y="${MY - 23}" width="172" height="46" rx="23"/><text x="${MX + 38 + 67}" y="${MY + 8}">Maintainer</text></g>
         <circle cx="${MX}" cy="${MY}" r="38" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", MX, MY, 46)}</g>`;
       g += `<circle class="fm-dot" r="7"/><circle class="fm-dot" r="7"/>`;
       return g;
     };
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    const capB = h("b", {}, ""),
-      capS = h("span", {}, "");
-    const cap = h("div", { class: "fm-cap" }, capB, capS);
-    let mode = -1,
-      cyc = -1,
-      picks = [],
-      t0 = 0,
-      lastPh = [];
-    const setMode = m => {
-      mode = m;
-      const L = LOOPS[m];
-      svg.innerHTML = svgFor(L);
-      svg.style.setProperty("--c", L.c);
-      capB.textContent = L.key;
-      capB.style.color = L.c;
-      capS.textContent = " · " + L.sub;
-      cap.classList.remove("swap");
-      void cap.offsetWidth;
-      cap.classList.add("swap");
-    };
-    const at = (id, u) => {
-      const p = svg.querySelector("#" + id),
-        n = p.getTotalLength(),
-        q = p.getPointAtLength(n * Math.min(1, Math.max(0, u)));
-      return q;
-    };
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const CYCLE = 6200;
-    const step = t => {
-      if (!t0) t0 = t;
-      const e = t - t0,
-        c = Math.floor(e / CYCLE),
-        u = e % CYCLE;
-      const m = Math.floor(c / 2) % LOOPS.length;
-      if (m !== mode) setMode(m);
-      if (c !== cyc) {
-        cyc = c;
-        lastPh = [];
-        const all = [0, 1, 2, 3, 4].sort(() => Math.random() - 0.5);
-        picks = all.slice(0, 2).sort();
-        svg.querySelectorAll(".on").forEach(x => x.classList.remove("on"));
-      }
-      const hand = svg.querySelector("#fmHand"),
-        ang = ((e / 1000) * 120 * Math.PI) / 180;
-      hand.setAttribute("x2", 150 + 20 * Math.sin(ang));
-      hand.setAttribute("y2", 532 - 20 * Math.cos(ang));
-      const dots = svg.querySelectorAll(".fm-dot");
-      svg.querySelector(".fm-sched").classList.toggle("on", u < 1700);
-      picks.forEach((i, k) => {
-        const d = dots[k];
-        let pt = null,
-          blue = false;
-        if (u > 500 && u < 1700) {
-          pt = at(`fmIn${i}`, ease((u - 500) / 1200));
-          svg.querySelector(`#fmIn${i}`).style.opacity = 1;
-        } else if (u >= 1700 && u < 2900) {
-          svg.querySelector(`#fmTask${i}`).classList.add("on");
-          pt = at(`fmOut${i}`, ease((u - 1700) / 1200));
-        } else if (u >= 2900 && u < 4100) {
-          svg.querySelector(`#fmOutI${i}`).classList.add("on");
-          pt = at(`fmRev${i}`, ease((u - 2900) / 1200));
-          blue = true;
-        } else if (u >= 4100 && u < 5600 && k === 0) {
-          svg.querySelector(".fm-maint").classList.add("on");
-          pt = at("fmLoop", ease((u - 4100) / 1500));
-          blue = true;
+    // Repo Assist backlog burndown: an approximate, illustrative redraw of open issues
+    // (% of the count on adoption day) across F# open-source repositories.
+    const makeBurndown = svg => {
+      let s = 7;
+      const rnd = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
+      const D0 = -90,
+        D1 = 80;
+      // [level before adoption, settled level after, decay days, dashed]
+      const SPEC = [
+        [100, 3, 5, 0],
+        [102, 2, 3, 0],
+        [98, 12, 8, 0],
+        [100, 15, 10, 0],
+        [101, 20, 5, 0],
+        [116, 32, 14, 0],
+        [82, 13, 12, 0],
+        [99, 26, 18, 0],
+        [103, 8, 3, 0],
+        [100, 30, 22, 0],
+        [97, 18, 9, 0],
+        [101, 86, 70, 1],
+        [100, 76, 40, 1],
+        [99, 62, 30, 1],
+      ];
+      const series = SPEC.map(([lv, tg, tau, dash]) => {
+        const pts = [];
+        let v = lv;
+        for (let d = D0; d <= D1; d++) {
+          if (d < -6) {
+            if (rnd() < 0.12) v = lv + (rnd() - 0.5) * 8;
+          } else if (d <= 0) v = lv + ((100 - lv) * (d + 6)) / 6;
+          else if (rnd() < 0.3) v = Math.max(0, tg + (100 - tg) * Math.exp(-d / tau) + (rnd() - 0.4) * (dash ? 6 : 14));
+          pts.push(v);
         }
-        if (u >= 4100) svg.querySelector(".fm-maint").classList.add("on");
-        if (pt && d.style.opacity !== "1") sfx.pop(i + 2 * k);
-        // a blip each time the dot reaches a box: task, output, maintainer, back to schedule
-        const ph = u < 1700 ? 0 : u < 2900 ? 1 : u < 4100 ? 2 : u < 5600 ? 3 : 4;
-        if (ph > (lastPh[k] ?? ph) && (k === 0 || ph < 3)) ph === 3 ? sfx.review() : sfx.pop(ph * 2 + k + 1);
-        lastPh[k] = ph;
-        d.style.opacity = pt ? 1 : 0;
-        if (pt) {
-          d.setAttribute("cx", pt.x);
-          d.setAttribute("cy", pt.y);
-          d.setAttribute("fill", blue ? "#4493f8" : "#ab7df8");
-        }
+        return { pts, dash };
       });
+      const med = series[0].pts.map((_, i) => {
+        const col = series.map(x => x.pts[i]).sort((a, b) => a - b);
+        return (col[6] + col[7]) / 2;
+      });
+      const X0 = 110,
+        X1 = 1010,
+        YT = 140,
+        YB = 560;
+      const x = d => X0 + ((d - D0) / (D1 - D0)) * (X1 - X0),
+        y = p => YB - (p / 120) * (YB - YT),
+        XA = x(0);
+      const path = pts =>
+        "M" +
+        pts
+          .map((p, i) => `${x(D0 + i).toFixed(1)} ${y(p).toFixed(1)}`)
+          .join("H")
+          .replace(/H([\d.]+) ([\d.]+)/g, (_, a, b) => `H${a}V${b}`);
+      const medY = d => y(med[Math.min(med.length - 1, Math.max(0, Math.floor(d - D0)))]);
+      const drop = Math.round(100 - med[med.length - 1]);
+      const svgFor = () => {
+        let g = `<defs><radialGradient id="bdAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+          <clipPath id="bdClip"><rect id="bdClipR" x="0" y="0" width="${X0}" height="${VH}"/></clipPath></defs>`;
+        g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+        g += `<text class="fm-lane-t" x="${(X0 + XA) / 2}" y="40">BEFORE</text><text class="fm-lane-t" x="${(XA + X1) / 2}" y="40">WITH REPO ASSIST</text>`;
+        for (let p = 0; p <= 120; p += 20) g += `<line class="bd-grid" x1="${X0}" y1="${y(p)}" x2="${X1}" y2="${y(p)}"/><text class="bd-yl" x="${X0 - 14}" y="${y(p) + 6}">${p}%</text>`;
+        for (let d = -80; d <= 80; d += 20) g += `<text class="bd-xl" x="${x(d)}" y="${YB + 34}">${d}</text>`;
+        g += `<text class="bd-at" x="${(X0 + X1) / 2}" y="${YB + 72}">days before / after adoption · open issues as % of count on adoption day</text>`;
+        g += `<g clip-path="url(#bdClip)">${series.map(sr => `<path class="bd-line${sr.dash ? " d" : ""}" d="${path(sr.pts)}"/>`).join("")}<path class="bd-med" d="${path(med)}"/></g>`;
+        g += `<line id="bdHead" class="bd-head" x1="${X0}" y1="${YT - 10}" x2="${X0}" y2="${YB}"/>`;
+        g += `<line id="bdAdopt" class="bd-adopt" x1="${XA}" y1="${YT - 30}" x2="${XA}" y2="${YB}" pathLength="1"/>`;
+        g += `<g id="bdPill" class="bd-pill"><rect x="${XA - 120}" y="${YT - 62}" width="240" height="48" rx="24"/>${ico("calendar", XA - 82, YT - 38, 26)}<text x="${XA + 18}" y="${YT - 30}">Adoption day</text></g>`;
+        g += `<g id="bdBot" class="bd-bot"><circle cx="0" cy="0" r="22" fill="url(#bdAgent)"/>${ico("copilot", 0, 1, 26)}</g>`;
+        g += `<g id="bdRes" class="bd-res"><text x="${X1 + 34}" y="${y(med[med.length - 1]) + 2}">−${drop}%</text><text class="s" x="${X1 + 36}" y="${y(med[med.length - 1]) + 26}">median</text></g>`;
+        g += `<text class="bd-note" x="${(X0 + X1) / 2}" y="${YB + 100}">illustrative redraw · F# open-source repositories</text>`;
+        return g;
+      };
+      const ease = u => 1 - (1 - Math.min(1, Math.max(0, u))) ** 3;
+      let fx = [];
+      // v: ms since the burndown phase started
+      const tick = v => {
+        const sweep = v < 2400 ? X0 + (XA - X0) * ease(v / 2400) : v < 3200 ? XA : XA + (X1 - XA) * ease((v - 3200) / 5600);
+        svg.querySelector("#bdClipR").setAttribute("width", sweep);
+        const head = svg.querySelector("#bdHead");
+        head.setAttribute("x1", sweep);
+        head.setAttribute("x2", sweep);
+        head.style.opacity = v < 8800 ? 1 : 0;
+        svg.querySelector("#bdAdopt").style.strokeDashoffset = 1 - ease((v - 2400) / 600);
+        svg.querySelector("#bdPill").classList.toggle("on", v >= 2700);
+        const bot = svg.querySelector("#bdBot");
+        bot.classList.toggle("on", v >= 3000);
+        const d = D0 + ((sweep - X0) / (X1 - X0)) * (D1 - D0);
+        bot.setAttribute("transform", `translate(${sweep},${medY(d)})`);
+        svg.querySelector("#bdRes").classList.toggle("on", v >= 8800);
+        if (v >= 2700 && !fx[0]) ((fx[0] = 1), sfx.pop(0));
+        if (v >= 8800 && !fx[1]) ((fx[1] = 1), sfx.review());
+      };
+      return { svgFor, tick, reset: () => (fx = []) };
     };
+    const newSvg = cls => {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      el.setAttribute("class", cls);
+      el.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      return el;
+    };
+    // An animated SCHEDULE → ACT → REVIEW swimlane cycling through the given LOOPS, two cycles each.
+    let flowSeq = 0;
+    const makeFlow = (svg, cap, loops) => {
+      const idp = `fm${++flowSeq}`;
+      const capB = h("b", {}, ""),
+        capS = h("span", {}, "");
+      cap.append(capB, capS);
+      let mode = -1,
+        cyc = -1,
+        picks = [],
+        t0 = 0,
+        lastPh = [];
+      const setMode = m => {
+        mode = m;
+        const L = LOOPS[loops[m]];
+        svg.innerHTML = svgFor(L, idp);
+        svg.style.setProperty("--c", L.c);
+        capB.textContent = L.key;
+        capB.style.color = L.c;
+        capS.textContent = " · " + L.sub;
+        cap.classList.remove("swap");
+        void cap.offsetWidth;
+        cap.classList.add("swap");
+      };
+      const at = (id, u) => {
+        const p = svg.querySelector("#" + id),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * Math.min(1, Math.max(0, u)));
+        return q;
+      };
+      const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+      const CYCLE = 6200;
+      const step = t => {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYCLE),
+          u = e % CYCLE;
+        const m = Math.floor(c / 2) % loops.length;
+        if (m !== mode) setMode(m);
+        if (c !== cyc) {
+          cyc = c;
+          lastPh = [];
+          const all = [0, 1, 2, 3, 4].sort(() => Math.random() - 0.5);
+          picks = all.slice(0, 2).sort();
+          svg.querySelectorAll(".on").forEach(x => x.classList.remove("on"));
+        }
+        const hand = svg.querySelector("#fmHand"),
+          ang = ((e / 1000) * 120 * Math.PI) / 180;
+        hand.setAttribute("x2", 150 + 20 * Math.sin(ang));
+        hand.setAttribute("y2", 532 - 20 * Math.cos(ang));
+        const dots = svg.querySelectorAll(".fm-dot");
+        svg.querySelector(".fm-sched").classList.toggle("on", u < 1700);
+        picks.forEach((i, k) => {
+          const d = dots[k];
+          let pt = null,
+            blue = false;
+          if (u > 500 && u < 1700) {
+            pt = at(`fmIn${i}`, ease((u - 500) / 1200));
+            svg.querySelector(`#fmIn${i}`).style.opacity = 1;
+          } else if (u >= 1700 && u < 2900) {
+            svg.querySelector(`#fmTask${i}`).classList.add("on");
+            pt = at(`fmOut${i}`, ease((u - 1700) / 1200));
+          } else if (u >= 2900 && u < 4100) {
+            svg.querySelector(`#fmOutI${i}`).classList.add("on");
+            pt = at(`fmRev${i}`, ease((u - 2900) / 1200));
+            blue = true;
+          } else if (u >= 4100 && u < 5600 && k === 0) {
+            svg.querySelector(".fm-maint").classList.add("on");
+            pt = at("fmLoop", ease((u - 4100) / 1500));
+            blue = true;
+          }
+          if (u >= 4100) svg.querySelector(".fm-maint").classList.add("on");
+          if (pt && d.style.opacity !== "1") sfx.pop(i + 2 * k);
+          // a blip each time the dot reaches a box: task, output, maintainer, back to schedule
+          const ph = u < 1700 ? 0 : u < 2900 ? 1 : u < 4100 ? 2 : u < 5600 ? 3 : 4;
+          if (ph > (lastPh[k] ?? ph) && (k === 0 || ph < 3)) ph === 3 ? sfx.review() : sfx.pop(ph * 2 + k + 1);
+          lastPh[k] = ph;
+          d.style.opacity = pt ? 1 : 0;
+          if (pt) {
+            d.setAttribute("cx", pt.x);
+            d.setAttribute("cy", pt.y);
+            d.setAttribute("fill", blue ? "#4493f8" : "#ab7df8");
+          }
+        });
+      };
+      return {
+        reset() {
+          t0 = 0;
+          mode = cyc = -1;
+        },
+        step,
+      };
+    };
+    const hapCap = h("div", { class: "fm-cap" });
+    const hapSvg = newSvg("fm-svg");
+    const hapFlow = makeFlow(hapSvg, hapCap, [0, 1]);
     slides.push({
       sound: "loop",
       trans: "down",
@@ -1466,11 +1602,10 @@
       notes:
         "Human Agent Processes. Replace recurring manual fixes with reviewed processes. Repo Assist illustrates repository maintenance; the unslopper illustrates continuous cleanup. Each loop is scheduled, the agent picks tasks and proposes labels, comments or pull requests, and a maintainer reviews the result: SCHEDULE → ACT → REVIEW. These are illustrative workflows, not activity attributed to particular people or teams.",
       enter() {
-        t0 = 0;
-        mode = cyc = -1;
+        hapFlow.reset();
       },
       tick(t) {
-        step(t);
+        hapFlow.step(t);
       },
       el: h(
         "section",
@@ -1482,8 +1617,51 @@
           { class: "fm-shifts" },
           shifts.map(([ic, b, sp, c], i) => h("div", { class: "fm-shift", "--i": i, "--c": c }, h("i", {}, ic), h("b", {}, b), h("span", {}, sp)))
         ),
-        cap,
-        svg
+        hapCap,
+        hapSvg
+      ),
+    });
+
+    // Repo Assist: the maintenance loop next to its backlog burndown
+    resetIndex();
+    const raCap = h("div", { class: "fm-cap ra-cap-flow" });
+    const raSvg = newSvg("fm-svg ra-flow");
+    const raFlow = makeFlow(raSvg, raCap, [0]);
+    const bdSvg = newSvg("fm-svg ra-chart");
+    const bd = makeBurndown(bdSvg);
+    const BD_PERIOD = 15000;
+    let bdT0 = 0,
+      bdRun = -1;
+    slides.push({
+      sound: "loop",
+      trans: "down",
+      palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
+      notes:
+        "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
+      enter() {
+        raFlow.reset();
+        bdT0 = 0;
+        bdRun = -1;
+      },
+      tick(t) {
+        raFlow.step(t);
+        if (!bdT0) bdT0 = t;
+        const run = Math.floor((t - bdT0) / BD_PERIOD);
+        if (run !== bdRun) {
+          bdRun = run;
+          bdSvg.innerHTML = bd.svgFor();
+          bd.reset();
+        }
+        bd.tick((t - bdT0) % BD_PERIOD);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A teammate on every repo"), h("h2", {}, letters("Repo "), letters("Assist", "l-grad"))),
+        raCap,
+        raSvg,
+        h("div", { class: "fm-cap ra-cap-chart" }, h("b", { style: "color:#3fb950" }, "Backlog burndown"), h("span", {}, " · open issues after adoption")),
+        bdSvg
       ),
     });
   }
