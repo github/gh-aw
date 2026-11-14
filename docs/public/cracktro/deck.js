@@ -46,6 +46,9 @@
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
   .wash.cover { z-index: 4; }
+  /* green wash for "Private enclaves": the inverse of the red one, with the grid tilted the other way */
+  .wash.green { background: radial-gradient(ellipse 80% 75% at 50% 55%, #0b4a2a 0%, #04261a 55%, #01100a 100%); }
+  .wash.green::after { background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #031f13aa 70%, #000503f0 100%); }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
@@ -707,6 +710,70 @@
   .ae-tag { position: absolute; left: 1000px; top: 944px; width: 880px; text-align: center; font: 600 30px/1 "Mona Sans"; color: #f0f6fc; opacity: 0; }
   .ae-tag em { font-style: normal; color: var(--ec); }
   .active .ae-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.1s; }
+
+  .en .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #39c5cf, #3fb950, #ab7df8); }
+  .en-card { position: absolute; top: 310px; height: 580px; box-sizing: border-box; padding: 30px 34px; border-radius: 22px; background: #0d1117f0;
+    border: 2px solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: 0 0 60px -30px var(--c); opacity: 0; }
+  .active .en-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(.3s + var(--i) * .25s); }
+  .en-card > i { font: 600 18px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
+  .en-card h3 { margin: 14px 0 12px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .en-pub { left: 110px; width: 480px; }
+  .en-vault { left: 1010px; width: 800px; border-style: dashed; border-width: 3px; background: #08130cf0; transition: box-shadow .4s; }
+  .en-vault.busy { box-shadow: 0 0 90px -20px var(--c), inset 0 0 80px -50px var(--c); }
+  .en-lock { position: absolute; right: 26px; top: 26px; padding: 8px 14px; border-radius: 8px; background: var(--c); color: #0d1117;
+    font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  .en-facts { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .en-facts span { padding: 7px 12px; border-radius: 99px; border: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #d1d7e0; }
+  .en-facts b { color: var(--c); }
+  .en-call { padding: 16px 18px; border-radius: 12px; background: #151b23; border: 1px solid #3d444d; font: 500 18px/1.35 var(--mono); color: #d1d7e0; }
+  .en-call > b { display: block; color: #4493f8; font-weight: 700; margin-bottom: 6px; }
+  .en-call small { display: block; margin-top: 8px; color: #656c76; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
+  .en-task { color: #f0f6fc; min-height: 50px; }
+  .en-schema { color: #a5d6ff; }
+  .en-call.flash { animation: en-flash .6s ease-out; }
+  @keyframes en-flash { from { border-color: #4493f8; box-shadow: 0 0 30px -4px #4493f8; } }
+  .en-log { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .en-log li { font: 500 19px/1.2 var(--mono); color: #d1d7e0; padding-left: 28px; position: relative; animation: rise .5s cubic-bezier(.2,.9,.2,1) both; }
+  .en-log li::before { content: "✓"; position: absolute; left: 0; color: #3fb950; font-weight: 800; }
+  .en-out { position: absolute; left: 34px; right: 34px; bottom: 26px; padding: 12px 16px; border-radius: 12px; border: 2px solid #ab7df8; background: #1c1430;
+    font: 600 19px/1.2 "Mona Sans"; color: #f0f6fc; opacity: 0; transform: translateY(12px); transition: all .5s cubic-bezier(.2,.9,.2,1); }
+  .en-out.show { opacity: 1; transform: none; box-shadow: 0 0 40px -10px #ab7df8; }
+  .en-out code { font: 600 17px var(--mono); color: #ab7df8; margin-right: 8px; }
+  .en-code { border-radius: 12px; background: #0d1117; border: 1px solid #263a2c; padding: 12px 0; font: 500 19px/30px var(--mono); color: #9198a1; }
+  .en-line { display: flex; white-space: pre; padding-right: 16px; transition: background .3s, color .3s; }
+  .en-line .no { width: 56px; padding-right: 18px; text-align: right; color: #3d444d; flex: none; }
+  .en-line.hot { color: #f0f6fc; background: linear-gradient(90deg, #3fb95040, transparent 85%); }
+  .en-status { margin-top: 14px; font: 600 19px/1 var(--mono); color: #3fb950; letter-spacing: .06em; min-height: 20px; }
+  .en-vault.busy .en-status::after { content: "▍"; animation: ga-blink .7s steps(1) infinite; }
+  .en-gate { position: absolute; left: 700px; top: 290px; width: 200px; height: 620px; text-align: center; opacity: 0; }
+  .active .en-gate { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .55s; }
+  .en-gate > i { display: block; font: 600 17px/1.25 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #d29922; font-style: normal; }
+  .en-gate small { position: absolute; left: 0; right: 0; bottom: 0; font: 500 16px/1.4 var(--mono); color: #9198a1; }
+  .en-pillar { position: absolute; left: 92px; top: 60px; bottom: 60px; width: 16px; border-radius: 8px; background: linear-gradient(#d2992200, #d29922, #d2992200);
+    box-shadow: 0 0 30px #d2992288; }
+  .en-gnote { position: absolute; left: 50%; top: 360px; transform: translate(-50%, 10px); white-space: nowrap; padding: 10px 16px; border-radius: 10px;
+    font: 700 19px/1 var(--mono); background: #0d1117; border: 2px solid; opacity: 0; transition: opacity .3s, transform .3s; z-index: 4; }
+  .en-gnote.show { opacity: 1; transform: translate(-50%, 0); }
+  .en-gnote.ok { color: #3fb950; border-color: #3fb950; }
+  .en-gnote.no { color: #ff7b72; border-color: #f85149; box-shadow: 0 0 40px -6px #f85149; }
+  .en-pk { position: absolute; left: 0; top: 582px; padding: 9px 16px; border-radius: 99px; white-space: nowrap; font: 600 17px/1 var(--mono); z-index: 3;
+    background: #0d1117; border: 2px solid var(--c); color: var(--c); box-shadow: 0 0 26px -4px var(--c); }
+  .en-pk.q { --c: #4493f8; }
+  .en-pk.a { --c: #3fb950; }
+  .en-pk.leak { --c: #f85149; }
+  .en-pk.burst { animation: en-burst .6s ease-out forwards; }
+  @keyframes en-burst { to { opacity: 0; filter: blur(8px); scale: 1.6; } }
+  .en-ledger { position: absolute; left: 110px; top: 930px; width: 1700px; display: flex; align-items: center; gap: 22px; opacity: 0; }
+  .active .en-ledger { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .en-ledger > i { font: 600 17px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; font-style: normal; white-space: nowrap; }
+  .en-bar { flex: 1; height: 18px; border-radius: 9px; background: #21262d; overflow: hidden; }
+  .en-fill { height: 100%; width: 100%; border-radius: 9px; background: linear-gradient(90deg, #3fb950, #39c5cf); transition: width .8s cubic-bezier(.2,.9,.2,1); }
+  .en-fill.low { background: linear-gradient(90deg, #d29922, #f0883e); }
+  .en-left { font: 600 20px/1 var(--mono); color: #d1d7e0; white-space: nowrap; }
+  .en-left b { color: #f0f6fc; font-size: 26px; }
+  .en-sens { display: flex; gap: 8px; }
+  .en-sens span { padding: 7px 12px; border-radius: 8px; font: 500 16px/1 var(--mono); color: #656c76; border: 1px solid #30363d; }
+  .en-sens span.on { color: #0d1117; background: #3fb950; border-color: #3fb950; font-weight: 700; }
 
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
@@ -1766,6 +1833,228 @@
         [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
         lane
       ),
+    });
+  }
+
+  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
+  {
+    resetIndex();
+    const BUDGET = 8;
+    const ROUNDS = [
+      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
+      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
+      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
+      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
+    ];
+    const CODE = [
+      "// billing/client.ts",
+      'import { charge } from "./v1/billing";',
+      "export async function renew(acct) {",
+      "  const plan = await lookup(acct);",
+      '  return charge(plan, { api: "v1" });',
+      "}",
+      "// auth/session.ts",
+      'import { sign } from "auth-lib@2.3.0";',
+      "// tests/integration/sync.test.ts",
+      'test.retry(3)("sync settles", run);',
+    ];
+    const PX = 560,
+      GX = 800,
+      VX = 1040;
+    const qTask = h("div", { class: "en-task" });
+    const qSchema = h("div", { class: "en-schema" });
+    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
+    const log = h("ul", { class: "en-log" });
+    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
+    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
+    const vaultStatus = h("div", { class: "en-status" });
+    const vault = h(
+      "div",
+      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
+      h("b", { class: "en-lock" }, "🔒 enclave"),
+      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
+      h("h3", {}, "octo-org/private-service"),
+      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
+      h("div", { class: "en-code" }, lines),
+      vaultStatus
+    );
+    const gNote = h("div", { class: "en-gnote" });
+    const fill = h("div", { class: "en-fill" });
+    const leftN = h("b");
+    const invN = h("span", { class: "en-left" });
+    const el = h(
+      "section",
+      { class: "slide en" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
+      h(
+        "div",
+        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
+        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
+        h("h3", {}, "Asks, never reads"),
+        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
+        call,
+        log,
+        out
+      ),
+      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
+      vault,
+      h(
+        "div",
+        { class: "en-ledger" },
+        h("i", {}, "Information budget"),
+        h("div", { class: "en-bar" }, fill),
+        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
+        invN,
+        h(
+          "div",
+          { class: "en-sens" },
+          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
+        )
+      )
+    );
+    let ev = [],
+      evI = 0,
+      pks = [],
+      used = 0,
+      calls = 0,
+      t0 = 0,
+      now = 0,
+      fresh = true;
+    const fmt = n => (Math.round(n * 10) / 10).toString();
+    const ledger = () => {
+      const left = BUDGET - used;
+      fill.style.width = `${(left / BUDGET) * 100}%`;
+      fill.classList.toggle("low", left < 3);
+      leftN.textContent = fmt(left);
+      invN.textContent = `· ${calls} / 4 invocations`;
+    };
+    const say = (txt, ok) => {
+      gNote.textContent = txt;
+      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
+    };
+    const launch = (txt, cls, x0, x1, dur, blocked) => {
+      const p = h("div", { class: `en-pk ${cls}` }, txt);
+      el.append(p);
+      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
+    };
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      let T = 600;
+      ROUNDS.forEach((r, k) => {
+        const s = T;
+        at(s, () => {
+          qTask.textContent = r.q;
+          qSchema.textContent = r.schema;
+          call.classList.remove("flash");
+          void call.offsetWidth;
+          call.classList.add("flash");
+          lines.forEach(l => l.classList.remove("hot"));
+          gNote.classList.remove("show");
+          sfx.key();
+        });
+        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
+        if (r.over) {
+          at(s + 1400, () => {
+            say(`✗ over budget · needs ${r.bits} bits`, 0);
+            sfx.route(0);
+          });
+          T = s + 3200;
+          return;
+        }
+        at(s + 1350, () => say("✓ masked capability", 1));
+        at(s + 2000, () => {
+          calls++;
+          ledger();
+          vault.classList.add("busy");
+          vaultStatus.textContent = "sub-agent reading ";
+          gNote.classList.remove("show");
+        });
+        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
+        let u = s + 3600;
+        at(u, () => {
+          vault.classList.remove("busy");
+          vaultStatus.textContent = "answer ready";
+        });
+        if (r.leak) {
+          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
+          at(u + 800, () => {
+            say("✗ free-form string · denied", 0);
+            sfx.route(0);
+          });
+          u += 1800;
+        }
+        at(u, () => launch(r.a, "a", VX, PX, 1400));
+        at(u + 700, () => {
+          used += r.bits;
+          ledger();
+          say(`✓ schema · −${r.bits} bits`, 1);
+          sfx.route(2);
+        });
+        at(u + 1400, () => {
+          log.append(h("li", {}, r.log));
+          sfx.pop(k * 2);
+        });
+        T = u + 2200;
+      });
+      at(T, () => {
+        out.classList.add("show");
+        gNote.classList.remove("show");
+        sfx.review();
+      });
+      at(T + 4000, () => (fresh = true));
+    };
+    const reset = () => {
+      pks.forEach(p => p.el.remove());
+      pks = [];
+      used = calls = 0;
+      log.replaceChildren();
+      out.classList.remove("show");
+      vault.classList.remove("busy");
+      vaultStatus.textContent = "";
+      gNote.className = "en-gnote";
+      qTask.textContent = "";
+      qSchema.textContent = "";
+      lines.forEach(l => l.classList.remove("hot"));
+      ledger();
+      t0 = now;
+      script();
+    };
+    slides.push({
+      sound: "vault",
+      green: true,
+      palette: ["#238636", "#0e3a1f", "#8957e5", "#0b2f3a"],
+      notes:
+        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
+      enter() {
+        fresh = true;
+      },
+      tick(t) {
+        now = t;
+        if (fresh) {
+          fresh = false;
+          reset();
+        }
+        const e = t - t0;
+        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
+        for (const p of pks) {
+          if (p.dead) continue;
+          const u = Math.min(1, (t - p.start) / p.dur);
+          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
+          if (u >= 1) {
+            p.dead = t + 600;
+            if (p.blocked) p.el.classList.add("burst");
+            else p.dead = t;
+          }
+        }
+        pks = pks.filter(p => {
+          if (p.dead && t >= p.dead) p.el.remove();
+          return !p.dead || t < p.dead;
+        });
+      },
+      el,
     });
   }
 
@@ -4724,8 +5013,9 @@
     '<g class="x"><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></g></svg>';
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
+  const gwash = h("div", { class: "wash green" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, count, snd, notes);
+  document.body.append(canvas, gwash, wash, gridc, stage, progress, dots, count, snd, notes);
 
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
@@ -5089,6 +5379,15 @@
         bell(81, t + 0.9 + 5 * s, 0.04, 1.4);
         pad([45, 52, 57, 61], t + 0.9, 2.2, 0.022, "triangle", 1600);
       },
+      // enclaves: a heavy vault bolt sliding shut, then a low sealed hum
+      vault: t => {
+        [0, 0.18].forEach((d, i) => {
+          click(t + 0.2 + d, 900 - i * 300, 0.12, 5);
+          osc("sine", 90 - i * 20, t + 0.2 + d, 0.25, 0.25, { f1: 40 });
+        });
+        pad([38, 45, 50], t + 0.6, 2.6, 0.03, "triangle", 700);
+        bell(86, t + 0.7, 0.03, 1.6);
+      },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
         pad([48, 55, 60, 64, 67], t + 0.1, 4.2, 0.04, "triangle", 2400);
@@ -5429,6 +5728,7 @@
   function show(n, horiz) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
+    gwash.classList.toggle("on", !!slides[n].green);
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
@@ -5555,7 +5855,8 @@
     });
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up.
+    // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up,
+    // and to -45° while the green "Private enclaves" wash is up.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -5563,7 +5864,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : 0;
+    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : gwash.classList.contains("on") ? -Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),
