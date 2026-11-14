@@ -56,10 +56,10 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone nineteen-slide deck, separate from the homepage slideshow, linked
+It is a standalone twenty-slide deck, separate from the homepage slideshow, linked
 from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
 Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
-The navigation dots jump directly to a slide; `#1` through `#19` are shareable
+The navigation dots jump directly to a slide; `#1` through `#20` are shareable
 slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
 
