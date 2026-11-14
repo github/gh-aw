@@ -36,13 +36,14 @@ print_result() {
 start_mock_mcp_server() {
   local port_file="$1"
   local log_file="$2"
+  local expected_github_auth="${3:-}"
 
-  node - "$port_file" >"$log_file" 2>&1 <<'NODE' &
+  node - "$port_file" "$expected_github_auth" >"$log_file" 2>&1 <<'NODE' &
 const fs = require("fs");
 const http = require("http");
 
 const portFile = process.argv[2];
-const expectedGithubAuth = process.env.EXPECT_GITHUB_AUTH || "";
+const expectedGithubAuth = process.argv[3] || "";
 
 const send = (res, code, payload, sessionId) => {
   const body = JSON.stringify(payload);
@@ -117,9 +118,10 @@ wait_for_port_file() {
 start_and_validate_mock_server() {
   local port_file="$1"
   local log_file="$2"
+  local expected_github_auth="${3:-}"
   local server_pid
 
-  server_pid=$(start_mock_mcp_server "$port_file" "$log_file")
+  server_pid=$(start_mock_mcp_server "$port_file" "$log_file" "$expected_github_auth")
   if [ -z "$server_pid" ] || ! kill -0 "$server_pid" 2>/dev/null; then
     return 1
   fi
@@ -915,13 +917,11 @@ test_github_uses_enclave_check_identity_when_configured() {
   local config_file="$tmpdir/config.json"
 
   local server_pid
-  export EXPECT_GITHUB_AUTH="enclave-key"
-  if ! server_pid=$(start_and_validate_mock_server "$port_file" "$tmpdir/mock.log"); then
-    unset EXPECT_GITHUB_AUTH
+  local expected_auth="test-enclave-agent-id"
+  if ! server_pid=$(start_and_validate_mock_server "$port_file" "$tmpdir/mock.log" "$expected_auth"); then
     print_result "Mock MCP server failed to start (check $tmpdir/mock.log)" "FAIL"
     return
   fi
-  unset EXPECT_GITHUB_AUTH
 
   local port
   port=$(cat "$port_file")
@@ -933,15 +933,15 @@ test_github_uses_enclave_check_identity_when_configured() {
       "type": "http",
       "url": "http://127.0.0.1:${port}/mcp/github",
       "headers": {
-        "Authorization": "primary-key"
+        "Authorization": "primary-test-key"
       }
     }
   }
 }
 EOF
 
-  if GH_AW_MCP_GITHUB_CHECK_AGENT_ID="enclave-key" \
-    bash "$SCRIPT_PATH" "$config_file" "http://127.0.0.1:${port}" "primary-key" >/dev/null 2>&1; then
+  if GH_AW_MCP_GITHUB_CHECK_AGENT_ID="$expected_auth" \
+    bash "$SCRIPT_PATH" "$config_file" "http://127.0.0.1:${port}" "primary-test-key" >/dev/null 2>&1; then
     print_result "GitHub checker used enclave identity" "PASS"
   else
     print_result "GitHub checker should use enclave identity" "FAIL"
