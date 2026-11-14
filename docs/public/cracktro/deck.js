@@ -12588,8 +12588,8 @@
     engineering: { base: [14, 8, 27], pal: ["#6e40c9", "#3c1e70", "#8957e5", "#1f0f3d"], grid: [210, 168, 255, 0.028, 0.07], ang: Math.PI / 6, cell: 32, accent: ["#d2a8ff", "#8957e5", "#eddeff", "#a371f7"], music: "engineering", prog: [0, 3, 5, -2, 7, -4] },
     // Enterprise: metallic grey with silver accents, wide grid tilted -30°, a broad chord fanning across runners.
     enterprise: { base: [17, 19, 23], pal: ["#30363d", "#1b2638", "#3d444d", "#262c36"], grid: [209, 215, 224, 0.03, 0.075], ang: -Math.PI / 6, cell: 48, accent: ["#d1d7e0", "#4493f8", "#9198a1", "#f0f6fc"], music: "enterprise", prog: [0, 5, -5, 2, -3] },
-    // AW factory (measured data): plum graph paper, a fine straight grid, a rising arpeggio.
-    data: { base: [19, 7, 17], pal: ["#7d2457", "#3d1a5c", "#0f5323", "#0d2a5c"], grid: [255, 155, 206, 0.03, 0.08], ang: 0, cell: 20, accent: ["#ff9bce", "#db61a2", "#ffd3eb", "#ab7df8"], music: "data", prog: [0, 4, 7, 2] },
+    // AW factory (measured data): violet graph paper, a fine straight grid, a rising arpeggio.
+    data: { base: [11, 7, 26], pal: ["#3d1a7a", "#1f1650", "#5a32a3", "#0d2a5c"], grid: [171, 125, 248, 0.035, 0.09], ang: 0, cell: 20, accent: ["#bc8cff", "#8957e5", "#e2c5ff", "#79c0ff"], music: "data", prog: [0, 4, 7, 2] },
     finale: { base: [13, 17, 23], pal: ["#0a8a2e", "#0d419d", "#5a32a3", "#196c2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "finale", prog: [0] },
   };
 
