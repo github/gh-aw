@@ -990,11 +990,11 @@
   .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
   .ek .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #f778ba, #3fb950); }
   .ek-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
-  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 200ms + 300ms); }
   .ek-hd { font: 600 15px var(--mono); letter-spacing: .12em; } .ek-hd.b { fill: #79c0ff; } .ek-hd.g { fill: #7ee787; } .ek-hd.o { fill: #ffa657; }
-  .ek-card { fill: #0d1117d9; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
-  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #3fb95014; transition: filter .3s; }
-  .ek-iss circle:first-child { fill: none; stroke: #3fb950; stroke-width: 2.5; }
+  .ek-card { fill: #0d1117f5; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
+  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #0e1a13f5; transition: filter .3s; }
+  .ek-who circle { fill: #0d1117; stroke: #4493f8; stroke-width: 2; } .ek-who text { fill: #9198a1; font: 600 14px var(--mono); }
   .ek-t { fill: #f0f6fc; font: 800 24px "Mona Sans"; } .ek-t.s { font-size: 20px; }
   .ek-ti { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
   .ek-tx { fill: #c9d1d9; font: 500 19px "Mona Sans"; } .ek-tx.r { fill: #ffa198; font-weight: 700; }
@@ -1005,84 +1005,84 @@
   .ek-pill.b rect { stroke: #4493f8; fill: #4493f81f; } .ek-pill.b text { fill: #79c0ff; }
   .ek-pill.o rect { stroke: #f0883e; fill: #f0883e1f; } .ek-pill.o text { fill: #ffa657; }
   .ek-pill.y rect { stroke: #d29922; fill: #d299221f; } .ek-pill.y text { fill: #e3b341; }
-  .ek-task { fill: none; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
-  .ek-wall { fill: #f0883e0d; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
+  .ek-task { fill: #0e1a13; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
+  .ek-wall { fill: #1a1009eb; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
   .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e99); } }
   .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
-  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x { opacity: 0; transition: opacity .4s, transform .4s; }
-  .ek-resp rect { fill: #3fb9501a; stroke: #3fb950; stroke-width: 2; }
-  .ek-shield { fill: #0d1117; stroke: #3fb950; stroke-width: 2.5; stroke-linejoin: round; opacity: 0; transition: opacity .3s .4s; }
-  .ek-leak rect { fill: #f851491a; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
-  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s6 .ek-cmt, .s7 .ek-clean { opacity: 1; }
+  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x, .ek-ft { opacity: 0; transition: opacity .4s, transform .4s; }
+  .ek-shield circle { fill: #0d1117; stroke: #3fb950; stroke-width: 2; }
+  .ek-resp rect { fill: #0e1a13; stroke: #3fb950; stroke-width: 2; }
+  .ek-shield { fill: #3fb950; opacity: 0; transition: opacity .3s .4s; }
+  .ek-leak rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
+  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s5 .ek-ft.f5, .s6 .ek-cmt, .s6 .ek-ft.f6, .s7 .ek-clean, .s7 .ek-ft.f7 { opacity: 1; }
   .s5 .ek-shield { opacity: 1; filter: drop-shadow(0 0 8px #3fb950); }
   .s5 .ek-leak text { text-decoration: line-through; } .s5 .ek-leak { opacity: .45; }
-  .ek-x circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; } .ek-x path { stroke: #ff7b72; stroke-width: 3.5; stroke-linecap: round; }
+  .ek-x { fill: #ff7b72; } .ek-x circle { fill: #0d1117; }
   .s4 .ek-x { filter: drop-shadow(0 0 10px #f85149); }
   .ek-opt { transition: fill .3s; } .s5 .ek-opt { fill: #3fb950; font-weight: 800; }
   .s5 .ek-card.gt { filter: drop-shadow(0 0 14px #3fb95099); }
   .ek-hl { fill: #7ee787; font-weight: 700; }
   .s7 .ek-in { opacity: .2; transition: opacity .6s; } .ek-in { transition: opacity .4s; }
   .ek-clean rect { fill: #0d1117; stroke: #f0883e; stroke-width: 3; } .ek-clean text { fill: #ffa657; font: 800 22px var(--mono); letter-spacing: .12em; text-anchor: middle; }
-  .ek-lock circle { fill: #0d1117; stroke: #f0883e; stroke-width: 2.5; } .ek-lock rect { fill: #ffa657; } .ek-lock path { fill: none; stroke: #ffa657; stroke-width: 3; }
+  .ek-lock circle { fill: #0d1117; stroke: #f0883e; stroke-width: 2.5; } .ek-lock { fill: #ffa657; }
+  .ek-file { fill: #9198a1; } .ek-file text { fill: #c9d1d9; }
   .ek-file rect { fill: #161b22; stroke: #30363d; stroke-width: 1.5; transition: stroke .3s, filter .3s; }
   .s3 .ek-f2 rect { stroke: #f0883e; filter: drop-shadow(0 0 10px #f0883e88); }
-  .ek-note rect { fill: #3fb95014; stroke: #3fb95088; stroke-width: 1.5; }
-  .ek-conf rect { fill: #f8514914; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
-  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; transition: opacity .3s; } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; }
+  .ek-note rect { fill: #0e1a13; stroke: #3fb95088; stroke-width: 1.5; }
+  .ek-conf rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
+  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; stroke-dasharray: 1; stroke-dashoffset: 1; transition: opacity .3s, stroke-dashoffset .75s cubic-bezier(.45,0,.55,1); } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; stroke-dashoffset: 0; opacity: 0; }
+  .s1 #ekP1, .s2 #ekP2, .s3 #ekP3, .s5 #ekP5, .s6 #ekP6 { stroke-dashoffset: 0; } .s4 #ekP4 { opacity: .45; }
   .ek-wire.hot { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
-  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; } .ek-wl.o { fill: #ffa657; }
+  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s; } .ek-wl.o { fill: #ffa657; } .s2 .ek-wl:not(.o), .s3 .ek-wl.o { opacity: 1; }
   .ek-dot { fill: #7ee787; opacity: 0; filter: drop-shadow(0 0 10px #3fb950); } .ek-dot.o { fill: #ffa657; filter: drop-shadow(0 0 10px #f0883e); } .ek-dot.r { fill: #ff7b72; filter: drop-shadow(0 0 10px #f85149); }
   .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
-  .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
-  .zs-vm { fill: #8957e52a; stroke: #a371f7; stroke-width: 4; }
+  .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .zs-vm { fill: #1c1233f2; stroke: #a371f7; stroke-width: 4; }
   .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
   .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 2.6s; }
   @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f7aa); } }
   .zs-lock circle { fill: #0d1117; stroke: #a371f7; stroke-width: 3; filter: drop-shadow(0 0 10px #a371f788); }
-  .zs-lock rect { fill: #d2a8ff; } .zs-lock path { fill: none; stroke: #d2a8ff; stroke-width: 3.5; stroke-linecap: round; }
+  .zs-lock .zs-li { fill: #d2a8ff; }
   .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
   .zs-port { fill: #0d1117; stroke: #d2a8ff; stroke-width: 3; }
-  .zs-bars { opacity: 0; } .active .zs-bars { animation: zs-dim .8s ease both 2.5s; }
-  @keyframes zs-dim { from { opacity: 1; } to { opacity: .2; } }
-  .zs-bar { fill: url(#zsSteel); stroke: #0d1117; stroke-width: 1.5; transform: translateY(-470px); }
-  .active .zs-bar { animation: zs-slam .42s cubic-bezier(.5,0,1,1) both calc(var(--b) * 70ms + 950ms); }
-  @keyframes zs-slam { 0% { transform: translateY(-470px); } 78% { transform: translateY(8px); } 90% { transform: translateY(-5px); } 100% { transform: none; } }
-  .zs-cross { fill: url(#zsSteelH); stroke: #0d1117; stroke-width: 1.5; transform: scaleX(0); transform-box: fill-box; transform-origin: left; }
-  .active .zs-cross { animation: zs-cross .3s cubic-bezier(.2,.9,.2,1) both calc(var(--b) * 90ms + 1620ms); }
-  @keyframes zs-cross { to { transform: none; } }
-  .zs-lock path { transform: translateY(-7px); } .active .zs-lock path { animation: zs-shackle .18s ease-in both 2.05s; }
-  @keyframes zs-shackle { to { transform: none; } }
-  .active .zs-lock circle { animation: zs-snap .5s ease-out both 2.05s; transform-box: fill-box; transform-origin: center; }
+  /* sealed boundary: a glowing perimeter traces around the micro-VM, then the lock snaps shut */
+  .zs-ring { fill: none; stroke: #d2a8ff; stroke-width: 4; stroke-dasharray: 1536; stroke-dashoffset: 1536; filter: drop-shadow(0 0 10px #a371f7); }
+  .active .zs-ring { animation: zs-ring .8s cubic-bezier(.6,0,.4,1) both .9s; }
+  @keyframes zs-ring { to { stroke-dashoffset: 0; } }
+  .zs-li { transform: translateY(-6px); opacity: .5; } .active .zs-li { animation: zs-shackle .18s ease-in both 1.9s; }
+  @keyframes zs-shackle { to { transform: none; opacity: 1; } }
+  .active .zs-lock circle { animation: zs-snap .5s ease-out both 1.9s; transform-box: fill-box; transform-origin: center; }
   @keyframes zs-snap { 0% { transform: scale(1); } 35% { transform: scale(1.3); filter: drop-shadow(0 0 22px #f778ba); stroke: #f778ba; } 100% { transform: scale(1); } }
-  .zs-host { fill: #3fb95012; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
-  .zs-kern.g { fill: #8957e526; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #3fb9501f; stroke: #2ea043; stroke-width: 2; }
-  .zs-kern.r { fill: #3fb95014; stroke: #3fb95088; stroke-width: 2; }
+  .zs-host { fill: #0e1a13eb; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
+  .zs-kern.g { fill: #1c1233f2; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #0e1a13f2; stroke: #2ea043; stroke-width: 2; }
+  .zs-kern.r { fill: #0d1117eb; stroke: #3fb95088; stroke-width: 2; }
   .zs-kt { font: 700 26px "Mona Sans"; text-anchor: middle; } .zs-kt.g { fill: #d2a8ff; } .zs-kt.h, .zs-kt.r { fill: #7ee787; }
   .zs-at { font: 600 15px var(--mono); letter-spacing: .1em; text-anchor: middle; } .zs-at.g { fill: #d2a8ff; } .zs-at.h { fill: #7ee787; text-anchor: start; }
-  .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; transition: opacity .3s, stroke .3s; }
+  .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; stroke-dasharray: 1; stroke-dashoffset: 1; transition: opacity .3s, stroke .3s, stroke-dashoffset .56s cubic-bezier(.45,0,.55,1); }
+  .zs-wire.on { stroke-dashoffset: 0; } .zs-wire.done { marker-end: url(#zsM); }
   .zs-wire.hot { opacity: 1; stroke: #7ee787; filter: drop-shadow(0 0 6px #3fb950); }
-  .zs-l { fill: #7ee787; font: 600 17px var(--mono); }
+  .zs-l { fill: #7ee787; font: 600 17px var(--mono); opacity: 0; transition: opacity .4s; } .zs-l.on { opacity: 1; }
   .zs-l.m { text-anchor: middle; }
   .zs-node rect { fill: #0d1117; stroke: #3fb950; stroke-width: 2; transition: stroke .3s, filter .3s; }
-  .zs-node.key rect { fill: #8957e533; stroke: #a371f7; }
+  .zs-node.key rect { fill: #24173f; stroke: #a371f7; }
   .zs-node.hot rect { filter: drop-shadow(0 0 16px #3fb950); stroke: #7ee787; }
   .zs-node.key.hot rect { filter: drop-shadow(0 0 18px #a371f7); stroke: #d2a8ff; }
   .zs-n { fill: #f0f6fc; font: 700 22px "Mona Sans"; text-anchor: middle; }
   .zs-s { fill: #9198a1; font: 600 15px var(--mono); text-anchor: middle; letter-spacing: .06em; }
-  .zs-key { fill: none; stroke: #e2c5ff; stroke-width: 3; stroke-linecap: round; transition: stroke .3s; }
-  .zs-node.hot .zs-key { stroke: #f778ba; filter: drop-shadow(0 0 8px #f778ba); }
+  .zs-key { fill: #e2c5ff; transition: fill .3s; }
+  .zs-node.hot .zs-key { fill: #f778ba; filter: drop-shadow(0 0 8px #f778ba); }
   .zs-folder { fill: #a371f7; } .zs-folder.h { fill: #2ea043; }
   .zs-ft { fill: #f0f6fc; font: 700 19px "Mona Sans"; text-anchor: middle; }
   .zs-eng rect { fill: #0d1117cc; stroke: #a371f7; stroke-width: 1.5; } .zs-eng text { fill: #e2c5ff; font: 600 17px var(--mono); text-anchor: middle; }
   .zs-none { fill: #f778ba; font: 700 17px var(--mono); letter-spacing: .08em; text-anchor: middle; }
-  .zs-nokey { fill: none; stroke: #f778ba99; stroke-width: 3; stroke-linecap: round; } .zs-nokey .x { stroke: #f778ba; stroke-width: 4; }
-  .zs-dest { fill: none; stroke-width: 3; } .zs-dest.gh { stroke: #4493f8; } .zs-dest.net { stroke: #4493f8; }
+  .zs-nokey { fill: #f778ba99; } .zs-nokey .x { fill: none; stroke: #f778ba; stroke-width: 4; stroke-linecap: round; }
+  .zs-dest { fill: #4493f8; transition: fill .3s; }
   .zs-dl { fill: #79c0ff; font: 600 17px var(--mono); text-anchor: middle; }
-  .zs-dest-g.hot .zs-dest { filter: drop-shadow(0 0 12px #4493f8); stroke: #79c0ff; }
-  .zs-cyl { fill: #3fb95033; stroke: #3fb950; stroke-width: 2; transition: filter .3s, stroke .3s; } .zs-cyl.top { fill: #3fb9505c; }
-  .zs-node.hot .zs-cyl { stroke: #7ee787; filter: drop-shadow(0 0 14px #3fb950); }
-  .zs-cut { opacity: 0; } .zs-cut circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; filter: drop-shadow(0 0 10px #f85149); }
-  .zs-cut path { stroke: #f85149; stroke-width: 5; stroke-linecap: round; } .zs-cut text { fill: #ff7b72; font: 600 17px var(--mono); text-anchor: middle; }
+  .zs-dest-g.hot .zs-dest { filter: drop-shadow(0 0 12px #4493f8); fill: #79c0ff; }
+  .zs-cyl { fill: #3fb950; transition: filter .3s, fill .3s; }
+  .zs-node.hot .zs-cyl { fill: #7ee787; filter: drop-shadow(0 0 14px #3fb950); }
+  .zs-cut { opacity: 0; fill: #f85149; } .zs-cut circle { fill: #0d1117; filter: drop-shadow(0 0 10px #f85149); }
+  .zs-cut text { fill: #ff7b72; font: 600 17px var(--mono); text-anchor: middle; }
   .zs-cut.on { opacity: 1; }
   .zs-phase { fill: #f0f6fc; font: 600 18px var(--mono); text-anchor: end; }
   .zs-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
@@ -3196,59 +3196,57 @@
     });
     const CYC = T + HOLD;
     const build = () => {
-      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-      const key = (x, y) => `<g class="zs-key" transform="translate(${x},${y})"><circle cx="0" cy="0" r="8"/><path d="M8 0 H30 M22 0 V8 M28 0 V6"/></g>`;
+      // fill = null leaves the colour to CSS
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})"${fill ? ` fill="${fill}"` : ""}>${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      const key = (x, y) => `<g class="zs-key">${ico("key", x + 15, y, 30, null)}</g>`;
       const folder = (x, y, w, ht, cls = "") => `<path class="zs-folder ${cls}" d="M${x} ${y + 8} q0 -8 8 -8 h${w * 0.32} l10 12 h${w * 0.68 - 26} q8 0 8 8 v${ht - 28} q0 8 -8 8 h${-(w - 16)} q-8 0 -8 -8z"/>`;
       const box = (id, x, y, w, ht, name, sub, isKey) =>
         `<g class="zs-node${isKey ? " key" : ""}" id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${ht}" rx="12"/><text class="zs-n" x="${x + w / 2}" y="${y + (isKey ? 38 : ht / 2 + (sub ? -2 : 8))}">${name}</text>${
           isKey ? key(x + w / 2 - 15, y + ht - 28) : sub ? `<text class="zs-s" x="${x + w / 2}" y="${y + ht / 2 + 24}">${sub}</text>` : ""
         }</g>`;
       let g = `<defs><marker id="zsM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>`;
-      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient>`;
-      g += `<linearGradient id="zsSteel"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
-      g += `<linearGradient id="zsSteelH" x2="0" y2="1"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
-      g += `<clipPath id="zsCell"><rect x="0" y="0" width="300" height="450" rx="18"/></clipPath></defs>`;
-      // runner VM, kernels and the two areas
-      g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
-      g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
+      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient></defs>`;
+      // build order: the agent's micro-VM seals first, then the host and its services, the wires between them, the exits, and finally the kernels and runner underneath
+      g += `<g class="zs-area" style="--d:3.1s"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
+      g += `<g class="zs-area" style="--d:2.9s"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
       g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
-      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
+      g += `<g class="zs-area" style="--d:2.1s"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
+      g += `<g class="zs-area zs-vm-g" style="--d:.3s"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
       g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
-      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/><g class="zs-bot" fill="none" stroke="#f0f6fc" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M150 128 V138"/><circle cx="150" cy="125" r="4" fill="#f0f6fc"/><rect x="126" y="138" width="48" height="38" rx="10"/><path d="M121 150 V164 M179 150 V164"/><circle cx="140" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><circle cx="160" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><path d="M142 166 H158"/></g><text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
+      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/>${ico("copilot", 150, 156, 58)}<text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
       [
         ["copilot", 14],
         ["claude", 107],
         ["codex", 200],
       ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="248" width="86" height="38" rx="19"/><text x="${x + 43}" y="273">${n}</text></g>`));
-      g += `<g class="zs-nokey" transform="translate(138,340)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
+      g += `<g class="zs-nokey">${ico("key", 150, 340, 40, null)}<path class="x" d="M124 316 L176 364"/></g>`;
       g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text>`;
       g += `<rect class="zs-port" x="290" y="226" width="20" height="28" rx="5"/>`;
-      // jail cell: bars slam down, crossbars slide in, then the lock snaps shut and the bars dim
-      g += `<g class="zs-bars" clip-path="url(#zsCell)">${[0, 1, 2, 3, 4, 5, 6].map(b => `<rect class="zs-bar" style="--b:${b}" x="${26 + b * 40}" y="-4" width="10" height="458" rx="5"/>`).join("")}`;
-      g += `${[94, 303].map((y, b) => `<rect class="zs-cross" style="--b:${b}" x="-4" y="${y}" width="308" height="10" rx="5"/>`).join("")}</g>`;
-      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g></g>`;
-      g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
+      // sealed boundary: a glowing perimeter traces around the VM, then the lock snaps shut
+      g += `<rect class="zs-ring" x="-10" y="-10" width="320" height="470" rx="26"/>`;
+      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><g class="zs-li">${ico("lock", 150, 0, 26, null)}</g></g></g>`;
       // wires and labels
-      g += `<g class="zs-area" style="--i:4">`;
-      for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" marker-end="url(#zsM)"/>`;
-      g += `<text class="zs-l" x="392" y="85">virtiofs</text><text class="zs-l" x="392" y="230">MCP</text><text class="zs-l" x="392" y="335">LLM API</text><text class="zs-l m" x="860" y="410">internet traffic</text>`;
+      g += `<g class="zs-area" style="--d:2.5s">`;
+      // wires draw in the first time a request travels them; labels follow their wire
+      for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" pathLength="1"/>`;
+      g += `<text class="zs-l" data-e="zsFs" x="392" y="85">virtiofs</text><text class="zs-l" data-e="zsMcp" x="392" y="230">MCP</text><text class="zs-l" data-e="zsLlm" x="392" y="335">LLM API</text><text class="zs-l m" data-e="zsNet" x="860" y="410">internet traffic</text>`;
       g += `</g>`;
       // host services
-      g += `<g class="zs-area" style="--i:5">`;
+      g += `<g class="zs-area" style="--d:2.3s">`;
       g += `<g class="zs-node" id="zsNFs">${folder(500, 56, 170, 80, "h")}<text class="zs-ft" x="585" y="98">workspace</text><text class="zs-ft" x="585" y="121">tool cache</text></g>`;
       g += box("zsNGw", 490, 200, 190, 80, "MCP gateway", "routes tools");
       g += box("zsNProxy", 490, 305, 190, 84, "API proxy", "", true);
       g += box("zsNSo", 790, 55, 200, 80, "Safe outputs", "proposals");
       g += box("zsNGhMcp", 790, 198, 200, 84, "GitHub MCP", "", true);
       g += box("zsNSquid", 1090, 200, 330, 80, "Squid firewall", "egress allowlist");
-      g += `<g class="zs-node" id="zsNArt"><path class="zs-cyl" d="M1195 66 V124 A45 12 0 0 0 1285 124 V66"/><ellipse class="zs-cyl top" cx="1240" cy="66" rx="45" ry="12"/><text class="zs-s" x="1240" y="164">ACTION ARTIFACTS</text></g>`;
-      g += `<g class="zs-cut" id="zsCut"><circle cx="1512" cy="240" r="20"/><path d="M1503 231 L1521 249 M1521 231 L1503 249"/><text x="1512" y="290">not allowed</text></g>`;
+      g += `<g class="zs-node" id="zsNArt"><g class="zs-cyl">${ico("package", 1240, 98, 64, null)}</g><text class="zs-s" x="1240" y="164">ACTION ARTIFACTS</text></g>`;
+      g += `<g class="zs-cut" id="zsCut"><circle cx="1512" cy="240" r="22"/>${ico("xCircle", 1512, 240, 40, null)}<text x="1512" y="290">not allowed</text></g>`;
       g += `</g>`;
       // destinations outside the runner
-      g += `<g class="zs-area" style="--i:6">`;
-      g += `<g class="zs-dest-g" id="zsDGh" transform="translate(1650,95)"><path class="zs-dest gh" d="M0 -34 L28 -23 V2 C28 20 13 30 0 36 C-13 30 -28 20 -28 2 V-23 Z"/><path class="zs-dest gh" d="M-11 0 L-3 9 L12 -8"/></g>`;
+      g += `<g class="zs-area" style="--d:2.7s">`;
+      g += `<g class="zs-dest-g" id="zsDGh"><g class="zs-dest">${ico("github", 1650, 95, 64, null)}</g></g>`;
       g += `<text class="zs-dl" x="1650" y="158">allow/deny</text><text class="zs-dl" x="1650" y="180">GitHub updates</text>`;
-      g += `<g class="zs-dest-g" id="zsDNet" transform="translate(1650,240)"><path class="zs-dest net" d="M-34 16 H32 A16 16 0 0 0 28 -14 A22 22 0 0 0 -12 -20 A18 18 0 0 0 -34 16 Z"/></g>`;
+      g += `<g class="zs-dest-g" id="zsDNet"><g class="zs-dest">${ico("globe", 1650, 240, 60, null)}</g></g>`;
       g += `<text class="zs-dl" x="1650" y="294">allow/deny</text><text class="zs-dl" x="1650" y="316">hosts/ports</text>`;
       g += `</g>`;
       g += `<text class="zs-phase" id="zsPhase" x="1476" y="34"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
@@ -3258,14 +3256,14 @@
       t0 = 0,
       cyc = -1,
       state = "",
-      jail = 0;
-    const JAIL = 1300;
+      seal = 0;
+    const SEAL = 2400;
     const $ = id => svg.querySelector("#" + id);
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     slides.push({
       group: "security",
       notes:
-        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
+        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; a sealed boundary traces around it and locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
       enter() {
         if (!built) {
           built = true;
@@ -3274,19 +3272,20 @@
         t0 = 0;
         cyc = -1;
         state = "";
-        jail = 0;
+        seal = 0;
+        svg.querySelectorAll(".zs-wire, .zs-l").forEach(x => x.classList.remove("on", "done"));
       },
       tick(t) {
         if (!t0) t0 = t;
         const raw = t - t0;
-        if (jail === 0 && raw >= 1330) {
-          jail = 1;
+        if (seal === 0 && raw >= 1700) {
+          seal = 1;
           sfx.block();
-        } else if (jail === 1 && raw >= 2050) {
-          jail = 2;
+        } else if (seal === 1 && raw >= 1900) {
+          seal = 2;
           sfx.key(1);
         }
-        const e = Math.max(0, raw - JAIL),
+        const e = Math.max(0, raw - SEAL),
           c = Math.floor(e / CYC),
           u = e % CYC;
         if (c !== cyc) {
@@ -3297,8 +3296,17 @@
         for (let i = 0; i < FLOW_AT.length; i++) if (u >= FLOW_AT[i]) f = i;
         const segs = SEGS.filter(s => s.f === f);
         const cur = segs.find(s => u >= s.t0 && u < s.t0 + SEG);
-        const done = segs.filter(s => u >= s.t0 + SEG).length;
         const deny = f >= 0 && FLOWS[f][2];
+        for (const s of segs) {
+          if (u < s.t0 || (deny && s.k === segs.length - 1)) continue;
+          const w = $(s.e);
+          if (!w.classList.contains("on")) {
+            w.classList.add("on");
+            svg.querySelectorAll(`[data-e="${s.e}"]`).forEach(x => x.classList.add("on"));
+          }
+          if (u >= s.t0 + SEG) w.classList.add("done");
+        }
+        const done = segs.filter(s => u >= s.t0 + SEG).length;
         const flowEnd = f >= 0 ? FLOW_AT[f] + segs.length * SEG + GAP - 150 : 0;
         const live = f >= 0 && u < flowEnd;
         const st = `${f}:${done}:${live}`;
@@ -3816,229 +3824,6 @@
     });
   }
 
-  // The Great Escapi: a daily red-team agent tries a new firewall escape each run; 400 recorded techniques fail, #401 (SNI domain fronting through a CDN-shared allowed host) escapes, and the firewall is fixed to check the TLS SNI. Counts and dates are measured from the workflow's repo memory
-  {
-    resetIndex();
-    const VW = 1800,
-      VH = 600;
-    // measured: The Great Escapi's repo memory (escape-attempts.json), 426 techniques in order, 15 Feb to 22 Sep 2026
-    const N = 426,
-      FIRST = 400,
-      ESC = new Set([400, 401, 402, 404, 405, 406, 409, 410, 411, 422, 423, 424, 425]),
-      MONTHS = [
-        [0, "FEB"],
-        [37, "JUL"],
-        [85, "AUG"],
-        [321, "SEP"],
-      ];
-    const ROWS = 3,
-      X0 = 60,
-      PITCH = 11.75,
-      CY0 = 432,
-      CS = 10;
-    const cx = i => X0 + Math.floor(i / ROWS) * PITCH;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg ge-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      "The Great Escapi: 426 recorded escape attempts; the first 400 are blocked, attempt 401 escapes by opening a tunnel to an allowed host on a shared CDN and asking for a different host in the TLS SNI, and the firewall fix checks the SNI against the allowlist"
-    );
-    const build = () => {
-      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-      // [id, path, color, label, lx, ly]
-      const EDGES = [
-        ["geW1", "M300 200 H520", "b", ["CONNECT", "registry.npmjs.org"], 410, 126],
-        ["geW2", "M745 200 H950", "o", ["TLS ClientHello", "SNI = contoso.com"], 850, 126],
-        ["geW3", "M1210 186 C1290 186 1290 120 1360 120", "g", [], 0, 0],
-        ["geW4", "M1210 214 C1290 214 1290 280 1360 280", "r", [], 0, 0],
-      ];
-      let g = `<defs><radialGradient id="geAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ff9b94"/><stop offset=".55" stop-color="#da3633"/><stop offset="1" stop-color="#6e1013"/></radialGradient>`;
-      for (const [k, c] of [
-        ["b", "#4493f8"],
-        ["o", "#d29922"],
-        ["g", "#3fb950"],
-        ["r", "#f85149"],
-      ])
-        g += `<marker id="geM${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
-      g += `</defs>`;
-      g += `<rect class="ge-box" x="20" y="70" width="270" height="260" rx="22"/><text class="ge-box-t" x="155" y="104">AWF SANDBOX</text>`;
-      for (const [id, d, c, lab, lx, ly] of EDGES) {
-        g += `<path class="ge-wire ${c}" id="${id}" d="${d}" marker-end="url(#geM${c})"/>`;
-        if (lab.length) g += `<text class="ge-l ${c}" x="${lx}" y="${ly}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-      }
-      g += `<g class="ge-node" id="geAgent"><circle cx="155" cy="200" r="54" fill="url(#geAgentG)"/>${ico("copilot", 155, 202, 58)}<text class="ge-n" x="155" y="294">Great Escapi</text></g>`;
-      g += `<g class="ge-node ge-proxy" id="geSquid"><rect x="525" y="120" width="215" height="160" rx="18"/><text class="ge-k" x="632" y="160">EGRESS PROXY</text><text class="ge-n" x="632" y="202">allowlist</text><text class="ge-s" id="geSquidT" x="632" y="244"></text></g>`;
-      g += `<g class="ge-node" id="geCdn"><rect x="955" y="130" width="250" height="140" rx="70"/><text class="ge-k" x="1080" y="186">SHARED CDN EDGE</text><text class="ge-s" x="1080" y="226">routes by SNI</text></g>`;
-      g += `<g class="ge-node ge-dest ok" id="geOk"><rect x="1365" y="88" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="129">registry.npmjs.org</text><text class="ge-tag g" x="1677" y="128">allowed</text></g>`;
-      g += `<g class="ge-node ge-dest bad" id="geBad"><rect x="1365" y="248" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="289">contoso.com</text><text class="ge-tag r" x="1677" y="288">not allowed</text><text class="ge-hit" id="geHit" x="1530" y="350">ESCAPED · 200 OK</text></g>`;
-      g += `<g class="ge-cut" id="geCut"><circle cx="800" cy="200" r="22"/><path d="M790 190 L810 210 M810 190 L790 210"/></g>`;
-      g += `<text class="ge-phase" id="gePhase" x="${VW - 60}" y="40"></text>`;
-      g += `<text class="ge-h" x="${X0}" y="402">EACH SQUARE IS ONE ESCAPE TECHNIQUE, IN THE ORDER THE AGENT TRIED THEM</text><text class="ge-h ge-cnt" id="geCnt" x="${cx(N - 1) + CS}" y="402"></text>`;
-      for (let i = 0; i < N; i++) g += `<rect class="ge-c${ESC.has(i) ? " x" : ""}" id="geC${i}" x="${cx(i)}" y="${CY0 + (i % ROWS) * PITCH}" width="${CS}" height="${CS}" rx="2"/>`;
-      const yb = CY0 + ROWS * PITCH + 4;
-      for (const [i, m] of MONTHS) g += `<line class="ge-tick" x1="${cx(i)}" y1="${yb}" x2="${cx(i)}" y2="${yb + 14}"/><text class="ge-m" x="${cx(i)}" y="${yb + 36}">${m}</text>`;
-      const xf = cx(FIRST) + CS / 2;
-      g += `<g class="ge-mark r" id="geFirst"><line x1="${xf}" y1="${yb}" x2="${xf}" y2="${yb + 62}"/><text x="${xf}" y="${yb + 88}" text-anchor="end">#401 · first escape · 14 Sep</text></g>`;
-      const xe = cx(N - 1) + CS + 8;
-      g += `<g class="ge-mark g" id="geFix"><path d="M${xe} ${CY0 - 4} H${xe + 10} V${CY0 + ROWS * PITCH} H${xe}"/><text x="${xe + 10}" y="402" text-anchor="end">firewall fix · 22 Sep</text></g>`;
-      g += `<circle class="ge-dot" id="geDot" r="9"/>`;
-      svg.innerHTML = g;
-    };
-    // measured from the same memory and the firewall pull request
-    const STATS = [
-      [400, "", "techniques blocked before the first escape", "#8b949e", "#c9d1d9"],
-      [401, "#", "SNI domain fronting through a CDN-shared allowed host", "#ff7b72", "#d29922"],
-      [13, "", "escapes logged, all variants of that one tunnel trick", "#d29922", "#ff7b72"],
-      [8, " days", "from first escape to the firewall fix", "#3fb950", "#79c0ff"],
-    ];
-    const fmt = (v, i) => (STATS[i][1] === "#" ? "#" + v : v + STATS[i][1]);
-    const nums = STATS.map((s, i) => h("div", { class: "ct-num" }, fmt(0, i)));
-    const stats = h(
-      "div",
-      { class: "ct-stats" },
-      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
-    );
-    // [phase, ms into the cycle]
-    const P = {
-      sweep: 600,
-      first: 4200,
-      w1: 4600,
-      w2: 5600,
-      w4: 6800,
-      hit: 7600,
-      more: 8200,
-      fix: 10200,
-      w1b: 10800,
-      w2b: 11800,
-      cut: 12400,
-    };
-    const CYC = 16000;
-    let built = false,
-      t0 = 0,
-      cyc = -1,
-      seen = new Set(),
-      lit = 0;
-    const $ = id => svg.querySelector("#" + id);
-    const fire = (name, fn) => {
-      if (seen.has(name)) return;
-      seen.add(name);
-      fn();
-    };
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const along = (id, f, col) => {
-      const p = $(id),
-        q = p.getPointAtLength(p.getTotalLength() * ease(Math.max(0, Math.min(1, f)))),
-        dot = $("geDot");
-      dot.setAttribute("cx", q.x);
-      dot.setAttribute("cy", q.y);
-      dot.setAttribute("fill", col);
-      dot.style.opacity = 1;
-      p.classList.add("hot");
-    };
-    const lightTo = n => {
-      for (; lit < n; lit++) $("geC" + lit).classList.add("on");
-      $("geCnt").textContent = lit ? "#" + String(lit).padStart(3, "0") : "";
-    };
-    slides.push({
-      group: "security",
-      notes:
-        "The Great Escapi is gh-aw's own red-team workflow: every day an agent runs inside the agent workflow firewall (AWF) with instructions to escape it, reads repo memory of every technique already tried so it never repeats one, tries something new, and writes the result back. The squares are measured from that memory: 426 recorded techniques between 15 February and 22 September 2026, in order. The first 400 were all blocked: DNS tricks, IPv6, request smuggling, encoding games, container and kernel escapes, proxy bypasses. Attempt 401, on 14 September, escaped. The agent noticed that a newly allowed package registry sits on a shared CDN, opened a proxy tunnel to it, which the allowlist accepts, and then asked for a different site in the TLS handshake's SNI. The proxy only checked the CONNECT target, so the CDN served the forbidden site. Over the next eight days the agent logged 13 escapes, all variants of that one trick, through more allowed hosts. Its report on 22 September went to the firewall team, and the same day the firewall shipped a fix: the proxy now peeks at the TLS ClientHello without decrypting it and terminates the connection unless the SNI is on the allowlist. The attack diagram is illustrative and simplified; the counts and dates are measured from the workflow's memory and the firewall pull request.",
-      enter() {
-        if (!built) {
-          built = true;
-          build();
-        }
-        t0 = 0;
-        cyc = -1;
-        nums.forEach((n, i) => (n.textContent = fmt(0, i)));
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC,
-          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
-        nums.forEach((n, i) => (n.textContent = fmt(Math.round(STATS[i][0] * f), i)));
-        if (c !== cyc) {
-          cyc = c;
-          seen = new Set();
-          lit = 0;
-          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
-          svg.classList.remove("fixed");
-          $("geSquidT").textContent = "";
-          $("gePhase").textContent = "";
-          $("geCnt").textContent = "";
-          $("geAgent").classList.add("on");
-          $("geSquid").classList.add("on");
-        }
-        svg.querySelectorAll(".ge-wire.hot").forEach(w => w.classList.remove("hot"));
-        const dot = $("geDot");
-        dot.style.opacity = 0;
-        if (u >= P.sweep && u < P.first) {
-          const n = Math.floor(((u - P.sweep) / (P.first - P.sweep)) * FIRST);
-          if (Math.floor(n / 25) !== Math.floor(lit / 25)) sfx.key(0.5);
-          lightTo(n);
-          fire("sweep", () => ($("gePhase").textContent = "attempts 1–400 · all blocked"));
-        }
-        if (u >= P.first) {
-          fire("first", () => {
-            lightTo(FIRST + 1);
-            $("geFirst").classList.add("on");
-            $("gePhase").textContent = "attempt #401 · 14 Sep 2026";
-            sfx.block(false);
-          });
-        }
-        if (u >= P.w1 && u < P.w2) along("geW1", (u - P.w1) / 800, "#4493f8");
-        if (u >= P.w1 + 800) fire("ok1", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
-        if (u >= P.w2 && u < P.w4) {
-          along("geW2", (u - P.w2) / 900, "#d29922");
-          fire("pass", () => ($("geSquidT").textContent = "tunnel open"));
-        }
-        if (u >= P.w2 + 900) fire("cdn", () => ($("geCdn").classList.add("on"), sfx.pop(4)));
-        if (u >= P.w4 && u < P.hit) along("geW4", (u - P.w4) / 700, "#f85149");
-        if (u >= P.hit && u < P.fix)
-          fire("hit", () => {
-            $("geBad").classList.add("on", "hot");
-            $("geW4").classList.add("on");
-            sfx.bug();
-          });
-        if (u >= P.more && u < P.fix) {
-          lightTo(FIRST + 1 + Math.floor(Math.min(1, (u - P.more) / 1600) * (N - FIRST - 1)));
-          fire("more", () => ($("gePhase").textContent = "13 escapes logged in 8 days"));
-        }
-        if (u >= P.fix)
-          fire("fix", () => {
-            lightTo(N);
-            ["geBad", "geW4", "geCdn"].forEach(id => $(id).classList.remove("on", "hot"));
-            svg.classList.add("fixed");
-            $("geFix").classList.add("on");
-            $("geSquidT").textContent = "+ SNI check";
-            $("gePhase").textContent = "firewall fix · 22 Sep 2026 · SNI must be allowed";
-            sfx.review();
-          });
-        if (u >= P.w1b && u < P.w2b) along("geW1", (u - P.w1b) / 800, "#4493f8");
-        if (u >= P.w1b + 800) fire("ok2", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
-        if (u >= P.w2b && u < P.cut) along("geW2", ((u - P.w2b) / 600) * 0.25, "#d29922");
-        if (u >= P.cut)
-          fire("cut", () => {
-            $("geCut").classList.add("on");
-            $("geSquidT").textContent = "✕ SNI denied";
-            sfx.block(true);
-          });
-      },
-      el: h(
-        "section",
-        { class: "slide ge" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A red-team agent that tries a new escape every day"), h("h2", {}, letters("Continuous "), letters("Security", "l-grad"))),
-        svg,
-        stats,
-        h("div", { class: "ct-src" }, "measured from The Great Escapi's repo memory · Feb–Sep 2026 · fixed in the AWF firewall")
-      ),
-    });
-  }
-
   // The factory mindset: engineer processes, not code
   {
     resetIndex();
@@ -4176,6 +3961,15 @@
     calendar: [
       "M6.75 0a.75.75 0 0 1 .75.75V3h9V.75a.75.75 0 0 1 1.5 0V3h2.75c.966 0 1.75.784 1.75 1.75v16a1.75 1.75 0 0 1-1.75 1.75H3.25a1.75 1.75 0 0 1-1.75-1.75v-16C1.5 3.784 2.284 3 3.25 3H6V.75A.75.75 0 0 1 6.75 0ZM21 9.5H3v11.25c0 .138.112.25.25.25h17.5a.25.25 0 0 0 .25-.25Zm-17.75-5a.25.25 0 0 0-.25.25V8h18V4.75a.25.25 0 0 0-.25-.25Z",
     ],
+    key: ["M16.75 8.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z", "M15.75 0a8.25 8.25 0 1 1-2.541 16.101l-1.636 1.636a1.744 1.744 0 0 1-1.237.513H9.25a.25.25 0 0 0-.25.25v1.448a.876.876 0 0 1-.256.619l-.214.213a.75.75 0 0 1-.545.22H5.25a.25.25 0 0 0-.25.25v1A1.75 1.75 0 0 1 3.25 24h-1.5A1.75 1.75 0 0 1 0 22.25v-2.836c0-.464.185-.908.513-1.236l7.386-7.388A8.249 8.249 0 0 1 15.75 0ZM9 8.25a6.733 6.733 0 0 0 .463 2.462.75.75 0 0 1-.168.804l-7.722 7.721a.25.25 0 0 0-.073.177v2.836c0 .138.112.25.25.25h1.5a.25.25 0 0 0 .25-.25v-1c0-.966.784-1.75 1.75-1.75H7.5v-1c0-.966.784-1.75 1.75-1.75h1.086a.25.25 0 0 0 .177-.073l1.971-1.972a.75.75 0 0 1 .804-.168A6.75 6.75 0 1 0 9 8.25Z"],
+    lock: ["M6 9V7.25C6 3.845 8.503 1 12 1s6 2.845 6 6.25V9h.5a2.5 2.5 0 0 1 2.5 2.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 19.5v-8A2.5 2.5 0 0 1 5.5 9Zm-1.5 2.5v8a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-13a1 1 0 0 0-1 1Zm3-4.25V9h9V7.25c0-2.67-1.922-4.75-4.5-4.75-2.578 0-4.5 2.08-4.5 4.75Z"],
+    repoLocked: ["M3 2.75A2.75 2.75 0 0 1 5.75 0h14.5a.75.75 0 0 1 .75.75v8a.75.75 0 0 1-1.5 0V1.5H5.75c-.69 0-1.25.56-1.25 1.25v12.651A2.987 2.987 0 0 1 6 15h5.25a.75.75 0 0 1 0 1.5H6A1.5 1.5 0 0 0 4.5 18v1.25c0 .69.56 1.25 1.25 1.25h5a.75.75 0 0 1 0 1.5h-5A2.75 2.75 0 0 1 3 19.25V2.75Z", "M15 14.5a3.5 3.5 0 1 1 7 0V16h.25c.966 0 1.75.784 1.75 1.75v4.5A1.75 1.75 0 0 1 22.25 24h-7.5A1.75 1.75 0 0 1 13 22.25v-4.5c0-.966.784-1.75 1.75-1.75H15Zm3.5-2a2 2 0 0 0-2 2V16h4v-1.5a2 2 0 0 0-2-2Z"],
+    github: ["M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"],
+    globe: ["M12 1c6.075 0 11 4.925 11 11s-4.925 11-11 11S1 18.075 1 12 5.925 1 12 1Zm3.241 10.5v-.001c-.1-2.708-.992-4.904-1.89-6.452a13.919 13.919 0 0 0-1.304-1.88L12 3.11l-.047.059c-.354.425-.828 1.06-1.304 1.88-.898 1.547-1.79 3.743-1.89 6.451Zm-12.728 0h4.745c.1-3.037 1.1-5.49 2.093-7.204.39-.672.78-1.233 1.119-1.673C6.11 3.329 2.746 7 2.513 11.5Zm18.974 0C21.254 7 17.89 3.329 13.53 2.623c.339.44.729 1.001 1.119 1.673.993 1.714 1.993 4.167 2.093 7.204ZM8.787 13c.182 2.478 1.02 4.5 1.862 5.953.382.661.818 1.29 1.304 1.88l.047.057.047-.059c.354-.425.828-1.06 1.304-1.88.842-1.451 1.679-3.471 1.862-5.951Zm-1.504 0H2.552a9.505 9.505 0 0 0 7.918 8.377 15.773 15.773 0 0 1-1.119-1.673C8.413 18.085 7.47 15.807 7.283 13Zm9.434 0c-.186 2.807-1.13 5.085-2.068 6.704-.39.672-.78 1.233-1.118 1.673A9.506 9.506 0 0 0 21.447 13Z"],
+    package: ["M12.876.64V.639l8.25 4.763c.541.313.875.89.875 1.515v9.525a1.75 1.75 0 0 1-.875 1.516l-8.25 4.762a1.748 1.748 0 0 1-1.75 0l-8.25-4.763a1.75 1.75 0 0 1-.875-1.515V6.917c0-.625.334-1.202.875-1.515L11.126.64a1.748 1.748 0 0 1 1.75 0Zm-1 1.298L4.251 6.34l7.75 4.474 7.75-4.474-7.625-4.402a.248.248 0 0 0-.25 0Zm.875 19.123 7.625-4.402a.25.25 0 0 0 .125-.216V7.639l-7.75 4.474ZM3.501 7.64v8.803c0 .09.048.172.125.216l7.625 4.402v-8.947Z"],
+    xCircle: ["M9.036 7.976a.75.75 0 0 0-1.06 1.06L10.939 12l-2.963 2.963a.75.75 0 1 0 1.06 1.06L12 13.06l2.963 2.964a.75.75 0 0 0 1.061-1.06L13.061 12l2.963-2.964a.75.75 0 1 0-1.06-1.06L12 10.939 9.036 7.976Z", "M12 1c6.075 0 11 4.925 11 11s-4.925 11-11 11S1 18.075 1 12 5.925 1 12 1ZM2.5 12a9.5 9.5 0 0 0 9.5 9.5 9.5 9.5 0 0 0 9.5-9.5A9.5 9.5 0 0 0 12 2.5 9.5 9.5 0 0 0 2.5 12Z"],
+    shieldCheck: ["M16.53 9.78a.75.75 0 0 0-1.06-1.06L11 13.19l-1.97-1.97a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.06 0l5-5Z", "m12.54.637 8.25 2.675A1.75 1.75 0 0 1 22 4.976V10c0 6.19-3.771 10.704-9.401 12.83a1.704 1.704 0 0 1-1.198 0C5.77 20.705 2 16.19 2 10V4.976c0-.758.489-1.43 1.21-1.664L11.46.637a1.748 1.748 0 0 1 1.08 0Zm-.617 1.426-8.25 2.676a.249.249 0 0 0-.173.237V10c0 5.46 3.28 9.483 8.43 11.426a.199.199 0 0 0 .14 0C17.22 19.483 20.5 15.461 20.5 10V4.976a.25.25 0 0 0-.173-.237l-8.25-2.676a.253.253 0 0 0-.154 0Z"],
+    file: ["M3 3a2 2 0 0 1 2-2h9.982a2 2 0 0 1 1.414.586l4.018 4.018A2 2 0 0 1 21 7.018V21a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm2-.5a.5.5 0 0 0-.5.5v18a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V8.5h-4a2 2 0 0 1-2-2v-4Zm10 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0-.146-.336l-4.018-4.018A.5.5 0 0 0 15 2.5Z"],
   };
   // Human Agent Processes: trigger → agent → output → human patterns, then the Repo Assist loop
   {
@@ -10340,8 +10134,8 @@
       "aria-label",
       "Need-to-know enclaves: a public issue asks whether version 2 is compatible with an internal integration; the primary agent hands the task through a trusted broker to a single-use enclave agent with read access to a private repository; the enclave tries to return a confidential launch date but the output gate drops anything outside the response schema; only compatibility and migrationRequired values reach the public comment, and the enclave is cleaned up"
     );
-    const bot = (cx, cy, s, c) =>
-      `<g fill="none" stroke="${c}" stroke-width="${3.5 / s}" stroke-linecap="round" stroke-linejoin="round" transform="translate(${cx},${cy}) scale(${s})"><path d="M0 -28 V-18"/><circle cx="0" cy="-31" r="4" fill="${c}"/><rect x="-24" y="-18" width="48" height="38" rx="10"/><path d="M-29 -6 V8 M29 -6 V8"/><circle cx="-10" cy="-2" r="4.5" fill="${c}" stroke="none"/><circle cx="10" cy="-2" r="4.5" fill="${c}" stroke="none"/><path d="M-8 10 H8"/></g>`;
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})"${fill ? ` fill="${fill}"` : ""}>${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const bot = (cx, cy, s, c) => ico("copilot", cx, cy, 60 * s, c);
     const pill = (x, y, w, t, c) => `<g class="ek-pill ${c}"><rect x="${x}" y="${y}" width="${w}" height="28" rx="14"/><text x="${x + w / 2}" y="${y + 19}">${t}</text></g>`;
     const PATHS = {
       ekP1: "M380 175 H440",
@@ -10352,16 +10146,16 @@
       ekP6: "M440 440 H380",
     };
     const build = () => {
-      let g = `<defs><radialGradient id="ekBotA"><stop offset="0" stop-color="#a371f7"/><stop offset="1" stop-color="#6e40c9"/></radialGradient><radialGradient id="ekBotB"><stop offset="0" stop-color="#f0883e"/><stop offset="1" stop-color="#9b4215"/></radialGradient></defs>`;
+      let g = `<defs><clipPath id="ekClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ekBotA"><stop offset="0" stop-color="#a371f7"/><stop offset="1" stop-color="#6e40c9"/></radialGradient><radialGradient id="ekBotB"><stop offset="0" stop-color="#f0883e"/><stop offset="1" stop-color="#9b4215"/></radialGradient></defs>`;
       // headers
       g += `<g class="ek-area" style="--i:0"><text class="ek-hd b" x="0" y="22">PUBLIC ISSUE</text><text class="ek-hd g" x="440" y="22">AGENTIC WORKFLOW</text><text class="ek-hd o" x="890" y="22">ISOLATED ENCLAVE · SINGLE USE</text><text class="ek-hd o" x="1360" y="22">PRIVATE REPOSITORY</text></g>`;
       // A: public issue + comment
       g += `<g class="ek-area" style="--i:1"><rect class="ek-card b" x="0" y="50" width="380" height="250" rx="16"/>`;
-      g += `<g class="ek-iss"><circle cx="34" cy="86" r="11"/><circle cx="34" cy="86" r="3" fill="#3fb950" stroke="none"/></g><text class="ek-t" x="56" y="94">Issue #42</text>${pill(290, 72, 70, "Public", "b")}`;
-      g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}</g>`;
+      g += `<g class="ek-iss">${ico("issue", 34, 86, 26, "#3fb950")}</g><text class="ek-t" x="56" y="94">Issue #42</text>${pill(290, 72, 70, "Public", "b")}`;
+      g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}<g class="ek-who"><circle cx="196" cy="258" r="17"/><image href="assets/avatars/ducky.jpg" x="181" y="243" width="30" height="30" clip-path="url(#ekClip)"/><text x="222" y="264">Ducky opened</text></g></g>`;
       g += `<g class="ek-cmt"><rect class="ek-card c" x="0" y="340" width="380" height="200" rx="16"/>${bot(34, 380, 0.5, "#d2a8ff")}<text class="ek-t s" x="58" y="386">AI agent commented</text>${pill(24, 406, 190, "Visible to everyone", "b")}`;
       g += `<text class="ek-tx" x="24" y="470">v2 is <tspan class="ek-hl">compatible</tspan> with our</text><text class="ek-tx" x="24" y="496">internal integration.</text><text class="ek-tx" x="24" y="522"><tspan class="ek-hl">No migration</tspan> is required.</text></g>`;
-      g += `<text class="ek-ft" x="190" y="582">✓ no project name · no launch date</text>`;
+      g += `<text class="ek-ft f6" x="190" y="582">✓ no project name · no launch date</text>`;
       // B: primary agent + output gate
       g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="url(#ekBotA)"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
       g += `<text class="ek-t" x="556" y="112">Primary agent</text><text class="ek-s" x="556" y="140">public repo · untrusted</text>`;
@@ -10369,32 +10163,33 @@
       g += `<g class="ek-area ek-gate" style="--i:3"><rect class="ek-card gt" x="440" y="300" width="380" height="240" rx="16"/><text class="ek-t" x="460" y="338">Output gate</text><text class="ek-s" x="460" y="364">only schema values leave</text>`;
       g += `<text class="ek-m k" x="460" y="408">compatibility</text><text class="ek-m" x="460" y="434"><tspan class="ek-opt">compatible</tspan> | incompatible | unknown</text>`;
       g += `<text class="ek-m k" x="460" y="478">migrationRequired</text><text class="ek-m" x="460" y="504">true | <tspan class="ek-opt">false</tspan></text></g>`;
-      g += `<text class="ek-ft" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
+      g += `<text class="ek-ft f5" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
       // C: enclave
       g += `<g class="ek-area" style="--i:4"><rect class="ek-wall" x="880" y="40" width="420" height="510" rx="24"/><g class="ek-in">`;
       g += `<rect class="ek-card o" x="910" y="70" width="360" height="150" rx="16"/><circle cx="970" cy="143" r="36" fill="url(#ekBotB)"/>${bot(970, 145, 0.75, "#f0f6fc")}`;
       g += `<text class="ek-t" x="1024" y="136">Enclave agent</text><text class="ek-s" x="1024" y="164">read-only · no network</text>`;
       g += `<rect class="ek-stat" x="910" y="236" width="360" height="38" rx="19"/><text id="ekStat" class="ek-m c" x="1090" y="261">Waiting for task</text>`;
       g += `<g class="ek-resp"><rect x="910" y="290" width="360" height="96" rx="14"/><text class="ek-m j" x="928" y="330">{"compatibility": "compatible",</text><text class="ek-m j" x="928" y="360"> "migrationRequired": false}</text>`;
-      g += `<path class="ek-shield" d="M1252 286 l16 6 v12 c0 10 -7 16 -16 20 c-9 -4 -16 -10 -16 -20 v-12 z M1245 305 l5 5 l9 -9"/></g>`;
+      g += `<g class="ek-shield"><circle cx="1252" cy="304" r="18"/>${ico("shieldCheck", 1252, 304, 26)}</g></g>`;
       g += `<g class="ek-leak"><rect x="910" y="406" width="360" height="110" rx="14"/><text class="ek-tx r" x="930" y="446">"Project Orchid launches</text><text class="ek-tx r" x="930" y="472">June 12…"</text><text class="ek-m x" x="930" y="502">✗ not in schema · dropped</text></g></g>`;
       g += `<g class="ek-clean"><rect x="975" y="372" width="230" height="60" rx="10"/><text x="1090" y="411">CLEANED UP</text></g></g>`;
-      g += `<text class="ek-ft" x="1090" y="582">launched per question · destroyed after</text>`;
+      g += `<text class="ek-ft f7" x="1090" y="582">launched per question · destroyed after</text>`;
       // D: private repo
       g += `<g class="ek-area" style="--i:5"><rect class="ek-card o" x="1360" y="50" width="400" height="490" rx="16"/>`;
-      g += `<g class="ek-lock"><circle cx="1396" cy="92" r="20"/><path d="M1389 92 V85 a7 7 0 0 1 14 0 V92"/><rect x="1385" y="91" width="22" height="14" rx="3"/></g>`;
+      g += `<g class="ek-lock"><circle cx="1396" cy="92" r="20"/>${ico("repoLocked", 1396, 92, 22)}</g>`;
       g += `<text class="ek-t s" x="1428" y="99">contoso/private-repo</text>${pill(1666, 126, 76, "Private", "o")}`;
-      g += `<g class="ek-file"><rect x="1380" y="168" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="194">README.md</text></g>`;
-      g += `<g class="ek-file ek-f2"><rect x="1380" y="218" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="244">compat-notes.md</text></g>`;
+      g += `<g class="ek-file"><rect x="1380" y="168" width="360" height="40" rx="8"/>${ico("file", 1406, 188, 20)}<text class="ek-m" x="1428" y="194">README.md</text></g>`;
+      g += `<g class="ek-file ek-f2"><rect x="1380" y="218" width="360" height="40" rx="8"/>${ico("file", 1406, 238, 20)}<text class="ek-m" x="1428" y="244">compat-notes.md</text></g>`;
       g += `<g class="ek-note"><rect x="1380" y="276" width="360" height="74" rx="10"/><text class="ek-tx" x="1398" y="306">v2: compatible with integration</text><text class="ek-tx" x="1398" y="334">migration: not required</text></g>`;
       g += `<g class="ek-conf"><rect x="1380" y="366" width="360" height="94" rx="10"/><text class="ek-m x" x="1398" y="398">CONFIDENTIAL</text><text class="ek-tx" x="1398" y="434">Project Orchid launches June 12</text></g>`;
       g += `${pill(1460, 484, 200, "authorized read access", "o")}</g>`;
-      // wires
+      // wires appear once both ends are on screen
+      g += `<g class="ek-area" style="--i:6">`;
       g += Object.entries(PATHS)
-        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"/>`)
+        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"${id === "ekP4" ? "" : ' pathLength="1"'}/>`)
         .join("");
-      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text>`;
-      g += `<g class="ek-x"><circle cx="830" cy="461" r="14"/><path d="M823 454 l14 14 M837 454 l-14 14"/></g>`;
+      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text></g>`;
+      g += `<g class="ek-x"><circle cx="830" cy="461" r="16"/>${ico("xCircle", 830, 461, 30)}</g>`;
       g += `<circle id="ekDot" class="ek-dot" r="9"/>`;
       svg.innerHTML = g;
     };
@@ -10433,7 +10228,9 @@
       },
       tick(t) {
         if (!t0) t0 = t;
-        const u = (t - t0) % CYC;
+        // hold the flow until every card and wire has risen in
+        const LEAD = 1900,
+          u = t - t0 < LEAD ? -1 : (t - t0 - LEAD) % CYC;
         let k = -1;
         for (let i = 0; i < STEPS.length; i++) if (u >= STEPS[i][0]) k = i;
         if (k !== stage) {
@@ -10458,6 +10255,229 @@
         dot.style.opacity = 1;
       },
       el: h("section", { class: "slide ek" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
+    });
+  }
+
+  // The Great Escapi: a daily red-team agent tries a new firewall escape each run; 400 recorded techniques fail, #401 (SNI domain fronting through a CDN-shared allowed host) escapes, and the firewall is fixed to check the TLS SNI. Counts and dates are measured from the workflow's repo memory
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 600;
+    // measured: The Great Escapi's repo memory (escape-attempts.json), 426 techniques in order, 15 Feb to 22 Sep 2026
+    const N = 426,
+      FIRST = 400,
+      ESC = new Set([400, 401, 402, 404, 405, 406, 409, 410, 411, 422, 423, 424, 425]),
+      MONTHS = [
+        [0, "FEB"],
+        [37, "JUL"],
+        [85, "AUG"],
+        [321, "SEP"],
+      ];
+    const ROWS = 3,
+      X0 = 60,
+      PITCH = 11.75,
+      CY0 = 432,
+      CS = 10;
+    const cx = i => X0 + Math.floor(i / ROWS) * PITCH;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ge-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "The Great Escapi: 426 recorded escape attempts; the first 400 are blocked, attempt 401 escapes by opening a tunnel to an allowed host on a shared CDN and asking for a different host in the TLS SNI, and the firewall fix checks the SNI against the allowlist"
+    );
+    const build = () => {
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      // [id, path, color, label, lx, ly]
+      const EDGES = [
+        ["geW1", "M300 200 H520", "b", ["CONNECT", "registry.npmjs.org"], 410, 126],
+        ["geW2", "M745 200 H950", "o", ["TLS ClientHello", "SNI = contoso.com"], 850, 126],
+        ["geW3", "M1210 186 C1290 186 1290 120 1360 120", "g", [], 0, 0],
+        ["geW4", "M1210 214 C1290 214 1290 280 1360 280", "r", [], 0, 0],
+      ];
+      let g = `<defs><radialGradient id="geAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ff9b94"/><stop offset=".55" stop-color="#da3633"/><stop offset="1" stop-color="#6e1013"/></radialGradient>`;
+      for (const [k, c] of [
+        ["b", "#4493f8"],
+        ["o", "#d29922"],
+        ["g", "#3fb950"],
+        ["r", "#f85149"],
+      ])
+        g += `<marker id="geM${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+      g += `</defs>`;
+      g += `<rect class="ge-box" x="20" y="70" width="270" height="260" rx="22"/><text class="ge-box-t" x="155" y="104">AWF SANDBOX</text>`;
+      for (const [id, d, c, lab, lx, ly] of EDGES) {
+        g += `<path class="ge-wire ${c}" id="${id}" d="${d}" marker-end="url(#geM${c})"/>`;
+        if (lab.length) g += `<text class="ge-l ${c}" x="${lx}" y="${ly}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+      }
+      g += `<g class="ge-node" id="geAgent"><circle cx="155" cy="200" r="54" fill="url(#geAgentG)"/>${ico("copilot", 155, 202, 58)}<text class="ge-n" x="155" y="294">Great Escapi</text></g>`;
+      g += `<g class="ge-node ge-proxy" id="geSquid"><rect x="525" y="120" width="215" height="160" rx="18"/><text class="ge-k" x="632" y="160">EGRESS PROXY</text><text class="ge-n" x="632" y="202">allowlist</text><text class="ge-s" id="geSquidT" x="632" y="244"></text></g>`;
+      g += `<g class="ge-node" id="geCdn"><rect x="955" y="130" width="250" height="140" rx="70"/><text class="ge-k" x="1080" y="186">SHARED CDN EDGE</text><text class="ge-s" x="1080" y="226">routes by SNI</text></g>`;
+      g += `<g class="ge-node ge-dest ok" id="geOk"><rect x="1365" y="88" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="129">registry.npmjs.org</text><text class="ge-tag g" x="1677" y="128">allowed</text></g>`;
+      g += `<g class="ge-node ge-dest bad" id="geBad"><rect x="1365" y="248" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="289">contoso.com</text><text class="ge-tag r" x="1677" y="288">not allowed</text><text class="ge-hit" id="geHit" x="1530" y="350">ESCAPED · 200 OK</text></g>`;
+      g += `<g class="ge-cut" id="geCut"><circle cx="800" cy="200" r="22"/><path d="M790 190 L810 210 M810 190 L790 210"/></g>`;
+      g += `<text class="ge-phase" id="gePhase" x="${VW - 60}" y="40"></text>`;
+      g += `<text class="ge-h" x="${X0}" y="402">EACH SQUARE IS ONE ESCAPE TECHNIQUE, IN THE ORDER THE AGENT TRIED THEM</text><text class="ge-h ge-cnt" id="geCnt" x="${cx(N - 1) + CS}" y="402"></text>`;
+      for (let i = 0; i < N; i++) g += `<rect class="ge-c${ESC.has(i) ? " x" : ""}" id="geC${i}" x="${cx(i)}" y="${CY0 + (i % ROWS) * PITCH}" width="${CS}" height="${CS}" rx="2"/>`;
+      const yb = CY0 + ROWS * PITCH + 4;
+      for (const [i, m] of MONTHS) g += `<line class="ge-tick" x1="${cx(i)}" y1="${yb}" x2="${cx(i)}" y2="${yb + 14}"/><text class="ge-m" x="${cx(i)}" y="${yb + 36}">${m}</text>`;
+      const xf = cx(FIRST) + CS / 2;
+      g += `<g class="ge-mark r" id="geFirst"><line x1="${xf}" y1="${yb}" x2="${xf}" y2="${yb + 62}"/><text x="${xf}" y="${yb + 88}" text-anchor="end">#401 · first escape · 14 Sep</text></g>`;
+      const xe = cx(N - 1) + CS + 8;
+      g += `<g class="ge-mark g" id="geFix"><path d="M${xe} ${CY0 - 4} H${xe + 10} V${CY0 + ROWS * PITCH} H${xe}"/><text x="${xe + 10}" y="402" text-anchor="end">firewall fix · 22 Sep</text></g>`;
+      g += `<circle class="ge-dot" id="geDot" r="9"/>`;
+      svg.innerHTML = g;
+    };
+    // measured from the same memory and the firewall pull request
+    const STATS = [
+      [400, "", "techniques blocked before the first escape", "#8b949e", "#c9d1d9"],
+      [401, "#", "SNI domain fronting through a CDN-shared allowed host", "#ff7b72", "#d29922"],
+      [13, "", "escapes logged, all variants of that one tunnel trick", "#d29922", "#ff7b72"],
+      [8, " days", "from first escape to the firewall fix", "#3fb950", "#79c0ff"],
+    ];
+    const fmt = (v, i) => (STATS[i][1] === "#" ? "#" + v : v + STATS[i][1]);
+    const nums = STATS.map((s, i) => h("div", { class: "ct-num" }, fmt(0, i)));
+    const stats = h(
+      "div",
+      { class: "ct-stats" },
+      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+    );
+    // [phase, ms into the cycle]
+    const P = {
+      sweep: 600,
+      first: 4200,
+      w1: 4600,
+      w2: 5600,
+      w4: 6800,
+      hit: 7600,
+      more: 8200,
+      fix: 10200,
+      w1b: 10800,
+      w2b: 11800,
+      cut: 12400,
+    };
+    const CYC = 16000;
+    let built = false,
+      t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      lit = 0;
+    const $ = id => svg.querySelector("#" + id);
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const along = (id, f, col) => {
+      const p = $(id),
+        q = p.getPointAtLength(p.getTotalLength() * ease(Math.max(0, Math.min(1, f)))),
+        dot = $("geDot");
+      dot.setAttribute("cx", q.x);
+      dot.setAttribute("cy", q.y);
+      dot.setAttribute("fill", col);
+      dot.style.opacity = 1;
+      p.classList.add("hot");
+    };
+    const lightTo = n => {
+      for (; lit < n; lit++) $("geC" + lit).classList.add("on");
+      $("geCnt").textContent = lit ? "#" + String(lit).padStart(3, "0") : "";
+    };
+    slides.push({
+      group: "security",
+      notes:
+        "The Great Escapi is gh-aw's own red-team workflow: every day an agent runs inside the agent workflow firewall (AWF) with instructions to escape it, reads repo memory of every technique already tried so it never repeats one, tries something new, and writes the result back. The squares are measured from that memory: 426 recorded techniques between 15 February and 22 September 2026, in order. The first 400 were all blocked: DNS tricks, IPv6, request smuggling, encoding games, container and kernel escapes, proxy bypasses. Attempt 401, on 14 September, escaped. The agent noticed that a newly allowed package registry sits on a shared CDN, opened a proxy tunnel to it, which the allowlist accepts, and then asked for a different site in the TLS handshake's SNI. The proxy only checked the CONNECT target, so the CDN served the forbidden site. Over the next eight days the agent logged 13 escapes, all variants of that one trick, through more allowed hosts. Its report on 22 September went to the firewall team, and the same day the firewall shipped a fix: the proxy now peeks at the TLS ClientHello without decrypting it and terminates the connection unless the SNI is on the allowlist. The attack diagram is illustrative and simplified; the counts and dates are measured from the workflow's memory and the firewall pull request.",
+      enter() {
+        if (!built) {
+          built = true;
+          build();
+        }
+        t0 = 0;
+        cyc = -1;
+        nums.forEach((n, i) => (n.textContent = fmt(0, i)));
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = fmt(Math.round(STATS[i][0] * f), i)));
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          lit = 0;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          svg.classList.remove("fixed");
+          $("geSquidT").textContent = "";
+          $("gePhase").textContent = "";
+          $("geCnt").textContent = "";
+          $("geAgent").classList.add("on");
+          $("geSquid").classList.add("on");
+        }
+        svg.querySelectorAll(".ge-wire.hot").forEach(w => w.classList.remove("hot"));
+        const dot = $("geDot");
+        dot.style.opacity = 0;
+        if (u >= P.sweep && u < P.first) {
+          const n = Math.floor(((u - P.sweep) / (P.first - P.sweep)) * FIRST);
+          if (Math.floor(n / 25) !== Math.floor(lit / 25)) sfx.key(0.5);
+          lightTo(n);
+          fire("sweep", () => ($("gePhase").textContent = "attempts 1–400 · all blocked"));
+        }
+        if (u >= P.first) {
+          fire("first", () => {
+            lightTo(FIRST + 1);
+            $("geFirst").classList.add("on");
+            $("gePhase").textContent = "attempt #401 · 14 Sep 2026";
+            sfx.block(false);
+          });
+        }
+        if (u >= P.w1 && u < P.w2) along("geW1", (u - P.w1) / 800, "#4493f8");
+        if (u >= P.w1 + 800) fire("ok1", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
+        if (u >= P.w2 && u < P.w4) {
+          along("geW2", (u - P.w2) / 900, "#d29922");
+          fire("pass", () => ($("geSquidT").textContent = "tunnel open"));
+        }
+        if (u >= P.w2 + 900) fire("cdn", () => ($("geCdn").classList.add("on"), sfx.pop(4)));
+        if (u >= P.w4 && u < P.hit) along("geW4", (u - P.w4) / 700, "#f85149");
+        if (u >= P.hit && u < P.fix)
+          fire("hit", () => {
+            $("geBad").classList.add("on", "hot");
+            $("geW4").classList.add("on");
+            sfx.bug();
+          });
+        if (u >= P.more && u < P.fix) {
+          lightTo(FIRST + 1 + Math.floor(Math.min(1, (u - P.more) / 1600) * (N - FIRST - 1)));
+          fire("more", () => ($("gePhase").textContent = "13 escapes logged in 8 days"));
+        }
+        if (u >= P.fix)
+          fire("fix", () => {
+            lightTo(N);
+            ["geBad", "geW4", "geCdn"].forEach(id => $(id).classList.remove("on", "hot"));
+            svg.classList.add("fixed");
+            $("geFix").classList.add("on");
+            $("geSquidT").textContent = "+ SNI check";
+            $("gePhase").textContent = "firewall fix · 22 Sep 2026 · SNI must be allowed";
+            sfx.review();
+          });
+        if (u >= P.w1b && u < P.w2b) along("geW1", (u - P.w1b) / 800, "#4493f8");
+        if (u >= P.w1b + 800) fire("ok2", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
+        if (u >= P.w2b && u < P.cut) along("geW2", ((u - P.w2b) / 600) * 0.25, "#d29922");
+        if (u >= P.cut)
+          fire("cut", () => {
+            $("geCut").classList.add("on");
+            $("geSquidT").textContent = "✕ SNI denied";
+            sfx.block(true);
+          });
+      },
+      el: h(
+        "section",
+        { class: "slide ge" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A red-team agent that tries a new escape every day"), h("h2", {}, letters("Continuous "), letters("Security", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "measured from The Great Escapi's repo memory · Feb–Sep 2026 · fixed in the AWF firewall")
+      ),
     });
   }
 
