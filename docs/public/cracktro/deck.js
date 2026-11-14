@@ -388,6 +388,17 @@
   .rao-led { animation: rao-led 1.1s steps(2) infinite; }
   @keyframes rao-led { 50% { opacity: .25; } }
   .rao-pkt { opacity: 0; }
+  .rob-card { fill: #0d1117e8; stroke: #3fb950; stroke-width: 2; filter: drop-shadow(0 0 10px #3fb95055); }
+  .rob-h { fill: #3fb950; font: 700 14px var(--mono); letter-spacing: .12em; }
+  .rob-s { fill: #9198a1; font: 500 13px var(--mono); }
+  .rob-bar { fill: #3fb95026; } .rob-bar.m { fill: #ab7df833; }
+  .rob-l { fill: #c9d1d9; font: 500 14px var(--mono); }
+  .rob-n { fill: #f0f6fc; font: 700 16px var(--mono); text-anchor: end; }
+  .rob-row text { fill: #8b949e; font: 500 13px var(--mono); transition: fill .3s; }
+  .rob-row .p { fill: #d29922; } .rob-row .f { fill: #3fb950; }
+  .rob-row rect { fill: transparent; transition: fill .3s; }
+  .rob-row.pick text { fill: #f0f6fc; } .rob-row.pick .p { fill: #f0b72f; } .rob-row.pick rect { fill: #3fb9501f; }
+  .rob-cap { fill: #9198a1; font: 500 15px var(--mono); letter-spacing: .04em; text-anchor: middle; }
   .otg-svg .fm-wire.o { stroke: #f0883e; } .otg-svg .mra-l.o { fill: #f0883e; }
   .otg-row { fill: transparent; transition: fill .4s; } .otg-row.hot { fill: #ab7df826; }
   .otg-a { fill: #e6edf3; font: 500 17px var(--mono); }
@@ -4854,6 +4865,40 @@
         <polyline class="rao-spark" id="raoSpark${i}" points=""/>`;
     });
     g += `</g>`;
+    // Measured (gh-aw, 13 Mar to 25 Oct 2026): daily-cli-performance "[performance] Regression in ..." issues,
+    // their Copilot assignment, Issue Monster picks and the merged fixes that closed them. Hours = issue opened → fix merged.
+    const RX = 446,
+      RW = 402,
+      FUNNEL = [
+        [116, "regression issues filed", ""],
+        [105, "assigned to Copilot", ""],
+        [72, "picked by Issue Monster", " m"],
+        [62, "fixes merged", ""],
+      ],
+      FIXES = [
+        ["21 Mar", "CompileComplex", "+40%", "2.9 h"],
+        ["25 Apr", "Validation", "+276%", "5.1 h"],
+        ["03 May", "CompileMCP", "+77%", "1.5 h"],
+        ["29 Jul", "CompileMCP", "+279%", "6.3 h"],
+        ["25 Oct", "ExtractWorkflowName", "+131%", "2.9 h"],
+      ];
+    g += `<g id="robPanel"><rect class="rob-card" x="${RX}" y="166" width="${RW}" height="306" rx="14"/>
+      <text class="rob-h" x="${RX + 16}" y="190">MEASURED · CLI PERFORMANCE</text>
+      <text class="rob-s" x="${RX + 16}" y="210">gh-aw benchmarks · 13 Mar – 25 Oct 2026</text>`;
+    FUNNEL.forEach(([n, l, m], i) => {
+      const y = 224 + i * 27;
+      g += `<rect class="rob-bar${m}" x="${RX + 12}" y="${y}" width="${((RW - 24) * n) / 116}" height="22" rx="4"/>
+        <text class="rob-l" x="${RX + 20}" y="${y + 16}">${l}</text><text class="rob-n" x="${RX + RW - 18}" y="${y + 17}">${n}</text>`;
+    });
+    g += `<text class="rob-s" x="${RX + 16}" y="350">median 6.8 h to merged fix · 55 of 62 &lt; 1 day</text>
+      <line class="fm-div" x1="${RX + 12}" y1="362" x2="${RX + RW - 12}" y2="362"/>`;
+    FIXES.forEach(([d, b, p, hrs], i) => {
+      const y = 382 + i * 19;
+      g += `<g class="rob-row" id="robFix${i}"><rect x="${RX + 8}" y="${y - 14}" width="${RW - 16}" height="19" rx="4"/>
+        <text x="${RX + 16}" y="${y}">${d}  ${b}</text><text class="p" x="${RX + RW - 78}" y="${y}" text-anchor="end">${p}</text>
+        <text class="f" x="${RX + RW - 16}" y="${y}" text-anchor="end">✓ ${hrs}</text></g>`;
+    });
+    g += `</g><text class="rob-cap" x="${VW / 2}" y="634">Measured: gh-aw daily-cli-performance → Issue Monster → Copilot, re-benchmarked daily (87 runs in repo memory). Fleet and spans are simulated.</text>`;
     g += agent("nResearch", 90, 140, 250, "Deep Research") + agent("nMonster", 510, 560, 220, "Issue Monster") + agent("nCopilot", 880, 560, 170, "Copilot");
     g += box("nRepo", 170, 350, "repo") + box("nIssues", 170, 560, "issue") + box("nMerge", 1620, 560, "merge") + dev("nDev", 1160, 560);
     g += `<g id="raoPkts"></g><circle class="fm-dot mra-dot" r="8"/>`;
@@ -4982,13 +5027,15 @@
       sound: "telemetry",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
-        "Research, assign, observe: an agentic feedback loop. The production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
+        "Research, assign, observe: an agentic feedback loop. Measured: the green panel and caption are gh-aw's own daily-cli-performance data, 13 Mar to 25 Oct 2026. The workflow benchmarks the compiler every day, keeps its history in repo memory (87 daily snapshots, 5 Apr to 13 Nov) and files '[performance] Regression in ...' issues labelled cookie: 116 of them. 105 were assigned to Copilot, 72 picked by Issue Monster, and 62 were closed by merged Copilot fixes, with a median of 6.8 hours from issue to merge (55 within a day); the next daily run re-benchmarks and observes the result. The five rows are real regressions with their slowdown and hours to fix. Illustrative: the production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
       enter() {
         t0 = prevT = lastSample = lastPkt = 0;
         cyc = -1;
       },
       tick(t) {
         if (!t0) t0 = prevT = t;
+        const fi = Math.floor((t - t0) / 1800) % FIXES.length;
+        FIXES.forEach((_, i) => $("robFix" + i).classList.toggle("pick", i === fi));
         const dt = Math.min(100, t - prevT);
         prevT = t;
         if (t - lastSample > 220) {
