@@ -11177,7 +11177,7 @@
   const BANDS = {
     platform: ["Workflows", "Markdown in, GitHub Actions out"],
     security: ["Security", "Assume the agent is compromised"],
-    process: ["Human agent processes", "Engineer processes, not code"],
+    process: ["Human agent processes", "Engineer processes, not code", ["#58a6ff", "#1f6feb", "#a5d6ff", "#cae8ff"]],
     cost: ["Cost & context", "Debug, spend less, route smarter"],
     engineering: ["Agentic Engineering", "Remember, expire, search, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
@@ -11213,7 +11213,7 @@
       resetIndex();
       const [title, sub] = BANDS[r.group],
         part = parts.indexOf(r) + 1,
-        c = r.items[0].palette;
+        c = BANDS[r.group][2] || r.items[0].palette;
       const map = h(
         "div",
         { class: "bh-map", "aria-hidden": "true" },
