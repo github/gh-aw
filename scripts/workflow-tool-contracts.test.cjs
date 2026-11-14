@@ -51,3 +51,24 @@ test("Tidy separates permitted formatting from exact permitted status inspection
     checkCommand(handler, command, "reject");
   }
 });
+
+test("Daily Graft uses full history and exposes the built wiring graph to its MCP server", () => {
+  const workflows = path.join(__dirname, "..", ".github", "workflows");
+  const source = fs.readFileSync(path.join(workflows, "daily-graft-intelligence.md"), "utf8");
+  const graft = fs.readFileSync(path.join(workflows, "shared", "mcp", "graft.md"), "utf8");
+  const lock = fs.readFileSync(path.join(workflows, "daily-graft-intelligence.lock.yml"), "utf8");
+
+  assert.match(source, /checkout:\s*\n\s+fetch-depth: 0/);
+  assert.doesNotMatch(source, /graft-(?:recent-activity|changed-files)\.txt \|\| true/);
+  assert.match(graft, /test -s "\$GRAFT_DIR\/\.graph\/wiring\.json"/);
+  assert.match(graft, /"--dir=\/tmp\/gh-aw\/graft"/);
+  assert.match(graft, /\\\$\{GITHUB_WORKSPACE\}:\\\$\{GITHUB_WORKSPACE\}:ro/);
+  assert.match(graft, /\/tmp\/gh-aw\/graft-empty-git:\\\$\{GITHUB_WORKSPACE\}\/\.git:ro/);
+  assert.match(graft, /\/tmp\/gh-aw\/graft:\/tmp\/gh-aw\/graft:ro/);
+  assert.match(lock, /fetch-depth: 0/);
+  assert.match(lock, /--dir=\/tmp\/gh-aw\/graft/);
+  assert.match(lock, /\/tmp\/gh-aw\/graft:\/tmp\/gh-aw\/graft:ro/);
+  assert.match(lock, /graft-empty-git:.*GITHUB_WORKSPACE.*\/\.git:ro/);
+  assert.match(source, /optional deep layer may report `NO GRAPH`/);
+  assert.match(source, /safeoutputs report_incomplete/);
+});

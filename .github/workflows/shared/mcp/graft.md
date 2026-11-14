@@ -5,8 +5,9 @@ steps:
       GRAFT_DIR: /tmp/gh-aw/graft
     run: |
       set -euo pipefail
-      mkdir -p "$GRAFT_DIR"
+      mkdir -p "$GRAFT_DIR" /tmp/gh-aw/graft-empty-git
       npx -y @nanonets/graft@0.8.0 --dir "$GRAFT_DIR" build "$GITHUB_WORKSPACE"
+      test -s "$GRAFT_DIR/.graph/wiring.json" || { echo "::error::Graft wiring graph is missing" >&2; exit 1; }
       npx -y @nanonets/graft@0.8.0 --dir "$GRAFT_DIR" check "$GITHUB_WORKSPACE"
 mcp-servers:
   graft:
@@ -14,10 +15,13 @@ mcp-servers:
     args:
       - "-y"
       - "@nanonets/graft@0.8.0"
+      - "--dir=/tmp/gh-aw/graft"
       - "mcp"
       - "${GITHUB_WORKSPACE}"
-    env:
-      GRAFT_DIR: "/tmp/gh-aw/graft"
+    mounts:
+      - \${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:ro
+      - /tmp/gh-aw/graft-empty-git:\${GITHUB_WORKSPACE}/.git:ro
+      - /tmp/gh-aw/graft:/tmp/gh-aw/graft:ro
     allowed:
       - graft_ask
       - graft_skeleton
@@ -40,7 +44,7 @@ network:
 # - https://www.npmjs.com/package/@nanonets/graft
 #
 # Why this wrapper exists:
-# - Builds the local Graft graph in /tmp so the repository checkout stays untouched.
+# - Builds the local Graft graph in /tmp and mounts it and the checkout read-only.
 # - Exposes Graft's stdio MCP server through npx using a pinned package version.
 # - Restricts access to the read-only Graft analysis tools.
 #

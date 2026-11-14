@@ -12,6 +12,8 @@ permissions:
   issues: read
   pull-requests: read
   copilot-requests: write
+checkout:
+  fetch-depth: 0
 engine:
   id: copilot
   copilot-sdk: true
@@ -52,10 +54,10 @@ steps:
       mkdir -p /tmp/gh-aw/agent
       git log --since="24 hours ago" --date=iso-strict \
         --format='commit %H%nAuthor: %an <%ae>%nDate: %ad%nSubject: %s%n' \
-        --name-status > /tmp/gh-aw/agent/graft-recent-activity.txt || true
+        --name-status > /tmp/gh-aw/agent/graft-recent-activity.txt
       git log --since="24 hours ago" --name-only --pretty=format: \
         | sed '/^$/d' \
-        | sort -u > /tmp/gh-aw/agent/graft-changed-files.txt || true
+        | sort -u > /tmp/gh-aw/agent/graft-changed-files.txt
 features:
   gh-aw-detection: true
 evals:
@@ -82,8 +84,8 @@ You are a repository intelligence analyst. Produce a concise daily report for th
 
 1. Run `cat /tmp/gh-aw/agent/graft-changed-files.txt` as a separate bash call.
 2. If the file is empty, call `noop` with a message that no repository files changed in the last 24 full hours.
-3. Run `graft graft_check` through bash to confirm the graph is current.
-4. Run `graft graft_map` through bash to identify the most connected directories, symbols, and hotspots.
+3. Run `graft graft_check` through bash to confirm the wiring graph is current. The optional deep layer may report `NO GRAPH`; rely on the wiring graph check, not the deep-layer status. If the wiring graph is missing, stale, or unusable, call `safeoutputs report_incomplete` and stop without creating a daily report.
+4. Run `graft graft_map` through bash to identify the most connected directories, symbols, and hotspots. If it fails, call `safeoutputs report_incomplete` and stop without creating a daily report.
 5. Run `cat /tmp/gh-aw/agent/graft-recent-activity.txt` as a separate bash call and identify the most meaningful changed files or subsystems.
 6. Use Graft tools to explain those changes:
    - `graft_ask` for high-level subsystem understanding
