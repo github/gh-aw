@@ -490,6 +490,45 @@
   .so-card .lb { margin-top: 12px; display: flex; gap: 10px; }
   .so-card .lb span { font: 600 16px/1 var(--mono); padding: 6px 12px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992222; color: #e3b341; }
   .so-card .lb span + span { border-color: #ab7df866; background: #ab7df822; color: #d2b8ff; }
+
+  /* --- agent memory: integrity-filtered inputs → agent recalls and works → trusted jobs persist the memories --- */
+  .mem .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #ab7df8, #3fb950); }
+  .mem-col, .mem-card { position: absolute; box-sizing: border-box; border: 2px solid var(--c); background: #0d1117ee; opacity: 0;
+    box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); transition: box-shadow .5s, border-color .5s; }
+  .mem-col { top: 320px; height: 600px; padding: 26px 28px; border-radius: 22px; }
+  .active .mem-col, .active .mem-card { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 260ms + 400ms); }
+  .mem-col.hot, .mem-card.hot { box-shadow: 0 0 110px -10px var(--c), inset 0 0 90px -40px var(--c); }
+  .mem-col > i, .mem-card > i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
+  .mem-col h3 { margin: 14px 0 18px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .mem-ico svg { width: 100%; height: 100%; display: block; }
+  .mem-gate { margin-bottom: 16px; padding: 10px 14px; border-radius: 10px; border: 1px dashed #d2992299; background: #d2992214; font: 600 17px/1.3 var(--mono); color: #e3b341; }
+  .mem-item { position: relative; margin-bottom: 12px; padding: 12px 14px; border-radius: 12px; background: #161b22; border: 1px solid #30363d;
+    transition: opacity .4s, border-color .4s, transform .4s, filter .4s; }
+  .mem-item .t { display: flex; align-items: center; gap: 10px; font: 600 21px/1.2 "Mona Sans"; color: #f0f6fc; white-space: nowrap; overflow: hidden; }
+  .mem-item .t .mem-ico { width: 22px; height: 22px; flex: none; }
+  .mem-item .s { margin-top: 8px; display: flex; white-space: nowrap; align-items: center; gap: 10px; font: 500 16px/1 var(--mono); color: #9198a1; }
+  .mem-lvl { padding: 5px 9px; border-radius: 99px; border: 1px solid var(--lc); color: var(--lc); font-weight: 600; }
+  .mem-item .v { margin-left: auto; font-weight: 700; opacity: 0; transition: opacity .3s; }
+  .mem-item.pass { border-color: #3fb950; } .mem-item.pass .v { opacity: 1; color: #3fb950; }
+  .mem-item.block { opacity: .5; filter: grayscale(.5); transform: translateX(-12px); border-color: #f85149; } .mem-item.block .v { opacity: 1; color: #ff7b72; }
+  .mem-item.block .t span:last-child { text-decoration: line-through; text-decoration-color: #f85149; }
+  .mem-term { margin-top: 18px; height: 336px; padding: 14px 16px; box-sizing: border-box; border-radius: 12px; background: #010409; border: 1px solid #30363d;
+    font: 500 19px/1.6 var(--mono); color: #d1d7e0; overflow: hidden; }
+  .mem-term div { white-space: pre; opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }
+  .mem-term div.on { opacity: 1; transform: none; }
+  .mem-term .o { color: #9198a1; } .mem-term .b { color: #79c0ff; } .mem-term .g { color: #3fb950; } .mem-term .w { color: #e3b341; }
+  .mem-card { left: 1270px; width: 540px; height: 136px; padding: 18px 22px; border-radius: 18px; }
+  .mem-card .n { margin-top: 12px; display: flex; align-items: center; gap: 12px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
+  .mem-card .n .mem-ico { width: 28px; height: 28px; }
+  .mem-card .d { margin-top: 12px; font: 500 17px/1 var(--mono); color: #9198a1; white-space: nowrap; }
+  .mem-card .st { position: absolute; right: 18px; top: 14px; padding: 6px 10px; border-radius: 99px; border: 1px solid #3d444d; font: 600 15px/1 var(--mono); color: #9198a1; transition: color .3s, border-color .3s, background .3s; }
+  .mem-card .st.in { border-color: #79c0ff; color: #79c0ff; background: #79c0ff1a; }
+  .mem-card .st.out { border-color: #3fb950; color: #3fb950; background: #3fb95022; }
+  .mem-arrow { position: absolute; top: 590px; text-align: center; font-size: 54px; color: #3d444d; opacity: 0; transition: color .4s, text-shadow .4s; }
+  .active .mem-arrow { animation: sec-arr .5s ease-out both 1.4s; }
+  .mem-arrow.hot { color: #f0f6fc; text-shadow: 0 0 24px #79c0ff; }
+  .mem-foot { position: absolute; left: 110px; top: 948px; font: 500 20px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .active .mem-foot { animation: rise .6s ease-out both 2s; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
   .so.p-pass .so-card .st { color: #3fb950; }
   .so.p-done .so-card { border-style: solid; border-color: #3fb950; box-shadow: 0 0 60px -6px #3fb95088; }
@@ -1113,6 +1152,55 @@
   .en-sens span { padding: 7px 12px; border-radius: 8px; font: 500 16px/1 var(--mono); color: #656c76; border: 1px solid #30363d; }
   .en-sens span.on { color: #0d1117; background: #3fb950; border-color: #3fb950; font-weight: 700; }
 
+  /* --- first commit to GA (measured history) --- */
+  .hist-tiles { position: absolute; left: 110px; top: 300px; width: 640px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
+  .hist-tile { border-left: 4px solid var(--c); padding: 6px 0 6px 20px; opacity: 0; }
+  .active .hist-tile { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 110ms + 400ms); }
+  .hist-tile b { display: block; font: 700 60px/1 var(--mono); color: var(--c); font-variant-numeric: tabular-nums; }
+  .hist-tile span { display: block; margin-top: 8px; font-size: 26px; font-variation-settings: "wght" 650, "wdth" 100; color: #f0f6fc; }
+  .hist-tile small { display: block; margin-top: 4px; font: 500 17px/1.2 var(--mono); color: #9198a1; }
+  .hist-splits { position: absolute; left: 110px; top: 800px; width: 640px; display: flex; flex-direction: column; gap: 26px; opacity: 0; }
+  .active .hist-splits { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.2s; }
+  .hist-split-t { font: 600 18px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; }
+  .hist-split-bar { display: flex; height: 18px; margin: 12px 0 10px; border-radius: 9px; overflow: hidden; gap: 3px; }
+  .hist-split-l { display: flex; gap: 24px; font-size: 20px; color: #c9d1d9; }
+  .hist-split-l em { font: 700 20px var(--mono); font-style: normal; color: var(--c); }
+  .hist-legend { position: absolute; left: 790px; top: 1012px; width: 1110px; display: flex; flex-wrap: wrap; gap: 10px 26px; opacity: 0; }
+  .active .hist-legend { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .hist-legend span { font: 600 17px/1 var(--mono); color: #ffffffd0; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
+  .hist-legend span::before { content: ""; width: 16px; height: 16px; border-radius: 3px; background: var(--c); }
+  .hist-legend span.ln::before { height: 4px; border-radius: 2px; }
+  .hist-svg { position: absolute; left: 760px; top: 340px; width: 1150px; height: 700px; overflow: visible; font-family: "Mona Sans"; }
+  .hist-grid { stroke: #ffffff12; stroke-width: 1; }
+  .hist-axis { stroke: #ffffff40; stroke-width: 2; }
+  .hist-ax { fill: #9198a1; font: 500 17px var(--mono); }
+  .hist-ax-l { fill: #d29922; }
+  .hist-yr { fill: #f0f6fc; font: 700 18px var(--mono); }
+  .hist-b-copilot { fill: #ab7df8; } .hist-b-bot { fill: #3fb950; } .hist-b-other { fill: #4493f8; }
+  .hist-b-human { fill: #db61a2; } .hist-b-none { fill: #ab7df84d; }
+  .hist-loc { fill: none; stroke: #d29922; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #d2992288); }
+  .hist-loc-dot { fill: #d29922; filter: drop-shadow(0 0 12px #d29922); }
+  .hist-head { stroke: #f0f6fc55; stroke-width: 2; stroke-dasharray: 4 6; }
+  .hist-flag { opacity: 0; transition: opacity .5s; }
+  .hist-flag.on { opacity: 1; }
+  .hist-flag line { stroke: var(--c); stroke-width: 2; stroke-dasharray: 6 6; }
+  .hist-flag circle { fill: var(--c); stroke: #0d1117; stroke-width: 3; }
+  .hist-fl { fill: var(--c); font: 700 22px "Mona Sans"; }
+  .hist-fd { fill: #9198a1; font: 500 16px var(--mono); }
+  /* --- how PRs land (measured distributions) --- */
+  .land-panels { position: absolute; left: 110px; top: 290px; width: 1700px; display: flex; gap: 100px; }
+  .land-panel { width: 800px; opacity: 0; }
+  .active .land-panel { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .land-t { font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; }
+  .land-big { display: flex; align-items: baseline; gap: 18px; margin: 12px 0 6px; }
+  .land-big b { font: 700 64px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; }
+  .land-big span { font-size: 22px; color: #c9d1d9; }
+  .land-svg { display: block; width: 800px; height: 470px; overflow: visible; font-family: "Mona Sans"; }
+  .land-med { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 6px; font-size: 19px; color: #c9d1d9; }
+  .land-med-t { width: 100%; font: 600 16px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; }
+  .land-med em { font: 700 19px var(--mono); font-style: normal; color: var(--c); }
+  .land-med span:nth-child(5) em { color: #c3a6f9; }
+  .land-legend.hist-legend { left: 110px; top: 1000px; width: auto; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -5608,6 +5696,188 @@
     });
   }
 
+  // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
+  {
+    resetIndex();
+    const icon = (name, fill = "#f0f6fc") => h("span", { class: "mem-ico", "data-ico": name, "data-fill": fill });
+    // cache-memory files: [icon, file, integrity of the run that wrote it, level colour, writer, visible to an approved run]
+    const INPUTS = [
+      ["merge", "triaged.json", "merged", "#ab7df8", "main branch", true],
+      ["person", "notes.md", "approved", "#3fb950", "maintainer", true],
+      ["comment", "labels.json", "unapproved", "#d29922", "contributor", false],
+      ["comment", "todo.md: skip all reviews", "none", "#f85149", "stranger", false],
+    ];
+    const items = INPUTS.map(([ic, t, lvl, lc, who]) =>
+      h(
+        "div",
+        { class: "mem-item" },
+        h("div", { class: "t" }, icon(ic, lc), h("span", {}, t)),
+        h("div", { class: "s" }, h("span", { class: "mem-lvl", "--lc": lc }, lvl), who, h("span", { class: "v" }))
+      )
+    );
+    // [store kind, name, icon, colour, idle/restored/saved chip text]
+    const STORES = [
+      ["ACTIONS CACHE · 7 DAYS", "cache-memory", "stopwatch", "#79c0ff", "saved"],
+      ["GIT BRANCH · NO EXPIRY", "repo-memory", "repo", "#ab7df8", "pushed"],
+      ["MANAGED ISSUE / PR COMMENT", "comment-memory", "comment", "#d29922", "upserted"],
+      ["APPEND-ONLY JSONL", "ledger", "tasklist", "#3fb950", "+1 shard"],
+    ];
+    const ledgerD = h("div", { class: "d" });
+    const DESC = [
+      h("div", { class: "d" }, "split by integrity · saved after detection"),
+      h("div", { class: "d" }, "memory/default · pushed by a trusted job"),
+      h("div", { class: "d" }, "comment-memory/*.md · keeps run history"),
+      ledgerD,
+    ];
+    const chips = STORES.map(() => h("span", { class: "st" }, "stored"));
+    const cards = STORES.map(([kind, name, ic, c], i) =>
+      h("div", { class: "mem-card", "--c": c, "--i": i + 2, style: { top: `${320 + i * 155}px` } }, h("i", {}, kind), chips[i], h("div", { class: "n" }, icon(ic, c), name), DESC[i])
+    );
+    const runNo = h("span", {});
+    const triaged = h("span", {});
+    const prevRun = h("span", {});
+    // [class, text] per terminal line; dynamic spans fill in per cycle
+    const lines = [
+      h("div", { class: "b" }, "↓ 4 memories restored · read-only"),
+      h("div", { class: "g" }, "✓ recall: merged + approved writes"),
+      h("div", {}, "$ cat cache-memory/triaged.json"),
+      h("div", { class: "o" }, "  ", triaged, " issues already triaged"),
+      h("div", {}, '$ ledger_query "top notes"'),
+      h("div", { class: "o" }, "  ▲4 retry flaky cart tests first"),
+      h("div", {}, "$ cat comment-memory/review.md"),
+      h("div", { class: "o" }, "  2 open questions from run #", prevRun),
+      h("div", { class: "w" }, "✎ triaged.json +3 · review.md"),
+      h("div", { class: "b" }, "→ ledger_note_add (safe output)"),
+    ];
+    const agentCol = h(
+      "div",
+      { class: "mem-col", "--c": "#ab7df8", "--i": 1, style: { left: "610px", width: "580px" } },
+      h("i", {}, "02 · AGENT · SANDBOXED"),
+      h("h3", {}, "Agent · run #", runNo),
+      h("div", { class: "so-who" }, h("span", { class: "so-av" }, icon("copilot")), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
+      h("div", { class: "mem-term" }, lines)
+    );
+    const inCol = h(
+      "div",
+      { class: "mem-col", "--c": "#d29922", "--i": 0, style: { left: "110px", width: "440px" } },
+      h("i", {}, "01 · RECALL · BY INTEGRITY"),
+      h("h3", {}, "cache-memory/"),
+      h("div", { class: "mem-gate" }, "approved run sees ≥ approved"),
+      items
+    );
+    const arrIn = h("div", { class: "mem-arrow", style: { left: "552px", width: "56px" } }, "→");
+    const arrMem = h("div", { class: "mem-arrow", style: { left: "1196px", width: "68px" } }, "⇄");
+    const el = h(
+      "section",
+      { class: "slide mem" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Restore · recall · write · persist, every run"), h("h2", {}, letters("Agent "), letters("memory", "l-grad"))),
+      inCol,
+      arrIn,
+      agentCol,
+      arrMem,
+      cards,
+      h("div", { class: "mem-foot" }, "Restored memory is untrusted data, not instructions · the agent proposes, trusted jobs persist")
+    );
+    // ms into the cycle: memories restore, inputs are filtered, the agent recalls and works, trusted jobs persist
+    const RESTORE = [700, 1100, 1500, 1900],
+      FILTER = [3200, 3650, 4100, 4550],
+      LINE = [2400, 5000, 5700, 6200, 6900, 7400, 8100, 8600, 9500, 10300],
+      PERSIST = [11000, 11600, 12200, 12800],
+      CYC = 17000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      iconsDrawn = false;
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const setNotes = n => (ledgerD.textContent = `${n} notes · queried read-only in SQLite`);
+    slides.push({
+      group: "cost",
+      sound: "memory",
+      palette: ["#8957e5", "#1f6feb", "#2da44e", "#0a3069"],
+      notes:
+        "Agent memory, an illustrative run with synthetic files, notes and counts. Agents start every run with no memory, so gh-aw gives them four kinds, all plain files or queries the agent already knows how to use. Before the agent starts, each configured memory is restored read-only into the sandbox: cache-memory from the GitHub Actions cache, fast scratch state with seven-day retention; repo-memory cloned from a memory/ git branch with no expiry; comment-memory extracted from a managed issue or pull request comment into markdown files, so state lives right next to the work; and ledgers replayed from append-only JSONL into a disposable SQLite view. Cache-memory is split by the integrity of the run that wrote it: this approved run recalls what merged and approved runs wrote, while files written by contributor or stranger-triggered runs stay invisible, so a poisoned todo can never steer it. The agent then recalls: it reads what it already triaged, queries the ledger for the highest-voted notes (evidence-backed hints with citations that later runs vote up or down) and picks up open questions from the last run's comment. It edits plain files and proposes ledger entries through safe outputs; it never writes back itself. After the run, trusted jobs persist: the cache is saved only after threat detection, repo-memory is pushed by a separate job, the comment is upserted with its run history, and ledger mutations are validated and appended as a new immutable shard. Restored memory is untrusted data, never instructions. Each cycle the run number and the memory grow.",
+      enter() {
+        if (!iconsDrawn) {
+          iconsDrawn = true;
+          el.querySelectorAll(".mem-ico").forEach(s => {
+            const n = s.dataset.ico;
+            s.innerHTML = `<svg viewBox="0 0 ${n === "merge" ? 16 : 24} ${n === "merge" ? 16 : 24}" fill="${s.dataset.fill || "#f0f6fc"}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+          });
+        }
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          runNo.textContent = 42 + c;
+          prevRun.textContent = 41 + c;
+          triaged.textContent = 118 + 3 * c;
+          setNotes(12 + c);
+          items.forEach(x => x.classList.remove("pass", "block"));
+          items.forEach(x => (x.querySelector(".v").textContent = ""));
+          lines.forEach(x => x.classList.remove("on"));
+          chips.forEach(x => {
+            x.classList.remove("in", "out");
+            x.textContent = "stored";
+          });
+        }
+        RESTORE.forEach((ms, i) => {
+          if (u >= ms)
+            fire("r" + i, () => {
+              chips[i].classList.add("in");
+              chips[i].textContent = "↓ restored";
+              sfx.pop(i);
+            });
+        });
+        FILTER.forEach((ms, i) => {
+          if (u >= ms)
+            fire("f" + i, () => {
+              const ok = INPUTS[i][5];
+              items[i].classList.add(ok ? "pass" : "block");
+              items[i].querySelector(".v").textContent = ok ? "✓ recalled" : "✕ hidden";
+              if (ok) sfx.pop(4 + i);
+              else sfx.step(-1);
+            });
+        });
+        LINE.forEach((ms, i) => {
+          if (u >= ms)
+            fire("l" + i, () => {
+              lines[i].classList.add("on");
+              sfx.key(0.7);
+            });
+        });
+        PERSIST.forEach((ms, i) => {
+          if (u >= ms)
+            fire("p" + i, () => {
+              chips[i].classList.remove("in");
+              chips[i].classList.add("out");
+              chips[i].textContent = `↑ ${STORES[i][4]}`;
+              if (i === 3) {
+                setNotes(13 + c);
+                sfx.notify(false);
+              } else sfx.pop(6 + i);
+            });
+        });
+        cards.forEach((x, i) => x.classList.toggle("hot", (u >= RESTORE[i] && u < RESTORE[i] + 600) || (u >= PERSIST[i] && u < PERSIST[i] + 900)));
+        inCol.classList.toggle("hot", u >= FILTER[0] - 200 && u < LINE[1]);
+        arrIn.classList.toggle("hot", u >= FILTER[0] && u < LINE[1]);
+        agentCol.classList.toggle("hot", u >= LINE[1] && u < PERSIST[0]);
+        arrMem.classList.toggle("hot", (u >= RESTORE[0] && u < LINE[0] + 300) || (u >= PERSIST[0] && u < PERSIST[3] + 900));
+      },
+      el,
+    });
+  }
+
   // Experiments, graders & evals: each run is assigned an A/B variant, graders measure it, evals judge it, and the analysis decides
   {
     resetIndex();
@@ -7273,6 +7543,368 @@
     });
   }
 
+  // First commit to GA: measured gh-aw history, monthly PRs by opener account and code size, from the first commit to GA at Universe
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    const nf = new Intl.NumberFormat("en-US");
+    // Calendar months Aug 2025 – Oct 2026 (October ends at GA, 28 Oct 2026).
+    const MON = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
+    const PRS = [130, 553, 1249, 1137, 1766, 2402, 2048, 1580, 1987, 2575, 1983, 1889, 2279, 870, 1484];
+    // PR origin by source issue: workflow PRs carry a gh-aw marker; Copilot PRs are split by who wrote the linked issue
+    const PR_AW = [5, 122, 147, 138, 188, 155, 207, 345, 353, 765, 331, 337, 466, 230, 264];
+    const PR_CCA_AW = [0, 0, 112, 323, 528, 588, 414, 345, 704, 878, 331, 951, 1140, 96, 189];
+    const PR_CCA_HUMAN = [21, 10, 48, 31, 31, 65, 161, 256, 289, 210, 71, 181, 201, 168, 233];
+    const PR_CCA_NONE = [7, 320, 848, 564, 962, 1439, 899, 495, 462, 602, 1114, 349, 375, 292, 125];
+    const ISSUES = [128, 253, 374, 644, 783, 1342, 2784, 1970, 2392, 2805, 3267, 3815, 4590, 5384, 5914];
+    const COMMITS = [199, 435, 1209, 1016, 1372, 1835, 1727, 1272, 1568, 1838, 1649, 1459, 1810, 638, 1251];
+    const RELEASES = [14, 25, 44, 20, 21, 47, 97, 52, 26, 30, 34, 22, 23, 34, 36];
+    const GO = [45343, 83895, 167218, 229698, 308671, 384658, 418714, 478675, 551585, 635605, 694490, 774553, 865285, 911402, 1114264];
+    const JS = [4964, 18340, 31187, 56842, 60565, 90464, 125903, 153134, 188628, 242988, 283948, 326296, 372962, 397896, 571579];
+    const LOC = GO.map((g, i) => g + JS[i]);
+    const N = MON.length;
+    const mStart = i => Date.UTC(2025, 7 + i, 1);
+    const DAY = 864e5,
+      T0 = Date.UTC(2025, 7, 12),
+      TGA = Date.UTC(2026, 9, 28);
+    const at = d => {
+      const i = Math.min(N - 1, Math.floor((new Date(d).getUTCFullYear() - 2025) * 12 + new Date(d).getUTCMonth() - 7));
+      return i + (d - mStart(i)) / (mStart(i + 1) - mStart(i));
+    };
+    const P0 = at(T0),
+      PEND = at(TGA + DAY);
+    const MILES = [
+      [T0, "first commit", "12 Aug 2025", "#9198a1"],
+      [Date.UTC(2026, 1, 13), "technical preview", "13 Feb 2026", "#4493f8"],
+      [Date.UTC(2026, 5, 11), "public preview", "11 Jun 2026", "#ab7df8"],
+      [TGA, "GA · Universe", "28 Oct 2026", "#3fb950"],
+    ];
+    // chart frame
+    const CX = 70,
+      SLOT = 66,
+      BW = 40,
+      BASE = 600,
+      TOP = 90,
+      PMAX = 2600,
+      LMAX = 1800000;
+    const xs = p => CX + p * SLOT;
+    const yP = v => BASE - ((BASE - TOP) * v) / PMAX;
+    const yL = v => BASE - ((BASE - TOP) * v) / LMAX;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "hist-svg");
+    svg.setAttribute("viewBox", "0 0 1150 700");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Measured gh-aw history: pull requests opened per month split by origin: workflow PRs, Copilot coding agent PRs from a workflow-written issue, from a human-written issue or with no linked issue, and other PRs, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026");
+    let grid = "";
+    for (const v of [0, 500, 1000, 1500, 2000, 2500]) grid += `<line x1="${CX - 10}" x2="${xs(N) + 6}" y1="${yP(v)}" y2="${yP(v)}" class="hist-grid"/><text x="${CX - 16}" y="${yP(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
+    for (const v of [500000, 1000000, 1500000]) grid += `<text x="${xs(N) + 14}" y="${yL(v) + 6}" class="hist-ax hist-ax-l">${v / 1e6}M</text>`;
+    let months = "";
+    MON.forEach((m, i) => {
+      months += `<text x="${xs(i + 0.5)}" y="${BASE + 30}" class="hist-ax" text-anchor="middle">${m}</text>`;
+      if (i === 0 || i === 5) months += `<text x="${xs(i + 0.5)}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">${i ? 2026 : 2025}</text>`;
+    });
+    let flags = "";
+    MILES.forEach(([d, label, date, c], k) => {
+      const x = xs(at(d)),
+        end = k === MILES.length - 1,
+        ly = k % 2 ? 26 : 62;
+      flags += `<g class="hist-flag" data-k="${k}" style="--c:${c}"><line x1="${x}" x2="${x}" y1="${ly + 14}" y2="${BASE}"/><circle cx="${x}" cy="${BASE}" r="7"/><text x="${x + (end ? 10 : -6)}" y="${ly - 18}" text-anchor="${end ? "end" : "start"}" class="hist-fl">${label}</text><text x="${x + (end ? 10 : -6)}" y="${ly + 4}" text-anchor="${end ? "end" : "start"}" class="hist-fd">${date}</text></g>`;
+    });
+    svg.innerHTML = `
+      <g>${grid}</g>
+      <g class="hist-bars"></g>
+      <path class="hist-loc" d=""/>
+      <circle class="hist-loc-dot" r="8" cx="${CX}" cy="${BASE}"/>
+      <line class="hist-axis" x1="${CX - 10}" x2="${xs(N) + 6}" y1="${BASE}" y2="${BASE}"/>
+      <g>${months}</g>
+      <g>${flags}</g>
+      <line class="hist-head" x1="${CX}" x2="${CX}" y1="${TOP - 10}" y2="${BASE}"/>`;
+    const barsG = svg.querySelector(".hist-bars");
+    const bars = MON.map((_, i) => {
+      const seg = ["hist-b-bot", "hist-b-copilot", "hist-b-human", "hist-b-none", "hist-b-other"].map(cls => {
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("class", cls);
+        r.setAttribute("x", xs(i + 0.5) - BW / 2);
+        r.setAttribute("width", BW);
+        r.setAttribute("rx", 3);
+        barsG.append(r);
+        return r;
+      });
+      return seg;
+    });
+    const locPath = svg.querySelector(".hist-loc"),
+      locDot = svg.querySelector(".hist-loc-dot"),
+      head = svg.querySelector(".hist-head"),
+      flagEls = [...svg.querySelectorAll(".hist-flag")];
+    // share of month i elapsed at playhead p; data spans 12 Aug 2025 to 28 Oct 2026, so the first and last months are partial
+    const fr = (i, p) => {
+      const a = i ? i : P0,
+        b = i === N - 1 ? PEND : i + 1;
+      return Math.max(0, Math.min(1, (p - a) / (b - a)));
+    };
+    const cum = (arr, p) => arr.reduce((s, v, i) => s + v * fr(i, p), 0);
+    const snap = (arr, p) => {
+      const i = Math.min(N - 1, Math.floor(p));
+      return (i ? arr[i - 1] : 0) + (arr[i] - (i ? arr[i - 1] : 0)) * fr(i, p);
+    };
+    const dayAt = p => {
+      const i = Math.min(N - 1, Math.floor(p)),
+        f = Math.min(1, p - i);
+      return Math.max(0, Math.min(TGA, mStart(i) + f * (mStart(i + 1) - mStart(i))) - T0) / DAY;
+    };
+    const TILES = [
+      ["days", p => Math.round(dayAt(p)), "#9198a1", "12 Aug 2025 → 28 Oct 2026"],
+      ["commits", p => cum(COMMITS, p), "#f0f6fc", "on main, all authors"],
+      ["pull requests", p => cum(PRS, p), "#ab7df8", "18,137 merged"],
+      ["issues", p => cum(ISSUES, p), "#4493f8", "33,441 by the workflow bot"],
+      ["releases", p => cum(RELEASES, p), "#3fb950", "v0.0.21 → v1.0.0"],
+      ["lines of Go + JS", p => snap(LOC, p), "#d29922", "incl. tests, at month end"],
+    ];
+    const tileVals = TILES.map(() => h("b", {}, "0"));
+    const fmt = (k, v) => (k === 5 ? (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : `${Math.round(v / 1000)}k`) : nf.format(Math.round(v)));
+    const split = (title, parts) =>
+      h(
+        "div",
+        { class: "hist-split" },
+        h("div", { class: "hist-split-t" }, title),
+        h("div", { class: "hist-split-bar" }, parts.map(([w, c]) => h("i", { style: { width: `${w}%`, background: c } }))),
+        h("div", { class: "hist-split-l" }, parts.map(([w, c, l]) => h("span", { "--c": c }, h("em", {}, `${w}%`), ` ${l}`)))
+      );
+    let p = P0,
+      t0 = 0,
+      lastMonth = -1,
+      lastFlag = -1;
+    const DUR = 9000;
+    const render = () => {
+      const pts = [];
+      for (let i = 0; i < N; i++) {
+        const g = Math.min(1, fr(i, p) * 1.4);
+        const vals = [PR_AW[i], PR_CCA_AW[i], PR_CCA_HUMAN[i], PR_CCA_NONE[i], PRS[i] - PR_AW[i] - PR_CCA_AW[i] - PR_CCA_HUMAN[i] - PR_CCA_NONE[i]];
+        let acc = 0;
+        bars[i].forEach((r, j) => {
+          const hgt = (BASE - yP(vals[j])) * g;
+          r.setAttribute("y", yP(0) - acc - hgt);
+          r.setAttribute("height", Math.max(0, hgt));
+          acc += hgt;
+        });
+        if (p >= i + 1 || i === N - 1) pts.push([xs(i + 1), yL(LOC[i])]);
+      }
+      const cur = [xs(Math.min(p, PEND)), yL(snap(LOC, p))];
+      const line = [[xs(P0), yL(0)], ...pts.filter(([x]) => x < cur[0]), cur];
+      locPath.setAttribute("d", "M" + line.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L"));
+      locDot.setAttribute("cx", cur[0]);
+      locDot.setAttribute("cy", cur[1]);
+      head.setAttribute("x1", cur[0]);
+      head.setAttribute("x2", cur[0]);
+      flagEls.forEach((f, k) => f.classList.toggle("on", p >= at(MILES[k][0]) - 0.02));
+      TILES.forEach(([, fn], k) => (tileVals[k].textContent = fmt(k, fn(p))));
+    };
+    slides.push({
+      group: "scale",
+      sound: "history",
+      palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
+      notes:
+        "Not illustrative: these are measured figures from gh-aw's own public history, from the first commit on 12 August 2025 to general availability at GitHub Universe on 28 October 2026 (v1.0.0 was tagged two days earlier). Commits, release tags and lines of Go and JavaScript (including tests, excluding docs) come from git on main as of the end of 28 October, Pacific time. Pull requests and issues come from GitHub search by creation date; October is a partial month. Bars split pull requests by where they started. Workflow PRs (4,053) are opened by the github-actions bot with a gh-aw workflow marker. Copilot coding agent PRs (17,509) are traced to their source issue through the agent's issue reference, closing links or a closing keyword: 6,599 came from an issue written by an agentic workflow (bot author plus workflow marker), 1,976 from an issue opened under a person's account, 8,853 had no linked issue, and 81 had mixed or other sources. A person's account does not mean no AI: GitHub records no creating app for issues written through the Copilot app or Copilot CLI, so those count as human here. Of the 1,976, only 74 carry a visible machine signal: 48 trace to issues a workflow filed with a personal token (they carry a workflow marker but a user author, so the rules keep them on the human side), 21 to issues whose text says Copilot drafted them, and 5 to issues GitHub records as created by the Copilot coding agent app. Of the Copilot PRs with an attributed source issue, 77 percent started from a workflow-written issue. Merge rates: 74 percent from workflow issues, 82 percent from human issues. Other PRs (2,451) include people, Dependabot, unmarked bot PRs and the mixed cases. Account type and issue provenance are not proof of who started a session, or of AI use.",
+      enter() {
+        t0 = 0;
+        lastMonth = lastFlag = -1;
+        p = matchMedia("(prefers-reduced-motion: reduce)").matches ? PEND : P0;
+        render();
+      },
+      tick(t) {
+        if (p >= PEND) return;
+        if (!t0) t0 = t;
+        const u = Math.min(1, (t - t0) / DUR);
+        p = P0 + (PEND - P0) * (1 - (1 - u) ** 1.6);
+        const m = Math.floor(p);
+        if (m !== lastMonth && m < N) sfx.pop((lastMonth = m));
+        const f = MILES.reduce((k, mi, j) => (p >= at(mi[0]) ? j : k), -1);
+        if (f > lastFlag) {
+          lastFlag = f;
+          if (f > 0) sfx.notify();
+        }
+        render();
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · gh-aw on GitHub"), h("h2", {}, letters("First commit "), letters("to GA", "l-grad"))),
+        h(
+          "div",
+          { class: "hist-tiles" },
+          TILES.map(([label, , c, sub], k) => h("div", { class: "hist-tile", "--c": c, "--i": k }, tileVals[k], h("span", {}, label), h("small", {}, sub)))
+        ),
+        h(
+          "div",
+          { class: "hist-splits" },
+          split("Copilot PRs from an issue written by", [
+            [77.0, "#ab7df8", "an agentic workflow"],
+            [23.0, "#db61a2", "a person's account"],
+          ]),
+          split("Commits authored by", [
+            [84.2, "#ab7df8", "agent & bot accounts"],
+            [15.8, "#4493f8", "people"],
+          ])
+        ),
+        h(
+          "div",
+          { class: "hist-legend" },
+          h("span", { "--c": "#3fb950" }, "workflow PRs"),
+          h("span", { "--c": "#ab7df8" }, "Copilot ← AW issue"),
+          h("span", { "--c": "#db61a2" }, "Copilot ← human issue"),
+          h("span", { "--c": "#ab7df84d" }, "Copilot, no issue"),
+          h("span", { "--c": "#4493f8" }, "other"),
+          h("span", { "--c": "#d29922", class: "ln" }, "lines of code")
+        ),
+        svg
+      ),
+    });
+  }
+
+  // How PRs land: measured time-to-merge and lines-changed distributions of merged gh-aw PRs, split by origin
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    const nf = new Intl.NumberFormat("en-US");
+    // origins: workflow PRs, Copilot from a workflow-written issue, from a human-written issue, with no linked issue, other
+    const ORIG = [
+      ["workflow PRs", "#3fb950"],
+      ["Copilot ← AW issue", "#ab7df8"],
+      ["Copilot ← human issue", "#db61a2"],
+      ["Copilot, no issue", "#ab7df84d"],
+      ["other", "#4493f8"],
+    ];
+    const CHARTS = [
+      {
+        title: "Time to merge",
+        big: "51 min",
+        sub: "median · 90% merged within 6.1 h",
+        bins: ["<10m", "10–30m", "30m–1h", "1–6h", "6–24h", "1–7d", ">7d"],
+        data: [
+          [638, 447, 324, 1047, 243, 25, 0],
+          [129, 1385, 957, 1879, 497, 33, 0],
+          [7, 154, 230, 897, 295, 37, 3],
+          [876, 1978, 1466, 2121, 425, 61, 2],
+          [581, 353, 254, 553, 173, 49, 18],
+        ],
+        medians: ["55m", "58m", "2.2h", "39m", "35m"],
+        ticks: [0, 2000, 4000, 6000],
+      },
+      {
+        title: "Lines changed per PR",
+        big: "120",
+        sub: "median lines added + removed · 90% under 1,560",
+        bins: ["<10", "10–49", "50–199", "200–999", "1k–5k", "5k+"],
+        data: [
+          [519, 1172, 676, 317, 31, 9],
+          [515, 1192, 1470, 1290, 350, 63],
+          [52, 177, 476, 604, 210, 104],
+          [668, 1260, 1693, 2005, 1011, 292],
+          [237, 373, 401, 541, 337, 92],
+        ],
+        medians: ["34", "102", "257", "176", "187"],
+        ticks: [0, 2000, 4000, 6000],
+      },
+    ];
+    const W = 800,
+      H = 470,
+      CX = 64,
+      BASE = 420,
+      TOP = 20,
+      YMAX = 6600;
+    const yv = v => BASE - ((BASE - TOP) * v) / YMAX;
+    const charts = CHARTS.map((c, ci) => {
+      const svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("class", "land-svg");
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", `${c.title} for ${nf.format(18137)} merged gh-aw pull requests, stacked by origin`);
+      const slot = (W - CX) / c.bins.length,
+        bw = slot * 0.62;
+      let g = "";
+      for (const v of c.ticks) g += `<line x1="${CX - 8}" x2="${W}" y1="${yv(v)}" y2="${yv(v)}" class="hist-grid"/><text x="${CX - 14}" y="${yv(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
+      c.bins.forEach((b, i) => (g += `<text x="${CX + slot * (i + 0.5)}" y="${BASE + 32}" class="hist-ax" text-anchor="middle">${b}</text>`));
+      svg.innerHTML = `<g>${g}</g><g class="land-bars"></g><line class="hist-axis" x1="${CX - 8}" x2="${W}" y1="${BASE}" y2="${BASE}"/>`;
+      const gb = svg.querySelector(".land-bars");
+      const rects = c.bins.map((_, i) =>
+        ORIG.map(([, col]) => {
+          const r = document.createElementNS(NS, "rect");
+          r.setAttribute("x", CX + slot * (i + 0.5) - bw / 2);
+          r.setAttribute("width", bw);
+          r.setAttribute("rx", 3);
+          r.setAttribute("fill", col);
+          gb.append(r);
+          return r;
+        })
+      );
+      return { c, svg, rects, ci };
+    });
+    const render = u => {
+      for (const { c, rects } of charts)
+        rects.forEach((seg, i) => {
+          const g = Math.max(0, Math.min(1, u * 1.6 - i * 0.1));
+          const e = 1 - (1 - g) ** 3;
+          let acc = 0;
+          seg.forEach((r, k) => {
+            const hgt = (BASE - yv(c.data[k][i])) * e;
+            r.setAttribute("y", BASE - acc - hgt);
+            r.setAttribute("height", Math.max(0, hgt));
+            acc += hgt;
+          });
+        });
+    };
+    let t0 = 0,
+      u = 0,
+      lastBin = -1;
+    const DUR = 2200;
+    const panel = ({ c, svg, ci }) =>
+      h(
+        "div",
+        { class: "land-panel", "--i": ci },
+        h("div", { class: "land-t" }, c.title),
+        h("div", { class: "land-big" }, h("b", {}, c.big), h("span", {}, c.sub)),
+        svg,
+        h(
+          "div",
+          { class: "land-med" },
+          h("span", { class: "land-med-t" }, "median by origin"),
+          ORIG.map(([label, col], k) => h("span", { "--c": col }, h("em", {}, c.medians[k]), ` ${label}`))
+        )
+      );
+    slides.push({
+      group: "scale",
+      sound: "land",
+      palette: ["#ab7df8", "#db61a2", "#3fb950", "#4493f8"],
+      notes:
+        "Not illustrative: measured from all 18,137 gh-aw pull requests opened between the first commit and GA at Universe (12 August 2025 to 28 October 2026) that were merged by 13 November 2026, from the GitHub API. Time to merge is mergedAt minus createdAt; bands include the lower bound. Lines changed are GitHub's additions plus deletions for the whole PR, across all files, including regenerated workflow lock files. Origins use the same rules as the history slide: workflow PRs carry a gh-aw workflow marker; Copilot coding agent PRs are traced to their source issue, which counts as workflow-written when a bot opened it with a workflow marker. Median time to merge: 51 minutes overall, 58 minutes from workflow-written issues and 2.2 hours from human-written issues. Median size: 120 lines overall, 102 from workflow-written issues and 257 from human-written issues. Workflow PRs are the smallest, at 34 lines. Human-written means opened under a person's account; issues drafted in the Copilot app or CLI leave no trace and count as human. Account type and issue provenance are not proof of who started a session, or of AI use.",
+      enter() {
+        t0 = 0;
+        lastBin = -1;
+        u = matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0;
+        render(u);
+      },
+      tick(t) {
+        if (u >= 1) return;
+        if (!t0) t0 = t;
+        u = Math.min(1, (t - t0) / DUR);
+        const b = Math.floor(u * 7);
+        if (b !== lastBin && b < 7) sfx.pop((lastBin = b));
+        render(u);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · merged gh-aw pull requests"), h("h2", {}, letters("How PRs "), letters("land", "l-grad"))),
+        h("div", { class: "land-panels" }, charts.map(panel)),
+        h(
+          "div",
+          { class: "land-legend hist-legend" },
+          ORIG.map(([label, col]) => h("span", { "--c": col }, label))
+        )
+      ),
+    });
+  }
+
   const stage = h(
     "div",
     { class: "stage" },
@@ -7845,6 +8477,24 @@
         });
         pad([38, 45, 50], t + 0.6, 2.6, 0.03, "triangle", 700);
         bell(86, t + 0.7, 0.03, 1.6);
+      },
+      // memory: a recalled motif, then its softer echo from the right, over a low pad
+      memory: t => {
+        [64, 67, 71, 76].forEach((m, i) => bell(m, t + 0.2 + i * 0.16, 0.045, 1.2));
+        [64, 67, 71, 76].forEach((m, i) => bell(m + 12, t + 1.0 + i * 0.16, 0.02, 1.0, panTo(0.5)));
+        pad([40, 47, 52, 56], t + 0.2, 2.6, 0.022, "triangle", 1400);
+      },
+      // first commit to GA: a climbing arpeggio that keeps rising, landing on a bright major chord
+      history: t => {
+        [48, 52, 55, 60, 64, 67, 72, 76].forEach((m, i) => tone(m, t + 0.15 + i * 0.22, { type: "triangle", dur: 0.3, vol: 0.05, cutoff: 2600, detune: 5 }));
+        pad([48, 55, 60, 64], t + 0.1, 3.4, 0.022, "triangle", 1400);
+        [79, 84, 88].forEach((m, i) => bell(m, t + 2 + i * 0.09, 0.035, 1.6));
+      },
+      // how PRs land: a burst of quick ticks that thins out, like a skewed merge-time distribution, then a settling chord
+      land: t => {
+        [0, 0.07, 0.13, 0.2, 0.28, 0.4, 0.58, 0.85, 1.25].forEach((d, i) => tone(76 - i * 2, t + 0.15 + d, { type: "square", dur: 0.08, vol: 0.04, cutoff: 3000, detune: 3 }));
+        pad([50, 57, 62, 66], t + 1.3, 2.4, 0.024, "triangle", 1500);
+        bell(86, t + 1.4, 0.035, 1.4);
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
