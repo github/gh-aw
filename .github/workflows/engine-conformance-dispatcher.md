@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 if: github.run_attempt == 1
 imports:
+  - shared/reporting.md
   - shared/work-queue-staged-plan.md
 permissions:
   contents: read
