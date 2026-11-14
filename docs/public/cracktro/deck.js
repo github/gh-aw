@@ -548,6 +548,53 @@
   .mem-arrow.hot { color: #f0f6fc; text-shadow: 0 0 24px #79c0ff; }
   .mem-foot { position: absolute; left: 110px; top: 948px; font: 500 20px/1 var(--mono); color: #9198a1; opacity: 0; }
   .active .mem-foot { animation: rise .6s ease-out both 2s; }
+
+  /* --- index & search: a shared workflow wires cache-memory → indexing job → artifact → agent MCP search --- */
+  .ix .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8); }
+  .ix-file, .ix-stage, .ix-term, .ix-gain { position: absolute; box-sizing: border-box; border: 2px solid var(--c); background: #0d1117ee; opacity: 0; border-radius: 20px;
+    box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); transition: box-shadow .5s, border-color .5s; }
+  .active .ix-file, .active .ix-stage, .active .ix-term, .active .ix-gain { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 200ms + 400ms); }
+  .ix-file.hot, .ix-stage.hot, .ix-term.hot, .ix-gain.hot { box-shadow: 0 0 110px -10px var(--c), inset 0 0 90px -40px var(--c); }
+  .ix-file > i, .ix-stage > i, .ix-term > i, .ix-gain > i { font: 600 16px/1 var(--mono); letter-spacing: .16em; color: var(--c); font-style: normal; }
+  .ix-file { left: 110px; width: 600px; padding: 22px 26px; }
+  .ix-file h3 { margin: 12px 0 14px; font: 600 30px/1 var(--mono); color: #f0f6fc; }
+  .ix-file .ln { margin-top: 8px; padding: 9px 12px; border-radius: 10px; border: 1px solid #30363d; background: #161b22; font: 500 18px/1.25 var(--mono); color: #d1d7e0;
+    white-space: nowrap; transition: border-color .3s, background .3s, color .3s; }
+  .ix-file .ln b { color: #79c0ff; font-weight: 600; }
+  .ix-file .ln em { font-style: normal; color: #9198a1; }
+  .ix-file .ln.hot { border-color: var(--lc, #79c0ff); background: #79c0ff14; color: #f0f6fc; }
+  .ix-imp { position: absolute; left: 330px; top: 526px; font: 600 18px/1 var(--mono); color: #3d444d; opacity: 0; transition: color .4s, text-shadow .4s; }
+  .ix-imp span { font-size: 38px; vertical-align: middle; margin-right: 10px; }
+  .active .ix-imp { animation: rise .5s ease-out both 1s; }
+  .ix-imp.hot { color: #f0f6fc; text-shadow: 0 0 20px #3fb950; }
+  .ix-stage { top: 300px; width: 232px; height: 214px; padding: 18px 18px; }
+  .ix-stage .n { margin-top: 12px; font: 700 27px/1.05 "Mona Sans"; color: #f0f6fc; }
+  .ix-stage .d { margin-top: 10px; font: 500 15px/1.35 var(--mono); color: #9198a1; }
+  .ix-stage .st { position: absolute; left: 18px; bottom: 16px; padding: 6px 10px; border-radius: 99px; border: 1px solid #3d444d; font: 600 15px/1 var(--mono); color: #9198a1;
+    transition: color .3s, border-color .3s, background .3s; white-space: nowrap; }
+  .ix-stage .st.on { border-color: var(--c); color: var(--c); background: #ffffff0d; }
+  .ix-arr { position: absolute; top: 380px; width: 34px; text-align: center; font-size: 40px; color: #3d444d; opacity: 0; transition: color .4s, text-shadow .4s; }
+  .active .ix-arr { animation: sec-arr .5s ease-out both 1.6s; }
+  .ix-arr.hot { color: #f0f6fc; text-shadow: 0 0 24px #79c0ff; }
+  .ix-loop { position: absolute; left: 886px; top: 514px; width: 798px; height: 52px; box-sizing: border-box; border: 2px dashed #3d444d; border-top: none; border-radius: 0 0 22px 22px;
+    opacity: 0; transition: border-color .4s, box-shadow .4s; }
+  .ix-loop span { position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%); padding: 0 14px; background: #0d1117; font: 600 16px/1.6 var(--mono); color: #9198a1; white-space: nowrap; transition: color .4s; }
+  .active .ix-loop { animation: rise .6s ease-out both 1.8s; }
+  .ix-loop.hot { border-color: #3fb950; box-shadow: 0 10px 30px -14px #3fb950; }
+  .ix-loop.hot span { color: #3fb950; }
+  .ix-term { left: 770px; top: 600px; width: 620px; height: 330px; padding: 20px 22px; }
+  .ix-term .tl { margin-top: 12px; font: 500 18px/1.6 var(--mono); color: #d1d7e0; }
+  .ix-term .tl div { white-space: pre; opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }
+  .ix-term .tl div.on { opacity: 1; transform: none; }
+  .ix-term .o { color: #9198a1; } .ix-term .b { color: #79c0ff; } .ix-term .g { color: #3fb950; } .ix-term .w { color: #e3b341; }
+  .ix-gain { left: 1420px; top: 600px; width: 390px; height: 330px; padding: 20px 22px; }
+  .ix-bar { margin-top: 20px; }
+  .ix-bar .k { display: flex; justify-content: space-between; font: 500 16px/1 var(--mono); color: #9198a1; }
+  .ix-bar .k b { color: #f0f6fc; font-weight: 600; }
+  .ix-bar .tr { margin-top: 8px; height: 16px; border-radius: 99px; background: #161b22; overflow: hidden; }
+  .ix-bar .fl { height: 100%; width: 0; border-radius: 99px; background: var(--bc); transition: width 1.1s cubic-bezier(.2,.9,.2,1); }
+  .ix-foot { position: absolute; left: 110px; top: 982px; font: 500 20px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .active .ix-foot { animation: rise .6s ease-out both 2.2s; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
   .so.p-pass .so-card .st { color: #3fb950; }
   .so.p-done .so-card { border-style: solid; border-color: #3fb950; box-shadow: 0 0 60px -6px #3fb95088; }
@@ -6090,6 +6137,169 @@
     });
   }
 
+  // Index & search: a shared workflow (shared/qmd.md) adds an indexing job, cache-memory and a QMD MCP search server; the agent searches a fresh index instead of reading a checkout
+  {
+    resetIndex();
+    // shared-file lines: [html, stage index that lights it]
+    const SHARED = [
+      ['<b>tools.cache-memory</b>: <em>id</em> qmd', 0],
+      ['<b>jobs.indexing</b>: <em>contents: read</em>', 1],
+      ['  qmd update · qmd embed <em># incremental</em>', 1],
+      ['<b>pre-agent-steps</b>: download qmd-index', 2],
+      ['<b>mcp-servers.qmd</b>: <em>allowed</em> query, get', 3],
+    ];
+    const sharedLines = SHARED.map(([html]) => {
+      const d = h("div", { class: "ln" });
+      d.innerHTML = html;
+      return d;
+    });
+    const consumerLines = ["<b>imports</b>: [shared/qmd.md]", "<b>checkout</b>: false · <em>contents: none</em>"].map(html => {
+      const d = h("div", { class: "ln", "--lc": "#3fb950" });
+      d.innerHTML = html;
+      return d;
+    });
+    const consumer = h("div", { class: "ix-file", "--c": "#3fb950", "--i": 0, style: { top: "300px" } }, h("i", {}, "CONSUMER WORKFLOW"), h("h3", {}, "docs-search.md"), consumerLines);
+    const imp = h("div", { class: "ix-imp" }, h("span", {}, "↓"), "imports");
+    const shared = h("div", { class: "ix-file", "--c": "#79c0ff", "--i": 1, style: { top: "566px" } }, h("i", {}, "SHARED AGENTIC WORKFLOW"), h("h3", {}, "shared/qmd.md"), sharedLines);
+    // [kicker, name, description, colour, chip text per phase]
+    const STAGES = [
+      ["CACHE-MEMORY", "previous index", "snapshot from the last published run", "#ab7df8"],
+      ["JOB · INDEXING", "update + embed", "only changed docs are re-embedded", "#3fb950"],
+      ["ARTIFACT", "qmd-index", "same-run handoff to the agent job", "#e3b341"],
+      ["JOB · AGENT", "MCP search", "disposable copy · no checkout", "#79c0ff"],
+    ];
+    const chips = STAGES.map(() => h("span", { class: "st" }, "idle"));
+    const stages = STAGES.map(([k, n, d, c], i) =>
+      h("div", { class: "ix-stage", "--c": c, "--i": i + 2, style: { left: `${770 + i * 266}px` } }, h("i", {}, k), h("div", { class: "n" }, n), h("div", { class: "d" }, d), chips[i])
+    );
+    const arrows = [0, 1, 2].map(i => h("div", { class: "ix-arr", style: { left: `${1002 + i * 266}px` } }, "→"));
+    const loop = h("div", { class: "ix-loop" }, h("span", {}, "↺ saved after threat detection · next run starts warm"));
+    const changed = h("span", {});
+    const lines = [
+      h("div", { class: "b" }, "→ qmd.query"),
+      h("div", { class: "o" }, '  lex "permissions contents"'),
+      h("div", { class: "o" }, '  vec "search docs without cloning"'),
+      h("div", { class: "g" }, "  0.91  reference/permissions.md"),
+      h("div", { class: "g" }, "  0.84  guides/least-privilege.md"),
+      h("div", { class: "b" }, "→ qmd.get permissions.md:40-80"),
+      h("div", { class: "w" }, "✎ answer with 2 cited passages"),
+    ];
+    const term = h("div", { class: "ix-term", "--c": "#79c0ff", "--i": 6 }, h("i", {}, "AGENT · SEARCH, THEN READ ONLY WHAT MATTERS"), h("div", { class: "tl" }, lines));
+    // [label, value, fill %, colour]
+    const BARS = [
+      ["grep + read the checkout", "~180k tok", 100, "#f85149"],
+      ["qmd query + get", "~9k tok", 5, "#3fb950"],
+    ];
+    const fills = BARS.map(([, , , c]) => h("div", { class: "fl", "--bc": c }));
+    const gain = h(
+      "div",
+      { class: "ix-gain", "--c": "#3fb950", "--i": 7 },
+      h("i", {}, "CONTEXT PER QUESTION"),
+      BARS.map(([l, v], i) => h("div", { class: "ix-bar" }, h("div", { class: "k" }, h("span", {}, l), h("b", {}, v)), h("div", { class: "tr" }, fills[i]))),
+      h("div", { class: "ix-bar" }, h("div", { class: "k" }, h("span", {}, "re-embedded"), h("b", {}, changed)))
+    );
+    const el = h(
+      "section",
+      { class: "slide ix" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "One import · index once · search every run"), h("h2", {}, letters("Index "), letters("& search", "l-grad"))),
+      consumer,
+      imp,
+      shared,
+      stages,
+      arrows,
+      loop,
+      term,
+      gain,
+      h("div", { class: "ix-foot" }, "Only the indexing job reads contents · the search server gets a disposable copy · illustrative figures")
+    );
+    // ms into the cycle when each stage lights; terminal lines; bars; publish
+    const STAGE = [600, 2200, 4000, 5400],
+      LINE = [6000, 6500, 7000, 7800, 8300, 9200, 10200],
+      BAR = 10800,
+      PUBLISH = 12600,
+      CYC = 16500,
+      CHANGED = [14, 3, 7, 0, 5];
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const chip = (i, text) => {
+      chips[i].textContent = text;
+      chips[i].classList.add("on");
+    };
+    slides.push({
+      group: "cost",
+      sound: "index",
+      palette: ["#2da44e", "#1f6feb", "#8957e5", "#0a3069"],
+      notes:
+        "Index and search, an illustrative run with synthetic file names, scores and token counts. Many workflows waste most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern separates preparing the corpus from using it. One import adds it: the consumer workflow lists shared/qmd.md under imports, turns checkout off and keeps contents: none. The shared agentic workflow brings everything else. A deterministic indexing job, the only job with contents: read, restores the previous index from cache-memory, runs qmd update and qmd embed so only changed documents are re-embedded, and uploads the index as an artifact, the same-run handoff. Before the agent starts, a pre-agent step downloads it and makes a disposable search copy. QMD runs as an MCP server in a container with only query, get, multi_get and status allowed, combining BM25 keywords, vectors and local reranking. The agent asks a hybrid query, gets ranked references, and retrieves only the lines it needs. After the run, cache-memory is published only after threat detection, so the next run starts warm. Any indexing library that builds a file-based index and serves it over MCP fits the same slots: index in a trusted job, hand off by artifact, persist through cache-memory, search read-only. See the experimental QMD page in the docs.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          changed.textContent = c === 0 ? "1,240 · cold start" : `${CHANGED[c % CHANGED.length]} of 1,240 docs`;
+          chips.forEach(x => {
+            x.classList.remove("on");
+            x.textContent = "idle";
+          });
+          lines.forEach(x => x.classList.remove("on"));
+          fills.forEach(x => (x.style.width = "0"));
+        }
+        STAGE.forEach((ms, i) => {
+          if (u >= ms)
+            fire("s" + i, () => {
+              if (i === 0) chip(0, c === 0 ? "∅ cold start" : `↓ run #${41 + c}`);
+              if (i === 1) chip(1, c === 0 ? "+1,240 embedded" : `+${CHANGED[c % CHANGED.length]} embedded`);
+              if (i === 2) chip(2, "↑ uploaded");
+              if (i === 3) chip(3, "query · get");
+              sfx.pop(i * 2);
+            });
+        });
+        LINE.forEach((ms, i) => {
+          if (u >= ms)
+            fire("l" + i, () => {
+              lines[i].classList.add("on");
+              sfx.key(0.7);
+            });
+        });
+        if (u >= BAR)
+          fire("bar", () => {
+            fills.forEach((x, i) => (x.style.width = `${BARS[i][2]}%`));
+            sfx.notify(false);
+          });
+        if (u >= PUBLISH)
+          fire("pub", () => {
+            chip(0, `↑ saved run #${42 + c}`);
+            sfx.pop(7);
+          });
+        const active = STAGE.findLastIndex(ms => u >= ms);
+        stages.forEach((x, i) => x.classList.toggle("hot", (i === active && u < PUBLISH) || (i === 0 && u >= PUBLISH && u < PUBLISH + 1200)));
+        arrows.forEach((x, i) => x.classList.toggle("hot", u >= STAGE[i + 1] - 300 && u < STAGE[i + 1] + 500));
+        sharedLines.forEach((x, i) => x.classList.toggle("hot", SHARED[i][1] === active && u < PUBLISH));
+        consumerLines[0].classList.toggle("hot", u < STAGE[0] + 400);
+        consumer.classList.toggle("hot", u < STAGE[0] + 400);
+        imp.classList.toggle("hot", u >= 200 && u < STAGE[1]);
+        shared.classList.toggle("hot", u >= STAGE[0] && u < LINE[0]);
+        term.classList.toggle("hot", u >= LINE[0] && u < BAR);
+        gain.classList.toggle("hot", u >= BAR && u < PUBLISH);
+        loop.classList.toggle("hot", u >= PUBLISH && u < PUBLISH + 2200);
+      },
+      el,
+    });
+  }
+
   // Experiments, graders & evals: each run is assigned an A/B variant, graders measure it, evals judge it, and the analysis decides
   {
     resetIndex();
@@ -8702,6 +8912,14 @@
         [64, 67, 71, 76].forEach((m, i) => bell(m, t + 0.2 + i * 0.16, 0.045, 1.2));
         [64, 67, 71, 76].forEach((m, i) => bell(m + 12, t + 1.0 + i * 0.16, 0.02, 1.0, panTo(0.5)));
         pad([40, 47, 52, 56], t + 0.2, 2.6, 0.022, "triangle", 1400);
+      },
+      // index & search: a quick indexing sweep of ticks, then a bright two-note "found" chime
+      index: t => {
+        osc("sine", 600, t + 0.15, 0.7, 0.012, { f1: 2400 });
+        [0, 1, 2, 3, 4, 5].forEach(i => click(t + 0.2 + i * 0.1, 2200 + i * 200, 0.035, 8));
+        bell(79, t + 0.95, 0.045, 1.2);
+        bell(86, t + 1.08, 0.04, 1.4);
+        pad([45, 52, 57, 64], t + 0.3, 2.2, 0.022, "triangle", 1500);
       },
       // first commit to GA: a climbing arpeggio that keeps rising, landing on a bright major chord
       history: t => {
