@@ -21,7 +21,6 @@ test("presents the forty-three slides without the removed sections", async ({ pa
     "Safety and control",
     "Supply chain hardening",
     "Safe outputs",
-    "Patch to PR",
     "Continuous Security",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
@@ -50,6 +49,7 @@ test("presents the forty-three slides without the removed sections", async ({ pa
     "Any agent, any provider",
     "Private enclaves",
     "Connectors",
+    "Patch to PR",
     "Enterprise ready",
     "Centralized campaigns",
     "G\u0131tHub Agentic Workflows",
@@ -67,8 +67,8 @@ test("presents the forty-three slides without the removed sections", async ({ pa
 });
 
 test("preserves navigation, slide links, speaker notes, and sound controls", async ({ page }) => {
-  await page.goto("/gh-aw/cracktro/#12");
-  await expect(page.locator(".count")).toHaveText("12 / 43");
+  await page.goto("/gh-aw/cracktro/#11");
+  await expect(page.locator(".count")).toHaveText("11 / 43");
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
   await expect(page.locator(".notes")).toContainText("LabelOps");
@@ -82,11 +82,11 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#13$/);
+  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#12$/);
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("12 / 43");
+  await expect(page.locator(".count")).toHaveText("11 / 43");
   await page.reload();
-  await expect(page.locator(".count")).toHaveText("12 / 43");
+  await expect(page.locator(".count")).toHaveText("11 / 43");
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
   await expect(page.locator(".count")).toHaveText("01 / 43");
@@ -158,7 +158,7 @@ test("publishes synthetic examples without profile assets or private source refe
     return route.abort();
   });
   await page.clock.install();
-  await page.goto("/gh-aw/cracktro/#20");
+  await page.goto("/gh-aw/cracktro/#19");
   await page.clock.runFor(15_000);
   for (const author of await page.locator(".mra-who").allTextContents()) {
     expect(author).toMatch(/^(?:linter miner|lintmonster|copilot) · /);
@@ -168,7 +168,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("gh-aw · May–Nov 2026");
   await page.keyboard.press("n");
-  for (const slide of [2, 3, 5, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) {
+  for (const slide of [2, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
