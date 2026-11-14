@@ -10107,7 +10107,7 @@
       ctx.setTransform(2, 0, 0, 2, 0, 0);
       ctx.clearRect(0, 0, CW, CH);
       ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
-      box(12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26" });
+      box(12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
       box(cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
         main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
       });
