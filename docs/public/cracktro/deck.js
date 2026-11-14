@@ -1203,160 +1203,6 @@
     });
   }
 
-  // Safety and control (security architecture): filtered inputs → sandbox → safe outputs
-  {
-    resetIndex();
-    const boxes = [
-      ["01 · IN · UNTRUSTED", "Filtered inputs", "#f85149", "", ["Untrusted content sanitized before the agent sees it", h("span", {}, "Read-only ", h("code", {}, "GITHUB_TOKEN"))]],
-      [
-        "02 · RUN · SAFE",
-        "Sandbox",
-        "#3fb950",
-        "sandbox",
-        [
-          h("span", {}, "Isolated container or ", h("code", {}, "NVX"), " microVM"),
-          "Enclaves: sub-agents scoped by repo sensitivity",
-          "Integrity filtering in the MCP gateway",
-          "Egress firewall: domain allowlist only",
-          "Model routing via API proxy: no keys inside",
-        ],
-      ],
-      [
-        "03 · OUT · SAFE",
-        "Safe outputs",
-        "#4493f8",
-        "out",
-        [h("span", {}, "Agent only ", h("em", {}, "proposes"), ": ", h("code", {}, "create-issue"), ", ", h("code", {}, "create-pull-request"), "…"), "Threat detection scans every output", "Separate job holds write permissions"],
-      ],
-    ];
-    const BX = [110, 710, 1310];
-    const threats = [
-      ["prompt injection", 80, 360],
-      ["secret exfiltration", 1420, 130],
-      ["poisoned pull request", 1300, 900],
-      ["token theft", 640, 960],
-      ["rogue MCP server", 1500, 250],
-      ["jailbreak", 60, 880],
-      ["supply-chain attack", 1640, 420],
-      ["data leak", 300, 230],
-      ["malicious issue comment", 1180, 60],
-      ["typosquatted package", 200, 990],
-      ["curl | sh", 1720, 820],
-      ["ignore previous instructions", 520, 30],
-    ];
-    const lane = h("canvas", { class: "sec-lane", width: 1920, height: 120 });
-    const ctx = lane.getContext("2d");
-    const GATE1 = 660,
-      GATE2 = 1260,
-      END = 1810,
-      LY = 60;
-    let pk = [],
-      lastSpawn = 0,
-      last = 0;
-    slides.push({
-      sound: "omen",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
-      notes:
-        "Safety and control: the security architecture is a big selling point of gh-aw. Inputs are filtered and sanitized, the agent runs in a sandbox (container or NVX microVM, with enclaves scoping sub-agents by repo sensitivity and integrity filtering in the MCP gateway) with a read-only token, model calls routed through an API proxy so no keys live inside, behind an egress firewall and MCP gateway, and it can only request safe outputs, which are scanned by threat detection and applied by a separate job that holds the write permissions. Enterprise ready: self-hosted runners, ARC with Docker-in-Docker, OpenTelemetry, GitHub Apps auth and multi-repo workflows.",
-      enter() {
-        pk = [];
-        lastSpawn = last = 0;
-        sfx.omen();
-      },
-      tick(t) {
-        const dt = last ? Math.min(50, t - last) : 16;
-        last = t;
-        if (t - lastSpawn > 260) {
-          lastSpawn = t;
-          const r = Math.random();
-          pk.push({ x: 20, y: LY + (Math.random() - 0.5) * 50, bad: r < 0.22 ? 1 : r < 0.32 ? 2 : 0, a: 1, ph: Math.random() * 6 });
-        }
-        ctx.clearRect(0, 0, 1920, 120);
-        ctx.strokeStyle = "#ffffff14";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 10]);
-        ctx.beginPath();
-        ctx.moveTo(0, LY);
-        ctx.lineTo(1920, LY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        for (const [x, c] of [
-          [GATE1, "#f85149"],
-          [GATE2, "#4493f8"],
-        ]) {
-          ctx.fillStyle = c;
-          ctx.shadowColor = c;
-          ctx.shadowBlur = 20;
-          ctx.fillRect(x - 3, 8, 6, 104);
-          ctx.shadowBlur = 0;
-        }
-        ctx.fillStyle = "#3fb95018";
-        ctx.fillRect(GATE1 + 50, 6, GATE2 - GATE1 - 100, 108);
-        ctx.fillStyle = "#9198a1";
-        ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-        ctx.textAlign = "center";
-        ctx.fillText("FILTER", GATE1, 2 + 12);
-        ctx.fillText("THREAT DETECTION", GATE2, 2 + 12);
-        ctx.fillText("GITHUB", END + 40, LY + 5);
-        for (const p of pk) {
-          const blockAt = p.bad === 1 ? GATE1 - 8 : p.bad === 2 ? GATE2 - 8 : Infinity;
-          if (p.x < blockAt) p.x += dt * 0.32;
-          else {
-            p.a -= dt / 500;
-            p.y += dt * 0.08;
-          }
-          const inBox = p.x > GATE1 && p.x < GATE2;
-          const y = p.y + (inBox ? Math.sin(t / 180 + p.ph) * 14 : 0);
-          const col = p.x >= blockAt ? "#ff7b72" : p.x > GATE2 ? "#4493f8" : inBox ? "#3fb950" : p.bad ? "#f85149" : "#8b949e";
-          ctx.globalAlpha = Math.max(0, p.a);
-          ctx.fillStyle = col;
-          ctx.shadowColor = col;
-          ctx.shadowBlur = 14;
-          ctx.beginPath();
-          ctx.arc(p.x, y, 7, 0, 7);
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        }
-        ctx.globalAlpha = 1;
-        pk = pk.filter(p => p.a > 0 && p.x < END);
-      },
-      el: h(
-        "section",
-        { class: "slide sec" },
-        h("div", { class: "sec-omen" }),
-        h(
-          "div",
-          { class: "sec-threats" },
-          threats.map(([w, x, y], i) => h("span", { "--i": i, style: { left: `${x}px`, top: `${y}px` } }, w))
-        ),
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Secure by design"), h("h2", {}, letters("Safety "), letters("and control", "l-grad"))),
-        h(
-          "div",
-          { class: "sec-ent" },
-          h("i", {}, "Enterprise ready"),
-          ["Self-hosted runners", "ARC + DinD", "OpenTelemetry", "GitHub Apps", "Multi-repo"].map((x, i) => h("span", { "--i": i }, x))
-        ),
-        boxes.map(([tag, title, c, cls, items], i) =>
-          h(
-            "div",
-            { class: `sec-box ${cls}`, "--c": c, "--i": i, style: { left: `${BX[i]}px` } },
-            cls === "sandbox" ? h("b", { class: "sec-shield" }, "🛡 safe zone") : null,
-            h("i", {}, tag),
-            h("h3", {}, title),
-            h(
-              "ul",
-              {},
-              items.map((x, j) => h("li", { "--j": j }, x))
-            )
-          )
-        ),
-        [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
-        lane
-      ),
-    });
-  }
-
   // Supply chain hardening: the compiler threat detection spec as concentric layers around the lock file
   {
     resetIndex();
@@ -1584,7 +1430,7 @@
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
-        "Supply chain hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and secret and content scans (secrets kept away from logs and telemetry, markdown scanned for hidden instructions, conditional imports checked). All of these are static checks on the authored file; the runtime sandbox and egress firewall are covered on the previous slide. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
+        "Supply chain hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and secret and content scans (secrets kept away from logs and telemetry, markdown scanned for hidden instructions, conditional imports checked). All of these are static checks on the authored file; the runtime sandbox and egress firewall come on the next slide. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
       enter() {
         shots = [];
         bits = [];
@@ -1670,6 +1516,160 @@
         lock,
         h("div", { class: "ch-legend" }, rows),
         h("div", { class: "ch-scan" }, "+ --validate · actionlint · zizmor · poutine")
+      ),
+    });
+  }
+
+  // Safety and control (security architecture): filtered inputs → sandbox → safe outputs
+  {
+    resetIndex();
+    const boxes = [
+      ["01 · IN · UNTRUSTED", "Filtered inputs", "#f85149", "", ["Untrusted content sanitized before the agent sees it", h("span", {}, "Read-only ", h("code", {}, "GITHUB_TOKEN"))]],
+      [
+        "02 · RUN · SAFE",
+        "Sandbox",
+        "#3fb950",
+        "sandbox",
+        [
+          h("span", {}, "Isolated container or ", h("code", {}, "NVX"), " microVM"),
+          "Enclaves: sub-agents scoped by repo sensitivity",
+          "Integrity filtering in the MCP gateway",
+          "Egress firewall: domain allowlist only",
+          "Model routing via API proxy: no keys inside",
+        ],
+      ],
+      [
+        "03 · OUT · SAFE",
+        "Safe outputs",
+        "#4493f8",
+        "out",
+        [h("span", {}, "Agent only ", h("em", {}, "proposes"), ": ", h("code", {}, "create-issue"), ", ", h("code", {}, "create-pull-request"), "…"), "Threat detection scans every output", "Separate job holds write permissions"],
+      ],
+    ];
+    const BX = [110, 710, 1310];
+    const threats = [
+      ["prompt injection", 80, 360],
+      ["secret exfiltration", 1420, 130],
+      ["poisoned pull request", 1300, 900],
+      ["token theft", 640, 960],
+      ["rogue MCP server", 1500, 250],
+      ["jailbreak", 60, 880],
+      ["supply-chain attack", 1640, 420],
+      ["data leak", 300, 230],
+      ["malicious issue comment", 1180, 60],
+      ["typosquatted package", 200, 990],
+      ["curl | sh", 1720, 820],
+      ["ignore previous instructions", 520, 30],
+    ];
+    const lane = h("canvas", { class: "sec-lane", width: 1920, height: 120 });
+    const ctx = lane.getContext("2d");
+    const GATE1 = 660,
+      GATE2 = 1260,
+      END = 1810,
+      LY = 60;
+    let pk = [],
+      lastSpawn = 0,
+      last = 0;
+    slides.push({
+      sound: "omen",
+      red: true,
+      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
+      notes:
+        "Safety and control: the security architecture is a big selling point of gh-aw. Inputs are filtered and sanitized, the agent runs in a sandbox (container or NVX microVM, with enclaves scoping sub-agents by repo sensitivity and integrity filtering in the MCP gateway) with a read-only token, model calls routed through an API proxy so no keys live inside, behind an egress firewall and MCP gateway, and it can only request safe outputs, which are scanned by threat detection and applied by a separate job that holds the write permissions. Enterprise ready: self-hosted runners, ARC with Docker-in-Docker, OpenTelemetry, GitHub Apps auth and multi-repo workflows.",
+      enter() {
+        pk = [];
+        lastSpawn = last = 0;
+        sfx.omen();
+      },
+      tick(t) {
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (t - lastSpawn > 260) {
+          lastSpawn = t;
+          const r = Math.random();
+          pk.push({ x: 20, y: LY + (Math.random() - 0.5) * 50, bad: r < 0.22 ? 1 : r < 0.32 ? 2 : 0, a: 1, ph: Math.random() * 6 });
+        }
+        ctx.clearRect(0, 0, 1920, 120);
+        ctx.strokeStyle = "#ffffff14";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 10]);
+        ctx.beginPath();
+        ctx.moveTo(0, LY);
+        ctx.lineTo(1920, LY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (const [x, c] of [
+          [GATE1, "#f85149"],
+          [GATE2, "#4493f8"],
+        ]) {
+          ctx.fillStyle = c;
+          ctx.shadowColor = c;
+          ctx.shadowBlur = 20;
+          ctx.fillRect(x - 3, 8, 6, 104);
+          ctx.shadowBlur = 0;
+        }
+        ctx.fillStyle = "#3fb95018";
+        ctx.fillRect(GATE1 + 50, 6, GATE2 - GATE1 - 100, 108);
+        ctx.fillStyle = "#9198a1";
+        ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("FILTER", GATE1, 2 + 12);
+        ctx.fillText("THREAT DETECTION", GATE2, 2 + 12);
+        ctx.fillText("GITHUB", END + 40, LY + 5);
+        for (const p of pk) {
+          const blockAt = p.bad === 1 ? GATE1 - 8 : p.bad === 2 ? GATE2 - 8 : Infinity;
+          if (p.x < blockAt) p.x += dt * 0.32;
+          else {
+            p.a -= dt / 500;
+            p.y += dt * 0.08;
+          }
+          const inBox = p.x > GATE1 && p.x < GATE2;
+          const y = p.y + (inBox ? Math.sin(t / 180 + p.ph) * 14 : 0);
+          const col = p.x >= blockAt ? "#ff7b72" : p.x > GATE2 ? "#4493f8" : inBox ? "#3fb950" : p.bad ? "#f85149" : "#8b949e";
+          ctx.globalAlpha = Math.max(0, p.a);
+          ctx.fillStyle = col;
+          ctx.shadowColor = col;
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(p.x, y, 7, 0, 7);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+        ctx.globalAlpha = 1;
+        pk = pk.filter(p => p.a > 0 && p.x < END);
+      },
+      el: h(
+        "section",
+        { class: "slide sec" },
+        h("div", { class: "sec-omen" }),
+        h(
+          "div",
+          { class: "sec-threats" },
+          threats.map(([w, x, y], i) => h("span", { "--i": i, style: { left: `${x}px`, top: `${y}px` } }, w))
+        ),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Secure by design"), h("h2", {}, letters("Safety "), letters("and control", "l-grad"))),
+        h(
+          "div",
+          { class: "sec-ent" },
+          h("i", {}, "Enterprise ready"),
+          ["Self-hosted runners", "ARC + DinD", "OpenTelemetry", "GitHub Apps", "Multi-repo"].map((x, i) => h("span", { "--i": i }, x))
+        ),
+        boxes.map(([tag, title, c, cls, items], i) =>
+          h(
+            "div",
+            { class: `sec-box ${cls}`, "--c": c, "--i": i, style: { left: `${BX[i]}px` } },
+            cls === "sandbox" ? h("b", { class: "sec-shield" }, "🛡 safe zone") : null,
+            h("i", {}, tag),
+            h("h3", {}, title),
+            h(
+              "ul",
+              {},
+              items.map((x, j) => h("li", { "--j": j }, x))
+            )
+          )
+        ),
+        [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
+        lane
       ),
     });
   }

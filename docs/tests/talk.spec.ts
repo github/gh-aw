@@ -17,8 +17,8 @@ test("presents the seventeen slides without the removed sections", async ({ page
     "AI-poweredworkflowsfor GitHub",
     "Anatomy of a workflow",
     "Turn Intent to Automation",
-    "Safety and control",
     "Supply chain hardening",
+    "Safety and control",
     "Stop manually translating intent into code.",
     "Human Agent Processes",
     "Pull Request Review²",
@@ -114,7 +114,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
   await page.keyboard.press("n");
-  for (const slide of [2, 3, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
+  for (const slide of [2, 3, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
