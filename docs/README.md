@@ -61,10 +61,9 @@ from the site footer. The deck is laid out as a table of horizontal bands: the
 title and the finale are rows of their own, and every other band (Workflows,
 Security, Human agent processes, Cost & context, Enterprise, AW factory) starts with a header
 slide that lists the band's slides (click a tile to jump) and a map of all bands.
-The arrow keys move through the bands like a cursor in a text file: Left/Right
-(or Space, Page Up/Page Down) step through the slides in reading order and wrap
-between bands, and Up/Down move to the band above or below while keeping the
-column (clamped to the band's length). Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
+Left/Right (or Space, Page Up/Page Down) step through the slides in reading
+order and wrap between bands, and Up/Down jump to the first slide of the band
+above or below. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
 and M to toggle sound. The navigation dots form a map with one row per band and
 jump directly to a slide (on narrow screens they become previous/next arrow
 buttons); `#1` through `#51` are shareable slide links. Clicking the left third

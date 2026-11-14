@@ -12310,9 +12310,7 @@
 
   // ---------- navigation ----------
   let cur = -1,
-    redT = null,
-    goal = 0,
-    vertical = false;
+    redT = null;
   // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
   function go(n) {
     n = Math.max(0, Math.min(slides.length - 1, n));
@@ -12360,8 +12358,6 @@
     void el.offsetWidth; // restart CSS animations on re-entry
     el.classList.add("active");
     cur = n;
-    if (!vertical) goal = n - rows[slides[n].band].start;
-    vertical = false;
     slides[n].enter?.(dir);
     progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
     dotBtns.forEach((d, i) => d.classList.toggle("on", i === n));
@@ -12372,15 +12368,10 @@
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
   }
-  // The grid behaves like a text file: bands are lines and slides are characters.
-  // Left/right move one slide and wrap across lines; up/down keep a sticky goal column, clamped to the line's length.
+  // Left/right move one slide and wrap across bands; up/down jump to the first slide (header) of the band above/below.
   const band = d => {
     const b = slides[cur].band + d;
-    if (b < 0 || b >= rows.length) return;
-    const end = (rows[b + 1]?.start ?? slides.length) - 1;
-    vertical = true;
-    go(Math.min(rows[b].start + goal, end));
-    vertical = false;
+    if (b >= 0 && b < rows.length) go(rows[b].start);
   };
   const next = () => {
       if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
@@ -12442,7 +12433,7 @@
     // Human agent processes: dark blueprint blue, straight grid.
     process: { base: [6, 19, 40], pal: ["#0b3d91", "#123a73", "#06204a", "#1a4f9c"], grid: [150, 205, 255, 0.05, 0.12], ang: 0 },
     // Cost & context: the usual gray, gold grid lines turned 45° to the left (the inverse of the security wash).
-    cost: { base: INK.base, grid: [227, 179, 65, 0.05, 0.13], ang: -Math.PI / 4 },
+    cost: { base: INK.base, grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4 },
   };
   let bgv = [...INK.base, ...INK.grid];
   let colors = slides[0].palette.map(hex),

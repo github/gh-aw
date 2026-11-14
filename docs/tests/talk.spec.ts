@@ -103,7 +103,7 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await expect(page.locator(".count")).toHaveText("51 / 51");
 });
 
-test("moves through the band grid like a text cursor", async ({ page }) => {
+test("moves through the bands, up/down landing on each band's first slide", async ({ page }) => {
   const count = page.locator(".count");
   await page.goto("/gh-aw/cracktro/#1");
   await page.keyboard.press("ArrowDown");
@@ -111,25 +111,15 @@ test("moves through the band grid like a text cursor", async ({ page }) => {
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Workflows");
   await page.keyboard.press("ArrowRight");
   await expect(count).toHaveText("03 / 51");
-  // up/down keep the column: Workflows column 1 lands on Security column 1
   await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveText("07 / 51");
-  // the one-slide title row clamps the column, which is restored on the way back down
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveText("01 / 51");
-  await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveText("01 / 51");
-  await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveText("03 / 51");
-  // left from a band header wraps to the last slide of the band above
-  await page.goto("/gh-aw/cracktro/#6");
-  await page.reload();
   await expect(count).toHaveText("06 / 51");
+  // left from a band header wraps to the last slide of the band above
   await page.keyboard.press("ArrowLeft");
   await expect(count).toHaveText("05 / 51");
-  await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveText("09 / 51");
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveText("01 / 51");
+  await page.keyboard.press("ArrowUp");
+  await expect(count).toHaveText("01 / 51");
 });
 
 test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
