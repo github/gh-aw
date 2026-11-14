@@ -1,29 +1,38 @@
-# Agent Performance Analyzer - Latest Run (2026-11-12T12:45Z)
+# Agent Performance Analyzer - Latest Run (2026-11-14)
 
-Data basis: complete 24h snapshot `metrics/daily/2026-11-08.json` (362 workflows, 511 executed, 444 ok = 86.9%; 354 safe outputs, 430 accepted / 0 rejected).
-`metrics/latest.json` is partial (4.7h, null run/quality fields) and was not used for scoring.
-Quality scores are null in every snapshot: success rate and safe-output acceptance are proxies. Output sampling was not performed this run.
+Data basis: `metrics/latest.json` (collection_status complete, window 2026-11-13T02:31Z to 2026-11-14T02:31Z). 367 workflows, 164 active, 592 runs, 584 executed, 423 successful (72.4%). 406 safe outputs accepted, 0 rejected. 82.9M tokens.
+Quality scores, engagement, PR merge rate, and cost are null in every snapshot. Success rate over executed runs and safe-output acceptance are the proxies. Output sampling not performed.
 
-## Bottom tier (executed >= 3, success < 100%)
-- ai-moderator 1/16 (6.3%), avg 6513s, declared timeout 5 min. Cached logs show successes at 6.4-7.8 min (suspect: duration may include queue time).
-- auditor 1/11 (9.1%), 0 tokens. Hourly `Collect failure evidence` failing (WHM P1 tracker). Logs blocked (403).
-- code-scanning-fixer 2/3 (n too small).
-- pr-specification-reviewer 31/41 (75.6%), avg 2642s vs 20 min timeout (suspect metric). No investigation budget or self-check found.
-- design-decision-gate 31/35 (88.6%), 2.25M tokens. Trend 54% (10-25) -> 100% (11-03) -> 89% (11-08).
-- mattpocock-skills-reviewer 29/31 (93.5%), 2.78M tokens, 60 comments. Inline comments 13 (10-25) -> 1 (11-03) -> 60 (11-08).
-- pr-code-quality-reviewer 33/35 (94.3%). ponytail-reviewer 35/36 (97.2%), 24.4M tokens. test-quality-sentinel 40/41 (97.6%), 5.8M tokens.
+## Bottom tier (executed >= 3, by success rate)
+- daily-go-test-parallelizer (codex) 0/9, 6.06M tokens. Blocked batch retried daily since 11-13. Filed prompt-improvement issue (this run).
+- auditor (copilot) 2/21 (9.5%). Hourly "Collect failure evidence" failing. Logs HTTP 403, so the time_budget cause is unverified. Tracker #77641 is open; #77062 was closed not_planned.
+- pr-specification-reviewer (copilot) 20/67 (29.9%). Seven open "Failed jobs" issues all trace to the non-agent `push_ledger_changes` job (missing artifact `gh-aw-ledger-transactions`). Existing tracker #77383. Ranking is largely downstream. No self-check or rubric in prompt; 20-min timeout vs 2120s average.
+- ai-moderator (pi) 12/18 (66.7%). Timeout-vs-duration mismatch still unconfirmed.
+- auto-triage-issues 3/4, code-scanning-fixer 3/4, aw-failure-investigator 4/5, pr-code-quality-reviewer 25/31 (80.6%), contribution-check 5/6. Sample sizes too small for conclusions.
 
-## Verdicts
-- Matt Pocock Skills Reviewer: REDESIGN (cost and output-volume swings). Not deprecate.
-- Design Decision Gate: KEEP; trim token spend (64k/run).
-- Impeccable Skills Reviewer: KEEP; path-gated to docs/** so 0-1 runs/day. Insufficient data.
+## Top performers (executed >= 3)
+- test-quality-sentinel 39/40 (97.5%), ponytail-reviewer 34/35 (97.1%), design-decision-gate 30/31 (96.8%), mattpocock-skills-reviewer 29/32 (90.6%), pr-sous-chef 105/116 (90.5%).
 
-## Other
-- daily-go-test-parallelizer: 82.3M tokens over 9 runs (~9.1M/run). Largest resource outlier.
-- metrics-collector.md:14-15 still `engine: id: codex` with no `model-provider` (re-verified).
-- Open trackers reported by search for ai-moderator and metrics-collector failures (#77094, #77023). Integrity-filtered, so content/state unverified. No duplicate filed.
+## Named reviewer verdicts
+- Matt Pocock Skills Reviewer: REDESIGN (not deprecate). Cost and output volume swing (2.74M tokens and 59 outputs on 11-14; 1.5M and 48 on 11-13).
+- Design Decision Gate: KEEP. Success 30/31. Tokens fell from 2.25M (11-08) to 418K (11-14). Trim check only.
+- Impeccable Skills Reviewer: KEEP. Path-gated to docs/**, 1 run in window, 105K tokens. Insufficient data.
+
+## Engine mix (executed-weighted)
+- copilot 181/287 (63%), pi 157/179 (87.7%), codex 54/77 (70.1%, 65.6M tokens), claude 29/38 (76.3%).
+- Copilot excluding auditor and pr-spec: 159/199 (79.8%).
+
+## Corrections to prior record
+- #77094 is a Tidy timeout tracker, closed not_planned 2026-11-12. Not an ai-moderator tracker.
+- #77023 closed not_planned 2026-11-12. Metrics-collector model-provider gap is still present (metrics-collector.md:14-15).
+- #77069 (DGTP parent) closed not_planned 2026-11-14 while DGTP is still 0/9.
+
+## Open items
+- metrics-collector.md still lacks `model-provider` under engine.
+- Command-gated workflows (pr-spec, DDG, Pocock, Ponytail, PCQ, TQS, ai-moderator): activated-run success not separated in metrics. Scored on executed runs as a proxy.
+- Auditor root cause unverified (logs 403).
 
 ## Run log (condensed)
-- 2026-09-30 to 2026-11-10: ranking deferred repeatedly (partial metrics snapshots).
-- 2026-11-11: ranking from 11-08 complete snapshot.
-- 2026-11-12: full ranking, bottom-tier audit, Pocock/Impeccable/DDG verdicts; weekly discussion created.
+- 2026-11-11: ranking from 11-08 snapshot.
+- 2026-11-12: full ranking, Pocock/Impeccable/DDG verdicts.
+- 2026-11-14: ranking from complete latest.json. Verified stale tracker claims. Filed DGTP prompt-improvement issue. pr-spec attributed to downstream ledger job (#77383).

@@ -286,3 +286,10 @@
 - The 2026-11-12 "time_budget" attribution for Auditor is NOT re-verified (job logs HTTP 403). Treat as hypothesis.
 - "Handle agent failure" conclusion-job failures with green agent jobs now span several workflows (daily-doc-updater, daily-experiment-report, daily-byok-ollama-test), not only daily-go-test-parallelizer. No tracker found.
 - AWF "Install AWF binary" failure recurred 2026-11-13T09:36Z (daily-spending-forecast). The 2026-11-13 note that the cluster had no occurrences after 11-12 23:30Z is stale.
+
+## Correction — 2026-11-14 (Agent Performance Analyzer)
+- #77094 is a Tidy timeout tracker, closed not_planned 2026-11-12. It is NOT an open ai-moderator tracker. Do not cite it as one.
+- #77023 closed not_planned 2026-11-12. Metrics-collector model-provider gap still present. No open tracker for it.
+- #77069 (DGTP parent) closed not_planned 2026-11-14 while DGTP is still 0/9 (9 runs, 6.06M tokens). Five open incomplete-result issues from today: #77638, #77686, #77715, #77726, #77743. Prompt-improvement issue filed this run (cursor retry loop, no stop rule).
+- pr-specification-reviewer failures (7 open "Failed jobs" issues: #77467, #77485, #77487, #77489, #77492, #77520, #77521) all trace to the non-agent `push_ledger_changes` job. Existing tracker #77383. Do not file a duplicate.
+- Auditor: #77062 closed not_planned 2026-11-13. Current tracker #77641 is open. Logs HTTP 403; time_budget cause is still unverified.
