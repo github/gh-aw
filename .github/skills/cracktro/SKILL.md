@@ -68,7 +68,7 @@ slides.push({
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
 - Exception: the Issues as intent slide (11) shows real counts for gh-aw issues labelled `community` and the merged PRs that closed them (November 2026 snapshot); its notes and caption say so.
-- Exception: the Spec-driven development slide (17) shows an illustrative excerpt of gh-aw's `pkg/ctxutil` change, README spec and spec tests, and names gh-aw's own spec workflows; its notes say so.
+- Exception: the Spec-driven testing slide (17) shows an illustrative excerpt of gh-aw's `pkg/ctxutil` change, README spec and spec tests, and names gh-aw's own spec workflows; its notes say so.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
 - Speaker notes for slides 2, 3, 6, 7, and 9–28 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.

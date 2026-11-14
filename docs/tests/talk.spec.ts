@@ -29,7 +29,7 @@ test("presents the twenty-eight slides without the removed sections", async ({ p
     "Merge fast, unslop daily",
     "Research · Assign · Observe",
     "Mine · Refine · Apply",
-    "Spec-driven development",
+    "Spec-driven testing",
     "Scan · Fix · Learn",
     "Audit & Optimize",
     "Cost management",
