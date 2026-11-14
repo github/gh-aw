@@ -60,7 +60,8 @@
   .ch { display: inline-block; font-variation-settings: "wght" 700, "wdth" 100; }
   .l-grad .ch { color: transparent; -webkit-background-clip: text; background-clip: text;
     background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #4493f8, #ab7df8);
-    background-size: 1800px 100%; background-position: var(--bx) 0; padding-bottom: .14em; margin-bottom: -.14em; }
+    background-size: 1800px 100%; background-position: var(--bx) 0;
+    padding-bottom: .14em; margin-bottom: -.14em; }
   @keyframes settle { from { opacity: 0; transform: translateY(.25em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
   @keyframes breathe { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
   .l-out .ch { color: transparent; -webkit-text-stroke: 3px #f0f6fc; }
@@ -143,13 +144,13 @@
   @keyframes glare { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
   /* --- central agentic ops --- */
-  .cao-steps { position: absolute; left: 114px; top: 330px; width: 560px; display: flex; flex-direction: column; gap: 18px; }
+  .cao-steps { position: absolute; left: 114px; top: 276px; width: 560px; display: flex; flex-direction: column; gap: 20px; }
   .cao-step { display: grid; grid-template-columns: 64px 1fr; column-gap: 18px; opacity: 0; }
   .active .cao-step { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 500ms); }
   .cao-step i { grid-row: span 2; font: 600 22px/1 var(--mono); color: var(--c); padding-top: 8px; font-style: normal; }
   .cao-step b { font-size: 40px; font-variation-settings: "wght" 700, "wdth" 100; }
   .cao-step span { font-size: 22px; color: #9198a1; line-height: 1.35; }
-  .cao-canvas { position: absolute; left: 720px; top: 300px; width: 1140px; height: 640px; }
+  .cao-canvas { position: absolute; left: 700px; top: 262px; width: 1180px; height: 690px; }
   .fm-quote { position: absolute; left: 114px; top: 318px; width: 600px; font: 700 44px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; opacity: 0; }
   .fm-quote em { font-style: normal; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8); }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
@@ -615,9 +616,10 @@
   .fm-marquee span { padding: 8px 18px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 19px/1 var(--mono); color: #c9d1d9; }
   @keyframes fm-scroll { to { transform: translateX(-50%); } }
   .cao-tag { position: absolute; font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
-  .rollout { position: absolute; right: 110px; bottom: 70px; display: flex; gap: 14px; align-items: center; font: 600 20px/1 var(--mono); }
+  /* centred under the CAO diagram (canvas left 700px + its centre 590px), right below its success rate */
+  .rollout { position: absolute; left: 1290px; bottom: 70px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; font: 600 20px/1 var(--mono); }
   .rollout em { font-style: normal; padding: 10px 18px; border: 1px solid #3d444d; border-radius: 999px; color: #9198a1; transition: all .4s; }
-  .rollout em.on { color: #0d1117; background: #3fb950; border-color: #3fb950; box-shadow: 0 0 24px #3fb95080; }
+  .rollout em.on { color: #0d1117; background: #3fb950; border-color: #3fb950; }
   .rollout s { text-decoration: none; color: #3d444d; }
   .finale-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
 
@@ -1677,6 +1679,24 @@
       [...text].map((c, j) => (c === " " ? " " : h("span", { class: "ch", "--i": charIndex++, "--bx": `${-j * 120}px` }, c)))
     );
   const resetIndex = () => (charIndex = 0);
+
+  // Primer Octicons (© GitHub, Inc., MIT license), drawn into canvases as Path2D.
+  // Keys are the octicon name plus the grid size its path is drawn on.
+  const OCTICONS = {
+    "circle-slash-16": "M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM3.965 13.096a6.5 6.5 0 0 0 9.131-9.131ZM1.5 8a6.474 6.474 0 0 0 1.404 4.035l9.131-9.131A6.499 6.499 0 0 0 1.5 8Z",
+    "gear-24": "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm-1.5 0a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0ZM12 1c.266 0 .532.009.797.028.763.055 1.345.617 1.512 1.304l.352 1.45c.019.078.09.171.225.221.247.089.49.19.728.302.13.061.246.044.315.002l1.275-.776c.603-.368 1.411-.353 1.99.147.402.349.78.726 1.128 1.129.501.578.515 1.386.147 1.99l-.776 1.274c-.042.069-.058.185.002.315.112.238.213.481.303.728.048.135.142.205.22.225l1.45.352c.687.167 1.249.749 1.303 1.512.038.531.038 1.063 0 1.594-.054.763-.616 1.345-1.303 1.512l-1.45.352c-.078.019-.171.09-.221.225-.089.248-.19.491-.302.728-.061.13-.044.246-.002.315l.776 1.275c.368.603.353 1.411-.147 1.99-.349.402-.726.78-1.129 1.128-.578.501-1.386.515-1.99.147l-1.274-.776c-.069-.042-.185-.058-.314.002a8.606 8.606 0 0 1-.729.303c-.135.048-.205.142-.225.22l-.352 1.45c-.167.687-.749 1.249-1.512 1.303-.531.038-1.063.038-1.594 0-.763-.054-1.345-.616-1.512-1.303l-.352-1.45c-.019-.078-.09-.171-.225-.221a8.138 8.138 0 0 1-.728-.302c-.13-.061-.246-.044-.315-.002l-1.275.776c-.603.368-1.411.353-1.99-.147-.402-.349-.78-.726-1.128-1.129-.501-.578-.515-1.386-.147-1.99l.776-1.274c.042-.069.058-.185-.002-.314a8.606 8.606 0 0 1-.303-.729c-.048-.135-.142-.205-.22-.225l-1.45-.352c-.687-.167-1.249-.749-1.304-1.512a11.158 11.158 0 0 1 0-1.594c.055-.763.617-1.345 1.304-1.512l1.45-.352c.078-.019.171-.09.221-.225.089-.248.19-.491.302-.728.061-.13.044-.246.002-.315l-.776-1.275c-.368-.603-.353-1.411.147-1.99.349-.402.726-.78 1.129-1.128.578-.501 1.386-.515 1.99-.147l1.274.776c.069.042.185.058.315-.002.238-.112.481-.213.728-.303.135-.048.205-.142.225-.22l.352-1.45c.167-.687.749-1.249 1.512-1.304C11.466 1.01 11.732 1 12 1Zm-.69 1.525c-.055.004-.135.05-.161.161l-.353 1.45a1.832 1.832 0 0 1-1.172 1.277 7.147 7.147 0 0 0-.6.249 1.833 1.833 0 0 1-1.734-.074l-1.274-.776c-.098-.06-.186-.036-.228 0a9.774 9.774 0 0 0-.976.976c-.036.042-.06.131 0 .228l.776 1.274c.314.529.342 1.18.074 1.734a7.147 7.147 0 0 0-.249.6 1.831 1.831 0 0 1-1.278 1.173l-1.45.351c-.11.027-.156.107-.16.162a9.63 9.63 0 0 0 0 1.38c.004.055.05.135.161.161l1.45.353a1.832 1.832 0 0 1 1.277 1.172c.074.204.157.404.249.6.268.553.24 1.204-.074 1.733l-.776 1.275c-.06.098-.036.186 0 .228.301.348.628.675.976.976.042.036.131.06.228 0l1.274-.776a1.83 1.83 0 0 1 1.734-.075c.196.093.396.176.6.25a1.831 1.831 0 0 1 1.173 1.278l.351 1.45c.027.11.107.156.162.16a9.63 9.63 0 0 0 1.38 0c.055-.004.135-.05.161-.161l.353-1.45a1.834 1.834 0 0 1 1.172-1.278 6.82 6.82 0 0 0 .6-.248 1.831 1.831 0 0 1 1.733.074l1.275.776c.098.06.186.036.228 0 .348-.301.675-.628.976-.976.036-.042.06-.131 0-.228l-.776-1.275a1.834 1.834 0 0 1-.075-1.733c.093-.196.176-.396.25-.6a1.831 1.831 0 0 1 1.278-1.173l1.45-.351c.11-.027.156-.107.16-.162a9.63 9.63 0 0 0 0-1.38c-.004-.055-.05-.135-.161-.161l-1.45-.353c-.626-.152-1.08-.625-1.278-1.172a6.576 6.576 0 0 0-.248-.6 1.833 1.833 0 0 1 .074-1.734l.776-1.274c.06-.098.036-.186 0-.228a9.774 9.774 0 0 0-.976-.976c-.042-.036-.131-.06-.228 0l-1.275.776a1.831 1.831 0 0 1-1.733.074 6.88 6.88 0 0 0-.6-.249 1.835 1.835 0 0 1-1.173-1.278l-.351-1.45c-.027-.11-.107-.156-.162-.16a9.63 9.63 0 0 0-1.38 0Z",
+    "globe-16": "M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 1.363 4.177c.255.426.542.832.857 1.215.245-.296.551-.705.857-1.215A9.64 9.64 0 0 0 10.22 8.75Zm4.44-1.5a9.64 9.64 0 0 0-1.363-4.177c-.307-.51-.612-.919-.857-1.215a9.927 9.927 0 0 0-.857 1.215A9.64 9.64 0 0 0 5.78 7.25Zm-5.944 1.5H1.543a6.507 6.507 0 0 0 4.666 5.5c-.123-.181-.24-.365-.352-.552-.715-1.192-1.437-2.874-1.581-4.948Zm-2.733-1.5h2.733c.144-2.074.866-3.756 1.58-4.948.12-.197.237-.381.353-.552a6.507 6.507 0 0 0-4.666 5.5Zm10.181 1.5c-.144 2.074-.866 3.756-1.58 4.948-.12.197-.237.381-.353.552a6.507 6.507 0 0 0 4.666-5.5Zm2.733-1.5a6.507 6.507 0 0 0-4.666-5.5c.123.181.24.365.353.552.714 1.192 1.436 2.874 1.58 4.948Z",
+    "north-star-16": "M8.5.75a.75.75 0 0 0-1.5 0v5.19L4.391 3.33a.75.75 0 1 0-1.06 1.061L5.939 7H.75a.75.75 0 0 0 0 1.5h5.19l-2.61 2.609a.75.75 0 1 0 1.061 1.06L7 9.561v5.189a.75.75 0 0 0 1.5 0V9.56l2.609 2.61a.75.75 0 1 0 1.06-1.061L9.561 8.5h5.189a.75.75 0 0 0 0-1.5H9.56l2.61-2.609a.75.75 0 0 0-1.061-1.06L8.5 5.939V.75Z",
+    "organization-16": "M1.75 16A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0h8.5C11.216 0 12 .784 12 1.75v12.5c0 .085-.006.168-.018.25h2.268a.25.25 0 0 0 .25-.25V8.285a.25.25 0 0 0-.111-.208l-1.055-.703a.749.749 0 1 1 .832-1.248l1.055.703c.487.325.779.871.779 1.456v5.965A1.75 1.75 0 0 1 14.25 16h-3.5a.766.766 0 0 1-.197-.026c-.099.017-.2.026-.303.026h-3a.75.75 0 0 1-.75-.75V14h-1v1.25a.75.75 0 0 1-.75.75Zm-.25-1.75c0 .138.112.25.25.25H4v-1.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .75.75v1.25h2.25a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25ZM3.75 6h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 3.75A.75.75 0 0 1 3.75 3h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 3.75Zm4 3A.75.75 0 0 1 7.75 6h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 6.75ZM7.75 3h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 9.75A.75.75 0 0 1 3.75 9h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 9.75ZM7.75 9h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z",
+    "repo-16": "M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z",
+    "workflow-16": "M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7H4v4a1 1 0 0 0 1 1h4v-1.25C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25v-.75H5A2.5 2.5 0 0 1 2.5 11V7h-.75A1.75 1.75 0 0 1 0 5.25Zm1.75-.25a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Zm9 9a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Z",
+  };
+  const octPaths = {};
+  const octicon = (ctx, name, x, y, size, color) => {
+    const n = +name.slice(name.lastIndexOf("-") + 1), p = (octPaths[name] ??= new Path2D(OCTICONS[name]));
+    ctx.save(); ctx.translate(x - size / 2, y - size / 2); ctx.scale(size / n, size / n);
+    ctx.fillStyle = color; ctx.fill(p); ctx.restore();
+  };
 
   // ---------- slides ----------
   const slides = [];
@@ -9973,7 +9993,8 @@
     });
   }
 
-  // Illustrative centralized campaigns
+  // 11. Central Agentic Ops (githubnext/gh-cao): a control repo lists its registered campaigns, which dispatch
+  // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
   {
     resetIndex();
     const steps = [
@@ -9981,197 +10002,271 @@
       ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#ab7df8"],
       ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#d29922"],
       ["04", "Work", "One target per worker, bounded mission, correlated results", "#3fb950"],
-      ["05", "Evolve", "Outcomes feed back; agents improve each cycle", "#f778ba"],
+      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#f778ba"],
     ];
-    const cv = h("canvas", { class: "cao-canvas", width: 2280, height: 1280 });
+    const CW = 1180, CH = 690, MONO = "'Monaspace Neon', ui-monospace, Menlo, monospace";
+    const cv = h("canvas", { class: "cao-canvas", width: CW * 2, height: CH * 2 });
     const ctx = cv.getContext("2d");
     const stages = ["review", "limited live", "scheduled live"].map(s => h("em", {}, s));
-    const CW = 1140,
-      CH = 640,
-      hub = { x: 170, y: CH / 2 };
+    // The control repo lists its registered ops, one row per campaign installed from the catalog and tracked by a
+    // manifest under .github/aw/campaigns/. The host org owns the repo; an enterprise account owns no repos itself.
+    const C = { x: 590, y: 345 };
+    const ICON = 16, GEAR = 24;
+    const campaigns = [
+      { name: "Dependabot", c: "#4493f8", rate: 1.3 },
+      { name: "Repo Assist", c: "#39c5cf", rate: 1.1 },
+      { name: "ESLint Factory", c: "#e3b341", rate: .9 },
+      { name: "EU CRA", c: "#b083f0", rate: .7 },
+    ].map(k => ({ ...k, v: 1 }));
+    const CA = 124, CHD = 40, ROW_H = 32, CR = 10, CHH = (CHD + 8 + campaigns.length * ROW_H) / 2;
+    const cx0 = C.x - CA, cy0 = C.y - CHH;
+    campaigns.forEach((k, i) => (k.y = cy0 + CHD + 4 + ROW_H * (i + .5)));
+    const PX = 26, PT = 30, PB = 26;
+    const edge = (ang, a, top, bottom, r) => {
+      const c = Math.abs(Math.cos(ang)), s = Math.abs(Math.sin(ang)), H = Math.sin(ang) < 0 ? top : bottom;
+      let d = Math.min(c > 1e-9 ? a / c : Infinity, s > 1e-9 ? H / s : Infinity);
+      if (d * c > a - r && d * s > H - r) {
+        const qx = a - r, qy = H - r, p = c * qx + s * qy;
+        d = p + Math.sqrt(p * p - (qx * qx + qy * qy - r * r));
+      }
+      return d;
+    };
+    const RY = 212, RX = 1.6 * RY;
+    const BW = 196, ROWS = [0, -44, 44];
+    const orgs = [
+      { name: "web", n: 9, side: -1, row: -1 },
+      { name: "data", n: 8, side: -1, row: 0 },
+      { name: "labs", n: 5, side: -1, row: 1, off: true },
+      { name: "mobile", n: 8, side: 1, row: -1 },
+      { name: "payments", n: 9, side: 1, row: 0 },
+      { name: "infra", n: 8, side: 1, row: 1 },
+    ];
+    const halfW = dy => RX * Math.sqrt(Math.max(0, 1 - (dy / RY) ** 2));
     const repos = [];
-    for (let c = 0; c < 6; c++) for (let r = 0; r < 7; r++) repos.push({ x: 470 + c * 110 + (r % 2) * 55, y: 70 + r * 84, state: 0, t: 0 });
-    let packets = [],
-      lastSpawn = 0,
-      t0 = 0,
-      stage = 0,
-      gen = 1,
-      evolvedAt = -1e9,
-      ok = 0,
-      tried = 0,
-      spin = 0;
-    const failP = () => Math.max(0.04, 0.5 - (gen - 1) * 0.16);
+    for (const o of orgs) {
+      o.y = C.y + o.row * 200; o.y0 = o.y - 72; o.y1 = o.y + 72; o.heat = 0; o.reps = []; o.cols = [];
+      const near = o.row ? Math.min(Math.abs(o.y0 - C.y), Math.abs(o.y1 - C.y)) : 0;
+      o.inner = C.x + o.side * (halfW(near) + 14); o.outer = o.inner + o.side * BW; o.x = o.inner + o.side * 28;
+      for (let j = 0; j < o.n; j++) {
+        const c = (j / 3) | 0, p = { o, x: o.x + o.side * (52 + c * 44), y: o.y + ROWS[j % 3], state: 0, t: 0 };
+        const col = (o.cols[c] ??= { x: p.x, y0: p.y, y1: p.y });
+        col.y0 = Math.min(col.y0, p.y); col.y1 = Math.max(col.y1, p.y);
+        o.reps.push(p);
+        if (!o.off) repos.push(p);
+      }
+      o.a = Math.atan2(o.y - C.y, o.x - C.x);
+      o.cos = Math.cos(o.a); o.sin = Math.sin(o.a); o.dist = Math.hypot(o.x - C.x, o.y - C.y);
+      const r = edge(o.a, CA, CHH, CHH, CR);
+      o.tap = [C.x + o.cos * r, C.y + o.sin * r];
+    }
+    const P = (o, r) => [C.x + o.cos * r, C.y + o.sin * r];
+    const path = pts => {
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      return { pts, cum, L: cum[cum.length - 1] };
+    };
+    const route = p => {
+      const o = p.o, r = path([o.tap, [o.x, o.y], [p.x, o.y], [p.x, p.y]]);
+      r.dOrg = r.cum[1];
+      return r;
+    };
+    const at = (r, d) => {
+      d = Math.max(0, Math.min(r.L, d));
+      let i = 1;
+      while (i < r.pts.length - 1 && r.cum[i] < d) i++;
+      const [ax, ay] = r.pts[i - 1], [bx, by] = r.pts[i], f = (d - r.cum[i - 1]) / (r.cum[i] - r.cum[i - 1] || 1);
+      return [ax + (bx - ax) * f, ay + (by - ay) * f];
+    };
+    const trace = (r, d0, d1) => {
+      ctx.beginPath(); ctx.moveTo(...at(r, d0));
+      for (let i = 1; i < r.pts.length - 1; i++) if (r.cum[i] > d0 && r.cum[i] < d1) ctx.lineTo(...r.pts[i]);
+      ctx.lineTo(...at(r, d1)); ctx.stroke();
+    };
+    const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+    const box = (g, x0, y0, x1, y1, o) => {
+      const r = o.r ?? 18, lx = x0 + 22;
+      g.font = `600 16px ${MONO}`;
+      let w = g.measureText(o.main).width + (o.icon ? 22 : 0);
+      if (o.sub) { g.font = `500 14px ${MONO}`; w += 10 + g.measureText(o.sub).width; }
+      if (o.fill) { g.fillStyle = o.fill; g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, r); g.fill(); }
+      g.strokeStyle = o.stroke; g.lineWidth = 1.5; g.setLineDash(o.dash || []);
+      g.beginPath(); g.moveTo(lx + w + 8, y0);
+      g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
+      g.lineTo(lx - 8, y0); g.stroke(); g.setLineDash([]);
+      let x = lx;
+      if (o.icon) { octicon(g, o.icon, x + 8, y0, ICON, o.col); x += 22; }
+      g.textAlign = "left"; g.font = `600 16px ${MONO}`; g.fillStyle = o.col; g.fillText(o.main, x, y0);
+      if (o.sub) { x += g.measureText(o.main).width + 10; g.font = `500 14px ${MONO}`; g.fillStyle = "#6e7681"; g.fillText(o.sub, x, y0); }
+    };
+    // Boxes, labels, org wiring and the unenrolled spoke never change, so they are drawn once into an offscreen layer
+    // (redrawn after web fonts load, since the labels are measured).
+    let bg = null;
+    document.fonts?.ready.then(() => (bg = null));
+    const background = () => {
+      const c = document.createElement("canvas");
+      c.width = cv.width; c.height = cv.height;
+      const g = c.getContext("2d");
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.textBaseline = "middle"; g.lineCap = "round"; g.lineJoin = "round";
+      box(g, 12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
+      box(g, cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
+        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
+      });
+      for (const o of orgs) {
+        box(g, Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
+          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
+          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
+        });
+        if (o.off) {
+          const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
+          g.strokeStyle = "#ffffff24"; g.lineWidth = 2; g.setLineDash([3, 5]);
+          g.beginPath(); g.moveTo(...P(o, o.dist - 15)); g.lineTo(...P(o, r0 + 11)); g.stroke(); g.setLineDash([]);
+          octicon(g, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
+        }
+        g.globalAlpha = o.off ? .45 : 1;
+        g.strokeStyle = "#ffffff30"; g.lineWidth = 1.5; g.beginPath();
+        g.moveTo(o.x, o.y); g.lineTo(o.cols[o.cols.length - 1].x, o.y);
+        for (const c of o.cols) { g.moveTo(c.x, c.y0); g.lineTo(c.x, c.y1); }
+        g.stroke(); g.globalAlpha = 1;
+      }
+      return c;
+    };
+    let packets = [], recent = [], last = 0, t0 = 0, stage = 0, spin = 0, kick = 0;
+    let turn = 0, volley = 0, shooter = null, nextShot = 0;
+    const failP = v => Math.max(0.04, 0.5 - (v - 1) * 0.16);
+    const evolve = (k, t) => { k.v++; k.got = 0; k.evolvedAt = t; k.hold = t + 1100; kick = 1; };
     const draw = t => {
       ctx.setTransform(2, 0, 0, 2, 0, 0);
       ctx.clearRect(0, 0, CW, CH);
-      for (const p of repos) {
-        ctx.strokeStyle = "#ffffff10";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(hub.x, hub.y);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
+      ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.drawImage(bg ??= background(), 0, 0, CW, CH);
+      for (const o of orgs) if (!o.off) {
+        ctx.strokeStyle = "#8b949e"; ctx.globalAlpha = .4 + .5 * o.heat; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(...o.tap); ctx.lineTo(...P(o, o.dist - 15)); ctx.stroke();
       }
-      for (const p of repos) {
-        const col = p.state === 3 ? "#f85149" : p.state === 2 ? "#3fb950" : p.state === 1 ? "#d29922" : "#3d444d";
-        ctx.fillStyle = col;
-        ctx.shadowColor = col;
-        ctx.shadowBlur = p.state ? 18 : 0;
-        ctx.beginPath();
-        ctx.roundRect(p.x - 22, p.y - 16, 44, 32, 7);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = "#0d1117";
-        ctx.fillRect(p.x - 12, p.y - 6, 24, 3);
-        ctx.fillRect(p.x - 12, p.y + 2, 16, 3);
+      // Packets go under the nodes so their dots and trails never cover an icon.
+      for (const q of packets) {
+        if (q.u >= 1) continue;
+        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
+        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
+        trace(q.r, d - 34, d);
+        const [x, y] = at(q.r, d);
+        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
       }
-      for (const k of packets) {
-        const e = k.u < 0.5 ? 2 * k.u * k.u : 1 - (-2 * k.u + 2) ** 2 / 2;
-        const [a, b] = k.back ? [k.to, hub] : [hub, k.to];
-        const x = a.x + (b.x - a.x) * e,
-          y = a.y + (b.y - a.y) * e;
-        ctx.fillStyle = k.back ? (k.fail ? "#f85149" : "#3fb950") : "#ab7df8";
-        ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = 16;
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, 7);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+      for (const o of orgs) {
+        ctx.globalAlpha = o.off ? .45 : 1;
+        for (const p of o.reps) {
+          const col = p.state === 1 ? p.camp.c : p.state === 2 ? "#3fb950" : null;
+          ctx.fillStyle = "#0d1117"; ctx.strokeStyle = col || "#30363d"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 13, 26, 26, 6); ctx.fill(); ctx.stroke();
+          octicon(ctx, "repo-16", p.x, p.y, ICON, col || "#6e7681");
+        }
+        ctx.fillStyle = "#161b22"; ctx.strokeStyle = o.off ? "#484f58" : "#8b949e"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(o.x - 15, o.y - 15, 30, 30, 8); ctx.fill(); ctx.stroke();
+        if (!o.off && o.heat > .01) { ctx.globalAlpha = o.heat; ctx.strokeStyle = "#e6edf3"; ctx.stroke(); ctx.globalAlpha = 1; }
+        octicon(ctx, "organization-16", o.x, o.y, ICON, o.off ? "#6e7681" : "#e6edf3");
       }
-      const pulse = 1 + 0.06 * Math.sin(t / 300);
-      const g = ctx.createRadialGradient(hub.x, hub.y, 10, hub.x, hub.y, 130 * pulse);
-      g.addColorStop(0, "#ab7df860");
-      g.addColorStop(1, "#ab7df800");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(hub.x, hub.y, 130 * pulse, 0, 7);
-      ctx.fill();
-      // feedback loop: three arrows orbit the control repo, faster right after an evolution
-      const flash = Math.max(0, 1 - (t - evolvedAt) / 1400);
-      ctx.lineWidth = 5;
-      ctx.lineCap = "round";
-      for (let i = 0; i < 3; i++) {
-        const a0 = spin + i * 2.094,
-          a1 = a0 + 1.5,
-          rr = 104;
-        ctx.strokeStyle = "#f778ba";
-        ctx.shadowColor = "#f778ba";
-        ctx.shadowBlur = 10 + 30 * flash;
-        ctx.beginPath();
-        ctx.arc(hub.x, hub.y, rr, a0, a1);
-        ctx.stroke();
-        const hx = hub.x + rr * Math.cos(a1),
-          hy = hub.y + rr * Math.sin(a1),
-          d = a1 + Math.PI / 2;
-        ctx.fillStyle = "#f778ba";
-        ctx.beginPath();
-        ctx.moveTo(hx + 13 * Math.cos(d), hy + 13 * Math.sin(d));
-        ctx.lineTo(hx + 9 * Math.cos(d + 2.4), hy + 9 * Math.sin(d + 2.4));
-        ctx.lineTo(hx + 9 * Math.cos(d - 2.4), hy + 9 * Math.sin(d - 2.4));
-        ctx.fill();
+      ctx.globalAlpha = 1;
+      const cardW = 2 * CA, cardH = 2 * CHH, hy = cy0 + CHD / 2;
+      ctx.fillStyle = "#0d1117"; ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.fillStyle = "#161b22"; ctx.fillRect(cx0, cy0, cardW, CHD);
+      for (const k of campaigns) if (k.fire > .02) {
+        ctx.fillStyle = k.c;
+        ctx.globalAlpha = .16 * k.fire; ctx.fillRect(cx0, k.y - ROW_H / 2, cardW, ROW_H);
+        ctx.globalAlpha = k.fire; ctx.beginPath(); ctx.roundRect(cx0 + 4, k.y - 10, 3, 20, 1.5); ctx.fill();
       }
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "#161b22";
-      ctx.strokeStyle = "#ab7df8";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(hub.x, hub.y, 74 * (1 + 0.12 * flash), 0, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#f0f6fc";
+      ctx.restore();
+      ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx0, cy0 + CHD); ctx.lineTo(cx0 + cardW, cy0 + CHD); ctx.stroke();
+      ctx.strokeStyle = "#8b949e"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.stroke();
+      octicon(ctx, "repo-16", cx0 + 20, hy, ICON, "#e6edf3");
+      ctx.textAlign = "left"; ctx.font = `600 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText("control repo", cx0 + 36, hy);
+      ctx.save(); ctx.translate(cx0 + cardW - 24, hy); ctx.rotate(spin);
+      octicon(ctx, "gear-24", 0, 0, GEAR, "#c9d1d9");
+      ctx.restore();
+      for (const k of campaigns) {
+        const pop = Math.max(0, 1 - (t - k.evolvedAt) / 1600), vx = cx0 + cardW - 14, vt = `v${k.v}`;
+        octicon(ctx, "workflow-16", cx0 + 20, k.y, ICON, k.c);
+        ctx.textAlign = "left"; ctx.font = `500 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText(k.name, cx0 + 36, k.y + 1);
+        ctx.font = `600 13px ${MONO}`; const vw = ctx.measureText(vt).width;
+        if (pop > 0) {
+          ctx.globalAlpha = pop; ctx.fillStyle = "#f778ba";
+          ctx.beginPath(); ctx.roundRect(vx - vw - 7, k.y - 9, vw + 14, 18, 9); ctx.fill(); ctx.globalAlpha = 1;
+        }
+        ctx.textAlign = "right"; ctx.fillStyle = pop > .5 ? "#0d1117" : "#9198a1"; ctx.fillText(vt, vx, k.y + 1);
+      }
       ctx.textAlign = "center";
-      ctx.font = "800 22px 'Mona Sans'";
-      ctx.fillText("control", hub.x, hub.y - 14);
-      ctx.fillText("repo", hub.x, hub.y + 12);
-      ctx.fillStyle = "#f778ba";
-      ctx.font = "700 17px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText(`agents v${gen}`, hub.x, hub.y + 38);
-      ctx.fillStyle = "#9198a1";
-      ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText("FEEDBACK LOOP", hub.x, hub.y - 132);
-      const rate = tried ? Math.round((100 * ok) / tried) : 0;
-      ctx.fillText("SUCCESS", hub.x, hub.y + 150);
-      ctx.fillStyle = rate > 85 ? "#3fb950" : rate > 65 ? "#d29922" : "#f85149";
-      ctx.font = "800 34px 'Mona Sans'";
-      ctx.fillText(tried ? `${rate}%` : "—", hub.x, hub.y + 186);
-      if (flash > 0) {
-        ctx.globalAlpha = flash;
-        ctx.fillStyle = "#f778ba";
-        ctx.font = "800 20px 'Mona Sans'";
-        ctx.fillText("evolved ↑", hub.x, hub.y - 160 - 20 * (1 - flash));
-        ctx.globalAlpha = 1;
-      }
-      ctx.fillStyle = "#9198a1";
-      ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText("WORKERS · ONE TARGET EACH", 470 + 2.5 * 110 + 27, CH - 6);
+      ctx.font = `600 16px ${MONO}`;
+      const sw = 22 + ctx.measureText("success").width, sx = C.x - sw / 2, sy = C.y + RY + 30;
+      octicon(ctx, "north-star-16", sx + 8, sy, ICON, "#9198a1");
+      ctx.textAlign = "left"; ctx.fillStyle = "#9198a1"; ctx.fillText("success", sx + 22, sy); ctx.textAlign = "center";
+      const rate = recent.length ? Math.round((100 * recent.reduce((a, b) => a + b, 0)) / recent.length) : 0;
+      ctx.fillStyle = recent.length ? "#e6edf3" : "#6e7681";
+      ctx.font = "800 40px 'Mona Sans'"; ctx.fillText(recent.length ? `${rate}%` : "—", C.x, sy + 40);
     };
     slides.push({
       group: "enterprise",
       sound: "radar",
       palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
-      notes:
-        "An illustrative multi-repository feedback loop, not an internal system or roadmap. A control repository coordinates bounded workers, reviews outcomes and updates shared workflows. The repositories, success rates and rollout stages in this animation are simulated, not operational data.",
+      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops (githubnext/gh-cao) is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
       enter() {
-        repos.forEach(p => (p.state = 0));
-        packets = [];
-        t0 = 0;
-        stage = 0;
-        gen = 1;
-        ok = tried = 0;
-        evolvedAt = -1e9;
+        repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
+        campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
+        packets = []; recent = []; t0 = 0; stage = 0; kick = 0; turn = volley = 0; shooter = null;
         stages.forEach((s, i) => s.classList.toggle("on", i === 0));
       },
       tick(t) {
-        if (!t0) t0 = lastSpawn = t;
-        const dt = Math.min(50, t - (this._last || t));
-        this._last = t;
-        spin += dt * (0.0016 + 0.01 * Math.max(0, 1 - (t - evolvedAt) / 1400));
-        if (t - lastSpawn > 120) {
-          lastSpawn = t;
+        if (!t0) { t0 = last = t; nextShot = t + 500; }
+        const dt = Math.min(50, t - last); last = t;
+        kick *= Math.exp(-dt / 600);
+        spin += dt * (0.0014 + 0.008 * kick);
+        for (const o of orgs) o.heat *= Math.exp(-dt / 600);
+        for (const k of campaigns) k.fire *= Math.exp(-dt / 300);
+        for (const p of repos) if (p.state >= 2 && t - p.t > 2600) p.state = 0;
+        if (t >= nextShot) {
+          if (!volley) {
+            shooter = null;
+            for (let i = 0; i < campaigns.length && !shooter; i++) {
+              const k = campaigns[turn++ % campaigns.length];
+              if (t >= k.hold) shooter = k;
+            }
+            volley = shooter ? Math.max(1, Math.round((2 + Math.random() * 3) * shooter.rate)) : 0;
+          }
           const idle = repos.filter(p => p.state === 0);
-          if (idle.length) {
-            const to = idle[(Math.random() * idle.length) | 0];
-            to.state = 1;
-            packets.push({ to, u: 0, back: false });
-          } else if (!packets.length) {
-            gen++;
-            ok = tried = 0;
-            evolvedAt = t;
-            repos.forEach(p => (p.state = 0));
+          if (shooter && t >= shooter.hold && idle.length) {
+            const p = idle[(Math.random() * idle.length) | 0];
+            p.state = 1; p.camp = shooter; shooter.fire = 1;
+            packets.push({ k: shooter, v: shooter.v, p, r: route(p), u: 0, work: 0 });
+            nextShot = --volley ? t + 70 : t + 150 + Math.random() * 120;
+          } else {
+            volley = 0; nextShot = t + 120;
           }
         }
-        for (const k of packets) {
-          k.u += dt / 800;
-          if (k.u >= 1 && !k.back) {
-            k.back = true;
-            k.u = 0;
-            k.fail = Math.random() < failP();
-            k.to.state = k.fail ? 3 : 2;
-          } else if (k.u >= 1 && k.back) {
-            tried++;
-            if (!k.fail) ok++;
+        for (const q of packets) {
+          if (q.u < 1) {
+            q.u = Math.min(1, q.u + dt / (220 + q.r.L * .9));
+            if (Math.abs(q.r.L * ease(q.u) - q.r.dOrg) < 24) q.p.o.heat = Math.max(q.p.o.heat, .9);
+            if (q.u >= 1) q.work = 200 + Math.random() * 600;
+            continue;
           }
+          if ((q.work -= dt) > 0) continue;
+          q.fail = Math.random() < failP(q.v); q.p.state = q.fail ? 3 : 2; q.p.t = t; q.done = true;
+          recent.push(q.fail ? 0 : 1); if (recent.length > 24) recent.shift();
+          if (q.v === q.k.v && ++q.k.got >= 8 + 5 * q.k.v) evolve(q.k, t);
         }
-        packets = packets.filter(k => k.u < 1);
-        const s = Math.min(2, gen - 1);
-        if (s !== stage) {
-          stage = s;
-          stages.forEach((e, i) => e.classList.toggle("on", i === s));
-        }
+        packets = packets.filter(q => !q.done);
+        const st = Math.min(2, Math.min(...campaigns.map(k => k.v)) - 1);
+        if (st !== stage) { stage = st; stages.forEach((e, i) => e.classList.toggle("on", i === st)); }
         draw(t);
       },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative multi-repository pattern"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
-        h(
-          "div",
-          { class: "cao-steps" },
-          steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))
-        ),
+      el: h("section", { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "githubnext/gh-cao · Central Agentic Ops"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
+        h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
         cv,
-        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])
-      ),
+        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),
     });
   }
 
