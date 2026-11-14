@@ -11,6 +11,7 @@ const { MAX_CLOSE_COUNT } = require("./constants.cjs");
 
 const receipts = new WeakMap();
 const REVISION = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const MAX_TREE_WALK = 10_000;
 const names = values => [...new Set(values.map(value => String(typeof value === "string" ? value : value.name || value.login).toLowerCase()))].sort();
 
 function nativeIdentityMatches(value, expected) {
@@ -59,6 +60,25 @@ async function readAncestry(github, repository, base, head) {
   const [owner, repo] = repository.split("/");
   const { data } = await github.rest.repos.compareCommits({ owner, repo, base, head });
   return data?.base_commit?.sha === base && data.merge_base_commit?.sha === base && data.status === "ahead" && Number.isSafeInteger(data.ahead_by) && data.ahead_by > 0 && data.behind_by === 0;
+}
+
+async function collectTreeBlobIds(github, owner, repo, root, blobIds, found) {
+  const pending = [root];
+  const visited = new Set();
+  while (pending.length && found.size < blobIds.size) {
+    const treeSha = pending.pop();
+    if (!REVISION.test(treeSha)) return false;
+    if (visited.has(treeSha)) continue;
+    if (visited.size >= MAX_TREE_WALK) return false;
+    visited.add(treeSha);
+    const { data: tree } = await github.rest.git.getTree({ owner, repo, tree_sha: treeSha });
+    if (tree?.sha !== treeSha || tree.truncated !== false || !Array.isArray(tree.tree)) return false;
+    for (const entry of tree.tree) {
+      if (entry.type === "blob" && REVISION.test(entry.sha) && blobIds.has(entry.sha)) found.add(entry.sha);
+      if (entry.type === "tree" && REVISION.test(entry.sha) && !visited.has(entry.sha)) pending.push(entry.sha);
+    }
+  }
+  return true;
 }
 
 async function readCode(github, receipt, pinnedCommit) {
@@ -305,7 +325,9 @@ async function verifyPullRequest(options, receipt) {
   const authority = await resolveParentResourceTarget(github, { repository: receipt.repository, kind: "pull_request", number: receipt.number }, data);
   const head = await resolveRepositoryTarget(github, { repository: receipt.headRepository, repository_id: nativeDecimalIdentity(data.head.repo.id), ref: `refs/heads/${receipt.branch}` });
   const effects = [];
-  const staged = (options.effects || []).filter(effect => receiptMatchesClaim(effect, claim) && effect.outcome === "succeeded" && effect.repository === receipt.headRepository && ["git_blob", "git_tree", "git_commit"].includes(effect.kind));
+  const gitObjectEffects = (options.effects || []).filter(effect => receiptMatchesClaim(effect, claim) && effect.outcome === "succeeded" && ["git_blob", "git_tree", "git_commit"].includes(effect.kind));
+  if (gitObjectEffects.some(effect => effect.repository !== receipt.headRepository)) return { verified: false, diagnostics: { event: "pull_request.effect_repository_mismatch" } };
+  const staged = gitObjectEffects;
   const stagedTrees = new Set();
   const [headOwner, headRepo] = receipt.headRepository.split("/");
   for (const effect of staged.filter(effect => effect.kind === "git_commit")) {
@@ -321,10 +343,15 @@ async function verifyPullRequest(options, receipt) {
   }
   const stagedBlobs = new Set();
   if (staged.some(effect => effect.kind === "git_blob")) {
+    const blobIds = new Set(staged.filter(effect => effect.kind === "git_blob").map(effect => effect.id));
+    if ([...blobIds].some(id => !REVISION.test(id))) return { verified: false, diagnostics: { event: "pull_request.effect_object_mismatch" } };
     for (const treeSha of stagedTrees) {
       const { data: tree } = await github.rest.git.getTree({ owner: headOwner, repo: headRepo, tree_sha: treeSha, recursive: "1" });
-      if (tree?.sha !== treeSha || tree.truncated !== false || !Array.isArray(tree.tree)) return { verified: false, diagnostics: { event: "pull_request.effect_tree_mismatch" } };
+      if (tree?.sha !== treeSha || !Array.isArray(tree.tree) || ![false, true].includes(tree.truncated)) return { verified: false, diagnostics: { event: "pull_request.effect_tree_mismatch" } };
       for (const entry of tree.tree) if (entry.type === "blob" && REVISION.test(entry.sha)) stagedBlobs.add(entry.sha);
+      if (tree.truncated === true && ![...blobIds].every(sha => stagedBlobs.has(sha)) && !(await collectTreeBlobIds(github, headOwner, headRepo, treeSha, blobIds, stagedBlobs))) {
+        return { verified: false, diagnostics: { event: "pull_request.effect_tree_mismatch" } };
+      }
     }
   }
   for (const effect of staged) {

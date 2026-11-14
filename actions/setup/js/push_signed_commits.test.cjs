@@ -1130,6 +1130,54 @@ describe("push_signed_commits integration tests", () => {
       }
     });
 
+    it("discards orphaned REST objects after losing a Claim-scoped branch-creation race", async () => {
+      execGit(["checkout", "-b", "claim-race-branch"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "race.txt"), "Race content\n");
+      execGit(["add", "race.txt"], { cwd: workDir });
+      execGit(["commit", "-m", "Race commit"], { cwd: workDir });
+      const expectedParentOid = execGit(["rev-parse", "HEAD^"], { cwd: workDir }).stdout.trim();
+      const concurrentOid = "a".repeat(40);
+      const finalOid = "signed-oid-final";
+      const realExec = makeRealExec(workDir);
+      let createRefAttempted = false;
+      global.exec = {
+        ...realExec,
+        getExecOutput: vi.fn(async (program, args, opts = {}) => {
+          if (program === "git" && args[0] === "ls-remote" && args.includes("refs/heads/claim-race-branch")) {
+            const stdout = createRefAttempted ? `${concurrentOid}\trefs/heads/claim-race-branch\n` : "";
+            return { exitCode: 0, stdout, stderr: "" };
+          }
+          return realExec.getExecOutput(program, args, opts);
+        }),
+      };
+      const concurrentError = Object.assign(new Error("Reference refs/heads/claim-race-branch already exists"), { status: 422 });
+      const githubClient = makeMockGithubClient();
+      githubClient.graphql.mockImplementation(async () => ({ createCommitOnBranch: { commit: { oid: finalOid } } }));
+      githubClient.rest.git.createRef.mockImplementation(async () => {
+        createRefAttempted = true;
+        throw concurrentError;
+      });
+      githubClient.rest.repos = { get: vi.fn(async () => ({ data: { id: 7, full_name: REPOSITORY } })) };
+      const claim = signedClaimFixture([{ repository: REPOSITORY, host: "github.com", repository_id: "7" }]);
+      const effects = [];
+      await expect(
+        withClaimExecution({ ...claim, effects }, () =>
+          pushSignedCommits({
+            githubClient: wrapClaimEffectClient(githubClient, { claim_handle: claim.claim_handle, authorize: claim.authorize }),
+            owner: "owner",
+            repo: "repo",
+            branch: "claim-race-branch",
+            baseRef: "origin/main",
+            cwd: workDir,
+            allowGitPushFallback: false,
+          })
+        )
+      ).resolves.toBe(finalOid);
+      expect(effects.filter(effect => ["git_blob", "git_tree", "git_commit"].includes(effect.kind))).toEqual([]);
+      expect(effects.find(effect => effect.kind === "graphql")).toMatchObject({ commit: finalOid, outcome: "succeeded" });
+      expect(githubClient.graphql).toHaveBeenCalledOnce();
+    });
+
     it.each([false, undefined])("never publishes an initial commit without a verified signature (%s)", async verified => {
       execGit(["checkout", "-b", "unverified-initial"], { cwd: workDir });
       fs.writeFileSync(path.join(workDir, "new.txt"), "new\n");
@@ -1146,18 +1194,21 @@ describe("push_signed_commits integration tests", () => {
       expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("falling back to git push"));
     });
 
-    it.each(["createBlob", "createTree", "createCommit"])("does not create a ref when initial %s fails", async method => {
+    it.each(["createBlob", "createTree", "createCommit", "createRef"])("surfaces initial %s failures without publishing an unsigned fallback", async method => {
       execGit(["checkout", "-b", "initial-failure"], { cwd: workDir });
       fs.writeFileSync(path.join(workDir, "new.txt"), "new\n");
       execGit(["add", "."], { cwd: workDir });
       execGit(["commit", "-m", "New file"], { cwd: workDir });
       global.exec = makeRealExec(workDir);
+      const gitExec = vi.spyOn(global.exec, "exec");
       const githubClient = makeMockGithubClient();
       githubClient.rest.git[method].mockRejectedValue(new Error("API unavailable"));
 
       await expect(pushSignedCommits({ githubClient, owner: "test-owner", repo: "test-repo", branch: "initial-failure", baseRef: "origin/main", cwd: workDir, allowGitPushFallback: false })).rejects.toThrow("API unavailable");
-      expect(githubClient.rest.git.createRef).not.toHaveBeenCalled();
+      if (method === "createRef") expect(githubClient.rest.git.createRef).toHaveBeenCalledOnce();
+      else expect(githubClient.rest.git.createRef).not.toHaveBeenCalled();
       expect(githubClient.graphql).not.toHaveBeenCalled();
+      expect(gitExec.mock.calls.some(([program, args]) => program === "git" && args[0] === "push")).toBe(false);
     });
 
     it("preserves binary contents, deletions, temporary IDs, and the full message in the initial commit", async () => {

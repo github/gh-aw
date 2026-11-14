@@ -15,6 +15,7 @@ const { overridePersistedExtraheader, restorePersistedExtraheader } = require(".
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { redactSecrets, redactBuiltInPatterns } = require("./redact_secrets.cjs");
 const { withGitClaimEffects } = require("./work_queue_git_effects.cjs");
+const { createClaimEffectBatch, withClaimEffectBatch, discardClaimEffectBatch } = require("./work_queue_claim_scope.cjs");
 const ERROR_CODE_PREFIX_RE = /^(?:ERR_[A-Z_]+|E\d{3}):\s*/;
 
 /**
@@ -860,29 +861,39 @@ async function pushSignedCommits({
           }
           assertTransportUnchanged?.();
           const parent = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: expectedHeadOid });
-          /** @type {Array<{path: string, mode: "100644", type: "blob", sha: string | null}>} */
-          const tree = [];
-          for (const addition of additions) {
-            assertTransportUnchanged?.();
-            const blob = await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths: [addition.path] }, () =>
-              githubClient.rest.git.createBlob({ owner, repo, content: addition.contents, encoding: "base64" })
-            );
-            tree.push({ path: addition.path, mode: "100644", type: "blob", sha: blob.data.sha });
+          const objectBatch = createClaimEffectBatch();
+          const createInitialObject = callback => withClaimEffectBatch(objectBatch, callback);
+          let createdCommit;
+          try {
+            createdCommit = await createInitialObject(async () => {
+              /** @type {Array<{path: string, mode: "100644", type: "blob", sha: string | null}>} */
+              const tree = [];
+              for (const addition of additions) {
+                assertTransportUnchanged?.();
+                const blob = await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths: [addition.path] }, () =>
+                  githubClient.rest.git.createBlob({ owner, repo, content: addition.contents, encoding: "base64" })
+                );
+                tree.push({ path: addition.path, mode: "100644", type: "blob", sha: blob.data.sha });
+              }
+              for (const deletion of deletions) tree.push({ path: deletion.path, mode: "100644", type: "blob", sha: null });
+              assertTransportUnchanged?.();
+              const treeOid = tree.length
+                ? (await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths }, () => githubClient.rest.git.createTree({ owner, repo, base_tree: parent.data.tree.sha, tree }))).data.sha
+                : parent.data.tree.sha;
+              assertTransportUnchanged?.();
+              return withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths }, () => githubClient.rest.git.createCommit({ owner, repo, message, tree: treeOid, parents: [expectedHeadOid] }));
+            });
+          } catch (error) {
+            discardClaimEffectBatch(objectBatch);
+            throw error;
           }
-          for (const deletion of deletions) tree.push({ path: deletion.path, mode: "100644", type: "blob", sha: null });
-          assertTransportUnchanged?.();
-          const treeOid = tree.length
-            ? (await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths }, () => githubClient.rest.git.createTree({ owner, repo, base_tree: parent.data.tree.sha, tree }))).data.sha
-            : parent.data.tree.sha;
-          assertTransportUnchanged?.();
-          const createdCommit = await withGitClaimEffects({ github: githubClient, repository: `${owner}/${repo}`, branch, paths }, () =>
-            githubClient.rest.git.createCommit({ owner, repo, message, tree: treeOid, parents: [expectedHeadOid] })
-          );
-          const firstOid = createdCommit.data.sha;
+          const firstOid = createdCommit?.data?.sha;
           if (typeof firstOid !== "string" || firstOid.length === 0) {
+            discardClaimEffectBatch(objectBatch);
             throw new Error(`${ERR_API}: REST createCommit did not return a valid commit OID`);
           }
-          if (createdCommit.data.verification?.verified !== true) {
+          if (createdCommit?.data?.verification?.verified !== true) {
+            discardClaimEffectBatch(objectBatch);
             throw new PushSignedCommitsPolicyViolation(`${ERR_VALIDATION}: GitHub did not verify the initial commit signature; refusing to publish branch '${branch}'`);
           }
           core.info(`pushSignedCommits: creating remote branch ${branch} at first signed commit ${firstOid}`);
@@ -900,7 +911,12 @@ async function pushSignedCommits({
             lastOid = firstOid;
             continue;
           } catch (createRefError) {
-            assertTransportUnchanged?.();
+            try {
+              assertTransportUnchanged?.();
+            } catch (error) {
+              discardClaimEffectBatch(objectBatch);
+              throw error;
+            }
             /** @type {any} */
             const err = createRefError;
             const status = err && typeof err === "object" ? err.status : undefined;
@@ -909,8 +925,15 @@ async function pushSignedCommits({
             // GitHub returns 422 "Reference refs/heads/<branch> already exists". Treat that as success and continue.
             if (status === 422 && /reference.*already exists/i.test(message)) {
               core.info(`pushSignedCommits: remote branch ${branch} was created concurrently (422 Reference already exists); continuing with signed commits`);
-              const refreshedOid = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
+              let refreshedOid;
+              try {
+                refreshedOid = await lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken);
+              } catch (error) {
+                discardClaimEffectBatch(objectBatch);
+                throw error;
+              }
               if (!refreshedOid) {
+                discardClaimEffectBatch(objectBatch);
                 throw new Error(`${ERR_API}: Could not resolve remote branch OID for ${branch} after concurrent creation`);
               }
               expectedHeadOid = refreshedOid;
@@ -918,7 +941,9 @@ async function pushSignedCommits({
                 lastOid = firstOid;
                 continue;
               }
+              discardClaimEffectBatch(objectBatch);
             } else {
+              discardClaimEffectBatch(objectBatch);
               throw createRefError;
             }
           }

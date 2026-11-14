@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const { queueFixture, REPOSITORY, WORKFLOW, REF } = require("./work_queue_lifecycle.test_helpers.cjs");
-const { withClaimExecution, closeClaimEffectChannel, recordClaimEffect } = require("./work_queue_claim_scope.cjs");
+const { withClaimExecution, closeClaimEffectChannel, recordClaimEffect, createClaimEffectBatch, withClaimEffectBatch, discardClaimEffectBatch } = require("./work_queue_claim_scope.cjs");
 const { authorizeWorkerClaim, finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
 const { readDeliveryControlInventory, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
 const { captureDiscussionDelivery, preparePullRequestDelivery, capturePullRequestDelivery, durableNativeCreationReceipt, verifyNativeCreationDelivery } = require("./work_queue_native_creation_delivery.cjs");
@@ -335,7 +335,7 @@ describe("native creation Claim delivery", () => {
       recordClaimEffect({ repository: REPOSITORY, kind: "git_tree", id: mismatch === "tree" ? BASE : TREE, outcome: "succeeded" });
       const effect = recordClaimEffect({ repository: REPOSITORY, kind: "git_blob", id: mismatch === "blob" ? BASE : blob, outcome: "succeeded" });
       f.client.rest.git.getTree.mockImplementation(async ({ tree_sha, recursive }) => ({
-        data: { sha: tree_sha, truncated: mismatch === "truncated" && recursive === "1", tree: [{ path: "new.txt", type: "blob", sha: blob }] },
+        data: { sha: tree_sha, truncated: mismatch === "truncated" && (recursive === "1" || recursive === undefined), tree: mismatch === "truncated" ? [] : [{ path: "new.txt", type: "blob", sha: blob }] },
       }));
       if (mismatch === "commit") commit.id = REF;
       if (mismatch === "base_commit") commit.id = BASE;
@@ -345,6 +345,85 @@ describe("native creation Claim delivery", () => {
       expect((await f.settle()).verification).toBe("unknown");
     });
     expect(f.queue.state.works.get(f.member.work_id).barrier).toBe("pending");
+  });
+
+  it("settles staged signed PR blobs after a truncated recursive listing using complete subtree reads", async () => {
+    const f = fixture("create_pull_request");
+    const blob = "1".repeat(40);
+    const subtree = "4".repeat(40);
+    f.client.rest.git.getTree.mockImplementation(async ({ tree_sha, recursive }) => {
+      if (recursive === "1") return { data: { sha: tree_sha, truncated: true, tree: [] } };
+      return {
+        data: {
+          sha: tree_sha,
+          truncated: false,
+          tree: tree_sha === TREE ? [{ path: "src", type: "tree", sha: subtree }] : [{ path: "new.txt", type: "blob", sha: blob }],
+        },
+      };
+    });
+    await f.execute(async () => {
+      recordClaimEffect({ repository: REPOSITORY, kind: "git_commit", id: COMMIT, outcome: "succeeded" });
+      recordClaimEffect({ repository: REPOSITORY, kind: "git_blob", id: blob, outcome: "succeeded" });
+      await f.capture();
+      expect((await f.settle()).verification).toBe("verified");
+    });
+  });
+
+  it("continues tree traversal when content-identical subtrees share a SHA", async () => {
+    const f = fixture("create_pull_request");
+    const firstBlob = "1".repeat(40);
+    const secondBlob = "2".repeat(40);
+    const duplicateSubtree = "4".repeat(40);
+    const otherSubtree = "5".repeat(40);
+    f.client.rest.git.getTree.mockImplementation(async ({ tree_sha, recursive }) => {
+      if (recursive === "1") return { data: { sha: tree_sha, truncated: true, tree: [] } };
+      if (tree_sha === TREE)
+        return {
+          data: {
+            sha: tree_sha,
+            truncated: false,
+            tree: [
+              { path: "other", type: "tree", sha: otherSubtree },
+              { path: "one", type: "tree", sha: duplicateSubtree },
+              { path: "two", type: "tree", sha: duplicateSubtree },
+            ],
+          },
+        };
+      return {
+        data: {
+          sha: tree_sha,
+          truncated: false,
+          tree: [{ path: "new.txt", type: "blob", sha: tree_sha === duplicateSubtree ? firstBlob : secondBlob }],
+        },
+      };
+    });
+    await f.execute(async () => {
+      recordClaimEffect({ repository: REPOSITORY, kind: "git_commit", id: COMMIT, outcome: "succeeded" });
+      recordClaimEffect({ repository: REPOSITORY, kind: "git_blob", id: firstBlob, outcome: "succeeded" });
+      recordClaimEffect({ repository: REPOSITORY, kind: "git_blob", id: secondBlob, outcome: "succeeded" });
+      await f.capture();
+      expect((await f.settle()).verification).toBe("verified");
+    });
+  });
+
+  it("settles a concurrent branch-creation race after discarding orphaned REST objects", async () => {
+    const f = fixture("create_pull_request");
+    await f.execute(async () => {
+      const batch = createClaimEffectBatch();
+      await withClaimEffectBatch(batch, async () => {
+        recordClaimEffect({ repository: REPOSITORY, kind: "git_blob", id: "1".repeat(40), outcome: "succeeded" });
+        recordClaimEffect({ repository: REPOSITORY, kind: "git_tree", id: TREE, outcome: "succeeded" });
+        recordClaimEffect({ repository: REPOSITORY, kind: "git_commit", id: "2".repeat(40), outcome: "succeeded" });
+      });
+      expect(discardClaimEffectBatch(batch)).toBe(3);
+      recordClaimEffect({ repository: REPOSITORY, kind: "graphql", id: "final-commit", commit: COMMIT, outcome: "succeeded" });
+      await f.capture();
+      const delivery = await f.settle();
+      expect(delivery.verification, delivery.reason).toBe("verified");
+    });
+    expect(f.effects.filter(effect => ["git_blob", "git_tree", "git_commit"].includes(effect.kind))).toEqual([]);
+    expect((await f.finalize()).claims.h1.state).toBe("result");
+    expect(f.queue.state.works.get(f.member.work_id).barrier).toBe("verified");
   });
 
   it.each([
