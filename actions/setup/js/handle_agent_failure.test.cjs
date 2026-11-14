@@ -888,6 +888,238 @@ describe("handle_agent_failure", () => {
       expect(global.github.request).not.toHaveBeenCalled();
     });
 
+    it("prefers the setup failure over an earlier unrelated failure during startup", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Run preflight checks", conclusion: "failure" },
+              { name: "Checkout repository (gh-aw default)", conclusion: "failure" },
+              { name: "Start MCP Gateway", conclusion: "skipped" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentDiagnostics({ startupFailure: true })).resolves.toEqual({
+        failingStep: "Checkout repository (gh-aw default)",
+        agentConclusion: "failure",
+        preAgentFailure: true,
+      });
+    });
+
+    it("redacts and bounds the failed startup step output without including adjacent steps or runner inputs", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
+      vi.stubEnv("SECRET_STARTUP_TEST", "configured-value-for-test");
+      const log = [
+        "2026-10-10T10:00:02.010Z ##[group]Run previous step",
+        "2026-10-10T10:00:02.020Z ##[endgroup]",
+        "2026-10-10T10:00:02.030Z previous step output",
+        '2026-10-10T10:00:02.040Z ##[group]Run bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v1 --rootless',
+        "2026-10-10T10:00:02.050Z env: private-runner-input",
+        "2026-10-10T10:00:02.060Z ##[endgroup]",
+        "2026-10-10T10:00:02.070Z ::add-mask::masked-value-for-test",
+        ...Array.from({ length: 35 }, (_, i) => `2026-10-10T10:00:02.100Z output line ${i}`),
+        "2026-10-10T10:00:02.500Z install failed: masked-value-for-test",
+        "2026-10-10T10:00:02.550Z configured-value-for-test ``` </details>",
+        "2026-10-10T10:00:02.600Z ##[error]Process completed with exit code 1.",
+        "2026-10-10T10:00:02.700Z ##[group]Run cleanup",
+        "2026-10-10T10:00:02.800Z cleanup output",
+      ].join("\n");
+      const download = vi.fn().mockResolvedValue({ data: new TextEncoder().encode(log) });
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Previous step", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+              { name: "Cleanup", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+      const diagnostics = await getFailedAgentDiagnostics({ startupFailure: true });
+      const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_startup_failure"], engineFailureContext: "" });
+      expect(rendered).toContain("Failing step:** `Install AWF binary`");
+      expect(rendered).toContain("Startup step log tail (redacted)");
+      expect(rendered).toContain("install failed:");
+      expect(rendered).toContain("output line 34");
+      expect(rendered).not.toContain("output line 0");
+      expect(rendered).not.toContain("masked-value-for-test");
+      expect(rendered).not.toContain("configured-value-for-test");
+      expect(rendered).not.toContain("\n</details>\n\n</details>");
+      expect(rendered).not.toContain("private-runner-input");
+      expect(rendered).not.toContain("previous step output");
+      expect(rendered).not.toContain("cleanup output");
+      expect(download).toHaveBeenCalledOnce();
+      await getFailedAgentDiagnostics();
+      expect(download).toHaveBeenCalledOnce();
+      vi.unstubAllEnvs();
+    });
+
+    it("preserves the startup cause and exit marker when sanitization expands the tail", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      const log = [
+        '2026-10-10T10:00:02.010Z ##[group]Run bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v1 --rootless',
+        "2026-10-10T10:00:02.020Z ##[endgroup]",
+        `2026-10-10T10:00:02.030Z ${"@npm/package ".repeat(350)}install failed: missing optional binding`,
+        "2026-10-10T10:00:02.040Z ##[error]Process completed with exit code 1.",
+      ].join("\n");
+      const download = vi.fn().mockResolvedValue({ data: log });
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+
+      const diagnostics = await getFailedAgentDiagnostics({ startupFailure: true });
+
+      expect(diagnostics.startupLogTail.length).toBeLessThanOrEqual(4000);
+      expect(diagnostics.startupLogTail).toContain("install failed: missing optional binding");
+      expect(diagnostics.startupLogTail).toContain("Process completed with exit code 1.");
+      vi.unstubAllEnvs();
+    });
+
+    it("withholds oversized startup job logs before parsing", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      const download = vi.fn().mockResolvedValue({ data: new Uint8Array(5 * 1024 * 1024 + 1) });
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      expect(global.core.warning).toHaveBeenCalledWith("Startup job log exceeds the safe parsing limit; see the failing step in the linked run.");
+      expect(download).toHaveBeenCalledOnce();
+      vi.unstubAllEnvs();
+    });
+
+    it("does not expose startup logs when retrieval fails or redaction failed", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      const download = vi.fn().mockRejectedValue(new Error("private response"));
+      const steps = [
+        { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+        { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+      ];
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([{ id: 456, name: "agent", conclusion: "failure", steps }]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("private response");
+      steps.push({ name: "Redact secrets in logs", conclusion: "failure" });
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      expect(download).toHaveBeenCalledOnce();
+      vi.unstubAllEnvs();
+    });
+
+    it("withholds startup output when runner boundaries cannot be established", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      const download = vi.fn().mockResolvedValue({ data: "2026-10-10T10:00:02.500Z unbounded output" });
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      expect(download).toHaveBeenCalledOnce();
+      vi.unstubAllEnvs();
+    });
+
+    it("withholds raw logs when custom masking is configured or its configuration is unavailable", async () => {
+      const download = vi.fn();
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+      for (const value of ["false", ""]) {
+        vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", value);
+        expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      }
+      expect(download).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it.each(["previous", "cleanup"])("withholds an ambiguous %s failure in the same second", async position => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              ...(position === "previous" ? [{ name: "Previous step", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" }] : []),
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+              ...(position === "cleanup" ? [{ name: "Cleanup", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" }] : []),
+            ],
+          },
+        ]),
+        rest: {
+          actions: {
+            listJobsForWorkflowRun: vi.fn(),
+            downloadJobLogsForWorkflowRun: vi.fn().mockResolvedValue({
+              data: ["2026-10-10T10:00:02.100Z ##[group]Run previous step", "2026-10-10T10:00:02.200Z ##[endgroup]", "2026-10-10T10:00:02.300Z unrelated output", "2026-10-10T10:00:02.400Z ##[error]Process completed with exit code 1."].join(
+                "\n"
+              ),
+            }),
+          },
+        },
+      };
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      vi.unstubAllEnvs();
+    });
+
     it("uses dependency results as the job fallback when the jobs API returns nothing", async () => {
       global.github = {
         paginate: vi.fn().mockResolvedValue([]),
@@ -7608,6 +7840,67 @@ describe("handle_agent_failure", () => {
       if (fs.existsSync(tmpDir)) {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
+    });
+
+    it("publishes a redacted Install AWF binary log tail as a startup failure, not an agent failure", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      syncRuntimePromptTemplates(import.meta.url);
+      fs.writeFileSync(path.join(tmpDir, "agent_execution.json"), JSON.stringify({ version: 1, component: "agent", run_id: 12345, run_attempt: 1, state: "not_started" }));
+      fs.writeFileSync(
+        path.join(tmpDir, "agent_output.json"),
+        JSON.stringify({
+          items: [{ type: "report_incomplete", reason: "agent_startup_failure", failureCause: "agent_startup_failure" }],
+          collectorEmptyOutputCause: "agent_startup_failure",
+          collectorFailureCause: "agent_startup_failure",
+        })
+      );
+      const create = vi.fn(async () => {
+        throw new Error("stop after capturing issue");
+      });
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: {
+          actions: {
+            listJobsForWorkflowRun: vi.fn(),
+            downloadJobLogsForWorkflowRun: vi.fn().mockResolvedValue({
+              data: [
+                "2026-10-10T10:00:02.100Z ##[group]Run install",
+                "2026-10-10T10:00:02.200Z ##[endgroup]",
+                "2026-10-10T10:00:02.300Z ::add-mask::masked-value-for-test",
+                "2026-10-10T10:00:02.400Z installer failed: masked-value-for-test",
+                "2026-10-10T10:00:02.500Z ##[error]Process completed with exit code 1.",
+              ].join("\n"),
+            }),
+          },
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      await require("./handle_agent_failure.cjs").main();
+      expect(create).toHaveBeenCalledOnce();
+      const { title, body } = create.mock.calls[0][0];
+      expect(title).toBe("[aw] Test Workflow: failed before agent execution started");
+      expect(body).toContain("Failure classification: agent_startup_failure");
+      expect(body).toContain("Failing step:** `Install AWF binary`");
+      expect(body).toContain("Startup step log tail (redacted)");
+      expect(body).toContain("installer failed:");
+      expect(body).not.toContain("masked-value-for-test");
+      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      expect(categories).toContain("agent_startup_failure");
+      expect(categories).not.toContain("agent_failure");
+      expect(categories).not.toContain("engine_driver_failure");
     });
 
     it("skips failure issue creation when terminal_reason: completed and non-noop safe outputs present", async () => {

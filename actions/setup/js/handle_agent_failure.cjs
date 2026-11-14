@@ -7,7 +7,7 @@ const { iterateJsonl, readJsonlFileEvents, iterateLines } = require("./jsonl_hel
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
+const { redactAndBoundDiagnostics, redactDiagnosticText } = require("./diagnostic_sanitization.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { getDetectionCautionBlocks, getFooterAgentFailureCommentBlocks } = require("./messages_footer.cjs");
 const { getPromptPath } = require("./messages_core.cjs");
@@ -89,6 +89,8 @@ const HARNESS_UNEXPECTED_ERROR_RE = /^\[(?:copilot|claude|codex)-harness\]\s*une
 const FAILURE_ISSUE_DEDUP_WINDOW_HOURS = 24;
 const FAILURE_ISSUE_CATEGORY_DAILY_CAP = 50;
 const FAILURE_ISSUE_WINDOW_MS = FAILURE_ISSUE_DEDUP_WINDOW_HOURS * 60 * 60 * 1000;
+const MAX_STARTUP_JOB_LOG_BYTES = 5 * 1024 * 1024;
+const MAX_STARTUP_LOG_TAIL_LENGTH = 4000;
 const DEFAULT_OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
 /** Path to the failure categories file written by handle_agent_failure and read by the OTLP conclusion span. */
 const FAILURE_CATEGORIES_PATH = "/tmp/gh-aw/failure_categories.json";
@@ -2014,9 +2016,76 @@ async function getSecretRedactionError(jobId, step) {
 }
 
 /**
- * Find the failed agent step using Actions metadata only, never agent-generated log text.
+ * Extract a shell step's output without the runner's script and environment dump.
+ * The runner's exit marker and group boundaries disambiguate steps that share
+ * the same second in the Actions metadata.
+ * @param {number} jobId
+ * @param {{name?: string, started_at?: string, completed_at?: string}} step
+ * @param {boolean} overlappingStep
+ * @returns {Promise<string>}
+ */
+async function getStartupStepLogTail(jobId, step, overlappingStep) {
+  const start = Date.parse(step.started_at || "");
+  const end = Date.parse(step.completed_at || "");
+  if (!Number.isSafeInteger(jobId) || jobId <= 0) return "";
+  if (!Number.isFinite(start)) return "";
+  if (!Number.isFinite(end)) return "";
+  if (end < start) return "";
+  try {
+    const { data } = await github.rest.actions.downloadJobLogsForWorkflowRun({ ...context.repo, job_id: jobId });
+    if (typeof data !== "string" && !(data instanceof ArrayBuffer) && !(data instanceof Uint8Array)) return "";
+    const byteLength = typeof data === "string" ? Buffer.byteLength(data, "utf8") : data.byteLength;
+    if (byteLength > MAX_STARTUP_JOB_LOG_BYTES) {
+      core.warning("Startup job log exceeds the safe parsing limit; see the failing step in the linked run.");
+      return "";
+    }
+    const log = typeof data === "string" ? data : Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data).toString("utf8");
+    const records = log.split(/\r?\n/).flatMap(line => {
+      const match = line.match(/^(\d{4}-\d{2}-\d{2}T\S+Z) (.*)$/);
+      if (!match) return [];
+      const timestamp = Date.parse(match[1]);
+      if (!Number.isFinite(timestamp)) return [];
+      return timestamp >= start && timestamp < end + 1000 ? [match[2]] : [];
+    });
+    const exits = records.flatMap((line, index) => (/^##\[error\]Process completed with exit code \d+\./.test(line) ? [index] : []));
+    if (exits.length !== 1) return "";
+    const exit = exits[0];
+    let group = exit - 1;
+    while (group >= 0 && !records[group].startsWith("##[group]Run ")) group--;
+    if (overlappingStep && (step.name !== "Install AWF binary" || !/^##\[group\]Run bash "\$\{RUNNER_TEMP\}\/gh-aw\/actions\/install_awf_binary\.sh"(?: |$)/.test(records[group] || ""))) return "";
+    const output = records.findIndex((line, index) => index > group && line === "##[endgroup]");
+    if (group < 0 || output < 0 || output >= exit) return "";
+    const maskedValues = collectAddMaskedValues(log);
+    const exitCode = records[exit].match(/^##\[error\]Process completed with exit code (\d+)\./)?.[1];
+    if (!exitCode) return "";
+    const exitMarker = `##[error]Process completed with exit code ${exitCode}.`;
+    let rawTail = records
+      .slice(output + 1, exit)
+      .slice(-30)
+      .join("\n")
+      .slice(-MAX_STARTUP_LOG_TAIL_LENGTH);
+    let sanitizedTail = "";
+    while (rawTail) {
+      sanitizedTail = redactAndBoundDiagnostics(redactDiagnosticText(rawTail, { maskedValues }), {
+        maskedValues,
+        maxLength: MAX_STARTUP_LOG_TAIL_LENGTH * 4,
+      });
+      if (sanitizedTail.length + exitMarker.length + 1 <= MAX_STARTUP_LOG_TAIL_LENGTH) break;
+      const newline = rawTail.indexOf("\n");
+      rawTail = newline >= 0 ? rawTail.slice(newline + 1) : rawTail.slice(Math.min(64, rawTail.length));
+    }
+    if (!sanitizedTail || sanitizedTail.length + exitMarker.length + 1 > MAX_STARTUP_LOG_TAIL_LENGTH) return "";
+    return `${sanitizedTail}\n${exitMarker}`;
+  } catch {
+    core.warning("Could not retrieve startup step diagnostics; see the failing step in the linked run.");
+    return "";
+  }
+}
+
+/**
+ * Find the failed agent step, excluding agent-generated log text.
  * @param {{startupFailure?: boolean}} [options] - Select the first failed step only for a validated collector startup failure.
- * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean, preAgentFailure?: boolean, checkoutRef?: string}>}
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, startupLogTail?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean, preAgentFailure?: boolean, checkoutRef?: string}>}
  */
 async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   let jobs;
@@ -2094,7 +2163,8 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   if (!startupFailure) steps?.reverse();
   const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && isFailedStep(step));
   // Failed redaction blocks safe diagnostics even after an agent crash; startup keeps priority.
-  const failedStep = (!startupFailure && redactionStep) || setupFailure || steps?.find(step => (isFailedStep(step) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
+  const firstFailedStep = steps?.find(step => (isFailedStep(step) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
+  const failedStep = startupFailure ? setupFailure || firstFailedStep : redactionStep || setupFailure || firstFailedStep;
   if (!failedStep) {
     return { failingStep: "", agentConclusion, ...(isCancelledTimeout ? { isTimedOut: true } : {}), attributionUnavailable: "The failed agent job had no failed step metadata." };
   }
@@ -2103,6 +2173,27 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   if (!failingStep) {
     return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no valid failed step name." };
   }
+  const executionIndex = steps.findIndex(isExecuteAgentStep);
+  const failedIndex = steps.indexOf(failedStep);
+  const start = Date.parse(failedStep.started_at || "");
+  const end = Date.parse(failedStep.completed_at || "");
+  const overlappingStep =
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    steps.some((step, index) => {
+      if (index === failedIndex || step.conclusion === "skipped") return false;
+      const started = Date.parse(step.started_at || "");
+      const completed = Date.parse(step.completed_at || "");
+      if (!Number.isFinite(started)) return true;
+      if (!Number.isFinite(completed)) return true;
+      if (!Number.isFinite(start)) return true;
+      if (!Number.isFinite(end)) return true;
+      return started < end + 1000 && completed + 1000 > start;
+    });
+  const startupLogTail =
+    startupFailure && process.env.GH_AW_STARTUP_LOG_EXCERPT_ALLOWED === "true" && !redactionStep && executionIndex >= 0 && failedIndex < executionIndex && isFailedStep(failedStep)
+      ? await getStartupStepLogTail(agentJob.id, failedStep, overlappingStep)
+      : "";
   return {
     failingStep,
     agentConclusion,
@@ -2112,12 +2203,13 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
       : {}),
     ...(isCancelledTimeout ? { isTimedOut: true } : {}),
     ...(failedStep === redactionStep ? { secretRedactionFailed: true, stepError: await getSecretRedactionError(agentJob.id, redactionStep) } : {}),
+    ...(startupLogTail ? { startupLogTail } : {}),
   };
 }
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>, preAgentFailure?: boolean, checkoutRef?: string}} options
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, startupLogTail?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>, preAgentFailure?: boolean, checkoutRef?: string}} options
  * @returns {ReportBlock[]}
  */
 function buildFailureDiagnosticsContext({
@@ -2126,6 +2218,7 @@ function buildFailureDiagnosticsContext({
   agentConclusion = "",
   attributionUnavailable = "",
   stepError = "",
+  startupLogTail = "",
   engineFailureContext,
   checkoutError = "",
   items = [],
@@ -2178,6 +2271,8 @@ function buildFailureDiagnosticsContext({
   }
   if (stepError) {
     context.push(...renderErrorDetails(stepError));
+  } else if (startupLogTail && failureCategories.includes("agent_startup_failure")) {
+    context.push(nodes.details("Startup step log tail (redacted)", [nodes.codeBlock(startupLogTail, "text")]));
   } else if (engineFailureContext.length) {
     context.push(...engineFailureContext);
   } else if (hasModelEndpointMismatch) {
@@ -2190,7 +2285,17 @@ function buildFailureDiagnosticsContext({
   if (attributionUnavailable) {
     context.push(nodes.details("Why step details are unavailable", [nodes.paragraph([nodes.text(attributionUnavailable)])]));
   }
-  context.push(nodes.paragraph([{ type: "emphasis", children: [nodes.text("Only runtime metadata is shown; agent-generated text is excluded.")], agentTainted: false }]));
+  context.push(
+    nodes.paragraph([
+      {
+        type: "emphasis",
+        children: [
+          nodes.text(startupLogTail && failureCategories.includes("agent_startup_failure") ? "The startup step log is redacted; agent-generated text is excluded." : "Only runtime metadata is shown; agent-generated text is excluded."),
+        ],
+        agentTainted: false,
+      },
+    ])
+  );
 
   return context;
 }

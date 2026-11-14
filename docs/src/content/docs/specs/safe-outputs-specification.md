@@ -6438,6 +6438,19 @@ This section defines required behavior for unusual or boundary conditions.
 
 *Rationale*: Partial failure should not prevent valid operations from executing.
 
+**Startup Failure Report Diagnostics**
+
+*Scenario*: Runtime evidence records that the agent did not start and identifies a failed startup step.
+
+*Behavior*:
+
+- Failure reporting MUST identify the failed startup step when attribution is available.
+- The reporter MAY parse that step's Actions log and include a bounded, redacted excerpt in the failure report.
+- The excerpt MUST be withheld when custom masking is configured, the secret-redaction step failed, step attribution is ambiguous, or log retrieval or parsing fails.
+- Reports MUST NOT include raw engine logs or agent-generated output. Startup failures MUST remain distinct from agent failures and driver crashes.
+
+*Rationale*: A guarded excerpt provides actionable setup diagnostics without publishing unverified or insufficiently redacted logs.
+
 **Missing Artifact**
 
 *Scenario*: Safe output job cannot download artifact (artifact not found)

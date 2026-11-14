@@ -28,6 +28,25 @@ func TestUsageActivityGenerationIncludesJobResults(t *testing.T) {
 	}
 }
 
+func TestAgentFailureStartupLogExcerptMaskingPolicy(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		masking *SecretMaskingConfig
+		allowed string
+	}{
+		{"default", nil, "true"},
+		{"empty", &SecretMaskingConfig{}, "true"},
+		{"custom", &SecretMaskingConfig{Steps: []map[string]any{{"run": "echo redacted"}}}, "false"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{AI: "copilot", SafeOutputs: &SafeOutputsConfig{}, SecretMasking: tt.masking}
+			steps, err := NewCompiler().buildAgentFailureStep(data, "agent", "", "")
+			require.NoError(t, err)
+			assert.Contains(t, strings.Join(steps, ""), `GH_AW_STARTUP_LOG_EXCERPT_ALLOWED: "`+tt.allowed+`"`)
+		})
+	}
+}
+
 func TestConclusionJob(t *testing.T) {
 	tests := []struct {
 		name               string
