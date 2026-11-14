@@ -102,7 +102,7 @@ If the new numbers are lower than the baseline, suspect the query, not the data:
 
 ```bash
 node --check docs/public/cracktro/deck.js
-python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#29 in the browser canvas
+python3 -m http.server 4339 --bind 127.0.0.1 --directory docs/public   # async; open http://127.0.0.1:4339/cracktro/#30 in the browser canvas
 git diff -U0 docs/public/cracktro/deck.js | grep '^+' | grep -nE '[0-9a-f]{40}|github/[a-z]|https?://|who:'   # must print nothing
 cd docs && npx playwright test tests/talk.spec.ts
 ```
