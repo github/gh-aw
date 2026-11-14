@@ -6122,11 +6122,11 @@
       `<g class="fv-res ${k}" id="${id}"><rect class="fv-card" x="1360" y="${y}" width="424" height="${hgt}" rx="16"/><text class="fv-rh" x="1382" y="${y + 36}">${esc(head)}</text>${lines.map(([cls, txt, dy]) => `<text class="${cls}" x="1382" y="${y + dy}">${esc(txt)}</text>`).join("")}</g>`;
     g += card("fvA", "g", 80, 150, "DAILY TLC · FairDAGGitHub", [
       ["fv-rt", "✓ Safety · 1,055,182 states", 80],
-      ["fv-rs", "exhausted · depth 20 · 16 min 33 s", 118],
+      ["fv-rs", "11 Nov · depth 20 · 16 min 33 s", 118],
     ]);
     g += card("fvB", "r", 246, 150, "MUTANT · BrokenCAS", [
       ["fv-rt", "✗ TerminalPersistence fails", 80],
-      ["fv-rs", "735 states · 1 of 99 mutants", 118],
+      ["fv-rs", "735 states · 7 Oct record", 118],
     ]);
     g += card("fvC", "b", 412, 188, "WITNESS → CONFORMANCE TEST", [
       ["fv-tr", "NoOutOfOrderClaim fails:", 74],
@@ -6184,7 +6184,7 @@
       sound: "formal",
       palette: ["#1f6feb", "#8957e5", "#238636", "#bf3989"],
       notes:
-        "Spec, model, test: formal methods as the backbone of spec-driven development, on gh-aw's own work queue. Measured (14 Nov 2026 snapshot): the top-right ledger counts the repository's specs/work-queue folder (16 TLA+ modules, 218 TLC configurations, of which 99 are Broken mutants and 55 are witnesses) and the 35 merged pull requests that changed it since 2 Oct 2026. The Daily Work Queue Formal Verification workflow re-runs the two expensive configurations every day; on its 11 Nov run FairDAGGitHub exhausted 1,055,182 distinct states at depth 20 in 16 min 33 s with Safety holding, while QueueOrdering was still open after 4 h 40 m with 178.9 million distinct states at depth 20, so it is reported as not established, not as a pass. The BrokenCAS mutant must fail TerminalPersistence (735 states) and the WeakOrderingWitness must reach an out-of-order Claim (756 states), from the 7 Oct 2026 verification record; that witness is why the spec says oldest-first is best effort, not strict FIFO. Shared fixtures replay against the real Go and JavaScript engines. Illustrative: the requirement wording, the abridged TLA+ excerpt, the small state graph and its animation are simplified; the invariant, mutant and witness names are real. Bounded checks are strong evidence, not a proof.",
+        "Spec, model, test: formal methods as the backbone of spec-driven development, on gh-aw's own work queue. Measured, data window 2 Oct to 14 Nov 2026 (43 days), snapshot taken 14 Nov 2026: the top-right ledger counts the repository's specs/work-queue folder (16 TLA+ modules, 218 TLC configurations, of which 99 are Broken mutants and 55 are witnesses) and the 35 merged pull requests that changed it between 2 Oct and 14 Nov 2026 (file counts are as of the 14 Nov snapshot). The Daily Work Queue Formal Verification workflow re-runs the two expensive configurations every day; on its 11 Nov run FairDAGGitHub exhausted 1,055,182 distinct states at depth 20 in 16 min 33 s with Safety holding, while QueueOrdering was still open after 4 h 40 m with 178.9 million distinct states at depth 20, so it is reported as not established, not as a pass. The BrokenCAS mutant must fail TerminalPersistence (735 states) and the WeakOrderingWitness must reach an out-of-order Claim (756 states), from the 7 Oct 2026 verification record; that witness is why the spec says oldest-first is best effort, not strict FIFO. Shared fixtures replay against the real Go and JavaScript engines. Illustrative: the requirement wording, the abridged TLA+ excerpt, the small state graph and its animation are simplified; the invariant, mutant and witness names are real. Bounded checks are strong evidence, not a proof.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -6287,11 +6287,11 @@
         h(
           "div",
           { class: "smt-led" },
-          h("div", { class: "smt-h" }, "MEASURED · specs/work-queue · 14 Nov 2026"),
+          h("div", { class: "smt-h" }, "MEASURED · 2 Oct – 14 Nov 2026 (43 days)"),
           h("div", { class: "smt-k" }, ...[["16", "TLA+ modules"], ["218", "TLC configs"], ["99", "mutants"], ["55", "witnesses"]].map(([n, l]) => h("div", {}, h("b", {}, n), h("span", {}, l)))),
-          h("div", { class: "smt-run" }, h("i", { class: "o" }, "◔"), "QueueOrdering: 178.9M states, open after 4 h 40 m"),
-          h("div", { class: "smt-run" }, h("i", { class: "g" }, "✓"), "35 merged PRs changed the spec since 2 Oct 2026"),
-          h("div", { class: "smt-cap" }, "TLC counts and verdicts measured · flow illustrative")
+          h("div", { class: "smt-run" }, h("i", { class: "o" }, "◔"), "11 Nov · QueueOrdering open: 178.9M states, 4 h 40 m"),
+          h("div", { class: "smt-run" }, h("i", { class: "g" }, "✓"), "2 Oct – 14 Nov · 35 merged PRs changed the spec"),
+          h("div", { class: "smt-cap" }, "specs/work-queue · TLC 7 Oct, 11 Nov · flow illustrative")
         ),
         svg
       ),
