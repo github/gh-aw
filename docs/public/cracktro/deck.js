@@ -1831,7 +1831,7 @@
     otel.classList.add("otel");
     const cRun = h("span");
     const runner = card(RN, RUN[0].c, "Your runners", "Any runner", cRun, SRV);
-    const fw = card(SB, FW.c, "Firewall · microVM", "Sandbox", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
+    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
     fw.classList.add("fw");
     const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
     eco.classList.add("eco");
