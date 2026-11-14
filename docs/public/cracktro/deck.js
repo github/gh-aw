@@ -321,6 +321,19 @@
   .ao-bar.seen.m { fill: #8957e5; } .ao-bar.seen.t { fill: #1f6feb; } .ao-bar.seen.x { fill: #f85149; } .ao-bar.seen.r, .ao-bar.seen.f { fill: #d29922; }
   .ao-leg { font: 500 14px var(--mono); }
   .ao-axis { stroke: #3d444d; stroke-width: 2; }
+  .mc-sub { fill: #f0f6fc; font: 600 20px var(--mono); text-anchor: middle; }
+  .mc-eng { fill: #9198a1; font: 500 17px var(--mono); text-anchor: middle; }
+  .mc-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
+  .mc-call rect { fill: transparent; stroke: transparent; transition: fill .3s, stroke .3s; } .mc-call.on rect { fill: #8957e522; stroke: #ab7df8; }
+  .sfl-row .mc-v { fill: #c297ff; font: 600 15px var(--mono); letter-spacing: .08em; }
+  .mc-chip rect { fill: #161b22; stroke: #3d444d; stroke-width: 2; transition: all .3s; }
+  .mc-chip .mc-n { fill: #c9d1d9; font: 600 20px var(--mono); } .mc-chip .mc-d { fill: #9198a1; font: 500 14px var(--mono); text-anchor: end; }
+  .mc-chip.on rect { fill: #8957e533; stroke: #ab7df8; filter: drop-shadow(0 0 12px #ab7df8); } .mc-chip.on .mc-n { fill: #f0f6fc; }
+  .mc-sel { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .3s, stroke .3s; } .mc-run.sel .mc-sel { fill: #ab7df81a; stroke: #ab7df8; }
+  .mc-id { fill: #e6edf3; font: 600 17px var(--mono); } .mc-tag { font: 500 15px var(--mono); }
+  .mc-tag.e0 { fill: #c297ff; } .mc-tag.e1 { fill: #f0883e; } .mc-tag.e2 { fill: #3fb950; }
+  .mc-tok { fill: #e6edf3; font: 600 16px var(--mono); text-anchor: end; opacity: 0; transition: opacity .3s; } .mc-run.seen .mc-tok { opacity: 1; }
+  .sfl-row.mc-find { opacity: 0; } .sfl-row.mc-find.seen { opacity: 1; } .mc-find .k { fill: #9198a1; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -4251,6 +4264,238 @@
     });
   }
 
+  // Agents that debug agents: any agent calls the agentic-workflows MCP server; logs, audit and audit-diff read runs as unified sessions to debug, audit and optimize other agents
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // the three calls: [verb, call text, chip index, selected run rows, findings [class, text][]]
+    const CALLS = [
+      ["① DEBUG", "audit { run: 1842 }", 3, [0], "DEBUG · audit 1842", [["ko", "✕ failed at turn 27 of 41"], ["ed", "⚠ api.example.com blocked"], ["ok", "→ add it to network.allowed"]]],
+      ["② AUDIT", "logs { triage, last: 20 }", 2, [0, 1, 2, 3, 4, 5], "AUDIT · 20 runs · 3 engines", [["k", "one schema across engines"], ["ko", "✕ 4 runs hit blocked domains"], ["ok", "✓ 0 safe-output violations"]]],
+      ["③ OPTIMIZE", "audit-diff { 1842, 1849 }", 4, [0, 5], "OPTIMIZE · 1842 → 1849", [["ok", "✓ tokens 412k → 138k (−66%)"], ["ok", "✓ turns 41 → 17"], ["ed", "⚠ 9 repeated searches removed"]]],
+    ];
+    const TOOLS = [
+      ["status", "workflows · state"],
+      ["health", "success · trends"],
+      ["logs", "many runs"],
+      ["audit", "one run, deep"],
+      ["audit-diff", "compare runs"],
+      ["compile", "validate · lock"],
+      ["checks", "PR CI state"],
+      ["fix", "codemods"],
+    ];
+    // synthetic runs: [id, engine, bar count, denied bars, wasted bars, tokens]
+    const RUNS = [
+      ["#1842", "copilot", 24, [12, 19], [8, 15, 16], "412k"],
+      ["#1843", "claude", 24, [], [], "296k"],
+      ["#1845", "copilot", 24, [18], [], "344k"],
+      ["#1846", "codex", 24, [10], [], "371k"],
+      ["#1848", "claude", 24, [6], [], "305k"],
+      ["#1849", "copilot", 11, [], [], "138k"],
+    ];
+    const ENG = { copilot: "e0", claude: "e1", codex: "e2" };
+    const callY = p => 300 + p * 86,
+      chipY = i => 150 + i * 50,
+      rowY = r => 140 + r * 56,
+      cardY = p => 80 + p * 156,
+      runY = p => (p === 1 ? 280 : rowY(CALLS[p][3][CALLS[p][3].length - 1]));
+    let g = `<defs><clipPath id="mcClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mcAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="mcP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="mcB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 380, "ANY AGENT"],
+      [380, 800, "AGENTIC-WORKFLOWS MCP"],
+      [800, 1270, "RUNS · UNIFIED SESSIONS"],
+      [1270, VW, "DEBUG · AUDIT · OPTIMIZE"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="mcLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    // edges: per call, agent → tool, tool → runs, runs → findings
+    const EDGES = [];
+    CALLS.forEach(([, , ci], p) => {
+      const y1 = callY(p) + 10,
+        y2 = chipY(ci),
+        ry = runY(p),
+        cy = cardY(p) + 70;
+      EDGES.push([`mcA${p}`, `M356 ${y1} C 400 ${y1}, 396 ${y2}, 436 ${y2}`, "p"]);
+      EDGES.push([`mcB${p}`, `M744 ${y2} C 790 ${y2}, 780 ${ry}, 826 ${ry}`, "p"]);
+      EDGES.push([`mcC${p}`, `M1254 ${ry} C 1272 ${ry}, 1266 ${cy}, 1286 ${cy}`, "b"]);
+    });
+    for (const [id, d, c] of EDGES) g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mc${c === "p" ? "P" : "B"})"/>`;
+    // the caller: any agent that speaks MCP
+    g += `<g class="fm-task" id="mcCaller"><g class="fm-pill"><rect x="70" y="105" width="270" height="50" rx="25"/><text x="223" y="138">any agent</text></g><circle cx="70" cy="130" r="34" fill="url(#mcAgent)"/>${ico("copilot", 70, 131, 38)}</g>`;
+    g += `<text class="mc-eng" x="190" y="206">Copilot · Claude · Codex</text><text class="mc-eng" x="190" y="230">IDE · terminal · workflow</text>`;
+    g += `<g class="sfl-box" id="mcCalls"><rect class="sfl-card" x="24" y="250" width="332" height="290" rx="12"/><text class="sfl-title" x="40" y="276">MCP TOOL CALLS</text>`;
+    CALLS.forEach(([v, c], p) => {
+      const y = callY(p) + 6;
+      g += `<g class="sfl-row mc-call" id="mcCall${p}"><rect x="32" y="${y - 22}" width="316" height="64" rx="6"/><text class="mc-v" x="44" y="${y}">${v}</text><text x="44" y="${y + 30}">${esc(c)}</text></g>`;
+    });
+    g += `</g>`;
+    // the MCP server and its tools
+    g += `<g class="sfl-box" id="mcSrv"><rect class="sfl-card" x="410" y="76" width="360" height="464" rx="16"/><text class="mc-sub" x="590" y="110">gh aw mcp-server</text>`;
+    TOOLS.forEach(([n, d], i) => {
+      const y = chipY(i);
+      g += `<g class="mc-chip" id="mcChip${i}"><rect x="440" y="${y - 20}" width="300" height="40" rx="8"/><text class="mc-n" x="456" y="${y + 7}">${n}</text><text class="mc-d" x="728" y="${y + 6}">${d}</text></g>`;
+    });
+    g += `</g>`;
+    // runs, each normalized to one unified session timeline
+    g += `<g class="sfl-box" id="mcRuns"><rect class="sfl-card" x="830" y="76" width="424" height="464" rx="12"/><text class="sfl-title" x="846" y="104">RUNS · aw_session.jsonl</text>`;
+    RUNS.forEach(([id, eng, n, den, waste, tok], r) => {
+      const y = rowY(r);
+      g += `<g class="mc-run" id="mcRun${r}"><rect class="mc-sel" x="838" y="${y - 22}" width="408" height="44" rx="6"/><text class="mc-id" x="846" y="${y + 6}">${id}</text><text class="mc-tag ${ENG[eng]}" x="916" y="${y + 6}">${eng}</text>`;
+      for (let j = 0; j < n; j++) {
+        const k = den.includes(j) ? "x" : waste.includes(j) ? "r" : j % 2 ? "t" : "m",
+          ht = k === "x" ? 26 : k === "r" ? 20 : 8 + ((j * 37 + r * 11) % 15);
+        g += `<rect class="ao-bar ${k}" data-j="${j}" x="${1000 + j * 7}" y="${y + 14 - ht}" width="5" height="${ht}" rx="1.5"/>`;
+      }
+      g += `<text class="mc-tok" x="1238" y="${y + 6}">${tok}</text></g>`;
+    });
+    [
+      ["#8957e5", "model"],
+      ["#1f6feb", "tool"],
+      ["#f85149", "denied"],
+      ["#d29922", "waste"],
+    ].forEach(([c, t], i) => (g += `<text class="ao-leg" x="${852 + i * 98}" y="478" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
+    g += `<text class="mc-cap" x="1042" y="518">every engine → one timeline</text></g>`;
+    // findings
+    CALLS.forEach(([, , , , title, rows], p) => {
+      const y = cardY(p);
+      g += `<g class="sfl-box" id="mcCard${p}"><rect class="sfl-card" x="1290" y="${y}" width="402" height="140" rx="12"/><text class="sfl-title" x="1306" y="${y + 28}">${esc(title)}</text>`;
+      rows.forEach(([c, t], i) => (g += `<g class="sfl-row mc-find"><text class="${c}" x="1306" y="${y + 64 + i * 30}">${esc(t)}</text></g>`));
+      g += `</g>`;
+    });
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // [edge id | CALL | SCAN | FIND, node lit on arrival, duration, call index]
+    const SEQ = [];
+    CALLS.forEach((_, p) => {
+      SEQ.push(["CALL", `mcCall${p}`, 900, p], [`mcA${p}`, `mcChip${CALLS[p][2]}`, 0, p], [`mcB${p}`, "mcRuns", 0, p], ["SCAN", "mcRuns", 1600, p], [`mcC${p}`, `mcCard${p}`, 0, p], ["FIND", `mcCard${p}`, 1500, p]);
+    });
+    const LANE = { mcCaller: 0, mcCalls: 0, mcSrv: 1, mcRuns: 2 };
+    const STEP = 1000,
+      START = 800,
+      HOLD = 2600,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1,
+      phase = -1,
+      shown = 0;
+    const light = nid => {
+      const call = /^mcCall\d/.test(nid);
+      if (!nid.startsWith("mcChip") || nid === "mcChip" + CALLS[phase][2]) $(nid).classList.add(call ? "seen" : "on");
+      if (nid.startsWith("mcChip")) $("mcSrv").classList.add("on");
+      if (call) $("mcCalls").classList.add("on");
+      const lane = nid.startsWith("mcCard") ? 3 : LANE[nid.replace(/\d+$/, "")] ?? (nid.startsWith("mcChip") ? 1 : 0);
+      $("mcLane" + lane).classList.add("on");
+    };
+    const select = p => {
+      if (phase === p) return;
+      phase = p;
+      svg.querySelectorAll(".mc-run.sel, .mc-call.on, .mc-chip.on").forEach(x => x.classList.remove("sel", "on"));
+      CALLS[p][3].forEach(r => $("mcRun" + r).classList.add("sel"));
+      $("mcCall" + p).classList.add("on");
+    };
+    const scan = (p, f) => {
+      const n = Math.min(1, f / 0.8) * 24;
+      CALLS[p][3].forEach(r => {
+        const row = $("mcRun" + r);
+        row.querySelectorAll(".ao-bar").forEach(b => +b.dataset.j < n && b.classList.add("seen"));
+        if (f >= 0.8) row.classList.add("seen");
+      });
+    };
+    slides.push({
+      group: "loops",
+      sound: "mcp",
+      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
+      notes:
+        "Agents that debug agents: every run, number and finding on this slide is illustrative and synthetic. gh aw ships an MCP server, agentic-workflows (gh aw mcp-server), that exposes the CLI as tools: status, health, logs, audit, audit-diff, compile, checks, fix. Any agent that speaks MCP can call it, whether Copilot, Claude or Codex, in an IDE, a terminal or inside another agentic workflow. logs and audit are read-only: they download a run's logs, firewall log and token usage and normalize every engine's trace into one unified session, aw_session.jsonl, with each turn, tool call, token count and denial in one schema. So an agent can debug one failed run with audit, audit twenty runs across engines with logs, and optimize by comparing a run before and after a change with audit-diff. The next slide puts that on a schedule.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .seen, .sel").forEach(x => x.classList.remove("on", "hot", "seen", "sel"));
+          light("mcCaller");
+          popK = -1;
+          phase = -1;
+          shown = 0;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP, p] = SEQ[k],
+          f = (u - T[k]) / (dur || STEP);
+        select(p);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (["CALL", "SCAN", "FIND"].includes(eid)) {
+          dot.style.opacity = 0;
+          light(nid);
+          if (eid === "SCAN") scan(p, f);
+          else if (eid === "FIND") {
+            const rows = [...$("mcCard" + p).querySelectorAll(".mc-find")];
+            rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.3) / rows.length));
+            const n = svg.querySelectorAll(".mc-find.seen").length;
+            if (n !== shown) {
+              shown = n;
+              if (n) sfx.pop(3 + n);
+            }
+          } else if (popK !== k) {
+            popK = k;
+            sfx.key();
+          }
+          return;
+        }
+        $("mcChip" + CALLS[p][2]).classList.toggle("on", eid !== `mcA${p}` || f >= 0.8);
+        const path = $(eid),
+          n = path.getTotalLength(),
+          q = path.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        path.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", path.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k % 8);
+          }
+          light(nid);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The agentic-workflows MCP · logs · audit · unified sessions"), h("h2", {}, letters("Agents that "), letters("debug agents", "l-grad"))), svg),
+    });
+  }
+
   // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
   {
     resetIndex();
@@ -7426,6 +7671,14 @@
         [64, 67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.11, { type: "triangle", dur: 0.22, vol: 0.06, cutoff: 2600, detune: 3 }));
         bell(76, t + 1.45, 0.04, 1.2);
         bell(79, t + 1.57, 0.035, 1.4);
+      },
+      // agents that debug agents: three call/response pings (one per MCP tool call), then findings resolving upward
+      mcp: t => {
+        [0, 1, 2].forEach(i => {
+          tone(76 + i * 2, t + 0.2 + i * 0.42, { type: "square", dur: 0.07, vol: 0.035, cutoff: 2200, detune: 6 });
+          bell(83 + i * 2, t + 0.34 + i * 0.42, 0.03, 0.6);
+        });
+        [67, 71, 74, 79].forEach((m, i) => tone(m, t + 1.5 + i * 0.09, { type: "triangle", dur: i === 3 ? 0.5 : 0.12, vol: 0.05, cutoff: 2800, detune: 3 }));
       },
       // audit & optimize: artifacts trickling down, a scanner sweep, two warning taps, then the tuned run resolving upward
       audit: t => {
