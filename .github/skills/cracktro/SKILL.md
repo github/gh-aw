@@ -61,7 +61,7 @@ slides.push({
 ## People and mascots
 
 - Never use a real GitHub user's avatar, handle or name for a person, in slides, speaker notes or comments. Never fetch `github.com/<login>.png`.
-- People are only the fake users `mona` and `ducky`, drawn from `assets/avatars/{mona,ducky}.jpg`. Pick Mona by default (community, maintainer, contributor) and Ducky for debugging or developer roles (fixing CI, audits, linting). Use both on one slide to tell two people apart.
+- People are only the fake users `mona` and `ducky`, drawn from `assets/avatars/{mona,ducky}.jpg`. Mona is the maintainer; Ducky is the external contributor (community user). A `Developer` can be either: mix them across slides, and use both when a slide shows two developers.
 - Follow https://brand.github.com/graphic-elements/mascots: use mascots sparingly, never as logos, and never on serious topics (security, enterprise, money). Use role icons there.
 - Never generate or redraw mascots. Both avatars are 160x160 clips of official brand.github.com art in the modern three-quarter 3D style: `mona.jpg` is the dark-mode purple Mona from `mona-2026-versions.png`, `ducky.jpg` the middle Ducky from `mascots-03.png`. Their backgrounds are recoloured to the deck's `#0d1117` (never white) so they blend into the dark avatar circles.
 
