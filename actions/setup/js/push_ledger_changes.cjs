@@ -33,6 +33,9 @@ function readTransactions(file = process.env.GH_AW_LEDGER_TRANSACTIONS) {
     artifact = JSON.parse(fs.readFileSync(fd, "utf8"));
   } catch (error) {
     if (error instanceof TypeError && error.message === "Invalid ledger transaction artifact") throw error;
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      throw new Error(`Missing validated ledger transaction artifact at ${file}; ensure safe_outputs uploads gh-aw-ledger-transactions before push_ledger_changes`, { cause: error });
+    }
     throw new Error("Failed to read validated ledger transaction artifact", { cause: error });
   } finally {
     if (fd !== undefined) fs.closeSync(fd);

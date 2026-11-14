@@ -56,6 +56,16 @@ test("reads and validates only versioned transaction artifacts", () => {
   assert.throws(() => validateTransactions({ ...transaction(), forged: true }, ledgerConfigs), /Invalid validated ledger transaction artifact/);
 });
 
+test("push reports a missing ledger transaction artifact handoff", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-missing-"));
+  const file = path.join(directory, "ledger-transactions.json");
+  try {
+    await assert.rejects(main({ file, ledgerConfigs }), /Missing validated ledger transaction artifact.*safe_outputs uploads gh-aw-ledger-transactions before push_ledger_changes/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("revalidates record schemas, reserved envelope fields, and record sizes", () => {
   assert.throws(() => validateTransactions(transaction({ subject: 5 }), ledgerConfigs), /does not match configured schema/);
   assert.throws(() => validateTransactions(transaction({ subject: "valid", parents: [] }), ledgerConfigs), /reserved field/);

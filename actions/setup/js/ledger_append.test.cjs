@@ -33,6 +33,7 @@ test("collects validated appends and writes the versioned artifact", async () =>
     await handler({ ledger: "findings", record: { subject: "follow-up", related_to: "#first" } });
     handler.finalize();
 
+    assert.equal(transactionPath(), path.join(runnerTemp, "gh-aw", "ledger-transactions.json"));
     const artifact = JSON.parse(fs.readFileSync(transactionPath(), "utf8"));
     assert.equal(artifact.version, 1);
     assert.equal(artifact.transaction_id, "42:1");

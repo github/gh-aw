@@ -708,6 +708,14 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	require.Contains(t, jobSteps, "GH_AW_LEDGER_TRANSACTIONS")
 	require.Contains(t, jobSteps, "GH_AW_LEDGER_CONFIG_BASE64")
 
+	var uploadState safeOutputsHandlerOutputsAndActionState
+	NewCompiler().appendLedgerTransactionsArtifactUpload(data, &uploadState)
+	uploadSteps := strings.Join(uploadState.steps, "")
+	transactionPath := "${{ runner.temp }}/gh-aw/ledger-transactions.json"
+	require.Contains(t, uploadSteps, "name: "+ledgerTransactionsArtifactName)
+	require.Contains(t, uploadSteps, "path: "+transactionPath+"\n")
+	require.Contains(t, jobSteps, "GH_AW_LEDGER_TRANSACTIONS: "+transactionPath+"\n")
+
 	var projectionStep strings.Builder
 	require.NoError(t, NewCompiler().generateLedgerProjectionStep(&projectionStep, data))
 	require.Contains(t, projectionStep.String(), "Create read-only ledger projections")
