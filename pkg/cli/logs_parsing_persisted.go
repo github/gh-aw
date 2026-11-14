@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -81,7 +81,7 @@ func readableUnifiedAgentSession(session []byte) (bool, error) {
 				Component string `json:"component"`
 			} `json:"provenance"`
 		}
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
+		if err := jsonutil.UnmarshalString(line, &event); err != nil {
 			return false, fmt.Errorf("invalid reconstructed agent session: %w", err)
 		}
 		if event.Provenance.Component == "agent" {
