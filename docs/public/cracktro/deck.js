@@ -158,12 +158,22 @@
   .fm-quote { position: absolute; left: 114px; top: 318px; width: 600px; font: 700 44px/1.1 "Mona Sans"; font-stretch: 100%; color: #f0f6fc; opacity: 0; }
   .fm-quote em { font-style: normal; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(90deg, #f778ba, #ab7df8, #4493f8); }
   .active .fm-quote { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
-  .fm-shifts { position: absolute; left: 114px; top: 500px; width: 580px; display: flex; flex-direction: column; gap: 22px; }
-  .fm-shift { display: grid; grid-template-columns: 56px 1fr; column-gap: 16px; opacity: 0; }
-  .active .fm-shift { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 180ms + 800ms); }
-  .fm-shift i { grid-row: span 2; font-size: 40px; font-style: normal; line-height: 1; }
-  .fm-shift b { font-size: 34px; font-variation-settings: "wght" 700, "wdth" 100; color: var(--c); }
-  .fm-shift span { font-size: 21px; color: #9198a1; line-height: 1.35; }
+  .hap-quote { top: 288px; width: auto; white-space: nowrap; }
+  .hap-svg { position: absolute; left: 110px; top: 390px; width: 1700px; height: 580px; overflow: visible; font-family: "Mona Sans"; }
+  .fm-lane-t.hap-lt { text-anchor: start; }
+  .hap-r { opacity: 0; }
+  .active .hap-r { animation: rise .8s cubic-bezier(.2,.9,.2,1) both; transform-box: fill-box; transform-origin: left center; }
+  .hap-row { fill: #ffffff08; stroke: #ffffff12; }
+  .hap-name { font: 700 34px "Mona Sans"; font-stretch: 100%; }
+  .hap-sub { fill: #9198a1; font: 500 20px var(--mono); }
+  .hap-node { opacity: .4; transition: opacity .4s; }
+  .hap-node.on { opacity: 1; }
+  .hap-node.on rect { stroke: var(--c); fill: #161b22; filter: drop-shadow(0 0 16px var(--c)); }
+  .hap-disc { fill: #0d1117; stroke: #9198a1; stroke-width: 2.5; }
+  .hap-disc.h { stroke: #4493f8; stroke-width: 3; }
+  .hap-node.on .hap-disc { stroke: var(--c); filter: drop-shadow(0 0 12px var(--c)); }
+  .hap-node.on .hap-disc.h { stroke: #4493f8; filter: drop-shadow(0 0 16px #4493f8); }
+  .fm-pill.g rect { stroke: #9198a1; filter: none; }
   .fmm-copy { position: absolute; left: 110px; top: 150px; width: 860px; }
   .fmm-copy h2 { margin: 0; font-variation-settings: "wght" 560, "wdth" 100; letter-spacing: -.02em; }
   .fmm-stop { margin-top: 30px !important; font-size: 80px; line-height: 1.04; color: #f0f6fc; }
@@ -293,7 +303,11 @@
   /* --- security architecture --- */
   .sec-box { position: absolute; top: 350px; width: 500px; height: 500px; padding: 34px 36px; border-radius: 22px;
     background: #161b22d0; border: 2px solid var(--c); box-shadow: 0 0 60px -20px var(--c), inset 0 0 80px -50px var(--c); opacity: 0; }
-  .active .sec-box { animation: rise .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 220ms + 400ms); }
+  .active .sec-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 800ms + 500ms); }
+  @keyframes sec-in { from { opacity: 0; transform: translateX(-90px) scale(.9); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+  .sec-box li, .sec-box .sec-shield { opacity: 0; }
+  .active .sec-box li { animation: rise .6s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 800ms + 850ms + var(--j) * 110ms); }
+  .active .sec-box .sec-shield { animation: rise .5s cubic-bezier(.3,1.6,.4,1) both 1900ms; }
   .sec-box.sandbox { border-style: dashed; }
   .sec .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ff7b72, #f85149, #d29922); }
   .sec-omen { position: absolute; inset: -40px; pointer-events: none;
@@ -307,10 +321,10 @@
     70% { opacity: .3; } 100% { opacity: 0; transform: translate(-30px, -16px); } }
   .sec-box:not(.sandbox) { background: #12080ae0; box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); border-color: color-mix(in srgb, var(--c) 70%, transparent); }
   .sec-box.out { background: #0a1424f0; border-color: #4493f8; }
-  .active .sec-box.out { animation: rise .9s cubic-bezier(.2,.9,.2,1) both 840ms, calm 4s ease-in-out infinite 2s; }
+  .active .sec-box.out { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 2100ms, calm 4s ease-in-out infinite 3s; }
   @keyframes calm { 0%, 100% { box-shadow: 0 0 60px -14px #4493f888, inset 0 0 80px -40px #4493f855; } 50% { box-shadow: 0 0 110px 0 #4493f855, inset 0 0 100px -40px #4493f877; } }
   .sec-box.sandbox { background: #0b1a10f0; border-width: 3px; z-index: 2; }
-  .active .sec-box.sandbox { animation: rise .9s cubic-bezier(.2,.9,.2,1) both 620ms, safe 3.2s ease-in-out infinite 1.6s; }
+  .active .sec-box.sandbox { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both 1300ms, safe 3.2s ease-in-out infinite 2.2s; }
   @keyframes safe { 0%, 100% { box-shadow: 0 0 70px -10px #3fb95099, inset 0 0 90px -40px #3fb95066; } 50% { box-shadow: 0 0 140px 10px #3fb95066, inset 0 0 120px -40px #3fb95088; } }
   .sec-shield { position: absolute; right: 26px; top: 26px; font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #0d1117;
     background: #3fb950; padding: 8px 12px; border-radius: 99px; box-shadow: 0 0 24px #3fb950aa; }
@@ -322,13 +336,14 @@
   .sec-box li { font-size: 25px; line-height: 1.3; color: #d1d7e0; padding-left: 30px; position: relative; }
   .sec-box li::before { content: ""; position: absolute; left: 0; top: 11px; width: 12px; height: 12px; border-radius: 3px; background: var(--c); box-shadow: 0 0 10px var(--c); }
   .sec-box code { font: 600 21px var(--mono); color: var(--c); }
-  .sec-arrow { position: absolute; top: 570px; width: 100px; text-align: center; font-size: 60px; color: #3d444d; }
-  .active .sec-arrow { animation: nudge 1.6s ease-in-out infinite; }
+  .sec-arrow { position: absolute; top: 570px; width: 100px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
+  .active .sec-arrow { animation: sec-arr .5s ease-out both calc(var(--i) * 800ms + 1100ms), nudge 1.6s ease-in-out infinite calc(var(--i) * 800ms + 1600ms); }
+  @keyframes sec-arr { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: none; } }
   @keyframes nudge { 50% { transform: translateX(10px); color: #9198a1; } }
   .sec-ent { position: absolute; left: 110px; top: 268px; display: flex; align-items: center; gap: 14px; }
   .sec-ent i { font: 600 18px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: #d29922; font-style: normal; margin-right: 10px; }
   .sec-ent span { font-size: 24px; padding: 8px 20px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992214; color: #f0f6fc; opacity: 0; }
-  .active .sec-ent span { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 120ms + 1200ms); }
+  .active .sec-ent span { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 120ms + 2900ms); }
   .sec-lane { position: absolute; left: 0; top: 880px; width: 1920px; height: 120px; }
 
   /* --- compiler hardening --- */
@@ -837,24 +852,24 @@
   // Spec Driven Automation: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
-    const PROMPT = "Create a daily agentic workflow that gives me an issue summary";
+    const PROMPT = "Create a daily agent that removes code duplication";
     const MD = [
       ["---", "#656c76"],
       ["on: ", "#ff7b72", "daily", "#a5d6ff"],
       ["safe-outputs:", "#ff7b72"],
-      ["  create-issue:", "#7ee787"],
+      ["  create-pull-request:", "#7ee787"],
       ["---", "#656c76"],
-      ["Summarise yesterday's issues. Flag", "#f0f6fc"],
-      ["anything that needs a reply.", "#f0f6fc"],
+      ["Find duplicated code. Extract a", "#f0f6fc"],
+      ["shared helper and keep tests green.", "#f0f6fc"],
     ];
     const MDLEN = MD.reduce((n, l) => n + l[0].length + (l[2] || "").length + 1, 0);
     const msg = h("div", { class: "msg" }),
-      reply = h("div", { class: "reply" }, "✓ Added ", h("code", {}, "daily-issue-summary.md"), " and opened a pull request.");
+      reply = h("div", { class: "reply" }, "✓ Added ", h("code", {}, "daily-dedup.md"), " and opened a pull request.");
     const pre = h("pre", {}),
       ypre = h("pre", {});
     // what gh aw compile emits: a hardened, pinned GitHub Actions workflow
     const YML = [
-      ["name: Daily Issue Summary", "#f0f6fc"],
+      ["name: Daily Dedup", "#f0f6fc"],
       ["on:", "#ff7b72"],
       ["  schedule:", "#ff7b72"],
       ['    - cron: "13 8 * * *"', "#a5d6ff"],
@@ -872,12 +887,12 @@
     const n1 = h("b", {}, "0"),
       n2 = h("b", {}, "0"),
       n3 = h("b", {}, "0");
-    const lis = [h("li", {}, n1, " new issues, ", n2, " closed"), h("li", {}, n3, " waiting on a maintainer reply"), h("li", {}, h("b", {}, "#482"), " blocked on design review")];
+    const lis = [h("li", {}, n1, " duplicate blocks found"), h("li", {}, h("b", { style: { color: "#3fb950" } }, "+", n2), " / ", h("b", { style: { color: "#f85149" } }, "−", n3), " lines"), h("li", {}, h("b", {}, "✓"), " all tests pass")];
     const cards = [
       h("div", { class: "pf-card pf-prompt" }, h("div", { class: "cap" }, "01 · Prompt"), h("div", { class: "sb" }, "9:41", h("span", {}, "▂▄▆ ▮")), h("div", { class: "you" }, "Copilot"), msg, reply),
-      h("div", { class: "pf-card pf-md" }, h("div", { class: "cap" }, "02 · Markdown"), h("div", { class: "file" }, "📄 .github/workflows/daily-issue-summary.md"), pre),
-      h("div", { class: "pf-card pf-yml" }, h("div", { class: "cap" }, "03 · Lock file"), h("div", { class: "file" }, "⚙ daily-issue-summary​.lock.yml"), ypre, go),
-      h("div", { class: "pf-card pf-issue" }, h("div", { class: "cap" }, "04 · Issue"), h("h4", {}, "Issue summary — Oct 2 ", h("small", {}, "#241"), h("span", { class: "open" }, "◉ Open")), h("ul", {}, lis)),
+      h("div", { class: "pf-card pf-md" }, h("div", { class: "cap" }, "02 · Markdown"), h("div", { class: "file" }, "📄 .github/workflows/daily-dedup.md"), pre),
+      h("div", { class: "pf-card pf-yml" }, h("div", { class: "cap" }, "03 · Lock file"), h("div", { class: "file" }, "⚙ daily-dedup.lock.yml"), ypre, go),
+      h("div", { class: "pf-card pf-issue" }, h("div", { class: "cap" }, "04 · Pull request"), h("h4", {}, "Extract shared parser helper ", h("small", {}, "#241"), h("span", { class: "open" }, "⇄ Open")), h("ul", {}, lis)),
     ];
     const links = [
       h("div", { class: "pf-link", style: { left: "530px", width: "40px", "--a": "#ab7df8", "--b": "#4493f8" } }),
@@ -922,7 +937,7 @@
       trans: "up",
       palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
-        "Spec Driven Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning the issue summary shows up. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
+        "Spec Driven Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning a pull request removing duplicated code shows up for review. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
       enter() {
         t0 = 0;
         snd = { p: 0, m: -2, go: false, card: [] };
@@ -982,9 +997,9 @@
         ttaT.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
         ttaSvg.querySelector(".fg").setAttribute("stroke-dashoffset", RC * (1 - tu));
         tta.classList.toggle("done", tu >= 1);
-        n1.textContent = Math.round(9 * ez);
-        n2.textContent = Math.round(6 * ez);
-        n3.textContent = Math.round(2 * ez);
+        n1.textContent = Math.round(4 * ez);
+        n2.textContent = Math.round(38 * ez);
+        n3.textContent = Math.round(212 * ez);
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Spec Driven "), letters("Automation", "l-grad"))), tta, links, tags, cards),
     });
@@ -1134,11 +1149,11 @@
             h(
               "ul",
               {},
-              items.map(x => h("li", {}, x))
+              items.map((x, j) => h("li", { "--j": j }, x))
             )
           )
         ),
-        [0, 1].map(i => h("div", { class: "sec-arrow", style: { left: `${BX[i] + 500}px` } }, "→")),
+        [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
         lane
       ),
     });
@@ -1599,14 +1614,9 @@
       "M6.75 0a.75.75 0 0 1 .75.75V3h9V.75a.75.75 0 0 1 1.5 0V3h2.75c.966 0 1.75.784 1.75 1.75v16a1.75 1.75 0 0 1-1.75 1.75H3.25a1.75 1.75 0 0 1-1.75-1.75v-16C1.5 3.784 2.284 3 3.25 3H6V.75A.75.75 0 0 1 6.75 0ZM21 9.5H3v11.25c0 .138.112.25.25.25h17.5a.25.25 0 0 0 .25-.25Zm-17.75-5a.25.25 0 0 0-.25.25V8h18V4.75a.25.25 0 0 0-.25-.25Z",
     ],
   };
-  // Human Agent Processes: Repo Assist & unslopper swimlanes
+  // Human Agent Processes: trigger → agent → output → human patterns, then the Repo Assist loop
   {
     resetIndex();
-    const shifts = [
-      ["🏭", "Code → process", "Turn recurring maintenance into reviewed workflows", "#ab7df8"],
-      ["🧹", "Merge now, unslop later", "Cleanup agents simplify, refactor and restyle the repo every day", "#f778ba"],
-      ["🌈", "A teammate on every repo", "Repo Assist triages, investigates, fixes and reports monthly", "#3fb950"],
-    ];
     const ICON = OCTI;
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${ICON[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const LOOPS = [
@@ -1623,19 +1633,6 @@
           ["Testing improvements", "pr"],
         ],
       },
-      {
-        key: "Unslopper",
-        sub: "continuous cleanup loop",
-        c: "#f778ba",
-        pick: "Daily sweep",
-        tasks: [
-          ["Code simplifier", "pr"],
-          ["Dead code remover", "pr"],
-          ["Duplicate detector", "issue"],
-          ["Semantic refactor", "pr"],
-          ["Unbloat docs", "pr"],
-        ],
-      },
     ];
     const VW = 1100,
       VH = 640,
@@ -1649,7 +1646,8 @@
     const svgFor = (L, p) => {
       let g = `<defs><radialGradient id="${p}Agent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
         <marker id="${p}ArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-        <marker id="${p}ArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+        <marker id="${p}ArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
+        <clipPath id="${p}Clip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
       g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
       [
         [0, 250, "SCHEDULE"],
@@ -1672,7 +1670,7 @@
       g += `<g class="fm-sched">${pill(40, SY, 200, L.pick)}${agent(p, 40, SY)}</g>`;
       g += `<g class="fm-watch">${ico("stopwatch", 150, 530, 64, "#f0f6fc")}<line id="fmHand" x1="150" y1="532" x2="150" y2="512" stroke="#f0f6fc" stroke-width="4" stroke-linecap="round"/></g>`;
       g += `<g class="fm-maint"><g class="fm-pill b"><rect x="${MX}" y="${MY - 23}" width="172" height="46" rx="23"/><text x="${MX + 38 + 67}" y="${MY + 8}">Maintainer</text></g>
-        <circle cx="${MX}" cy="${MY}" r="38" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", MX, MY, 46)}</g>`;
+        <circle cx="${MX}" cy="${MY}" r="38" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/dsyme.jpg" x="${MX - 35}" y="${MY - 35}" width="70" height="70" clip-path="url(#${p}Clip)"/></g>`;
       g += `<circle class="fm-dot" r="7"/><circle class="fm-dot" r="7"/>`;
       return g;
     };
@@ -1869,32 +1867,119 @@
         step,
       };
     };
-    const hapCap = h("div", { class: "fm-cap" });
-    const hapSvg = newSvg("fm-svg");
-    const hapFlow = makeFlow(hapSvg, hapCap, [0, 1]);
+    // Patterns: [name, trigger, colour, nodes]; node = [kind (e event, a agent, h human), icon, label]
+    const HAP = [
+      ["IssueOps", "on: issues opened", "#3fb950", [["e", "issue", "Issue opened"], ["a", "copilot", "Triage"], ["e", "comment", "Comment"], ["h", "person", "Maintainer"]]],
+      ["DailyOps", "on: schedule", "#d29922", [["e", "calendar", "Schedule"], ["a", "copilot", "Daily scan"], ["e", "issue", "Issue"]]],
+      ["ReviewOps", "on: ready for review", "#ab7df8", [["e", "pr", "Ready for review"], ["a", "copilot", "Code review"], ["e", "comment", "Comments"], ["h", "person", "Maintainer"]]],
+      ["LabelOps", "on: label added", "#f778ba", [["e", "tag", "Label added"], ["a", "copilot", "Investigate"], ["e", "comment", "Comment"], ["h", "person", "Maintainer"]]],
+    ];
+    const HVW = 1700,
+      HVH = 580,
+      HCX = [450, 770, 1090, 1410],
+      HPW = 230,
+      HY = [130, 260, 390, 520];
+    const hapSvgFor = () => {
+      let g = `<defs><radialGradient id="hapAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+        <marker id="hapArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+        <marker id="hapArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+      g += `<rect class="fm-lane" x="0" y="0" width="${HVW}" height="60" rx="10"/><text class="fm-lane-t hap-lt" x="24" y="40">PATTERN</text>`;
+      ["TRIGGER", "AGENT", "OUTPUT", "HUMAN"].forEach((t, k) => {
+        g += `<text class="fm-lane-t" x="${HCX[k] + HPW / 2 - 10}" y="40">${t}</text>`;
+      });
+      HAP.forEach(([name, sub, c, nodes], r) => {
+        const y = HY[r];
+        g += `<g class="hap-r" style="--c:${c};animation-delay:${0.6 + r * 0.15}s">`;
+        g += `<rect class="hap-row" x="0" y="${y - 54}" width="${HVW}" height="108" rx="18"/>`;
+        g += `<text class="hap-name" x="28" y="${y - 2}" fill="${c}">${name}</text><text class="hap-sub" x="28" y="${y + 30}">${sub}</text>`;
+        nodes.forEach(([kind], k) => {
+          if (k === nodes.length - 1) return;
+          const b = nodes[k + 1][0] === "h";
+          g += `<path class="fm-wire ${b ? "b" : "p"}" id="hapE${r}_${k}" d="M${HCX[k] + HPW} ${y} H${HCX[k + 1] - 40}" marker-end="url(#hapArr${b ? "B" : "P"})"/>`;
+        });
+        nodes.forEach(([kind, icon, label], k) => {
+          const x = HCX[k];
+          const disc =
+            kind === "a"
+              ? `<circle cx="${x}" cy="${y}" r="32" fill="url(#hapAgent)"/>${ico(icon, x, y + 1, 36)}`
+              : `<circle class="hap-disc ${kind}" cx="${x}" cy="${y}" r="32"/>${ico(icon, x, y, kind === "h" ? 38 : 30)}`;
+          g += `<g class="hap-node" id="hapN${r}_${k}"><g class="fm-pill${kind === "h" ? " b" : kind === "e" ? " g" : ""}"><rect x="${x}" y="${y - 25}" width="${HPW}" height="50" rx="25"/><text x="${x + 16 + HPW / 2}" y="${y + 8}">${label}</text></g>${disc}</g>`;
+        });
+        g += `<circle class="fm-dot" id="hapD${r}" r="7"/></g>`;
+      });
+      return g;
+    };
+    const hapSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    hapSvg.setAttribute("class", "hap-svg");
+    hapSvg.setAttribute("viewBox", `0 0 ${HVW} ${HVH}`);
+    hapSvg.innerHTML = hapSvgFor();
+    // Rows start one after another; each step lights a node, then a dot travels the next edge.
+    const HSTEP = 850,
+      HROW = 1300,
+      HCYCLE = 3 * HROW + 4 * HSTEP + 2600;
+    let hT0 = 0,
+      hCyc = -1,
+      hLit = [];
+    const hEase = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const hapStep = t => {
+      if (!hT0) hT0 = t;
+      const e = t - hT0,
+        c = Math.floor(e / HCYCLE),
+        u = e % HCYCLE;
+      if (c !== hCyc) {
+        hCyc = c;
+        hLit = HAP.map(() => -1);
+        hapSvg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+      }
+      HAP.forEach(([, , col, nodes], r) => {
+        const v = u - r * HROW,
+          n = nodes.length,
+          dot = hapSvg.querySelector(`#hapD${r}`);
+        const k = v < 0 ? -1 : Math.min(n - 1, Math.floor(v / HSTEP));
+        while (hLit[r] < k) {
+          const j = ++hLit[r],
+            kind = nodes[j][0];
+          hapSvg.querySelector(`#hapN${r}_${j}`).classList.add("on");
+          if (kind === "h") sfx.review();
+          else if (kind === "a") sfx.pop(1);
+          else sfx.notify(j === 0);
+        }
+        let pt = null;
+        if (k >= 0 && k < n - 1) {
+          const f = ((v - k * HSTEP) / HSTEP - 0.3) / 0.7;
+          if (f > 0) {
+            const p = hapSvg.querySelector(`#hapE${r}_${k}`);
+            p.classList.add("hot");
+            pt = p.getPointAtLength(p.getTotalLength() * hEase(Math.min(1, f)));
+          }
+        }
+        dot.style.opacity = pt ? 1 : 0;
+        if (pt) {
+          dot.setAttribute("cx", pt.x);
+          dot.setAttribute("cy", pt.y);
+          dot.setAttribute("fill", col);
+          dot.style.color = col;
+        }
+      });
+    };
     slides.push({
       sound: "loop",
-      trans: "down",
+      trans: "up",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
-        "Human Agent Processes. Replace recurring manual fixes with reviewed processes. Repo Assist illustrates repository maintenance; the unslopper illustrates continuous cleanup. Each loop is scheduled, the agent picks tasks and proposes labels, comments or pull requests, and a maintainer reviews the result: SCHEDULE → ACT → REVIEW. These are illustrative workflows, not activity attributed to particular people or teams.",
+        "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. These are illustrative patterns with synthetic examples, not activity attributed to particular people or teams.",
       enter() {
-        hapFlow.reset();
+        hT0 = 0;
+        hCyc = -1;
       },
       tick(t) {
-        hapFlow.step(t);
+        hapStep(t);
       },
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative maintenance loops"), h("h2", {}, letters("Human Agent "), letters("Processes", "l-grad"))),
-        h("div", { class: "fm-quote" }, "Build the ", h("em", {}, "factory"), " that works for you."),
-        h(
-          "div",
-          { class: "fm-shifts" },
-          shifts.map(([ic, b, sp, c], i) => h("div", { class: "fm-shift", "--i": i, "--c": c }, h("i", {}, ic), h("b", {}, b), h("span", {}, sp)))
-        ),
-        hapCap,
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative patterns"), h("h2", {}, letters("Human Agent "), letters("Processes", "l-grad"))),
+        h("div", { class: "fm-quote hap-quote" }, "Build the ", h("em", {}, "factory"), " that works for you."),
         hapSvg
       ),
     });
@@ -1902,6 +1987,164 @@
     // Repo Assist: the maintenance loop next to its backlog burndown
     resetIndex();
     const raCap = h("div", { class: "fm-cap ra-cap-flow" });
+    // PR Review²: the classic review gains a ready-for-review step that starts agentic reviewers and a Sous Chef loop before a human merges
+    {
+      resetIndex();
+      const VW = 1700,
+        VH = 680;
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+        <circle cx="${x}" cy="${y}" r="34" fill="url(#prqAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+      const human = (id, x, y, w, label, avatar = "assets/avatars/pelikhan.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+        <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#prqClip)"/></g>`;
+      const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+      const REV = ["nRevA", "nRevB", "nRevC"];
+      // [edge id, path, color, label, lx, ly, anchor]; fan-out/fan-in wires (no label) light with their main edge
+      const EDGES = [
+        ["classic", "M90 374 V640 H1460 V598", "classic", ["classic review: straight to a human"], 760, 626, "middle"],
+        ["p0", "M90 174 V302", "b", ["opens draft", "pull request"], 112, 236, "start"],
+        ["p1", "M126 340 H462", "b", ["ready for", "review"], 250, 300, "middle"],
+        ["p1a", "M400 340 V220 H462", "b", [], 0, 0, "start"],
+        ["p1b", "M400 340 V460 H462", "b", [], 0, 0, "start"],
+        ["p2", "M790 340 H860 V140 H1042", "p", ["review comments"], 950, 122, "middle"],
+        ["p2a", "M790 220 H860", "p", [], 0, 0, "start"],
+        ["p2b", "M790 460 H860 V340", "p", [], 0, 0, "start"],
+        ["p3", "M1080 174 V522", "p", ["nudges", "@copilot"], 1102, 330, "start"],
+        ["p4", "M1042 560 H500 V498", "p", ["pushes fixes · re-review"], 770, 544, "middle"],
+        ["p5", "M1322 140 H1460 V302", "p", ["threads", "resolved"], 1482, 206, "start"],
+        ["p6", "M1460 374 V522", "b", ["reviews &", "merges"], 1482, 438, "start"],
+      ];
+      const FAN = { p1: ["p1a", "p1b"], p2: ["p2a", "p2b"] };
+      // [edge, node(s) lit on arrival, open threads shown on arrival]
+      const SEQ = [
+        ["p0", "nPRq"],
+        ["p1", REV, 3],
+        ["p2", "nChef"],
+        ["p3", "nCopilotq"],
+        ["p4", REV, 1],
+        ["p2", "nChef"],
+        ["p3", "nCopilotq"],
+        ["p4", REV, 0],
+        ["p2", "nChef"],
+        ["p5", "nMaint"],
+        ["p6", "nMergeq"],
+      ];
+      const LANE = { nAuthor: 0, nPRq: 0, nRevA: 1, nRevB: 1, nRevC: 1, nChef: 1, nCopilotq: 1, nMaint: 2, nMergeq: 2 };
+      let g = `<defs><radialGradient id="prqAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+        <marker id="prqP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+        <marker id="prqB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
+        <clipPath id="prqClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+        <marker id="prqG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#9198a1"/></marker></defs>`;
+      g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+      [
+        [0, 380, "AUTHOR"],
+        [380, 1340, "REVIEW²"],
+        [1340, VW, "MERGE"],
+      ].forEach(([x0, x1, t], i) => {
+        g += `<text class="fm-lane-t mra-lane" id="prqLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+        if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+      });
+      for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+        const fan = id === "p2a" || id === "p2b";
+        g += `<path class="fm-wire ${c}" id="${id}" d="${d}"${fan ? "" : ` marker-end="url(#prq${c === "p" ? "P" : c === "b" ? "B" : "G"})"`}/>`;
+        if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+      }
+      g += human("nAuthor", 90, 140, 200, "Developer") + box("nPRq", 90, 340, "pr");
+      g += agent("nRevA", 500, 220, 290, "Matt Pocock skills") + agent("nRevB", 500, 340, 290, "Code quality") + agent("nRevC", 500, 460, 290, "Test quality");
+      g += agent("nChef", 1080, 140, 242, "PR Sous Chef") + agent("nCopilotq", 1080, 560, 200, "Copilot");
+      g += human("nMaint", 1460, 340, 220, "Developer", "assets/avatars/lpcox.jpg") + box("nMergeq", 1460, 560, "merge");
+      g += `<text class="prq-thr" id="prqThr" x="968" y="356"></text>`;
+      g += `<circle class="fm-dot mra-dot" r="8"/>`;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "fm-svg rpa-svg");
+      svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      svg.style.setProperty("--c", "#ab7df8");
+      svg.innerHTML = g;
+      const $ = id => svg.querySelector("#" + id),
+        dot = svg.querySelector(".mra-dot"),
+        thr = $("prqThr");
+      const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+      const STEP = 1050,
+        START = 900,
+        HOLD = 1800,
+        T = [];
+      let END = START;
+      for (const s of SEQ) {
+        T.push(END);
+        END += STEP;
+      }
+      const CYC = END + HOLD;
+      let t0 = 0,
+        cyc = -1,
+        popK = -1;
+      const light = nids => {
+        for (const nid of [].concat(nids)) {
+          $(nid).classList.add("on");
+          $("prqLane" + LANE[nid]).classList.add("on");
+        }
+      };
+      const threads = k => {
+        let n = null;
+        for (let j = 0; j <= k; j++) if (SEQ[j][2] !== undefined) n = SEQ[j][2];
+        thr.classList.toggle("show", n !== null);
+        thr.classList.toggle("ok", n === 0);
+        thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
+      };
+      slides.push({
+        sound: "loop",
+        palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
+        notes:
+          "Pull Request Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
+        enter() {
+          t0 = 0;
+          cyc = -1;
+        },
+        tick(t) {
+          if (!t0) t0 = t;
+          const e = t - t0,
+            c = Math.floor(e / CYC),
+            u = e % CYC;
+          if (c !== cyc) {
+            cyc = c;
+            svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+            thr.classList.remove("show", "ok");
+            light("nAuthor");
+            popK = -1;
+          }
+          svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+          if (u < START || u >= END) {
+            dot.style.opacity = 0;
+            return;
+          }
+          let k = 0;
+          while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+          const [eid, nid] = SEQ[k],
+            f = (u - T[k]) / STEP;
+          const p = $(eid),
+            n = p.getTotalLength(),
+            q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+          p.classList.add("hot");
+          for (const w of FAN[eid] || []) $(w).classList.add("hot");
+          if (dot.style.opacity !== "1") sfx.pop(0);
+          dot.style.opacity = 1;
+          dot.setAttribute("cx", q.x);
+          dot.setAttribute("cy", q.y);
+          dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+          for (let j = 0; j < k; j++) light(SEQ[j][1]);
+          threads(k - 1);
+          if (f >= 0.8) {
+            if (popK !== k) {
+              popK = k;
+              sfx.pop(k);
+            }
+            light(nid);
+            threads(k);
+          }
+        },
+        el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Ready for review · agentic reviewers · PR Sous Chef"), h("h2", {}, letters("Pull Request "), letters("Review²", "l-grad"))), svg),
+      });
+    }
+
     const raSvg = newSvg("fm-svg ra-flow");
     const raFlow = makeFlow(raSvg, raCap, [0]);
     const bdSvg = newSvg("fm-svg ra-chart");
@@ -1911,7 +2154,7 @@
       bdRun = -1;
     slides.push({
       sound: "loop",
-      trans: "down",
+      trans: "up",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
@@ -2132,164 +2375,6 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
-    });
-  }
-
-  // PR Review²: the classic review gains a ready-for-review step that starts agentic reviewers and a Sous Chef loop before a human merges
-  {
-    resetIndex();
-    const VW = 1700,
-      VH = 680;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="url(#prqAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const human = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#prqClip)"/></g>`;
-    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
-    const REV = ["nRevA", "nRevB", "nRevC"];
-    // [edge id, path, color, label, lx, ly, anchor]; fan-out/fan-in wires (no label) light with their main edge
-    const EDGES = [
-      ["classic", "M90 374 V640 H1460 V598", "classic", ["classic review: straight to a human"], 760, 626, "middle"],
-      ["p0", "M90 174 V302", "b", ["opens draft", "pull request"], 112, 236, "start"],
-      ["p1", "M126 340 H462", "b", ["ready for", "review"], 250, 300, "middle"],
-      ["p1a", "M400 340 V220 H462", "b", [], 0, 0, "start"],
-      ["p1b", "M400 340 V460 H462", "b", [], 0, 0, "start"],
-      ["p2", "M790 340 H860 V140 H1042", "p", ["review comments"], 950, 122, "middle"],
-      ["p2a", "M790 220 H860", "p", [], 0, 0, "start"],
-      ["p2b", "M790 460 H860 V340", "p", [], 0, 0, "start"],
-      ["p3", "M1080 174 V522", "p", ["nudges", "@copilot"], 1102, 330, "start"],
-      ["p4", "M1042 560 H500 V498", "p", ["pushes fixes · re-review"], 770, 544, "middle"],
-      ["p5", "M1322 140 H1460 V302", "p", ["threads", "resolved"], 1482, 206, "start"],
-      ["p6", "M1460 374 V522", "b", ["reviews &", "merges"], 1482, 438, "start"],
-    ];
-    const FAN = { p1: ["p1a", "p1b"], p2: ["p2a", "p2b"] };
-    // [edge, node(s) lit on arrival, open threads shown on arrival]
-    const SEQ = [
-      ["p0", "nPRq"],
-      ["p1", REV, 3],
-      ["p2", "nChef"],
-      ["p3", "nCopilotq"],
-      ["p4", REV, 1],
-      ["p2", "nChef"],
-      ["p3", "nCopilotq"],
-      ["p4", REV, 0],
-      ["p2", "nChef"],
-      ["p5", "nMaint"],
-      ["p6", "nMergeq"],
-    ];
-    const LANE = { nAuthor: 0, nPRq: 0, nRevA: 1, nRevB: 1, nRevC: 1, nChef: 1, nCopilotq: 1, nMaint: 2, nMergeq: 2 };
-    let g = `<defs><radialGradient id="prqAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
-      <marker id="prqP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-      <marker id="prqB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
-      <clipPath id="prqClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
-      <marker id="prqG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#9198a1"/></marker></defs>`;
-    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    [
-      [0, 380, "AUTHOR"],
-      [380, 1340, "REVIEW²"],
-      [1340, VW, "MERGE"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="prqLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
-    });
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      const fan = id === "p2a" || id === "p2b";
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}"${fan ? "" : ` marker-end="url(#prq${c === "p" ? "P" : c === "b" ? "B" : "G"})"`}/>`;
-      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    g += human("nAuthor", 90, 140, 200, "Developer") + box("nPRq", 90, 340, "pr");
-    g += agent("nRevA", 500, 220, 290, "Matt Pocock skills") + agent("nRevB", 500, 340, 290, "Code quality") + agent("nRevC", 500, 460, 290, "Test quality");
-    g += agent("nChef", 1080, 140, 242, "PR Sous Chef") + agent("nCopilotq", 1080, 560, 200, "Copilot");
-    g += human("nMaint", 1460, 340, 220, "Developer") + box("nMergeq", 1460, 560, "merge");
-    g += `<text class="prq-thr" id="prqThr" x="968" y="356"></text>`;
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg rpa-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot"),
-      thr = $("prqThr");
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 1050,
-      START = 900,
-      HOLD = 1800,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1;
-    const light = nids => {
-      for (const nid of [].concat(nids)) {
-        $(nid).classList.add("on");
-        $("prqLane" + LANE[nid]).classList.add("on");
-      }
-    };
-    const threads = k => {
-      let n = null;
-      for (let j = 0; j <= k; j++) if (SEQ[j][2] !== undefined) n = SEQ[j][2];
-      thr.classList.toggle("show", n !== null);
-      thr.classList.toggle("ok", n === 0);
-      thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
-    };
-    slides.push({
-      sound: "loop",
-      palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
-      notes:
-        "Pull Request Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
-          thr.classList.remove("show", "ok");
-          light("nAuthor");
-          popK = -1;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid] = SEQ[k],
-          f = (u - T[k]) / STEP;
-        const p = $(eid),
-          n = p.getTotalLength(),
-          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
-        p.classList.add("hot");
-        for (const w of FAN[eid] || []) $(w).classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
-        threads(k - 1);
-        if (f >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          light(nid);
-          threads(k);
-        }
-      },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Ready for review · agentic reviewers · PR Sous Chef"), h("h2", {}, letters("Pull Request "), letters("Review²", "l-grad"))), svg),
     });
   }
 
