@@ -1466,6 +1466,35 @@
   .cn-p { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .4s; }
   .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px var(--pc); }
 
+  /* --- enterprise operations: OpenTelemetry, governance, infrastructure (shared static visuals from ops-visuals.js) --- */
+  .ops .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--oc), #a5d6ff, var(--oc)); }
+  .ops-tag { position: absolute; left: 110px; right: 110px; top: 252px; font: 500 28px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
+  .ops-tag b { color: #f0f6fc; font-weight: 700; }
+  .active .ops-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .ops-fig { position: absolute; left: 110px; top: 326px; width: 1000px; margin: 0; opacity: 0; }
+  .active .ops-fig { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .ops-fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .ops-fig .ov-card { fill: #161b22e8; stroke: #3d444d; stroke-width: 1.5; }
+  .ops-fig .ov-key { stroke: var(--oc); fill: color-mix(in srgb, var(--oc) 12%, #0d1117); }
+  .ops-fig .ov-pill { fill: #0d1117; stroke: #3d444d; stroke-width: 1.5; }
+  .ops-fig .ov-bar { fill: var(--oc); opacity: .8; }
+  .ops-fig .ov-line { fill: none; stroke: #9198a1; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ops-fig .ov-dash { stroke-dasharray: 6 5; }
+  .ops-fig text { fill: #9198a1; font: 500 12px "Mona Sans", sans-serif; }
+  .ops-fig .ov-t { fill: #e6edf3; font-size: 15px; }
+  .ops-fig .ov-b { fill: #f0f6fc; font-size: 16px; font-weight: 700; }
+  .ops-fig .ov-m { font: 500 13px var(--mono); }
+  .ops-fig .ov-c { fill: var(--oc); font: 500 13px var(--mono); }
+  .ops-fig .ov-k { fill: var(--oc); font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  .ops-facts { position: absolute; left: 1180px; right: 110px; top: 326px; display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+  .ops-facts li { padding: 18px 22px; border-left: 4px solid var(--oc); border-radius: 0 14px 14px 0; background: #161b22c8; opacity: 0; }
+  .active .ops-facts li { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(.7s + var(--i) * 120ms); }
+  .ops-facts i { display: block; font: normal 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--oc); }
+  .ops-facts span { display: block; margin-top: 10px; font: 500 23px/1.3 "Mona Sans"; color: #c9d1d9; }
+  .ops-own { position: absolute; left: 110px; right: 110px; top: 990px; font: 500 21px/1.3 var(--mono); color: #9198a1; opacity: 0; }
+  .ops-own b { color: #d29922; font-weight: 600; }
+  .active .ops-own { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.3s; }
+
   /* --- enterprise ready --- */
   .er { --ec: #4493f8; }
   .er .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #a5d6ff, #d29922, #4493f8); }
@@ -9993,7 +10022,88 @@
     });
   }
 
-  // 11. Central Agentic Ops (githubnext/gh-cao): a control repo lists its registered campaigns, which dispatch
+  // Enterprise operations: three static slides whose diagrams come from ops-visuals.js, the same source the
+  // docs landing page renders, so the deck and the site show one picture of observability, governance and infrastructure.
+  for (const s of [
+    {
+      key: "observability",
+      color: "#f0883e",
+      kicker: "Observability",
+      head: [["OpenTelemetry", "l-grad"]],
+      tag: ["Traces and opt-in logs go to ", h("b", {}, "your OTLP backend"), ", with credentials kept in secrets."],
+      facts: [
+        ["Workflow traces", "observability.otlp sends job spans to one or more endpoints; headers come from secrets and are masked."],
+        ["Org defaults", "GH_AW_DEFAULT_OTLP_ENDPOINT plus the secret GH_AW_DEFAULT_OTLP_HEADERS; an endpoint without headers exports nothing and fails the agent job."],
+        ["Hosted MCP gateway / server traces", "The gateway exports one span per MCP tool call; headers arrive only via OTEL_EXPORTER_OTLP_HEADERS."],
+        ["Opt-in logs", "GH_AW_OTLP_LOGS_ENABLED=true adds compact session logs from the conclusion job."],
+      ],
+      own: [h("b", {}, "Operator owned: "), "collector and credentials. Export errors never fail runs; a default endpoint without headers fails the agent."],
+      notes:
+        "OpenTelemetry. Agentic workflows export OpenTelemetry over OTLP/HTTP to collectors you run. In the workflow, observability.otlp lists one or more endpoints, each with headers that come from secrets, and the credentials are masked in logs. Organizations can set a default instead: GH_AW_DEFAULT_OTLP_ENDPOINT as a variable or secret, plus GH_AW_DEFAULT_OTLP_HEADERS, which must be a secret; an endpoint without headers is treated as unconfigured, nothing is exported from any job, and the agent job fails with a visible error so the misconfiguration is not silent. Spans follow the run across its jobs. The hosted MCP gateway has its own traces-only exporter that emits one span per MCP tool call; it reads headers only from the OTEL_EXPORTER_OTLP_HEADERS environment variable, never from its JSON configuration. Logs are opt-in: GH_AW_OTLP_LOGS_ENABLED=true exports compact unified-session logs from the conclusion job, bounded by GH_AW_OTLP_LOGS_MAX_BYTES. These defaults are cooperative configuration, not a locked policy. Transport failures, such as a rejected or unreachable collector, never fail the functional workflow; missing or invalid credentials are configuration errors to fix, and 401 or 403 responses are not retried with unchanged credentials. The diagram and span bars are illustrative; see the OpenTelemetry and MCP gateway reference.",
+    },
+    {
+      key: "governance",
+      color: "#ab7df8",
+      kicker: "Governance stays in GitHub",
+      head: [["GitHub-native "], ["governance", "l-grad"]],
+      tag: ["The rules you already enforce in GitHub ", h("b", {}, "apply to every agentic job"), "."],
+      facts: [
+        ["Org / repo variables", "gh aw env sets GH_AW_DEFAULT_* defaults at enterprise, org or repo scope; frontmatter still wins."],
+        ["Protected environments", "manual-approval and safe-outputs.environment add required reviewers, wait timers and branch policies."],
+        ["Branch rulesets", "Require agentic review checks or a central compile check before merge."],
+        ["Actions policies", "Allowed actions, runner groups and SHA-pinned lock files apply like any other job."],
+      ],
+      own: [h("b", {}, "Separate authority: "), "a Central Agentic Ops rollout is reviewed on its own and never replaces GitHub enforcement."],
+      notes:
+        "GitHub-native governance. Enforcement stays where your organization already keeps it. gh aw env manages GH_AW_DEFAULT_* Actions variables at enterprise, organization or repository scope; precedence runs frontmatter, then repository, organization, enterprise, then the compiler fallback. GH_AW_POLICY_* variables gate runtime capabilities, for example turning off pull request creation. These variables are cooperative defaults, not locked policy, so pair them with real enforcement: protected environments, reached through on.manual-approval or safe-outputs.environment, carry required reviewers, wait timers and branch policies, and naming an environment without protection rules adds no review. Branch rulesets require checks, such as agentic review or a centrally managed compile check that rejects jobs without self-hosted runners. Actions policies, allowed actions, runner groups and SHA-pinned lock files apply to agentic jobs like any other. A Central Agentic Ops campaign moves through review, limited live and scheduled live under its own reviewed authority, but it never bypasses the target repository's rules. The diagram is illustrative; see the governance and enterprise environment controls reference.",
+    },
+    {
+      key: "infrastructure",
+      color: "#3fb950",
+      kicker: "Your runners, mirrors and registries",
+      head: [["Operator-owned "], ["infrastructure", "l-grad"]],
+      tag: ["Compile-time substitutions ", h("b", {}, "point every pin at infrastructure you run"), "."],
+      facts: [
+        ["Self-hosted Linux", "Linux runners with Docker, selected through runs-on with the self-hosted label or a runner group."],
+        ["ARC + DinD", "runner.topology: arc-dind with a privileged Docker-in-Docker sidecar and a shared work volume."],
+        ["Mirrors and registries", "aw.json action_pins, action_pin_prefixes and container_pins rewrite the lock file to your mirrors."],
+        ["Pinned versions", "Upgrading the CLI alone never upgrades lock pins; recompile, then validate on your runners."],
+      ],
+      own: [h("b", {}, "Operator owned: "), "runners, mirrors, images and upgrades. ARC and GHES end to end remain unconfirmed."],
+      notes:
+        "Operator-owned infrastructure. Agentic jobs run on Linux runners with Docker; macOS and Windows runners are not supported. Choose self-hosted runners through runs-on with the self-hosted label or a runner group. On Kubernetes, ARC with a Docker-in-Docker sidecar needs runner.topology: arc-dind, a privileged DinD sidecar, a shared work volume and DOCKER_HOST, and the compiler stages the sysroot. For air-gapped or controlled networks, aw.json maps actions to your mirrors with action_pins or action_pin_prefixes, whose mirrors must contain the same commits, and maps container images to an internal registry with container_pins, by digest. Substitutions are baked into the lock file when you run gh aw compile. Pinned versions are the compatibility boundary: upgrading the CLI alone does not upgrade the pins already in compiled lock files, so recompile, record versions and validate on your own runners. You own the runners, mirrors, images and upgrades, and ARC and GHES end-to-end support remains unconfirmed. The diagram is illustrative; see the self-hosted runners and enterprise configuration reference.",
+    },
+  ]) {
+    resetIndex();
+    const fig = h("figure", { class: "ops-fig" });
+    const svg = window.AW_OPS_VISUALS?.[s.key];
+    if (svg) fig.innerHTML = svg;
+    const el = h(
+      "section",
+      { class: `slide ops ops-${s.key}`, "--oc": s.color },
+      h(
+        "div",
+        { class: "slide-head" },
+        h("div", { class: "kicker" }, s.kicker),
+        h(
+          "h2",
+          {},
+          s.head.map(([t, c]) => letters(t, c))
+        )
+      ),
+      h("div", { class: "ops-tag" }, ...s.tag),
+      fig,
+      h(
+        "ul",
+        { class: "ops-facts" },
+        s.facts.map(([k, v], i) => h("li", { "--i": i }, h("i", {}, k), h("span", {}, v)))
+      ),
+      h("div", { class: "ops-own" }, ...s.own)
+    );
+    slides.push({ group: "enterprise", sound: "enterprise", palette: [s.color, "#1f6feb", "#d29922", "#0a1a33"], notes: s.notes, el });
+  }
+
+  // 11. Central Agentic Ops: a control repo lists its registered campaigns, which dispatch
   // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
   {
     resetIndex();
@@ -10211,7 +10321,7 @@
       group: "enterprise",
       sound: "radar",
       palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
-      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops (githubnext/gh-cao) is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
+      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
       enter() {
         repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
         campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
@@ -10263,7 +10373,7 @@
         draw(t);
       },
       el: h("section", { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "githubnext/gh-cao · Central Agentic Ops"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Central Agentic Ops · campaigns"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
         h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
         cv,
         h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),

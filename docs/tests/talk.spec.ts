@@ -3,13 +3,13 @@ import { readdirSync } from "node:fs";
 
 test.use({ reducedMotion: "reduce" });
 
-test("presents the fifty-two slides in bands without the removed sections", async ({ page }) => {
+test("presents the fifty-five slides in bands without the removed sections", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/gh-aw/cracktro/");
   await expect(page).toHaveTitle("GitHub Agentic Workflows Talk");
-  await expect(page.locator(".slide")).toHaveCount(52);
+  await expect(page.locator(".slide")).toHaveCount(55);
   await expect(page.locator(".stage")).not.toContainText(/the crew|the story|akeso|security at (?:hyper)?scale/i);
 
   const headings = [
@@ -58,6 +58,9 @@ test("presents the fifty-two slides in bands without the removed sections", asyn
     "Enterprise",
     "Connectors",
     "Enterprise ready",
+    "OpenTelemetry",
+    "GitHub-native governance",
+    "Operator-owned infrastructure",
     "Centralized campaigns",
     "AW factory",
     "First commit to GA",
@@ -68,7 +71,7 @@ test("presents the fifty-two slides in bands without the removed sections", asyn
   ];
   for (const [index, heading] of headings.entries()) {
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
-    await expect(page.locator(".count")).toHaveText(`${String(index + 1).padStart(2, "0")} / 52`);
+    await expect(page.locator(".count")).toHaveText(`${String(index + 1).padStart(2, "0")} / 55`);
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(heading);
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
@@ -77,7 +80,7 @@ test("presents the fifty-two slides in bands without the removed sections", asyn
 
 test("preserves navigation, slide links, speaker notes, and sound controls", async ({ page }) => {
   await page.goto("/gh-aw/cracktro/#15");
-  await expect(page.locator(".count")).toHaveText("15 / 52");
+  await expect(page.locator(".count")).toHaveText("15 / 55");
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
   await expect(page.locator(".notes")).toContainText("LabelOps");
@@ -93,34 +96,34 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.keyboard.press("Space");
   await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#16$/);
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("15 / 52");
+  await expect(page.locator(".count")).toHaveText("15 / 55");
   await page.reload();
-  await expect(page.locator(".count")).toHaveText("15 / 52");
+  await expect(page.locator(".count")).toHaveText("15 / 55");
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("01 / 52");
+  await expect(page.locator(".count")).toHaveText("01 / 55");
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator(".count")).toHaveText("52 / 52");
+  await expect(page.locator(".count")).toHaveText("55 / 55");
 });
 
 test("moves through the bands, up/down landing on each band's first slide", async ({ page }) => {
   const count = page.locator(".count");
   await page.goto("/gh-aw/cracktro/#1");
   await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveText("02 / 52");
+  await expect(count).toHaveText("02 / 55");
   await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Workflows");
   await page.keyboard.press("ArrowRight");
-  await expect(count).toHaveText("03 / 52");
+  await expect(count).toHaveText("03 / 55");
   await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveText("06 / 52");
+  await expect(count).toHaveText("06 / 55");
   // left from a band header wraps to the last slide of the band above
   await page.keyboard.press("ArrowLeft");
-  await expect(count).toHaveText("05 / 52");
+  await expect(count).toHaveText("05 / 55");
   await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveText("01 / 52");
+  await expect(count).toHaveText("01 / 55");
   await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveText("01 / 52");
+  await expect(count).toHaveText("01 / 55");
 });
 
 test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
@@ -131,9 +134,9 @@ test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
   const next = page.getByRole("button", { name: "Next slide", exact: true });
   await expect(prev).toBeDisabled();
   await next.click();
-  await expect(page.locator(".count")).toHaveText("02 / 52");
+  await expect(page.locator(".count")).toHaveText("02 / 55");
   await prev.click();
-  await expect(page.locator(".count")).toHaveText("01 / 52");
+  await expect(page.locator(".count")).toHaveText("01 / 55");
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeVisible();
@@ -145,7 +148,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#1$/);
 
-  const assets = ["deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["deck.js", "ops-visuals.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -172,6 +175,8 @@ test("publishes synthetic examples without profile assets or private source refe
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
     expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
   }
+  const visuals = await (await request.get("/gh-aw/cracktro/ops-visuals.js")).text();
+  expect(visuals.match(/\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b|https?:|<image|\bhref=|\bid=/i)).toBeNull();
   const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
@@ -196,10 +201,45 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("gh-aw · May–Nov 2026");
   await page.keyboard.press("n");
-  for (const slide of [3, 4, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 44, 45, 46, 51, 52]) {
+  for (const slide of [3, 4, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 54, 55]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
+});
+
+test("shares the enterprise operations visuals with the landing page", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/gh-aw/cracktro/");
+  const deck: string[] = [];
+  for (const [slide, heading] of [
+    [46, "OpenTelemetry"],
+    [47, "GitHub-native governance"],
+    [48, "Operator-owned infrastructure"],
+  ] as const) {
+    await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
+    const active = page.locator(".slide.active");
+    await expect(active.locator("h2")).toHaveText(heading);
+    await expect(active.locator(".ops-fig svg.ov")).toHaveCount(1);
+    await expect(active.locator(".ops-facts li")).toHaveCount(4);
+    deck.push((await active.locator(".ops-fig svg.ov").getAttribute("aria-label")) ?? "");
+  }
+  expect(errors).toEqual([]);
+
+  await page.goto("/gh-aw/");
+  const landing: string[] = [];
+  for (const [id, heading] of [
+    ["observability", "OpenTelemetry"],
+    ["governance", "GitHub-native governance"],
+    ["infrastructure", "Operator-owned infrastructure"],
+  ]) {
+    const section = page.locator(`section#${id}`);
+    await expect(section.getByRole("heading", { level: 2 })).toHaveText(heading);
+    await expect(section.locator("svg.ov")).toHaveCount(1);
+    landing.push((await section.locator("svg.ov").getAttribute("aria-label")) ?? "");
+  }
+  expect(landing).toEqual(deck);
+  expect(deck.every(label => label.length > 40)).toBe(true);
 });
