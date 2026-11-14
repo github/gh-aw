@@ -353,7 +353,8 @@
   .ch-scan { position: absolute; left: 1340px; top: 928px; width: 480px; font: 500 15px/1 var(--mono); letter-spacing: .08em; color: #9198a1; text-align: center; opacity: 0; }
   .active .ch-scan { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.4s; }
 
-  /* --- prompt to factory --- */
+  /* --- spec driven automation --- */
+  .slide-head h2.pf-h { font-size: 100px; }
   .pf-card { position: absolute; top: 360px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -25px var(--c); opacity: 0; transform: translateY(30px) scale(.97); transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1); }
   .pf-card.on { opacity: 1; transform: none; }
   .pf-tta { position: absolute; left: 1330px; top: 112px; width: 480px; display: flex; align-items: center; gap: 26px; padding: 20px 28px; border-radius: 22px;
@@ -766,7 +767,7 @@
     });
   }
 
-  // Prompt to factory: prompt → markdown → issue (from the gh-aw hero)
+  // Spec Driven Automation: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
     const PROMPT = "Create a daily agentic workflow that gives me an issue summary";
@@ -854,7 +855,7 @@
       trans: "up",
       palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
-        "Prompt to factory: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning the issue summary shows up. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
+        "Spec Driven Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning the issue summary shows up. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
       enter() {
         t0 = 0;
         snd = { p: 0, m: -2, go: false, card: [] };
@@ -918,7 +919,7 @@
         n2.textContent = Math.round(6 * ez);
         n3.textContent = Math.round(2 * ez);
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", {}, letters("Prompt to "), letters("factory", "l-grad"))), tta, links, tags, cards),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Spec Driven "), letters("Automation", "l-grad"))), tta, links, tags, cards),
     });
   }
 
