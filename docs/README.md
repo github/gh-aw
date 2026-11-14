@@ -56,11 +56,11 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone thirty-nine-slide deck, separate from the homepage slideshow, linked
+It is a standalone forty-slide deck, separate from the homepage slideshow, linked
 from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
 Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
 The navigation dots jump directly to a slide (on narrow screens they become
-previous/next arrow buttons); `#1` through `#39` are shareable
+previous/next arrow buttons); `#1` through `#40` are shareable
 slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
 Slides are grouped into sections: slides within a section push left, and
@@ -76,11 +76,12 @@ issues labelled `community` and the merged pull requests that closed them
 counts of Linter Miner analyzer pull requests, LintMonster issues and the
 merged pull requests that closed them (May to November 2026), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
-(February to November 2026, with shortened titles), and the two data slides after the finale: "First
+(February to November 2026, with shortened titles), and the three data slides after the finale: "First
 commit to GA", which shows this repository's measured public history from its
 first commit to general availability at GitHub Universe, and "How PRs land",
 which shows measured time-to-merge and lines-changed distributions of its
-merged pull requests. All say so in their speaker notes.
+merged pull requests, and "How workflows evolve", which shows a statistical
+study of the commits that changed its own workflow Markdown. All say so in their speaker notes.
 Use role icons rather than employee profiles. The only exceptions are the
 local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` in `public/cracktro/assets/avatars/`.
 Keep private repository
