@@ -1002,7 +1002,6 @@ func TestCompileDefaultModelRouting_ExplicitModelUnchanged(t *testing.T) {
 		"engine.model":     {"main.md": base + "engine:\n  id: copilot\n  model: gpt-5.6-luna\n---\nReport.\n"},
 		"alias":            {"main.md": base + "engine:\n  id: copilot\n  model: small\n---\nReport.\n"},
 		"auto":             {"main.md": base + "model: auto\nengine: copilot\n---\nReport.\n"},
-		"expression":       {"main.md": base + "engine:\n  id: copilot\n  model: ${{ vars.MY_MODEL }}\n---\nReport.\n"},
 		"engine env model": {"main.md": base + "engine:\n  id: copilot\n  env:\n    COPILOT_MODEL: gpt-5.6-luna\n---\nReport.\n"},
 		"imported model": {
 			"main.md":         base + "imports:\n  - shared/model.md\n---\nReport.\n",

@@ -26,6 +26,10 @@ type CopilotModelRoutingConfig struct {
 	// requested is the router value (for example router/economy) that selected
 	// routing through the main agent's model, or "" for engine.model-routing.
 	requested string
+	// selector is the main agent's model expression, in its downstream-job form,
+	// when the activation job decides from it at run time whether routing applies
+	// and with which mode. It is never emitted.
+	selector string
 }
 
 func isModelRoutingEnabled(data *WorkflowData) bool {
@@ -35,6 +39,9 @@ func isModelRoutingEnabled(data *WorkflowData) bool {
 func applyModelRoutingEnv(env map[string]string, data *WorkflowData) {
 	if isModelRoutingEnabled(data) {
 		env["GH_AW_MODEL_ROUTING"] = modelRoutingRuntimeFlag(data)
+	}
+	if isModelRoutingDynamic(data) {
+		env[modelRoutingModeEnvVar] = "${{ " + modelRoutingModeDownstream + " }}"
 	}
 }
 
@@ -190,7 +197,8 @@ func modelRoutingOverrideWarning(data *WorkflowData) string {
 		return ""
 	}
 	var warnings []string
-	if data.Model != "" {
+	// A dynamic model expression is the routing selector, not a fixed model.
+	if data.Model != "" && !isModelRoutingDynamic(data) {
 		warnings = append(warnings, "model")
 	}
 	if data.EngineConfig != nil {

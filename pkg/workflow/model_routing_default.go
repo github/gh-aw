@@ -80,10 +80,11 @@ func modelRoutingRuntimeVariables(engineID string) (agentVar, defaultVar string,
 	}
 }
 
-// isModelRoutingRuntimeGuarded reports whether the implicit routing default is
-// decided at run time by the activation job from the engine's model variables.
+// isModelRoutingRuntimeGuarded reports whether the activation job decides at run
+// time whether routing applies: from the engine's model variables for the
+// implicit default, or from the main agent's model expression for dynamic routing.
 func isModelRoutingRuntimeGuarded(data *WorkflowData) bool {
-	if !isModelRoutingImplicit(data) {
+	if !isModelRoutingImplicit(data) && !isModelRoutingDynamic(data) {
 		return false
 	}
 	_, _, ok := modelRoutingRuntimeVariables(data.EngineConfig.ID)
@@ -110,20 +111,20 @@ func withoutModelRouting(data *WorkflowData) *WorkflowData {
 }
 
 // guardModelExpressionForImplicitRouting wraps a ${{ }} model expression so it is
-// empty when the activation job selected implicit routing for this run.
+// empty when the activation job selected routing for this run.
 func guardModelExpressionForImplicitRouting(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if !strings.HasPrefix(trimmed, "${{") || !strings.HasSuffix(trimmed, "}}") || strings.Count(trimmed, "${{") != 1 {
 		return value
 	}
 	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "${{"), "}}"))
-	// The non-routed model expression always resolves to a nonempty value when the
-	// activation job disables routing, because that requires a nonempty variable.
+	// When the activation job disables routing, the non-routed model expression is
+	// used as is; an empty result falls back to the engine's model variables.
 	return fmt.Sprintf("${{ %s && (%s) || '' }}", modelRoutingInactiveDownstream, inner)
 }
 
 // guardImplicitRoutingModelEnv wraps the named non-routed model env entries so
-// they are populated only when the activation job disabled implicit routing.
+// they are populated only when the activation job disabled routing.
 func guardImplicitRoutingModelEnv(env map[string]string, data *WorkflowData, keys ...string) {
 	if !isModelRoutingRuntimeGuarded(data) {
 		return
@@ -150,6 +151,9 @@ func modelRoutingRuntimeFlag(data *WorkflowData) string {
 func generateModelRoutingDecisionStep(data *WorkflowData) string {
 	if !isModelRoutingRuntimeGuarded(data) {
 		return ""
+	}
+	if isModelRoutingDynamic(data) {
+		return generateDynamicModelRoutingDecisionStep(data)
 	}
 	agentVar, defaultVar, _ := modelRoutingRuntimeVariables(data.EngineConfig.ID)
 	return fmt.Sprintf(`      - name: Resolve model routing
@@ -276,6 +280,15 @@ func defaultModelRoutingNotice(workflowFile, engineID string) string {
 // defaultModelRoutingIneligibility returns why the implicit default cannot be
 // applied safely, or "" when the workflow is a candidate.
 func defaultModelRoutingIneligibility(data *WorkflowData) string {
+	if config := data.EngineConfig; config != nil && config.ModelRouting == nil && !config.ModelRoutingDisabled && data.Model != "" {
+		return "a model is configured"
+	}
+	return modelRoutingRuntimeIneligibility(data)
+}
+
+// modelRoutingRuntimeIneligibility returns why routing decided at run time cannot
+// be applied safely regardless of the configured model, or "" when it can.
+func modelRoutingRuntimeIneligibility(data *WorkflowData) string {
 	config := data.EngineConfig
 	switch {
 	case config == nil:
@@ -284,8 +297,6 @@ func defaultModelRoutingIneligibility(data *WorkflowData) string {
 		return "model routing is already configured"
 	case config.ModelRoutingDisabled:
 		return "engine.model-routing is false"
-	case data.Model != "":
-		return "a model is configured"
 	}
 	engineID := strings.ToLower(config.ID)
 	if engineID != string(constants.CopilotEngine) && engineID != string(constants.ClaudeEngine) &&

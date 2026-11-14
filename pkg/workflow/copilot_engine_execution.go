@@ -684,6 +684,7 @@ func (e *CopilotEngine) addCopilotModelEnv(env map[string]string, workflowData *
 		}
 		copilotExecLog.Printf("Setting %s env var for model: %s", constants.CopilotCLIModelEnvVar, workflowData.Model)
 		env[constants.CopilotCLIModelEnvVar] = workflowData.Model
+		guardImplicitRoutingModelEnv(env, workflowData, constants.CopilotCLIModelEnvVar)
 		return
 	}
 	env[constants.CopilotCLIModelEnvVar] = compilerenv.BuildModelOverrideExpression(modelEnvVar, compilerenv.DefaultModelCopilot, constants.CopilotBYOKDefaultModel)
