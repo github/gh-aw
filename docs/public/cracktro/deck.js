@@ -5497,14 +5497,12 @@
         ["11-13", "builtin name match", "Universe guard gap"],
       ],
       STATS = [
-        ["128", "runs"],
-        ["667", "findings"],
-        ["287", "issues filed"],
-        ["164", "fix PRs merged"],
-        ["17", "own PRs merged"],
-        ["8.5", "avg self-score"],
+        ["128", "runs · 667 findings", "6 May – 14 Nov"],
+        ["287", "issues filed", "16 Apr – 29 Oct"],
+        ["164", "fix PRs merged", "16 Apr – 30 Oct"],
+        ["17", "own PRs merged", "28 Oct – 14 Nov"],
       ];
-    let m = `<text class="exm-t" x="0" y="16">FINDINGS PER RUN</text>`;
+    let m = `<text class="exm-t" x="0" y="16">FINDINGS PER RUN · 6 MAY – 14 NOV</text>`;
     FPR.forEach(([mo, v], i) => {
       const x = 8 + i * 58,
         bh = v * 12;
@@ -5522,12 +5520,12 @@
     CACHE.forEach(([d, c, n], i) => {
       m += `<text class="exm-l" x="476" y="${134 + i * 21}">${d} <tspan class="c">cached: ${c}</tspan> + <tspan class="n">new: ${n}</tspan></text>`;
     });
-    STATS.forEach(([n, k], i) => {
-      const x = 1060 + (i % 2) * 180,
-        y = 42 + Math.floor(i / 2) * 52;
-      m += `<text class="exm-n" x="${x}" y="${y}">${n}</text><text class="exm-k" x="${x}" y="${y + 18}">${k}</text>`;
+    STATS.forEach(([n, k, w], i) => {
+      const x = 1040 + (i % 2) * 200,
+        y = 40 + Math.floor(i / 2) * 84;
+      m += `<text class="exm-n" x="${x}" y="${y}">${n}</text><text class="exm-k" x="${x}" y="${y + 20}">${k}</text><text class="exm-k" x="${x}" y="${y + 38}" fill="#6e7681">${w}</text>`;
     });
-    m += `<text class="exm-cap" x="0" y="204">measured · Sergo's repo memory and gh-aw issues and PRs labelled sergo, 16 Apr to 14 Nov 2026 · grid above illustrative</text>`;
+    m += `<text class="exm-cap" x="0" y="204">MEASURED · Sergo repo memory + gh-aw issues/PRs labelled sergo · 16 Apr – 14 Nov 2026 (213 days), snapshot 14 Nov 2026 · grid is illustrative</text>`;
     const meas = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     meas.setAttribute("class", "exm-svg");
     meas.setAttribute("viewBox", "0 0 1400 210");
@@ -5639,7 +5637,7 @@
       sound: "explore",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
-        "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces. The strip at the bottom is measured, not illustrative: it comes from Sergo's repo memory in gh-aw (the memory/sergo branch: its run statistics and the history of its strategy cache) and from gh-aw issues and pull requests labelled sergo, 16 April to 14 November 2026. Over 128 cached runs Sergo logged 667 findings, and findings per run fell from 8.3 in May to 3.3 in October: the easy patterns run out, which is the exhaustion the grid shows. No runs were cached in August. It filed 287 issues; 164 merged pull requests closed 172 of them, 158 of those authored by Copilot. Since late October Sergo opens its own pull requests: 17 merged. Thirteen of them, 31 October to 12 November, came from one cached strategy, paren_unwrap_gap, linters that missed calls wrapped in parentheses: each day's cache entry reads cached: paren_unwrap_gap plus new: some untried corner, reuse and explore in the same run. The three cache lines are real entries, shortened.",
+        "Explore, reuse, lint: exhausting the patterns a model knows. The animation is illustrative and its pattern grid is synthetic; it shows the idea behind the first versions of Sergo, gh-aw's daily Serena Go expert. Each run reads a strategy cache, a JSONL file where every past run logged the strategy it tried, the tools it used and a success score. It then splits its effort in half: half reuses a proven strategy, adapted to a new target next to where it found something before, and half explores a strategy or a corner of the code it has not tried yet. One run is a coin toss; the cache makes a year of runs a systematic search that never repeats itself and keeps going back to what pays off, until the whole space has been tried. A pattern found more than once stops being a finding and becomes a linter, a deterministic analyzer, so the model is no longer needed to catch it. The linter names on the right are examples of the kind of analyzers this produces. The strip at the bottom is measured, not illustrative, over 16 April to 14 November 2026 (213 days, snapshot 14 November 2026); each panel is labelled with its own window. It comes from Sergo's repo memory in gh-aw (the memory/sergo branch: its run statistics and the history of its strategy cache) and from gh-aw issues and pull requests labelled sergo, 16 April to 14 November 2026. Over 128 cached runs, 6 May to 14 November, Sergo logged 667 findings, and findings per run fell from 8.3 in May to 3.3 in October: the easy patterns run out, which is the exhaustion the grid shows. No runs were cached in August. It filed 287 issues, 16 April to 29 October; 164 merged pull requests closed 172 of them, 158 of those authored by Copilot. Since late October Sergo opens its own pull requests: 17 merged. Thirteen of them, 31 October to 12 November, came from one cached strategy, paren_unwrap_gap, linters that missed calls wrapped in parentheses: each day's cache entry reads cached: paren_unwrap_gap plus new: some untried corner, reuse and explore in the same run. The three cache lines are real entries, shortened.",
       enter() {
         t0 = 0;
         cyc = -1;
