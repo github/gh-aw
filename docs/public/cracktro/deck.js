@@ -2938,16 +2938,6 @@
         spawnAt = t + 90;
         toks.push({ p: 0, sx, sy: sy + 40, c });
       }
-      tx.globalAlpha = 0.25;
-      tx.strokeStyle = c;
-      tx.setLineDash([2, 10]);
-      tx.lineWidth = 2;
-      tx.beginPath();
-      tx.moveTo(sx, sy + 40);
-      tx.lineTo(CORE.x, CORE.y - 75);
-      tx.stroke();
-      tx.setLineDash([]);
-      tx.globalAlpha = 1;
       for (const q of toks) {
         q.p += dt / 900;
         const u = Math.min(1, q.p);
