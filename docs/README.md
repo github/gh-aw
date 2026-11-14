@@ -102,6 +102,11 @@ Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.
 The workflow illustration, avatars, and fonts are local.
+The Enterprise band's OpenTelemetry, GitHub-native governance and
+operator-owned infrastructure diagrams come from `public/cracktro/ops-visuals.js`,
+a dependency-free script that sets `window.AW_OPS_VISUALS` for the deck. The
+homepage imports the same file at build time for its matching sections, so
+edit those diagrams in one place and keep them free of external references.
 Mona Sans reuses `public/fonts/`; Monaspace Neon and its SIL Open Font License
 are in `public/cracktro/fonts/`.
 

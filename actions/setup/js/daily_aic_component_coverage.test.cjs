@@ -1011,7 +1011,7 @@ it("preserves supported decimal numeric strings and the legacy non-strict parser
   fs.writeFileSync(file, '{"aic":"2.5"}\n{"usage":{"ai_credits":"1e1"}}');
   expect(sumAICFromUsageJSONLFiles([file], { strict: true })).toBe(12.5);
   fs.writeFileSync(file, '{"aic":2}\n{"provider":"openai","model":"gpt-4o","input_tokens":"invalid","output_tokens":500}');
-  expect(sumAICFromUsageJSONLFiles([file])).toBe(2.5);
+  expect(() => sumAICFromUsageJSONLFiles([file])).toThrow("unpriced");
   fs.writeFileSync(file, '{"ai_credits":false}');
   expect(sumAICFromUsageJSONLFiles([file])).toBe(0);
 });

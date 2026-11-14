@@ -17,10 +17,11 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Security |  |
 | Agentic attacks | illustrative |
 | Safety and control |  |
+| Zero-secret agents | illustrative |
 | Supply chain hardening | illustrative |
 | Safe outputs | illustrative |
 | Continuous Security | illustrative |
-| Private enclaves | illustrative |
+| Need-to-know enclaves | illustrative |
 | Stop manually translating intent into code. |  |
 | Human agent processes |  |
 | Human Agent Processes | illustrative |
@@ -40,6 +41,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Docs that heal | illustrative |
 | Speak · Map · Grep | illustrative |
 | Scan · Fix · Learn | illustrative |
+| For PMs | illustrative |
 | Cost & context |  |
 | Cost management | illustrative |
 | Model routing | illustrative |
@@ -52,10 +54,13 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Experiments, graders & evals | illustrative |
 | Audit & Optimize | illustrative |
 | Enterprise |  |
-| Connectors | illustrative |
-| Enterprise ready | illustrative |
+| Enterprise infrastructure as code | illustrative |
+| OpenTelemetry | illustrative |
+| GitHub-native governance | illustrative |
+| Operator-owned infrastructure | illustrative |
 | Centralized campaigns | illustrative |
 | Push SDLC | illustrative |
+| Connectors | illustrative |
 | AW factory |  |
 | First commit to GA |  |
 | How PRs land |  |

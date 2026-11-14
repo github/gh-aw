@@ -233,7 +233,7 @@ test("publishes synthetic examples without profile assets or private source refe
   const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
   expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
-  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/"]);
+  expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/", "https://github.com/chrizbo/agentics-beyond-code"]);
 
   const externalRequests: string[] = [];
   const errors: string[] = [];
@@ -260,4 +260,14 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
+});
+
+test("keeps every key on the host side of the zero-secret agents diagram", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Zero-secret agents")}`);
+  await expect(page.locator(".slide.active h2")).toContainText("Zero-secret agents");
+  await expect(page.locator(".zs-vm-g .zs-key")).toHaveCount(0);
+  await expect(page.locator(".zs-svg .zs-key")).toHaveCount(2);
+  expect(errors).toEqual([]);
 });

@@ -726,6 +726,47 @@
   .sfm-m div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; color: #6e7681; font-size: 12px; }
   .sfm-m i { display: block; width: 100%; background: linear-gradient(#ab7df8, #8957e5); border-radius: 3px 3px 0 0; }
   .sfm-c { margin-top: 6px; color: #6e7681; font-size: 12.5px; white-space: nowrap; }
+  .pm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #ab7df8, #3fb950, #4493f8, #d29922); }
+  .pm-src { color: #d29922; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+  .pm-src:hover { color: #f0f6fc; }
+  .pm-tabs { position: absolute; left: 110px; top: 262px; display: flex; gap: 20px; opacity: 0; }
+  .active .pm-tabs { animation: settle .6s .3s both; }
+  .pm-tab { display: flex; align-items: center; gap: 16px; width: 560px; padding: 16px 22px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; color: #9198a1; text-align: left; cursor: pointer; font: inherit; transition: border-color .3s, background .3s, color .3s, box-shadow .3s; }
+  .pm-tab:hover { border-color: #6e7681; color: #f0f6fc; }
+  .pm-tab:focus-visible { outline: 3px solid #4493f8; outline-offset: 3px; }
+  .pm-tab i { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 2px solid currentColor; font: 600 20px var(--mono); font-style: normal; }
+  .pm-tab b { display: block; font: 600 28px/1.15 "Mona Sans"; }
+  .pm-tab em { display: block; margin-top: 4px; font: normal 16px var(--mono); color: #6e7681; }
+  .pm-tab.on { border-color: #d29922; background: #161b22f0; color: #f0f6fc; box-shadow: 0 0 30px #d2992240; }
+  .pm-tab.on i { color: #d29922; }
+  .pm-flow { position: absolute; left: 110px; top: 400px; width: 1700px; display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 56px; }
+  .pm-st { position: relative; height: 126px; padding: 16px 20px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117d0; transition: border-color .3s, box-shadow .3s, background .3s; }
+  .pm-st + .pm-st::before { content: ""; position: absolute; left: -54px; top: 50%; width: 46px; height: 2px; background: #3d444d; transition: background .3s; }
+  .pm-st + .pm-st::after { content: ""; position: absolute; left: -14px; top: calc(50% - 6px); border: 7px solid transparent; border-left-color: #3d444d; border-right: 0; transition: border-color .3s; }
+  .pm-st small { display: flex; align-items: center; gap: 10px; font: 500 14px var(--mono); letter-spacing: .12em; color: #6e7681; }
+  .pm-st svg { width: 22px; height: 22px; fill: #6e7681; transition: fill .3s; }
+  .pm-st b { display: block; margin-top: 12px; color: #f0f6fc; font: 600 27px/1.15 "Mona Sans"; }
+  .pm-st em { display: block; margin-top: 6px; color: #9198a1; font: normal 16px/1.25 var(--mono); }
+  .pm-st.k1 b { font-family: var(--mono); font-size: 25px; color: #c297ff; }
+  .pm-st.lit { border-color: var(--c); background: #161b22f0; box-shadow: 0 0 28px color-mix(in srgb, var(--c) 40%, transparent); }
+  .pm-st.lit small { color: var(--c); }
+  .pm-st.lit svg { fill: var(--c); }
+  .pm-st.lit::before { background: var(--c); }
+  .pm-st.lit::after { border-left-color: var(--c); }
+  .pm-doc { position: absolute; left: 110px; top: 580px; width: 1050px; height: 420px; padding: 22px 28px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117e8; }
+  .pm-doc-h { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #21262d; color: #f0f6fc; font: 600 26px "Mona Sans"; }
+  .pm-doc-h svg { width: 28px; height: 28px; fill: #3fb950; }
+  .pm-doc-h .pm-when { margin-left: auto; color: #6e7681; font: 15px var(--mono); }
+  .pm-ln { display: grid; grid-template-columns: 34px 270px 1fr; align-items: baseline; padding: 11px 0; border-bottom: 1px solid #161b22; color: #9198a1; font: 21px var(--mono); opacity: 0; transform: translateX(-12px); transition: opacity .35s, transform .35s; }
+  .pm-ln.on { opacity: 1; transform: none; }
+  .pm-ln i { font-style: normal; font-weight: 700; }
+  .pm-ln b { color: #f0f6fc; font: 600 22px "Mona Sans"; }
+  .pm-ln.ok i { color: #3fb950; } .pm-ln.bad i, .pm-ln.bad b { color: #f85149; } .pm-ln.warn i { color: #d29922; } .pm-ln.hl b { color: #d29922; }
+  .pm-idea { position: absolute; left: 1210px; top: 580px; width: 600px; height: 420px; padding: 26px 30px; border: 2px solid #3d444d; border-radius: 14px; background: #0d1117e0; }
+  .pm-idea small { font: 500 15px var(--mono); letter-spacing: .12em; color: #d29922; }
+  .pm-idea b { display: block; margin-top: 18px; color: #f0f6fc; font: 700 44px/1.1 "Mona Sans"; }
+  .pm-idea p { margin: 20px 0 0; color: #9198a1; font: 22px/1.4 "Mona Sans"; }
+  .pm-cap { position: absolute; left: 110px; right: 100px; bottom: 34px; color: #6e7681; font: 15px var(--mono); }
   .ao-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .ao-run .sfl-card { transition: stroke .4s, filter .4s; }
   .ao-run.bad .sfl-card { stroke: #f85149; filter: drop-shadow(0 0 10px #f8514966); }
@@ -926,6 +967,105 @@
   .ge-mark.r text { fill: #ff7b72; } .ge-mark.r line { stroke: #f85149; }
   .ge-mark.g text { fill: #3fb950; } .ge-mark.g path { stroke: #3fb950; filter: drop-shadow(0 0 8px #3fb950); }
   .ge-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
+  .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
+  .ek .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #f778ba, #3fb950); }
+  .ek-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
+  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .ek-hd { font: 600 15px var(--mono); letter-spacing: .12em; } .ek-hd.b { fill: #79c0ff; } .ek-hd.g { fill: #7ee787; } .ek-hd.o { fill: #ffa657; }
+  .ek-card { fill: #0d1117d9; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
+  .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #3fb95014; transition: filter .3s; }
+  .ek-iss circle:first-child { fill: none; stroke: #3fb950; stroke-width: 2.5; }
+  .ek-t { fill: #f0f6fc; font: 800 24px "Mona Sans"; } .ek-t.s { font-size: 20px; }
+  .ek-ti { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
+  .ek-tx { fill: #c9d1d9; font: 500 19px "Mona Sans"; } .ek-tx.r { fill: #ffa198; font-weight: 700; }
+  .ek-s { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .04em; }
+  .ek-m { fill: #c9d1d9; font: 600 16px var(--mono); } .ek-m.c { text-anchor: middle; } .ek-m.k { fill: #7ee787; } .ek-m.x { fill: #ff7b72; letter-spacing: .06em; } .ek-m.j { fill: #7ee787; }
+  .ek-ft { fill: #9198a1; font: 600 16px var(--mono); text-anchor: middle; }
+  .ek-pill rect { fill: none; stroke-width: 1.5; } .ek-pill text { font: 600 14px var(--mono); text-anchor: middle; }
+  .ek-pill.b rect { stroke: #4493f8; fill: #4493f81f; } .ek-pill.b text { fill: #79c0ff; }
+  .ek-pill.o rect { stroke: #f0883e; fill: #f0883e1f; } .ek-pill.o text { fill: #ffa657; }
+  .ek-pill.y rect { stroke: #d29922; fill: #d299221f; } .ek-pill.y text { fill: #e3b341; }
+  .ek-task { fill: none; stroke: #3fb950; stroke-width: 1.5; stroke-dasharray: 6 5; }
+  .ek-wall { fill: #f0883e0d; stroke: #f0883e; stroke-width: 3; stroke-dasharray: 12 8; }
+  .active .ek-wall { animation: ek-seal 3s ease-in-out infinite 1.5s; } @keyframes ek-seal { 50% { filter: drop-shadow(0 0 18px #f0883e99); } }
+  .ek-stat { fill: #0d1117; stroke: #f0883e88; stroke-width: 1.5; } #ekStat { fill: #ffa657; }
+  .ek-resp, .ek-leak, .ek-cmt, .ek-clean, .ek-x { opacity: 0; transition: opacity .4s, transform .4s; }
+  .ek-resp rect { fill: #3fb9501a; stroke: #3fb950; stroke-width: 2; }
+  .ek-shield { fill: #0d1117; stroke: #3fb950; stroke-width: 2.5; stroke-linejoin: round; opacity: 0; transition: opacity .3s .4s; }
+  .ek-leak rect { fill: #f851491a; stroke: #f85149; stroke-width: 2; stroke-dasharray: 8 6; }
+  .s4 .ek-leak, .s4 .ek-x, .s5 .ek-resp, .s6 .ek-cmt, .s7 .ek-clean { opacity: 1; }
+  .s5 .ek-shield { opacity: 1; filter: drop-shadow(0 0 8px #3fb950); }
+  .s5 .ek-leak text { text-decoration: line-through; } .s5 .ek-leak { opacity: .45; }
+  .ek-x circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; } .ek-x path { stroke: #ff7b72; stroke-width: 3.5; stroke-linecap: round; }
+  .s4 .ek-x { filter: drop-shadow(0 0 10px #f85149); }
+  .ek-opt { transition: fill .3s; } .s5 .ek-opt { fill: #3fb950; font-weight: 800; }
+  .s5 .ek-card.gt { filter: drop-shadow(0 0 14px #3fb95099); }
+  .ek-hl { fill: #7ee787; font-weight: 700; }
+  .s7 .ek-in { opacity: .2; transition: opacity .6s; } .ek-in { transition: opacity .4s; }
+  .ek-clean rect { fill: #0d1117; stroke: #f0883e; stroke-width: 3; } .ek-clean text { fill: #ffa657; font: 800 22px var(--mono); letter-spacing: .12em; text-anchor: middle; }
+  .ek-lock circle { fill: #0d1117; stroke: #f0883e; stroke-width: 2.5; } .ek-lock rect { fill: #ffa657; } .ek-lock path { fill: none; stroke: #ffa657; stroke-width: 3; }
+  .ek-file rect { fill: #161b22; stroke: #30363d; stroke-width: 1.5; transition: stroke .3s, filter .3s; }
+  .s3 .ek-f2 rect { stroke: #f0883e; filter: drop-shadow(0 0 10px #f0883e88); }
+  .ek-note rect { fill: #3fb95014; stroke: #3fb95088; stroke-width: 1.5; }
+  .ek-conf rect { fill: #f8514914; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
+  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; transition: opacity .3s; } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; }
+  .ek-wire.hot { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
+  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; } .ek-wl.o { fill: #ffa657; }
+  .ek-dot { fill: #7ee787; opacity: 0; filter: drop-shadow(0 0 10px #3fb950); } .ek-dot.o { fill: #ffa657; filter: drop-shadow(0 0 10px #f0883e); } .ek-dot.r { fill: #ff7b72; filter: drop-shadow(0 0 10px #f85149); }
+  .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
+  .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .zs-vm { fill: #8957e52a; stroke: #a371f7; stroke-width: 4; }
+  .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
+  .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 2.6s; }
+  @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f7aa); } }
+  .zs-lock circle { fill: #0d1117; stroke: #a371f7; stroke-width: 3; filter: drop-shadow(0 0 10px #a371f788); }
+  .zs-lock rect { fill: #d2a8ff; } .zs-lock path { fill: none; stroke: #d2a8ff; stroke-width: 3.5; stroke-linecap: round; }
+  .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
+  .zs-port { fill: #0d1117; stroke: #d2a8ff; stroke-width: 3; }
+  .zs-bars { opacity: 0; } .active .zs-bars { animation: zs-dim .8s ease both 2.5s; }
+  @keyframes zs-dim { from { opacity: 1; } to { opacity: .2; } }
+  .zs-bar { fill: url(#zsSteel); stroke: #0d1117; stroke-width: 1.5; transform: translateY(-470px); }
+  .active .zs-bar { animation: zs-slam .42s cubic-bezier(.5,0,1,1) both calc(var(--b) * 70ms + 950ms); }
+  @keyframes zs-slam { 0% { transform: translateY(-470px); } 78% { transform: translateY(8px); } 90% { transform: translateY(-5px); } 100% { transform: none; } }
+  .zs-cross { fill: url(#zsSteelH); stroke: #0d1117; stroke-width: 1.5; transform: scaleX(0); transform-box: fill-box; transform-origin: left; }
+  .active .zs-cross { animation: zs-cross .3s cubic-bezier(.2,.9,.2,1) both calc(var(--b) * 90ms + 1620ms); }
+  @keyframes zs-cross { to { transform: none; } }
+  .zs-lock path { transform: translateY(-7px); } .active .zs-lock path { animation: zs-shackle .18s ease-in both 2.05s; }
+  @keyframes zs-shackle { to { transform: none; } }
+  .active .zs-lock circle { animation: zs-snap .5s ease-out both 2.05s; transform-box: fill-box; transform-origin: center; }
+  @keyframes zs-snap { 0% { transform: scale(1); } 35% { transform: scale(1.3); filter: drop-shadow(0 0 22px #f778ba); stroke: #f778ba; } 100% { transform: scale(1); } }
+  .zs-host { fill: #3fb95012; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
+  .zs-kern.g { fill: #8957e526; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #3fb9501f; stroke: #2ea043; stroke-width: 2; }
+  .zs-kern.r { fill: #3fb95014; stroke: #3fb95088; stroke-width: 2; }
+  .zs-kt { font: 700 26px "Mona Sans"; text-anchor: middle; } .zs-kt.g { fill: #d2a8ff; } .zs-kt.h, .zs-kt.r { fill: #7ee787; }
+  .zs-at { font: 600 15px var(--mono); letter-spacing: .1em; text-anchor: middle; } .zs-at.g { fill: #d2a8ff; } .zs-at.h { fill: #7ee787; text-anchor: start; }
+  .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; transition: opacity .3s, stroke .3s; }
+  .zs-wire.hot { opacity: 1; stroke: #7ee787; filter: drop-shadow(0 0 6px #3fb950); }
+  .zs-l { fill: #7ee787; font: 600 17px var(--mono); }
+  .zs-l.m { text-anchor: middle; }
+  .zs-node rect { fill: #0d1117; stroke: #3fb950; stroke-width: 2; transition: stroke .3s, filter .3s; }
+  .zs-node.key rect { fill: #8957e533; stroke: #a371f7; }
+  .zs-node.hot rect { filter: drop-shadow(0 0 16px #3fb950); stroke: #7ee787; }
+  .zs-node.key.hot rect { filter: drop-shadow(0 0 18px #a371f7); stroke: #d2a8ff; }
+  .zs-n { fill: #f0f6fc; font: 700 22px "Mona Sans"; text-anchor: middle; }
+  .zs-s { fill: #9198a1; font: 600 15px var(--mono); text-anchor: middle; letter-spacing: .06em; }
+  .zs-key { fill: none; stroke: #e2c5ff; stroke-width: 3; stroke-linecap: round; transition: stroke .3s; }
+  .zs-node.hot .zs-key { stroke: #f778ba; filter: drop-shadow(0 0 8px #f778ba); }
+  .zs-folder { fill: #a371f7; } .zs-folder.h { fill: #2ea043; }
+  .zs-ft { fill: #f0f6fc; font: 700 19px "Mona Sans"; text-anchor: middle; }
+  .zs-eng rect { fill: #0d1117cc; stroke: #a371f7; stroke-width: 1.5; } .zs-eng text { fill: #e2c5ff; font: 600 17px var(--mono); text-anchor: middle; }
+  .zs-none { fill: #f778ba; font: 700 17px var(--mono); letter-spacing: .08em; text-anchor: middle; }
+  .zs-nokey { fill: none; stroke: #f778ba99; stroke-width: 3; stroke-linecap: round; } .zs-nokey .x { stroke: #f778ba; stroke-width: 4; }
+  .zs-dest { fill: none; stroke-width: 3; } .zs-dest.gh { stroke: #4493f8; } .zs-dest.net { stroke: #4493f8; }
+  .zs-dl { fill: #79c0ff; font: 600 17px var(--mono); text-anchor: middle; }
+  .zs-dest-g.hot .zs-dest { filter: drop-shadow(0 0 12px #4493f8); stroke: #79c0ff; }
+  .zs-cyl { fill: #3fb95033; stroke: #3fb950; stroke-width: 2; transition: filter .3s, stroke .3s; } .zs-cyl.top { fill: #3fb9505c; }
+  .zs-node.hot .zs-cyl { stroke: #7ee787; filter: drop-shadow(0 0 14px #3fb950); }
+  .zs-cut { opacity: 0; } .zs-cut circle { fill: #0d1117; stroke: #f85149; stroke-width: 3; filter: drop-shadow(0 0 10px #f85149); }
+  .zs-cut path { stroke: #f85149; stroke-width: 5; stroke-linecap: round; } .zs-cut text { fill: #ff7b72; font: 600 17px var(--mono); text-anchor: middle; }
+  .zs-cut.on { opacity: 1; }
+  .zs-phase { fill: #f0f6fc; font: 600 18px var(--mono); text-anchor: end; }
+  .zs-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
   .so-box { position: absolute; top: 300px; width: 500px; height: 620px; padding: 30px 34px; border-radius: 22px; border: 2px solid var(--c);
     background: #0d1117ee; box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); opacity: 0; transition: box-shadow .5s, border-color .5s; }
   .active .so-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 400ms); }
@@ -1705,10 +1845,42 @@
   .cn-p { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .4s; }
   .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px var(--pc); }
 
+  /* --- enterprise operations: OpenTelemetry, governance, infrastructure (shared static visuals from ops-visuals.js) --- */
+  .ops .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--oc), #a5d6ff, var(--oc)); }
+  .ops-tag { position: absolute; left: 110px; right: 110px; top: 252px; font: 500 28px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
+  .ops-tag b { color: #f0f6fc; font-weight: 700; }
+  .active .ops-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .ops-fig { position: absolute; left: 110px; top: 326px; width: 1000px; margin: 0; opacity: 0; }
+  .active .ops-fig { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .ops-fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .ops-fig .ov-card { fill: #161b22e8; stroke: #3d444d; stroke-width: 1.5; }
+  .ops-fig .ov-key { stroke: var(--oc); fill: color-mix(in srgb, var(--oc) 12%, #0d1117); }
+  .ops-fig .ov-pill { fill: #0d1117; stroke: #3d444d; stroke-width: 1.5; }
+  .ops-fig .ov-bar { fill: var(--oc); opacity: .8; }
+  .ops-fig .ov-line { fill: none; stroke: #9198a1; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ops-fig .ov-dash { stroke-dasharray: 6 5; }
+  .ops-fig .ov-hot { fill: #f85149; opacity: 1; }
+  .ops-fig .ov-cap { stroke: #f85149; }
+  .ops-fig text { fill: #9198a1; font: 500 12px "Mona Sans", sans-serif; }
+  .ops-fig .ov-t { fill: #e6edf3; font-size: 15px; }
+  .ops-fig .ov-b { fill: #f0f6fc; font-size: 16px; font-weight: 700; }
+  .ops-fig .ov-m { font: 500 13px var(--mono); }
+  .ops-fig .ov-c { fill: var(--oc); font: 500 13px var(--mono); }
+  .ops-fig .ov-k { fill: var(--oc); font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  .ops-facts { position: absolute; left: 1180px; right: 110px; top: 326px; display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+  .ops-facts li { padding: 18px 22px; border-left: 4px solid var(--oc); border-radius: 0 14px 14px 0; background: #161b22c8; opacity: 0; }
+  .active .ops-facts li { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(.7s + var(--i) * 120ms); }
+  .ops-facts i { display: block; font: normal 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--oc); }
+  .ops-facts span { display: block; margin-top: 10px; font: 500 23px/1.3 "Mona Sans"; color: #c9d1d9; }
+  .ops-own { position: absolute; left: 110px; right: 110px; top: 990px; font: 500 21px/1.3 var(--mono); color: #9198a1; opacity: 0; }
+  .ops-own b { color: #d29922; font-weight: 600; }
+  .active .ops-own { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.3s; }
+
   /* --- enterprise ready --- */
   .er { --ec: #4493f8; }
   .er .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #a5d6ff, #d29922, #4493f8); }
-  .er-tag { position: absolute; right: 110px; top: 118px; width: 600px; text-align: right; font: 500 30px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
+  .er .slide-head h2 { font-size: 96px; }
+  .er-tag { position: absolute; left: 110px; right: 110px; top: 250px; font: 500 30px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
   .er-tag b { color: #f0f6fc; font-weight: 700; }
   .active .er-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
   .er-ed { position: absolute; left: 110px; top: 330px; width: 720px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
@@ -1763,69 +1935,6 @@
   .er-chip { padding: 10px 16px; border-radius: 99px; border: 1.5px solid #d2992255; background: #d2992210; font: 500 19px/1 var(--mono); color: #c9d1d9; white-space: nowrap; opacity: 0; transition: all .35s; }
   .active .er-chip { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(1.1s + var(--i) * 90ms); }
   .er-chip.lit { border-color: #d29922; background: #d2992230; color: #f0f6fc; box-shadow: 0 0 30px -6px #d29922; }
-  .en .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #39c5cf, #3fb950, #ab7df8); }
-  .en-card { position: absolute; top: 310px; height: 580px; box-sizing: border-box; padding: 30px 34px; border-radius: 22px; background: #0d1117f0;
-    border: 2px solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: 0 0 60px -30px var(--c); opacity: 0; }
-  .active .en-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(.3s + var(--i) * .25s); }
-  .en-card > i { font: 600 18px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
-  .en-card h3 { margin: 14px 0 12px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
-  .en-pub { left: 110px; width: 480px; }
-  .en-vault { left: 1010px; width: 800px; border-style: dashed; border-width: 3px; background: #08130cf0; transition: box-shadow .4s; }
-  .en-vault.busy { box-shadow: 0 0 90px -20px var(--c), inset 0 0 80px -50px var(--c); }
-  .en-lock { position: absolute; right: 26px; top: 26px; padding: 8px 14px; border-radius: 8px; background: var(--c); color: #0d1117;
-    font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
-  .en-facts { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-  .en-facts span { padding: 7px 12px; border-radius: 99px; border: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #d1d7e0; }
-  .en-facts b { color: var(--c); }
-  .en-call { padding: 16px 18px; border-radius: 12px; background: #151b23; border: 1px solid #3d444d; font: 500 18px/1.35 var(--mono); color: #d1d7e0; }
-  .en-call > b { display: block; color: #4493f8; font-weight: 700; margin-bottom: 6px; }
-  .en-call small { display: block; margin-top: 8px; color: #656c76; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
-  .en-task { color: #f0f6fc; min-height: 50px; }
-  .en-schema { color: #a5d6ff; }
-  .en-call.flash { animation: en-flash .6s ease-out; }
-  @keyframes en-flash { from { border-color: #4493f8; box-shadow: 0 0 30px -4px #4493f8; } }
-  .en-log { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
-  .en-log li { font: 500 19px/1.2 var(--mono); color: #d1d7e0; padding-left: 28px; position: relative; animation: rise .5s cubic-bezier(.2,.9,.2,1) both; }
-  .en-log li::before { content: "✓"; position: absolute; left: 0; color: #3fb950; font-weight: 800; }
-  .en-out { position: absolute; left: 34px; right: 34px; bottom: 26px; padding: 12px 16px; border-radius: 12px; border: 2px solid #ab7df8; background: #1c1430;
-    font: 600 19px/1.2 "Mona Sans"; color: #f0f6fc; opacity: 0; transform: translateY(12px); transition: all .5s cubic-bezier(.2,.9,.2,1); }
-  .en-out.show { opacity: 1; transform: none; box-shadow: 0 0 40px -10px #ab7df8; }
-  .en-out code { font: 600 17px var(--mono); color: #ab7df8; margin-right: 8px; }
-  .en-code { border-radius: 12px; background: #0d1117; border: 1px solid #263a2c; padding: 12px 0; font: 500 19px/30px var(--mono); color: #9198a1; }
-  .en-line { display: flex; white-space: pre; padding-right: 16px; transition: background .3s, color .3s; }
-  .en-line .no { width: 56px; padding-right: 18px; text-align: right; color: #3d444d; flex: none; }
-  .en-line.hot { color: #f0f6fc; background: linear-gradient(90deg, #3fb95040, transparent 85%); }
-  .en-status { margin-top: 14px; font: 600 19px/1 var(--mono); color: #3fb950; letter-spacing: .06em; min-height: 20px; }
-  .en-vault.busy .en-status::after { content: "▍"; animation: ga-blink .7s steps(1) infinite; }
-  .en-gate { position: absolute; left: 700px; top: 290px; width: 200px; height: 620px; text-align: center; opacity: 0; }
-  .active .en-gate { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .55s; }
-  .en-gate > i { display: block; font: 600 17px/1.25 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #d29922; font-style: normal; }
-  .en-gate small { position: absolute; left: 0; right: 0; bottom: 0; font: 500 16px/1.4 var(--mono); color: #9198a1; }
-  .en-pillar { position: absolute; left: 92px; top: 60px; bottom: 60px; width: 16px; border-radius: 8px; background: linear-gradient(#d2992200, #d29922, #d2992200);
-    box-shadow: 0 0 30px #d2992288; }
-  .en-gnote { position: absolute; left: 50%; top: 360px; transform: translate(-50%, 10px); white-space: nowrap; padding: 10px 16px; border-radius: 10px;
-    font: 700 19px/1 var(--mono); background: #0d1117; border: 2px solid; opacity: 0; transition: opacity .3s, transform .3s; z-index: 4; }
-  .en-gnote.show { opacity: 1; transform: translate(-50%, 0); }
-  .en-gnote.ok { color: #3fb950; border-color: #3fb950; }
-  .en-gnote.no { color: #ff7b72; border-color: #f85149; box-shadow: 0 0 40px -6px #f85149; }
-  .en-pk { position: absolute; left: 0; top: 582px; padding: 9px 16px; border-radius: 99px; white-space: nowrap; font: 600 17px/1 var(--mono); z-index: 3;
-    background: #0d1117; border: 2px solid var(--c); color: var(--c); box-shadow: 0 0 26px -4px var(--c); }
-  .en-pk.q { --c: #4493f8; }
-  .en-pk.a { --c: #3fb950; }
-  .en-pk.leak { --c: #f85149; }
-  .en-pk.burst { animation: en-burst .6s ease-out forwards; }
-  @keyframes en-burst { to { opacity: 0; filter: blur(8px); scale: 1.6; } }
-  .en-ledger { position: absolute; left: 110px; top: 930px; width: 1700px; display: flex; align-items: center; gap: 22px; opacity: 0; }
-  .active .en-ledger { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
-  .en-ledger > i { font: 600 17px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; font-style: normal; white-space: nowrap; }
-  .en-bar { flex: 1; height: 18px; border-radius: 9px; background: #21262d; overflow: hidden; }
-  .en-fill { height: 100%; width: 100%; border-radius: 9px; background: linear-gradient(90deg, #3fb950, #39c5cf); transition: width .8s cubic-bezier(.2,.9,.2,1); }
-  .en-fill.low { background: linear-gradient(90deg, #d29922, #f0883e); }
-  .en-left { font: 600 20px/1 var(--mono); color: #d1d7e0; white-space: nowrap; }
-  .en-left b { color: #f0f6fc; font-size: 26px; }
-  .en-sens { display: flex; gap: 8px; }
-  .en-sens span { padding: 7px 12px; border-radius: 8px; font: 500 16px/1 var(--mono); color: #656c76; border: 1px solid #30363d; }
-  .en-sens span.on { color: #0d1117; background: #3fb950; border-color: #3fb950; font-weight: 700; }
 
   /* --- first commit to GA (measured history) --- */
   .hist-tiles { position: absolute; left: 110px; top: 300px; width: 640px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
@@ -3031,6 +3140,199 @@
         [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
         lane
       ),
+    });
+  }
+
+  // Zero-secret agents: the agent runs in a micro-VM with no auth; every key lives on the host (GitHub MCP server, API proxy) and every exit goes through safe outputs or the Squid firewall
+  {
+    resetIndex();
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "zs-svg");
+    svg.setAttribute("viewBox", "0 0 1800 600");
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "Zero-secret agents: the agent and its runtime run in a micro-VM with no credentials on a guest kernel; on the host, a virtiofs mount shares the workspace, an MCP gateway routes to safe outputs or a GitHub MCP server that holds the token, an API proxy holds the model key, and all traffic leaves through a Squid firewall that allows or denies hosts and ports; safe outputs become action artifacts whose GitHub updates are allowed or denied; both kernels run inside the GitHub Actions runner VM"
+    );
+    // rows: workspace/safe outputs/artifacts 95, gateway/GitHub MCP/Squid 240, API proxy 345, internet 420
+    // [id, path, node lit on arrival]
+    const EDGES = [
+      ["zsVm", "M310 240 H380", ""],
+      ["zsFs", "M380 240 V95 H482", "zsNFs"],
+      ["zsMcp", "M380 240 H482", "zsNGw"],
+      ["zsLlm", "M380 240 V345 H482", "zsNProxy"],
+      ["zsNet", "M380 240 V420 H1340 V288", "zsNSquid"],
+      ["zsSo", "M680 222 L782 112", "zsNSo"],
+      ["zsGh", "M680 240 H782", "zsNGhMcp"],
+      ["zsGhSq", "M990 240 H1082", "zsNSquid"],
+      ["zsSoArt", "M990 95 H1185", "zsNArt"],
+      ["zsArtGh", "M1295 95 H1604", "zsDGh"],
+      ["zsLlmSq", "M680 345 H1220 V288", "zsNSquid"],
+      ["zsSqNet", "M1420 240 H1604", "zsDNet"],
+    ];
+    const TARGET = Object.fromEntries(EDGES.map(([id, , n]) => [id, n]));
+    // [phase, edges, deny?]
+    const FLOWS = [
+      ["workspace + tool cache · virtiofs mount, files only", ["zsVm", "zsFs"]],
+      ["MCP read · the GitHub MCP server adds its token on the host", ["zsVm", "zsMcp", "zsGh", "zsGhSq", "zsSqNet"]],
+      ["write · safe output → artifact → allow/deny GitHub update", ["zsVm", "zsMcp", "zsSo", "zsSoArt", "zsArtGh"]],
+      ["LLM API · the API proxy adds the model key on the host", ["zsVm", "zsLlm", "zsLlmSq", "zsSqNet"]],
+      ["internet traffic · host or port not on the allowlist", ["zsVm", "zsNet", "zsSqNet"], true],
+    ];
+    const START = 1500,
+      SEG = 560,
+      GAP = 900,
+      HOLD = 1400;
+    const SEGS = [];
+    const FLOW_AT = [];
+    let T = START;
+    FLOWS.forEach(([, edges], f) => {
+      FLOW_AT.push(T);
+      edges.forEach((e, k) => SEGS.push({ e, f, k, t0: T + k * SEG }));
+      T += edges.length * SEG + GAP;
+    });
+    const CYC = T + HOLD;
+    const build = () => {
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      const key = (x, y) => `<g class="zs-key" transform="translate(${x},${y})"><circle cx="0" cy="0" r="8"/><path d="M8 0 H30 M22 0 V8 M28 0 V6"/></g>`;
+      const folder = (x, y, w, ht, cls = "") => `<path class="zs-folder ${cls}" d="M${x} ${y + 8} q0 -8 8 -8 h${w * 0.32} l10 12 h${w * 0.68 - 26} q8 0 8 8 v${ht - 28} q0 8 -8 8 h${-(w - 16)} q-8 0 -8 -8z"/>`;
+      const box = (id, x, y, w, ht, name, sub, isKey) =>
+        `<g class="zs-node${isKey ? " key" : ""}" id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${ht}" rx="12"/><text class="zs-n" x="${x + w / 2}" y="${y + (isKey ? 38 : ht / 2 + (sub ? -2 : 8))}">${name}</text>${
+          isKey ? key(x + w / 2 - 15, y + ht - 28) : sub ? `<text class="zs-s" x="${x + w / 2}" y="${y + ht / 2 + 24}">${sub}</text>` : ""
+        }</g>`;
+      let g = `<defs><marker id="zsM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>`;
+      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient>`;
+      g += `<linearGradient id="zsSteel"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
+      g += `<linearGradient id="zsSteelH" x2="0" y2="1"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
+      g += `<clipPath id="zsCell"><rect x="0" y="0" width="300" height="450" rx="18"/></clipPath></defs>`;
+      // runner VM, kernels and the two areas
+      g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
+      g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
+      g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
+      g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
+      g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
+      g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/><g class="zs-bot" fill="none" stroke="#f0f6fc" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M150 128 V138"/><circle cx="150" cy="125" r="4" fill="#f0f6fc"/><rect x="126" y="138" width="48" height="38" rx="10"/><path d="M121 150 V164 M179 150 V164"/><circle cx="140" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><circle cx="160" cy="154" r="4.5" fill="#f0f6fc" stroke="none"/><path d="M142 166 H158"/></g><text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
+      [
+        ["copilot", 14],
+        ["claude", 107],
+        ["codex", 200],
+      ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="248" width="86" height="38" rx="19"/><text x="${x + 43}" y="273">${n}</text></g>`));
+      g += `<g class="zs-nokey" transform="translate(138,340)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
+      g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text>`;
+      g += `<rect class="zs-port" x="290" y="226" width="20" height="28" rx="5"/>`;
+      // jail cell: bars slam down, crossbars slide in, then the lock snaps shut and the bars dim
+      g += `<g class="zs-bars" clip-path="url(#zsCell)">${[0, 1, 2, 3, 4, 5, 6].map(b => `<rect class="zs-bar" style="--b:${b}" x="${26 + b * 40}" y="-4" width="10" height="458" rx="5"/>`).join("")}`;
+      g += `${[94, 303].map((y, b) => `<rect class="zs-cross" style="--b:${b}" x="-4" y="${y}" width="308" height="10" rx="5"/>`).join("")}</g>`;
+      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g></g>`;
+      g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
+      // wires and labels
+      g += `<g class="zs-area" style="--i:4">`;
+      for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" marker-end="url(#zsM)"/>`;
+      g += `<text class="zs-l" x="392" y="85">virtiofs</text><text class="zs-l" x="392" y="230">MCP</text><text class="zs-l" x="392" y="335">LLM API</text><text class="zs-l m" x="860" y="410">internet traffic</text>`;
+      g += `</g>`;
+      // host services
+      g += `<g class="zs-area" style="--i:5">`;
+      g += `<g class="zs-node" id="zsNFs">${folder(500, 56, 170, 80, "h")}<text class="zs-ft" x="585" y="98">workspace</text><text class="zs-ft" x="585" y="121">tool cache</text></g>`;
+      g += box("zsNGw", 490, 200, 190, 80, "MCP gateway", "routes tools");
+      g += box("zsNProxy", 490, 305, 190, 84, "API proxy", "", true);
+      g += box("zsNSo", 790, 55, 200, 80, "Safe outputs", "proposals");
+      g += box("zsNGhMcp", 790, 198, 200, 84, "GitHub MCP", "", true);
+      g += box("zsNSquid", 1090, 200, 330, 80, "Squid firewall", "egress allowlist");
+      g += `<g class="zs-node" id="zsNArt"><path class="zs-cyl" d="M1195 66 V124 A45 12 0 0 0 1285 124 V66"/><ellipse class="zs-cyl top" cx="1240" cy="66" rx="45" ry="12"/><text class="zs-s" x="1240" y="164">ACTION ARTIFACTS</text></g>`;
+      g += `<g class="zs-cut" id="zsCut"><circle cx="1512" cy="240" r="20"/><path d="M1503 231 L1521 249 M1521 231 L1503 249"/><text x="1512" y="290">not allowed</text></g>`;
+      g += `</g>`;
+      // destinations outside the runner
+      g += `<g class="zs-area" style="--i:6">`;
+      g += `<g class="zs-dest-g" id="zsDGh" transform="translate(1650,95)"><path class="zs-dest gh" d="M0 -34 L28 -23 V2 C28 20 13 30 0 36 C-13 30 -28 20 -28 2 V-23 Z"/><path class="zs-dest gh" d="M-11 0 L-3 9 L12 -8"/></g>`;
+      g += `<text class="zs-dl" x="1650" y="158">allow/deny</text><text class="zs-dl" x="1650" y="180">GitHub updates</text>`;
+      g += `<g class="zs-dest-g" id="zsDNet" transform="translate(1650,240)"><path class="zs-dest net" d="M-34 16 H32 A16 16 0 0 0 28 -14 A22 22 0 0 0 -12 -20 A18 18 0 0 0 -34 16 Z"/></g>`;
+      g += `<text class="zs-dl" x="1650" y="294">allow/deny</text><text class="zs-dl" x="1650" y="316">hosts/ports</text>`;
+      g += `</g>`;
+      g += `<text class="zs-phase" id="zsPhase" x="1476" y="34"></text><circle class="zs-dot" id="zsDot" r="9"/>`;
+      svg.innerHTML = g;
+    };
+    let built = false,
+      t0 = 0,
+      cyc = -1,
+      state = "",
+      jail = 0;
+    const JAIL = 1300;
+    const $ = id => svg.querySelector("#" + id);
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    slides.push({
+      group: "security",
+      sound: "vault",
+      red: true,
+      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
+      notes:
+        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
+      enter() {
+        if (!built) {
+          built = true;
+          build();
+        }
+        t0 = 0;
+        cyc = -1;
+        state = "";
+        jail = 0;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const raw = t - t0;
+        if (jail === 0 && raw >= 1330) {
+          jail = 1;
+          sfx.block();
+        } else if (jail === 1 && raw >= 2050) {
+          jail = 2;
+          sfx.key(1);
+        }
+        const e = Math.max(0, raw - JAIL),
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          state = "";
+        }
+        let f = -1;
+        for (let i = 0; i < FLOW_AT.length; i++) if (u >= FLOW_AT[i]) f = i;
+        const segs = SEGS.filter(s => s.f === f);
+        const cur = segs.find(s => u >= s.t0 && u < s.t0 + SEG);
+        const done = segs.filter(s => u >= s.t0 + SEG).length;
+        const deny = f >= 0 && FLOWS[f][2];
+        const flowEnd = f >= 0 ? FLOW_AT[f] + segs.length * SEG + GAP - 150 : 0;
+        const live = f >= 0 && u < flowEnd;
+        const st = `${f}:${done}:${live}`;
+        if (st !== state) {
+          state = st;
+          svg.querySelectorAll(".hot").forEach(x => x.classList.remove("hot"));
+          $("zsCut").classList.remove("on");
+          $("zsPhase").textContent = live ? FLOWS[f][0] : "";
+          if (live) {
+            for (const s of segs) {
+              if (s.k > done) break;
+              if (!deny || s.k < segs.length - 1) $(s.e).classList.add("hot");
+              if (s.k < done && TARGET[s.e]) $(TARGET[s.e]).classList.add("hot");
+            }
+            if (done === 0) sfx.key(0.6);
+            else if (deny && done === segs.length) {
+              $("zsCut").classList.add("on");
+              $("zsDNet").classList.remove("hot");
+              sfx.block(true);
+            } else if (done === segs.length) sfx.review();
+            else sfx.pop(done + f);
+          }
+        }
+        const dot = $("zsDot");
+        if (cur) {
+          const p = $(cur.e),
+            q = p.getPointAtLength(p.getTotalLength() * ease((u - cur.t0) / SEG) * (deny && cur.k === segs.length - 1 ? 0.5 : 1));
+          dot.setAttribute("cx", q.x);
+          dot.setAttribute("cy", q.y);
+          dot.setAttribute("fill", deny && cur.k === segs.length - 1 ? "#f85149" : cur.k > 1 && f !== 0 ? "#d2a8ff" : "#7ee787");
+          dot.style.opacity = 1;
+        } else dot.style.opacity = 0;
+      },
+      el: h("section", { class: "slide zs" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Nothing to steal inside the sandbox"), h("h2", {}, letters("Zero-secret "), letters("agents", "l-grad"))), svg),
     });
   }
 
@@ -7645,6 +7947,121 @@
     });
   }
 
+  // For PMs: two clickable PM processes (feature intake, launch readiness) from the public chrizbo/agentics-beyond-code repo (MIT): habit → agent → artifact → human, with a synthetic artifact
+  {
+    resetIndex();
+    const icon = n => h("span", { innerHTML: `<svg viewBox="0 0 24 24">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>` }).firstChild;
+    const COLS = ["#d29922", "#ab7df8", "#3fb950", "#4493f8"];
+    const KINDS = ["HABIT", "AGENT", "ARTIFACT", "HUMAN"];
+    // steps: [title, detail, icon] × 4; doc lines: [mark, label, value, cls]
+    const PROCS = [
+      {
+        tab: ["Feature intake", "a Slack reaction becomes a scored issue"],
+        steps: [
+          ["React 📥 in Slack", "on any message · no form", "comment"],
+          ["intake-triage", "scores it against strategy.md", "copilot"],
+          ["Scored intake issue", "RICE · Kano · strategy fit", "issue"],
+          ["PM decides", "accept · ask for more · park", "person"],
+        ],
+        doc: ["issue", "Intake: bulk export for workspace admins", "opened by the agent"],
+        lines: [
+          ["→", "Source", "Slack · #customer-feedback · 3 reactions", ""],
+          ["R", "Reach", "~340 admins / quarter", ""],
+          ["I", "Impact · Confidence", "2 (high) · 80%", ""],
+          ["E", "Effort", "3 person-weeks", ""],
+          ["=", "RICE score", "181 · top 10% of the backlog", "hl"],
+          ["✓", "Kano · strategy fit", "Performance · pillar 2, admin self-serve", "ok"],
+        ],
+        idea: ["Your habits are already triggers", "Nobody fills in a form. The emoji the team already uses is the trigger; the agent does the paperwork and the PM keeps the decision."],
+      },
+      {
+        tab: ["Launch readiness", "every Monday, against the policy"],
+        steps: [
+          ["Monday morning", "every launch in flight", "calendar"],
+          ["launch-readiness", "reads launch-ready.md", "copilot"],
+          ["Readiness report", "blockers · risk · sign-offs", "tasklist"],
+          ["DRI unblocks", "chases the one missing sign-off", "person"],
+        ],
+        doc: ["tasklist", "Readiness: bulk export · GA in 2 weeks", "posted Monday"],
+        lines: [
+          ["✓", "Docs", "published to staging", "ok"],
+          ["✓", "Security review", "approved", "ok"],
+          ["!", "Support runbook", "draft · no owner yet", "warn"],
+          ["✗", "Legal sign-off", "missing · blocks GA", "bad"],
+          ["✓", "Metrics dashboard", "live", "ok"],
+          ["=", "Overall risk", "medium · 1 blocker, 1 at risk", "hl"],
+        ],
+        idea: ["Process as code", "The launch-ready policy is a Markdown file in the repo. Change the policy in a pull request and next Monday's check follows it."],
+      },
+    ];
+    const tabs = PROCS.map((p, i) => h("button", { class: "pm-tab", type: "button", "aria-pressed": "false", onclick: () => (pick(i), sfx.step()) }, h("i", {}, String(i + 1)), h("div", {}, h("b", {}, p.tab[0]), h("em", {}, p.tab[1]))));
+    const stepEls = KINDS.map((k, i) => h("div", { class: `pm-st k${i}`, "--c": COLS[i] }, h("small", {}, h("span", {}), k), h("b", {}), h("em", {})));
+    const docIco = h("span", {}),
+      docT = h("div", {}),
+      docS = h("span", { class: "pm-when" }),
+      docLines = h("div", {});
+    const ideaB = h("b", {}),
+      ideaP = h("p", {});
+    const STEP = 650;
+    let sel = 0,
+      t0 = 0,
+      shown = -1;
+    function pick(i) {
+      sel = i;
+      const p = PROCS[i];
+      tabs.forEach((t, j) => (t.classList.toggle("on", j === i), t.setAttribute("aria-pressed", String(j === i))));
+      stepEls.forEach((el, j) => {
+        const [b, em, ic] = p.steps[j];
+        el.classList.remove("lit");
+        el.querySelector("small span").replaceWith(h("span", {}, icon(ic)));
+        el.querySelector("b").textContent = b;
+        el.querySelector("em").textContent = em;
+      });
+      docIco.replaceChildren(icon(p.doc[0]));
+      docT.textContent = p.doc[1];
+      docS.textContent = p.doc[2];
+      docLines.replaceChildren(...p.lines.map(([m, l, v, c]) => h("div", { class: `pm-ln ${c}` }, h("i", {}, m), h("b", {}, l), h("span", {}, v))));
+      ideaB.textContent = p.idea[0];
+      ideaP.textContent = p.idea[1];
+      t0 = 0;
+      shown = -1;
+    }
+    slides.push({
+      group: "process",
+      sound: "pm",
+      palette: ["#d29922", "#8957e5", "#2da44e", "#1f6feb"],
+      notes:
+        "For PMs. Agentic workflows are not only for code. These two processes come from the public, MIT-licensed agentics-beyond-code repository (chrizbo/agentics-beyond-code), a collection of gh-aw workflows for product managers, DRIs and leaders; the workflow names, inputs, outputs and ideas are taken from it. The issue and report contents are synthetic and illustrative. Click a process, or press right, to switch. Each one has the same shape: a habit the team already has, an agent, an artifact left in the repo, and a human who decides. One, feature intake: someone reacts with an inbox emoji on a Slack message; the intake triage agent turns it into an issue scored with RICE and Kano against the strategy doc, and the PM accepts it, asks for more or parks it. The repo's idea: your habits are already triggers. Two, launch readiness: every Monday the agent reads the launch-ready policy, itself a Markdown file, checks every launch in flight and reports blockers, risk and sign-offs; the DRI chases the one missing sign-off. The idea: process as code. The repo has more, a decision log, an adversarial PM, a Friday leadership post and a process analyzer that opens a pull request when the team drifts from how-we-work.md.",
+      enter(dir) {
+        pick(dir < 0 ? 1 : 0);
+      },
+      onNext() {
+        if (sel === 0) return pick(1), sfx.step(), true;
+      },
+      onPrev() {
+        if (sel === 1) return pick(0), sfx.step(), true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const n = Math.floor((t - t0 - 500) / STEP);
+        if (n < 0 || n === shown || n > 4 + PROCS[sel].lines.length) return;
+        shown = n;
+        if (n < 4) (stepEls[n].classList.add("lit"), sfx.pop(n));
+        else if (n > 4) docLines.children[n - 5]?.classList.add("on");
+      },
+      el: h(
+        "section",
+        { class: "slide pm" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentics beyond code · patterns from ", h("a", { class: "pm-src", href: "https://github.com/chrizbo/agentics-beyond-code", target: "_blank", rel: "noopener" }, "chrizbo/agentics-beyond-code")), h("h2", {}, letters("For "), letters("PMs", "l-grad"))),
+        h("div", { class: "pm-tabs" }, ...tabs),
+        h("div", { class: "pm-flow" }, ...stepEls),
+        h("div", { class: "pm-doc" }, h("div", { class: "pm-doc-h" }, docIco, docT, docS), docLines),
+        h("div", { class: "pm-idea" }, h("small", {}, "THE IDEA · FROM THE REPO"), ideaB, ideaP),
+        h("div", { class: "pm-cap" }, "Workflows and ideas from chrizbo/agentics-beyond-code (MIT) · issue and report contents synthetic")
+      ),
+    });
+  }
+
   // Cost management: guard, measure, optimize (+ model routing)
   {
     resetIndex();
@@ -9913,225 +10330,935 @@
     });
   }
 
-  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
+  // Need-to-know enclaves: the GitLost story; a public issue asks about a private repo, an isolated enclave reads it, and only schema values come back
   {
     resetIndex();
-    const BUDGET = 8;
-    const ROUNDS = [
-      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
-      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
-      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
-      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
-    ];
-    const CODE = [
-      "// billing/client.ts",
-      'import { charge } from "./v1/billing";',
-      "export async function renew(acct) {",
-      "  const plan = await lookup(acct);",
-      '  return charge(plan, { api: "v1" });',
-      "}",
-      "// auth/session.ts",
-      'import { sign } from "auth-lib@2.3.0";',
-      "// tests/integration/sync.test.ts",
-      'test.retry(3)("sync settles", run);',
-    ];
-    const PX = 560,
-      GX = 800,
-      VX = 1040;
-    const qTask = h("div", { class: "en-task" });
-    const qSchema = h("div", { class: "en-schema" });
-    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
-    const log = h("ul", { class: "en-log" });
-    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
-    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
-    const vaultStatus = h("div", { class: "en-status" });
-    const vault = h(
-      "div",
-      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
-      h("b", { class: "en-lock" }, "🔒 enclave"),
-      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
-      h("h3", {}, "octo-org/private-service"),
-      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
-      h("div", { class: "en-code" }, lines),
-      vaultStatus
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "ek-svg");
+    svg.setAttribute("viewBox", "0 0 1800 600");
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "Need-to-know enclaves: a public issue asks whether version 2 is compatible with an internal integration; the primary agent hands the task through a trusted broker to a single-use enclave agent with read access to a private repository; the enclave tries to return a confidential launch date but the output gate drops anything outside the response schema; only compatibility and migrationRequired values reach the public comment, and the enclave is cleaned up"
     );
-    const gNote = h("div", { class: "en-gnote" });
-    const fill = h("div", { class: "en-fill" });
-    const leftN = h("b");
-    const invN = h("span", { class: "en-left" });
-    const el = h(
-      "section",
-      { class: "slide en" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
-      h(
-        "div",
-        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
-        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
-        h("h3", {}, "Asks, never reads"),
-        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
-        call,
-        log,
-        out
-      ),
-      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
-      vault,
-      h(
-        "div",
-        { class: "en-ledger" },
-        h("i", {}, "Information budget"),
-        h("div", { class: "en-bar" }, fill),
-        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
-        invN,
-        h(
-          "div",
-          { class: "en-sens" },
-          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
-        )
-      )
-    );
-    let ev = [],
-      evI = 0,
-      pks = [],
-      used = 0,
-      calls = 0,
+    const bot = (cx, cy, s, c) =>
+      `<g fill="none" stroke="${c}" stroke-width="${3.5 / s}" stroke-linecap="round" stroke-linejoin="round" transform="translate(${cx},${cy}) scale(${s})"><path d="M0 -28 V-18"/><circle cx="0" cy="-31" r="4" fill="${c}"/><rect x="-24" y="-18" width="48" height="38" rx="10"/><path d="M-29 -6 V8 M29 -6 V8"/><circle cx="-10" cy="-2" r="4.5" fill="${c}" stroke="none"/><circle cx="10" cy="-2" r="4.5" fill="${c}" stroke="none"/><path d="M-8 10 H8"/></g>`;
+    const pill = (x, y, w, t, c) => `<g class="ek-pill ${c}"><rect x="${x}" y="${y}" width="${w}" height="28" rx="14"/><text x="${x + w / 2}" y="${y + 19}">${t}</text></g>`;
+    const PATHS = {
+      ekP1: "M380 175 H440",
+      ekP2: "M820 140 H910",
+      ekP3: "M1380 220 H1315 V145 H1270",
+      ekP4: "M910 461 H842",
+      ekP5: "M910 338 C866 338 864 410 820 410",
+      ekP6: "M440 440 H380",
+    };
+    const build = () => {
+      let g = `<defs><radialGradient id="ekBotA"><stop offset="0" stop-color="#a371f7"/><stop offset="1" stop-color="#6e40c9"/></radialGradient><radialGradient id="ekBotB"><stop offset="0" stop-color="#f0883e"/><stop offset="1" stop-color="#9b4215"/></radialGradient></defs>`;
+      // headers
+      g += `<g class="ek-area" style="--i:0"><text class="ek-hd b" x="0" y="22">PUBLIC ISSUE</text><text class="ek-hd g" x="440" y="22">AGENTIC WORKFLOW</text><text class="ek-hd o" x="890" y="22">ISOLATED ENCLAVE · SINGLE USE</text><text class="ek-hd o" x="1360" y="22">PRIVATE REPOSITORY</text></g>`;
+      // A: public issue + comment
+      g += `<g class="ek-area" style="--i:1"><rect class="ek-card b" x="0" y="50" width="380" height="250" rx="16"/>`;
+      g += `<g class="ek-iss"><circle cx="34" cy="86" r="11"/><circle cx="34" cy="86" r="3" fill="#3fb950" stroke="none"/></g><text class="ek-t" x="56" y="94">Issue #42</text>${pill(290, 72, 70, "Public", "b")}`;
+      g += `<text class="ek-ti" x="24" y="146">Can we upgrade to v2?</text><text class="ek-tx" x="24" y="184">Is v2 compatible with our</text><text class="ek-tx" x="24" y="210">internal integration?</text>${pill(24, 244, 130, "triage:agent", "y")}</g>`;
+      g += `<g class="ek-cmt"><rect class="ek-card c" x="0" y="340" width="380" height="200" rx="16"/>${bot(34, 380, 0.5, "#d2a8ff")}<text class="ek-t s" x="58" y="386">AI agent commented</text>${pill(24, 406, 190, "Visible to everyone", "b")}`;
+      g += `<text class="ek-tx" x="24" y="470">v2 is <tspan class="ek-hl">compatible</tspan> with our</text><text class="ek-tx" x="24" y="496">internal integration.</text><text class="ek-tx" x="24" y="522"><tspan class="ek-hl">No migration</tspan> is required.</text></g>`;
+      g += `<text class="ek-ft" x="190" y="582">✓ no project name · no launch date</text>`;
+      // B: primary agent + output gate
+      g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="url(#ekBotA)"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
+      g += `<text class="ek-t" x="556" y="112">Primary agent</text><text class="ek-s" x="556" y="140">public repo · untrusted</text>`;
+      g += `<rect class="ek-task" x="460" y="176" width="340" height="38" rx="10"/><text class="ek-m c" x="630" y="201">task: check v2 compatibility</text></g>`;
+      g += `<g class="ek-area ek-gate" style="--i:3"><rect class="ek-card gt" x="440" y="300" width="380" height="240" rx="16"/><text class="ek-t" x="460" y="338">Output gate</text><text class="ek-s" x="460" y="364">only schema values leave</text>`;
+      g += `<text class="ek-m k" x="460" y="408">compatibility</text><text class="ek-m" x="460" y="434"><tspan class="ek-opt">compatible</tspan> | incompatible | unknown</text>`;
+      g += `<text class="ek-m k" x="460" y="478">migrationRequired</text><text class="ek-m" x="460" y="504">true | <tspan class="ek-opt">false</tspan></text></g>`;
+      g += `<text class="ek-ft" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
+      // C: enclave
+      g += `<g class="ek-area" style="--i:4"><rect class="ek-wall" x="880" y="40" width="420" height="510" rx="24"/><g class="ek-in">`;
+      g += `<rect class="ek-card o" x="910" y="70" width="360" height="150" rx="16"/><circle cx="970" cy="143" r="36" fill="url(#ekBotB)"/>${bot(970, 145, 0.75, "#f0f6fc")}`;
+      g += `<text class="ek-t" x="1024" y="136">Enclave agent</text><text class="ek-s" x="1024" y="164">read-only · no network</text>`;
+      g += `<rect class="ek-stat" x="910" y="236" width="360" height="38" rx="19"/><text id="ekStat" class="ek-m c" x="1090" y="261">Waiting for task</text>`;
+      g += `<g class="ek-resp"><rect x="910" y="290" width="360" height="96" rx="14"/><text class="ek-m j" x="928" y="330">{"compatibility": "compatible",</text><text class="ek-m j" x="928" y="360"> "migrationRequired": false}</text>`;
+      g += `<path class="ek-shield" d="M1252 286 l16 6 v12 c0 10 -7 16 -16 20 c-9 -4 -16 -10 -16 -20 v-12 z M1245 305 l5 5 l9 -9"/></g>`;
+      g += `<g class="ek-leak"><rect x="910" y="406" width="360" height="110" rx="14"/><text class="ek-tx r" x="930" y="446">"Project Orchid launches</text><text class="ek-tx r" x="930" y="472">June 12…"</text><text class="ek-m x" x="930" y="502">✗ not in schema · dropped</text></g></g>`;
+      g += `<g class="ek-clean"><rect x="975" y="372" width="230" height="60" rx="10"/><text x="1090" y="411">CLEANED UP</text></g></g>`;
+      g += `<text class="ek-ft" x="1090" y="582">launched per question · destroyed after</text>`;
+      // D: private repo
+      g += `<g class="ek-area" style="--i:5"><rect class="ek-card o" x="1360" y="50" width="400" height="490" rx="16"/>`;
+      g += `<g class="ek-lock"><circle cx="1396" cy="92" r="20"/><path d="M1389 92 V85 a7 7 0 0 1 14 0 V92"/><rect x="1385" y="91" width="22" height="14" rx="3"/></g>`;
+      g += `<text class="ek-t s" x="1428" y="99">contoso/private-repo</text>${pill(1666, 126, 76, "Private", "o")}`;
+      g += `<g class="ek-file"><rect x="1380" y="168" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="194">README.md</text></g>`;
+      g += `<g class="ek-file ek-f2"><rect x="1380" y="218" width="360" height="40" rx="8"/><text class="ek-m" x="1398" y="244">compat-notes.md</text></g>`;
+      g += `<g class="ek-note"><rect x="1380" y="276" width="360" height="74" rx="10"/><text class="ek-tx" x="1398" y="306">v2: compatible with integration</text><text class="ek-tx" x="1398" y="334">migration: not required</text></g>`;
+      g += `<g class="ek-conf"><rect x="1380" y="366" width="360" height="94" rx="10"/><text class="ek-m x" x="1398" y="398">CONFIDENTIAL</text><text class="ek-tx" x="1398" y="434">Project Orchid launches June 12</text></g>`;
+      g += `${pill(1460, 484, 200, "authorized read access", "o")}</g>`;
+      // wires
+      g += Object.entries(PATHS)
+        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"/>`)
+        .join("");
+      g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text>`;
+      g += `<g class="ek-x"><circle cx="830" cy="461" r="14"/><path d="M823 454 l14 14 M837 454 l-14 14"/></g>`;
+      g += `<circle id="ekDot" class="ek-dot" r="9"/>`;
+      svg.innerHTML = g;
+    };
+    // [time, path, stage label, sound]
+    const STEPS = [
+      [400, "ekP1", "Waiting for task", () => sfx.pop(0)],
+      [1300, "ekP2", "Launching enclave…", () => sfx.key()],
+      [2300, "ekP3", "Reading private repo…", () => sfx.key(0.6)],
+      [3600, "ekP4", "Checking response…", () => sfx.block(true)],
+      [5000, "ekP5", "Response matches schema", () => (sfx.route(2), sfx.review())],
+      [6400, "ekP6", "Answer posted", () => sfx.notify()],
+      [7800, null, "Analysis ended · enclave cleaned up", () => sfx.pop(4)],
+    ];
+    const CYC = 11000,
+      DUR = 750;
+    let built = false,
       t0 = 0,
-      now = 0,
-      fresh = true;
-    const fmt = n => (Math.round(n * 10) / 10).toString();
-    const ledger = () => {
-      const left = BUDGET - used;
-      fill.style.width = `${(left / BUDGET) * 100}%`;
-      fill.classList.toggle("low", left < 3);
-      leftN.textContent = fmt(left);
-      invN.textContent = `· ${calls} / 4 invocations`;
-    };
-    const say = (txt, ok) => {
-      gNote.textContent = txt;
-      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
-    };
-    const launch = (txt, cls, x0, x1, dur, blocked) => {
-      const p = h("div", { class: `en-pk ${cls}` }, txt);
-      el.append(p);
-      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
-    };
-    const script = () => {
-      ev = [];
-      evI = 0;
-      const at = (ms, fn) => ev.push([ms, fn]);
-      let T = 600;
-      ROUNDS.forEach((r, k) => {
-        const s = T;
-        at(s, () => {
-          qTask.textContent = r.q;
-          qSchema.textContent = r.schema;
-          call.classList.remove("flash");
-          void call.offsetWidth;
-          call.classList.add("flash");
-          lines.forEach(l => l.classList.remove("hot"));
-          gNote.classList.remove("show");
-          sfx.key();
-        });
-        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
-        if (r.over) {
-          at(s + 1400, () => {
-            say(`✗ over budget · needs ${r.bits} bits`, 0);
-            sfx.route(0);
-          });
-          T = s + 3200;
-          return;
-        }
-        at(s + 1350, () => say("✓ masked capability", 1));
-        at(s + 2000, () => {
-          calls++;
-          ledger();
-          vault.classList.add("busy");
-          vaultStatus.textContent = "sub-agent reading ";
-          gNote.classList.remove("show");
-        });
-        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
-        let u = s + 3600;
-        at(u, () => {
-          vault.classList.remove("busy");
-          vaultStatus.textContent = "answer ready";
-        });
-        if (r.leak) {
-          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
-          at(u + 800, () => {
-            say("✗ free-form string · denied", 0);
-            sfx.route(0);
-          });
-          u += 1800;
-        }
-        at(u, () => launch(r.a, "a", VX, PX, 1400));
-        at(u + 700, () => {
-          used += r.bits;
-          ledger();
-          say(`✓ schema · −${r.bits} bits`, 1);
-          sfx.route(2);
-        });
-        at(u + 1400, () => {
-          log.append(h("li", {}, r.log));
-          sfx.pop(k * 2);
-        });
-        T = u + 2200;
-      });
-      at(T, () => {
-        out.classList.add("show");
-        gNote.classList.remove("show");
-        sfx.review();
-      });
-      at(T + 4000, () => (fresh = true));
-    };
-    const reset = () => {
-      pks.forEach(p => p.el.remove());
-      pks = [];
-      used = calls = 0;
-      log.replaceChildren();
-      out.classList.remove("show");
-      vault.classList.remove("busy");
-      vaultStatus.textContent = "";
-      gNote.className = "en-gnote";
-      qTask.textContent = "";
-      qSchema.textContent = "";
-      lines.forEach(l => l.classList.remove("hot"));
-      ledger();
-      t0 = now;
-      script();
+      stage = -1;
+    const setStage = k => {
+      stage = k;
+      svg.setAttribute("class", "ek-svg" + STEPS.slice(0, k + 1).map((_, i) => " s" + (i + 1)).join(""));
+      const st = svg.querySelector("#ekStat");
+      if (st) st.textContent = k >= 1 ? STEPS[k][2] : "Waiting for task";
     };
     slides.push({
       group: "security",
       sound: "vault",
-      palette: ["#8957e5", "#1f6feb", "#238636", "#1b7c83"],
+      red: true,
+      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
-        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
+        "Need-to-know enclaves. GitLost was a real attack: a public issue prompted an agent with access to a private repository, and the agent's public reply leaked private contents. Enclaves stop private-to-public leaks in cross-repo flows. Here a public issue asks whether version 2 is compatible with an internal integration. The primary agent in the public repo never reads the private repo; it hands the repo, the task and a response schema to a trusted broker, which launches a single-use, isolated enclave agent with read-only access to the private repository. The enclave finds the answer, and also a confidential launch date. If it tries to return free text, the output gate drops it: only schema values leave. Compatibility is compatible, incompatible or unknown, and migrationRequired is true or false, so there are six possible answers, three bits, which together with timing and error bits fit an eight-bit confidential budget. The public comment says compatible, no migration required, and nothing else. Then the enclave is destroyed. The issue, repository, project name and date are synthetic, and the flow is illustrative.",
       enter() {
-        fresh = true;
+        if (!built) {
+          built = true;
+          build();
+        }
+        t0 = 0;
+        setStage(-1);
       },
       tick(t) {
-        now = t;
-        if (fresh) {
-          fresh = false;
-          reset();
+        if (!t0) t0 = t;
+        const u = (t - t0) % CYC;
+        let k = -1;
+        for (let i = 0; i < STEPS.length; i++) if (u >= STEPS[i][0]) k = i;
+        if (k !== stage) {
+          setStage(k);
+          if (k >= 0) STEPS[k][3]();
         }
-        const e = t - t0;
-        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
-        for (const p of pks) {
-          if (p.dead) continue;
-          const u = Math.min(1, (t - p.start) / p.dur);
-          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
-          if (u >= 1) {
-            p.dead = t + 600;
-            if (p.blocked) p.el.classList.add("burst");
-            else p.dead = t;
+        const dot = svg.querySelector("#ekDot");
+        if (!dot) return;
+        const s = k >= 0 ? STEPS[k] : null;
+        const p = s && s[1] && u < s[0] + DUR ? svg.querySelector("#" + s[1]) : null;
+        svg.querySelectorAll(".ek-wire").forEach(w => w.classList.toggle("hot", !!p && w === p));
+        if (!p) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const v = Math.min(1, (u - s[0]) / DUR),
+          e = v < 0.5 ? 2 * v * v : 1 - (-2 * v + 2) ** 2 / 2,
+          pt = p.getPointAtLength(e * p.getTotalLength());
+        dot.setAttribute("cx", pt.x);
+        dot.setAttribute("cy", pt.y);
+        dot.setAttribute("class", "ek-dot " + (s[1] === "ekP4" ? "r" : s[1] === "ekP3" ? "o" : ""));
+        dot.style.opacity = 1;
+      },
+      el: h("section", { class: "slide ek" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
+    });
+  }
+
+  // Enterprise infrastructure as code: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  {
+    resetIndex();
+    const RUN = [
+      { k: "[self-hosted, linux]", c: "#d29922" },
+      { k: "[self-hosted, arm64]", c: "#ab7df8" },
+      { k: "[self-hosted, gpu]", c: "#4493f8" },
+    ];
+    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
+    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
+    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
+    const STEPS = ["checkout", "setup-node", "cache"];
+    const CHIPS = [
+      ["GitHub Apps", [6, 7, 8]],
+      ["OIDC", [4, 5]],
+      ["Runner groups", [3]],
+      ["Environments", []],
+      ["Org secrets", [8]],
+      ["OpenTelemetry", [13, 14, 15]],
+      ["Rulesets", []],
+      ["Audit log", []],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff",
+      E = "#d2a8ff";
+    const vRun = h("span", { class: "ae-val" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [["runs-on: ", K], vRun],
+      [["permissions:", K]],
+      [
+        ["  id-token: ", K],
+        ["write", V],
+      ],
+      [["github-app:", K]],
+      [
+        ["  client-id: ", K],
+        ["${{ vars.APP_ID }}", E],
+      ],
+      [
+        ["  private-key: ", K],
+        ["${{ secrets.APP_KEY }}", E],
+      ],
+      [["network:", K]],
+      [
+        ["  allowed: ", K],
+        ["[defaults, node]", V],
+      ],
+      [["steps:", K]],
+      [
+        ["  - uses: ", K],
+        ["actions/setup-node@v4", V],
+      ],
+      [["observability:", K]],
+      [["  otlp:", K]],
+      [
+        ["    endpoint: ", K],
+        ["${{ secrets.OTLP_ENDPOINT }}", E],
+      ],
+      [["---", D]],
+      [["# Triage new issues for the platform team", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
+    const SB = 1,
+      RN = 2,
+      EC = 3;
+    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
+    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
+    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
+    const card = (i, c, tag, title, code, ic, extra) => {
+      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
+      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
+      return el;
+    };
+    const spans = h(
+      "div",
+      { class: "er-spans" },
+      [
+        [0, 100],
+        [8, 46],
+        [30, 58],
+        [62, 30],
+      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
+    );
+    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
+    otel.classList.add("otel");
+    const cRun = h("span");
+    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
+    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
+    fw.classList.add("fw");
+    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
+    eco.classList.add("eco");
+    const job = h("div", { class: "er-job" });
+    const trace = h("div", { class: "er-job er-trace" });
+    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
+    const el = h(
+      "section",
+      { class: "slide er" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("infrastructure as code", "l-grad"))),
+      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
+      ed,
+      arrow,
+      otel,
+      fw,
+      runner,
+      eco,
+      job,
+      trace,
+      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
+    );
+    const fly = (dot, [x0, y0], [x1, y1]) => {
+      dot.style.transition = "none";
+      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
+      void dot.offsetWidth;
+      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
+      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
+    };
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      typed = "",
+      arriveAt = 0,
+      otelAt = 0,
+      chipAt = 0,
+      sbAt = 0,
+      chip = -1;
+    const setRunner = (i, t) => {
+      cur = i;
+      el.style.setProperty("--ec", RUN[i].c);
+      runner.style.setProperty("--rc", RUN[i].c);
+      cRun.textContent = RUN[i].k;
+      runner.classList.add("on");
+      for (const c of [runner, eco, fw]) c.classList.remove("run");
+      eco.classList.remove("on");
+      fw.classList.remove("on");
+      steps.forEach(p => p.classList.remove("up"));
+      fly(job, [840, 460], MID(RN));
+      arriveAt = t + 700;
+      sbAt = otelAt = Infinity;
+    };
+    const setChip = i => {
+      chip = i;
+      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
+      const lit = CHIPS[i][1];
+      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "enterprise",
+      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
+      notes:
+        "Enterprise infrastructure as code. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+      enter() {
+        typed = RUN[0].k;
+        vRun.textContent = typed;
+        phase = "hold";
+        since = chipAt = 0;
+        chip = -1;
+        chips.forEach(c => c.classList.remove("lit"));
+        rows.forEach(r => r.classList.remove("lit"));
+        otel.classList.remove("on", "run");
+        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
+        steps.forEach(p => p.classList.remove("up"));
+        cRun.textContent = RUN[0].k;
+        sbAt = Infinity;
+        for (const d of [job, trace]) {
+          d.style.transition = "none";
+          d.style.opacity = "0";
+        }
+        cur = 0;
+        arriveAt = otelAt = Infinity;
+      },
+      tick(t) {
+        if (!since) {
+          since = t;
+          chipAt = t + 1800;
+          setRunner(0, t + 900);
+        }
+        if (t > arriveAt && !runner.classList.contains("run")) {
+          runner.classList.add("run");
+          sbAt = t + 900;
+        }
+        if (t > sbAt) {
+          sbAt = Infinity;
+          fw.classList.remove("run");
+          void fw.offsetWidth;
+          fw.classList.add("on", "run");
+          fly(trace, MID(SB), MID(0));
+          otelAt = t + 700;
+        }
+        if (t > otelAt) {
+          otelAt = Infinity;
+          otel.classList.remove("run");
+          void otel.offsetWidth;
+          otel.classList.add("on", "run");
+        }
+        if (t > arriveAt) {
+          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
+          steps.forEach((p, j) => p.classList.toggle("up", j < n));
+          eco.classList.add("on");
+          eco.classList.toggle("run", n === steps.length);
+        }
+        if (t > chipAt) {
+          chipAt = t + 1500;
+          setChip((chip + 1) % CHIPS.length);
+        }
+        const el2 = t - since;
+        const next = RUN[(cur + 1) % RUN.length].k;
+        if (phase === "hold" && el2 > 3400) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 28) {
+          since = t;
+          typed = typed.slice(0, -1);
+          vRun.textContent = typed;
+          if (!typed) phase = "type";
+        } else if (phase === "type" && el2 > 70) {
+          since = t;
+          typed = next.slice(0, typed.length + 1);
+          vRun.textContent = typed;
+          sfx.key(0.7);
+          if (typed === next) {
+            setRunner((cur + 1) % RUN.length, t);
+            sfx.pop(cur * 2);
+            phase = "hold";
           }
         }
-        pks = pks.filter(p => {
-          if (p.dead && t >= p.dead) p.el.remove();
-          return !p.dead || t < p.dead;
-        });
       },
       el,
+    });
+  }
+
+  // Enterprise operations: three static slides whose diagrams come from ops-visuals.js, the same source the
+  // docs landing page renders, so the deck and the site show one picture of observability, governance and infrastructure.
+  for (const s of [
+    {
+      key: "observability",
+      color: "#f0883e",
+      kicker: "Observability",
+      head: [["OpenTelemetry", "l-grad"]],
+      tag: ["Traces and ", h("b", {}, "AI credit burn"), " stream to your OTLP backend."],
+      facts: [
+        ["Traces", "Job spans, firewall requests and MCP tool calls over OTLP/HTTP."],
+        ["AI credit burn", "Agent spans carry gh-aw.aic; conclusion flags max_ai_credits_exceeded."],
+        ["Secrets", "Collector headers stay in secrets, masked in logs."],
+      ],
+      own: [h("b", {}, "Your collector: "), "chart, alert and cap credits. Export errors never fail runs."],
+      notes:
+        "OpenTelemetry. Agentic workflows export OpenTelemetry over OTLP/HTTP to collectors you run. In the workflow, observability.otlp lists one or more endpoints, each with headers that come from secrets, and the credentials are masked in logs. Organizations can set a default instead: GH_AW_DEFAULT_OTLP_ENDPOINT as a variable or secret, plus GH_AW_DEFAULT_OTLP_HEADERS, which must be a secret; an endpoint without headers is treated as unconfigured, nothing is exported from any job, and the agent job fails with a visible error so the misconfiguration is not silent. Spans follow the run across its jobs, and the firewall's allowed and blocked request counts ride on them as gh-aw.firewall.* attributes. AI credit burn rides on the spans: the agent job span carries gh-aw.aic, the AI credits the run consumed, and the conclusion span records gh-aw.max_ai_credits and gh-aw.max_ai_credits_exceeded, so the backend can chart burn per workflow, alert on spikes and see which runs hit the cap. The hosted MCP gateway has its own traces-only exporter that emits one span per MCP tool call; it reads headers only from the OTEL_EXPORTER_OTLP_HEADERS environment variable, never from its JSON configuration. Logs are opt-in: GH_AW_OTLP_LOGS_ENABLED=true exports compact unified-session logs from the conclusion job, bounded by GH_AW_OTLP_LOGS_MAX_BYTES. These defaults are cooperative configuration, not a locked policy. Transport failures, such as a rejected or unreachable collector, never fail the functional workflow; missing or invalid credentials are configuration errors to fix, and 401 or 403 responses are not retried with unchanged credentials. The diagram, span bars and credit chart are illustrative; see the OpenTelemetry and MCP gateway reference.",
+    },
+    {
+      key: "governance",
+      color: "#ab7df8",
+      kicker: "Governance stays in GitHub",
+      head: [["GitHub-native "], ["governance", "l-grad"]],
+      tag: ["The rules you already enforce in GitHub ", h("b", {}, "apply to every agentic job"), "."],
+      facts: [
+        ["Org / repo variables", "gh aw env sets GH_AW_DEFAULT_* defaults at enterprise, org or repo scope; frontmatter still wins."],
+        ["Protected environments", "manual-approval and safe-outputs.environment add required reviewers, wait timers and branch policies."],
+        ["Branch rulesets", "Require agentic review checks or a central compile check before merge."],
+        ["Actions policies", "Allowed actions, runner groups and SHA-pinned lock files apply like any other job."],
+      ],
+      own: [h("b", {}, "Cooperative defaults: "), "variables guide; environments, rulesets and policies enforce."],
+      notes:
+        "GitHub-native governance. Enforcement stays where your organization already keeps it. gh aw env manages GH_AW_DEFAULT_* Actions variables at enterprise, organization or repository scope; precedence runs frontmatter, then repository, organization, enterprise, then the compiler fallback. GH_AW_POLICY_* variables gate runtime capabilities, for example turning off pull request creation. These variables are cooperative defaults, not locked policy, so pair them with real enforcement: protected environments, reached through on.manual-approval or safe-outputs.environment, carry required reviewers, wait timers and branch policies, and naming an environment without protection rules adds no review. Branch rulesets require checks, such as agentic review or a centrally managed compile check that rejects jobs without self-hosted runners. Actions policies, allowed actions, runner groups and SHA-pinned lock files apply to agentic jobs like any other. The diagram is illustrative; see the governance and enterprise environment controls reference.",
+    },
+    {
+      key: "infrastructure",
+      color: "#3fb950",
+      kicker: "Your runners, mirrors and registries",
+      head: [["Operator-owned "], ["infrastructure", "l-grad"]],
+      tag: ["Compile-time substitutions ", h("b", {}, "point every pin at infrastructure you run"), "."],
+      facts: [
+        ["Self-hosted Linux", "Linux runners with Docker, selected through runs-on with the self-hosted label or a runner group."],
+        ["ARC + DinD", "runner.topology: arc-dind with a privileged Docker-in-Docker sidecar and a shared work volume."],
+        ["Mirrors and registries", "aw.json action_pins, action_pin_prefixes and container_pins rewrite the lock file to your mirrors."],
+        ["Pinned versions", "Upgrading the CLI alone never upgrades lock pins; recompile, then validate on your runners."],
+      ],
+      own: [h("b", {}, "Operator owned: "), "runners, mirrors, images and upgrades. ARC and GHES end to end remain unconfirmed."],
+      notes:
+        "Operator-owned infrastructure. Agentic jobs run on Linux runners with Docker; macOS and Windows runners are not supported. Choose self-hosted runners through runs-on with the self-hosted label or a runner group. On Kubernetes, ARC with a Docker-in-Docker sidecar needs runner.topology: arc-dind, a privileged DinD sidecar, a shared work volume and DOCKER_HOST, and the compiler stages the sysroot. For air-gapped or controlled networks, aw.json maps actions to your mirrors with action_pins or action_pin_prefixes, whose mirrors must contain the same commits, and maps container images to an internal registry with container_pins, by digest. Substitutions are baked into the lock file when you run gh aw compile. Pinned versions are the compatibility boundary: upgrading the CLI alone does not upgrade the pins already in compiled lock files, so recompile, record versions and validate on your own runners. You own the runners, mirrors, images and upgrades, and ARC and GHES end-to-end support remains unconfirmed. The diagram is illustrative; see the self-hosted runners and enterprise configuration reference.",
+    },
+  ]) {
+    resetIndex();
+    const fig = h("figure", { class: "ops-fig" });
+    const svg = window.AW_OPS_VISUALS?.[s.key];
+    if (svg) fig.innerHTML = svg;
+    const el = h(
+      "section",
+      { class: `slide ops ops-${s.key}`, "--oc": s.color },
+      h(
+        "div",
+        { class: "slide-head" },
+        h("div", { class: "kicker" }, s.kicker),
+        h(
+          "h2",
+          {},
+          s.head.map(([t, c]) => letters(t, c))
+        )
+      ),
+      h("div", { class: "ops-tag" }, ...s.tag),
+      fig,
+      h(
+        "ul",
+        { class: "ops-facts" },
+        s.facts.map(([k, v], i) => h("li", { "--i": i }, h("i", {}, k), h("span", {}, v)))
+      ),
+      h("div", { class: "ops-own" }, ...s.own)
+    );
+    slides.push({ group: "enterprise", sound: "enterprise", palette: [s.color, "#1f6feb", "#d29922", "#0a1a33"], notes: s.notes, el });
+  }
+
+  // 11. Central Agentic Ops: a control repo lists its registered campaigns, which dispatch
+  // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
+  {
+    resetIndex();
+    const steps = [
+      ["01", "Observe", "Runs, costs and outcomes from every repo in one dashboard", "#4493f8"],
+      ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#ab7df8"],
+      ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#d29922"],
+      ["04", "Work", "One target per worker, bounded mission, correlated results", "#3fb950"],
+      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#f778ba"],
+    ];
+    const CW = 1180, CH = 690, MONO = "'Monaspace Neon', ui-monospace, Menlo, monospace";
+    const cv = h("canvas", { class: "cao-canvas", width: CW * 2, height: CH * 2 });
+    const ctx = cv.getContext("2d");
+    const stages = ["review", "limited live", "scheduled live"].map(s => h("em", {}, s));
+    // The control repo lists its registered ops, one row per campaign installed from the catalog and tracked by a
+    // manifest under .github/aw/campaigns/. The host org owns the repo; an enterprise account owns no repos itself.
+    const C = { x: 590, y: 345 };
+    const ICON = 16, GEAR = 24;
+    const campaigns = [
+      { name: "Dependabot", c: "#4493f8", rate: 1.3 },
+      { name: "Repo Assist", c: "#39c5cf", rate: 1.1 },
+      { name: "ESLint Factory", c: "#e3b341", rate: .9 },
+      { name: "EU CRA", c: "#b083f0", rate: .7 },
+    ].map(k => ({ ...k, v: 1 }));
+    const CA = 124, CHD = 40, ROW_H = 32, CR = 10, CHH = (CHD + 8 + campaigns.length * ROW_H) / 2;
+    const cx0 = C.x - CA, cy0 = C.y - CHH;
+    campaigns.forEach((k, i) => (k.y = cy0 + CHD + 4 + ROW_H * (i + .5)));
+    const PX = 26, PT = 30, PB = 26;
+    const edge = (ang, a, top, bottom, r) => {
+      const c = Math.abs(Math.cos(ang)), s = Math.abs(Math.sin(ang)), H = Math.sin(ang) < 0 ? top : bottom;
+      let d = Math.min(c > 1e-9 ? a / c : Infinity, s > 1e-9 ? H / s : Infinity);
+      if (d * c > a - r && d * s > H - r) {
+        const qx = a - r, qy = H - r, p = c * qx + s * qy;
+        d = p + Math.sqrt(p * p - (qx * qx + qy * qy - r * r));
+      }
+      return d;
+    };
+    const RY = 212, RX = 1.6 * RY;
+    const BW = 196, ROWS = [0, -44, 44];
+    const orgs = [
+      { name: "web", n: 9, side: -1, row: -1 },
+      { name: "data", n: 8, side: -1, row: 0 },
+      { name: "labs", n: 5, side: -1, row: 1, off: true },
+      { name: "mobile", n: 8, side: 1, row: -1 },
+      { name: "payments", n: 9, side: 1, row: 0 },
+      { name: "infra", n: 8, side: 1, row: 1 },
+    ];
+    const halfW = dy => RX * Math.sqrt(Math.max(0, 1 - (dy / RY) ** 2));
+    const repos = [];
+    for (const o of orgs) {
+      o.y = C.y + o.row * 200; o.y0 = o.y - 72; o.y1 = o.y + 72; o.heat = 0; o.reps = []; o.cols = [];
+      const near = o.row ? Math.min(Math.abs(o.y0 - C.y), Math.abs(o.y1 - C.y)) : 0;
+      o.inner = C.x + o.side * (halfW(near) + 14); o.outer = o.inner + o.side * BW; o.x = o.inner + o.side * 28;
+      for (let j = 0; j < o.n; j++) {
+        const c = (j / 3) | 0, p = { o, x: o.x + o.side * (52 + c * 44), y: o.y + ROWS[j % 3], state: 0, t: 0 };
+        const col = (o.cols[c] ??= { x: p.x, y0: p.y, y1: p.y });
+        col.y0 = Math.min(col.y0, p.y); col.y1 = Math.max(col.y1, p.y);
+        o.reps.push(p);
+        if (!o.off) repos.push(p);
+      }
+      o.a = Math.atan2(o.y - C.y, o.x - C.x);
+      o.cos = Math.cos(o.a); o.sin = Math.sin(o.a); o.dist = Math.hypot(o.x - C.x, o.y - C.y);
+      const r = edge(o.a, CA, CHH, CHH, CR);
+      o.tap = [C.x + o.cos * r, C.y + o.sin * r];
+    }
+    const P = (o, r) => [C.x + o.cos * r, C.y + o.sin * r];
+    const path = pts => {
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      return { pts, cum, L: cum[cum.length - 1] };
+    };
+    const route = p => {
+      const o = p.o, r = path([o.tap, [o.x, o.y], [p.x, o.y], [p.x, p.y]]);
+      r.dOrg = r.cum[1];
+      return r;
+    };
+    const at = (r, d) => {
+      d = Math.max(0, Math.min(r.L, d));
+      let i = 1;
+      while (i < r.pts.length - 1 && r.cum[i] < d) i++;
+      const [ax, ay] = r.pts[i - 1], [bx, by] = r.pts[i], f = (d - r.cum[i - 1]) / (r.cum[i] - r.cum[i - 1] || 1);
+      return [ax + (bx - ax) * f, ay + (by - ay) * f];
+    };
+    const trace = (r, d0, d1) => {
+      ctx.beginPath(); ctx.moveTo(...at(r, d0));
+      for (let i = 1; i < r.pts.length - 1; i++) if (r.cum[i] > d0 && r.cum[i] < d1) ctx.lineTo(...r.pts[i]);
+      ctx.lineTo(...at(r, d1)); ctx.stroke();
+    };
+    const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+    const box = (g, x0, y0, x1, y1, o) => {
+      const r = o.r ?? 18, lx = x0 + 22;
+      g.font = `600 16px ${MONO}`;
+      let w = g.measureText(o.main).width + (o.icon ? 22 : 0);
+      if (o.sub) { g.font = `500 14px ${MONO}`; w += 10 + g.measureText(o.sub).width; }
+      if (o.fill) { g.fillStyle = o.fill; g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, r); g.fill(); }
+      g.strokeStyle = o.stroke; g.lineWidth = 1.5; g.setLineDash(o.dash || []);
+      g.beginPath(); g.moveTo(lx + w + 8, y0);
+      g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
+      g.lineTo(lx - 8, y0); g.stroke(); g.setLineDash([]);
+      let x = lx;
+      if (o.icon) { octicon(g, o.icon, x + 8, y0, ICON, o.col); x += 22; }
+      g.textAlign = "left"; g.font = `600 16px ${MONO}`; g.fillStyle = o.col; g.fillText(o.main, x, y0);
+      if (o.sub) { x += g.measureText(o.main).width + 10; g.font = `500 14px ${MONO}`; g.fillStyle = "#6e7681"; g.fillText(o.sub, x, y0); }
+    };
+    // Boxes, labels, org wiring and the unenrolled spoke never change, so they are drawn once into an offscreen layer
+    // (redrawn after web fonts load, since the labels are measured).
+    let bg = null;
+    document.fonts?.ready.then(() => (bg = null));
+    const background = () => {
+      const c = document.createElement("canvas");
+      c.width = cv.width; c.height = cv.height;
+      const g = c.getContext("2d");
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.textBaseline = "middle"; g.lineCap = "round"; g.lineJoin = "round";
+      box(g, 12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
+      box(g, cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
+        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
+      });
+      for (const o of orgs) {
+        box(g, Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
+          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
+          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
+        });
+        if (o.off) {
+          const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
+          g.strokeStyle = "#ffffff24"; g.lineWidth = 2; g.setLineDash([3, 5]);
+          g.beginPath(); g.moveTo(...P(o, o.dist - 15)); g.lineTo(...P(o, r0 + 11)); g.stroke(); g.setLineDash([]);
+          octicon(g, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
+        }
+        g.globalAlpha = o.off ? .45 : 1;
+        g.strokeStyle = "#ffffff30"; g.lineWidth = 1.5; g.beginPath();
+        g.moveTo(o.x, o.y); g.lineTo(o.cols[o.cols.length - 1].x, o.y);
+        for (const c of o.cols) { g.moveTo(c.x, c.y0); g.lineTo(c.x, c.y1); }
+        g.stroke(); g.globalAlpha = 1;
+      }
+      return c;
+    };
+    let packets = [], recent = [], last = 0, t0 = 0, stage = 0, spin = 0, kick = 0;
+    let turn = 0, volley = 0, shooter = null, nextShot = 0;
+    const failP = v => Math.max(0.04, 0.5 - (v - 1) * 0.16);
+    const evolve = (k, t) => { k.v++; k.got = 0; k.evolvedAt = t; k.hold = t + 1100; kick = 1; };
+    const draw = t => {
+      ctx.setTransform(2, 0, 0, 2, 0, 0);
+      ctx.clearRect(0, 0, CW, CH);
+      ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.drawImage(bg ??= background(), 0, 0, CW, CH);
+      for (const o of orgs) if (!o.off) {
+        ctx.strokeStyle = "#8b949e"; ctx.globalAlpha = .4 + .5 * o.heat; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(...o.tap); ctx.lineTo(...P(o, o.dist - 15)); ctx.stroke();
+      }
+      // Packets go under the nodes so their dots and trails never cover an icon.
+      for (const q of packets) {
+        if (q.u >= 1) continue;
+        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
+        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
+        trace(q.r, d - 34, d);
+        const [x, y] = at(q.r, d);
+        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
+      }
+      for (const o of orgs) {
+        ctx.globalAlpha = o.off ? .45 : 1;
+        for (const p of o.reps) {
+          const col = p.state === 1 ? p.camp.c : p.state === 2 ? "#3fb950" : null;
+          ctx.fillStyle = "#0d1117"; ctx.strokeStyle = col || "#30363d"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 13, 26, 26, 6); ctx.fill(); ctx.stroke();
+          octicon(ctx, "repo-16", p.x, p.y, ICON, col || "#6e7681");
+        }
+        ctx.fillStyle = "#161b22"; ctx.strokeStyle = o.off ? "#484f58" : "#8b949e"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(o.x - 15, o.y - 15, 30, 30, 8); ctx.fill(); ctx.stroke();
+        if (!o.off && o.heat > .01) { ctx.globalAlpha = o.heat; ctx.strokeStyle = "#e6edf3"; ctx.stroke(); ctx.globalAlpha = 1; }
+        octicon(ctx, "organization-16", o.x, o.y, ICON, o.off ? "#6e7681" : "#e6edf3");
+      }
+      ctx.globalAlpha = 1;
+      const cardW = 2 * CA, cardH = 2 * CHH, hy = cy0 + CHD / 2;
+      ctx.fillStyle = "#0d1117"; ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.fillStyle = "#161b22"; ctx.fillRect(cx0, cy0, cardW, CHD);
+      for (const k of campaigns) if (k.fire > .02) {
+        ctx.fillStyle = k.c;
+        ctx.globalAlpha = .16 * k.fire; ctx.fillRect(cx0, k.y - ROW_H / 2, cardW, ROW_H);
+        ctx.globalAlpha = k.fire; ctx.beginPath(); ctx.roundRect(cx0 + 4, k.y - 10, 3, 20, 1.5); ctx.fill();
+      }
+      ctx.restore();
+      ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx0, cy0 + CHD); ctx.lineTo(cx0 + cardW, cy0 + CHD); ctx.stroke();
+      ctx.strokeStyle = "#8b949e"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.stroke();
+      octicon(ctx, "repo-16", cx0 + 20, hy, ICON, "#e6edf3");
+      ctx.textAlign = "left"; ctx.font = `600 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText("control repo", cx0 + 36, hy);
+      ctx.save(); ctx.translate(cx0 + cardW - 24, hy); ctx.rotate(spin);
+      octicon(ctx, "gear-24", 0, 0, GEAR, "#c9d1d9");
+      ctx.restore();
+      for (const k of campaigns) {
+        const pop = Math.max(0, 1 - (t - k.evolvedAt) / 1600), vx = cx0 + cardW - 14, vt = `v${k.v}`;
+        octicon(ctx, "workflow-16", cx0 + 20, k.y, ICON, k.c);
+        ctx.textAlign = "left"; ctx.font = `500 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText(k.name, cx0 + 36, k.y + 1);
+        ctx.font = `600 13px ${MONO}`; const vw = ctx.measureText(vt).width;
+        if (pop > 0) {
+          ctx.globalAlpha = pop; ctx.fillStyle = "#f778ba";
+          ctx.beginPath(); ctx.roundRect(vx - vw - 7, k.y - 9, vw + 14, 18, 9); ctx.fill(); ctx.globalAlpha = 1;
+        }
+        ctx.textAlign = "right"; ctx.fillStyle = pop > .5 ? "#0d1117" : "#9198a1"; ctx.fillText(vt, vx, k.y + 1);
+      }
+      ctx.textAlign = "center";
+      ctx.font = `600 16px ${MONO}`;
+      const sw = 22 + ctx.measureText("success").width, sx = C.x - sw / 2, sy = C.y + RY + 30;
+      octicon(ctx, "north-star-16", sx + 8, sy, ICON, "#9198a1");
+      ctx.textAlign = "left"; ctx.fillStyle = "#9198a1"; ctx.fillText("success", sx + 22, sy); ctx.textAlign = "center";
+      const rate = recent.length ? Math.round((100 * recent.reduce((a, b) => a + b, 0)) / recent.length) : 0;
+      ctx.fillStyle = recent.length ? "#e6edf3" : "#6e7681";
+      ctx.font = "800 40px 'Mona Sans'"; ctx.fillText(recent.length ? `${rate}%` : "—", C.x, sy + 40);
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "radar",
+      palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
+      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
+      enter() {
+        repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
+        campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
+        packets = []; recent = []; t0 = 0; stage = 0; kick = 0; turn = volley = 0; shooter = null;
+        stages.forEach((s, i) => s.classList.toggle("on", i === 0));
+      },
+      tick(t) {
+        if (!t0) { t0 = last = t; nextShot = t + 500; }
+        const dt = Math.min(50, t - last); last = t;
+        kick *= Math.exp(-dt / 600);
+        spin += dt * (0.0014 + 0.008 * kick);
+        for (const o of orgs) o.heat *= Math.exp(-dt / 600);
+        for (const k of campaigns) k.fire *= Math.exp(-dt / 300);
+        for (const p of repos) if (p.state >= 2 && t - p.t > 2600) p.state = 0;
+        if (t >= nextShot) {
+          if (!volley) {
+            shooter = null;
+            for (let i = 0; i < campaigns.length && !shooter; i++) {
+              const k = campaigns[turn++ % campaigns.length];
+              if (t >= k.hold) shooter = k;
+            }
+            volley = shooter ? Math.max(1, Math.round((2 + Math.random() * 3) * shooter.rate)) : 0;
+          }
+          const idle = repos.filter(p => p.state === 0);
+          if (shooter && t >= shooter.hold && idle.length) {
+            const p = idle[(Math.random() * idle.length) | 0];
+            p.state = 1; p.camp = shooter; shooter.fire = 1;
+            packets.push({ k: shooter, v: shooter.v, p, r: route(p), u: 0, work: 0 });
+            nextShot = --volley ? t + 70 : t + 150 + Math.random() * 120;
+          } else {
+            volley = 0; nextShot = t + 120;
+          }
+        }
+        for (const q of packets) {
+          if (q.u < 1) {
+            q.u = Math.min(1, q.u + dt / (220 + q.r.L * .9));
+            if (Math.abs(q.r.L * ease(q.u) - q.r.dOrg) < 24) q.p.o.heat = Math.max(q.p.o.heat, .9);
+            if (q.u >= 1) q.work = 200 + Math.random() * 600;
+            continue;
+          }
+          if ((q.work -= dt) > 0) continue;
+          q.fail = Math.random() < failP(q.v); q.p.state = q.fail ? 3 : 2; q.p.t = t; q.done = true;
+          recent.push(q.fail ? 0 : 1); if (recent.length > 24) recent.shift();
+          if (q.v === q.k.v && ++q.k.got >= 8 + 5 * q.k.v) evolve(q.k, t);
+        }
+        packets = packets.filter(q => !q.done);
+        const st = Math.min(2, Math.min(...campaigns.map(k => k.v)) - 1);
+        if (st !== stage) { stage = st; stages.forEach((e, i) => e.classList.toggle("on", i === st)); }
+        draw(t);
+      },
+      el: h("section", { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Central Agentic Ops · campaigns"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
+        h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
+        cv,
+        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),
+    });
+  }
+
+  // Push SDLC: a sprint task arrives with its own Squad (designer, frontend, accessibility and scribe agents); the squad deploys into the developer's repository as files, pairs with them in their own session, then steps back and leaves its decisions behind
+  {
+    resetIndex();
+    const svgIco = (n, sz = 24) => `<svg viewBox="0 0 ${sz} ${sz}" aria-hidden="true">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // [initial, role, what it does on this task, colour, ring position, label dy]
+    const SQUAD = [
+      ["D", "Designer", "picks tokens and contrast", "#ab7df8", [170, 70], -46],
+      ["F", "Frontend", "builds the toggle", "#4493f8", [300, 230], 58],
+      ["A", "A11y", "checks screen readers", "#3fb950", [170, 390], 58],
+      ["S", "Scribe", "records the decisions", "#d29922", [40, 230], 58],
+    ];
+    const DEV = [170, 230];
+    // [task, owner index (4 = developer), file it touches]
+    const TODO = [
+      ["Dark colour tokens", 0, "src/theme/dark.ts"],
+      ["Settings toggle", 1, "src/ui/ThemeToggle.tsx"],
+      ["Contrast 4.5:1 + labels", 2, "tests/a11y.test.ts"],
+      ["Decision: use OS theme", 3, ".squad/decisions.md"],
+      ["Try on device & ship", 4, null],
+    ];
+    const ownerColor = o => (o === 4 ? "#f0f6fc" : SQUAD[o][3]);
+    const ownerName = o => (o === 4 ? "you" : SQUAD[o][1].toLowerCase());
+    const members = SQUAD.map(([n, r, d, c]) => h("div", { class: "psd-m", "--c": c }, h("em", {}, n), h("b", {}, r), h("span", {}, d)));
+    const stIco = h("span", { class: "psd-st" }, "assigned to you");
+    stIco.insertAdjacentHTML("afterbegin", svgIco("tasklist"));
+    const task = h(
+      "div",
+      { class: "psd-task" },
+      stIco,
+      h("h3", {}, "Dark mode for the settings screen"),
+      h("div", { class: "psd-lb" }, h("span", {}, "sprint 14"), h("span", {}, "mobile"), h("span", {}, "ui")),
+      h("div", { class: "psd-sq" }, h("i", {}, "github/squad · ", h("b", {}, "theme-crew")), members)
+    );
+    const arrow = h("div", { class: "psd-arrow" }, "deploy");
+    arrow.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.squad/</small>');
+    const pkg = h("div", { class: "psd-pkg" }, "squad");
+    const FILES = [
+      ["src/", 0],
+      ["tests/", 0],
+      [".squad/team.md", 1],
+      [".squad/agents/designer.md", 1],
+      [".squad/agents/frontend.md", 1],
+      [".squad/agents/a11y.md", 1],
+      [".squad/agents/scribe.md", 1],
+      [".squad/decisions.md", 1],
+      ["src/theme/dark.ts", 2],
+      ["src/ui/ThemeToggle.tsx", 2],
+      ["tests/a11y.test.ts", 2],
+    ];
+    const files = FILES.map(([f, k]) => h("div", { class: "psd-f" + (k === 1 ? " sq" : k === 2 ? " new" : "") }, f));
+    const fileOf = name => files[FILES.findIndex(([f]) => f === name)];
+    const sqFiles = files.filter((_, i) => FILES[i][1] === 1);
+    const newFiles = files.filter((_, i) => FILES[i][1] === 2);
+    const rhState = h("span", {}, "no squad");
+    const rh = h("div", { class: "psd-rh" }, "mobile-app", rhState);
+    rh.insertAdjacentHTML("afterbegin", svgIco("repo"));
+    const ring = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    ring.setAttribute("class", "psd-ring");
+    ring.setAttribute("viewBox", "0 0 340 450");
+    ring.innerHTML =
+      SQUAD.map(([, , , c, [x, y]], i) => `<line class="psd-ln" data-i="${i}" style="--c:${c}" x1="${DEV[0]}" y1="${DEV[1]}" x2="${x}" y2="${y}"/>`).join("") +
+      SQUAD.map(([n, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/><text class="psd-in" x="${x}" y="${y + 10}">${n}</text><text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
+      `<defs><clipPath id="psdClip"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="37"/></clipPath></defs><g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/><image href="assets/avatars/mona.jpg" x="${DEV[0] - 37}" y="${DEV[1] - 37}" width="74" height="74" clip-path="url(#psdClip)"/></g>`;
+    const lines = [...ring.querySelectorAll(".psd-ln")];
+    const agents = [...ring.querySelectorAll(".psd-ag")];
+    const dev = ring.querySelector(".psd-dev");
+    const todos = TODO.map(([t, o]) => h("div", { class: "psd-t", "--c": ownerColor(o) }, h("s"), h("b", {}, t), h("span", {}, ownerName(o))));
+    const pr = h("div", { class: "psd-pr" }, h("span", {}, "build"));
+    pr.insertAdjacentHTML("afterbegin", svgIco("tag"));
+    const prText = pr.lastChild;
+    const repo = h("div", { class: "psd-repo" }, rh, h("div", { class: "psd-files" }, files), ring, h("div", { class: "psd-todo" }, h("i", {}, "Task plan"), todos), pr);
+    const STEP = 1500,
+      T_WORK = 4300,
+      T_CLOSE = T_WORK + TODO.length * STEP + 200,
+      T_DONE = T_CLOSE + 900,
+      LOOP = T_DONE + 2800;
+    const fly = () => {
+      pkg.style.transition = "none";
+      Object.assign(pkg.style, { left: "380px", top: "760px", opacity: "1", transform: "scale(.6)" });
+      void pkg.offsetWidth;
+      pkg.style.transition = "left .8s cubic-bezier(.5,0,.2,1), top .8s cubic-bezier(.5,0,.2,1), transform .8s, opacity .3s .8s";
+      Object.assign(pkg.style, { left: "990px", top: "570px", opacity: "0", transform: "scale(1)" });
+    };
+    const reset = () => {
+      members.forEach(m => m.classList.remove("on"));
+      task.classList.remove("closed");
+      stIco.lastChild.textContent = "assigned to you";
+      arrow.classList.remove("on");
+      pkg.style.transition = "none";
+      pkg.style.opacity = "0";
+      files.forEach(f => f.classList.remove("in", "hot", "gone", "kept"));
+      newFiles.forEach(f => (f.style.display = "none"));
+      rhState.textContent = "no squad";
+      rhState.classList.remove("on");
+      for (const e of [...lines, ...agents]) e.classList.remove("up", "on", "out");
+      dev.classList.remove("on");
+      todos.forEach(t => t.classList.remove("doing", "done"));
+      pr.classList.remove("draft", "merged");
+      prText.textContent = "build";
+    };
+    const work = k => {
+      const [, o, f] = TODO[k];
+      lines.forEach((l, i) => l.classList.toggle("on", i === o));
+      agents.forEach((a, i) => a.classList.toggle("on", i === o));
+      dev.classList.toggle("on", o === 4);
+      todos.forEach((t, i) => t.classList.toggle("doing", i === k));
+      files.forEach(x => x.classList.remove("hot"));
+      if (f) {
+        const el = fileOf(f);
+        el.style.display = "";
+        el.classList.add("in", "hot");
+      }
+      if (o === 4) sfx.review();
+      else sfx.pop(k * 2);
+    };
+    const done = k => {
+      todos[k].classList.remove("doing");
+      todos[k].classList.add("done");
+      if (k === 1) {
+        pr.classList.add("draft");
+        prText.textContent = "preview build · dark mode";
+      }
+      if (k === TODO.length - 1) {
+        pr.classList.add("merged");
+        prText.textContent = "shipped · app v2.4";
+        sfx.notify(false);
+      }
+    };
+    const EV = [
+      ...members.map((m, i) => [500 + i * 260, () => (m.classList.add("on"), sfx.pop(i))]),
+      [1700, () => (arrow.classList.add("on"), fly())],
+      [2400, () => ((rhState.textContent = "squad deploying…"), rhState.classList.add("on"))],
+      ...sqFiles.map((f, i) => [2400 + i * 200, () => (f.classList.add("in"), sfx.key(0.8))]),
+      [3700, () => ((rhState.textContent = "squad · 4 agents"), [...lines, ...agents].forEach(e => e.classList.add("up")), sfx.pop(6))],
+      ...TODO.flatMap((_, k) => [
+        [T_WORK + k * STEP, () => work(k)],
+        [T_WORK + k * STEP + 1100, () => done(k)],
+      ]),
+      [
+        T_CLOSE,
+        () => {
+          for (const e of [...lines, ...agents]) e.classList.remove("on");
+          dev.classList.remove("on");
+          files.forEach(x => x.classList.remove("hot"));
+          task.classList.add("closed");
+          stIco.lastChild.textContent = "done";
+        },
+      ],
+      [
+        T_DONE,
+        () => {
+          for (const e of [...lines, ...agents]) e.classList.add("out");
+          lines.forEach(l => l.classList.remove("up"));
+          sqFiles.forEach(f => f.classList.add(f.textContent === ".squad/decisions.md" ? "kept" : "gone"));
+          rhState.textContent = "task done · decisions kept";
+          rhState.classList.remove("on");
+          sfx.pop(0);
+        },
+      ],
+    ].sort((a, b) => a[0] - b[0]);
+    let t0 = 0,
+      ev = 0;
+    slides.push({
+      group: "enterprise",
+      sound: "squad",
+      palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
+      notes:
+        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project: human-led AI agents with designer, frontend, accessibility and scribe roles. Squad does not replace people; it enhances the engineering process around them. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad steps back and its decisions stay in the repository for the next task. The developer stays in charge throughout, shown here as Mona. The task, repository, squad and file names are synthetic and the animation is illustrative.",
+      enter() {
+        t0 = 0;
+        ev = 0;
+        reset();
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        let e = t - t0;
+        if (e > LOOP) {
+          t0 = t;
+          e = 0;
+          ev = 0;
+          reset();
+        }
+        while (ev < EV.length && EV[ev][0] <= e) EV[ev++][1]();
+      },
+      el: h(
+        "section",
+        { class: "slide psd" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative · the task ships with its team"), h("h2", {}, letters("Push "), letters("SDLC", "l-grad"))),
+        h("div", { class: "psd-tag" }, "Pull: you hunt for tools, docs and experts. ", h("b", {}, "Push: the task arrives with a squad that boosts your process.")),
+        task,
+        arrow,
+        repo,
+        pkg
+      ),
     });
   }
 
@@ -10386,723 +11513,6 @@
         packets(t);
       },
       el,
-    });
-  }
-
-  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
-  {
-    resetIndex();
-    const RUN = [
-      { k: "[self-hosted, linux]", c: "#d29922" },
-      { k: "[self-hosted, arm64]", c: "#ab7df8" },
-      { k: "[self-hosted, gpu]", c: "#4493f8" },
-    ];
-    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
-    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
-    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
-    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
-    const STEPS = ["checkout", "setup-node", "cache"];
-    const CHIPS = [
-      ["GitHub Apps", [6, 7, 8]],
-      ["OIDC", [4, 5]],
-      ["Runner groups", [3]],
-      ["Environments", []],
-      ["Org secrets", [8]],
-      ["OpenTelemetry", [13, 14, 15]],
-      ["Rulesets", []],
-      ["Audit log", []],
-    ];
-    const K = "#ff7b72",
-      D = "#656c76",
-      T = "#f0f6fc",
-      V = "#a5d6ff",
-      E = "#d2a8ff";
-    const vRun = h("span", { class: "ae-val" });
-    const LINES = [
-      [["---", D]],
-      [
-        ["on: ", K],
-        ["issues", V],
-      ],
-      [["runs-on: ", K], vRun],
-      [["permissions:", K]],
-      [
-        ["  id-token: ", K],
-        ["write", V],
-      ],
-      [["github-app:", K]],
-      [
-        ["  client-id: ", K],
-        ["${{ vars.APP_ID }}", E],
-      ],
-      [
-        ["  private-key: ", K],
-        ["${{ secrets.APP_KEY }}", E],
-      ],
-      [["network:", K]],
-      [
-        ["  allowed: ", K],
-        ["[defaults, node]", V],
-      ],
-      [["steps:", K]],
-      [
-        ["  - uses: ", K],
-        ["actions/setup-node@v4", V],
-      ],
-      [["observability:", K]],
-      [["  otlp:", K]],
-      [
-        ["    endpoint: ", K],
-        ["${{ secrets.OTLP_ENDPOINT }}", E],
-      ],
-      [["---", D]],
-      [["# Triage new issues for the platform team", T]],
-    ];
-    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
-    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
-    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
-    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
-    const SB = 1,
-      RN = 2,
-      EC = 3;
-    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
-    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
-    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
-    const card = (i, c, tag, title, code, ic, extra) => {
-      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
-      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
-      return el;
-    };
-    const spans = h(
-      "div",
-      { class: "er-spans" },
-      [
-        [0, 100],
-        [8, 46],
-        [30, 58],
-        [62, 30],
-      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
-    );
-    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
-    otel.classList.add("otel");
-    const cRun = h("span");
-    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
-    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
-    fw.classList.add("fw");
-    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
-    eco.classList.add("eco");
-    const job = h("div", { class: "er-job" });
-    const trace = h("div", { class: "er-job er-trace" });
-    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
-    const el = h(
-      "section",
-      { class: "slide er" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
-      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
-      ed,
-      arrow,
-      otel,
-      fw,
-      runner,
-      eco,
-      job,
-      trace,
-      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
-    );
-    const fly = (dot, [x0, y0], [x1, y1]) => {
-      dot.style.transition = "none";
-      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
-      void dot.offsetWidth;
-      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
-      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
-    };
-    let cur = 0,
-      phase = "hold",
-      since = 0,
-      typed = "",
-      arriveAt = 0,
-      otelAt = 0,
-      chipAt = 0,
-      sbAt = 0,
-      chip = -1;
-    const setRunner = (i, t) => {
-      cur = i;
-      el.style.setProperty("--ec", RUN[i].c);
-      runner.style.setProperty("--rc", RUN[i].c);
-      cRun.textContent = RUN[i].k;
-      runner.classList.add("on");
-      for (const c of [runner, eco, fw]) c.classList.remove("run");
-      eco.classList.remove("on");
-      fw.classList.remove("on");
-      steps.forEach(p => p.classList.remove("up"));
-      fly(job, [840, 460], MID(RN));
-      arriveAt = t + 700;
-      sbAt = otelAt = Infinity;
-    };
-    const setChip = i => {
-      chip = i;
-      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
-      const lit = CHIPS[i][1];
-      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
-    };
-    slides.push({
-      group: "enterprise",
-      sound: "enterprise",
-      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
-      notes:
-        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
-      enter() {
-        typed = RUN[0].k;
-        vRun.textContent = typed;
-        phase = "hold";
-        since = chipAt = 0;
-        chip = -1;
-        chips.forEach(c => c.classList.remove("lit"));
-        rows.forEach(r => r.classList.remove("lit"));
-        otel.classList.remove("on", "run");
-        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
-        steps.forEach(p => p.classList.remove("up"));
-        cRun.textContent = RUN[0].k;
-        sbAt = Infinity;
-        for (const d of [job, trace]) {
-          d.style.transition = "none";
-          d.style.opacity = "0";
-        }
-        cur = 0;
-        arriveAt = otelAt = Infinity;
-      },
-      tick(t) {
-        if (!since) {
-          since = t;
-          chipAt = t + 1800;
-          setRunner(0, t + 900);
-        }
-        if (t > arriveAt && !runner.classList.contains("run")) {
-          runner.classList.add("run");
-          sbAt = t + 900;
-        }
-        if (t > sbAt) {
-          sbAt = Infinity;
-          fw.classList.remove("run");
-          void fw.offsetWidth;
-          fw.classList.add("on", "run");
-          fly(trace, MID(SB), MID(0));
-          otelAt = t + 700;
-        }
-        if (t > otelAt) {
-          otelAt = Infinity;
-          otel.classList.remove("run");
-          void otel.offsetWidth;
-          otel.classList.add("on", "run");
-        }
-        if (t > arriveAt) {
-          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
-          steps.forEach((p, j) => p.classList.toggle("up", j < n));
-          eco.classList.add("on");
-          eco.classList.toggle("run", n === steps.length);
-        }
-        if (t > chipAt) {
-          chipAt = t + 1500;
-          setChip((chip + 1) % CHIPS.length);
-        }
-        const el2 = t - since;
-        const next = RUN[(cur + 1) % RUN.length].k;
-        if (phase === "hold" && el2 > 3400) {
-          phase = "del";
-          since = t;
-        } else if (phase === "del" && el2 > 28) {
-          since = t;
-          typed = typed.slice(0, -1);
-          vRun.textContent = typed;
-          if (!typed) phase = "type";
-        } else if (phase === "type" && el2 > 70) {
-          since = t;
-          typed = next.slice(0, typed.length + 1);
-          vRun.textContent = typed;
-          sfx.key(0.7);
-          if (typed === next) {
-            setRunner((cur + 1) % RUN.length, t);
-            sfx.pop(cur * 2);
-            phase = "hold";
-          }
-        }
-      },
-      el,
-    });
-  }
-
-  // 11. Central Agentic Ops (githubnext/gh-cao): a control repo lists its registered campaigns, which dispatch
-  // workers radially to one repo in each enrolled org; each run ends there and leaves its result.
-  {
-    resetIndex();
-    const steps = [
-      ["01", "Observe", "Runs, costs and outcomes from every repo in one dashboard", "#4493f8"],
-      ["02", "Govern", "Reviewed policy in a control repository: modes, caps, safe outputs", "#ab7df8"],
-      ["03", "Orchestrate", "Discover, rank and cap targets, then dispatch workers", "#d29922"],
-      ["04", "Work", "One target per worker, bounded mission, correlated results", "#3fb950"],
-      ["05", "Evolve", "Each campaign versions its own agents, improving every cycle", "#f778ba"],
-    ];
-    const CW = 1180, CH = 690, MONO = "'Monaspace Neon', ui-monospace, Menlo, monospace";
-    const cv = h("canvas", { class: "cao-canvas", width: CW * 2, height: CH * 2 });
-    const ctx = cv.getContext("2d");
-    const stages = ["review", "limited live", "scheduled live"].map(s => h("em", {}, s));
-    // The control repo lists its registered ops, one row per campaign installed from the catalog and tracked by a
-    // manifest under .github/aw/campaigns/. The host org owns the repo; an enterprise account owns no repos itself.
-    const C = { x: 590, y: 345 };
-    const ICON = 16, GEAR = 24;
-    const campaigns = [
-      { name: "Dependabot", c: "#4493f8", rate: 1.3 },
-      { name: "Repo Assist", c: "#39c5cf", rate: 1.1 },
-      { name: "ESLint Factory", c: "#e3b341", rate: .9 },
-      { name: "EU CRA", c: "#b083f0", rate: .7 },
-    ].map(k => ({ ...k, v: 1 }));
-    const CA = 124, CHD = 40, ROW_H = 32, CR = 10, CHH = (CHD + 8 + campaigns.length * ROW_H) / 2;
-    const cx0 = C.x - CA, cy0 = C.y - CHH;
-    campaigns.forEach((k, i) => (k.y = cy0 + CHD + 4 + ROW_H * (i + .5)));
-    const PX = 26, PT = 30, PB = 26;
-    const edge = (ang, a, top, bottom, r) => {
-      const c = Math.abs(Math.cos(ang)), s = Math.abs(Math.sin(ang)), H = Math.sin(ang) < 0 ? top : bottom;
-      let d = Math.min(c > 1e-9 ? a / c : Infinity, s > 1e-9 ? H / s : Infinity);
-      if (d * c > a - r && d * s > H - r) {
-        const qx = a - r, qy = H - r, p = c * qx + s * qy;
-        d = p + Math.sqrt(p * p - (qx * qx + qy * qy - r * r));
-      }
-      return d;
-    };
-    const RY = 212, RX = 1.6 * RY;
-    const BW = 196, ROWS = [0, -44, 44];
-    const orgs = [
-      { name: "web", n: 9, side: -1, row: -1 },
-      { name: "data", n: 8, side: -1, row: 0 },
-      { name: "labs", n: 5, side: -1, row: 1, off: true },
-      { name: "mobile", n: 8, side: 1, row: -1 },
-      { name: "payments", n: 9, side: 1, row: 0 },
-      { name: "infra", n: 8, side: 1, row: 1 },
-    ];
-    const halfW = dy => RX * Math.sqrt(Math.max(0, 1 - (dy / RY) ** 2));
-    const repos = [];
-    for (const o of orgs) {
-      o.y = C.y + o.row * 200; o.y0 = o.y - 72; o.y1 = o.y + 72; o.heat = 0; o.reps = []; o.cols = [];
-      const near = o.row ? Math.min(Math.abs(o.y0 - C.y), Math.abs(o.y1 - C.y)) : 0;
-      o.inner = C.x + o.side * (halfW(near) + 14); o.outer = o.inner + o.side * BW; o.x = o.inner + o.side * 28;
-      for (let j = 0; j < o.n; j++) {
-        const c = (j / 3) | 0, p = { o, x: o.x + o.side * (52 + c * 44), y: o.y + ROWS[j % 3], state: 0, t: 0 };
-        const col = (o.cols[c] ??= { x: p.x, y0: p.y, y1: p.y });
-        col.y0 = Math.min(col.y0, p.y); col.y1 = Math.max(col.y1, p.y);
-        o.reps.push(p);
-        if (!o.off) repos.push(p);
-      }
-      o.a = Math.atan2(o.y - C.y, o.x - C.x);
-      o.cos = Math.cos(o.a); o.sin = Math.sin(o.a); o.dist = Math.hypot(o.x - C.x, o.y - C.y);
-      const r = edge(o.a, CA, CHH, CHH, CR);
-      o.tap = [C.x + o.cos * r, C.y + o.sin * r];
-    }
-    const P = (o, r) => [C.x + o.cos * r, C.y + o.sin * r];
-    const path = pts => {
-      const cum = [0];
-      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
-      return { pts, cum, L: cum[cum.length - 1] };
-    };
-    const route = p => {
-      const o = p.o, r = path([o.tap, [o.x, o.y], [p.x, o.y], [p.x, p.y]]);
-      r.dOrg = r.cum[1];
-      return r;
-    };
-    const at = (r, d) => {
-      d = Math.max(0, Math.min(r.L, d));
-      let i = 1;
-      while (i < r.pts.length - 1 && r.cum[i] < d) i++;
-      const [ax, ay] = r.pts[i - 1], [bx, by] = r.pts[i], f = (d - r.cum[i - 1]) / (r.cum[i] - r.cum[i - 1] || 1);
-      return [ax + (bx - ax) * f, ay + (by - ay) * f];
-    };
-    const trace = (r, d0, d1) => {
-      ctx.beginPath(); ctx.moveTo(...at(r, d0));
-      for (let i = 1; i < r.pts.length - 1; i++) if (r.cum[i] > d0 && r.cum[i] < d1) ctx.lineTo(...r.pts[i]);
-      ctx.lineTo(...at(r, d1)); ctx.stroke();
-    };
-    const ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-    const box = (g, x0, y0, x1, y1, o) => {
-      const r = o.r ?? 18, lx = x0 + 22;
-      g.font = `600 16px ${MONO}`;
-      let w = g.measureText(o.main).width + (o.icon ? 22 : 0);
-      if (o.sub) { g.font = `500 14px ${MONO}`; w += 10 + g.measureText(o.sub).width; }
-      if (o.fill) { g.fillStyle = o.fill; g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, r); g.fill(); }
-      g.strokeStyle = o.stroke; g.lineWidth = 1.5; g.setLineDash(o.dash || []);
-      g.beginPath(); g.moveTo(lx + w + 8, y0);
-      g.arcTo(x1, y0, x1, y1, r); g.arcTo(x1, y1, x0, y1, r); g.arcTo(x0, y1, x0, y0, r); g.arcTo(x0, y0, x1, y0, r);
-      g.lineTo(lx - 8, y0); g.stroke(); g.setLineDash([]);
-      let x = lx;
-      if (o.icon) { octicon(g, o.icon, x + 8, y0, ICON, o.col); x += 22; }
-      g.textAlign = "left"; g.font = `600 16px ${MONO}`; g.fillStyle = o.col; g.fillText(o.main, x, y0);
-      if (o.sub) { x += g.measureText(o.main).width + 10; g.font = `500 14px ${MONO}`; g.fillStyle = "#6e7681"; g.fillText(o.sub, x, y0); }
-    };
-    // Boxes, labels, org wiring and the unenrolled spoke never change, so they are drawn once into an offscreen layer
-    // (redrawn after web fonts load, since the labels are measured).
-    let bg = null;
-    document.fonts?.ready.then(() => (bg = null));
-    const background = () => {
-      const c = document.createElement("canvas");
-      c.width = cv.width; c.height = cv.height;
-      const g = c.getContext("2d");
-      g.setTransform(2, 0, 0, 2, 0, 0);
-      g.textBaseline = "middle"; g.lineCap = "round"; g.lineJoin = "round";
-      box(g, 12, 14, CW - 12, CH - 14, { r: 26, main: "enterprise", icon: "globe-16", col: "#9198a1", stroke: "#ffffff26", fill: "#0d1117f0" });
-      box(g, cx0 - PX, cy0 - PT, C.x + CA + PX, C.y + CHH + PB, {
-        main: "@platform", sub: "host org", icon: "organization-16", dash: [4, 6], col: "#e6edf3", stroke: "#ffffff2a", fill: "#ffffff06",
-      });
-      for (const o of orgs) {
-        box(g, Math.min(o.inner, o.outer), o.y0, Math.max(o.inner, o.outer), o.y1, {
-          main: `@${o.name}`, sub: o.off ? "not enrolled" : "", dash: [4, 6],
-          col: o.off ? "#6e7681" : "#e6edf3", stroke: o.off ? "#ffffff14" : "#ffffff2a", fill: o.off ? "#ffffff03" : "#ffffff06",
-        });
-        if (o.off) {
-          const r0 = edge(o.a, CA + PX, CHH + PT, CHH + PB, 18) + 14;
-          g.strokeStyle = "#ffffff24"; g.lineWidth = 2; g.setLineDash([3, 5]);
-          g.beginPath(); g.moveTo(...P(o, o.dist - 15)); g.lineTo(...P(o, r0 + 11)); g.stroke(); g.setLineDash([]);
-          octicon(g, "circle-slash-16", ...P(o, r0), ICON, "#6e7681");
-        }
-        g.globalAlpha = o.off ? .45 : 1;
-        g.strokeStyle = "#ffffff30"; g.lineWidth = 1.5; g.beginPath();
-        g.moveTo(o.x, o.y); g.lineTo(o.cols[o.cols.length - 1].x, o.y);
-        for (const c of o.cols) { g.moveTo(c.x, c.y0); g.lineTo(c.x, c.y1); }
-        g.stroke(); g.globalAlpha = 1;
-      }
-      return c;
-    };
-    let packets = [], recent = [], last = 0, t0 = 0, stage = 0, spin = 0, kick = 0;
-    let turn = 0, volley = 0, shooter = null, nextShot = 0;
-    const failP = v => Math.max(0.04, 0.5 - (v - 1) * 0.16);
-    const evolve = (k, t) => { k.v++; k.got = 0; k.evolvedAt = t; k.hold = t + 1100; kick = 1; };
-    const draw = t => {
-      ctx.setTransform(2, 0, 0, 2, 0, 0);
-      ctx.clearRect(0, 0, CW, CH);
-      ctx.textBaseline = "middle"; ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.drawImage(bg ??= background(), 0, 0, CW, CH);
-      for (const o of orgs) if (!o.off) {
-        ctx.strokeStyle = "#8b949e"; ctx.globalAlpha = .4 + .5 * o.heat; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(...o.tap); ctx.lineTo(...P(o, o.dist - 15)); ctx.stroke();
-      }
-      // Packets go under the nodes so their dots and trails never cover an icon.
-      for (const q of packets) {
-        if (q.u >= 1) continue;
-        const d = q.r.L * ease(q.u), a = Math.min(1, d / 10);
-        ctx.strokeStyle = q.k.c; ctx.globalAlpha = .55 * a; ctx.lineWidth = 3;
-        trace(q.r, d - 34, d);
-        const [x, y] = at(q.r, d);
-        ctx.globalAlpha = a; ctx.fillStyle = q.k.c;
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
-      }
-      for (const o of orgs) {
-        ctx.globalAlpha = o.off ? .45 : 1;
-        for (const p of o.reps) {
-          const col = p.state === 1 ? p.camp.c : p.state === 2 ? "#3fb950" : null;
-          ctx.fillStyle = "#0d1117"; ctx.strokeStyle = col || "#30363d"; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 13, 26, 26, 6); ctx.fill(); ctx.stroke();
-          octicon(ctx, "repo-16", p.x, p.y, ICON, col || "#6e7681");
-        }
-        ctx.fillStyle = "#161b22"; ctx.strokeStyle = o.off ? "#484f58" : "#8b949e"; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.roundRect(o.x - 15, o.y - 15, 30, 30, 8); ctx.fill(); ctx.stroke();
-        if (!o.off && o.heat > .01) { ctx.globalAlpha = o.heat; ctx.strokeStyle = "#e6edf3"; ctx.stroke(); ctx.globalAlpha = 1; }
-        octicon(ctx, "organization-16", o.x, o.y, ICON, o.off ? "#6e7681" : "#e6edf3");
-      }
-      ctx.globalAlpha = 1;
-      const cardW = 2 * CA, cardH = 2 * CHH, hy = cy0 + CHD / 2;
-      ctx.fillStyle = "#0d1117"; ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.fill();
-      ctx.save(); ctx.clip();
-      ctx.fillStyle = "#161b22"; ctx.fillRect(cx0, cy0, cardW, CHD);
-      for (const k of campaigns) if (k.fire > .02) {
-        ctx.fillStyle = k.c;
-        ctx.globalAlpha = .16 * k.fire; ctx.fillRect(cx0, k.y - ROW_H / 2, cardW, ROW_H);
-        ctx.globalAlpha = k.fire; ctx.beginPath(); ctx.roundRect(cx0 + 4, k.y - 10, 3, 20, 1.5); ctx.fill();
-      }
-      ctx.restore();
-      ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(cx0, cy0 + CHD); ctx.lineTo(cx0 + cardW, cy0 + CHD); ctx.stroke();
-      ctx.strokeStyle = "#8b949e"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.roundRect(cx0, cy0, cardW, cardH, CR); ctx.stroke();
-      octicon(ctx, "repo-16", cx0 + 20, hy, ICON, "#e6edf3");
-      ctx.textAlign = "left"; ctx.font = `600 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText("control repo", cx0 + 36, hy);
-      ctx.save(); ctx.translate(cx0 + cardW - 24, hy); ctx.rotate(spin);
-      octicon(ctx, "gear-24", 0, 0, GEAR, "#c9d1d9");
-      ctx.restore();
-      for (const k of campaigns) {
-        const pop = Math.max(0, 1 - (t - k.evolvedAt) / 1600), vx = cx0 + cardW - 14, vt = `v${k.v}`;
-        octicon(ctx, "workflow-16", cx0 + 20, k.y, ICON, k.c);
-        ctx.textAlign = "left"; ctx.font = `500 16px ${MONO}`; ctx.fillStyle = "#e6edf3"; ctx.fillText(k.name, cx0 + 36, k.y + 1);
-        ctx.font = `600 13px ${MONO}`; const vw = ctx.measureText(vt).width;
-        if (pop > 0) {
-          ctx.globalAlpha = pop; ctx.fillStyle = "#f778ba";
-          ctx.beginPath(); ctx.roundRect(vx - vw - 7, k.y - 9, vw + 14, 18, 9); ctx.fill(); ctx.globalAlpha = 1;
-        }
-        ctx.textAlign = "right"; ctx.fillStyle = pop > .5 ? "#0d1117" : "#9198a1"; ctx.fillText(vt, vx, k.y + 1);
-      }
-      ctx.textAlign = "center";
-      ctx.font = `600 16px ${MONO}`;
-      const sw = 22 + ctx.measureText("success").width, sx = C.x - sw / 2, sy = C.y + RY + 30;
-      octicon(ctx, "north-star-16", sx + 8, sy, ICON, "#9198a1");
-      ctx.textAlign = "left"; ctx.fillStyle = "#9198a1"; ctx.fillText("success", sx + 22, sy); ctx.textAlign = "center";
-      const rate = recent.length ? Math.round((100 * recent.reduce((a, b) => a + b, 0)) / recent.length) : 0;
-      ctx.fillStyle = recent.length ? "#e6edf3" : "#6e7681";
-      ctx.font = "800 40px 'Mona Sans'"; ctx.fillText(recent.length ? `${rate}%` : "—", C.x, sy + 40);
-    };
-    slides.push({
-      group: "enterprise",
-      sound: "radar",
-      palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
-      notes: "An illustrative, simulated enterprise campaign network, not an operational system or data. Central Agentic Ops (githubnext/gh-cao) is drawn as an enterprise network. An enterprise account doesn't own repositories, so the control repository lives in a host org, here @platform. Its rows are registered campaigns installed from a catalog and tracked by manifests under .github/aw/campaigns/: Dependabot for dependency planning, Repo Assist for triage and maintenance, ESLint Factory for lint rules mined from real defects, and EU CRA for compliance evidence. Each has its own agent version. The gear is the operating wheel. A campaign orchestrates discovery, ranking, caps and dispatch, then sends bounded one-target workers to org repositories. Enrolled orgs have allowlisted spokes with scoped credentials and an installed App. @labs is not enrolled, so its spoke never connects. Every run ends in its target repo, leaving an issue, comment or pull request there; nothing flows back to the control repo. Campaigns version their agents independently; busier campaigns evolve faster than quieter ones. Success is the north-star metric, and the rollout moves from review to limited live to scheduled live as the slowest campaign catches up. Names, outcomes and rollout activity shown are illustrative and simulated.",
-      enter() {
-        repos.forEach(p => (p.state = 0)); orgs.forEach(o => (o.heat = 0));
-        campaigns.forEach(k => Object.assign(k, { v: 1, got: 0, fire: 0, evolvedAt: -1e9, hold: 0 }));
-        packets = []; recent = []; t0 = 0; stage = 0; kick = 0; turn = volley = 0; shooter = null;
-        stages.forEach((s, i) => s.classList.toggle("on", i === 0));
-      },
-      tick(t) {
-        if (!t0) { t0 = last = t; nextShot = t + 500; }
-        const dt = Math.min(50, t - last); last = t;
-        kick *= Math.exp(-dt / 600);
-        spin += dt * (0.0014 + 0.008 * kick);
-        for (const o of orgs) o.heat *= Math.exp(-dt / 600);
-        for (const k of campaigns) k.fire *= Math.exp(-dt / 300);
-        for (const p of repos) if (p.state >= 2 && t - p.t > 2600) p.state = 0;
-        if (t >= nextShot) {
-          if (!volley) {
-            shooter = null;
-            for (let i = 0; i < campaigns.length && !shooter; i++) {
-              const k = campaigns[turn++ % campaigns.length];
-              if (t >= k.hold) shooter = k;
-            }
-            volley = shooter ? Math.max(1, Math.round((2 + Math.random() * 3) * shooter.rate)) : 0;
-          }
-          const idle = repos.filter(p => p.state === 0);
-          if (shooter && t >= shooter.hold && idle.length) {
-            const p = idle[(Math.random() * idle.length) | 0];
-            p.state = 1; p.camp = shooter; shooter.fire = 1;
-            packets.push({ k: shooter, v: shooter.v, p, r: route(p), u: 0, work: 0 });
-            nextShot = --volley ? t + 70 : t + 150 + Math.random() * 120;
-          } else {
-            volley = 0; nextShot = t + 120;
-          }
-        }
-        for (const q of packets) {
-          if (q.u < 1) {
-            q.u = Math.min(1, q.u + dt / (220 + q.r.L * .9));
-            if (Math.abs(q.r.L * ease(q.u) - q.r.dOrg) < 24) q.p.o.heat = Math.max(q.p.o.heat, .9);
-            if (q.u >= 1) q.work = 200 + Math.random() * 600;
-            continue;
-          }
-          if ((q.work -= dt) > 0) continue;
-          q.fail = Math.random() < failP(q.v); q.p.state = q.fail ? 3 : 2; q.p.t = t; q.done = true;
-          recent.push(q.fail ? 0 : 1); if (recent.length > 24) recent.shift();
-          if (q.v === q.k.v && ++q.k.got >= 8 + 5 * q.k.v) evolve(q.k, t);
-        }
-        packets = packets.filter(q => !q.done);
-        const st = Math.min(2, Math.min(...campaigns.map(k => k.v)) - 1);
-        if (st !== stage) { stage = st; stages.forEach((e, i) => e.classList.toggle("on", i === st)); }
-        draw(t);
-      },
-      el: h("section", { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "githubnext/gh-cao · Central Agentic Ops"), h("h2", {}, letters("Centralized "), letters("campaigns", "l-grad"))),
-        h("div", { class: "cao-steps" }, steps.map(([n, b, s, c], i) => h("div", { class: "cao-step", "--i": i, "--c": c }, h("i", {}, n), h("b", {}, b), h("span", {}, s)))),
-        cv,
-        h("div", { class: "rollout" }, stages[0], h("s", {}, "→"), stages[1], h("s", {}, "→"), stages[2])),
-    });
-  }
-
-  // Push SDLC: a sprint task arrives with its own Squad (designer, frontend, accessibility and scribe agents); the squad deploys into the developer's repository as files, pairs with them in their own session, then steps back and leaves its decisions behind
-  {
-    resetIndex();
-    const svgIco = (n, sz = 24) => `<svg viewBox="0 0 ${sz} ${sz}" aria-hidden="true">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
-    const ico = (n, x, y, sz, fill) => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    // [initial, role, what it does on this task, colour, ring position, label dy]
-    const SQUAD = [
-      ["D", "Designer", "picks tokens and contrast", "#ab7df8", [170, 70], -46],
-      ["F", "Frontend", "builds the toggle", "#4493f8", [300, 230], 58],
-      ["A", "A11y", "checks screen readers", "#3fb950", [170, 390], 58],
-      ["S", "Scribe", "records the decisions", "#d29922", [40, 230], 58],
-    ];
-    const DEV = [170, 230];
-    // [task, owner index (4 = developer), file it touches]
-    const TODO = [
-      ["Dark colour tokens", 0, "src/theme/dark.ts"],
-      ["Settings toggle", 1, "src/ui/ThemeToggle.tsx"],
-      ["Contrast 4.5:1 + labels", 2, "tests/a11y.test.ts"],
-      ["Decision: use OS theme", 3, ".squad/decisions.md"],
-      ["Try on device & ship", 4, null],
-    ];
-    const ownerColor = o => (o === 4 ? "#f0f6fc" : SQUAD[o][3]);
-    const ownerName = o => (o === 4 ? "you" : SQUAD[o][1].toLowerCase());
-    const members = SQUAD.map(([n, r, d, c]) => h("div", { class: "psd-m", "--c": c }, h("em", {}, n), h("b", {}, r), h("span", {}, d)));
-    const stIco = h("span", { class: "psd-st" }, "assigned to you");
-    stIco.insertAdjacentHTML("afterbegin", svgIco("tasklist"));
-    const task = h(
-      "div",
-      { class: "psd-task" },
-      stIco,
-      h("h3", {}, "Dark mode for the settings screen"),
-      h("div", { class: "psd-lb" }, h("span", {}, "sprint 14"), h("span", {}, "mobile"), h("span", {}, "ui")),
-      h("div", { class: "psd-sq" }, h("i", {}, "github/squad · ", h("b", {}, "theme-crew")), members)
-    );
-    const arrow = h("div", { class: "psd-arrow" }, "deploy");
-    arrow.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.squad/</small>');
-    const pkg = h("div", { class: "psd-pkg" }, "squad");
-    const FILES = [
-      ["src/", 0],
-      ["tests/", 0],
-      [".squad/team.md", 1],
-      [".squad/agents/designer.md", 1],
-      [".squad/agents/frontend.md", 1],
-      [".squad/agents/a11y.md", 1],
-      [".squad/agents/scribe.md", 1],
-      [".squad/decisions.md", 1],
-      ["src/theme/dark.ts", 2],
-      ["src/ui/ThemeToggle.tsx", 2],
-      ["tests/a11y.test.ts", 2],
-    ];
-    const files = FILES.map(([f, k]) => h("div", { class: "psd-f" + (k === 1 ? " sq" : k === 2 ? " new" : "") }, f));
-    const fileOf = name => files[FILES.findIndex(([f]) => f === name)];
-    const sqFiles = files.filter((_, i) => FILES[i][1] === 1);
-    const newFiles = files.filter((_, i) => FILES[i][1] === 2);
-    const rhState = h("span", {}, "no squad");
-    const rh = h("div", { class: "psd-rh" }, "mobile-app", rhState);
-    rh.insertAdjacentHTML("afterbegin", svgIco("repo"));
-    const ring = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    ring.setAttribute("class", "psd-ring");
-    ring.setAttribute("viewBox", "0 0 340 450");
-    ring.innerHTML =
-      SQUAD.map(([, , , c, [x, y]], i) => `<line class="psd-ln" data-i="${i}" style="--c:${c}" x1="${DEV[0]}" y1="${DEV[1]}" x2="${x}" y2="${y}"/>`).join("") +
-      SQUAD.map(([n, r, , c, [x, y], dy], i) => `<g class="psd-ag" data-i="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="32"/><text class="psd-in" x="${x}" y="${y + 10}">${n}</text><text x="${x}" y="${y + dy}">${r}</text></g>`).join("") +
-      `<defs><clipPath id="psdClip"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="37"/></clipPath></defs><g class="psd-dev" style="--c:#f0f6fc"><circle cx="${DEV[0]}" cy="${DEV[1]}" r="40"/><image href="assets/avatars/mona.jpg" x="${DEV[0] - 37}" y="${DEV[1] - 37}" width="74" height="74" clip-path="url(#psdClip)"/></g>`;
-    const lines = [...ring.querySelectorAll(".psd-ln")];
-    const agents = [...ring.querySelectorAll(".psd-ag")];
-    const dev = ring.querySelector(".psd-dev");
-    const todos = TODO.map(([t, o]) => h("div", { class: "psd-t", "--c": ownerColor(o) }, h("s"), h("b", {}, t), h("span", {}, ownerName(o))));
-    const pr = h("div", { class: "psd-pr" }, h("span", {}, "build"));
-    pr.insertAdjacentHTML("afterbegin", svgIco("tag"));
-    const prText = pr.lastChild;
-    const repo = h("div", { class: "psd-repo" }, rh, h("div", { class: "psd-files" }, files), ring, h("div", { class: "psd-todo" }, h("i", {}, "Task plan"), todos), pr);
-    const STEP = 1500,
-      T_WORK = 4300,
-      T_CLOSE = T_WORK + TODO.length * STEP + 200,
-      T_DONE = T_CLOSE + 900,
-      LOOP = T_DONE + 2800;
-    const fly = () => {
-      pkg.style.transition = "none";
-      Object.assign(pkg.style, { left: "380px", top: "760px", opacity: "1", transform: "scale(.6)" });
-      void pkg.offsetWidth;
-      pkg.style.transition = "left .8s cubic-bezier(.5,0,.2,1), top .8s cubic-bezier(.5,0,.2,1), transform .8s, opacity .3s .8s";
-      Object.assign(pkg.style, { left: "990px", top: "570px", opacity: "0", transform: "scale(1)" });
-    };
-    const reset = () => {
-      members.forEach(m => m.classList.remove("on"));
-      task.classList.remove("closed");
-      stIco.lastChild.textContent = "assigned to you";
-      arrow.classList.remove("on");
-      pkg.style.transition = "none";
-      pkg.style.opacity = "0";
-      files.forEach(f => f.classList.remove("in", "hot", "gone", "kept"));
-      newFiles.forEach(f => (f.style.display = "none"));
-      rhState.textContent = "no squad";
-      rhState.classList.remove("on");
-      for (const e of [...lines, ...agents]) e.classList.remove("up", "on", "out");
-      dev.classList.remove("on");
-      todos.forEach(t => t.classList.remove("doing", "done"));
-      pr.classList.remove("draft", "merged");
-      prText.textContent = "build";
-    };
-    const work = k => {
-      const [, o, f] = TODO[k];
-      lines.forEach((l, i) => l.classList.toggle("on", i === o));
-      agents.forEach((a, i) => a.classList.toggle("on", i === o));
-      dev.classList.toggle("on", o === 4);
-      todos.forEach((t, i) => t.classList.toggle("doing", i === k));
-      files.forEach(x => x.classList.remove("hot"));
-      if (f) {
-        const el = fileOf(f);
-        el.style.display = "";
-        el.classList.add("in", "hot");
-      }
-      if (o === 4) sfx.review();
-      else sfx.pop(k * 2);
-    };
-    const done = k => {
-      todos[k].classList.remove("doing");
-      todos[k].classList.add("done");
-      if (k === 1) {
-        pr.classList.add("draft");
-        prText.textContent = "preview build · dark mode";
-      }
-      if (k === TODO.length - 1) {
-        pr.classList.add("merged");
-        prText.textContent = "shipped · app v2.4";
-        sfx.notify(false);
-      }
-    };
-    const EV = [
-      ...members.map((m, i) => [500 + i * 260, () => (m.classList.add("on"), sfx.pop(i))]),
-      [1700, () => (arrow.classList.add("on"), fly())],
-      [2400, () => ((rhState.textContent = "squad deploying…"), rhState.classList.add("on"))],
-      ...sqFiles.map((f, i) => [2400 + i * 200, () => (f.classList.add("in"), sfx.key(0.8))]),
-      [3700, () => ((rhState.textContent = "squad · 4 agents"), [...lines, ...agents].forEach(e => e.classList.add("up")), sfx.pop(6))],
-      ...TODO.flatMap((_, k) => [
-        [T_WORK + k * STEP, () => work(k)],
-        [T_WORK + k * STEP + 1100, () => done(k)],
-      ]),
-      [
-        T_CLOSE,
-        () => {
-          for (const e of [...lines, ...agents]) e.classList.remove("on");
-          dev.classList.remove("on");
-          files.forEach(x => x.classList.remove("hot"));
-          task.classList.add("closed");
-          stIco.lastChild.textContent = "done";
-        },
-      ],
-      [
-        T_DONE,
-        () => {
-          for (const e of [...lines, ...agents]) e.classList.add("out");
-          lines.forEach(l => l.classList.remove("up"));
-          sqFiles.forEach(f => f.classList.add(f.textContent === ".squad/decisions.md" ? "kept" : "gone"));
-          rhState.textContent = "task done · decisions kept";
-          rhState.classList.remove("on");
-          sfx.pop(0);
-        },
-      ],
-    ].sort((a, b) => a[0] - b[0]);
-    let t0 = 0,
-      ev = 0;
-    slides.push({
-      group: "enterprise",
-      sound: "squad",
-      palette: ["#f778ba", "#8957e5", "#1f6feb", "#3fb950"],
-      notes:
-        "Push SDLC. Today's SDLC is pull: a developer picks up a sprint task, then goes looking for the tools, docs and experts it needs. In a push SDLC the task arrives with its team. Here a mobile UI task, dark mode for the settings screen, carries a Squad from the open-source github/squad project: human-led AI agents with designer, frontend, accessibility and scribe roles. Squad does not replace people; it enhances the engineering process around them. Picking up the task deploys the squad into the developer's repository as plain files under .squad: a team roster, one charter per agent and a shared decisions log. The squad pairs with the developer in their own session, not as a scheduled or event-triggered workflow: the designer picks the colour tokens, the frontend agent builds the toggle, the accessibility agent checks contrast and labels, the scribe records the decisions, and the developer tries it on a device and ships it. When the task is done the squad steps back and its decisions stay in the repository for the next task. The developer stays in charge throughout, shown here as Mona. The task, repository, squad and file names are synthetic and the animation is illustrative.",
-      enter() {
-        t0 = 0;
-        ev = 0;
-        reset();
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        let e = t - t0;
-        if (e > LOOP) {
-          t0 = t;
-          e = 0;
-          ev = 0;
-          reset();
-        }
-        while (ev < EV.length && EV[ev][0] <= e) EV[ev++][1]();
-      },
-      el: h(
-        "section",
-        { class: "slide psd" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Illustrative · the task ships with its team"), h("h2", {}, letters("Push "), letters("SDLC", "l-grad"))),
-        h("div", { class: "psd-tag" }, "Pull: you hunt for tools, docs and experts. ", h("b", {}, "Push: the task arrives with a squad that boosts your process.")),
-        task,
-        arrow,
-        repo,
-        pkg
-      ),
     });
   }
 
@@ -12760,6 +13170,14 @@
         [64, 67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.11, { type: "triangle", dur: 0.22, vol: 0.06, cutoff: 2600, detune: 3 }));
         bell(76, t + 1.45, 0.04, 1.2);
         bell(79, t + 1.57, 0.035, 1.4);
+      },
+      // for PMs: a notification blip (the habit), a hand-off up to the agent, a page stamp (the artifact), then a warm nod resolving home
+      pm: t => {
+        [84, 88].forEach((m, i) => osc("sine", hz(m), t + 0.2 + i * 0.09, 0.14, 0.03, { a: 0.003 }));
+        [67, 71, 74].forEach((m, i) => tone(m, t + 0.65 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.055, cutoff: 2600, detune: 3 }));
+        click(t + 1.1, 1800, 0.06, 6);
+        [72, 76, 79].forEach((m, i) => bell(m, t + 1.35 + i * 0.07, 0.035, 1.3));
+        pad([48, 55, 64, 67], t + 1.35, 1.8, 0.025, "triangle", 1800);
       },
       // agents that debug agents: three call/response pings (one per MCP tool call), then findings resolving upward
       mcp: t => {

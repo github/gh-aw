@@ -11,6 +11,7 @@ const { computeInferenceAIC } = req("./model_costs.cjs");
 const { estimateBaseline, persistModelConfigBaseline, projectModelConfig } = req("./routing_analytics.cjs");
 const fixtures = req("./fixtures/routing_analytics_runs.cjs");
 const { readJsonlFile } = req("./jsonl_helpers.cjs");
+const { useModelOverrides } = req("./fixtures/model_overrides.cjs");
 
 const { routed, unrouted, routedClaude } = fixtures.RUNS;
 const NEW_INFO_KEYS = ["engine_harness", "workflow_ref", "server_url", "model_config"];
@@ -105,10 +106,13 @@ const proxyRouting = id => [...readJsonlFile(path.join(fixtures.runDir(id), "san
 
 describe("routing analytics in aw_session.jsonl", () => {
   let savedEnv;
+  let restoreModels;
   beforeEach(() => {
     savedEnv = { ...process.env };
+    restoreModels = useModelOverrides({ "github-copilot": { models: { "claude-sonnet-5.5": { cost: { input: "0.000002", output: "0.000004", cache_read: "0.0000002", cache_write: "0.0000025" } } } } });
   });
   afterEach(() => {
+    restoreModels();
     for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
     for (const key of Object.keys(process.env)) if (!(key in savedEnv)) delete process.env[key];
     Object.assign(process.env, savedEnv);

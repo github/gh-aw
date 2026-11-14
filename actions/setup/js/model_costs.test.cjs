@@ -25,31 +25,21 @@ function writeModelsFixture(providers) {
 }
 
 describe("model_costs.cjs", () => {
-  it.each([
-    ["github-copilot", "gpt-5.6-luna-utility", [2e-7, 1.2e-6, 2e-8, 2.5e-7], 0.03805],
-    ["github-copilot", "gpt-6.1-terra", [1e-6, 5e-6, 5e-8, 1.25e-6], 0.16825],
-    ["openai", "gpt-6.1-terra", [1e-6, 5e-6, 5e-8, 1.25e-6], 0.16825],
-  ])("prices bundled %s/%s with explicit pricing and routing metadata", async (provider, model, rates, expectedAIC) => {
-    const catalog = JSON.parse(fs.readFileSync(new URL("./models.json", import.meta.url), "utf8"));
-    const entry = catalog.providers[provider].models[model];
-    expect(entry).toBeDefined();
-    expect(entry.provider_type).toBe("openai");
-    expect(entry.wire_api).toBe("responses");
-    expect(["input", "output", "cache_read", "cache_write"].map(key => Number(entry.cost[key]))).toEqual(rates);
+  it("does not supply default pricing or metadata without an explicit overlay", async () => {
+    const { getModelsPath, loadModelsJson, loadCatalog, findModelPricing, computeInferenceAIC } = await import("./model_costs.cjs");
+    expect(getModelsPath()).toBeNull();
+    expect(loadModelsJson()).toBeNull();
+    expect(loadCatalog()).toEqual([]);
+    expect(findModelPricing("copilot", "gpt-5-mini")).toBeNull();
+    expect(computeInferenceAIC({ provider: "copilot", model: "gpt-5-mini", inputTokens: 1000, outputTokens: 200, cacheReadTokens: 0, cacheWriteTokens: 0 })).toBe(0);
+  });
 
-    const { computeInferenceAIC } = await import("./model_costs.cjs");
-    for (const pricingProvider of provider === "github-copilot" ? [provider, "copilot", "github_models"] : [provider]) {
-      expect(
-        computeInferenceAIC({
-          provider: pricingProvider,
-          model,
-          inputTokens: 1000,
-          outputTokens: 200,
-          cacheReadTokens: 400,
-          cacheWriteTokens: 50,
-        })
-      ).toBeCloseTo(expectedAIC, 10);
-    }
+  it("preserves explicit routing metadata alongside pricing", async () => {
+    const entry = { provider_type: "openai", wire_api: "responses", cost: { input: "0.000002", output: "0.000004" } };
+    writeModelsFixture({ custom: { models: { "custom-model": entry } } });
+    const { loadModelsJson, computeInferenceAIC } = await import("./model_costs.cjs");
+    expect(loadModelsJson().providers.custom.models["custom-model"]).toEqual(entry);
+    expect(computeInferenceAIC({ provider: "custom", model: "custom-model", inputTokens: 1000, outputTokens: 200, cacheReadTokens: 0, cacheWriteTokens: 0 })).toBeCloseTo(0.28);
   });
 
   it("computes inference AIC using provider-specific pricing", async () => {
@@ -310,15 +300,10 @@ describe("model_costs.cjs", () => {
     expect(aic).toBeCloseTo(0.0255, 6);
   });
 
-  it("falls back to bundled models.json when GH_AW_MODELS_JSON_PATH points to a non-existent file", async () => {
-    // Simulate the detection/evals job scenario: GH_AW_MODELS_JSON_PATH is set to
-    // /tmp/gh-aw/models.json but that file was never downloaded from the activation artifact.
-    process.env.GH_AW_MODELS_JSON_PATH = "/tmp/gh-aw-test-nonexistent-path/models.json";
-    const { loadModelsJson } = await import("./model_costs.cjs");
-    const result = loadModelsJson();
-    // Should fall back to the bundled models.json and return a valid catalog, not null.
-    expect(result).not.toBeNull();
-    expect(typeof result).toBe("object");
-    expect(result).toHaveProperty("providers");
+  it.each(["missing-models.json", ""])("does not substitute a catalog for an unavailable override %s", async filename => {
+    process.env.GH_AW_MODELS_JSON_PATH = filename ? path.join(import.meta.dirname, filename) : " ";
+    const { loadModelsJson, loadCatalog } = await import("./model_costs.cjs");
+    expect(loadModelsJson()).toBeNull();
+    expect(loadCatalog()).toEqual([]);
   });
 });
