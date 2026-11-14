@@ -33,6 +33,7 @@
   .slide.active.up-in { animation: up-in .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.leaving.up-out { animation: up-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.active.down-in { animation: down-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.fadeout { opacity: 0; transition: opacity .3s ease-in; }
   .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   /* full-screen red wash for the security band (THEME.security.red): fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
@@ -13449,7 +13450,8 @@
 
   // ---------- navigation ----------
   let cur = -1,
-    redT = null;
+    redT = null,
+    bgN = null; // slide whose THEME the background shows while a staged light/dark swap is pending
   // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
   function go(n) {
     n = Math.max(0, Math.min(slides.length - 1, n));
@@ -13460,6 +13462,22 @@
         redT = null;
         show(n, true);
       }, 320);
+      return;
+    }
+    // light <-> dark band: stage it so nothing overlaps; old slide fades out, then the background swaps, then the new slide enters
+    if (cur >= 0 && !!THEME[slides[n].group].light !== !!THEME[slides[cur].group].light && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const old = slides[cur].el;
+      old.classList.add("fadeout");
+      wash.style.transitionDuration = ".3s";
+      wash.classList.remove("on");
+      redT = setTimeout(() => {
+        bgN = n;
+        document.body.classList.toggle("light", !!THEME[slides[n].group].light);
+        redT = setTimeout(() => {
+          redT = null;
+          show(n, true);
+        }, 450);
+      }, 300);
       return;
     }
     show(n);
@@ -13479,7 +13497,7 @@
       // already hidden under the red wash: drop it instantly so it doesn't flash back when the wash moves behind the stage
       const old = slides[cur].el;
       clearTimeout(old._lt);
-      old.classList.remove("active", "leaving", ...TR);
+      old.classList.remove("active", "leaving", "fadeout", ...TR);
     } else if (cur >= 0) {
       const old = slides[cur].el;
       old.classList.remove("active", ...TR);
@@ -13494,6 +13512,8 @@
     el.classList.remove(...TR);
     if (vert) el.classList.add(vert + "-in");
     wash.classList.remove("cover");
+    wash.style.transitionDuration = "";
+    bgN = null;
     el.style.setProperty("--dx", cur < 0 ? "0%" : dir > 0 ? "100%" : "-100%");
     el.classList.remove("leaving");
     void el.offsetWidth; // restart CSS animations on re-entry
@@ -13594,7 +13614,7 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const cs = slides[cur] || slides[0],
+    const cs = slides[bgN ?? cur] || slides[0],
       th = THEME[cs.group],
       target = th.pal.map(hex),
       bgt = bgOf(th);
