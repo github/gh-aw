@@ -1,58 +1,21 @@
 {
-  "run_id": "pr-triage-20261113T180000Z",
-  "run_date": "2026-11-13T18:21:44Z",
+  "run_id": "2026-11-14T00:47:04Z",
+  "run_date": "2026-11-14T00:47:04Z",
   "source": "pr-triage",
-  "eligible_total": 2,
-  "open_copilot_prs": 7,
-  "cooldown_skipped": 5,
-  "category_counts": {
-    "bug": 2
-  },
-  "risk_counts": {
-    "medium": 2
-  },
-  "priority_counts": {
-    "medium": 2
-  },
+  "eligible_total": 0,
+  "open_copilot_prs": 0,
+  "cooldown_skipped": 0,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
   "action_counts": {
     "auto_merge": 0,
     "fast_track": 0,
-    "batch_review": 2,
+    "batch_review": 0,
     "defer": 0,
     "close": 0
   },
-  "selected_candidates": [
-    {
-      "number": 77212,
-      "title": "Align model routing with AWF runtime, topology, and host support",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 63,
-      "score_breakdown": {
-        "impact": 33,
-        "urgency": 18,
-        "quality": 12
-      },
-      "reason": "Runtime compatibility fix with direct user impact and a contained change set; CI checks pass and the scope is well defined."
-    },
-    {
-      "number": 77455,
-      "title": "Resolve package specification audit findings",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 55,
-      "score_breakdown": {
-        "impact": 27,
-        "urgency": 14,
-        "quality": 14
-      },
-      "reason": "Package-spec remediation with strong validation and low regression risk, though it affects broader API contracts than a minimal fix."
-    }
-  ],
+  "selected_candidates": [],
   "batches": [],
-  "summary": "Two eligible Copilot-authored PRs remain outside the one-hour cooldown. Both are medium-risk bug fixes with green CI; the model-routing compatibility issue is the higher-impact item, and no 3+ review cluster is large enough to justify a shared batch."
+  "summary": "No currently open PRs authored by app/github-copilot were found; the review queue is empty and no labels/comments were required."
 }
