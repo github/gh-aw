@@ -287,6 +287,30 @@
   .fm-wire.hot { opacity: 1; stroke-width: 3; }
   .fm-wire.hot + .mra-l { opacity: 1; }
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
+  .sdd-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .sdd-svg .mra-l.g { fill: #3fb950; }
+  .sdd-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
+  .sdd-panel.on .sdd-card { stroke: #ab7df8; filter: drop-shadow(0 0 14px #8957e566); }
+  .sdd-panel.ok .sdd-card { stroke: #3fb950; filter: drop-shadow(0 0 18px #238636aa); }
+  .sdd-hd { stroke: #3d444d; stroke-width: 1.5; }
+  .sdd-file { fill: #e6edf3; font: 600 20px var(--mono); }
+  .sdd-tag { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; text-anchor: end; }
+  .sdd-panel.on .sdd-tag { fill: #c297ff; } .sdd-panel.ok .sdd-tag { fill: #3fb950; }
+  .sdd-ln { fill: #c9d1d9; font: 500 20px var(--mono); opacity: 0; transform: translateX(-12px); transition: opacity .35s, transform .35s; }
+  .sdd-ln.on { opacity: 1; transform: none; }
+  .sdd-ln.add { fill: #7ee787; } .sdd-ln.h { fill: #f0f6fc; font-weight: 700; } .sdd-ln.q { fill: #9198a1; }
+  .sdd-ln.api { fill: #79c0ff; } .sdd-ln.fn { fill: #d2a8ff; } .sdd-ln.pass { fill: #3fb950; font-weight: 700; }
+  .sdd-ck { fill: #3fb950; font: 700 24px var(--mono); text-anchor: end; opacity: 0; transition: opacity .25s; filter: drop-shadow(0 0 6px #3fb950); }
+  .sdd-ck.on { opacity: 1; }
+  .sdd-scan { fill: #d29922; opacity: 0; filter: drop-shadow(0 0 8px #d29922); }
+  .sdd-stamp { fill: #d29922; font: 700 20px var(--mono); text-anchor: end; opacity: 0; transition: opacity .35s; }
+  .sdd-stamp.on { opacity: 1; }
+  .sdd-ln .kw { fill: #ffa657; font-weight: 700; }
+  .sdd-say { fill: #0d1117; stroke: #4493f8; stroke-width: 2; filter: drop-shadow(0 0 10px #1f6feb66); }
+  .sdd-say-t { fill: #f0f6fc; font: italic 500 23px "Mona Sans"; text-anchor: middle; }
+  .sdd-chips { position: absolute; left: 110px; top: 890px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 1720px; }
+  .sdd-chips b { font: 600 17px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; margin-right: 6px; }
+  .sdd-chips span { padding: 7px 13px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 16px/1 var(--mono); color: #c9d1d9; }
+  .active .sdd-chips { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
   .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
   .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
@@ -4063,6 +4087,218 @@
     });
   }
 
+  // Spec-driven development: a human states intent, the W3C spec writer formalizes it with RFC 2119 keywords, an agent extracts the spec from each code change, a librarian keeps specs consistent, and an enforcer turns the spec into tests that guard the next change
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372,
+      PW = 540,
+      PX = [40, 810, 1580],
+      AY = 300;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label) => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#sddAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    };
+    // an illustrative excerpt of gh-aw's own ctxutil package: the change, its README.md spec and the spec-derived tests
+    const PANELS = [
+      [
+        "pkg/ctxutil/ctxutil.go",
+        "PR DIFF",
+        [
+          ["add", "+ // OrBackground returns ctx, or"],
+          ["add", "+ // context.Background() when nil."],
+          ["add", "+ func OrBackground(ctx context.Context)"],
+          ["add", "+         context.Context {"],
+          ["add", "+     if ctx == nil {"],
+          ["add", "+         return context.Background()"],
+          ["add", "+     }"],
+          ["add", "+     return ctx"],
+          ["add", "+ }"],
+        ],
+      ],
+      [
+        "pkg/ctxutil/README.md",
+        "SPEC",
+        [
+          ["h", "# ctxutil Package"],
+          ["q", "> W3C style · RFC 2119 keywords"],
+          ["api", "## OrBackground(ctx) ctx"],
+          ["", "- MUST return context.Background()"],
+          ["", "    when ctx is nil"],
+          ["", "- MUST return ctx unchanged"],
+          ["", "    otherwise"],
+          ["", "- MUST NOT drop values or cancel"],
+        ],
+      ],
+      [
+        "pkg/ctxutil/spec_test.go",
+        "FROM SPEC",
+        [
+          ["fn", "func TestSpec_PublicAPI_OrBackground"],
+          ["", "  nil ctx → context.Background()"],
+          ["", "  non-nil ctx returned unchanged"],
+          ["", "  preserves context values"],
+          ["", "  preserves cancellation"],
+          ["q", ""],
+          ["q", "$ go test ./pkg/ctxutil"],
+          ["pass", "ok    pkg/ctxutil   0.01s"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["sddE1", `M${PX[0] + PW + 6} ${AY} H${PX[1] - 8}`, "p", ["extract from", "every PR diff"], 695, AY - 56, "middle"],
+      ["sddE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["tests from the", "spec, not source"], 1465, AY - 56, "middle"],
+      ["sddE3", `M${PX[2] + PW / 2} ${PY + PH + 4} V618 H${PX[0] + PW / 2} V${PY + PH + 10}`, "g", ["spec tests guard the next change"], 1080, 656, "middle"],
+      ["sddE4", "M1104 106 H1120", "p", [], 0, 0, "middle"],
+    ];
+    let g = `<defs><radialGradient id="sddAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="sddP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="sddG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 695, "EXTRACT"],
+      [695, 1465, "SPECIFY"],
+      [1465, VW, "ENFORCE"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="sddLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([file, tag, lines], i) => {
+      const x = PX[i];
+      g += `<g class="sdd-panel" id="sddP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${PW}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + PW}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + PW - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => {
+        const y = PY + 88 + j * 32;
+        g += `<text class="sdd-ln ${c}" id="sddL${i}_${j}" x="${x + 24}" y="${y}">${sp(s).replace(/MUST(\u00a0NOT)?/g, m => `<tspan class="kw">${m}</tspan>`)}</text>`;
+        if (i === 2 && j >= 1 && j <= 4) g += `<text class="sdd-ck" id="sddCk${j}" x="${x + PW - 26}" y="${y + 1}">✓</text>`;
+      });
+      g += `</g>`;
+    });
+    g += `<rect class="sdd-scan" id="sddScan" x="${PX[1] + 4}" y="${PY + 56}" width="${PW - 8}" height="5" rx="2"/>`;
+    g += `<text class="sdd-stamp" id="sddStamp" x="${PX[1] + PW - 24}" y="${PY + PH - 22}">Spec Librarian ✓ no drift</text>`;
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#sdd${c === "g" ? "G" : "P"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += agent("sddExtractor", PX[0] + PW / 2, 106, 240, "Spec Extractor") + agent("sddWriter", 1271, 106, 260, "W3C Spec Writer") + agent("sddEnforcer", PX[2] + PW / 2, 106, 240, "Spec Enforcer");
+    // the human states intent in plain natural language; the W3C Specification Writer agent turns it into RFC 2119 requirements
+    g += `<g class="fm-task sdd-human" id="sddHuman"><circle cx="740" cy="106" r="32" fill="#1f6feb"/>${ico("person", 740, 107, 36)}
+      <rect class="sdd-say" x="780" y="81" width="320" height="50" rx="25"/><text class="sdd-say-t" x="940" y="114">“nil should just work”</text></g>`;
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      scan = $("sddScan");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const CYC = 15500;
+    let t0 = 0,
+      cyc = -1,
+      ev = [],
+      evI = 0,
+      fly = null,
+      scanAt = 0;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(300, () => (on("sddLane0"), on("sddP0")));
+      PANELS[0][2].forEach((_, j) => at(500 + j * 190, () => (on(`sddL0_${j}`), sfx.key(0.6))));
+      at(2400, () => on("sddExtractor"));
+      flight(2600, "sddE1", 1000, "#ab7df8", 1);
+      at(3300, () => (on("sddLane1"), on("sddHuman"), sfx.key(0.7)));
+      at(3600, () => (on("sddWriter"), on("sddE4"), on("sddP1")));
+      PANELS[1][2].forEach((_, j) => at(3700 + j * 200, () => (on(`sddL1_${j}`), sfx.key(0.5))));
+      at(5500, () => (scanAt = 5500));
+      at(6800, () => ((scanAt = 0), (scan.style.opacity = 0), on("sddStamp"), sfx.pop(3)));
+      at(7200, () => on("sddEnforcer"));
+      flight(7300, "sddE2", 1000, "#ab7df8", 4);
+      at(8300, () => (on("sddLane2"), on("sddP2"), on("sddL2_0"), sfx.key(0.6)));
+      [1, 2, 3, 4].forEach((j, k) => {
+        at(8500 + k * 380, () => (on(`sddL2_${j}`), sfx.key(0.5)));
+        at(8750 + k * 380, () => (on(`sddCk${j}`), sfx.pop(5 + k)));
+      });
+      at(10200, () => (on("sddL2_5"), on("sddL2_6"), sfx.key(0.6)));
+      at(10600, () => (on("sddL2_7"), on("sddP2", "ok")));
+      flight(10900, "sddE3", 1500, "#3fb950", 8);
+      at(12400, () => (on("sddP0", "ok"), on("sddP1", "ok"), sfx.review()));
+    };
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .ok").forEach(x => x.classList.remove("on", "hot", "ok"));
+      scan.style.opacity = 0;
+      dot.style.opacity = 0;
+      fly = null;
+      scanAt = 0;
+      script();
+    };
+    slides.push({
+      group: "loops",
+      sound: "spec",
+      palette: ["#8957e5", "#238636", "#1f6feb", "#d29922"],
+      notes:
+        "Spec-driven development, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt shown is an illustrative, simplified view of gh-aw's ctxutil package; the workflow names listed are gh-aw's own spec workflows.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (scanAt) {
+          const f = Math.min(1, (u - scanAt) / 1300);
+          scan.style.opacity = 1;
+          scan.setAttribute("y", PY + 56 + f * (PH - 66));
+        }
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Humans state intent, agents write the RFC spec, test it and extract it from every change"), h("h2", {}, letters("Spec-driven "), letters("development", "l-grad"))),
+        svg,
+        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["spec-extractor", "pr-specification-reviewer", "spec-librarian", "spec-enforcer", "w3c-specification-writer", "weekly-safe-outputs-spec-review"].map(n => h("span", {}, n))),
+      ),
+    });
+  }
+
   // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
   {
     resetIndex();
@@ -7418,6 +7654,13 @@
           click(t + 1.25 + i * 0.1, 3000, 0.04, 6);
           tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
         });
+      },
+      // spec-driven: the diff typed in, a page swish as the spec is written, then four rising test passes resolving on a bell
+      spec: t => {
+        for (let i = 0; i < 6; i++) click(t + 0.15 + i * 0.07, 2600 + (i % 2) * 500, 0.04, 5);
+        osc("sine", 420, t + 0.65, 0.3, 0.02, { f1: 1300, a: 0.04 });
+        [72, 76, 79, 84].forEach((m, i) => tone(m, t + 1.0 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.5 : 0.12, vol: 0.05, cutoff: 2800, detune: 3 }));
+        bell(88, t + 1.5, 0.03, 1.2);
       },
       // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
       cihealth: t => {
