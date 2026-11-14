@@ -4958,7 +4958,7 @@
       RW = 402,
       FUNNEL = [
         [116, "regression issues filed", ""],
-        [105, "assigned to Copilot", ""],
+        [101, "assigned to Copilot", ""],
         [72, "picked by Issue Monster", " m"],
         [62, "fixes merged", ""],
       ],
@@ -4985,7 +4985,7 @@
         <text x="${RX + 16}" y="${y}">${d}  ${b}</text><text class="p" x="${RX + RW - 78}" y="${y}" text-anchor="end">${p}</text>
         <text class="f" x="${RX + RW - 16}" y="${y}" text-anchor="end">✓ ${hrs}</text></g>`;
     });
-    g += `</g><text class="rob-cap" x="${VW / 2}" y="634">Measured · issues filed 13 Mar – 25 Oct 2026 · 87 daily benchmarks 5 Apr – 13 Nov · snapshot 14 Nov 2026 · fleet and spans simulated</text>`;
+    g += `</g><text class="rob-cap" x="${VW / 2}" y="634">Measured · issues filed 13 Mar – 25 Oct 2026 · 101 daily benchmarks 5 Apr – 13 Nov · snapshot 14 Nov 2026 · fleet and spans simulated</text>`;
     g += agent("nResearch", 90, 140, 250, "Deep Research") + agent("nMonster", 510, 560, 220, "Issue Monster") + agent("nCopilot", 880, 560, 170, "Copilot");
     g += box("nRepo", 170, 350, "repo") + box("nIssues", 170, 560, "issue") + box("nMerge", 1620, 560, "merge") + dev("nDev", 1160, 560);
     g += `<g id="raoPkts"></g><circle class="fm-dot mra-dot" r="8"/>`;
@@ -5114,7 +5114,7 @@
       sound: "telemetry",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
-        "Research, assign, observe: an agentic feedback loop. Measured: the green panel and caption are gh-aw's own daily-cli-performance data, 13 Mar to 25 Oct 2026. The workflow benchmarks the compiler every day, keeps its history in repo memory (87 daily snapshots, 5 Apr to 13 Nov) and files '[performance] Regression in ...' issues labelled cookie: 116 of them. 105 were assigned to Copilot, 72 picked by Issue Monster, and 62 were closed by merged Copilot fixes, with a median of 6.8 hours from issue to merge (55 within a day); the next daily run re-benchmarks and observes the result. The five rows are real regressions with their slowdown and hours to fix. Illustrative: the production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
+        "Research, assign, observe: an agentic feedback loop. Measured: the green panel and caption are gh-aw's own daily-cli-performance data, 13 Mar to 25 Oct 2026. The workflow benchmarks the compiler every day, keeps its history in repo memory (101 daily snapshots, 5 Apr to 13 Nov) and files '[performance] Regression in ...' issues labelled cookie: 116 of them. 101 were assigned to Copilot, 72 picked by Issue Monster, and 62 were closed by merged Copilot fixes, with a median of 6.8 hours from issue to merge (55 within a day); the next daily run re-benchmarks and observes the result. The five rows are real regressions with their slowdown and hours to fix. Illustrative: the production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
       enter() {
         t0 = prevT = lastSample = lastPkt = 0;
         cyc = -1;
