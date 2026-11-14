@@ -3013,144 +3013,6 @@
     });
   }
 
-  // Merge fast, unslop daily: three slow pull requests polished through many nit rounds (each still merging slop) vs many fast pull requests, agentic reviewers and background unsloppers that eat the slop
-  {
-    resetIndex();
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const CYC = 12800,
-      A_N = 3,
-      A_SPAN = 3800,
-      A_AT = k => 200 + k * A_SPAN,
-      A_X = k => 440 + k * 440,
-      NITS = ["nit: rename this", "nit: typo", "nit: extract helper", "nit: blank line", "nit: reword comment", "nit: early return", "nit: sort imports", "nit: one more test", "nit: naming again", "nit: inline this", "nit: fix wording", "nit: lgtm, but…"],
-      ROUND = (A_SPAN - 400) / (NITS.length / A_N),
-      B_N = 30,
-      B_AT = i => 300 + i * 290,
-      B_X = i => 50 + i * 48,
-      SWEEPS = [3600, 7200, 10200],
-      SWEEP_D = 1200,
-      LA = 230,
-      LB = 560;
-    // a couple of synthetic slop specks per fast commit
-    const SPECKS = Array.from({ length: B_N }, (_, i) => (i % 3 === 1 ? [[0, -24]] : [[-10, -22], [10, -26]]));
-    let g = `<line class="us-main" x1="0" y1="${LA}" x2="1500" y2="${LA}"/><text class="us-mainl" x="0" y="${LA + 38}">main</text>
-      <line class="us-main" x1="0" y1="${LB}" x2="1500" y2="${LB}"/><text class="us-mainl" x="0" y="${LB + 38}">main</text>
-      <line class="us-div" x1="0" y1="300" x2="1700" y2="300"/>
-      <text class="us-lane" x="0" y="34">Slow · polished · nit after nit</text>
-      <text class="us-lane good" x="0" y="356">Fast · good enough · unslopped in the background</text><text class="us-diff" x="1500" y="356" text-anchor="end">each <tspan class="add">+40</tspan> <tspan class="del">−8</tspan></text>
-      ${Array.from({ length: A_N }, (_, k) => `<circle class="us-commit" id="usA${k}" cx="${A_X(k)}" cy="${LA}" r="26"/><circle class="us-slop" id="usAS${k}" cx="${A_X(k) + 26}" cy="${LA - 34}" r="11"/>`).join("")}
-      <g id="usCard"><g class="us-nit" id="usNit"><rect x="0" y="-80" width="290" height="44" rx="10"/><text id="usNitT" x="16" y="-50"></text></g>
-        <g class="us-card"><rect class="c" x="0" y="-20" width="350" height="104" rx="14"/>${ico("pr", 36, 32, 34, "#9198a1")}<text id="usPrN" x="68" y="14">PR #1</text><text class="us-round" id="usRound" x="68" y="42">round 0</text><text class="us-diff" x="68" y="70"><tspan class="add">+1,240</tspan> <tspan class="del">−380</tspan> · 46 files</text><circle cx="334" cy="-6" r="8" fill="#d29922"/></g></g>`;
-    for (let i = 0; i < B_N; i++) {
-      const x = B_X(i);
-      g += `<g transform="translate(${x - 20},${LB - 112})"><g class="us-pr" id="usP${i}"><rect x="0" y="0" width="40" height="40" rx="8"/>${ico("pr", 20, 20, 22, "#e6edf3")}<circle cx="38" cy="2" r="9" fill="#8957e5"/>${ico("copilot", 38, 2, 13)}</g></g>`;
-      g += `<circle class="us-commit" id="usC${i}" cx="${x}" cy="${LB}" r="11"/>`;
-      SPECKS[i].forEach(([dx, dy], j) => (g += `<circle class="us-slop" id="usS${i}_${j}" cx="${x + dx}" cy="${LB + dy}" r="5"/>`));
-    }
-    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily unsloppers</text></g>
-      <text class="us-bots" x="0" y="${LB + 100}">code-simplifier · dead-code-remover · duplicate-code-detector · daily-file-diet · unbloat-docs</text>
-      <text class="us-num" id="usNA" x="1620" y="${LA - 50}">0%</text><text class="us-cap" x="1620" y="${LA - 16}">of feature</text><text class="us-cap" id="usMA" x="1620" y="${LA + 16}"></text><text class="us-cap bad" id="usCA" x="1620" y="${LA + 44}"></text>
-      <text class="us-num" id="usNB" x="1620" y="${LB - 50}">0%</text><text class="us-cap" x="1620" y="${LB - 16}">of feature</text><text class="us-cap" id="usMB" x="1620" y="${LB + 16}"></text><text class="us-cap ok" id="usCB" x="1620" y="${LB + 44}"></text>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "us-svg");
-    svg.setAttribute("viewBox", "0 0 1700 660");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id);
-    const card = $("usCard"),
-      nit = $("usNit"),
-      nitT = $("usNitT"),
-      round = $("usRound"),
-      prN = $("usPrN"),
-      chomp = $("usChomp");
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    let t0 = 0,
-      cyc = -1,
-      fired = new Set();
-    const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
-    slides.push({
-      group: "factory",
-      sound: "unslop",
-      palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
-      notes:
-        "Merge fast, unslop daily. This is an illustrative, synthetic timeline. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: thirty fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. The feature ships a slice at a time, so its percentage climbs with every merge and the feature is complete while the polished lane is still in review. The slop that gets through is eaten by many background unsloppers, daily workflows such as code simplifier, dead code remover, duplicate code detector and file diet, which open their own small clean-up pull requests. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          fired = new Set();
-        }
-        // lane A: three big pull requests, each crawling through nit rounds before it merges, and each still merging some slop
-        const k = Math.min(A_N - 1, Math.max(0, Math.floor((u - 200) / A_SPAN))),
-          v = u - A_AT(k),
-          per = NITS.length / A_N,
-          r = Math.min(per, Math.floor(Math.max(0, v) / ROUND) + 1),
-          f = (Math.max(0, v) % ROUND) / ROUND,
-          review = v < A_SPAN - 400,
-          x0 = k ? A_X(k - 1) + 30 : 20;
-        let m = 0;
-        for (let j = 0; j < A_N; j++) {
-          const on = u >= A_AT(j) + A_SPAN - 200;
-          $("usA" + j).classList.toggle("on", on);
-          $("usAS" + j).classList.toggle("on", on);
-          if (on) (m++, once("am" + j, () => sfx.notify(false)));
-        }
-        card.setAttribute("transform", `translate(${x0 + (A_X(k) - 200 - x0) * ease(Math.min(1, Math.max(0, v) / (A_SPAN - 400)))},${LA - 140})`);
-        card.style.opacity = v < 0 || u >= A_AT(k) + A_SPAN - 200 ? 0 : 1;
-        prN.textContent = `PR #${k + 1}`;
-        round.textContent = `round ${r}`;
-        nitT.textContent = NITS[k * per + r - 1];
-        nit.style.opacity = !review || v < 0 ? 0 : f < 0.12 ? f / 0.12 : f > 0.85 ? (1 - f) / 0.15 : 1;
-        if (review && v >= 0) once(`n${k}_${r}`, () => sfx.key(0.5));
-        $("usNA").textContent = `${Math.round((m * 40) / A_N)}%`;
-        $("usMA").textContent = `${m} PR${m === 1 ? "" : "s"} merged`;
-        $("usCA").textContent = `${m} slop left`;
-        // lane B: a fast pull request every beat, reviewed by agents and merged; sweeps eat what slipped through
-        let n = 0,
-          eaten = 0,
-          cx = -1;
-        for (const s of SWEEPS) {
-          if (u < s) continue;
-          const last = SPECKS.reduce((m, _, i) => (B_AT(i) + 500 <= s ? i : m), -1),
-            end = B_X(last) + 40,
-            p = Math.min(1, (u - s) / SWEEP_D);
-          if (p < 1) cx = end * ease(p);
-          once("s" + s, () => sfx.review());
-        }
-        for (let i = 0; i < B_N; i++) {
-          const at = B_AT(i),
-            x = B_X(i),
-            on = u >= at + 500;
-          $("usP" + i).classList.toggle("on", u >= at && u < at + 520);
-          $("usC" + i).classList.toggle("on", on);
-          if (on) (n++, once("b" + i, () => sfx.pop(i)));
-          let clean = on;
-          SPECKS[i].forEach((_, j) => {
-            const sp = $(`usS${i}_${j}`),
-              gone = SWEEPS.some(s => u >= s && at + 500 <= s && (u >= s + SWEEP_D || x <= cx));
-            sp.classList.toggle("on", on);
-            sp.classList.toggle("eaten", gone);
-            if (gone) eaten++;
-            else clean = false;
-          });
-          $("usC" + i).classList.toggle("clean", clean);
-        }
-        chomp.classList.toggle("on", cx >= 0);
-        if (cx >= 0) chomp.setAttribute("transform", `translate(${cx},0)`);
-        $("usNB").textContent = `${Math.round((n / B_N) * 100)}%`;
-        $("usMB").textContent = `${n} PR${n === 1 ? "" : "s"} merged`;
-        $("usCB").textContent = `${eaten} slop eaten`;
-      },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))), svg),
-    });
-  }
-
   // Research → Assign → Refine: deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
     resetIndex();
@@ -3341,6 +3203,144 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
+    });
+  }
+
+  // Merge fast, unslop daily: three slow pull requests polished through many nit rounds (each still merging slop) vs many fast pull requests, agentic reviewers and background unsloppers that eat the slop
+  {
+    resetIndex();
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const CYC = 12800,
+      A_N = 3,
+      A_SPAN = 3800,
+      A_AT = k => 200 + k * A_SPAN,
+      A_X = k => 440 + k * 440,
+      NITS = ["nit: rename this", "nit: typo", "nit: extract helper", "nit: blank line", "nit: reword comment", "nit: early return", "nit: sort imports", "nit: one more test", "nit: naming again", "nit: inline this", "nit: fix wording", "nit: lgtm, but…"],
+      ROUND = (A_SPAN - 400) / (NITS.length / A_N),
+      B_N = 30,
+      B_AT = i => 300 + i * 290,
+      B_X = i => 50 + i * 48,
+      SWEEPS = [3600, 7200, 10200],
+      SWEEP_D = 1200,
+      LA = 230,
+      LB = 560;
+    // a couple of synthetic slop specks per fast commit
+    const SPECKS = Array.from({ length: B_N }, (_, i) => (i % 3 === 1 ? [[0, -24]] : [[-10, -22], [10, -26]]));
+    let g = `<line class="us-main" x1="0" y1="${LA}" x2="1500" y2="${LA}"/><text class="us-mainl" x="0" y="${LA + 38}">main</text>
+      <line class="us-main" x1="0" y1="${LB}" x2="1500" y2="${LB}"/><text class="us-mainl" x="0" y="${LB + 38}">main</text>
+      <line class="us-div" x1="0" y1="300" x2="1700" y2="300"/>
+      <text class="us-lane" x="0" y="34">Slow · polished · nit after nit</text>
+      <text class="us-lane good" x="0" y="356">Fast · good enough · unslopped in the background</text><text class="us-diff" x="1500" y="356" text-anchor="end">each <tspan class="add">+40</tspan> <tspan class="del">−8</tspan></text>
+      ${Array.from({ length: A_N }, (_, k) => `<circle class="us-commit" id="usA${k}" cx="${A_X(k)}" cy="${LA}" r="26"/><circle class="us-slop" id="usAS${k}" cx="${A_X(k) + 26}" cy="${LA - 34}" r="11"/>`).join("")}
+      <g id="usCard"><g class="us-nit" id="usNit"><rect x="0" y="-80" width="290" height="44" rx="10"/><text id="usNitT" x="16" y="-50"></text></g>
+        <g class="us-card"><rect class="c" x="0" y="-20" width="350" height="104" rx="14"/>${ico("pr", 36, 32, 34, "#9198a1")}<text id="usPrN" x="68" y="14">PR #1</text><text class="us-round" id="usRound" x="68" y="42">round 0</text><text class="us-diff" x="68" y="70"><tspan class="add">+1,240</tspan> <tspan class="del">−380</tspan> · 46 files</text><circle cx="334" cy="-6" r="8" fill="#d29922"/></g></g>`;
+    for (let i = 0; i < B_N; i++) {
+      const x = B_X(i);
+      g += `<g transform="translate(${x - 20},${LB - 112})"><g class="us-pr" id="usP${i}"><rect x="0" y="0" width="40" height="40" rx="8"/>${ico("pr", 20, 20, 22, "#e6edf3")}<circle cx="38" cy="2" r="9" fill="#8957e5"/>${ico("copilot", 38, 2, 13)}</g></g>`;
+      g += `<circle class="us-commit" id="usC${i}" cx="${x}" cy="${LB}" r="11"/>`;
+      SPECKS[i].forEach(([dx, dy], j) => (g += `<circle class="us-slop" id="usS${i}_${j}" cx="${x + dx}" cy="${LB + dy}" r="5"/>`));
+    }
+    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily unsloppers</text></g>
+      <text class="us-bots" x="0" y="${LB + 100}">code-simplifier · dead-code-remover · duplicate-code-detector · daily-file-diet · unbloat-docs</text>
+      <text class="us-num" id="usNA" x="1620" y="${LA - 50}">0%</text><text class="us-cap" x="1620" y="${LA - 16}">of feature</text><text class="us-cap" id="usMA" x="1620" y="${LA + 16}"></text><text class="us-cap bad" id="usCA" x="1620" y="${LA + 44}"></text>
+      <text class="us-num" id="usNB" x="1620" y="${LB - 50}">0%</text><text class="us-cap" x="1620" y="${LB - 16}">of feature</text><text class="us-cap" id="usMB" x="1620" y="${LB + 16}"></text><text class="us-cap ok" id="usCB" x="1620" y="${LB + 44}"></text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "us-svg");
+    svg.setAttribute("viewBox", "0 0 1700 660");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id);
+    const card = $("usCard"),
+      nit = $("usNit"),
+      nitT = $("usNitT"),
+      round = $("usRound"),
+      prN = $("usPrN"),
+      chomp = $("usChomp");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    let t0 = 0,
+      cyc = -1,
+      fired = new Set();
+    const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
+    slides.push({
+      group: "loops",
+      sound: "unslop",
+      palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
+      notes:
+        "Merge fast, unslop daily. This is an illustrative, synthetic timeline. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: thirty fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. The feature ships a slice at a time, so its percentage climbs with every merge and the feature is complete while the polished lane is still in review. The slop that gets through is eaten by many background unsloppers, daily workflows such as code simplifier, dead code remover, duplicate code detector and file diet, which open their own small clean-up pull requests. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          fired = new Set();
+        }
+        // lane A: three big pull requests, each crawling through nit rounds before it merges, and each still merging some slop
+        const k = Math.min(A_N - 1, Math.max(0, Math.floor((u - 200) / A_SPAN))),
+          v = u - A_AT(k),
+          per = NITS.length / A_N,
+          r = Math.min(per, Math.floor(Math.max(0, v) / ROUND) + 1),
+          f = (Math.max(0, v) % ROUND) / ROUND,
+          review = v < A_SPAN - 400,
+          x0 = k ? A_X(k - 1) + 30 : 20;
+        let m = 0;
+        for (let j = 0; j < A_N; j++) {
+          const on = u >= A_AT(j) + A_SPAN - 200;
+          $("usA" + j).classList.toggle("on", on);
+          $("usAS" + j).classList.toggle("on", on);
+          if (on) (m++, once("am" + j, () => sfx.notify(false)));
+        }
+        card.setAttribute("transform", `translate(${x0 + (A_X(k) - 200 - x0) * ease(Math.min(1, Math.max(0, v) / (A_SPAN - 400)))},${LA - 140})`);
+        card.style.opacity = v < 0 || u >= A_AT(k) + A_SPAN - 200 ? 0 : 1;
+        prN.textContent = `PR #${k + 1}`;
+        round.textContent = `round ${r}`;
+        nitT.textContent = NITS[k * per + r - 1];
+        nit.style.opacity = !review || v < 0 ? 0 : f < 0.12 ? f / 0.12 : f > 0.85 ? (1 - f) / 0.15 : 1;
+        if (review && v >= 0) once(`n${k}_${r}`, () => sfx.key(0.5));
+        $("usNA").textContent = `${Math.round((m * 40) / A_N)}%`;
+        $("usMA").textContent = `${m} PR${m === 1 ? "" : "s"} merged`;
+        $("usCA").textContent = `${m} slop left`;
+        // lane B: a fast pull request every beat, reviewed by agents and merged; sweeps eat what slipped through
+        let n = 0,
+          eaten = 0,
+          cx = -1;
+        for (const s of SWEEPS) {
+          if (u < s) continue;
+          const last = SPECKS.reduce((m, _, i) => (B_AT(i) + 500 <= s ? i : m), -1),
+            end = B_X(last) + 40,
+            p = Math.min(1, (u - s) / SWEEP_D);
+          if (p < 1) cx = end * ease(p);
+          once("s" + s, () => sfx.review());
+        }
+        for (let i = 0; i < B_N; i++) {
+          const at = B_AT(i),
+            x = B_X(i),
+            on = u >= at + 500;
+          $("usP" + i).classList.toggle("on", u >= at && u < at + 520);
+          $("usC" + i).classList.toggle("on", on);
+          if (on) (n++, once("b" + i, () => sfx.pop(i)));
+          let clean = on;
+          SPECKS[i].forEach((_, j) => {
+            const sp = $(`usS${i}_${j}`),
+              gone = SWEEPS.some(s => u >= s && at + 500 <= s && (u >= s + SWEEP_D || x <= cx));
+            sp.classList.toggle("on", on);
+            sp.classList.toggle("eaten", gone);
+            if (gone) eaten++;
+            else clean = false;
+          });
+          $("usC" + i).classList.toggle("clean", clean);
+        }
+        chomp.classList.toggle("on", cx >= 0);
+        if (cx >= 0) chomp.setAttribute("transform", `translate(${cx},0)`);
+        $("usNB").textContent = `${Math.round((n / B_N) * 100)}%`;
+        $("usMB").textContent = `${n} PR${n === 1 ? "" : "s"} merged`;
+        $("usCB").textContent = `${eaten} slop eaten`;
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))), svg),
     });
   }
 
