@@ -327,6 +327,15 @@
   .fv-rs { fill: #9198a1; font: 500 18px var(--mono); }
   .fv-tr { fill: #c9d1d9; font: 500 19px var(--mono); }
   .fv-chip { opacity: .35; transition: opacity .3s; } .fv-chip.on { opacity: 1; }
+  .smt-led { position: absolute; right: 60px; top: 50px; width: 640px; padding: 16px 24px 12px; border: 2px solid #3d444d; border-radius: 16px; background: #0d1117d9; font: 500 17px var(--mono); color: #9198a1; }
+  .active .smt-led { animation: mra-in .8s .2s both; }
+  .smt-h { font-weight: 600; letter-spacing: .1em; color: #ab7df8; }
+  .smt-k { display: flex; justify-content: space-between; margin: 8px 0 6px; }
+  .smt-k b { display: block; font: 700 40px "Mona Sans"; color: #f0f6fc; line-height: 1.05; }
+  .smt-k span { font-size: 15px; letter-spacing: .04em; }
+  .smt-run { margin-top: 5px; white-space: nowrap; }
+  .smt-run i { font-style: normal; margin-right: 10px; } .smt-run .o { color: #d29922; } .smt-run .g { color: #3fb950; }
+  .smt-cap { margin-top: 8px; font-size: 14px; letter-spacing: .06em; color: #6e7681; }
   .cpr-svg { position: absolute; left: 60px; top: 300px; width: 1800px; height: 680px; overflow: visible; font-family: "Mona Sans"; }
   .cpr-e { fill: none; stroke: #3d444d; stroke-width: 2; transition: stroke .3s, opacity .3s; }
   .cpr-e.on { stroke: var(--c); stroke-width: 3.5; filter: drop-shadow(0 0 6px var(--c)); }
@@ -5971,31 +5980,32 @@
     const VW = 1800,
       VH = 680;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // invariant, mutant and witness names are gh-aw's real work-queue TLA+ names; the excerpt itself is abridged
     const REQ = [
-      ["R1", "A running Claim MUST stop", "when its Work expires."],
-      ["R2", "Only a live grant MAY", "start a Claim."],
-      ["R3", "Checkpoints MUST keep", "the expiry watermark."],
-      ["R4", "Expiry MUST use committed", "time, not the wall clock."],
+      ["R1", "A committed Completion", "MUST stay durable."],
+      ["R2", "One Claim MUST win", "each Work, at most."],
+      ["R3", "Effects MUST follow", "authorization."],
+      ["R4", "Claims SHOULD take the", "oldest Work, not FIFO."],
     ];
     const CODE = [
-      "---- MODULE Expiry ----",
+      "---- MODULE WorkQueue ----",
       'Broken == "none"',
-      "Next == Grant \\/ Start \\/ Tick",
-      "     \\/ Expire \\/ Checkpoint",
+      "Next == Dispatch \\/ Worker",
       "\\* R1",
-      "Expiry == \\A c \\in Claims :",
-      "  run[c] => now < due[c]",
+      "TerminalPersistence ==",
+      "  \\A w : Done(w) \\subseteq log",
       "\\* R2",
-      "LiveGrant == \\A c \\in Claims :",
-      "  run[c] => live[c]",
+      "SingleEffectiveClaim ==",
+      "  \\A w : Cardinality(Win(w)) <= 1",
       "\\* R3",
-      "Watermark == ckpt.mark <= now",
+      "EffectSoundness ==",
+      "  effects \\subseteq authorized",
       "\\* witness: must be reachable",
-      "Seen == ~\\E c : expired[c]",
+      "NoOutOfOrderClaim == FIFO",
       "====",
     ];
-    const INV_LINES = [4, 5, 6, 7, 8, 9, 10, 11],
-      BAD_LINES = [7, 8, 9],
+    const INV_LINES = [3, 4, 5, 6, 7, 8, 9, 10, 11],
+      BAD_LINES = [3, 4, 5],
       WIT_LINES = [12, 13];
     const hl = line =>
       line.startsWith("\\*")
@@ -6044,14 +6054,15 @@
       g += `<text class="fm-lane-t mra-lane" id="fvLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
       if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 64}"/>`;
     });
-    g += `<rect class="fv-card" x="16" y="80" width="368" height="520" rx="16"/><text class="fv-t" x="38" y="116">SPEC.MD · WORK EXPIRY</text>`;
+    g += `<rect class="fv-card" x="16" y="80" width="368" height="520" rx="16"/><text class="fv-t" x="38" y="116">SPEC · WORK QUEUE</text>`;
     REQ.forEach(([id, a, b], i) => {
       const y = 170 + i * 104;
       g += `<g class="fv-req${i === 3 ? " fv-new" : ""}" id="fvR${i}"><rect x="28" y="${y - 34}" width="344" height="90" rx="10"/><text class="fv-id" x="44" y="${y}">${id}</text>`;
       if (i === 3) g += `<text class="fv-tag" x="44" y="${y + 32}">NEW</text>`;
-      g += `<text class="fv-rq" x="96" y="${y}">${esc(a).replace(/\b(MUST|MAY)\b/, '<tspan class="m">$1</tspan>')}</text><text class="fv-rq" x="96" y="${y + 32}">${esc(b)}</text></g>`;
+      const kw = s => esc(s).replace(/\b(MUST|SHOULD)\b/, '<tspan class="m">$1</tspan>');
+      g += `<text class="fv-rq" x="96" y="${y}">${kw(a)}</text><text class="fv-rq" x="96" y="${y + 32}">${kw(b)}</text></g>`;
     });
-    g += `<rect class="fv-card" x="416" y="80" width="428" height="520" rx="16"/><text class="fv-t" x="438" y="116">EXPIRY.TLA</text>`;
+    g += `<rect class="fv-card" x="416" y="80" width="428" height="520" rx="16"/><text class="fv-t" x="438" y="116">WORKQUEUE.TLA</text>`;
     CODE.forEach((line, i) => {
       const y = 160 + i * 29;
       g += `<g class="fv-code" id="fvL${i}"><rect x="426" y="${y - 21}" width="408" height="28" rx="5"/><text x="440" y="${y}">${hl(line)}</text></g>`;
@@ -6062,17 +6073,17 @@
     g += `<circle class="fm-dot fv-dot" r="8" fill="#79c0ff"/>`;
     const card = (id, k, y, hgt, head, lines) =>
       `<g class="fv-res ${k}" id="${id}"><rect class="fv-card" x="1360" y="${y}" width="424" height="${hgt}" rx="16"/><text class="fv-rh" x="1382" y="${y + 36}">${esc(head)}</text>${lines.map(([cls, txt, dy]) => `<text class="${cls}" x="1382" y="${y + dy}">${esc(txt)}</text>`).join("")}</g>`;
-    g += card("fvA", "g", 80, 150, "TLC · INVARIANTS HOLD", [
-      ["fv-rt", "✓ Expiry  ✓ LiveGrant  ✓ Watermark", 80],
-      ["fv-rs", "12,480 states · no counterexample", 118],
+    g += card("fvA", "g", 80, 150, "DAILY TLC · FairDAGGitHub", [
+      ["fv-rt", "✓ Safety · 1,055,182 states", 80],
+      ["fv-rs", "exhausted · depth 20 · 16 min 33 s", 118],
     ]);
-    g += card("fvB", "r", 246, 150, 'MUTANT · Broken = "grant"', [
-      ["fv-rt", "✗ LiveGrant fails, as it must", 80],
-      ["fv-rs", "negative control: the check bites", 118],
+    g += card("fvB", "r", 246, 150, "MUTANT · BrokenCAS", [
+      ["fv-rt", "✗ TerminalPersistence fails", 80],
+      ["fv-rs", "735 states · 1 of 99 mutants", 118],
     ]);
     g += card("fvC", "b", 412, 188, "WITNESS → CONFORMANCE TEST", [
-      ["fv-tr", "Grant → Start → Tick →", 74],
-      ["fv-tr", "Checkpoint → Tick → Expire", 102],
+      ["fv-tr", "NoOutOfOrderClaim fails:", 74],
+      ["fv-tr", "newer Work claimed first", 102],
     ]);
     [
       ["fvGo", 1382, "Go engine"],
@@ -6126,7 +6137,7 @@
       sound: "formal",
       palette: ["#1f6feb", "#8957e5", "#238636", "#bf3989"],
       notes:
-        "Spec, model, test: formal methods as the backbone of spec-driven development. Illustrative: the spec, TLA+ model, state counts and traces shown here are synthetic, modelled on how gh-aw's work queue is specified. Write the requirement in the spec first, then encode it as TLA+ invariants. The TLC model checker explores every reachable state of a small bounded model. Every configuration has an expected verdict: correct models must exhaust with no counterexample, deliberately broken mutants must fail with their exact named violation, and witness properties are negated on purpose so TLC prints a trace that reaches an interesting state. Those traces become fixtures replayed against the real Go and JavaScript engines as conformance tests. When a trace surprises you, change the spec first, then the model, then the code. Bounded checks are strong evidence, not a proof.",
+        "Spec, model, test: formal methods as the backbone of spec-driven development, on gh-aw's own work queue. Measured (14 Nov 2026 snapshot): the top-right ledger counts the repository's specs/work-queue folder (16 TLA+ modules, 218 TLC configurations, of which 99 are Broken mutants and 55 are witnesses) and the 35 merged pull requests that changed it since 2 Oct 2026. The Daily Work Queue Formal Verification workflow re-runs the two expensive configurations every day; on its 11 Nov run FairDAGGitHub exhausted 1,055,182 distinct states at depth 20 in 16 min 33 s with Safety holding, while QueueOrdering was still open after 4 h 40 m with 178.9 million distinct states at depth 20, so it is reported as not established, not as a pass. The BrokenCAS mutant must fail TerminalPersistence (735 states) and the WeakOrderingWitness must reach an out-of-order Claim (756 states), from the 7 Oct 2026 verification record; that witness is why the spec says oldest-first is best effort, not strict FIFO. Shared fixtures replay against the real Go and JavaScript engines. Illustrative: the requirement wording, the abridged TLA+ excerpt, the small state graph and its animation are simplified; the invariant, mutant and witness names are real. Bounded checks are strong evidence, not a proof.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -6178,25 +6189,25 @@
           el.classList.toggle("wit", ph === 3 && WIT_LINES.includes(i));
           if (u >= T.model + i * 120 && once("l" + i)) sfx.key(0.7);
         });
-        broken.textContent = ph === 2 ? '"grant"' : '"none"';
+        broken.textContent = ph === 2 ? '"cas"' : '"none"';
         rEl.forEach((el, i) => {
           el.classList.toggle("on", i < 3 ? u >= 200 : u >= T.back + 600);
           el.classList.toggle("ok", passed && i < 3);
-          el.classList.toggle("bad", found && i === 1);
+          el.classList.toggle("bad", found && i === 0);
         });
         laneEl.forEach((el, i) => el.classList.toggle("on", u >= [0, T.model, T.check, T.check + EXPLORE][i]));
-        // counters, verdicts and generated tests
+        // counters: measured TLC distinct-state counts (FairDAGGitHub, BrokenCAS, WeakOrderingWitness)
         if (ph === 1) {
           const f = Math.min(1, d1 / EXPLORE);
-          lastCount = setText(count, `${Math.round(12480 * f * f).toLocaleString("en-US")} distinct states · depth ${Math.min(8, 1 + Math.floor(f * 8))}`, "", lastCount);
-          lastStat = setText(stat, passed ? "✓ 3 invariants hold" : "exploring every state…", passed ? "ok" : "", lastStat);
+          lastCount = setText(count, `${Math.round(1055182 * f * f).toLocaleString("en-US")} distinct states · depth ${Math.min(20, 1 + Math.floor(f * 20))}`, "", lastCount);
+          lastStat = setText(stat, passed ? "✓ Safety holds · exhausted" : "exploring every state…", passed ? "ok" : "", lastStat);
         } else if (ph === 2) {
           const f = Math.min(1, d2 / FOUND);
-          lastCount = setText(count, `${Math.round(3906 * f).toLocaleString("en-US")} distinct states · depth ${Math.min(6, 1 + Math.floor(f * 6))}`, "", lastCount);
-          lastStat = setText(stat, found ? "✗ LiveGrant violated · 5 steps" : 're-checking Broken = "grant"…', found ? "bad" : "", lastStat);
+          lastCount = setText(count, `${Math.round(735 * f).toLocaleString("en-US")} distinct states`, "", lastCount);
+          lastStat = setText(stat, found ? "✗ TerminalPersistence violated" : "re-checking BrokenCAS…", found ? "bad" : "", lastStat);
         } else if (ph === 3) {
-          lastCount = setText(count, d3 < SEEK ? "negating Seen…" : "6 steps · 1 trace", "", lastCount);
-          lastStat = setText(stat, d3 < SEEK + 6 * WSTEP ? "→ looking for a witness…" : "→ Seen reached · trace saved", d3 < SEEK ? "" : "wit", lastStat);
+          lastCount = setText(count, d3 < SEEK ? "negating FIFO…" : "756 distinct states · 1 trace", "", lastCount);
+          lastStat = setText(stat, d3 < SEEK + 6 * WSTEP ? "→ looking for a witness…" : "→ out-of-order Claim reached", d3 < SEEK ? "" : "wit", lastStat);
         }
         $("fvA").classList.toggle("on", u >= T.check + EXPLORE + 200);
         $("fvB").classList.toggle("on", u >= T.mutant + FOUND + 700);
@@ -6222,7 +6233,21 @@
           dot.setAttribute("cy", a.y + (b.y - a.y) * f);
         } else dot.style.opacity = 0;
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Formal methods turn the spec into tests"), h("h2", {}, letters("Spec · Model · "), letters("Test", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Formal methods turn the spec into tests"), h("h2", {}, letters("Spec · Model · "), letters("Test", "l-grad"))),
+        h(
+          "div",
+          { class: "smt-led" },
+          h("div", { class: "smt-h" }, "MEASURED · specs/work-queue · 14 Nov 2026"),
+          h("div", { class: "smt-k" }, ...[["16", "TLA+ modules"], ["218", "TLC configs"], ["99", "mutants"], ["55", "witnesses"]].map(([n, l]) => h("div", {}, h("b", {}, n), h("span", {}, l)))),
+          h("div", { class: "smt-run" }, h("i", { class: "o" }, "◔"), "QueueOrdering: 178.9M states, open after 4 h 40 m"),
+          h("div", { class: "smt-run" }, h("i", { class: "g" }, "✓"), "35 merged PRs changed the spec since 2 Oct 2026"),
+          h("div", { class: "smt-cap" }, "TLC counts and verdicts measured · flow illustrative")
+        ),
+        svg
+      ),
     });
   }
 
