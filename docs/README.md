@@ -56,11 +56,11 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone thirty-seven-slide deck, separate from the homepage slideshow, linked
+It is a standalone thirty-eight-slide deck, separate from the homepage slideshow, linked
 from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
 Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
 The navigation dots jump directly to a slide (on narrow screens they become
-previous/next arrow buttons); `#1` through `#37` are shareable
+previous/next arrow buttons); `#1` through `#38` are shareable
 slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
 Slides are grouped into sections: slides within a section push left, and
@@ -74,7 +74,10 @@ repository's own workflows, the Issues as intent slide's counts of
 issues labelled `community` and the merged pull requests that closed them
 (November 2026 snapshot), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
-(February to November 2026, with shortened titles), and the two data slides after the finale: "First
+(February to November 2026, with shortened titles), the Great Escapi slide's
+counts and dates, measured from that red-team workflow's repository memory and
+the firewall fix it led to (its attack diagram is a simplified illustration),
+and the two data slides after the finale: "First
 commit to GA", which shows this repository's measured public history from its
 first commit to general availability at GitHub Universe, and "How PRs land",
 which shows measured time-to-merge and lines-changed distributions of its

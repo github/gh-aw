@@ -541,6 +541,53 @@
 
   /* --- safe outputs: boxed agent → threat detection → write job --- */
   .so .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #3fb950); }
+  .ge .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ff7b72, #f85149, #d29922, #3fb950); }
+  .ge-svg { left: 60px; top: 270px; width: 1800px; height: 600px; }
+  .ge-box { fill: #f8514908; stroke: #f85149; stroke-width: 2; stroke-dasharray: 10 8; opacity: .7; }
+  .ge-box-t { fill: #ff7b72; font: 600 16px var(--mono); letter-spacing: .16em; text-anchor: middle; }
+  .ge-wire { fill: none; stroke-width: 3; opacity: .35; transition: opacity .3s; }
+  .ge-wire.b { stroke: #4493f8; } .ge-wire.o { stroke: #d29922; } .ge-wire.g { stroke: #3fb950; stroke-dasharray: 6 8; } .ge-wire.r { stroke: #f85149; }
+  .ge-wire.hot, .ge-wire.on { opacity: 1; }
+  .ge-l { font: 600 17px var(--mono); text-anchor: middle; }
+  .ge-l.b { fill: #79c0ff; } .ge-l.o { fill: #d29922; }
+  .ge-node { opacity: .45; transition: opacity .4s; } .ge-node.on { opacity: 1; }
+  .ge-node rect { fill: #0d1117; stroke: #6e7681; stroke-width: 2; transition: stroke .4s, filter .4s; }
+  .ge-node.on rect { stroke: #c9d1d9; }
+  .ge-n { fill: #f0f6fc; font: 700 26px "Mona Sans"; text-anchor: middle; }
+  .ge-k { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .14em; text-anchor: middle; }
+  .ge-s { fill: #d29922; font: 600 19px var(--mono); text-anchor: middle; }
+  .ge-proxy.on rect { stroke: #4493f8; filter: drop-shadow(0 0 14px #1f6feb88); }
+  .fixed .ge-proxy rect { stroke: #3fb950; filter: drop-shadow(0 0 20px #3fb950); }
+  .fixed .ge-proxy .ge-s { fill: #3fb950; }
+  #geCdn.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d2992288); }
+  .ge-dest { opacity: .7; }
+  .ge-tag { font: 600 16px var(--mono); letter-spacing: .06em; text-anchor: end; }
+  .ge-tag.g { fill: #3fb950; } .ge-tag.r { fill: #ff7b72; }
+  .ge-dn { text-anchor: start; font-size: 24px; }
+  .ge-dest.bad.hot rect { stroke: #f85149; fill: #f8514926; filter: drop-shadow(0 0 22px #f85149); }
+  .ge-hit { fill: #ff7b72; font: 800 30px "Mona Sans"; letter-spacing: .04em; text-anchor: middle; opacity: 0; }
+  .ge-dest.hot .ge-hit { opacity: 1; animation: rise .5s cubic-bezier(.2,.9,.2,1) both; }
+  .ge-cut { opacity: 0; transform-box: fill-box; transform-origin: center; }
+  .ge-cut circle { fill: #0d1117; stroke: #3fb950; stroke-width: 3; filter: drop-shadow(0 0 12px #3fb950); }
+  .ge-cut path { stroke: #3fb950; stroke-width: 5; stroke-linecap: round; }
+  .ge-cut.on { opacity: 1; animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
+  .ge-phase { fill: #f0f6fc; font: 600 24px var(--mono); text-anchor: end; }
+  .fixed .ge-phase { fill: #3fb950; }
+  .ge-h { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .12em; }
+  .ge-cnt { fill: #f0f6fc; text-anchor: end; font-size: 20px; transition: opacity .3s; }
+  .fixed .ge-cnt { opacity: 0; }
+  .ge-c { fill: #30363d; opacity: .5; transition: fill .15s, opacity .15s; }
+  .ge-c.on { fill: #6e7681; opacity: 1; }
+  .ge-c.x.on { fill: #f85149; filter: drop-shadow(0 0 6px #f85149); }
+  .fixed .ge-c.on { fill: #3d444d; } .fixed .ge-c.x.on { fill: #da3633; filter: none; }
+  .ge-tick { stroke: #6e7681; stroke-width: 2; }
+  .ge-m { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .12em; }
+  .ge-mark { opacity: 0; transition: opacity .4s; } .ge-mark.on { opacity: 1; }
+  .ge-mark text { font: 600 19px var(--mono); }
+  .ge-mark line, .ge-mark path { fill: none; stroke-width: 3; }
+  .ge-mark.r text { fill: #ff7b72; } .ge-mark.r line { stroke: #f85149; }
+  .ge-mark.g text { fill: #3fb950; } .ge-mark.g path { stroke: #3fb950; filter: drop-shadow(0 0 8px #3fb950); }
+  .ge-dot { opacity: 0; filter: drop-shadow(0 0 10px #f0f6fc88); }
   .so-box { position: absolute; top: 300px; width: 500px; height: 620px; padding: 30px 34px; border-radius: 22px; border: 2px solid var(--c);
     background: #0d1117ee; box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); opacity: 0; transition: box-shadow .5s, border-color .5s; }
   .active .so-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 400ms); }
@@ -2865,6 +2912,231 @@
           });
       },
       el,
+    });
+  }
+
+  // The Great Escapi: a daily red-team agent tries a new firewall escape each run; 400 recorded techniques fail, #401 (SNI domain fronting through a CDN-shared allowed host) escapes, and the firewall is fixed to check the TLS SNI. Counts and dates are measured from the workflow's repo memory
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 600;
+    // measured: The Great Escapi's repo memory (escape-attempts.json), 426 techniques in order, 15 Feb to 22 Sep 2026
+    const N = 426,
+      FIRST = 400,
+      ESC = new Set([400, 401, 402, 404, 405, 406, 409, 410, 411, 422, 423, 424, 425]),
+      MONTHS = [
+        [0, "FEB"],
+        [37, "JUL"],
+        [85, "AUG"],
+        [321, "SEP"],
+      ];
+    const ROWS = 3,
+      X0 = 60,
+      PITCH = 11.75,
+      CY0 = 432,
+      CS = 10;
+    const cx = i => X0 + Math.floor(i / ROWS) * PITCH;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ge-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "The Great Escapi: 426 recorded escape attempts; the first 400 are blocked, attempt 401 escapes by opening a tunnel to an allowed host on a shared CDN and asking for a different host in the TLS SNI, and the firewall fix checks the SNI against the allowlist"
+    );
+    const build = () => {
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      // [id, path, color, label, lx, ly]
+      const EDGES = [
+        ["geW1", "M300 200 H520", "b", ["CONNECT", "registry.npmjs.org"], 410, 140],
+        ["geW2", "M745 200 H950", "o", ["TLS ClientHello", "SNI = example.com"], 845, 140],
+        ["geW3", "M1210 186 C1290 186 1290 120 1360 120", "g", [], 0, 0],
+        ["geW4", "M1210 214 C1290 214 1290 280 1360 280", "r", [], 0, 0],
+      ];
+      let g = `<defs><radialGradient id="geAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ff9b94"/><stop offset=".55" stop-color="#da3633"/><stop offset="1" stop-color="#6e1013"/></radialGradient>`;
+      for (const [k, c] of [
+        ["b", "#4493f8"],
+        ["o", "#d29922"],
+        ["g", "#3fb950"],
+        ["r", "#f85149"],
+      ])
+        g += `<marker id="geM${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+      g += `</defs>`;
+      g += `<rect class="ge-box" x="20" y="70" width="270" height="260" rx="22"/><text class="ge-box-t" x="155" y="104">AWF SANDBOX</text>`;
+      for (const [id, d, c, lab, lx, ly] of EDGES) {
+        g += `<path class="ge-wire ${c}" id="${id}" d="${d}" marker-end="url(#geM${c})"/>`;
+        if (lab.length) g += `<text class="ge-l ${c}" x="${lx}" y="${ly}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+      }
+      g += `<g class="ge-node" id="geAgent"><circle cx="155" cy="200" r="54" fill="url(#geAgentG)"/>${ico("copilot", 155, 202, 58)}<text class="ge-n" x="155" y="294">Great Escapi</text></g>`;
+      g += `<g class="ge-node ge-proxy" id="geSquid"><rect x="525" y="120" width="215" height="160" rx="18"/><text class="ge-k" x="632" y="160">EGRESS PROXY</text><text class="ge-n" x="632" y="202">allowlist</text><text class="ge-s" id="geSquidT" x="632" y="244"></text></g>`;
+      g += `<g class="ge-node" id="geCdn"><rect x="955" y="130" width="250" height="140" rx="70"/><text class="ge-k" x="1080" y="186">SHARED CDN EDGE</text><text class="ge-s" x="1080" y="226">routes by SNI</text></g>`;
+      g += `<g class="ge-node ge-dest ok" id="geOk"><rect x="1365" y="88" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="129">registry.npmjs.org</text><text class="ge-tag g" x="1677" y="128">allowed</text></g>`;
+      g += `<g class="ge-node ge-dest bad" id="geBad"><rect x="1365" y="248" width="330" height="64" rx="14"/><text class="ge-n ge-dn" x="1385" y="289">example.com</text><text class="ge-tag r" x="1677" y="288">not allowed</text><text class="ge-hit" id="geHit" x="1530" y="350">ESCAPED · 200 OK</text></g>`;
+      g += `<g class="ge-cut" id="geCut"><circle cx="770" cy="200" r="26"/><path d="M758 188 L782 212 M782 188 L758 212"/></g>`;
+      g += `<text class="ge-phase" id="gePhase" x="${VW - 60}" y="40"></text>`;
+      g += `<text class="ge-h" x="${X0}" y="402">EACH SQUARE IS ONE ESCAPE TECHNIQUE, IN THE ORDER THE AGENT TRIED THEM</text><text class="ge-h ge-cnt" id="geCnt" x="${cx(N - 1) + CS}" y="402"></text>`;
+      for (let i = 0; i < N; i++) g += `<rect class="ge-c${ESC.has(i) ? " x" : ""}" id="geC${i}" x="${cx(i)}" y="${CY0 + (i % ROWS) * PITCH}" width="${CS}" height="${CS}" rx="2"/>`;
+      const yb = CY0 + ROWS * PITCH + 4;
+      for (const [i, m] of MONTHS) g += `<line class="ge-tick" x1="${cx(i)}" y1="${yb}" x2="${cx(i)}" y2="${yb + 14}"/><text class="ge-m" x="${cx(i)}" y="${yb + 36}">${m}</text>`;
+      const xf = cx(FIRST) + CS / 2;
+      g += `<g class="ge-mark r" id="geFirst"><line x1="${xf}" y1="${yb}" x2="${xf}" y2="${yb + 62}"/><text x="${xf}" y="${yb + 88}" text-anchor="end">#401 · first escape · 14 Sep</text></g>`;
+      const xe = cx(N - 1) + CS + 8;
+      g += `<g class="ge-mark g" id="geFix"><path d="M${xe} ${CY0 - 4} H${xe + 10} V${CY0 + ROWS * PITCH} H${xe}"/><text x="${xe + 10}" y="402" text-anchor="end">firewall fix · 22 Sep</text></g>`;
+      g += `<circle class="ge-dot" id="geDot" r="9"/>`;
+      svg.innerHTML = g;
+    };
+    // measured from the same memory and the firewall pull request
+    const STATS = [
+      [400, "", "techniques blocked before the first escape", "#8b949e", "#c9d1d9"],
+      [401, "#", "SNI domain fronting through a CDN-shared allowed host", "#ff7b72", "#d29922"],
+      [13, "", "escapes logged, all variants of that one tunnel trick", "#d29922", "#ff7b72"],
+      [8, " days", "from first escape to the firewall fix", "#3fb950", "#79c0ff"],
+    ];
+    const fmt = (v, i) => (STATS[i][1] === "#" ? "#" + v : v + STATS[i][1]);
+    const nums = STATS.map((s, i) => h("div", { class: "ct-num" }, fmt(0, i)));
+    const stats = h(
+      "div",
+      { class: "ct-stats" },
+      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+    );
+    // [phase, ms into the cycle]
+    const P = {
+      sweep: 600,
+      first: 4200,
+      w1: 4600,
+      w2: 5600,
+      w4: 6800,
+      hit: 7600,
+      more: 8200,
+      fix: 10200,
+      w1b: 10800,
+      w2b: 11800,
+      cut: 12400,
+    };
+    const CYC = 16000;
+    let built = false,
+      t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      lit = 0;
+    const $ = id => svg.querySelector("#" + id);
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const along = (id, f, col) => {
+      const p = $(id),
+        q = p.getPointAtLength(p.getTotalLength() * ease(Math.max(0, Math.min(1, f)))),
+        dot = $("geDot");
+      dot.setAttribute("cx", q.x);
+      dot.setAttribute("cy", q.y);
+      dot.setAttribute("fill", col);
+      dot.style.opacity = 1;
+      p.classList.add("hot");
+    };
+    const lightTo = n => {
+      for (; lit < n; lit++) $("geC" + lit).classList.add("on");
+      $("geCnt").textContent = lit ? "#" + String(lit).padStart(3, "0") : "";
+    };
+    slides.push({
+      group: "security",
+      sound: "escape",
+      palette: ["#8e1519", "#1f6feb", "#3d0a0d", "#238636"],
+      notes:
+        "The Great Escapi is gh-aw's own red-team workflow: every day an agent runs inside the agent workflow firewall (AWF) with instructions to escape it, reads repo memory of every technique already tried so it never repeats one, tries something new, and writes the result back. The squares are measured from that memory: 426 recorded techniques between 15 February and 22 September 2026, in order. The first 400 were all blocked: DNS tricks, IPv6, request smuggling, encoding games, container and kernel escapes, proxy bypasses. Attempt 401, on 14 September, escaped. The agent noticed that a newly allowed package registry sits on a shared CDN, opened a proxy tunnel to it, which the allowlist accepts, and then asked for a different site in the TLS handshake's SNI. The proxy only checked the CONNECT target, so the CDN served the forbidden site. Over the next eight days the agent logged 13 escapes, all variants of that one trick, through more allowed hosts. Its report on 22 September went to the firewall team, and the same day the firewall shipped a fix: the proxy now peeks at the TLS ClientHello without decrypting it and terminates the connection unless the SNI is on the allowlist. The attack diagram is illustrative and simplified; the counts and dates are measured from the workflow's memory and the firewall pull request.",
+      enter() {
+        if (!built) {
+          built = true;
+          build();
+        }
+        t0 = 0;
+        cyc = -1;
+        nums.forEach((n, i) => (n.textContent = fmt(0, i)));
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = fmt(Math.round(STATS[i][0] * f), i)));
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          lit = 0;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          svg.classList.remove("fixed");
+          $("geSquidT").textContent = "";
+          $("gePhase").textContent = "";
+          $("geCnt").textContent = "";
+          $("geAgent").classList.add("on");
+          $("geSquid").classList.add("on");
+        }
+        svg.querySelectorAll(".ge-wire.hot").forEach(w => w.classList.remove("hot"));
+        const dot = $("geDot");
+        dot.style.opacity = 0;
+        if (u >= P.sweep && u < P.first) {
+          const n = Math.floor(((u - P.sweep) / (P.first - P.sweep)) * FIRST);
+          if (Math.floor(n / 25) !== Math.floor(lit / 25)) sfx.key(0.5);
+          lightTo(n);
+          fire("sweep", () => ($("gePhase").textContent = "attempts 1–400 · all blocked"));
+        }
+        if (u >= P.first) {
+          fire("first", () => {
+            lightTo(FIRST + 1);
+            $("geFirst").classList.add("on");
+            $("gePhase").textContent = "attempt #401 · 14 Sep 2026";
+            sfx.block(false);
+          });
+        }
+        if (u >= P.w1 && u < P.w2) along("geW1", (u - P.w1) / 800, "#4493f8");
+        if (u >= P.w1 + 800) fire("ok1", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
+        if (u >= P.w2 && u < P.w4) {
+          along("geW2", (u - P.w2) / 900, "#d29922");
+          fire("pass", () => ($("geSquidT").textContent = "tunnel open"));
+        }
+        if (u >= P.w2 + 900) fire("cdn", () => ($("geCdn").classList.add("on"), sfx.pop(4)));
+        if (u >= P.w4 && u < P.hit) along("geW4", (u - P.w4) / 700, "#f85149");
+        if (u >= P.hit && u < P.fix)
+          fire("hit", () => {
+            $("geBad").classList.add("on", "hot");
+            $("geW4").classList.add("on");
+            sfx.bug();
+          });
+        if (u >= P.more && u < P.fix) {
+          lightTo(FIRST + 1 + Math.floor(Math.min(1, (u - P.more) / 1600) * (N - FIRST - 1)));
+          fire("more", () => ($("gePhase").textContent = "13 escapes logged in 8 days"));
+        }
+        if (u >= P.fix)
+          fire("fix", () => {
+            lightTo(N);
+            ["geBad", "geW4", "geCdn"].forEach(id => $(id).classList.remove("on", "hot"));
+            svg.classList.add("fixed");
+            $("geFix").classList.add("on");
+            $("geSquidT").textContent = "+ SNI check";
+            $("gePhase").textContent = "firewall fix · 22 Sep 2026 · SNI must be allowed";
+            sfx.review();
+          });
+        if (u >= P.w1b && u < P.w2b) along("geW1", (u - P.w1b) / 800, "#4493f8");
+        if (u >= P.w1b + 800) fire("ok2", () => (($("geSquidT").textContent = "✓ host allowed"), sfx.pop(2)));
+        if (u >= P.w2b && u < P.cut) along("geW2", ((u - P.w2b) / 600) * 0.25, "#d29922");
+        if (u >= P.cut)
+          fire("cut", () => {
+            $("geCut").classList.add("on");
+            $("geSquidT").textContent = "✕ SNI denied";
+            sfx.block(true);
+          });
+      },
+      el: h(
+        "section",
+        { class: "slide ge" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "A red-team agent that tries a new escape every day"), h("h2", {}, letters("The Great "), letters("Escapi", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "measured from The Great Escapi's repo memory · Feb–Sep 2026 · fixed in the AWF firewall")
+      ),
     });
   }
 
@@ -9955,6 +10227,14 @@
         click(t + 1.6, 1200, 0.1, 6);
         bell(80, t + 1.62, 0.03, 1.4);
         bell(86, t + 1.66, 0.02, 1.2);
+      },
+      // the great escapi: muffled knocks on a locked door, a crack of light, then a bolt sliding shut
+      escape: t => {
+        [0, 0.22, 0.44, 0.66].forEach((d, i) => click(t + 0.2 + d, 700 + i * 120, 0.08, 6));
+        pad([38, 45, 49], t + 0.2, 2.6, 0.026, "sawtooth", 700);
+        [79, 83, 86].forEach((m, i) => bell(m, t + 1.2 + i * 0.09, 0.03, 1.1));
+        click(t + 1.9, 900, 0.12, 5);
+        osc("sine", 90, t + 1.9, 0.25, 0.2, { f1: 40 });
       },
       // enclaves: a heavy vault bolt sliding shut, then a low sealed hum
       vault: t => {
