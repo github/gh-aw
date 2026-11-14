@@ -249,8 +249,9 @@ function sumAICFromUsageJSONLFiles(filePaths, options = {}) {
           ...(options.strict && typeof parsed.input_tokens_include_cache === "boolean" ? { inputTokensIncludeCache: parsed.input_tokens_include_cache } : {}),
         };
         const hasTokens = [inference.inputTokens, inference.outputTokens, inference.cacheReadTokens, inference.cacheWriteTokens, inference.reasoningTokens].some(value => value > 0);
-        if (options.strict && hasTokens && !findModelPricing(inference.provider, inference.model)) {
-          throw new Error("No pricing for a daily AIC usage record");
+        const unpriced = hasTokens && !findModelPricing(inference.provider, inference.model);
+        if (unpriced) {
+          throw Object.assign(new Error("Daily AIC usage is unpriced because model pricing is unavailable"), { code: "AIC_USAGE_UNPRICED" });
         }
         const computed = computeInferenceAIC(inference);
         if (options.strict && (!Number.isFinite(computed) || computed < 0)) {
@@ -261,7 +262,12 @@ function sumAICFromUsageJSONLFiles(filePaths, options = {}) {
           observations++;
         }
       } catch (error) {
-        if (options.strict) throw new Error("Daily AIC accounting record could not be resolved", { cause: error });
+        const unpriced = error instanceof Error && "code" in error && error.code === "AIC_USAGE_UNPRICED";
+        if (options.strict || unpriced) {
+          const unresolved = new Error(`Daily AIC accounting record could not be resolved${unpriced ? ": unpriced" : ""}`, { cause: error });
+          if (unpriced) Object.assign(unresolved, { code: "AIC_USAGE_UNPRICED" });
+          throw unresolved;
+        }
         // Ignore malformed lines.
       }
     }

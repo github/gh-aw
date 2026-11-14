@@ -394,7 +394,7 @@ describe("resolveModelRoutingSummary", () => {
     }
   });
 
-  it("estimates classifier AIC from attributed token usage when response AIC is absent", () => {
+  it("does not estimate classifier AIC from token usage when response AIC is absent", () => {
     const root = createRoot();
     const sessionPath = path.join(root, "usage/aw_session.jsonl");
     const infoPath = path.join(root, "aw_info.json");
@@ -423,7 +423,27 @@ describe("resolveModelRoutingSummary", () => {
         },
       ]);
 
-      expect(resolveModelRoutingSummary({ sessionPath, infoPath, ghAwDir: root }).classifier_aic).toBeGreaterThan(0);
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath, ghAwDir: root }).classifier_aic).toBeUndefined();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("retains reported classifier AIC", () => {
+    const root = createRoot();
+    const sessionPath = path.join(root, "usage/aw_session.jsonl");
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(infoPath, JSON.stringify({ model_routing: { status: "selected" } }));
+      writeJSONL(sessionPath, [
+        {
+          type: "firewall.token_usage",
+          data: { purpose: "routing_classification", aic: 0.25 },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+      ]);
+
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath, ghAwDir: root }).classifier_aic).toBe(0.25);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

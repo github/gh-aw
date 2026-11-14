@@ -9,9 +9,8 @@ import (
 )
 
 type tokenUsageAICFieldState struct {
-	hasReportedFields         bool
-	hasValidReportedFields    bool
-	hasExplicitCacheSemantics bool
+	hasReportedFields      bool
+	hasValidReportedFields bool
 }
 
 func tokenUsageEntryHasAIC(entry TokenUsageEntry) bool {
@@ -21,9 +20,7 @@ func tokenUsageEntryHasAIC(entry TokenUsageEntry) bool {
 	if _, _, valid := parseOptionalNonNegativeFloat(entry.AICreditsTotal); valid {
 		return true
 	}
-	includeCache, _, _ := parseOptionalBool(entry.InputTokensIncludeCache)
-	return computeModelInferenceAICWithCacheSemantics(entry.Provider, entry.Model, entry.InputTokens, entry.OutputTokens,
-		entry.CacheReadTokens, entry.CacheWriteTokens, entry.ReasoningTokens, includeCache) > 0
+	return false
 }
 
 func parseOptionalNonNegativeFloat(raw json.RawMessage) (value float64, present, valid bool) {
@@ -39,17 +36,6 @@ func parseOptionalNonNegativeFloat(raw json.RawMessage) (value float64, present,
 	return value, true, true
 }
 
-func parseOptionalBool(raw json.RawMessage) (*bool, bool, bool) {
-	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		return nil, false, false
-	}
-	var value bool
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, true, true
-	}
-	return &value, true, false
-}
-
 func inspectTokenUsageAICFields(entries []TokenUsageEntry) tokenUsageAICFieldState {
 	state := tokenUsageAICFieldState{}
 	for _, entry := range entries {
@@ -61,11 +47,6 @@ func inspectTokenUsageAICFields(entries []TokenUsageEntry) tokenUsageAICFieldSta
 		}
 		if _, _, totalValid := parseOptionalNonNegativeFloat(entry.AICreditsTotal); totalValid {
 			state.hasValidReportedFields = true
-		}
-		if value, present, _ := parseOptionalBool(entry.InputTokensIncludeCache); present {
-			if value != nil {
-				state.hasExplicitCacheSemantics = true
-			}
 		}
 	}
 	return state
@@ -90,25 +71,40 @@ func orderTokenUsageEntriesForAIC(entries []TokenUsageEntry) []TokenUsageEntry {
 	return ordered
 }
 
-func applyTokenUsageAICEntries(summary *TokenUsageSummary, entries []TokenUsageEntry, hasReportedFields bool) (runningAIC float64, fallbackRecordCount int, invalidCacheSemanticsCount int) {
-	for _, entry := range orderTokenUsageEntriesForAIC(entries) {
+// tokenUsageEntriesWithCreditDeltas derives missing per-request credits from the
+// same ordered AWF totals used by summary accounting, before filtering by caller.
+func tokenUsageEntriesWithCreditDeltas(entries []TokenUsageEntry) []TokenUsageEntry {
+	ordered := orderTokenUsageEntriesForAIC(entries)
+	var running float64
+	for index := range ordered {
+		entry := &ordered[index]
+		delta, _, deltaValid := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse)
+		total, _, totalValid := parseOptionalNonNegativeFloat(entry.AICreditsTotal)
+		if !deltaValid && totalValid {
+			delta = max(0, total-running)
+		}
+		entry.reportedCreditDelta = delta
+		if totalValid {
+			running = total
+		} else {
+			running += delta
+		}
+	}
+	return ordered
+}
+
+func applyTokenUsageAICEntries(summary *TokenUsageSummary, entries []TokenUsageEntry) (runningAIC float64, missingRecordCount int) {
+	for _, entry := range tokenUsageEntriesWithCreditDeltas(entries) {
 		model := entry.Model
 		if model == "" {
 			model = "unknown"
 		}
-		reportedDelta, deltaPresent, deltaValid := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse)
+		_, deltaPresent, deltaValid := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse)
 		reportedTotal, totalPresent, totalValid := parseOptionalNonNegativeFloat(entry.AICreditsTotal)
-		inputTokensIncludeCache, _, invalidCacheSemantics := parseOptionalBool(entry.InputTokensIncludeCache)
-		if hasReportedFields && (!deltaPresent || !deltaValid || !totalPresent || !totalValid) {
-			fallbackRecordCount++
+		if !deltaPresent || !deltaValid || !totalPresent || !totalValid {
+			missingRecordCount++
 		}
-		deltaAIC := reportedDelta
-		if !deltaValid {
-			if invalidCacheSemantics {
-				invalidCacheSemanticsCount++
-			}
-			deltaAIC = computeModelInferenceAICWithCacheSemantics(entry.Provider, model, entry.InputTokens, entry.OutputTokens, entry.CacheReadTokens, entry.CacheWriteTokens, entry.ReasoningTokens, inputTokensIncludeCache)
-		}
+		deltaAIC := tokenUsageEntryCredits(entry)
 		if usage := summary.ByModel[model]; usage != nil {
 			usage.AIC += deltaAIC
 		}
@@ -118,15 +114,12 @@ func applyTokenUsageAICEntries(summary *TokenUsageSummary, entries []TokenUsageE
 			runningAIC += deltaAIC
 		}
 	}
-	return runningAIC, fallbackRecordCount, invalidCacheSemanticsCount
+	return runningAIC, missingRecordCount
 }
 
-func appendTokenUsageAICWarnings(summary *TokenUsageSummary, state tokenUsageAICFieldState, fallbackRecordCount int, invalidCacheSemanticsCount int) {
-	if invalidCacheSemanticsCount > 0 {
-		addTokenUsageWarning(summary, fmt.Sprintf("%d token usage record(s) had invalid input_tokens_include_cache values; legacy provider cache semantics were used.", invalidCacheSemanticsCount))
-	}
-	if fallbackRecordCount > 0 {
-		addTokenUsageWarning(summary, fmt.Sprintf("%d token usage record(s) had missing or invalid AWF-reported AI Credits fields; fallback accounting was used for the missing values.", fallbackRecordCount))
+func appendTokenUsageAICWarnings(summary *TokenUsageSummary, state tokenUsageAICFieldState, missingRecordCount int) {
+	if missingRecordCount > 0 && state.hasValidReportedFields {
+		addTokenUsageWarning(summary, fmt.Sprintf("%d token usage record(s) had missing or invalid AWF-reported AI Credits fields; only reported costs are available and observed cost may be incomplete.", missingRecordCount))
 	}
 	summedDeltaAIC := 0.0
 	for _, usage := range summary.ByModel {
@@ -146,28 +139,15 @@ func populateAICFromTokenUsageEntries(summary *TokenUsageSummary, entries []Toke
 		return
 	}
 	state := inspectTokenUsageAICFields(entries)
-	if !state.hasReportedFields && !state.hasExplicitCacheSemantics {
-		populateAIC(summary)
-		invalidCacheSemanticsCount := 0
-		for _, entry := range entries {
-			if _, _, invalid := parseOptionalBool(entry.InputTokensIncludeCache); invalid {
-				invalidCacheSemanticsCount++
-			}
-		}
-		summary.AICFound = summary.TotalAIC > 0
-		appendTokenUsageAICWarnings(summary, state, 0, invalidCacheSemanticsCount)
-		return
-	}
 	for _, usage := range summary.ByModel {
 		if usage != nil {
 			usage.AIC = 0
 		}
 	}
-	var fallbackRecordCount int
-	var invalidCacheSemanticsCount int
-	summary.TotalAIC, fallbackRecordCount, invalidCacheSemanticsCount = applyTokenUsageAICEntries(summary, entries, state.hasReportedFields)
+	var missingRecordCount int
+	summary.TotalAIC, missingRecordCount = applyTokenUsageAICEntries(summary, entries)
 	// Any valid reported AWF credit field, including an explicit zero, means AIC
 	// data was found and callers must not fall back to repricing other artifacts.
 	summary.AICFound = state.hasValidReportedFields || summary.TotalAIC > 0
-	appendTokenUsageAICWarnings(summary, state, fallbackRecordCount, invalidCacheSemanticsCount)
+	appendTokenUsageAICWarnings(summary, state, missingRecordCount)
 }

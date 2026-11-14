@@ -105,6 +105,21 @@ describe("daily_aic_repo_memory_ledger", () => {
     expect(ledger.readLedgerCoverageStart({ repoMemoryDir, repository: "owner/repo", workflowId: "triage", now })).toBe(now);
   });
 
+  it("skips unpriced usage instead of recording it as free", () => {
+    const repoMemoryDir = path.join(directory, "memory");
+    const usageDir = path.join(directory, "usage");
+    fs.mkdirSync(usageDir, { recursive: true });
+    fs.writeFileSync(path.join(usageDir, "agent_usage.jsonl"), JSON.stringify({ provider: "unknown", model: "unknown", input_tokens: 100 }), "utf8");
+    vi.stubEnv("GITHUB_RUN_ID", "42");
+    vi.stubEnv("GITHUB_REPOSITORY", "owner/repo");
+    vi.stubEnv("GH_AW_WORKFLOW_ID", "triage");
+
+    ledger.appendCurrentRunLedgerEntry({ repoMemoryDir, usageRoot: usageDir, now });
+
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("usage is unpriced"));
+    expect(fs.existsSync(ledger.ledgerRoot(repoMemoryDir))).toBe(false);
+  });
+
   it("keeps coverage starts isolated per repository and workflow", () => {
     expect(ledger.ledgerCoveragePath(directory, "owner/repo", "triage")).not.toBe(ledger.ledgerCoveragePath(directory, "other/repo", "triage"));
     expect(ledger.ledgerCoveragePath(directory, "owner/repo", "triage")).not.toBe(ledger.ledgerCoveragePath(directory, "owner/repo", "other"));
