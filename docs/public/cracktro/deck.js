@@ -698,10 +698,10 @@
 
   /* --- finale --- */
   .fin-bg { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
-  .fin-bg h1 { margin: 0; font-size: 300px; line-height: .86; letter-spacing: -.045em; font-variation-settings: "wght" 800, "wdth" 112; white-space: nowrap;
+  .fin-bg h1 { margin: 0; font-size: 150px; line-height: 1.1; letter-spacing: -.01em; font-variation-settings: "wght" 700, "wdth" 100; white-space: nowrap;
     background: linear-gradient(100deg, #0fbf3e 0%, #5fed83 30%, #4493f8 65%, #ab7df8 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
-    opacity: .2; animation: finShimmer 14s ease-in-out infinite alternate; }
-  .fin-bg h1 + h1 { font-size: 210px; }
+    opacity: .5; animation: finShimmer 14s ease-in-out infinite alternate; }
+  .fin-bg h1 + h1 { font-size: 72px; line-height: 1.2; margin-top: 36px; }
   @keyframes finShimmer { to { background-position: 100% 0; } }
   .fin-cap { position: absolute; left: 0; right: 0; bottom: 64px; text-align: center; font: 600 18px/1 var(--mono); letter-spacing: .3em; text-transform: uppercase; color: #9198a1; }
   .fin-cap b { color: #f0f6fc; font-weight: 700; }
@@ -5521,8 +5521,7 @@
       if (!iDot.offsetWidth) return;
       const cs = getComputedStyle(iDot),
         fs = parseFloat(cs.fontSize);
-      mctx.font = `800 ${fs}px "Mona Sans"`;
-      if ("fontStretch" in mctx) mctx.fontStretch = "semi-expanded";
+      mctx.font = `700 ${fs}px "Mona Sans"`;
       const m = mctx.measureText("ı");
       // ink of the dotless i stem, relative to the span's origin and baseline
       const left = iDot.offsetLeft - m.actualBoundingBoxLeft,
@@ -5729,7 +5728,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "fin-bg" }, h("h1", {}, "G", iDot, "tHub"), h("h1", {}, "Agentic Workflows")),
+        h("div", { class: "fin-bg" }, h("h1", {}, "G", iDot, "tHub Agentic Workflows"), h("h1", {}, "Build the factory that works for you")),
         cv,
         h("div", { class: "fin-cap" }, "Illustrative  ·  ", h("b", {}, "1"), " control repo  ·  ", h("b", {}, `${repos.length}`), " repos  ·  ", cRuns, " runs")
       ),
