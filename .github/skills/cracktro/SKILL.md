@@ -14,7 +14,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fi
 - `docs/public/cracktro/index.html`: loads `deck.js` and holds the SEO/Open Graph/Twitter meta (absolute `https://github.github.com/gh-aw/cracktro/` URLs).
 - `docs/public/cracktro/og-image.png`: 1200x630 social card rendered from slide 1 with the dots/count/sound/progress UI hidden. Keep it outside `assets/` (the asset test only allows avatars there).
 - `docs/public/cracktro/deck.js`: about 575 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
-- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist,mona}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
+- `docs/public/cracktro/assets/avatars/{mona,ducky}.jpg`: the fake users Mona and Ducky (GitHub's mascots), the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
 - `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifty-three slide headings (band headers included), so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
@@ -58,7 +58,7 @@ slides.push({
 | `content-rules.md` | Adding any public text, data, avatar or image; contains the per-slide Exception bullets for measured data. |
 | `data-refresh.md` | Adding, changing or refreshing a data slide; holds the refresh mini-skill convention and the slide→`refresh/<slug>.md` index. |
 
-Core rules (details in `content-rules.md`): everything is public; no people except the allowed avatars; no 40-hex SHAs or private repos; the only URL is `https://github.github.com/gh-aw/introduction/overview/`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
+Core rules (details in `content-rules.md`): everything is public; no real GitHub avatars, handles or people, only the fake users Mona and Ducky (per the brand mascot guidelines); no 40-hex SHAs or private repos; the only URL is `https://github.github.com/gh-aw/introduction/overview/`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
 
 ## Preview loop
 
