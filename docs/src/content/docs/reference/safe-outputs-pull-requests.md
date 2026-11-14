@@ -183,6 +183,8 @@ When `head-repo` is set, the preferred model is an ephemeral upstream-based bran
 
 Updates PR title or body. Both fields are enabled by default. The `operation` field controls how body updates are applied: `replace` (default), `append`, `prepend`, or `replace-island` (updates a run-specific section delimited by HTML comments).
 
+`safe-outputs.update-pull-request.operation` sets the default body operation when the agent omits `operation`. An explicit agent operation takes precedence; without either value, the handler uses `replace`.
+
 ```yaml wrap
 safe-outputs:
   update-pull-request:
