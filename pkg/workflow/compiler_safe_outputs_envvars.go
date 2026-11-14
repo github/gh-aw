@@ -21,9 +21,6 @@ func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID
 	addJobLevelEngineMetadata(envVars, data)
 	addJobLevelCommandMetadata(envVars, data)
 	c.addJobLevelSafeOutputConfig(envVars, data)
-	if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
-		envVars["GH_AW_LEDGER_TRANSACTIONS"] = fmt.Sprintf("%q", ledgerTransactionsArtifactPath)
-	}
 	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
 		if plan := data.Connectors[alias].SafeOutputPlan; plan != "" {
 			envVars[connectorEnvPrefix(alias)+"PLAN"] = quoteYAMLEnvValue(plan)

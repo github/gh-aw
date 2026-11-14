@@ -722,8 +722,11 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 		downloadStep = downloadStep[:nextStep]
 	}
 	require.Contains(t, downloadStep, "          path: "+ledgerTransactionsArtifactDir)
+	handlerManagerSteps, err := NewCompiler().buildHandlerManagerStep(data)
+	require.NoError(t, err)
+	require.Contains(t, strings.Join(handlerManagerSteps, ""), "GH_AW_LEDGER_TRANSACTIONS: "+ledgerTransactionsArtifactPath+"\n")
 	safeOutputsEnv := NewCompiler().buildJobLevelSafeOutputEnvVars(data, "")
-	require.Equal(t, strconv.Quote(ledgerTransactionsArtifactPath), safeOutputsEnv["GH_AW_LEDGER_TRANSACTIONS"])
+	require.NotContains(t, safeOutputsEnv, "GH_AW_LEDGER_TRANSACTIONS")
 
 	var projectionStep strings.Builder
 	require.NoError(t, NewCompiler().generateLedgerProjectionStep(&projectionStep, data))

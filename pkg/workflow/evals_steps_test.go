@@ -169,7 +169,7 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 	}
 	script, err := os.ReadFile("../../actions/setup/sh/collect_usage_artifact_files.sh")
 	require.NoError(t, err)
-	assert.Contains(t, string(script), "cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl")
-	assert.Contains(t, string(script), "cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json")
-	assert.Contains(t, string(script), "cp /tmp/gh-aw/evals/evals_status.json /tmp/gh-aw/usage/evals/evals_status.json")
+	assert.Contains(t, string(script), "safe_copy /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl")
+	assert.Contains(t, string(script), "safe_copy /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json")
+	assert.Contains(t, string(script), "safe_copy /tmp/gh-aw/evals/evals_status.json /tmp/gh-aw/usage/evals/evals_status.json")
 }
