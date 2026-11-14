@@ -453,6 +453,17 @@
     opacity: 0; transform: translateX(30px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), border-color .5s, box-shadow .5s; }
   .an-call.on { opacity: 1; transform: none; }
   .an-call.hot { border-color: var(--c); box-shadow: 0 0 50px -16px var(--c); }
+  .an-cc { position: absolute; left: 1210px; top: 140px; width: 600px; height: 96px; display: flex; align-items: center; gap: 14px; font: 500 20px/1 var(--mono); opacity: 0; transform: translateY(-12px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1); }
+  .an-cc.on { opacity: 1; transform: none; }
+  .an-cc .term { padding: 14px 18px; border-radius: 12px; background: #0d1117; border: 1px solid #3d444d; color: #f0f6fc; white-space: nowrap; }
+  .an-cc .term b { color: #3fb950; font-weight: 500; }
+  .an-cc .arr { flex: 1; height: 3px; min-width: 40px; position: relative; background: repeating-linear-gradient(90deg, #d29922 0 8px, transparent 8px 14px); background-size: 14px 3px; }
+  .an-cc .arr::after { content: ""; position: absolute; right: -2px; top: -7px; border: 8px solid transparent; border-left: 12px solid #d29922; border-right: 0; }
+  .an-cc.hot .arr { animation: an-arr .6s linear infinite; }
+  @keyframes an-arr { to { background-position: 14px 0; } }
+  .an-cc .lockf { padding: 10px 16px; border-radius: 12px; background: #161b22; border: 1px solid #d29922; color: #f0f6fc; white-space: nowrap; transition: box-shadow .5s; }
+  .an-cc .lockf small { display: block; margin-top: 6px; font: 500 14px/1 var(--mono); color: #9198a1; }
+  .an-cc.hot .lockf { box-shadow: 0 0 36px -8px #d29922; }
   .an-call .an-num { position: absolute; left: 24px; top: 22px; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font: 700 22px/1 var(--mono); color: #0d1117; background: var(--c); }
   .an-call h3 { margin: 0 0 10px; display: flex; align-items: center; gap: 14px; font-size: 32px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
   .an-call h3 code { font: 500 16px/1 var(--mono); color: var(--c); padding: 6px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); }
@@ -882,6 +893,146 @@
     });
   }
 
+  // Anatomy of a workflow: one synthetic .md dissected into front matter, schedule, tools, steps, safe outputs and prompt
+  {
+    resetIndex();
+    const YAML = [
+      "---",
+      "on:",
+      "  schedule: daily on weekdays",
+      "tools:",
+      "  github:",
+      "    toolsets: [issues]",
+      "  repo-memory:",
+      "    branch-name: memory/docs-audit",
+      "permissions: read-all",
+      "steps:",
+      "  - run: npm ci",
+      "  - run: npm run lint -- --json > lint.json",
+      "safe-outputs:",
+      "  create-issue:",
+      '    title-prefix: "[audit] "',
+      "    max: 1",
+      "---",
+    ];
+    const C = { fm: "#d1d7e0", sch: "#d29922", tl: "#4493f8", st: "#39c5cf", so: "#3fb950", pr: "#ab7df8" };
+    const tok = (k, text) => h("span", { class: `an-tok an-tok-${k}`, "--c": C[k], style: { color: C[k] } }, text);
+    const yamlLine = l => {
+      if (l === "---") return [h("span", { style: { color: "#656c76" } }, l)];
+      const [, ind, key, val] = l.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
+      return [ind, h("span", { style: { color: ind ? "#7ee787" : "#ff7b72" } }, key), h("span", { style: { color: "#a5d6ff" } }, val)];
+    };
+    const BODY = [
+      [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, "# Docs audit")],
+      ["Triage ", tok("st", "lint.json"), ". Skip findings already in"],
+      [tok("tl", "memory"), " or ", tok("tl", "open issues"), ", then file"],
+      [tok("so", "one issue"), " with a checklist of fixes."],
+    ];
+    const lines = [...YAML.map(yamlLine), ...BODY].map(kids => h("div", { class: "an-ln" }, kids));
+    const LH = 30,
+      CODE_TOP = 345;
+    const CALLS = [
+      ["sch", [2, 3], "Schedule", "on: schedule", "Fuzzy schedule in plain words; the compiler scatters it to a concrete cron."],
+      ["tl", [4, 8], "Tools", "tools:", ["Read-only GitHub toolsets, plus ", h("code", {}, "repo-memory"), ": a git branch the agent keeps notes in across runs."]],
+      ["st", [10, 12], "Steps", "deterministic", ["Plain shell runs before the agent and leaves ", h("code", {}, "lint.json"), " in the workspace."]],
+      ["so", [13, 16], "Safe outputs", "max: 1", "The agent stays read-only. It can only request one issue; a separate job writes it."],
+      ["pr", [18, 21], "Prompt", "markdown body", "Everything below the front matter is the agent prompt: plain-English instructions it follows on every run."],
+    ];
+    const CALL_TOP = [295, 440, 585, 730, 875];
+    const bands = CALLS.map(([k, [a, b]]) => h("div", { class: "an-band", "--c": C[k], style: { top: `${18 + (a - 1) * LH}px`, height: `${(b - a + 1) * LH}px` } }));
+    const calls = CALLS.map(([k, , title, chip, text], i) =>
+      h("div", { class: "an-call", "--c": C[k], style: { top: `${CALL_TOP[i]}px` } }, h("div", { class: "an-num" }, String(i + 1).padStart(2, "0")), h("h3", {}, title, h("code", {}, chip)), h("p", {}, text))
+    );
+    const brace = (k, [a, b], label) => h("div", { class: "an-brace", "--c": C[k], style: { top: `${CODE_TOP + (a - 1) * LH + 2}px`, height: `${(b - a + 1) * LH - 4}px` } }, h("span", {}, label));
+    const braces = [brace("fm", [1, 17], "Front matter"), brace("pr", [18, 21], "Prompt")];
+    const botSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    botSvg.setAttribute("viewBox", "0 0 24 24");
+    const bot = h("div", { class: "an-bot", "--c": C.pr, style: { top: `${18 + 17 * LH}px` } }, botSvg, "Agent prompt");
+    const lockSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    lockSvg.setAttribute("viewBox", "0 0 24 24");
+    lockSvg.innerHTML = '<path d="M12 1.5 3 5v6.5c0 5.2 3.8 9.6 9 11 5.2-1.4 9-5.8 9-11V5L12 1.5Zm0 6a2.5 2.5 0 0 1 1.25 4.67V15.5h-2.5v-3.33A2.5 2.5 0 0 1 12 7.5Z"/>';
+    const lock = h("div", { class: "an-bot", "--c": C.fm, style: { top: "18px" } }, lockSvg, "Deterministic security config");
+    const cc = h("div", { class: "an-cc" }, h("div", { class: "term" }, h("b", {}, "$ "), "gh aw compile"), h("div", { class: "arr" }), h("div", { class: "lockf" }, "🔒 docs-audit.lock.yml", h("small", {}, "hardened Actions YAML")));
+    const wires = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    wires.setAttribute("class", "an-wires");
+    wires.setAttribute("viewBox", "0 0 1920 1080");
+    wires.innerHTML = CALLS.map(([k, [a, b]], i) => {
+      const ry = CODE_TOP + (a - 1) * LH + ((b - a + 1) * LH) / 2,
+        cy = CALL_TOP[i] + 63;
+      return `<path style="--c:${C[k]}" d="M 984 ${ry} H 1050 C 1095 ${ry} 1095 ${cy} 1140 ${cy}"/><circle style="--c:${C[k]}" cx="984" cy="${ry}" r="6"/>`;
+    }).join("");
+    const paths = [...wires.querySelectorAll("path")],
+      dots = [...wires.querySelectorAll("circle")];
+    const toks = { tl: [...lines[19].querySelectorAll(".an-tok-tl")], st: [lines[18].querySelector(".an-tok-st")], so: [lines[20].querySelector(".an-tok-so")] };
+    // reveal order: front matter brace, then each callout (the prompt callout also brings the body brace)
+    const REVEAL = 0.6,
+      GAP = 1,
+      CYCLE = REVEAL + GAP * 6,
+      HOT = 2.4;
+    let t0 = 0,
+      seen = -1,
+      skip = false;
+    const lit = (idx, on) => {
+      if (idx === 0) {
+        [braces[0], lock, cc].forEach(e => e.classList.toggle("on", on));
+        [0, 8, 16].forEach(n => lines[n].classList.toggle("on", on));
+        return;
+      }
+      const [, [a, b]] = CALLS[idx - 1];
+      for (let n = a - 1; n < b; n++) lines[n].classList.toggle("on", on);
+      [bands, calls, paths, dots].forEach(list => list[idx - 1].classList.toggle("on", on));
+      if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
+    };
+    slides.push({
+      sound: "ship",
+      palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
+      notes:
+        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        skip = false;
+        if (!botSvg.firstChild) botSvg.innerHTML = OCTI.copilot.map(d => `<path d="${d}"/>`).join("");
+        [bot, lock, cc].forEach(e => e.classList.remove("on", "hot"));
+        [...lines, ...bands, ...calls, ...paths, ...dots, ...braces, ...Object.values(toks).flat()].forEach(e => e.classList.remove("on", "hot"));
+      },
+      onNext() {
+        if (seen >= 5) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.min(5, Math.floor((e - REVEAL) / GAP));
+        while (seen < n) {
+          seen++;
+          lit(seen, true);
+          sfx.pop(seen * 2);
+        }
+        const hot = e >= CYCLE ? Math.floor((e - CYCLE) / HOT) % 6 : -1;
+        braces[0].classList.toggle("hot", hot === 0);
+        lock.classList.toggle("hot", hot === 0);
+        cc.classList.toggle("hot", hot === 0);
+        braces[1].classList.toggle("hot", hot === 5);
+        bot.classList.toggle("hot", hot === 5);
+        [bands, calls, paths].forEach(list => list.forEach((el, i) => el.classList.toggle("hot", hot === i + 1)));
+        ["tl", "st", "so"].forEach((k, i) => toks[k].forEach(el => el.classList.toggle("hot", hot === i + 2)));
+      },
+      el: h(
+        "section",
+        { class: "slide an" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Inside one file"), h("h2", { class: "pf-h" }, letters("Anatomy of a "), letters("workflow", "l-grad"))),
+        h("div", { class: "an-file" }, h("div", { class: "file" }, "📄 .github/workflows/docs-audit.md"), h("div", { class: "an-code" }, bands, lines, lock, bot)),
+        braces,
+        wires,
+        calls,
+        cc
+      ),
+    });
+  }
+
   // Spec Driven Automation: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
@@ -1035,143 +1186,6 @@
         n3.textContent = Math.round(212 * ez);
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Spec Driven "), letters("Automation", "l-grad"))), tta, links, tags, cards),
-    });
-  }
-
-  // Anatomy of a workflow: one synthetic .md dissected into front matter, schedule, tools, steps, safe outputs and prompt
-  {
-    resetIndex();
-    const YAML = [
-      "---",
-      "on:",
-      "  schedule: daily on weekdays",
-      "tools:",
-      "  github:",
-      "    toolsets: [issues]",
-      "  repo-memory:",
-      "    branch-name: memory/docs-audit",
-      "permissions: read-all",
-      "steps:",
-      "  - run: npm ci",
-      "  - run: npm run lint -- --json > lint.json",
-      "safe-outputs:",
-      "  create-issue:",
-      '    title-prefix: "[audit] "',
-      "    max: 1",
-      "---",
-    ];
-    const C = { fm: "#d1d7e0", sch: "#d29922", tl: "#4493f8", st: "#39c5cf", so: "#3fb950", pr: "#ab7df8" };
-    const tok = (k, text) => h("span", { class: `an-tok an-tok-${k}`, "--c": C[k], style: { color: C[k] } }, text);
-    const yamlLine = l => {
-      if (l === "---") return [h("span", { style: { color: "#656c76" } }, l)];
-      const [, ind, key, val] = l.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
-      return [ind, h("span", { style: { color: ind ? "#7ee787" : "#ff7b72" } }, key), h("span", { style: { color: "#a5d6ff" } }, val)];
-    };
-    const BODY = [
-      [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, "# Docs audit")],
-      ["Triage ", tok("st", "lint.json"), ". Skip findings already in"],
-      [tok("tl", "memory"), " or ", tok("tl", "open issues"), ", then file"],
-      [tok("so", "one issue"), " with a checklist of fixes."],
-    ];
-    const lines = [...YAML.map(yamlLine), ...BODY].map(kids => h("div", { class: "an-ln" }, kids));
-    const LH = 30,
-      CODE_TOP = 345;
-    const CALLS = [
-      ["sch", [2, 3], "Schedule", "on: schedule", "Fuzzy schedule in plain words; the compiler scatters it to a concrete cron."],
-      ["tl", [4, 8], "Tools", "tools:", ["Read-only GitHub toolsets, plus ", h("code", {}, "repo-memory"), ": a git branch the agent keeps notes in across runs."]],
-      ["st", [10, 12], "Steps", "deterministic", ["Plain shell runs before the agent and leaves ", h("code", {}, "lint.json"), " in the workspace."]],
-      ["so", [13, 16], "Safe outputs", "max: 1", "The agent stays read-only. It can only request one issue; a separate job writes it."],
-      ["pr", [18, 21], "Prompt", "markdown body", "Everything below the front matter is the agent prompt: plain-English instructions it follows on every run."],
-    ];
-    const CALL_TOP = [295, 440, 585, 730, 875];
-    const bands = CALLS.map(([k, [a, b]]) => h("div", { class: "an-band", "--c": C[k], style: { top: `${18 + (a - 1) * LH}px`, height: `${(b - a + 1) * LH}px` } }));
-    const calls = CALLS.map(([k, , title, chip, text], i) =>
-      h("div", { class: "an-call", "--c": C[k], style: { top: `${CALL_TOP[i]}px` } }, h("div", { class: "an-num" }, String(i + 1).padStart(2, "0")), h("h3", {}, title, h("code", {}, chip)), h("p", {}, text))
-    );
-    const brace = (k, [a, b], label) => h("div", { class: "an-brace", "--c": C[k], style: { top: `${CODE_TOP + (a - 1) * LH + 2}px`, height: `${(b - a + 1) * LH - 4}px` } }, h("span", {}, label));
-    const braces = [brace("fm", [1, 17], "Front matter"), brace("pr", [18, 21], "Prompt")];
-    const botSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    botSvg.setAttribute("viewBox", "0 0 24 24");
-    const bot = h("div", { class: "an-bot", "--c": C.pr, style: { top: `${18 + 17 * LH}px` } }, botSvg, "Agent prompt");
-    const lockSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    lockSvg.setAttribute("viewBox", "0 0 24 24");
-    lockSvg.innerHTML = '<path d="M12 1.5 3 5v6.5c0 5.2 3.8 9.6 9 11 5.2-1.4 9-5.8 9-11V5L12 1.5Zm0 6a2.5 2.5 0 0 1 1.25 4.67V15.5h-2.5v-3.33A2.5 2.5 0 0 1 12 7.5Z"/>';
-    const lock = h("div", { class: "an-bot", "--c": C.fm, style: { top: "18px" } }, lockSvg, "Deterministic security config");
-    const wires = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    wires.setAttribute("class", "an-wires");
-    wires.setAttribute("viewBox", "0 0 1920 1080");
-    wires.innerHTML = CALLS.map(([k, [a, b]], i) => {
-      const ry = CODE_TOP + (a - 1) * LH + ((b - a + 1) * LH) / 2,
-        cy = CALL_TOP[i] + 63;
-      return `<path style="--c:${C[k]}" d="M 984 ${ry} H 1050 C 1095 ${ry} 1095 ${cy} 1140 ${cy}"/><circle style="--c:${C[k]}" cx="984" cy="${ry}" r="6"/>`;
-    }).join("");
-    const paths = [...wires.querySelectorAll("path")],
-      dots = [...wires.querySelectorAll("circle")];
-    const toks = { tl: [...lines[19].querySelectorAll(".an-tok-tl")], st: [lines[18].querySelector(".an-tok-st")], so: [lines[20].querySelector(".an-tok-so")] };
-    // reveal order: front matter brace, then each callout (the prompt callout also brings the body brace)
-    const REVEAL = 0.6,
-      GAP = 1,
-      CYCLE = REVEAL + GAP * 6,
-      HOT = 2.4;
-    let t0 = 0,
-      seen = -1,
-      skip = false;
-    const lit = (idx, on) => {
-      if (idx === 0) {
-        [braces[0], lock].forEach(e => e.classList.toggle("on", on));
-        [0, 8, 16].forEach(n => lines[n].classList.toggle("on", on));
-        return;
-      }
-      const [, [a, b]] = CALLS[idx - 1];
-      for (let n = a - 1; n < b; n++) lines[n].classList.toggle("on", on);
-      [bands, calls, paths, dots].forEach(list => list[idx - 1].classList.toggle("on", on));
-      if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
-    };
-    slides.push({
-      sound: "ship",
-      palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
-      notes:
-        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that the compiler turns into a hardened lock file, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
-      enter() {
-        t0 = 0;
-        seen = -1;
-        skip = false;
-        if (!botSvg.firstChild) botSvg.innerHTML = OCTI.copilot.map(d => `<path d="${d}"/>`).join("");
-        [bot, lock].forEach(e => e.classList.remove("on", "hot"));
-        [...lines, ...bands, ...calls, ...paths, ...dots, ...braces, ...Object.values(toks).flat()].forEach(e => e.classList.remove("on", "hot"));
-      },
-      onNext() {
-        if (seen >= 5) return false;
-        skip = true;
-        return true;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
-        const e = (t - t0) / 1000;
-        const n = Math.min(5, Math.floor((e - REVEAL) / GAP));
-        while (seen < n) {
-          seen++;
-          lit(seen, true);
-          sfx.pop(seen * 2);
-        }
-        const hot = e >= CYCLE ? Math.floor((e - CYCLE) / HOT) % 6 : -1;
-        braces[0].classList.toggle("hot", hot === 0);
-        lock.classList.toggle("hot", hot === 0);
-        braces[1].classList.toggle("hot", hot === 5);
-        bot.classList.toggle("hot", hot === 5);
-        [bands, calls, paths].forEach(list => list.forEach((el, i) => el.classList.toggle("hot", hot === i + 1)));
-        ["tl", "st", "so"].forEach((k, i) => toks[k].forEach(el => el.classList.toggle("hot", hot === i + 2)));
-      },
-      el: h(
-        "section",
-        { class: "slide an" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Inside one file"), h("h2", { class: "pf-h" }, letters("Anatomy of a "), letters("workflow", "l-grad"))),
-        h("div", { class: "an-file" }, h("div", { class: "file" }, "📄 .github/workflows/docs-audit.md"), h("div", { class: "an-code" }, bands, lines, lock, bot)),
-        braces,
-        wires,
-        calls
-      ),
     });
   }
 

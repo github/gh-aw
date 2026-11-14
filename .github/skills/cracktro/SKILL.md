@@ -66,7 +66,7 @@ slides.push({
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 2, 4, 6, and 8–17 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 2, 3, 6, and 8–17 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop

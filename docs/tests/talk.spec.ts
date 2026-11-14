@@ -15,8 +15,8 @@ test("presents the seventeen slides without the removed sections", async ({ page
   const headings = [
     "GitHubAgenticWorkflows",
     "AI-poweredworkflowsfor GitHub",
-    "Spec Driven Automation",
     "Anatomy of a workflow",
+    "Spec Driven Automation",
     "Safety and control",
     "Automation hardening",
     "Stop manually translating intent into code.",
@@ -114,7 +114,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
   await page.keyboard.press("n");
-  for (const slide of [2, 4, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
+  for (const slide of [2, 3, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
