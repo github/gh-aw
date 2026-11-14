@@ -359,6 +359,12 @@
   .gf .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #ab7df8, #79c0ff); }
   .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
   .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
+  .prq-svg { left: 280px; top: 262px; width: 1360px; height: 664px; }
+  .prq-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
+  .prq-cap { fill: #9198a1; font: 600 19px var(--mono); letter-spacing: .08em; }
+  .prq-stat { opacity: .45; transition: opacity .5s; } .prq-stat.on { opacity: 1; }
+  .prq-v { fill: #f0f6fc; font: 700 46px "Mona Sans"; transition: fill .5s; } .prq-stat.on .prq-v { fill: #ab7df8; }
+  .prq-sl { fill: #9198a1; font: 500 19px var(--mono); }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .rao-card.on { stroke: var(--rc, #3fb950); filter: drop-shadow(0 0 12px var(--rc, #3fb950)); }
   .rao-h { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
@@ -3974,10 +3980,19 @@
     {
       resetIndex();
       const VW = 1700,
-        VH = 680;
+        VH = 830;
       const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
       const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
         <circle cx="${x}" cy="${y}" r="34" fill="url(#prqAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+      // measured on gh-aw merged PRs, 15 Oct to 13 Nov 2026; [edge that lights it, value, label lines]
+      const STATS = [
+        ["p1", "938", ["of 1,263 merged PRs", "checked by agents"]],
+        ["p1", "1,337", ["agentic reviews", "submitted"]],
+        ["p2", "1,612", ["inline review", "threads opened"]],
+        ["p3", "517", ["Sous Chef nudges", "on 336 PRs"]],
+        ["p4", "965", ["Copilot fix commits", "on 305 PRs"]],
+        ["p6", "1.8 h", ["median ready", "for review → merge"]],
+      ];
       const human = (id, x, y, w, label, avatar = "assets/avatars/pelikhan.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
         <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#prqClip)"/></g>`;
       const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
@@ -4025,7 +4040,12 @@
         [1340, VW, "MERGE"],
       ].forEach(([x0, x1, t], i) => {
         g += `<text class="fm-lane-t mra-lane" id="prqLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-        if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+        if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="664"/>`;
+      });
+      g += `<rect class="prq-card" x="0" y="680" width="${VW}" height="150" rx="16"/><text class="prq-cap" x="24" y="716">MEASURED · gh-aw merged pull requests, 15 Oct – 13 Nov 2026 · flow above is illustrative</text>`;
+      STATS.forEach(([, v, lab], i) => {
+        const x = 24 + i * 280;
+        g += `<g class="prq-stat" id="prqS${i}"><text class="prq-v" x="${x}" y="768">${v}</text>${lab.map((l, k) => `<text class="prq-sl" x="${x}" y="${794 + k * 24}">${l}</text>`).join("")}</g>`;
       });
       for (const [id, d, c, lab, lx, ly, an] of EDGES) {
         const fan = id === "p2a" || id === "p2b";
@@ -4039,7 +4059,7 @@
       g += `<text class="prq-thr" id="prqThr" x="968" y="356"></text>`;
       g += `<circle class="fm-dot mra-dot" r="8"/>`;
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("class", "fm-svg rpa-svg");
+      svg.setAttribute("class", "fm-svg rpa-svg prq-svg");
       svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
       svg.style.setProperty("--c", "#ab7df8");
       svg.innerHTML = g;
@@ -4078,7 +4098,7 @@
         sound: "reviews",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
-          "Pull Request Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
+          "Pull Request Review squared. The flow is illustrative and its open-thread counter is synthetic; the bottom strip is measured on gh-aw's own merged pull requests from 15 October to 13 November 2026. Of 1,263 merged pull requests, 938 were checked by the Matt Pocock Skills Reviewer, PR Code Quality Reviewer or Test Quality Sentinel workflows, which submitted 1,337 reviews and opened 1,612 inline review threads. PR Sous Chef posted 517 @copilot nudges on 336 pull requests, and Copilot pushed 965 fix commits after a nudge on 305 of them. 660 of the 682 reviewed pull requests merged after a single review round per reviewer, with a median of 1.8 hours from ready for review to merge. Reviewers are identified by their workflow footers and nudges by the Sous Chef workflow marker. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
         enter() {
           t0 = 0;
           cyc = -1;
@@ -4097,6 +4117,7 @@
           }
           svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
           if (u < START || u >= END) {
+            if (u >= END) STATS.forEach((_, i) => $("prqS" + i).classList.add("on"));
             dot.style.opacity = 0;
             return;
           }
@@ -4116,6 +4137,8 @@
           dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
           for (let j = 0; j < k; j++) light(SEQ[j][1]);
           threads(k - 1);
+          const done = SEQ.slice(0, f >= 0.8 ? k + 1 : k).map(x => x[0]);
+          STATS.forEach(([se], i) => $("prqS" + i).classList.toggle("on", done.includes(se)));
           if (f >= 0.8) {
             if (popK !== k) {
               popK = k;
