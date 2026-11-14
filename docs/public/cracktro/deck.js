@@ -12434,7 +12434,7 @@
   const INK = { base: [13, 17, 23], grid: [240, 246, 252, 0.028, 0.07], ang: 0 };
   const BG = {
     // Human agent processes: dark blueprint blue, straight grid.
-    process: { base: [3, 10, 24], pal: ["#06285e", "#082048", "#03122c", "#0b3166"], grid: [200, 228, 255, 0.06, 0.16], ang: 0 },
+    process: { base: [3, 10, 24], pal: ["#06285e", "#082048", "#03122c", "#0b3166"], grid: [170, 210, 255, 0.018, 0.045], ang: 0 },
     // Cost & context: the usual gray, gold grid lines turned 45° to the left (the inverse of the security wash).
     cost: { base: INK.base, grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4 },
   };
