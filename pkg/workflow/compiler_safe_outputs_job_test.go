@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,6 +17,99 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSafeOutputsRequireAgentSuccess(t *testing.T) {
+	for _, setting := range []string{"", "false", "true"} {
+		for _, detection := range []string{"false", "true", `"${{ vars.DETECT == 'true' }}"`} {
+			t.Run(fmt.Sprintf("setting=%s/detection=%s", setting, detection), func(t *testing.T) {
+				config := ""
+				if setting != "" {
+					config = "  require-agent-success: " + setting + "\n"
+				}
+				source := `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+tools:
+  repo-memory:
+    branch-name: memory/test
+post-steps:
+  - name: Deterministic gate
+    run: exit 1
+safe-outputs:
+` + config + `  threat-detection: ` + detection + `
+  add-comment:
+  upload-asset:
+  jobs:
+    publish:
+      if: always() || failure()
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo publish
+---
+Test publication gate.
+`
+				compiler := NewCompiler()
+				path := filepath.Join(t.TempDir(), "workflow.md")
+				data, err := compiler.ParseWorkflowString(source, path)
+				require.NoError(t, err)
+				require.Equal(t, setting == "true", data.SafeOutputs.RequireAgentSuccess)
+				output, err := compiler.CompileToYAML(data, path)
+				require.NoError(t, err)
+				var compiled map[string]any
+				require.NoError(t, yaml.Unmarshal([]byte(output), &compiled))
+				jobs := compiled["jobs"].(map[string]any)
+				repoMemory := jobs["push_repo_memory"].(map[string]any)
+				repoMemorySteps, err := yaml.Marshal(repoMemory["steps"])
+				require.NoError(t, err)
+				assert.Contains(t, string(repoMemorySteps), "Download repo-memory artifact")
+				assert.Contains(t, string(repoMemorySteps), "Push repo-memory changes")
+				names := []string{"safe_outputs", "publish", "upload_assets", "push_repo_memory"}
+				if detection != "false" {
+					names = append(names, "detection")
+				}
+				for _, name := range names {
+					job := jobs[name].(map[string]any)
+					condition := strings.Join(strings.Fields(job["if"].(string)), " ")
+					if setting == "true" {
+						assert.Contains(t, condition, "needs.agent.result == 'success'", name)
+					} else {
+						assert.NotContains(t, condition, "needs.agent.result == 'success'", name)
+					}
+					// Substitute non-result predicates to exercise the agent-result gate
+					// with output present and all other publication checks passing.
+					condition = strings.NewReplacer(
+						"!cancelled()", "('true' == 'true')",
+						"always()", "('true' == 'true')",
+						"failure()", "('true' == 'false')",
+						"contains(needs.agent.outputs.output_types, 'publish')", "('true' == 'true')",
+						"contains(needs.agent.outputs.output_types, 'upload_asset')", "('true' == 'true')",
+					).Replace(condition)
+					for _, result := range []string{"success", "failure", "cancelled", "skipped"} {
+						for _, detectionResult := range []string{"success", "failure", "skipped"} {
+							if name == "upload_assets" && detection == "true" && detectionResult != "success" {
+								continue
+							}
+							allowed := (result != "skipped" || (name == "push_repo_memory" && detection == "false")) &&
+								(setting != "true" || result == "success")
+							if name != "detection" && detection != "false" {
+								allowed = allowed && (detectionResult == "success" || (detectionResult == "skipped" &&
+									(name == "push_repo_memory" || detection != "true")))
+							}
+							assert.Equal(t, allowed, evaluateTestCondition(t, condition, map[string]string{
+								"needs.agent.result":     result,
+								"needs.detection.result": detectionResult,
+								"vars.DETECT":            "true",
+							}), "%s agent=%s detection=%s", name, result, detectionResult)
+						}
+					}
+				}
+				assert.NotContains(t, jobs["conclusion"].(map[string]any)["if"], "needs.agent.result == 'success'")
+			})
+		}
+	}
+}
 
 func TestSafeOutputsPRLifecyclePermissions(t *testing.T) {
 	t.Parallel()

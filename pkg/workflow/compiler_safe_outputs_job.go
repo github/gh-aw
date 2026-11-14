@@ -1011,6 +1011,7 @@ func buildSafeOutputsJobCondition(data *WorkflowData, threatDetectionEnabled boo
 			BuildStringLiteral("skipped"),
 		),
 	)
+	agentNotSkipped = requireSafeOutputsAgentSuccess(agentNotSkipped, data.SafeOutputs)
 	if IsConditionalDetection(data.SafeOutputs) {
 		// When detection is expression-controlled, the detection job may be skipped at runtime
 		// (expression evaluated to false). Use always() to prevent safe_outputs from being

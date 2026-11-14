@@ -6,6 +6,45 @@ import (
 	"testing"
 )
 
+func TestMainWorkflowSchema_RequireAgentSuccess(t *testing.T) {
+	t.Parallel()
+	keys, err := GetSafeOutputTypeKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range keys {
+		if key == "require-agent-success" {
+			t.Fatal("require-agent-success must not be classified as an output operation")
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		value any
+		valid bool
+	}{
+		{"enabled", true, true},
+		{"disabled", false, true},
+		{"string", "true", false},
+		{"expression", "${{ inputs.publish }}", false},
+		{"number", 1, false},
+		{"null", nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "push",
+				"safe-outputs": map[string]any{
+					"require-agent-success": tc.value,
+					"add-comment":           nil,
+				},
+			}
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/require-agent-success.md")
+			if (err == nil) != tc.valid {
+				t.Fatalf("schema validity = %v, want %v: %v", err == nil, tc.valid, err)
+			}
+		})
+	}
+}
+
 func TestMainWorkflowSchema_CreateIssueOptOut(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

@@ -3,14 +3,47 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSafeOutputsRequireAgentSuccessImports(t *testing.T) {
+	for _, main := range []string{"", "false", "true"} {
+		for _, first := range []string{"false", "true"} {
+			for _, second := range []string{"false", "true"} {
+				t.Run(fmt.Sprintf("main=%s/first=%s/second=%s", main, first, second), func(t *testing.T) {
+					dir := t.TempDir()
+					for name, value := range map[string]string{"first": first, "second": second} {
+						require.NoError(t, os.WriteFile(filepath.Join(dir, name+".md"), []byte(
+							"---\nsafe-outputs:\n  require-agent-success: "+value+"\n---\nShared gate.\n"), 0o600))
+					}
+					config := ""
+					if main != "" {
+						config = "  require-agent-success: " + main + "\n"
+					}
+					source := "---\non: workflow_dispatch\nimports:\n  - ./first.md\n  - ./second.md\nsafe-outputs:\n" +
+						config + "  add-comment:\n---\nMain workflow.\n"
+					path := filepath.Join(dir, "main.md")
+					require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+					compiler := NewCompiler()
+					data, err := compiler.ParseWorkflowFile(path)
+					require.NoError(t, err)
+					enabled := main == "true" || (main == "" && (first == "true" || second == "true"))
+					require.Equal(t, enabled, data.SafeOutputs.RequireAgentSuccess)
+					condition := RenderCondition(buildSafeOutputsJobCondition(data, true))
+					assert.Equal(t, enabled, strings.Contains(condition, "needs.agent.result == 'success'"))
+				})
+			}
+		}
+	}
+}
 
 // TestSafeOutputsImport tests that safe-output types can be imported from shared workflows
 func TestSafeOutputsImport(t *testing.T) {
