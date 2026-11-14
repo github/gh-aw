@@ -613,6 +613,59 @@
   .ae-tag em { font-style: normal; color: var(--ec); }
   .active .ae-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.1s; }
 
+  /* --- enterprise ready --- */
+  .er { --ec: #4493f8; }
+  .er .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #a5d6ff, #d29922, #4493f8); }
+  .er-tag { position: absolute; right: 110px; top: 118px; width: 600px; text-align: right; font: 500 30px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
+  .er-tag b { color: #f0f6fc; font-weight: 700; }
+  .active .er-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .er-ed { position: absolute; left: 110px; top: 330px; width: 720px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .er-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .er-ed .ae-code { font-size: 22px; line-height: 27px; }
+  .er-ed .ae-row { transition: background .4s; }
+  .er-ed .ae-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--ec) 24%, transparent), transparent 85%); }
+  .er-ed .ae-row.lit { background: linear-gradient(90deg, #d2992255, transparent 85%); box-shadow: inset 4px 0 0 #d29922; }
+  .er-arrow { position: absolute; left: 846px; top: 430px; width: 150px; text-align: center; font: 500 17px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .er-arrow svg { display: block; width: 150px; height: 40px; margin-top: 12px; overflow: visible; }
+  .er-arrow path { fill: none; stroke: #9198a1; stroke-width: 3; stroke-dasharray: 10 8; animation: ae-flow .8s linear infinite; }
+  .er-arrow small { display: block; margin-top: 10px; white-space: nowrap; font: 600 15px/1 var(--mono); color: #3fb950; letter-spacing: .06em; }
+  .active .er-arrow { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .er-card { position: absolute; width: 390px; height: 230px; padding: 24px 26px; border-radius: 20px; background: #161b22e8; border: 2px solid #3d444d; opacity: 0;
+    transition: border-color .4s, box-shadow .4s, background .4s; }
+  .active .er-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(.5s + var(--i) * 120ms); }
+  .er-card.on { border-color: var(--rc); background: color-mix(in srgb, var(--rc) 9%, #0d1117f0); box-shadow: 0 0 60px -14px var(--rc), inset 0 0 40px -24px var(--rc); }
+  .er-card svg.ic { position: absolute; right: 24px; top: 22px; width: 56px; height: 56px; fill: none; stroke: #656c76; stroke-width: 2; stroke-linejoin: round; transition: stroke .4s; }
+  .er-card.on svg.ic { stroke: var(--rc); filter: drop-shadow(0 0 10px var(--rc)); }
+  .er-card i { display: block; font: normal 600 16px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: #9198a1; }
+  .er-card.on i { color: var(--rc); }
+  .er-card h3 { margin: 14px 56px 0 0; font: 700 34px/1 "Mona Sans"; white-space: nowrap; color: #f0f6fc; }
+  .er-card code { display: block; margin-top: 16px; font: 500 20px/1 var(--mono); color: #9198a1; }
+  .er-card.on code { color: var(--rc); }
+  .er-st { position: absolute; left: 26px; bottom: 22px; font: 600 17px/1 var(--mono); color: #656c76; letter-spacing: .04em; }
+  .er-st::before { content: "○ idle"; }
+  .er-card.on .er-st::before { content: "◌ job queued…"; color: #d29922; }
+  .er-card.run .er-st::before { content: "● agent job running"; color: var(--rc); }
+  .er-card.eco .er-st { display: none; }
+  .er-steps { position: absolute; left: 26px; right: 26px; bottom: 20px; display: flex; gap: 6px; }
+  .er-steps b { padding: 7px 8px; border-radius: 8px; border: 1.5px solid #3d444d; font: 500 14px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .3s; }
+  .er-steps b::before { content: "○ "; }
+  .er-steps b.up { border-color: var(--rc); color: #f0f6fc; background: color-mix(in srgb, var(--rc) 30%, transparent); box-shadow: 0 0 14px -2px var(--rc); }
+  .er-steps b.up::before { content: "✓ "; color: var(--rc); }
+  .er-card.otel .er-st::before { content: "○ waiting for spans"; color: #656c76; }
+  .er-card.otel.run .er-st::before { content: "● trace exported"; color: var(--rc); }
+  .er-spans { position: absolute; right: 26px; bottom: 20px; width: 150px; display: flex; flex-direction: column; gap: 5px; }
+  .er-spans b { display: block; height: 9px; margin-left: var(--x); width: var(--w); border-radius: 3px; background: #3d444d; transform-origin: left; }
+  .er-card.otel.run .er-spans b { background: var(--rc); box-shadow: 0 0 10px var(--rc); animation: er-span .5s cubic-bezier(.2,.9,.2,1) both calc(var(--j) * 140ms); }
+  @keyframes er-span { from { transform: scaleX(0); } to { transform: none; } }
+  .er-job.er-trace { width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #f0883e; box-shadow: 0 0 22px #f0883e, 0 0 4px #fff; }
+  .er-job { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 8px; background: var(--ec); box-shadow: 0 0 26px var(--ec), 0 0 6px #fff; opacity: 0; z-index: 3; pointer-events: none; }
+  .er-chips { position: absolute; left: 110px; right: 110px; top: 880px; display: flex; align-items: center; gap: 12px; }
+  .er-chips > i { font: normal 600 17px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #d29922; margin-right: 6px; white-space: nowrap; opacity: 0; }
+  .active .er-chips > i { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .er-chip { padding: 10px 16px; border-radius: 99px; border: 1.5px solid #d2992255; background: #d2992210; font: 500 19px/1 var(--mono); color: #c9d1d9; white-space: nowrap; opacity: 0; transition: all .35s; }
+  .active .er-chip { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(1.1s + var(--i) * 90ms); }
+  .er-chip.lit { border-color: #d29922; background: #d2992230; color: #f0f6fc; box-shadow: 0 0 30px -6px #d29922; }
+
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -1671,6 +1724,223 @@
         [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
         lane
       ),
+    });
+  }
+
+  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  {
+    resetIndex();
+    const RUN = [
+      { k: "ubuntu-24.04-arm", tag: "Larger · Arm64", title: "Custom runners", c: "#ab7df8", ic: '<rect x="16" y="16" width="32" height="32" rx="4"/><rect x="25" y="25" width="14" height="14"/><path d="M24 8v8M32 8v8M40 8v8M24 48v8M32 48v8M40 48v8M8 24h8M8 32h8M8 40h8M48 24h8M48 32h8M48 40h8"/>' },
+      { k: "[self-hosted, linux]", tag: "Your network", title: "Self-hosted", c: "#d29922", ic: '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>' },
+    ];
+    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
+    const STEPS = ["checkout", "setup-node", "cache"];
+    const CHIPS = [
+      ["GitHub Apps", [6, 7, 8]],
+      ["OIDC", [4, 5]],
+      ["Runner groups", [3]],
+      ["Environments", [9]],
+      ["Org secrets", [8]],
+      ["OpenTelemetry", [12, 13, 14]],
+      ["Rulesets", []],
+      ["Audit log", []],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff",
+      E = "#d2a8ff";
+    const vRun = h("span", { class: "ae-val" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [["runs-on: ", K], vRun],
+      [["permissions:", K]],
+      [
+        ["  id-token: ", K],
+        ["write", V],
+      ],
+      [["github-app:", K]],
+      [
+        ["  client-id: ", K],
+        ["${{ vars.APP_ID }}", E],
+      ],
+      [
+        ["  private-key: ", K],
+        ["${{ secrets.APP_KEY }}", E],
+      ],
+      [
+        ["environment: ", K],
+        ["production", V],
+      ],
+      [["steps:", K]],
+      [
+        ["  - uses: ", K],
+        ["actions/setup-node@v4", V],
+      ],
+      [["observability:", K]],
+      [["  otlp:", K]],
+      [
+        ["    endpoint: ", K],
+        ["${{ secrets.OTLP_ENDPOINT }}", E],
+      ],
+      [["---", D]],
+      [["# Triage new issues for the platform team", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
+    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
+    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
+    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
+    const card = (i, c, tag, title, code, ic, extra) => {
+      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
+      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
+      return el;
+    };
+    const spans = h(
+      "div",
+      { class: "er-spans" },
+      [
+        [0, 100],
+        [8, 46],
+        [30, 58],
+        [62, 30],
+      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
+    );
+    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
+    otel.classList.add("otel");
+    const cards = RUN.map((r, i) => card(i + 1, r.c, r.tag, r.title, r.k, r.ic));
+    const eco = card(3, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
+    eco.classList.add("eco");
+    const job = h("div", { class: "er-job" });
+    const trace = h("div", { class: "er-job er-trace" });
+    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
+    const el = h(
+      "section",
+      { class: "slide er" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
+      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
+      ed,
+      arrow,
+      otel,
+      cards,
+      eco,
+      job,
+      trace,
+      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
+    );
+    const fly = (dot, [x0, y0], [x1, y1]) => {
+      dot.style.transition = "none";
+      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
+      void dot.offsetWidth;
+      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
+      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
+    };
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      typed = "",
+      arriveAt = 0,
+      otelAt = 0,
+      chipAt = 0,
+      chip = -1;
+    const setRunner = (i, t) => {
+      cur = i;
+      el.style.setProperty("--ec", RUN[i].c);
+      cards.forEach((c, j) => c.classList.toggle("on", j === i));
+      cards.forEach(c => c.classList.remove("run"));
+      eco.classList.remove("on", "run");
+      steps.forEach(p => p.classList.remove("up"));
+      fly(job, [840, 461], MID(i + 1));
+      arriveAt = t + 700;
+      otelAt = Infinity;
+    };
+    const setChip = i => {
+      chip = i;
+      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
+      const lit = CHIPS[i][1];
+      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
+    };
+    slides.push({
+      sound: "ship",
+      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
+      notes:
+        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+      enter() {
+        typed = RUN[0].k;
+        vRun.textContent = typed;
+        phase = "hold";
+        since = chipAt = 0;
+        chip = -1;
+        chips.forEach(c => c.classList.remove("lit"));
+        rows.forEach(r => r.classList.remove("lit"));
+        otel.classList.remove("on", "run");
+        eco.classList.remove("on", "run");
+        steps.forEach(p => p.classList.remove("up"));
+        for (const d of [job, trace]) {
+          d.style.transition = "none";
+          d.style.opacity = "0";
+        }
+        cur = 0;
+        arriveAt = otelAt = Infinity;
+      },
+      tick(t) {
+        if (!since) {
+          since = t;
+          chipAt = t + 1800;
+          setRunner(0, t + 900);
+        }
+        if (t > arriveAt && !cards[cur].classList.contains("run")) {
+          cards[cur].classList.add("run");
+          fly(trace, MID(cur + 1), MID(0));
+          otelAt = t + 700;
+        }
+        if (t > otelAt) {
+          otelAt = Infinity;
+          otel.classList.remove("run");
+          void otel.offsetWidth;
+          otel.classList.add("on", "run");
+        }
+        if (t > arriveAt) {
+          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
+          steps.forEach((p, j) => p.classList.toggle("up", j < n));
+          eco.classList.add("on");
+          eco.classList.toggle("run", n === steps.length);
+        }
+        if (t > chipAt) {
+          chipAt = t + 1500;
+          setChip((chip + 1) % CHIPS.length);
+        }
+        const el2 = t - since;
+        const next = RUN[(cur + 1) % RUN.length].k;
+        if (phase === "hold" && el2 > 3400) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 28) {
+          since = t;
+          typed = typed.slice(0, -1);
+          vRun.textContent = typed;
+          if (!typed) phase = "type";
+        } else if (phase === "type" && el2 > 70) {
+          since = t;
+          typed = next.slice(0, typed.length + 1);
+          vRun.textContent = typed;
+          sfx.key(0.7);
+          if (typed === next) {
+            setRunner((cur + 1) % RUN.length, t);
+            sfx.pop(cur * 2);
+            phase = "hold";
+          }
+        }
+      },
+      el,
     });
   }
 
