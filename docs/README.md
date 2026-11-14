@@ -72,7 +72,9 @@ Examples, review activity, repository counts, and cost figures are synthetic,
 except the model routing slide's results, which are measured on this
 repository's own workflows, the Issues as intent slide's counts of
 issues labelled `community` and the merged pull requests that closed them
-(November 2026 snapshot), the Go Fan slide's counts of daily
+(November 2026 snapshot), the Mine · Refine · Apply slide's dated feed and
+counts of Linter Miner analyzer pull requests, LintMonster issues and the
+merged pull requests that closed them (May to November 2026), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
 (February to November 2026, with shortened titles), and the two data slides after the finale: "First
 commit to GA", which shows this repository's measured public history from its

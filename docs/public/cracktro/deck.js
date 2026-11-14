@@ -205,6 +205,7 @@
   .fm-out.on { opacity: 1; animation: fm-pop .5s cubic-bezier(.3,1.6,.4,1); }
   .fm-out.on rect { stroke: var(--c); filter: drop-shadow(0 0 14px var(--c)); }
   .mra-svg { left: 60px; top: 290px; width: 1800px; height: 566px; }
+  .mra .mra-svg { top: 272px; }
   .mra-svg .fm-pill text { font-size: 26px; }
   .rpa-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .rpa-code { opacity: .6; transition: opacity .4s; } .rpa-code.on { opacity: 1; }
@@ -348,7 +349,7 @@
   .mra-row.new { animation: mra-in .6s cubic-bezier(.2,.9,.2,1); }
   @keyframes mra-in { from { opacity: 0; } }
   .mra-who { fill: #79c0ff; font: 600 19px var(--mono); }
-  .mra-row.ag .mra-who { fill: #c297ff; }
+  .mra-row.m .mra-who, .mra-row.i .mra-who { fill: #c297ff; } .mra-row.c .mra-who { fill: #3fb950; }
   .mra-msg { fill: #e6edf3; font: 500 24px "Mona Sans"; }
   .mra-msg .pat { fill: #d29922; font-weight: 700; }
   .mra-beam { fill: none; stroke-width: 3; stroke-dasharray: 8 8; filter: drop-shadow(0 0 6px currentColor); animation: mra-beam 1.4s linear both; }
@@ -4637,7 +4638,7 @@
     });
   }
 
-  // Mine → Refine → Apply: harvesting developer interventions into linters
+  // Mine → Refine → Apply: Linter Miner turns recurring patterns into analyzers, review refines them, LintMonster applies them across the repo. Feed events and counts are mined from gh-aw's history
   {
     resetIndex();
     const RX = 460,
@@ -4648,22 +4649,22 @@
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#mraAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#mraClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
-      ["e0", "M200 168 V292", "p", ["mines patterns", "autonomously"], 222, 222, "start"],
-      ["e1", "M200 372 V500", "p", ["opens", "analyzer PR"], 222, 430, "start"],
-      ["e2", "M238 540 H606", "p", ["analyzer rules"], 420, 524, "middle"],
-      ["e3", "M640 506 V372", "b", ["reviews &", "merges"], 662, 436, "start"],
-      ["e4", "M678 338 H882", "p", ["challenge"], 780, 322, "middle"],
-      ["e5", "M920 300 V168", "p", ["autonomous", "hardening PR"], 942, 222, "start"],
-      ["e6", "M1060 140 H1258", "p", ["hardened rules → repo"], 1158, 120, "middle"],
-      ["e7", "M1300 168 V292", "p", ["groups findings,", "opens cleanup PRs"], 1322, 222, "start"],
-      ["e8", "M1300 372 V500", "p", ["assigns"], 1322, 442, "start"],
-      ["e9", "M1504 540 H1584", "b", ["review &", "merge"], 1544, 594, "middle"],
-      ["e10", "M1522 512 V168", "b", ["iterates"], 1544, 350, "start"],
+      ["e0", "M200 168 V292", "p", ["mines issues,", "discussions & code"], 222, 222, "start"],
+      ["e1", "M200 372 V500", "p", ["opens draft", "analyzer PR"], 222, 430, "start"],
+      ["e2", "M238 540 H606", "p", ["analyzer + tests"], 420, 524, "middle"],
+      ["e3", "M640 506 V372", "b", ["review", "threads"], 662, 436, "start"],
+      ["e4", "M640 304 V140 H762", "b", ["@copilot"], 662, 222, "start"],
+      ["e5", "M920 168 V300", "p", ["pushes", "fixes"], 942, 222, "start"],
+      ["e6", "M958 338 H1100 V140 H1258", "p", ["merged"], 1029, 318, "middle"],
+      ["e7", "M1300 168 V292", "p", ["scans daily, files", "finding issues"], 1322, 222, "start"],
+      ["e8", "M1300 372 V500", "b", ["assigned"], 1322, 442, "start"],
+      ["e9", "M1504 540 H1584", "b", ["cleanup PR", "merged"], 1544, 594, "middle"],
+      ["e10", "M1624 506 V140 H1540", "p", ["rescans", "daily"], 1606, 330, "end"],
     ];
     // the token's journey: [edge, node lit on arrival]
     const SEQ = [
@@ -4671,29 +4672,29 @@
       ["e1", "nPR1"],
       ["e2", "nDev1"],
       ["e3", "nIssue"],
-      ["e4", "nPR2"],
-      ["e5", "nRefiner"],
+      ["e4", "nRefiner"],
+      ["e5", "nPR2"],
       ["e6", "nMonster"],
       ["e7", "nPR3"],
       ["e8", "nDev2"],
-      ["e10", "nMonster"],
       ["e9", "nMerge"],
+      ["e10", "nMonster"],
     ];
     const LANE = { nComment: 0, nPR1: 0, nDev1: 1, nIssue: 1, nPR2: 1, nRefiner: 1, nMonster: 2, nPR3: 2, nDev2: 2, nMerge: 2 };
     let g = `<defs><clipPath id="mraClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mraAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="mraP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="mraB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    g += `<text class="fm-lane-t mra-lane on" x="${RX / 2}" y="40">HUMANS ↔ AGENTS</text><line class="fm-div" x1="${RX}" y1="0" x2="${RX}" y2="${VH}"/>
+    g += `<text class="fm-lane-t mra-lane on" x="${RX / 2}" y="40">MINED FROM GH-AW</text><line class="fm-div" x1="${RX}" y1="0" x2="${RX}" y2="${VH}"/>
       <clipPath id="mraFeedClip"><rect x="16" y="164" width="${RX - 32}" height="${VH - 172}"/></clipPath>
       <rect class="mra-repo" x="16" y="78" width="${RX - 32}" height="${VH - 82}" rx="16"/>
-      <text class="mra-repo-t" x="38" y="114">▣ example/repo · synthetic activity</text>
+      <text class="mra-repo-t" x="38" y="114">▣ gh-aw · May–Nov 2026</text>
       <g id="mraBeams"></g><g id="mraFeed" clip-path="url(#mraFeedClip)"></g>
       <text class="mra-seen" id="mraSeen" x="${MINX - 34}" y="92"></text>
       <g transform="translate(${RX},0)">`;
     [
       [0, 520, "MINE"],
-      [520, 1140, "CHALLENGE"],
+      [520, 1140, "REFINE"],
       [1140, 1700, "APPLY"],
     ].forEach(([x0, x1, t], i) => {
       g += `<text class="fm-lane-t mra-lane" id="lane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
@@ -4703,14 +4704,15 @@
       g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#mra${c === "p" ? "P" : "B"})"/>`;
       g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
-    g += agent("nMiner", 120, 140, 230, "Linter Miner") + agent("nRefiner", 800, 140, 240, "Linter Refiner") + agent("nMonster", 1300, 140, 236, "LintMonster");
-    g += box("nComment", 200, 332, "comment") + box("nPR1", 200, 540, "pr") + box("nIssue", 640, 338, "issue") + box("nPR2", 920, 338, "pr") + box("nPR3", 1300, 332, "pr") + box("nMerge", 1624, 540, "merge");
-    g += dev("nDev1", 640, 540) + dev("nDev2", 1300, 540);
+    g += agent("nMiner", 120, 140, 230, "Linter Miner") + agent("nRefiner", 800, 140, 200, "Copilot") + agent("nMonster", 1300, 140, 236, "LintMonster");
+    g += box("nComment", 200, 332, "discussion") + box("nPR1", 200, 540, "pr") + box("nIssue", 640, 338, "comment") + box("nPR2", 920, 338, "pr") + box("nPR3", 1300, 332, "issue") + box("nMerge", 1624, 540, "merge");
+    g += dev("nDev1", 640, 540) + agent("nDev2", 1300, 540, 200, "Copilot");
     g += `<circle class="fm-dot mra-dot" r="8"/></g>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg mra-svg");
     svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Linter Miner mines issues, discussions and code and opens a draft analyzer pull request; review threads and Copilot fixes refine it until it merges; LintMonster then scans daily, files finding issues, and Copilot cleanup pull requests apply the rule across the repository");
     svg.innerHTML = g;
     const $ = id => svg.querySelector("#" + id),
       dot = svg.querySelector(".mra-dot");
@@ -4722,21 +4724,25 @@
     let t0 = 0,
       cyc = -1,
       popK = -1;
-    // humans and agents interacting in the repo; the miner watches every exchange
+    // measured on gh-aw: [kind, date, text, analyzer ordinal]; m = analyzer merged from a Linter Miner PR, i = LintMonster finding issue, c = Copilot cleanup PR merged
     const FEED = [
-      ["reviewer", "review", "don't swallow this error", "error"],
-      [0, "fix", "wrapped with fmt.Errorf(%w)"],
-      ["maintainer", "review", "use errors.Is, not ==", "errors.Is"],
-      [0, "fix", "updated 3 call sites"],
-      ["reviewer", "issue", "flaky test in example_test.go"],
-      [0, "CI Doctor", "proposed a test fix"],
-      ["maintainer", "review", "again: errors.Is, not ==", "errors.Is"],
-      [0, "fix", "switched to errors.Is"],
-      ["reviewer", "review", "no context.TODO in handlers"],
-      [0, "fix", "threaded ctx through"],
-      ["maintainer", "review", "wrap this error with %w", "error"],
-      [0, "Repo Assist", "labelled 4 issues"],
+      ["m", "15 May", "osexitinlibrary", 1],
+      ["m", "17 May", "ctxbackground", 3],
+      ["m", "18 May", "errstringmatch", 4],
+      ["i", "24 May", "28 panics in library code"],
+      ["c", "24 May", "18 library panics removed"],
+      ["m", "8 Jun", "sortslice", 18],
+      ["c", "9 Jun", "sort.Slice → slices.SortFunc"],
+      ["m", "14 Jun", "errorfwrapv", 23],
+      ["m", "13 Jul", "ioutildeprecated", 37],
+      ["c", "21 Jul", "33 long functions → 0"],
+      ["m", "21 Sep", "unchecked-slice-index", 52],
+      ["i", "4 Oct", "3,561 unchecked errors"],
+      ["m", "13 Oct", "goroutineresourceleak", 59],
+      ["c", "25 Oct", "slice indexing guarded"],
+      ["m", "11 Nov", "ignoredlocalerror", 65],
     ];
+    const WHO = { m: "linter miner", i: "lintmonster", c: "copilot" };
     const feed = $("mraFeed"),
       beams = $("mraBeams"),
       seen = $("mraSeen"),
@@ -4744,18 +4750,21 @@
       FBOT = VH - 52;
     let rows = [],
       fi = 0,
-      lastAdd = 0,
-      hits = 0;
+      lastAdd = 0;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
     const addRow = instant => {
-      if (!instant) sfx.notify(!!FEED[fi % FEED.length][0]);
-      const [who, kind, msg, pat] = FEED[fi++ % FEED.length],
+      const [kind, date, msg, nth] = FEED[fi++ % FEED.length],
         el = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      const body = pat ? esc(msg).replace(esc(pat), `<tspan class="pat">${esc(pat)}</tspan>`) : esc(msg);
-      el.setAttribute("class", "mra-row" + (who ? "" : " ag") + (instant ? "" : " new"));
+      if (!instant) sfx.notify(kind !== "m");
+      const body = kind === "m" ? `+ <tspan class="pat">${esc(msg)}</tspan>` : esc(msg);
+      el.setAttribute("class", "mra-row " + kind + (instant ? "" : " new"));
       el.innerHTML =
-        (who ? `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#4493f8" stroke-width="2"/>${ico("person", 58, 0, 30)}` : `<circle cx="58" cy="0" r="26" fill="url(#mraAgent)"/>${ico("copilot", 58, 1, 30)}`) +
-        `<text class="mra-who" x="96" y="-8">${who || "copilot"} · ${kind}</text><text class="mra-msg" x="96" y="20">${body}</text>`;
+        (kind === "m"
+          ? `<circle cx="58" cy="0" r="26" fill="url(#mraAgent)"/>${ico("copilot", 58, 1, 30)}`
+          : kind === "i"
+            ? `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("issue", 58, 0, 28, "#c297ff")}`
+            : `<circle cx="58" cy="0" r="26" fill="#0d1117" stroke="#3fb950" stroke-width="2"/>${ico("merge", 58, 0, 26, "#3fb950")}`) +
+        `<text class="mra-who" x="96" y="-8">${WHO[kind]} · ${date}</text><text class="mra-msg" x="96" y="20">${body}</text>`;
       feed.appendChild(el);
       rows.push(el);
       rows.forEach((r, k) => {
@@ -4764,7 +4773,7 @@
       if (rows.length > 8) rows.shift().remove();
       if (instant) return;
       const y = FBOT,
-        col = pat ? "#d29922" : who ? "#4493f8" : "#ab7df8";
+        col = kind === "m" ? "#d29922" : kind === "i" ? "#ab7df8" : "#3fb950";
       const b = document.createElementNS("http://www.w3.org/2000/svg", "path");
       b.setAttribute("class", "mra-beam");
       b.setAttribute("stroke", col);
@@ -4774,9 +4783,8 @@
       $("nMiner").classList.remove("blink");
       void $("nMiner").getBBox();
       $("nMiner").classList.add("blink");
-      if (pat) {
-        hits++;
-        seen.textContent = `pattern seen ×${hits}`;
+      if (nth) {
+        seen.textContent = `analyzer #${nth} of 65`;
         seen.classList.remove("pop");
         void seen.getBBox();
         seen.classList.add("pop");
@@ -4787,29 +4795,40 @@
       $("nMiner").classList.add("on");
       $("lane0").classList.add("on");
     };
+    // measured on gh-aw, 15 May to 11 November 2026
+    const STATS = [
+      [65, "analyzers merged from 73 Linter Miner PRs", "#d29922", "#ab7df8"],
+      [376, "reviews refining them before merge", "#79c0ff", "#ab7df8"],
+      [235, "LintMonster finding issues filed", "#ab7df8", "#d2a8ff"],
+      [92, "Copilot cleanup PRs merged · 54,128 lines", "#3fb950", "#79c0ff"],
+    ];
+    const nums = STATS.map(() => h("div", { class: "ct-num" }, "0"));
+    const stats = h("div", { class: "ct-stats" }, ...STATS.map(([, lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab))));
     slides.push({
       group: "loops",
       sound: "mine",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
-        "Mine, refine, apply: harvesting developer interventions into linters. All activity and review messages shown here are synthetic examples, not quotations or records of real people. Repeated corrections can become analyzer proposals, reviewed and refined by a developer, then applied across the repository through cleanup pull requests. Human corrections become deterministic checks.",
+        "Mine, refine, apply: harvesting recurring corrections into Go linters. The loop is illustrative of three of gh-aw's own workflows; the feed and numbers are mined from gh-aw's history, 15 May to 11 November 2026. Mine: every day Linter Miner reads recent issues, discussions and the Go code, picks one pattern no existing analyzer catches, and opens a draft pull request with a go/analysis analyzer and its tests under pkg/linters. It opened 73 such pull requests; 65 merged and 8 were closed. Refine: Copilot code review and a maintainer leave review threads, and Copilot pushes fixes; 58 of the 65 needed follow-up commits, 376 reviews in all, and the median analyzer merged about two hours after it was opened. Apply: once merged the analyzer runs in make golint-custom. Every day LintMonster runs it, groups the findings by root cause and keeps one tracking issue per category, 235 so far, some counting thousands of findings, such as 3,561 unchecked errors on 4 October. Maintainers assign them to Copilot, and 92 merged Copilot pull requests closed them, changing 54,128 lines. For example, the sortslice analyzer merged on 8 June and the next day a Copilot pull request moved every sort.Slice call to slices.SortFunc. Human corrections become deterministic checks.",
       enter() {
         t0 = 0;
         cyc = -1;
         lastAdd = 0;
-        hits = 0;
         seen.textContent = "";
         feed.innerHTML = "";
         beams.innerHTML = "";
         rows = [];
         fi = 0;
+        nums.forEach(n => (n.textContent = "0"));
         for (let i = 0; i < 5; i++) addRow(true);
       },
       tick(t) {
         if (!t0) t0 = t;
         const e = t - t0,
           c = Math.floor(e / CYC),
-          u = e % CYC;
+          u = e % CYC,
+          fn = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * fn).toLocaleString("en-US")));
         if (c !== cyc) {
           cyc = c;
           reset();
@@ -4849,7 +4868,14 @@
           $("lane" + LANE[nid]).classList.add("on");
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+      el: h(
+        "section",
+        { class: "slide mra" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "mined from gh-aw [linter-miner] PRs, [lint-monster] issues and the PRs that closed them · May–Nov 2026")
+      ),
     });
   }
 
