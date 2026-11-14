@@ -26,6 +26,7 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.102 | Audit-only normative clarification mapping existing behavior: `merge-pull-request` requires a scoped, owner-declared `allowed-base-branches` list (compiler, schema, and runtime validation; #77371), and CTR-006 `template-injection` treats actor and user/login metadata as attacker-controlled (#77516). No new threat identifier, permission, or compiler behavior change. |
 | 1.0.101 | Audit-only normative clarification that whole-context, `github.*`, `github.token`, and `secrets` references (including wildcard and computed forms) are credential-bearing for prompt bindings and workflow/engine environment validation, while `github.event.*`, `vars.*`, and quoted literals are not. Maps existing implementation (`credential_free_prompt.go`, `awf_env.go`) to `TestCompileEnvCredentialReferences`. No new threat identifier, permission, or compiler behavior change. |
 | 1.0.100 | Closes security alert 1093 in the existing CTR-017 secret-leakage/publication boundary. Generated agent step-summary publication now runs only under `always()` plus the successful secret-masking condition. Redaction fails closed on EACCES/EPERM scan errors and summary-symlink unlink failures. The summary publisher uses the shared Linux descriptor-relative no-follow reader, accepts only isolated regular files up to 10 MiB, preserves missing/empty no-op behavior, and rejects symlinks, non-regular files, and replacement races. Evidence includes compiler gating, redaction regressions, guarded-reader regressions, and wrapper coverage. No new threat identifier, permission, workflow schema, or Safe Outputs contract is introduced. |
 | 1.0.99 | Specifies AWF-resident advisory invocation decisions, compiler-validated data-only question transport, guarded runtime file evidence, deterministic aggregation and failure abstention, and separate sanitized session/audit accounting. Review corrections reject nonempty lists with protected session capture, normalize nested working directories, and record harness initialization before billable decision requests without claiming a CLI invocation. Heuristic credential screening withholds matching questions as unknown; JSON-escaped evidence records separate file data without claiming semantic instruction isolation or complete secret detection. Preserves safe-output publication authority and existing retry/budget/detection boundaries. Requires matching compiler/setup runtime for configured workflows; absent/empty lists retain existing behavior. Maps local and mocked regression evidence without claiming live deployment or semantic prompt-injection isolation. No new threat identifier or permission grant. |
@@ -108,6 +109,19 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-11-14)
+
+Reviewed commits from the last two days touching compiler, parser, bootstrap, and runtime security boundaries.
+
+Findings and disposition:
+
+- Required scoped `allowed-base-branches` for `merge-pull-request` (#77371): already enforced by `validateMergePullRequestBaseBranches` and the runtime handler, with tests. Added the compiler validation and serialization requirement and test mapping to Section 7.7. No new `CTR-*` rule.
+- Actor/user-login template-injection sources (#77516): already enforced by `pkg/workflow/lint/template_injection.go` and covered by `TestTemplateInjectionSources`. Clarified the CTR-006 conformance row. No new `CTR-*` rule.
+- Firewall v0.29.13 and MCP gateway v0.5.9 bump (#77338): `DefaultFirewallVersion` matches the v0.29.13 checksum pin in `actions/setup/sh/release_integrity.sh`; covered by existing bootstrap release-digest controls. No rule change.
+- Fixed Pi sub-agent executable (#77474), skipped ledger persistence on safe-output failure (#77480), duplicate-footer, and dependency-ordering fixes: runtime or safe-output behavior with no new compiler detection class.
+- Open high-severity code-scanning alerts: none reviewed as new. No `threat-detection-suppress` annotations exist in workflow sources, so no suppression SLA action applies.
+- Go tests could not be executed (the required Go 1.27.4 toolchain is unavailable); only specification and changelog text changed, and no implementation was modified.
 
 ### Mapping Audit (2026-11-13)
 

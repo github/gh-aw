@@ -445,7 +445,7 @@ default_max_ai_credits: "5M"
 default_max_daily_ai_credits: "15M"
 ```
 
-`default_model_*` variables are explicit model overrides: when set, they opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model). Leave them unset to preserve default routing for eligible workflows. They cannot enable routing, so do not set them to `router` or `router/*` values; a run whose model resolves to a router value at run time stops before the agent starts. To route workflows explicitly, write the router value in the workflow.
+`default_model_*` variables are explicit model overrides: when set, they opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model). Leave them unset to preserve default routing for eligible workflows. They cannot enable routing, so do not set them to `router` or `router/*` values; a router value in these variables stops the run before the agent starts. To route workflows explicitly, write the router value in the workflow.
 
 ```bash
 gh aw env update defaults.yml --scope org --org MY_ORG

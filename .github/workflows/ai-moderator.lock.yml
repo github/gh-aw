@@ -902,7 +902,7 @@ jobs:
                         "type": "string"
                       },
                       "rationale": {
-                        "description": "Optional rationale for the change (max 280 characters).",
+                        "description": "Optional rationale for the change. Hard limit: 280 characters — longer values are rejected, so keep it to one or two short sentences.",
                         "maxLength": 280,
                         "type": "string"
                       }

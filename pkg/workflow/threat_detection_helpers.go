@@ -328,17 +328,24 @@ func engineCoreSecretVarNames(engineID string) []string {
 // otherwise the enterprise override or runtime-aware engine detection default.
 func resolveThreatDetectionModel(data *WorkflowData, engineID string, engine CodingAgentEngine) string {
 	model := inheritedDetectionModel(data, engineID)
-	if data != nil && data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
+	explicit := data != nil && data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != ""
+	if explicit {
 		model = data.SafeOutputs.ThreatDetection.Model
 	}
-	if model == "" {
+	defaultModel := func() string {
 		if engine != nil {
-			model = defaultDetectionModel(engine)
-		} else if defaultModel := compilerenv.ResolveDefaultDetectionModel(""); defaultModel != "" {
-			model = defaultModel
-		} else {
-			model = "detection"
+			return defaultDetectionModel(engine)
 		}
+		if defaultModel := compilerenv.ResolveDefaultDetectionModel(""); defaultModel != "" {
+			return defaultModel
+		}
+		return "detection"
+	}
+	if model == "" {
+		return defaultModel()
+	}
+	if !explicit && isModelRoutingDynamic(data) {
+		return guardDynamicRoutingDetectionModel(model, defaultModel())
 	}
 	return model
 }

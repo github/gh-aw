@@ -101,17 +101,19 @@ async function main(core, ctx, githubClient, options = {}) {
   const modelConfig = parseCompiledModelConfig(process.env.GH_AW_INFO_MODEL_CONFIG, process.env.GH_AW_INFO_MAX_AI_CREDITS, message => core.warning(message));
 
   // A router value (router, router/economy, ...) chooses model routing; it is not a
-  // model name. Router values are accepted only when written in the workflow, where
-  // the compiler turns them into routing. When the main agent's model is not routed
-  // for this run and a variable or expression resolves to a router value, stop before
-  // the agent starts instead of passing it to the engine as a model. When the model
-  // expression resolves empty, the harness uses the model-variable fallback
-  // (GH_AW_INFO_MODEL_FALLBACK mirrors GH_AW_MODEL_FALLBACK), so check that value.
+  // model name. Router values are accepted when written in the workflow, where the
+  // compiler turns them into routing, and from a whole-model expression on a workflow
+  // compiled for routing chosen at run time, where the activation job enables routing
+  // first. When the main agent's model is not routed for this run and a variable or
+  // expression resolves to a router value, stop before the agent starts instead of
+  // passing it to the engine as a model. When the model expression resolves empty,
+  // the harness uses the model-variable fallback (GH_AW_INFO_MODEL_FALLBACK mirrors
+  // GH_AW_MODEL_FALLBACK), so check that value.
   const effectiveModel = model.trim() || (process.env.GH_AW_INFO_MODEL_FALLBACK || "").trim();
   if (isRouterModelValue(effectiveModel) && modelConfig?.routing?.enabled !== true) {
     const message =
       `${ERR_CONFIG}: the main agent's model resolved to the router value ${JSON.stringify(effectiveModel)} at run time. ` +
-      `Router values (${[...ROUTER_MODEL_VALUES].join(", ")}) must be written in the workflow's model or engine.model and are not accepted from expressions or variables such as vars.GH_AW_MODEL_AGENT_<ENGINE> or vars.GH_AW_DEFAULT_MODEL_<ENGINE>. ` +
+      `Router values (${[...ROUTER_MODEL_VALUES].join(", ")}) are routed only when written in the workflow's model or engine.model, or when that model is a single expression on a workflow that supports routing; they are not accepted from variables such as vars.GH_AW_MODEL_AGENT_<ENGINE> or vars.GH_AW_DEFAULT_MODEL_<ENGINE>. ` +
       "Set a model name in the variable or expression, or write the router value in the workflow and recompile. See https://github.github.com/gh-aw/reference/model-routing/";
     core.setFailed(message);
     throw new Error(message);

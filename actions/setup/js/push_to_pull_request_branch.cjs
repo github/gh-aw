@@ -1021,8 +1021,15 @@ async function main(config = {}) {
     // protection rules. PR head branches must never be default or protected branches.
     // This prevents agents from pushing directly to branches that should only receive
     // changes through reviewed pull requests.
+    let allowGitPushFallback = true;
     {
-      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, checkBranchProtection);
+      const blockReason = await checkBranchPushable(pushGithubClient, pushRepoParts.owner, pushRepoParts.repo, branchName, checkBranchProtection, {
+        signedCommits,
+        onProtectionException: () => {
+          // A ruleset exception must not turn a signed push into an unsigned fallback.
+          if (signedCommits) allowGitPushFallback = false;
+        },
+      });
       if (blockReason) {
         core.error(blockReason);
         return { success: false, error: blockReason };
@@ -1724,6 +1731,7 @@ async function main(config = {}) {
             pushRemoteUrl,
             pushToken: headGitHubToken,
             signedCommits,
+            allowGitPushFallback,
             requireExistingBranch: true,
             resolvedTemporaryIds,
             currentRepo: itemRepo,
@@ -1776,7 +1784,7 @@ async function main(config = {}) {
 
         // Fallback path for diverged branches: create a new pull request so changes
         // can still be reviewed and merged into the original PR branch.
-        if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest) {
+        if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest && allowGitPushFallback) {
           const staleReason = await getStalePullRequestReason(githubClient, { repo: repoParts, payload: { pull_request: { number: pullNumber, state: "open" } } });
           if (staleReason) {
             if (isNonFastForward) {

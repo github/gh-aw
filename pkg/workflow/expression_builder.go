@@ -384,6 +384,16 @@ func BuildNotFromFork() *ComparisonNode {
 	)
 }
 
+func requireSafeOutputsAgentSuccess(condition ConditionNode, safeOutputs *SafeOutputsConfig) ConditionNode {
+	if safeOutputs == nil || !safeOutputs.RequireAgentSuccess {
+		return condition
+	}
+	return BuildAnd(condition, BuildEquals(
+		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
+		BuildStringLiteral("success"),
+	))
+}
+
 func BuildSafeOutputType(outputType string) ConditionNode {
 	expressionBuilderLog.Printf("Building safe-output condition for output type: %s", outputType)
 	// Use !cancelled() && needs.agent.result != 'skipped' to properly handle workflow cancellation

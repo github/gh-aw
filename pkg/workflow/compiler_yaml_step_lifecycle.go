@@ -161,9 +161,10 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	if modelConfigured {
 		// data.Model may reference an experiment variant as needs.activation.outputs.<name>
 		// (rewritten from engine.model: ${{ experiments.<name> }} for jobs downstream of
-		// activation). This step runs inside the activation job itself, so it must read the
-		// pick-experiment step's output directly rather than via the needs context.
-		infoModel := RewriteActivationOutputsToLocalStepOutputs(data.Model, data.Experiments)
+		// activation), or the activation job's resolved model expression. This step runs
+		// inside the activation job itself, so it must read the step outputs directly
+		// rather than via the needs context.
+		infoModel := activationModelExpression(data)
 		writeFormattedYAML(yaml, "          GH_AW_INFO_MODEL: \"%s\"\n", infoModel)
 		// When the model expression resolves empty, the harness uses GH_AW_MODEL_FALLBACK.
 		// Publish the same fallback so activation checks the model the harness will use.
@@ -214,7 +215,10 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	}
 	if modelConfigJSON, budget := buildAwInfoModelConfig(data); modelConfigJSON != "" {
 		modelConfigValue := modelConfigJSON
-		if isModelRoutingRuntimeGuarded(data) {
+		if isModelRoutingDynamic(data) {
+			// The activation job records the routing mode its decision step chose.
+			modelConfigValue = dynamicRoutingAwInfoModelConfig(data)
+		} else if isModelRoutingRuntimeGuarded(data) {
 			// The activation job records routing only when it applies to this run.
 			plainModelConfigJSON, _ := buildAwInfoModelConfig(withoutModelRouting(data))
 			modelConfigValue = fmt.Sprintf("${{ %s && '%s' || '%s' }}", modelRoutingActiveInActivation,

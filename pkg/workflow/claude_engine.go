@@ -201,7 +201,7 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	// This avoids embedding the value directly in the shell command (which fails template injection
 	// validation for GitHub Actions expressions like ${{ inputs.model }}).
 	// Fallback for unconfigured model uses GH_AW_MODEL_AGENT_CLAUDE with shell expansion.
-	modelConfigured := workflowData.Model != "" && !isModelRoutingEnabled(workflowData)
+	modelConfigured := workflowData.Model != "" && !isModelRoutingUnconditional(workflowData)
 
 	claudeArgs, mcpConfigArg, allowedTools := e.buildClaudeCliArgs(workflowData, toolsWithMountedCLIs, logFile)
 
@@ -514,7 +514,7 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	applyEngineHarnessRetryEnv(env, workflowData)
 	if !isModelRoutingUnconditional(workflowData) {
 		applyClaudeModelEnvVars(env, workflowData)
-		guardImplicitRoutingModelEnv(env, workflowData, constants.EnvVarModelAgentClaude)
+		guardImplicitRoutingModelEnv(env, workflowData, constants.EnvVarModelAgentClaude, constants.ClaudeCLIModelEnvVar)
 	}
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, claudeLog)

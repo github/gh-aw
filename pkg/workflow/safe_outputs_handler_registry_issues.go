@@ -79,6 +79,7 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 		// Body uses boolean value mode - add the actual boolean value
 		builder.AddBoolPtrOrDefault("allow_body", c.Body, true)
 		return builder.
+			AddStringPtr("default_operation", c.Operation).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "update-issue", c.GitHubToken)).

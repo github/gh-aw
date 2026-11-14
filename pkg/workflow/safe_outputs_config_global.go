@@ -59,6 +59,10 @@ func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *S
 		}
 	}
 
+	if requireAgentSuccess, ok := outputMap["require-agent-success"].(bool); ok {
+		config.RequireAgentSuccess = requireAgentSuccess
+	}
+
 	// Handle staged flag
 	if err := preprocessBoolFieldAsString(outputMap, "staged", safeOutputsConfigLog); err != nil {
 		safeOutputsConfigLog.Printf("staged: %v", err)
