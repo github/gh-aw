@@ -827,6 +827,15 @@ func parseOnMapPreamble(onMap map[string]any, workflowData *WorkflowData) (hasRe
 		workflowData.ReactionIssues = reactionIssues
 		workflowData.ReactionPullRequests = reactionPullRequests
 		workflowData.ReactionDiscussions = reactionDiscussions
+		if reactionMap, ok := reactionValue.(map[string]any); ok {
+			if value, exists := reactionMap["remove-on-complete"]; exists {
+				remove, ok := value.(bool)
+				if !ok {
+					return false, false, false, fmt.Errorf("reaction.remove-on-complete has type %T, expected a boolean value. Example: reaction:\n  remove-on-complete: true", value)
+				}
+				workflowData.ReactionRemoveOnComplete = remove
+			}
+		}
 	}
 	if statusCommentValue, hasStatusCommentField := onMap["status-comment"]; hasStatusCommentField {
 		hasStatusComment = true

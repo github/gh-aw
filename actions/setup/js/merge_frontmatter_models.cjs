@@ -2,10 +2,8 @@
 /// <reference types="@actions/github-script" />
 
 const fs = require("fs");
-const path = require("path");
 const { TMP_GH_AW_PATH } = require("./constants.cjs");
 
-const DEFAULT_MODELS_JSON_PATH = path.join(__dirname, "models.json");
 const MERGED_MODELS_JSON_PATH = `${TMP_GH_AW_PATH}/models.json`;
 
 /**
@@ -71,18 +69,18 @@ function mergeModelCosts(base, overlay) {
 }
 
 /**
- * Read the base models.json and merge any frontmatter `models` overlay on top, then
- * write the combined catalog to /tmp/gh-aw/models.json so the agent job can
- * use it via GH_AW_MODELS_JSON_PATH.
+ * Write frontmatter model overrides, optionally merged over an explicitly supplied
+ * source document, for consumers using GH_AW_MODELS_JSON_PATH.
  *
  * @param {typeof import('@actions/core')} core
+ * @param {string} [outputPath]
  */
-function writeMergedModelsJSON(core) {
-  const baseModelsPath = process.env.GH_AW_MODELS_JSON_SRC_PATH || DEFAULT_MODELS_JSON_PATH;
+function writeMergedModelsJSON(core, outputPath = MERGED_MODELS_JSON_PATH) {
+  const baseModelsPath = process.env.GH_AW_MODELS_JSON_SRC_PATH?.trim();
 
   /** @type {Record<string, unknown>} */
   let base = {};
-  if (fs.existsSync(baseModelsPath)) {
+  if (baseModelsPath && fs.existsSync(baseModelsPath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(baseModelsPath, "utf8"));
       if (isPlainObject(parsed)) {
@@ -93,7 +91,7 @@ function writeMergedModelsJSON(core) {
     } catch (error) {
       core.warning(`Failed to parse models.json at ${baseModelsPath}: ${String(error)}`);
     }
-  } else {
+  } else if (baseModelsPath) {
     core.warning(`models.json not found at ${baseModelsPath}`);
   }
 
@@ -110,24 +108,23 @@ function writeMergedModelsJSON(core) {
         core.warning("GH_AW_INFO_MODEL_COSTS must be a JSON object, ignoring");
       }
     } catch {
-      core.warning(`Failed to parse GH_AW_INFO_MODEL_COSTS: ${modelCostsEnv}`);
+      core.warning("Failed to parse GH_AW_INFO_MODEL_COSTS, ignoring");
     }
   }
 
   const merged = Object.keys(overlay).length > 0 ? mergeModelCosts(base, overlay) : base;
 
   try {
-    fs.writeFileSync(MERGED_MODELS_JSON_PATH, JSON.stringify(merged), "utf8");
+    fs.writeFileSync(outputPath, JSON.stringify(merged), "utf8");
   } catch (err) {
-    throw new Error(`Failed to write file ${MERGED_MODELS_JSON_PATH}: ${String(err)}`, { cause: err });
+    throw new Error(`Failed to write file ${outputPath}: ${String(err)}`, { cause: err });
   }
-  core.info(`Generated merged models.json at: ${MERGED_MODELS_JSON_PATH}`);
+  core.info(`Generated model overrides at: ${outputPath}`);
 }
 
 module.exports = {
   isPlainObject,
   mergeModelCosts,
   writeMergedModelsJSON,
-  DEFAULT_MODELS_JSON_PATH,
   MERGED_MODELS_JSON_PATH,
 };

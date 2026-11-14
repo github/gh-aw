@@ -78,11 +78,6 @@ func (state Projection) issueTransitionSelection(requestID string) ([]issueTrans
 	return targets, pending, nil
 }
 
-func (state Projection) issueTransitionTargets(requestID string) ([]issueTransitionTarget, error) {
-	targets, _, err := state.issueTransitionSelection(requestID)
-	return targets, err
-}
-
 func terminalIssueStatus(work *WorkState) (string, error) {
 	if work.State == "cancelled" {
 		return "Cancelled", nil

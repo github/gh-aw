@@ -2552,6 +2552,8 @@ jobs:
     # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:
       contents: read
+      issues: read # Read issues and comments for workflow context.
+      pull-requests: read # Read pull requests and review comments for workflow context.
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:

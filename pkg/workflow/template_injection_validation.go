@@ -8,7 +8,7 @@
 //
 // # Validation Functions
 //
-//   - validateNoTemplateInjectionFromParsed() - Validates parsed YAML for template injection risks
+//   - validateRunScriptTemplateInjection() - Validates parsed YAML for template injection risks
 //
 // # Validation Pattern: Security Detection
 //
@@ -336,13 +336,6 @@ func scanRunContentExpressions(yamlContent string) runContentExpressionScan {
 	return scan
 }
 
-// validateNoTemplateInjectionFromParsed checks a pre-parsed workflow map for template
-// injection vulnerabilities. It is called when the caller already holds a parsed
-// representation of the compiled YAML, avoiding a redundant parse.
-func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
-	return validateRunScriptTemplateInjection(workflow, true)
-}
-
 func validateRunScriptTemplateInjection(workflow map[string]any, checkShellEvaluation bool) error {
 	// Extract all run blocks from the workflow
 	runBlocks := extractRunBlocks(workflow)
@@ -391,15 +384,6 @@ func validateRunScriptTemplateInjection(workflow map[string]any, checkShellEvalu
 
 	templateInjectionValidationLog.Print("Template injection validation passed")
 	return nil
-}
-
-// validateNoGitHubExpressionsInRunScriptsFromParsed checks a pre-parsed workflow map
-// for any GitHub Actions expression usage in run: scripts.
-//
-// This raw-content guardrail rejects prohibited expressions left in run: scripts,
-// including comments and quoted heredocs that the sanitizer preserves.
-func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) error {
-	return validateRunScriptExpressions(workflow, true)
 }
 
 func validateRunScriptExpressions(workflow map[string]any, checkShellEvaluation bool) error {
