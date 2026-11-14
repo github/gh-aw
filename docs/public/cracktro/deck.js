@@ -284,6 +284,8 @@
   .ao-h { fill: #f0f6fc; font: 700 24px "Mona Sans"; }
   .ao-stat { font: 600 18px var(--mono); fill: #9198a1; } .ao-stat.ko { fill: #ff7b72; } .ao-stat.ok { fill: #3fb950; }
   .ao-k { fill: #9198a1; font: 500 16px var(--mono); }
+  .ao-sc { font: 600 16px var(--mono); text-anchor: end; } .ao-sc.ok { fill: #3fb950; } .ao-sc.ko { fill: #ff7b72; }
+  .ao-hrow rect { fill: transparent; stroke: transparent; transition: fill .3s, stroke .3s; } .ao-pick.on rect { fill: #f8514922; stroke: #f85149; } .ao-pick.on .ao-k { fill: #f0f6fc; }
   .ao-v { fill: #e6edf3; font: 600 18px var(--mono); text-anchor: end; }
   .ao-run.good .ao-v { fill: #3fb950; }
   .ao-delta { fill: #3fb950; font: 700 18px var(--mono); opacity: 0; transition: opacity .4s; } .ao-delta.on { opacity: 1; }
@@ -4019,10 +4021,21 @@
       ["tool calls", 96, 22, v => `${Math.round(v)}`],
       ["denied", 3, 0, v => `${Math.round(v)}`],
     ];
-    let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="222" rx="12"/><text class="sfl-title" x="40" y="116">WORKFLOW RUN</text>
-      <text class="ao-h" x="40" y="150">issue-triage</text><text class="ao-stat" id="aoStat" x="40" y="180"></text>`;
-    MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${216 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${216 + i * 26}"></text>`));
-    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="342">−66% tokens · −59% turns</text>`;
+    // what the scheduled health agent sees across the repository's workflows: [name, score, ok]
+    const HEALTH = [
+      ["daily-report", 97, 1],
+      ["pr-review", 94, 1],
+      ["issue-triage", 58, 0],
+      ["docs-sync", 91, 1],
+    ];
+    let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="298" rx="12"/><text class="sfl-title" x="40" y="116">HEALTH · ${HEALTH.length} WORKFLOWS</text>`;
+    HEALTH.forEach(([n, sc, ok], i) => {
+      const y = 146 + i * 26;
+      run += `<g class="ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
+    });
+    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
+    MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${292 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${292 + i * 26}"></text>`));
+    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
     // what the audit downloads, typed into the terminal
     const TERM = [
       ["cmd", "$ gh aw audit 1842"],
@@ -4080,8 +4093,8 @@
     diff += `</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
-      ["aoE0", "M90 360 V542", "p", ["gh aw health", "✕ run 1842 regressed"], 112, 430, "start"],
-      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 506, "middle"],
+      ["aoE0", "M90 400 V542", "p", ["on schedule · gh aw health", "picks issue-triage"], 112, 446, "start"],
+      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 522, "middle"],
       ["aoE2", "M450 544 V396", "p", ["audit"], 472, 478, "start"],
       ["aoE3", "M804 240 H834", "p", [], 0, 0, "start"],
       ["aoE4", "M1260 240 H1284", "p", [], 0, 0, "start"],
@@ -4111,7 +4124,7 @@
       <marker id="aoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
     [
-      [0, 380, "RUN"],
+      [0, 380, "HEALTH"],
       [380, 820, "AUDIT"],
       [820, 1270, "AGENT · ANALYZE"],
       [1270, VW, "AGENT · OPTIMIZE · FIX"],
@@ -4126,7 +4139,9 @@
     g += run + term + sess + diff;
     const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 20)}</g>`;
     g += badge(1232, 444) + badge(1666, 394);
+
     g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
+    g += `<g class="ao-badge"><circle cx="62" cy="548" r="17" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("calendar", 62, 548, 18, "#ab7df8")}</g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg ao-svg");
@@ -4156,13 +4171,14 @@
     const light = nid => {
       $(nid).classList.add("on");
       $("aoLane" + LANE[nid]).classList.add("on");
+      if (nid === "aoHealth") $("aoPick").classList.add("on");
     };
     const setRun = (f, state) => {
       const r = $("aoRun");
       r.classList.toggle("bad", state === "bad");
       r.classList.toggle("good", state === "good");
       const st = $("aoStat");
-      st.textContent = state === "bad" ? "run #1842 · ✕ failure" : state === "good" ? "run #1843 · ✓ success" : "run #1843 · ◌ running…";
+      st.textContent = state === "bad" ? "issue-triage #1842 · ✕" : state === "good" ? "issue-triage #1843 · ✓" : "issue-triage #1843 · ◌";
       st.setAttribute("class", "ao-stat" + (state === "bad" ? " ko" : state === "good" ? " ok" : ""));
       MET.forEach(([, a, b, fmt], i) => ($("aoV" + i).textContent = fmt(a + (b - a) * f)));
     };
@@ -4192,7 +4208,7 @@
       sound: "audit",
       palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
       notes:
-        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: a scheduled health agent runs gh aw health, flags the regressed run and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
+        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
       enter() {
         t0 = 0;
         cyc = -1;
