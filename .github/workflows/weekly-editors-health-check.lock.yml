@@ -784,7 +784,7 @@ jobs:
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install Playwright CLI
-        run: npm install -g @playwright/cli@0.1.23
+        run: npm install -g @playwright/cli@0.1.24
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
         timeout-minutes: 10

@@ -89,6 +89,8 @@ const HARNESS_UNEXPECTED_ERROR_RE = /^\[(?:copilot|claude|codex)-harness\]\s*une
 const FAILURE_ISSUE_DEDUP_WINDOW_HOURS = 24;
 const FAILURE_ISSUE_CATEGORY_DAILY_CAP = 50;
 const FAILURE_ISSUE_WINDOW_MS = FAILURE_ISSUE_DEDUP_WINDOW_HOURS * 60 * 60 * 1000;
+const MAX_STARTUP_JOB_LOG_BYTES = 5 * 1024 * 1024;
+const MAX_STARTUP_LOG_TAIL_LENGTH = 4000;
 const DEFAULT_OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
 /** Path to the failure categories file written by handle_agent_failure and read by the OTLP conclusion span. */
 const FAILURE_CATEGORIES_PATH = "/tmp/gh-aw/failure_categories.json";
@@ -2032,6 +2034,11 @@ async function getStartupStepLogTail(jobId, step, overlappingStep) {
   try {
     const { data } = await github.rest.actions.downloadJobLogsForWorkflowRun({ ...context.repo, job_id: jobId });
     if (typeof data !== "string" && !(data instanceof ArrayBuffer) && !(data instanceof Uint8Array)) return "";
+    const byteLength = typeof data === "string" ? Buffer.byteLength(data, "utf8") : data.byteLength;
+    if (byteLength > MAX_STARTUP_JOB_LOG_BYTES) {
+      core.warning("Startup job log exceeds the safe parsing limit; see the failing step in the linked run.");
+      return "";
+    }
     const log = typeof data === "string" ? data : Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data).toString("utf8");
     const records = log.split(/\r?\n/).flatMap(line => {
       const match = line.match(/^(\d{4}-\d{2}-\d{2}T\S+Z) (.*)$/);
@@ -2049,8 +2056,26 @@ async function getStartupStepLogTail(jobId, step, overlappingStep) {
     const output = records.findIndex((line, index) => index > group && line === "##[endgroup]");
     if (group < 0 || output < 0 || output >= exit) return "";
     const maskedValues = collectAddMaskedValues(log);
-    const redacted = redactDiagnosticText(records.slice(output + 1, exit + 1).join("\n"), { maskedValues });
-    return redactAndBoundDiagnostics(redacted.split("\n").slice(-30).join("\n").slice(-4000), { maskedValues, maxLength: 4000 });
+    const exitCode = records[exit].match(/^##\[error\]Process completed with exit code (\d+)\./)?.[1];
+    if (!exitCode) return "";
+    const exitMarker = `##[error]Process completed with exit code ${exitCode}.`;
+    let rawTail = records
+      .slice(output + 1, exit)
+      .slice(-30)
+      .join("\n")
+      .slice(-MAX_STARTUP_LOG_TAIL_LENGTH);
+    let sanitizedTail = "";
+    while (rawTail) {
+      sanitizedTail = redactAndBoundDiagnostics(redactDiagnosticText(rawTail, { maskedValues }), {
+        maskedValues,
+        maxLength: MAX_STARTUP_LOG_TAIL_LENGTH * 4,
+      });
+      if (sanitizedTail.length + exitMarker.length + 1 <= MAX_STARTUP_LOG_TAIL_LENGTH) break;
+      const newline = rawTail.indexOf("\n");
+      rawTail = newline >= 0 ? rawTail.slice(newline + 1) : rawTail.slice(Math.min(64, rawTail.length));
+    }
+    if (!sanitizedTail || sanitizedTail.length + exitMarker.length + 1 > MAX_STARTUP_LOG_TAIL_LENGTH) return "";
+    return `${sanitizedTail}\n${exitMarker}`;
   } catch {
     core.warning("Could not retrieve startup step diagnostics; see the failing step in the linked run.");
     return "";
@@ -2139,7 +2164,7 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && isFailedStep(step));
   // Failed redaction blocks safe diagnostics even after an agent crash; startup keeps priority.
   const firstFailedStep = steps?.find(step => (isFailedStep(step) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
-  const failedStep = startupFailure ? firstFailedStep : redactionStep || setupFailure || firstFailedStep;
+  const failedStep = startupFailure ? setupFailure || firstFailedStep : redactionStep || setupFailure || firstFailedStep;
   if (!failedStep) {
     return { failingStep: "", agentConclusion, ...(isCancelledTimeout ? { isTimedOut: true } : {}), attributionUnavailable: "The failed agent job had no failed step metadata." };
   }

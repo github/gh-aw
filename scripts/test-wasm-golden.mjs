@@ -191,6 +191,11 @@ function normalizeProjectUTC(content) {
   return content.replace(/^\s*GH_AW_PROJECT_UTC:.*(?:\r?\n|$)/gm, "");
 }
 
+// Keep GitHub token environment names stable across native and wasm compilation.
+function normalizeMCPGitHubTokenEnv(content) {
+  return content.replace(/GH_AW_MCP_SCRIPTS_ENV_[0-9a-f]+_47485f544f4b454e/g, "GH_AW_MCP_SCRIPTS_ENV_TOKEN");
+}
+
 // ── Normalize copilot model fallback ───────────────────────────────────
 // Keep golden fixtures stable across copilot default model fallback updates.
 // Mirrors normalizeOutput() in pkg/workflow/wasm_golden_test.go.
@@ -248,7 +253,9 @@ function normalizeDefaultRuntimeVersions(content) {
 // new normalization steps only need to be added in one place.
 // Mirrors normalizeOutput() in pkg/workflow/wasm_golden_test.go.
 function normalize(content) {
-  return normalizeAWFConfigPayload(normalizeCheckoutPin(normalizeDefaultRuntimeVersions(normalizeCopilotDefaultModel(normalizeProjectUTC(normalizeAWFImageTagDigests(normalizeContainerPins(normalizeHeredocDelimiters(content))))))));
+  return normalizeMCPGitHubTokenEnv(
+    normalizeAWFConfigPayload(normalizeCheckoutPin(normalizeDefaultRuntimeVersions(normalizeCopilotDefaultModel(normalizeProjectUTC(normalizeAWFImageTagDigests(normalizeContainerPins(normalizeHeredocDelimiters(content))))))))
+  );
 }
 
 // ── Load golden file ─────────────────────────────────────────────────

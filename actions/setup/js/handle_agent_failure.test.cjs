@@ -888,6 +888,31 @@ describe("handle_agent_failure", () => {
       expect(global.github.request).not.toHaveBeenCalled();
     });
 
+    it("prefers the setup failure over an earlier unrelated failure during startup", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Run preflight checks", conclusion: "failure" },
+              { name: "Checkout repository (gh-aw default)", conclusion: "failure" },
+              { name: "Start MCP Gateway", conclusion: "skipped" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentDiagnostics({ startupFailure: true })).resolves.toEqual({
+        failingStep: "Checkout repository (gh-aw default)",
+        agentConclusion: "failure",
+        preAgentFailure: true,
+      });
+    });
+
     it("redacts and bounds the failed startup step output without including adjacent steps or runner inputs", async () => {
       vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
       vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
@@ -939,6 +964,62 @@ describe("handle_agent_failure", () => {
       expect(rendered).not.toContain("cleanup output");
       expect(download).toHaveBeenCalledOnce();
       await getFailedAgentDiagnostics();
+      expect(download).toHaveBeenCalledOnce();
+      vi.unstubAllEnvs();
+    });
+
+    it("preserves the startup cause and exit marker when sanitization expands the tail", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      const log = [
+        '2026-10-10T10:00:02.010Z ##[group]Run bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v1 --rootless',
+        "2026-10-10T10:00:02.020Z ##[endgroup]",
+        `2026-10-10T10:00:02.030Z ${"@npm/package ".repeat(350)}install failed: missing optional binding`,
+        "2026-10-10T10:00:02.040Z ##[error]Process completed with exit code 1.",
+      ].join("\n");
+      const download = vi.fn().mockResolvedValue({ data: log });
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+
+      const diagnostics = await getFailedAgentDiagnostics({ startupFailure: true });
+
+      expect(diagnostics.startupLogTail.length).toBeLessThanOrEqual(4000);
+      expect(diagnostics.startupLogTail).toContain("install failed: missing optional binding");
+      expect(diagnostics.startupLogTail).toContain("Process completed with exit code 1.");
+      vi.unstubAllEnvs();
+    });
+
+    it("withholds oversized startup job logs before parsing", async () => {
+      vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      const download = vi.fn().mockResolvedValue({ data: new Uint8Array(5 * 1024 * 1024 + 1) });
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            id: 456,
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn(), downloadJobLogsForWorkflowRun: download } },
+      };
+
+      expect(await getFailedAgentDiagnostics({ startupFailure: true })).not.toHaveProperty("startupLogTail");
+      expect(global.core.warning).toHaveBeenCalledWith("Startup job log exceeds the safe parsing limit; see the failing step in the linked run.");
       expect(download).toHaveBeenCalledOnce();
       vi.unstubAllEnvs();
     });
