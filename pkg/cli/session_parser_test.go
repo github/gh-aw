@@ -330,7 +330,7 @@ func TestSessionParserDoesNotInferSubagentsFromStdio(t *testing.T) {
 			writeSessionTestFile(t, root, "agent-stdio.log",
 				"[INFO] container(s)\nclass RoutingProfile(StrictModel)\nlen(d)\n● "+dispatch+" Research routing\n")
 			writeSessionTestFile(t, root, "agent_usage.json", `{"primary_model":"opus","input_tokens":1000}`)
-			require.NoError(t, parseAgentLog(root, workflow.NewCopilotEngine(), false))
+			require.NoError(t, parseAgentLog(t.Context(), root, workflow.NewCopilotEngine(), false))
 			markdown, err := os.ReadFile(filepath.Join(root, "log.md"))
 			require.NoError(t, err)
 			require.Contains(t, string(markdown), "Research")
@@ -379,7 +379,7 @@ func TestParseAgentLogUsesSharedSessionParser(t *testing.T) {
 	requireSessionTestNode(t)
 	root := t.TempDir()
 	writeSessionTestFile(t, root, "agent-stdio.log", `{"type":"assistant","message":{"content":[{"type":"text","text":"Audit parser works"}]}}`+"\n")
-	require.NoError(t, parseAgentLog(root, workflow.NewClaudeEngine(), false))
+	require.NoError(t, parseAgentLog(t.Context(), root, workflow.NewClaudeEngine(), false))
 	markdown, err := os.ReadFile(filepath.Join(root, "log.md"))
 	require.NoError(t, err)
 	require.Contains(t, string(markdown), "Audit parser works")
@@ -431,7 +431,7 @@ func TestParseAgentLogUsesBehaviorDefinedParser(t *testing.T) {
 				},
 			})
 			require.NoError(t, err)
-			err = parseAgentLog(root, engine, false)
+			err = parseAgentLog(t.Context(), root, engine, false)
 			if test.wantError != "" {
 				require.ErrorContains(t, err, test.wantError)
 				return

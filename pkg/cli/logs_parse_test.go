@@ -24,7 +24,7 @@ func TestParseAgentLogNoAgentOutput(t *testing.T) {
 	}
 
 	// Run the parser - should not fail, just skip
-	err = parseAgentLog(tempDir, engine, true)
+	err = parseAgentLog(t.Context(), tempDir, engine, true)
 	if err != nil {
 		t.Fatalf("parseAgentLog should not fail when agent logs are missing: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestParseAgentLogNoEngine(t *testing.T) {
 	}
 
 	// Run the parser with nil engine - should skip gracefully
-	err := parseAgentLog(tempDir, nil, true)
+	err := parseAgentLog(t.Context(), tempDir, nil, true)
 	if err != nil {
 		t.Fatalf("parseAgentLog should not fail with nil engine: %v", err)
 	}
