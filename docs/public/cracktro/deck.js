@@ -1719,6 +1719,8 @@
   .ops-fig .ov-bar { fill: var(--oc); opacity: .8; }
   .ops-fig .ov-line { fill: none; stroke: #9198a1; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .ops-fig .ov-dash { stroke-dasharray: 6 5; }
+  .ops-fig .ov-hot { fill: #f85149; opacity: 1; }
+  .ops-fig .ov-cap { stroke: #f85149; }
   .ops-fig text { fill: #9198a1; font: 500 12px "Mona Sans", sans-serif; }
   .ops-fig .ov-t { fill: #e6edf3; font-size: 15px; }
   .ops-fig .ov-b { fill: #f0f6fc; font-size: 16px; font-weight: 700; }
@@ -10164,260 +10166,6 @@
     });
   }
 
-  // Connectors: a declaration lists everything a service offers; a workflow imports it and selects a few reads and one write; only that selection reaches the run
-  {
-    resetIndex();
-    // [label, kind] where kind 1 = selected by the workflow, "+" = collapsed remainder
-    const PV = [
-      {
-        id: "linear", name: "Linear", host: "api.linear.app", c: "#79c0ff",
-        trig: [["issue-created"], ["+6 more", "+"]],
-        tools: [["get-issue", 1], ["list-comments", 1], ["+27 more", "+"]],
-        safe: [["add-comment", 1], ["create-issue"], ["+6 more", "+"]],
-        sel: "[get-issue, list-comments]", reads: ["get-issue", "list-comments"], fx: "add-comment",
-      },
-      {
-        id: "jira", name: "Jira", host: "<site>.atlassian.net", c: "#4c9aff",
-        trig: [["issue-created"], ["+6 more", "+"]],
-        tools: [["getJiraIssue", 1], ["get-issue-remote-links"], ["+ MCP readers", "+"]],
-        safe: [["add-comment", 1], ["add-label"], ["+4 more", "+"]],
-        sel: "{personal: [getJiraIssue]}", reads: ["getJiraIssue"], fx: "add-comment",
-      },
-      {
-        id: "azure-devops", name: "Azure DevOps", host: "dev.azure.com", c: "#39c5cf",
-        trig: [["work-item-created"], ["+7 more", "+"]],
-        tools: [["get-work-item-description", 1], ["get-work-item"], ["+10 more", "+"]],
-        safe: [["comment-on-work-item", 1], ["create-work-item"], ["+21 more", "+"]],
-        sel: "[get-work-item-description]", reads: ["get-work-item-description"], fx: "comment-on-work-item",
-      },
-      {
-        id: "gitlab", name: "GitLab", host: "gitlab.com · self-managed", c: "#f0883e",
-        trig: [["merge-request-opened"], ["pipeline-updated"]],
-        tools: [["get-merge-request", 1], ["get-pipeline"]],
-        safe: [["add-merge-request-note", 1]],
-        sel: "[get-merge-request]", reads: ["get-merge-request"], fx: "add-merge-request-note",
-      },
-    ];
-    const CATALOG = ["Linear", "Jira", "Azure DevOps", "Slack", "Teams", "Confluence", "Sentry", "ServiceNow", "GitLab", "PagerDuty", "Datadog", "Zendesk", "Notion", "Asana"];
-    const K = "#ff7b72", D = "#656c76", T = "#f0f6fc", V = "#a5d6ff";
-    const R = "var(--r)", Wr = "var(--w)";
-
-    // declaration card
-    const cardFile = h("em");
-    const body = h("div", { class: "cn-body" });
-    const card = h("div", { class: "cn-card" }, h("div", { class: "cn-tab" }, "connectors/", cardFile, ".md"), body);
-    let pick = 0;
-    const chips = (list, k) => h("div", { class: "cn-chips" }, list.map(([l, s]) => h("span", { class: `cn-chip ${k}${s === 1 ? " pick" : ""}${s === "+" ? " more" : ""}`, "--i": s === 1 ? pick++ : 0 }, l)));
-    const sec = (label, ...kids) => h("div", { class: "cn-sec" }, h("small", {}, label), ...kids);
-    const buildCard = p => {
-      pick = 0;
-      cardFile.textContent = p.id;
-      body.replaceChildren(
-        sec("endpoint", h("div", { class: "cn-host" }, p.host)),
-        // reader secret serves the reads, writer secret only the safe-outputs job
-        sec("credentials", h("div", { class: "cn-chips" }, h("span", { class: "cn-chip r pick", "--i": 0 }, "reader"), h("span", { class: "cn-chip w pick", "--i": 3 }, "writer"))),
-        sec("triggers · not selected", chips(p.trig, "")),
-        sec("tools · read", chips(p.tools, "r")),
-        sec("safe-outputs · write", chips(p.safe, "w"))
-      );
-      body.classList.remove("swap");
-      void body.offsetWidth;
-      body.classList.add("swap");
-    };
-
-    // workflow editor: five slots retype per provider
-    const slot = k => h("span", { class: "cn-v", "--k": k });
-    const S = [slot("var(--pc)"), slot(R), slot(R), slot(Wr), slot(Wr)];
-    const LINES = [
-      [["---", D]],
-      [["on: ", K], ["workflow_dispatch", V]],
-      [["imports:", K]],
-      [["  - ", K], [".github/workflows/connectors/", V], S[0], [".md", V]],
-      [["tools:", K]],
-      [["  ", K], S[1], [": ", K], S[2]],
-      [["safe-outputs:", K]],
-      [["  staged: ", K], ["true", V]],
-      [["  ", K], S[3], ["-", K], S[4], [":", K]],
-      [["---", D]],
-      [["# Intake handoff", T]],
-      [["Read the approved item. Propose one update.", T]],
-    ];
-    const HOT = { 3: "var(--pc)", 5: R, 8: Wr };
-    const rows = LINES.map((parts, i) =>
-      h("div", { class: "cn-row" + (HOT[i] ? " hot" : ""), "--k": HOT[i] || "transparent" }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0])))))
-    );
-    const ed = h("div", { class: "cn-ed" }, h("div", { class: "cn-tab" }, "intake.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cn-code" }, rows));
-    const target = p => [p.id, p.id, p.sel, p.id, p.fx];
-
-    // run time: provider ← reads ← agent → proposal → safe-outputs job → write → provider
-    const rt = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    rt.setAttribute("class", "cn-rt");
-    rt.setAttribute("viewBox", "0 0 450 520");
-    rt.innerHTML = `
-      <path class="e r" id="cnRead" d="M150 100 C150 190 98 210 98 300"/>
-      <path class="e p" id="cnProp" d="M195 410 H255"/>
-      <path class="e w" id="cnWrite" d="M352 300 C352 210 300 190 300 100"/>
-      <rect class="box pv" x="70" y="0" width="310" height="100" rx="18" style="--k:var(--pc)"/>
-      <text class="t pvt" x="225" y="46" text-anchor="middle"></text>
-      <text class="s" x="225" y="76" text-anchor="middle"></text>
-      <text class="m" x="20" y="196" style="fill:var(--r)">read</text>
-      <text class="m" x="430" y="196" text-anchor="end" style="fill:var(--w)">write</text>
-      <text class="m" x="225" y="438" text-anchor="middle" style="fill:#9198a1;font-size:12px">propose</text>
-      <rect class="box ag" x="0" y="300" width="195" height="220" rx="18" style="--k:var(--r)"/>
-      <text class="t" x="20" y="340">Agent</text>
-      <text class="s" x="20" y="366">sandbox</text>
-      <text class="m tl" x="20" y="404" style="fill:var(--r)"></text>
-      <text class="m tl" x="20" y="430" style="fill:var(--r)"></text>
-      <text class="s cnt" x="20" y="472"></text>
-      <text class="s" x="20" y="500" style="fill:#ff7b72">no writer secret</text>
-      <rect class="box so" x="255" y="300" width="195" height="220" rx="18" style="--k:var(--w)"/>
-      <text class="t" x="275" y="340">Safe outputs</text>
-      <text class="s" x="275" y="366">separate job</text>
-      <text class="m fx" x="275" y="404" style="fill:var(--w)"></text>
-      <text class="m fx" x="275" y="430" style="fill:var(--w)"></text>
-      <text class="s" x="275" y="472">writer secret</text>
-      <text class="s" x="275" y="500" style="fill:#d29922">staged · max 1</text>
-      <circle class="pk" r="9" style="fill:var(--r);filter:drop-shadow(0 0 8px var(--r))"/>
-      <circle class="pk" r="9" style="fill:#f0f6fc;filter:drop-shadow(0 0 8px #f0f6fc)"/>
-      <circle class="pk" r="9" style="fill:var(--w);filter:drop-shadow(0 0 8px var(--w))"/>`;
-    const [pvName, pvHost] = rt.querySelectorAll("text");
-    const toolEls = rt.querySelectorAll(".tl"),
-      fxEls = rt.querySelectorAll(".fx"),
-      cnt = rt.querySelector(".cnt"),
-      boxes = rt.querySelectorAll(".box"),
-      pks = rt.querySelectorAll(".pk"),
-      paths = ["cnRead", "cnProp", "cnWrite"].map(id => rt.querySelector("#" + id));
-    // fit a mono label into a box by shrinking its font (about 0.66em per glyph)
-    const fitText = (t, s, w = 160) => {
-      t.textContent = s;
-      t.style.fontSize = `${Math.min(16, Math.max(11, w / (s.length * 0.66)))}px`;
-    };
-    // a single long name wraps over both lines at its last hyphen that keeps the head short
-    const wrap = names => {
-      if (names.length > 1 || names[0].length <= 15) return names;
-      const n = names[0],
-        i = n.lastIndexOf("-", 14);
-      return [n.slice(0, i + 1), n.slice(i + 1)];
-    };
-    const buildRt = p => {
-      pvName.textContent = p.name;
-      pvHost.textContent = p.host;
-      const tl = wrap(p.reads);
-      toolEls.forEach((t, i) => fitText(t, tl[i] || ""));
-      cnt.textContent = `${p.reads.length} reader${p.reads.length > 1 ? "s" : ""} exposed`;
-      fitText(fxEls[0], p.id + "-");
-      fitText(fxEls[1], p.fx);
-    };
-
-    const cols = [
-      [110, "1", "Declare once", "endpoint · credentials · capabilities", ".2s"],
-      [600, "2", "Select per workflow", "importing alone grants nothing", ".3s"],
-      [1360, "3", "Expose only the selection", "reads in the sandbox · writes in a job", ".4s"],
-    ].map(([x, n, t, s, d]) => h("div", { class: "cn-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
-    const cat = CATALOG.map(n => h("span", { class: "cn-p" }, n));
-    const el = h(
-      "section",
-      { class: "slide cn" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring any service in · one reviewable YAML contract"), h("h2", {}, letters("Connectors", "l-grad"))),
-      cols,
-      card,
-      ed,
-      rt,
-      h("div", { class: "cn-cat" }, h("small", {}, "14 declarations"), cat)
-    );
-
-    let cur = 0,
-      phase = "hold",
-      since = 0,
-      holdAt = 0,
-      typed = [],
-      lens = null;
-    const setProvider = i => {
-      cur = i;
-      const p = PV[i];
-      el.style.setProperty("--pc", p.c);
-      buildCard(p);
-      buildRt(p);
-      cat.forEach(c => c.classList.toggle("on", c.textContent === p.name));
-    };
-    const paint = () => S.forEach((s, i) => (s.textContent = typed[i]));
-    const SEG = [
-      [300, 1300],
-      [1600, 2300],
-      [2600, 3700],
-    ];
-    const HOLD = 5200;
-    const packets = t => {
-      lens ??= paths.map(p => p.getTotalLength());
-      const e = phase === "hold" ? t - holdAt : -1;
-      SEG.forEach(([a, b], i) => {
-        const u = (e - a) / (b - a),
-          on = u >= 0 && u <= 1;
-        pks[i].style.opacity = on ? 1 : 0;
-        if (on) {
-          const pt = paths[i].getPointAtLength(u * lens[i]);
-          pks[i].setAttribute("cx", pt.x);
-          pks[i].setAttribute("cy", pt.y);
-        }
-      });
-      // light the box a packet just reached: agent after the read, job after the proposal, provider after the write
-      const near = at => e >= at && e < at + 700;
-      boxes[1].classList.toggle("hot", near(SEG[0][1]));
-      boxes[2].classList.toggle("hot", near(SEG[1][1]));
-      boxes[0].classList.toggle("hot", near(SEG[2][1]));
-    };
-    slides.push({
-      group: "enterprise",
-      sound: "connectors",
-      palette: ["#1f6feb", "#238636", "#8957e5", "#1b7c83"],
-      notes:
-        "Connectors. A connector is an ordinary Markdown file under .github/workflows/connectors whose frontmatter declares one service: a fixed endpoint, separate reader and writer credential secret names, exact resource grants, and every capability the service offers, meaning triggers, read tools and safe-output writes. A workflow imports the declaration and then selects only what it needs: a reader or two under tools, and one write under safe-outputs, prefixed with the connector id. Importing alone grants nothing. At run time only the selection is exposed: the agent sees just the chosen readers inside the sandbox and holds no writer secret; it can only propose the write, which a separate safe-outputs job performs, staged here so it is only previewed. The same shape covers Linear, Jira, Azure DevOps, GitLab and ten more declarations. Connectors are experimental. The workflow is a synthetic example, capability names come from the declarations, and the request flow is illustrative.",
-      enter() {
-        phase = "hold";
-        since = 0;
-        holdAt = 0;
-        setProvider(0);
-        typed = target(PV[0]);
-        paint();
-        card.classList.add("lit");
-      },
-      tick(t) {
-        if (!since) since = holdAt = t;
-        const e = t - since;
-        if (phase === "hold" && e > HOLD) {
-          phase = "del";
-          since = t;
-          card.classList.remove("lit");
-        } else if (phase === "del" && e > 14) {
-          since = t;
-          const i = typed.findLastIndex(s => s.length);
-          if (i >= 0) typed[i] = typed[i].slice(0, -1);
-          else {
-            phase = "type";
-            setProvider((cur + 1) % PV.length);
-            sfx.pop(cur * 2);
-          }
-          paint();
-        } else if (phase === "type" && e > 40) {
-          since = t;
-          const goal = target(PV[cur]),
-            i = typed.findIndex((s, j) => s !== goal[j]);
-          if (i >= 0) {
-            typed[i] = goal[i].slice(0, typed[i].length + 1);
-            sfx.key(0.6);
-          } else {
-            phase = "hold";
-            holdAt = t;
-            card.classList.add("lit");
-          }
-          paint();
-        }
-        packets(t);
-      },
-      el,
-    });
-  }
-
   // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
   {
     resetIndex();
@@ -10668,16 +10416,15 @@
       color: "#f0883e",
       kicker: "Observability",
       head: [["OpenTelemetry", "l-grad"]],
-      tag: ["Traces and opt-in logs go to ", h("b", {}, "your OTLP backend"), ", with credentials kept in secrets."],
+      tag: ["Traces and ", h("b", {}, "AI credit burn"), " stream to your OTLP backend."],
       facts: [
-        ["Workflow traces", "observability.otlp sends job spans to one or more endpoints; headers come from secrets and are masked."],
-        ["Org defaults", "GH_AW_DEFAULT_OTLP_ENDPOINT plus the secret GH_AW_DEFAULT_OTLP_HEADERS; an endpoint without headers exports nothing and fails the agent job."],
-        ["Hosted MCP gateway / server traces", "The gateway exports one span per MCP tool call; headers arrive only via OTEL_EXPORTER_OTLP_HEADERS."],
-        ["Opt-in logs", "GH_AW_OTLP_LOGS_ENABLED=true adds compact session logs from the conclusion job."],
+        ["Traces", "Job spans and MCP tool calls over OTLP/HTTP."],
+        ["AI credit burn", "Agent spans carry gh-aw.aic; conclusion flags max_ai_credits_exceeded."],
+        ["Secrets", "Collector headers stay in secrets, masked in logs."],
       ],
-      own: [h("b", {}, "Operator owned: "), "collector and credentials. Export errors never fail runs; a default endpoint without headers fails the agent."],
+      own: [h("b", {}, "Your collector: "), "chart, alert and cap credits. Export errors never fail runs."],
       notes:
-        "OpenTelemetry. Agentic workflows export OpenTelemetry over OTLP/HTTP to collectors you run. In the workflow, observability.otlp lists one or more endpoints, each with headers that come from secrets, and the credentials are masked in logs. Organizations can set a default instead: GH_AW_DEFAULT_OTLP_ENDPOINT as a variable or secret, plus GH_AW_DEFAULT_OTLP_HEADERS, which must be a secret; an endpoint without headers is treated as unconfigured, nothing is exported from any job, and the agent job fails with a visible error so the misconfiguration is not silent. Spans follow the run across its jobs. The hosted MCP gateway has its own traces-only exporter that emits one span per MCP tool call; it reads headers only from the OTEL_EXPORTER_OTLP_HEADERS environment variable, never from its JSON configuration. Logs are opt-in: GH_AW_OTLP_LOGS_ENABLED=true exports compact unified-session logs from the conclusion job, bounded by GH_AW_OTLP_LOGS_MAX_BYTES. These defaults are cooperative configuration, not a locked policy. Transport failures, such as a rejected or unreachable collector, never fail the functional workflow; missing or invalid credentials are configuration errors to fix, and 401 or 403 responses are not retried with unchanged credentials. The diagram and span bars are illustrative; see the OpenTelemetry and MCP gateway reference.",
+        "OpenTelemetry. Agentic workflows export OpenTelemetry over OTLP/HTTP to collectors you run. In the workflow, observability.otlp lists one or more endpoints, each with headers that come from secrets, and the credentials are masked in logs. Organizations can set a default instead: GH_AW_DEFAULT_OTLP_ENDPOINT as a variable or secret, plus GH_AW_DEFAULT_OTLP_HEADERS, which must be a secret; an endpoint without headers is treated as unconfigured, nothing is exported from any job, and the agent job fails with a visible error so the misconfiguration is not silent. Spans follow the run across its jobs. AI credit burn rides on the spans: the agent job span carries gh-aw.aic, the AI credits the run consumed, and the conclusion span records gh-aw.max_ai_credits and gh-aw.max_ai_credits_exceeded, so the backend can chart burn per workflow, alert on spikes and see which runs hit the cap. The hosted MCP gateway has its own traces-only exporter that emits one span per MCP tool call; it reads headers only from the OTEL_EXPORTER_OTLP_HEADERS environment variable, never from its JSON configuration. Logs are opt-in: GH_AW_OTLP_LOGS_ENABLED=true exports compact unified-session logs from the conclusion job, bounded by GH_AW_OTLP_LOGS_MAX_BYTES. These defaults are cooperative configuration, not a locked policy. Transport failures, such as a rejected or unreachable collector, never fail the functional workflow; missing or invalid credentials are configuration errors to fix, and 401 or 403 responses are not retried with unchanged credentials. The diagram, span bars and credit chart are illustrative; see the OpenTelemetry and MCP gateway reference.",
     },
     {
       key: "governance",
@@ -10691,9 +10438,9 @@
         ["Branch rulesets", "Require agentic review checks or a central compile check before merge."],
         ["Actions policies", "Allowed actions, runner groups and SHA-pinned lock files apply like any other job."],
       ],
-      own: [h("b", {}, "Separate authority: "), "a Central Agentic Ops rollout is reviewed on its own and never replaces GitHub enforcement."],
+      own: [h("b", {}, "Cooperative defaults: "), "variables guide; environments, rulesets and policies enforce."],
       notes:
-        "GitHub-native governance. Enforcement stays where your organization already keeps it. gh aw env manages GH_AW_DEFAULT_* Actions variables at enterprise, organization or repository scope; precedence runs frontmatter, then repository, organization, enterprise, then the compiler fallback. GH_AW_POLICY_* variables gate runtime capabilities, for example turning off pull request creation. These variables are cooperative defaults, not locked policy, so pair them with real enforcement: protected environments, reached through on.manual-approval or safe-outputs.environment, carry required reviewers, wait timers and branch policies, and naming an environment without protection rules adds no review. Branch rulesets require checks, such as agentic review or a centrally managed compile check that rejects jobs without self-hosted runners. Actions policies, allowed actions, runner groups and SHA-pinned lock files apply to agentic jobs like any other. A Central Agentic Ops campaign moves through review, limited live and scheduled live under its own reviewed authority, but it never bypasses the target repository's rules. The diagram is illustrative; see the governance and enterprise environment controls reference.",
+        "GitHub-native governance. Enforcement stays where your organization already keeps it. gh aw env manages GH_AW_DEFAULT_* Actions variables at enterprise, organization or repository scope; precedence runs frontmatter, then repository, organization, enterprise, then the compiler fallback. GH_AW_POLICY_* variables gate runtime capabilities, for example turning off pull request creation. These variables are cooperative defaults, not locked policy, so pair them with real enforcement: protected environments, reached through on.manual-approval or safe-outputs.environment, carry required reviewers, wait timers and branch policies, and naming an environment without protection rules adds no review. Branch rulesets require checks, such as agentic review or a centrally managed compile check that rejects jobs without self-hosted runners. Actions policies, allowed actions, runner groups and SHA-pinned lock files apply to agentic jobs like any other. The diagram is illustrative; see the governance and enterprise environment controls reference.",
     },
     {
       key: "infrastructure",
@@ -11213,6 +10960,260 @@
         repo,
         pkg
       ),
+    });
+  }
+
+  // Connectors: a declaration lists everything a service offers; a workflow imports it and selects a few reads and one write; only that selection reaches the run
+  {
+    resetIndex();
+    // [label, kind] where kind 1 = selected by the workflow, "+" = collapsed remainder
+    const PV = [
+      {
+        id: "linear", name: "Linear", host: "api.linear.app", c: "#79c0ff",
+        trig: [["issue-created"], ["+6 more", "+"]],
+        tools: [["get-issue", 1], ["list-comments", 1], ["+27 more", "+"]],
+        safe: [["add-comment", 1], ["create-issue"], ["+6 more", "+"]],
+        sel: "[get-issue, list-comments]", reads: ["get-issue", "list-comments"], fx: "add-comment",
+      },
+      {
+        id: "jira", name: "Jira", host: "<site>.atlassian.net", c: "#4c9aff",
+        trig: [["issue-created"], ["+6 more", "+"]],
+        tools: [["getJiraIssue", 1], ["get-issue-remote-links"], ["+ MCP readers", "+"]],
+        safe: [["add-comment", 1], ["add-label"], ["+4 more", "+"]],
+        sel: "{personal: [getJiraIssue]}", reads: ["getJiraIssue"], fx: "add-comment",
+      },
+      {
+        id: "azure-devops", name: "Azure DevOps", host: "dev.azure.com", c: "#39c5cf",
+        trig: [["work-item-created"], ["+7 more", "+"]],
+        tools: [["get-work-item-description", 1], ["get-work-item"], ["+10 more", "+"]],
+        safe: [["comment-on-work-item", 1], ["create-work-item"], ["+21 more", "+"]],
+        sel: "[get-work-item-description]", reads: ["get-work-item-description"], fx: "comment-on-work-item",
+      },
+      {
+        id: "gitlab", name: "GitLab", host: "gitlab.com · self-managed", c: "#f0883e",
+        trig: [["merge-request-opened"], ["pipeline-updated"]],
+        tools: [["get-merge-request", 1], ["get-pipeline"]],
+        safe: [["add-merge-request-note", 1]],
+        sel: "[get-merge-request]", reads: ["get-merge-request"], fx: "add-merge-request-note",
+      },
+    ];
+    const CATALOG = ["Linear", "Jira", "Azure DevOps", "Slack", "Teams", "Confluence", "Sentry", "ServiceNow", "GitLab", "PagerDuty", "Datadog", "Zendesk", "Notion", "Asana"];
+    const K = "#ff7b72", D = "#656c76", T = "#f0f6fc", V = "#a5d6ff";
+    const R = "var(--r)", Wr = "var(--w)";
+
+    // declaration card
+    const cardFile = h("em");
+    const body = h("div", { class: "cn-body" });
+    const card = h("div", { class: "cn-card" }, h("div", { class: "cn-tab" }, "connectors/", cardFile, ".md"), body);
+    let pick = 0;
+    const chips = (list, k) => h("div", { class: "cn-chips" }, list.map(([l, s]) => h("span", { class: `cn-chip ${k}${s === 1 ? " pick" : ""}${s === "+" ? " more" : ""}`, "--i": s === 1 ? pick++ : 0 }, l)));
+    const sec = (label, ...kids) => h("div", { class: "cn-sec" }, h("small", {}, label), ...kids);
+    const buildCard = p => {
+      pick = 0;
+      cardFile.textContent = p.id;
+      body.replaceChildren(
+        sec("endpoint", h("div", { class: "cn-host" }, p.host)),
+        // reader secret serves the reads, writer secret only the safe-outputs job
+        sec("credentials", h("div", { class: "cn-chips" }, h("span", { class: "cn-chip r pick", "--i": 0 }, "reader"), h("span", { class: "cn-chip w pick", "--i": 3 }, "writer"))),
+        sec("triggers · not selected", chips(p.trig, "")),
+        sec("tools · read", chips(p.tools, "r")),
+        sec("safe-outputs · write", chips(p.safe, "w"))
+      );
+      body.classList.remove("swap");
+      void body.offsetWidth;
+      body.classList.add("swap");
+    };
+
+    // workflow editor: five slots retype per provider
+    const slot = k => h("span", { class: "cn-v", "--k": k });
+    const S = [slot("var(--pc)"), slot(R), slot(R), slot(Wr), slot(Wr)];
+    const LINES = [
+      [["---", D]],
+      [["on: ", K], ["workflow_dispatch", V]],
+      [["imports:", K]],
+      [["  - ", K], [".github/workflows/connectors/", V], S[0], [".md", V]],
+      [["tools:", K]],
+      [["  ", K], S[1], [": ", K], S[2]],
+      [["safe-outputs:", K]],
+      [["  staged: ", K], ["true", V]],
+      [["  ", K], S[3], ["-", K], S[4], [":", K]],
+      [["---", D]],
+      [["# Intake handoff", T]],
+      [["Read the approved item. Propose one update.", T]],
+    ];
+    const HOT = { 3: "var(--pc)", 5: R, 8: Wr };
+    const rows = LINES.map((parts, i) =>
+      h("div", { class: "cn-row" + (HOT[i] ? " hot" : ""), "--k": HOT[i] || "transparent" }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0])))))
+    );
+    const ed = h("div", { class: "cn-ed" }, h("div", { class: "cn-tab" }, "intake.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cn-code" }, rows));
+    const target = p => [p.id, p.id, p.sel, p.id, p.fx];
+
+    // run time: provider ← reads ← agent → proposal → safe-outputs job → write → provider
+    const rt = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    rt.setAttribute("class", "cn-rt");
+    rt.setAttribute("viewBox", "0 0 450 520");
+    rt.innerHTML = `
+      <path class="e r" id="cnRead" d="M150 100 C150 190 98 210 98 300"/>
+      <path class="e p" id="cnProp" d="M195 410 H255"/>
+      <path class="e w" id="cnWrite" d="M352 300 C352 210 300 190 300 100"/>
+      <rect class="box pv" x="70" y="0" width="310" height="100" rx="18" style="--k:var(--pc)"/>
+      <text class="t pvt" x="225" y="46" text-anchor="middle"></text>
+      <text class="s" x="225" y="76" text-anchor="middle"></text>
+      <text class="m" x="20" y="196" style="fill:var(--r)">read</text>
+      <text class="m" x="430" y="196" text-anchor="end" style="fill:var(--w)">write</text>
+      <text class="m" x="225" y="438" text-anchor="middle" style="fill:#9198a1;font-size:12px">propose</text>
+      <rect class="box ag" x="0" y="300" width="195" height="220" rx="18" style="--k:var(--r)"/>
+      <text class="t" x="20" y="340">Agent</text>
+      <text class="s" x="20" y="366">sandbox</text>
+      <text class="m tl" x="20" y="404" style="fill:var(--r)"></text>
+      <text class="m tl" x="20" y="430" style="fill:var(--r)"></text>
+      <text class="s cnt" x="20" y="472"></text>
+      <text class="s" x="20" y="500" style="fill:#ff7b72">no writer secret</text>
+      <rect class="box so" x="255" y="300" width="195" height="220" rx="18" style="--k:var(--w)"/>
+      <text class="t" x="275" y="340">Safe outputs</text>
+      <text class="s" x="275" y="366">separate job</text>
+      <text class="m fx" x="275" y="404" style="fill:var(--w)"></text>
+      <text class="m fx" x="275" y="430" style="fill:var(--w)"></text>
+      <text class="s" x="275" y="472">writer secret</text>
+      <text class="s" x="275" y="500" style="fill:#d29922">staged · max 1</text>
+      <circle class="pk" r="9" style="fill:var(--r);filter:drop-shadow(0 0 8px var(--r))"/>
+      <circle class="pk" r="9" style="fill:#f0f6fc;filter:drop-shadow(0 0 8px #f0f6fc)"/>
+      <circle class="pk" r="9" style="fill:var(--w);filter:drop-shadow(0 0 8px var(--w))"/>`;
+    const [pvName, pvHost] = rt.querySelectorAll("text");
+    const toolEls = rt.querySelectorAll(".tl"),
+      fxEls = rt.querySelectorAll(".fx"),
+      cnt = rt.querySelector(".cnt"),
+      boxes = rt.querySelectorAll(".box"),
+      pks = rt.querySelectorAll(".pk"),
+      paths = ["cnRead", "cnProp", "cnWrite"].map(id => rt.querySelector("#" + id));
+    // fit a mono label into a box by shrinking its font (about 0.66em per glyph)
+    const fitText = (t, s, w = 160) => {
+      t.textContent = s;
+      t.style.fontSize = `${Math.min(16, Math.max(11, w / (s.length * 0.66)))}px`;
+    };
+    // a single long name wraps over both lines at its last hyphen that keeps the head short
+    const wrap = names => {
+      if (names.length > 1 || names[0].length <= 15) return names;
+      const n = names[0],
+        i = n.lastIndexOf("-", 14);
+      return [n.slice(0, i + 1), n.slice(i + 1)];
+    };
+    const buildRt = p => {
+      pvName.textContent = p.name;
+      pvHost.textContent = p.host;
+      const tl = wrap(p.reads);
+      toolEls.forEach((t, i) => fitText(t, tl[i] || ""));
+      cnt.textContent = `${p.reads.length} reader${p.reads.length > 1 ? "s" : ""} exposed`;
+      fitText(fxEls[0], p.id + "-");
+      fitText(fxEls[1], p.fx);
+    };
+
+    const cols = [
+      [110, "1", "Declare once", "endpoint · credentials · capabilities", ".2s"],
+      [600, "2", "Select per workflow", "importing alone grants nothing", ".3s"],
+      [1360, "3", "Expose only the selection", "reads in the sandbox · writes in a job", ".4s"],
+    ].map(([x, n, t, s, d]) => h("div", { class: "cn-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
+    const cat = CATALOG.map(n => h("span", { class: "cn-p" }, n));
+    const el = h(
+      "section",
+      { class: "slide cn" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring any service in · one reviewable YAML contract"), h("h2", {}, letters("Connectors", "l-grad"))),
+      cols,
+      card,
+      ed,
+      rt,
+      h("div", { class: "cn-cat" }, h("small", {}, "14 declarations"), cat)
+    );
+
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      holdAt = 0,
+      typed = [],
+      lens = null;
+    const setProvider = i => {
+      cur = i;
+      const p = PV[i];
+      el.style.setProperty("--pc", p.c);
+      buildCard(p);
+      buildRt(p);
+      cat.forEach(c => c.classList.toggle("on", c.textContent === p.name));
+    };
+    const paint = () => S.forEach((s, i) => (s.textContent = typed[i]));
+    const SEG = [
+      [300, 1300],
+      [1600, 2300],
+      [2600, 3700],
+    ];
+    const HOLD = 5200;
+    const packets = t => {
+      lens ??= paths.map(p => p.getTotalLength());
+      const e = phase === "hold" ? t - holdAt : -1;
+      SEG.forEach(([a, b], i) => {
+        const u = (e - a) / (b - a),
+          on = u >= 0 && u <= 1;
+        pks[i].style.opacity = on ? 1 : 0;
+        if (on) {
+          const pt = paths[i].getPointAtLength(u * lens[i]);
+          pks[i].setAttribute("cx", pt.x);
+          pks[i].setAttribute("cy", pt.y);
+        }
+      });
+      // light the box a packet just reached: agent after the read, job after the proposal, provider after the write
+      const near = at => e >= at && e < at + 700;
+      boxes[1].classList.toggle("hot", near(SEG[0][1]));
+      boxes[2].classList.toggle("hot", near(SEG[1][1]));
+      boxes[0].classList.toggle("hot", near(SEG[2][1]));
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "connectors",
+      palette: ["#1f6feb", "#238636", "#8957e5", "#1b7c83"],
+      notes:
+        "Connectors. A connector is an ordinary Markdown file under .github/workflows/connectors whose frontmatter declares one service: a fixed endpoint, separate reader and writer credential secret names, exact resource grants, and every capability the service offers, meaning triggers, read tools and safe-output writes. A workflow imports the declaration and then selects only what it needs: a reader or two under tools, and one write under safe-outputs, prefixed with the connector id. Importing alone grants nothing. At run time only the selection is exposed: the agent sees just the chosen readers inside the sandbox and holds no writer secret; it can only propose the write, which a separate safe-outputs job performs, staged here so it is only previewed. The same shape covers Linear, Jira, Azure DevOps, GitLab and ten more declarations. Connectors are experimental. The workflow is a synthetic example, capability names come from the declarations, and the request flow is illustrative.",
+      enter() {
+        phase = "hold";
+        since = 0;
+        holdAt = 0;
+        setProvider(0);
+        typed = target(PV[0]);
+        paint();
+        card.classList.add("lit");
+      },
+      tick(t) {
+        if (!since) since = holdAt = t;
+        const e = t - since;
+        if (phase === "hold" && e > HOLD) {
+          phase = "del";
+          since = t;
+          card.classList.remove("lit");
+        } else if (phase === "del" && e > 14) {
+          since = t;
+          const i = typed.findLastIndex(s => s.length);
+          if (i >= 0) typed[i] = typed[i].slice(0, -1);
+          else {
+            phase = "type";
+            setProvider((cur + 1) % PV.length);
+            sfx.pop(cur * 2);
+          }
+          paint();
+        } else if (phase === "type" && e > 40) {
+          since = t;
+          const goal = target(PV[cur]),
+            i = typed.findIndex((s, j) => s !== goal[j]);
+          if (i >= 0) {
+            typed[i] = goal[i].slice(0, typed[i].length + 1);
+            sfx.key(0.6);
+          } else {
+            phase = "hold";
+            holdAt = t;
+            card.classList.add("lit");
+          }
+          paint();
+        }
+        packets(t);
+      },
+      el,
     });
   }
 

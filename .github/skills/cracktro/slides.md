@@ -52,13 +52,13 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Experiments, graders & evals | illustrative |
 | Audit & Optimize | illustrative |
 | Enterprise |  |
-| Connectors | illustrative |
 | Enterprise ready | illustrative |
 | OpenTelemetry | illustrative |
 | GitHub-native governance | illustrative |
 | Operator-owned infrastructure | illustrative |
 | Centralized campaigns | illustrative |
 | Push SDLC | illustrative |
+| Connectors | illustrative |
 | AW factory |  |
 | First commit to GA |  |
 | How PRs land |  |

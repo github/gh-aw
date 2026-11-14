@@ -4,7 +4,7 @@
 // Each consumer themes the ov-* classes; the geometry and wording live here once.
 (function (root) {
   const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const rect = (x, y, w, h, cls = "ov-card") => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/>`;
+  const rect = (x, y, w, h, cls = "ov-card") => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="${cls.startsWith("ov-bar") ? 0 : 10}"/>`;
   const text = (x, y, s, cls = "ov-t", anchor = "start") => `<text class="${cls}" x="${x}" y="${y}"${anchor === "start" ? "" : ` text-anchor="${anchor}"`}>${esc(s)}</text>`;
   const path = (d, cls = "ov-line") => `<path class="${cls}" d="${d}"/>`;
   const head = (x, y) => path(`M${x - 8} ${y - 5} L${x} ${y} L${x - 8} ${y + 5}`, "ov-line");
@@ -12,7 +12,7 @@
   const svg = (label, body) => `<svg class="ov" viewBox="0 0 560 360" role="img" aria-label="${esc(label)}">${body}</svg>`;
 
   const observability = svg(
-    "OpenTelemetry export: workflow job spans and MCP gateway tool-call spans go over OTLP/HTTP with secret headers to your backend; compact session logs are opt-in from the conclusion job.",
+    "OpenTelemetry export: workflow job spans, tagged with AI credits, and MCP gateway tool-call spans go over OTLP/HTTP to your backend, which charts AI credit burn per run against the max_ai_credits cap.",
     [
       rect(16, 16, 224, 196),
       text(32, 44, "Workflow run", "ov-b"),
@@ -22,36 +22,34 @@
         ["safe outputs", 70, 26],
         ["conclusion", 82, 22],
       ].map(([n, x, w], i) => text(32, 82 + i * 34, n, "ov-m") + rect(128 + x, 72 + i * 34, w, 12, "ov-bar")),
-      rect(16, 232, 224, 92),
+      rect(16, 232, 224, 80),
       text(32, 260, "MCP gateway", "ov-b"),
-      text(32, 282, "hosted MCP server tool calls", "ov-s"),
       ...[
         [32, 50],
         [90, 34],
         [132, 70],
-      ].map(([x, w]) => rect(x, 300, w, 10, "ov-bar")),
+      ].map(([x, w]) => rect(x, 284, w, 10, "ov-bar")),
       path("M240 114 C252 114 252 160 262 160"),
-      path("M240 278 C252 278 252 184 262 184"),
+      path("M240 272 C252 272 252 184 262 184"),
       rect(262, 146, 118, 52, "ov-card ov-key"),
       text(321, 168, "OTLP/HTTP", "ov-b", "middle"),
       text(321, 188, "secret headers", "ov-s", "middle"),
       path("M380 172 H398"),
       head(400, 172),
-      rect(404, 40, 140, 264),
-      text(420, 68, "Your backend", "ov-b"),
-      text(420, 104, "traces", "ov-t"),
-      text(420, 124, "workflow + gateway", "ov-s"),
-      ...[0, 1, 2].map(i => rect(420 + i * 12, 136 + i * 14, 96 - i * 24, 8, "ov-bar")),
-      path("M420 196 H528", "ov-line ov-dash"),
-      text(420, 226, "session logs", "ov-t"),
-      text(420, 246, "opt-in, compact", "ov-s"),
-      text(420, 266, "conclusion job only", "ov-s"),
-      text(16, 350, "Logs: GH_AW_OTLP_LOGS_ENABLED=true. Gateway exports traces only.", "ov-s"),
+      rect(404, 16, 140, 296),
+      text(420, 44, "Your backend", "ov-b"),
+      text(420, 76, "traces", "ov-t"),
+      ...[0, 1, 2].map(i => rect(420 + i * 12, 88 + i * 12, 96 - i * 24, 7, "ov-bar")),
+      text(420, 152, "AI credit burn", "ov-t"),
+      text(420, 172, "gh-aw.aic", "ov-c"),
+      ...[30, 46, 24, 58, 38, 52, 92].map((v, i) => rect(422 + i * 16, 292 - v, 10, v, i === 6 ? "ov-bar ov-hot" : "ov-bar")),
+      path("M418 222 H532", "ov-line ov-dash ov-cap"),
+      text(420, 214, "max_ai_credits", "ov-s"),
     ].join("")
   );
 
   const governance = svg(
-    "GitHub-native governance: organization and repository variables, protected environments, branch rulesets and Actions policies gate every run, separately from the reviewed Central Agentic Ops rollout.",
+    "GitHub-native governance: organization and repository variables, protected environments, branch rulesets and Actions policies gate every run.",
     [
       text(16, 24, "GitHub-native controls", "ov-k"),
       ...[
@@ -59,17 +57,7 @@
         ["Protected environments", "required reviewers gate write jobs"],
         ["Branch rulesets", "required checks · central compile check"],
         ["Actions policies", "allowed actions · runner groups"],
-      ].map(([t, s], i) => rect(16, 36 + i * 70, 320, 58) + text(32, 60 + i * 70, t, "ov-b") + text(32, 82 + i * 70, s, "ov-s")),
-      text(372, 24, "Reviewed rollout", "ov-k"),
-      rect(364, 36, 180, 268, "ov-card ov-dash"),
-      text(380, 62, "CAO campaign", "ov-b"),
-      text(380, 82, "proposes the next stage", "ov-s"),
-      ...["review", "limited live", "scheduled live"].map(
-        (s, i) => rect(380, 102 + i * 64, 148, 40, "ov-pill") + text(454, 127 + i * 64, s, "ov-t", "middle") + (i < 2 ? path(`M454 ${142 + i * 64} V${162 + i * 64}`) + down(454, 164 + i * 64) : "")
-      ),
-      path("M350 40 V300", "ov-line ov-dash"),
-      text(16, 336, "Variables are cooperative defaults, not locked policy.", "ov-s"),
-      text(16, 354, "Rollout stages never bypass the target repository's rules.", "ov-s"),
+      ].map(([t, s], i) => rect(16, 36 + i * 70, 528, 58) + text(32, 60 + i * 70, t, "ov-b") + text(32, 82 + i * 70, s, "ov-s")),
     ].join("")
   );
 
