@@ -967,9 +967,10 @@
   .s3 .ek-f2 rect { stroke: #f0883e; filter: drop-shadow(0 0 10px #f0883e88); }
   .ek-note rect { fill: #0e1a13; stroke: #3fb95088; stroke-width: 1.5; }
   .ek-conf rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
-  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; transition: opacity .3s; } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; }
+  .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; stroke-dasharray: 1; stroke-dashoffset: 1; transition: opacity .3s, stroke-dashoffset .75s cubic-bezier(.45,0,.55,1); } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; stroke-dashoffset: 0; opacity: 0; }
+  .s1 #ekP1, .s2 #ekP2, .s3 #ekP3, .s5 #ekP5, .s6 #ekP6 { stroke-dashoffset: 0; } .s4 #ekP4 { opacity: .45; }
   .ek-wire.hot { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
-  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; } .ek-wl.o { fill: #ffa657; }
+  .ek-wl { fill: #7ee787; font: 600 14px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s; } .ek-wl.o { fill: #ffa657; } .s2 .ek-wl:not(.o), .s3 .ek-wl.o { opacity: 1; }
   .ek-dot { fill: #7ee787; opacity: 0; filter: drop-shadow(0 0 10px #3fb950); } .ek-dot.o { fill: #ffa657; filter: drop-shadow(0 0 10px #f0883e); } .ek-dot.r { fill: #ff7b72; filter: drop-shadow(0 0 10px #f85149); }
   .zs-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
   .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both var(--d); }
@@ -994,9 +995,10 @@
   .zs-kern.r { fill: #0d1117eb; stroke: #3fb95088; stroke-width: 2; }
   .zs-kt { font: 700 26px "Mona Sans"; text-anchor: middle; } .zs-kt.g { fill: #d2a8ff; } .zs-kt.h, .zs-kt.r { fill: #7ee787; }
   .zs-at { font: 600 15px var(--mono); letter-spacing: .1em; text-anchor: middle; } .zs-at.g { fill: #d2a8ff; } .zs-at.h { fill: #7ee787; text-anchor: start; }
-  .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; transition: opacity .3s, stroke .3s; }
+  .zs-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .4; stroke-dasharray: 1; stroke-dashoffset: 1; transition: opacity .3s, stroke .3s, stroke-dashoffset .56s cubic-bezier(.45,0,.55,1); }
+  .zs-wire.on { stroke-dashoffset: 0; } .zs-wire.done { marker-end: url(#zsM); }
   .zs-wire.hot { opacity: 1; stroke: #7ee787; filter: drop-shadow(0 0 6px #3fb950); }
-  .zs-l { fill: #7ee787; font: 600 17px var(--mono); }
+  .zs-l { fill: #7ee787; font: 600 17px var(--mono); opacity: 0; transition: opacity .4s; } .zs-l.on { opacity: 1; }
   .zs-l.m { text-anchor: middle; }
   .zs-node rect { fill: #0d1117; stroke: #3fb950; stroke-width: 2; transition: stroke .3s, filter .3s; }
   .zs-node.key rect { fill: #24173f; stroke: #a371f7; }
@@ -3178,8 +3180,9 @@
       g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g></g>`;
       // wires and labels
       g += `<g class="zs-area" style="--d:2.5s">`;
-      for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" marker-end="url(#zsM)"/>`;
-      g += `<text class="zs-l" x="392" y="85">virtiofs</text><text class="zs-l" x="392" y="230">MCP</text><text class="zs-l" x="392" y="335">LLM API</text><text class="zs-l m" x="860" y="410">internet traffic</text>`;
+      // wires draw in the first time a request travels them; labels follow their wire
+      for (const [id, d] of EDGES) g += `<path class="zs-wire" id="${id}" d="${d}" pathLength="1"/>`;
+      g += `<text class="zs-l" data-e="zsFs" x="392" y="85">virtiofs</text><text class="zs-l" data-e="zsMcp" x="392" y="230">MCP</text><text class="zs-l" data-e="zsLlm" x="392" y="335">LLM API</text><text class="zs-l m" data-e="zsNet" x="860" y="410">internet traffic</text>`;
       g += `</g>`;
       // host services
       g += `<g class="zs-area" style="--d:2.3s">`;
@@ -3226,6 +3229,7 @@
         cyc = -1;
         state = "";
         seal = 0;
+        svg.querySelectorAll(".zs-wire, .zs-l").forEach(x => x.classList.remove("on", "done"));
       },
       tick(t) {
         if (!t0) t0 = t;
@@ -3248,8 +3252,17 @@
         for (let i = 0; i < FLOW_AT.length; i++) if (u >= FLOW_AT[i]) f = i;
         const segs = SEGS.filter(s => s.f === f);
         const cur = segs.find(s => u >= s.t0 && u < s.t0 + SEG);
-        const done = segs.filter(s => u >= s.t0 + SEG).length;
         const deny = f >= 0 && FLOWS[f][2];
+        for (const s of segs) {
+          if (u < s.t0 || (deny && s.k === segs.length - 1)) continue;
+          const w = $(s.e);
+          if (!w.classList.contains("on")) {
+            w.classList.add("on");
+            svg.querySelectorAll(`[data-e="${s.e}"]`).forEach(x => x.classList.add("on"));
+          }
+          if (u >= s.t0 + SEG) w.classList.add("done");
+        }
+        const done = segs.filter(s => u >= s.t0 + SEG).length;
         const flowEnd = f >= 0 ? FLOW_AT[f] + segs.length * SEG + GAP - 150 : 0;
         const live = f >= 0 && u < flowEnd;
         const st = `${f}:${done}:${live}`;
@@ -10229,7 +10242,7 @@
       // wires appear once both ends are on screen
       g += `<g class="ek-area" style="--i:6">`;
       g += Object.entries(PATHS)
-        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"/>`)
+        .map(([id, d]) => `<path id="${id}" class="ek-wire ${id === "ekP4" ? "r" : id === "ekP3" ? "o" : ""}" d="${d}"${id === "ekP4" ? "" : ' pathLength="1"'}/>`)
         .join("");
       g += `<text class="ek-wl" x="865" y="128">broker</text><text class="ek-wl o" x="1316" y="132">read</text></g>`;
       g += `<g class="ek-x"><circle cx="830" cy="461" r="14"/><path d="M823 454 l14 14 M837 454 l-14 14"/></g>`;
