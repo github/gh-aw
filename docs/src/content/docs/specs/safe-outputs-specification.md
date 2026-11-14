@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.25<br>
+**Version**: 1.29.26<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-12<br>
+**Publication Date**: 2026-11-13<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -3379,7 +3379,7 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
       "operation": {
         "type": "string",
         "enum": ["replace", "append", "prepend", "replace-island"],
-        "description": "Body update mode (default: append)"
+        "description": "Body update mode (defaults to the workflow-configured operation, or append)"
       },
       "labels": {"type": "array", "items": {"type": "string"}, "description": "Replacement label list"},
       "assignees": {"type": "array", "items": {"type": "string"}, "description": "Replacement assignee list"},
@@ -3409,7 +3409,18 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 **Operational Semantics**:
 
 1. **Partial Updates**: Only fields explicitly provided are modified; omitted fields are unchanged.
-2. **Body Operation Modes**: `replace` overwrites the entire body; `append`/`prepend` add content with separator; `replace-island` updates a run-specific section.
+2. **Body Operation Modes**: The effective body operation MUST be selected in this order:
+   1. the agent-supplied `operation`, when present;
+   2. the workflow-configured `safe-outputs.update-issue.operation`, when present;
+   3. `append`, when neither value is present.
+
+   The permitted values are `replace`, `append`, `prepend`, and
+   `replace-island`. `replace` overwrites the entire body; `append` and
+   `prepend` add content with a separator; `replace-island` updates a
+   run-specific section. The selected operation applies only when body updates
+   are enabled and the request includes `body`. If body updates are disabled or
+   no body is supplied, the implementation MUST leave the existing body
+   unchanged and MUST NOT perform a body operation.
 3. **Label Validation**: Provided labels must exist in the repository; non-existent labels cause failure.
 4. **Assignee Resolution**: Assignees must have repository access; invalid usernames cause failure.
 5. **Cross-Repository**: When `target-repo` is configured, operates on that repository (must be in `allowed-repos`).
@@ -3423,6 +3434,9 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+- `operation`: Default body update mode. MUST be one of `replace`, `append`,
+  `prepend`, or `replace-island`; invalid values MUST be rejected during
+  workflow configuration validation.
 - `staged`: Staged mode override
 
 Artifact limits use the same parsing and defaults as `create-issue`: `max-issue-artifacts` is an integer (default: 10; non-positive disables artifacts), and `max-issue-artifact-size` is positive integer bytes or a human-friendly size (default: `1mb`, 1048576 UTF-8 bytes). The compiler MUST emit `max_issue_artifacts` and normalized integer `max_issue_artifact_size`.
@@ -6925,6 +6939,12 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.26** (2026-11-13):
+
+- **Specified**: `safe-outputs.update-issue.operation` workflow configuration with `append`, `prepend`, `replace`, and `replace-island` values.
+- **Specified**: Body-operation precedence: explicit agent operation, workflow default, then `append`; body-disabled and no-body behavior is unchanged.
+- **Updated**: Publication metadata to 1.29.26.
 
 **Version 1.29.25** (2026-11-12):
 

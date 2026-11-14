@@ -19,6 +19,7 @@ type UpdateIssuesConfig struct {
 	Status                 *bool    `yaml:"status,omitempty"`                  // Allow updating issue status (open/closed) - presence indicates field can be updated
 	Title                  *bool    `yaml:"title,omitempty"`                   // Allow updating issue title - presence indicates field can be updated
 	Body                   *bool    `yaml:"body,omitempty"`                    // Allow updating issue body - boolean value controls permission (defaults to true)
+	Operation              *string  `yaml:"operation,omitempty"`               // Default body operation when omitted by the agent (defaults to "append")
 	TitlePrefix            string   `yaml:"title-prefix,omitempty"`            // Required title prefix for issue validation - only issues with this prefix can be updated (deprecated: use required-title-prefix)
 	RequiredTitlePrefix    string   `yaml:"required-title-prefix,omitempty"`   // Title prefix the issue must have (preferred over title-prefix)
 	RequiredLabels         []string `yaml:"required-labels,omitempty"`         // Labels that must ALL be present on the issue
@@ -40,6 +41,9 @@ func (c *Compiler) parseUpdateIssuesConfig(outputMap map[string]any) *UpdateIssu
 				updateEntityFooterField(&cfg.Footer),
 			}
 		}, func(configMap map[string]any, cfg *UpdateIssuesConfig) {
+			if operation, ok := configMap["operation"].(string); ok {
+				cfg.Operation = &operation
+			}
 			cfg.MaxIssueArtifacts = parseOptionalIssueArtifactLimit(configMap["max-issue-artifacts"])
 			if size, ok := configMap["max-issue-artifact-size"].(string); ok {
 				bytes, err := parseIssueArtifactSize(size)
