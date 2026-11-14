@@ -189,6 +189,10 @@
   .rpa-scan { opacity: 0; } .rpa-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
   .fm-wire.day { stroke-dasharray: 10 8; }
   .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
+  .fm-wire.classic { stroke: #9198a1; stroke-dasharray: 6 8; opacity: .4; }
+  .mra-l.classic { fill: #9198a1; font: 500 19px var(--mono); opacity: .8; }
+  .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
+  .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
   .rao-card.on { stroke: var(--rc, #3fb950); filter: drop-shadow(0 0 12px var(--rc, #3fb950)); }
   .rao-h { fill: #f0f6fc; font: 700 22px "Mona Sans"; }
@@ -1895,6 +1899,164 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
+    });
+  }
+
+  // PR Review²: the classic review gains a ready-for-review step that starts agentic reviewers and a Sous Chef loop before a human merges
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#prqAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const human = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#prqClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    const REV = ["nRevA", "nRevB", "nRevC"];
+    // [edge id, path, color, label, lx, ly, anchor]; fan-out/fan-in wires (no label) light with their main edge
+    const EDGES = [
+      ["classic", "M90 374 V640 H1460 V598", "classic", ["classic review: straight to a human"], 760, 626, "middle"],
+      ["p0", "M90 174 V302", "b", ["opens draft", "pull request"], 112, 236, "start"],
+      ["p1", "M126 340 H462", "b", ["ready for", "review"], 250, 300, "middle"],
+      ["p1a", "M400 340 V220 H462", "b", [], 0, 0, "start"],
+      ["p1b", "M400 340 V460 H462", "b", [], 0, 0, "start"],
+      ["p2", "M790 340 H860 V140 H1042", "p", ["review comments"], 950, 122, "middle"],
+      ["p2a", "M790 220 H860", "p", [], 0, 0, "start"],
+      ["p2b", "M790 460 H860 V340", "p", [], 0, 0, "start"],
+      ["p3", "M1080 174 V522", "p", ["nudges", "@copilot"], 1102, 330, "start"],
+      ["p4", "M1042 560 H500 V498", "p", ["pushes fixes · re-review"], 770, 544, "middle"],
+      ["p5", "M1322 140 H1460 V302", "p", ["threads", "resolved"], 1482, 206, "start"],
+      ["p6", "M1460 374 V522", "b", ["reviews &", "merges"], 1482, 438, "start"],
+    ];
+    const FAN = { p1: ["p1a", "p1b"], p2: ["p2a", "p2b"] };
+    // [edge, node(s) lit on arrival, open threads shown on arrival]
+    const SEQ = [
+      ["p0", "nPRq"],
+      ["p1", REV, 3],
+      ["p2", "nChef"],
+      ["p3", "nCopilotq"],
+      ["p4", REV, 1],
+      ["p2", "nChef"],
+      ["p3", "nCopilotq"],
+      ["p4", REV, 0],
+      ["p2", "nChef"],
+      ["p5", "nMaint"],
+      ["p6", "nMergeq"],
+    ];
+    const LANE = { nAuthor: 0, nPRq: 0, nRevA: 1, nRevB: 1, nRevC: 1, nChef: 1, nCopilotq: 1, nMaint: 2, nMergeq: 2 };
+    let g = `<defs><radialGradient id="prqAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="prqP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="prqB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker>
+      <clipPath id="prqClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      <marker id="prqG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#9198a1"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 380, "AUTHOR"],
+      [380, 1340, "REVIEW²"],
+      [1340, VW, "MERGE"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="prqLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      const fan = id === "p2a" || id === "p2b";
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}"${fan ? "" : ` marker-end="url(#prq${c === "p" ? "P" : c === "b" ? "B" : "G"})"`}/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += human("nAuthor", 90, 140, 200, "Developer") + box("nPRq", 90, 340, "pr");
+    g += agent("nRevA", 500, 220, 290, "Matt Pocock skills") + agent("nRevB", 500, 340, 290, "Code quality") + agent("nRevC", 500, 460, 290, "Test quality");
+    g += agent("nChef", 1080, 140, 242, "PR Sous Chef") + agent("nCopilotq", 1080, 560, 200, "Copilot");
+    g += human("nMaint", 1460, 340, 220, "Developer") + box("nMergeq", 1460, 560, "merge");
+    g += `<text class="prq-thr" id="prqThr" x="968" y="356"></text>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg rpa-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot"),
+      thr = $("prqThr");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 1800,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nids => {
+      for (const nid of [].concat(nids)) {
+        $(nid).classList.add("on");
+        $("prqLane" + LANE[nid]).classList.add("on");
+      }
+    };
+    const threads = k => {
+      let n = null;
+      for (let j = 0; j <= k; j++) if (SEQ[j][2] !== undefined) n = SEQ[j][2];
+      thr.classList.toggle("show", n !== null);
+      thr.classList.toggle("ok", n === 0);
+      thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
+    };
+    slides.push({
+      sound: "loop",
+      palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
+      notes:
+        "Pull Request Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          thr.classList.remove("show", "ok");
+          light("nAuthor");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid] = SEQ[k],
+          f = (u - T[k]) / STEP;
+        const p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        for (const w of FAN[eid] || []) $(w).classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        threads(k - 1);
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+          threads(k);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Ready for review · agentic reviewers · PR Sous Chef"), h("h2", {}, letters("Pull Request "), letters("Review²", "l-grad"))), svg),
     });
   }
 
