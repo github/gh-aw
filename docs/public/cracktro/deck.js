@@ -264,6 +264,22 @@
   .fm-wire.hot { opacity: 1; stroke-width: 3; }
   .fm-wire.hot + .mra-l { opacity: 1; }
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
+  .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
+  .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
+  .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
+  .sfl-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
+  .sfl-box.on .sfl-card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .sfl-title { fill: #9198a1; font: 500 15px var(--mono); letter-spacing: .08em; }
+  .sfl-row { opacity: .45; transition: opacity .3s; } .sfl-row.seen { opacity: 1; }
+  .sfl-row text { fill: #c9d1d9; font: 500 17px var(--mono); }
+  .sfl-row circle { fill: #3d444d; transition: fill .3s; } .sfl-row.seen circle { fill: #3fb950; }
+  .sfl-row.seen.bad circle { fill: #f85149; filter: drop-shadow(0 0 6px #f85149); } .sfl-row.seen.bad text { fill: #ff7b72; }
+  .sfl-row .ok { fill: #3fb950; } .sfl-row .ko { fill: #f85149; } .sfl-row .ed { fill: #d29922; }
+  .sfl-badge { fill: #ff7b72; font: 600 17px var(--mono); opacity: 0; transition: opacity .4s; } .sfl-badge.on { opacity: 1; }
+  .sfl-scan { opacity: 0; } .sfl-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
+  .sfl-rule { fill: #ff7b72; font: 600 18px var(--mono); }
+  #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
+  #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
   @keyframes fm-pop { from { transform: scale(.4); } }
   .ra-flow { left: 60px; top: 340px; width: 880px; height: 512px; }
@@ -2132,247 +2148,6 @@
     });
   }
 
-  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
-  {
-    resetIndex();
-    const RUN = [
-      { k: "[self-hosted, linux]", c: "#d29922" },
-      { k: "[self-hosted, arm64]", c: "#ab7df8" },
-      { k: "[self-hosted, gpu]", c: "#4493f8" },
-    ];
-    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
-    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
-    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
-    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
-    const STEPS = ["checkout", "setup-node", "cache"];
-    const CHIPS = [
-      ["GitHub Apps", [6, 7, 8]],
-      ["OIDC", [4, 5]],
-      ["Runner groups", [3]],
-      ["Environments", []],
-      ["Org secrets", [8]],
-      ["OpenTelemetry", [13, 14, 15]],
-      ["Rulesets", []],
-      ["Audit log", []],
-    ];
-    const K = "#ff7b72",
-      D = "#656c76",
-      T = "#f0f6fc",
-      V = "#a5d6ff",
-      E = "#d2a8ff";
-    const vRun = h("span", { class: "ae-val" });
-    const LINES = [
-      [["---", D]],
-      [
-        ["on: ", K],
-        ["issues", V],
-      ],
-      [["runs-on: ", K], vRun],
-      [["permissions:", K]],
-      [
-        ["  id-token: ", K],
-        ["write", V],
-      ],
-      [["github-app:", K]],
-      [
-        ["  client-id: ", K],
-        ["${{ vars.APP_ID }}", E],
-      ],
-      [
-        ["  private-key: ", K],
-        ["${{ secrets.APP_KEY }}", E],
-      ],
-      [["network:", K]],
-      [
-        ["  allowed: ", K],
-        ["[defaults, node]", V],
-      ],
-      [["steps:", K]],
-      [
-        ["  - uses: ", K],
-        ["actions/setup-node@v4", V],
-      ],
-      [["observability:", K]],
-      [["  otlp:", K]],
-      [
-        ["    endpoint: ", K],
-        ["${{ secrets.OTLP_ENDPOINT }}", E],
-      ],
-      [["---", D]],
-      [["# Triage new issues for the platform team", T]],
-    ];
-    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
-    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
-    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
-    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
-    const SB = 1,
-      RN = 2,
-      EC = 3;
-    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
-    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
-    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
-    const card = (i, c, tag, title, code, ic, extra) => {
-      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
-      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
-      return el;
-    };
-    const spans = h(
-      "div",
-      { class: "er-spans" },
-      [
-        [0, 100],
-        [8, 46],
-        [30, 58],
-        [62, 30],
-      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
-    );
-    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
-    otel.classList.add("otel");
-    const cRun = h("span");
-    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
-    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
-    fw.classList.add("fw");
-    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
-    eco.classList.add("eco");
-    const job = h("div", { class: "er-job" });
-    const trace = h("div", { class: "er-job er-trace" });
-    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
-    const el = h(
-      "section",
-      { class: "slide er" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
-      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
-      ed,
-      arrow,
-      otel,
-      fw,
-      runner,
-      eco,
-      job,
-      trace,
-      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
-    );
-    const fly = (dot, [x0, y0], [x1, y1]) => {
-      dot.style.transition = "none";
-      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
-      void dot.offsetWidth;
-      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
-      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
-    };
-    let cur = 0,
-      phase = "hold",
-      since = 0,
-      typed = "",
-      arriveAt = 0,
-      otelAt = 0,
-      chipAt = 0,
-      sbAt = 0,
-      chip = -1;
-    const setRunner = (i, t) => {
-      cur = i;
-      el.style.setProperty("--ec", RUN[i].c);
-      runner.style.setProperty("--rc", RUN[i].c);
-      cRun.textContent = RUN[i].k;
-      runner.classList.add("on");
-      for (const c of [runner, eco, fw]) c.classList.remove("run");
-      eco.classList.remove("on");
-      fw.classList.remove("on");
-      steps.forEach(p => p.classList.remove("up"));
-      fly(job, [840, 460], MID(RN));
-      arriveAt = t + 700;
-      sbAt = otelAt = Infinity;
-    };
-    const setChip = i => {
-      chip = i;
-      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
-      const lit = CHIPS[i][1];
-      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
-    };
-    slides.push({
-      sound: "ship",
-      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
-      notes:
-        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
-      enter() {
-        typed = RUN[0].k;
-        vRun.textContent = typed;
-        phase = "hold";
-        since = chipAt = 0;
-        chip = -1;
-        chips.forEach(c => c.classList.remove("lit"));
-        rows.forEach(r => r.classList.remove("lit"));
-        otel.classList.remove("on", "run");
-        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
-        steps.forEach(p => p.classList.remove("up"));
-        cRun.textContent = RUN[0].k;
-        sbAt = Infinity;
-        for (const d of [job, trace]) {
-          d.style.transition = "none";
-          d.style.opacity = "0";
-        }
-        cur = 0;
-        arriveAt = otelAt = Infinity;
-      },
-      tick(t) {
-        if (!since) {
-          since = t;
-          chipAt = t + 1800;
-          setRunner(0, t + 900);
-        }
-        if (t > arriveAt && !runner.classList.contains("run")) {
-          runner.classList.add("run");
-          sbAt = t + 900;
-        }
-        if (t > sbAt) {
-          sbAt = Infinity;
-          fw.classList.remove("run");
-          void fw.offsetWidth;
-          fw.classList.add("on", "run");
-          fly(trace, MID(SB), MID(0));
-          otelAt = t + 700;
-        }
-        if (t > otelAt) {
-          otelAt = Infinity;
-          otel.classList.remove("run");
-          void otel.offsetWidth;
-          otel.classList.add("on", "run");
-        }
-        if (t > arriveAt) {
-          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
-          steps.forEach((p, j) => p.classList.toggle("up", j < n));
-          eco.classList.add("on");
-          eco.classList.toggle("run", n === steps.length);
-        }
-        if (t > chipAt) {
-          chipAt = t + 1500;
-          setChip((chip + 1) % CHIPS.length);
-        }
-        const el2 = t - since;
-        const next = RUN[(cur + 1) % RUN.length].k;
-        if (phase === "hold" && el2 > 3400) {
-          phase = "del";
-          since = t;
-        } else if (phase === "del" && el2 > 28) {
-          since = t;
-          typed = typed.slice(0, -1);
-          vRun.textContent = typed;
-          if (!typed) phase = "type";
-        } else if (phase === "type" && el2 > 70) {
-          since = t;
-          typed = next.slice(0, typed.length + 1);
-          vRun.textContent = typed;
-          sfx.key(0.7);
-          if (typed === next) {
-            setRunner((cur + 1) % RUN.length, t);
-            sfx.pop(cur * 2);
-            phase = "hold";
-          }
-        }
-      },
-      el,
-    });
-  }
-
   // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
   {
     resetIndex();
@@ -4008,6 +3783,193 @@
     });
   }
 
+  // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#sflAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const maint = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
+    const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
+    const FAIL = [1, 3, 4],
+      KIND = ["test hang", "assertion failure", "build break"];
+    const ROW0 = 284,
+      ROWH = 26;
+    let pipes = `<g class="sfl-box" id="sflPipes"><rect class="sfl-card" x="24" y="220" width="460" height="232" rx="12"/><text class="sfl-title" x="40" y="246">OUTER-LOOP PIPELINES</text>`;
+    PIPES.forEach((p, i) => (pipes += `<g class="sfl-row sfl-pipe" data-y="${ROW0 + i * ROWH}"><text x="40" y="${ROW0 + i * ROWH}">${p}</text><circle cx="462" cy="${ROW0 + i * ROWH - 6}" r="7"/></g>`));
+    pipes += `<text class="sfl-badge" id="sflBadge" x="40" y="440"></text>`;
+    pipes += `<g class="sfl-scan" id="sflBeam"><rect x="24" y="-28" width="460" height="28" fill="url(#sflBeamG)"/><line x1="24" y1="0" x2="484" y2="0"/></g></g>`;
+    const RUB = [
+      ["ok", "✓ signature is specific"],
+      ["ok", "✓ known-error data is valid"],
+      ["ok", "✓ fixed, never muted"],
+      ["ko", "✗ owner pinged wrongly"],
+      ["ed", "+ prompt edit proposed"],
+    ];
+    let rubric = `<g class="sfl-box" id="sflRubric"><rect class="sfl-card" x="1316" y="270" width="364" height="190" rx="12"/><text class="sfl-title" x="1332" y="296">KPI TRACKER · RUBRIC</text>`;
+    RUB.forEach(([c, t], i) => (rubric += `<g class="sfl-row sfl-rub"><text class="${c}" x="1332" y="${330 + i * 27}">${t}</text></g>`));
+    rubric += `</g>`;
+    const scanPipes = (f, c) => {
+      const s = $("sflBeam"),
+        y = 262 + Math.min(1, f / 0.75) * 166;
+      s.setAttribute("transform", `translate(0,${y})`);
+      s.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      svg.querySelectorAll(".sfl-pipe").forEach(r => r.classList.toggle("seen", +r.dataset.y <= y));
+      if (ROW0 + FAIL[c % 3] * ROWH <= y && !$("sflBadge").classList.contains("on")) {
+        $("sflBadge").classList.add("on");
+        sfx.pop(5);
+      }
+    };
+    const readRubric = f => svg.querySelectorAll(".sfl-rub").forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.5) / (RUB.length + 0.5)));
+    // [edge id, path, color, label, lx, ly, anchor, extra label class]
+    const EDGES = [
+      ["sflE0", "M110 174 V212", "p", ["scans failing runs"], 132, 200, "start"],
+      ["sflE1", "M492 340 H596", "p", ["files Known", "Build Error"], 640, 404, "middle"],
+      ["sflE2", "M640 304 V140 H818", "p", ["picks up", "open errors"], 662, 222, "start"],
+      ["sflO0", "M860 174 V274 H760 V320", "p", ["small and build-validated:", "draft fix PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO1", "M860 174 V274 H900 V320", "p", ["plausible, unverified:", "help-wanted PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO2", "M860 174 V274 H1040 V320", "p", ["no code change possible:", "root-cause comment"], 880, 222, "start", "sfl-ol"],
+      ["sflR0", "M760 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR1", "M900 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR2", "M1040 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflE3", "M1072 580 H1190 V140 H1214", "b", ["reactions & reviews"], 1140, 622, "middle"],
+      ["sflE4", "M1252 174 V292", "p", ["scores both", "against rubrics"], 1274, 222, "start"],
+      ["sflE5", "M1252 366 V542", "p", ["proposes", "prompt edits"], 1274, 494, "start"],
+      ["sflE6", "M1464 580 H1640 V655 H10 V140 H72", "b day", ["sharper prompts · the loop runs again"], 700, 642, "middle"],
+    ];
+    // the token's journey: [edge, node lit on arrival, duration]; SCAN and RUBRIC are in-place steps, {o} is this cycle's outcome
+    const SEQ = [
+      ["sflE0", "sflPipes"],
+      ["SCAN", "sflPipes", 2600],
+      ["sflE1", "sflKbe"],
+      ["sflE2", "sflFixer"],
+      ["sflO{o}", "sflOut{o}"],
+      ["sflR{o}", "sflDev"],
+      ["sflE3", "sflFeed"],
+      ["sflE4", "sflKpi"],
+      ["RUBRIC", "sflRubric", 2400],
+      ["sflE5", "sflDev2"],
+      ["sflE6", "sflScan", 1800],
+    ];
+    const LANE = { sflScan: 0, sflPipes: 0, sflKbe: 1, sflFixer: 1, sflOut0: 1, sflOut1: 1, sflOut2: 1, sflDev: 1, sflFeed: 2, sflKpi: 2, sflRubric: 2, sflDev2: 2 };
+    let g = `<defs><radialGradient id="sflAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="sflP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="sflBeamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
+      <marker id="sflB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "SCAN · EVERY 12H"],
+      [520, 1160, "FIX · WEEKDAYS"],
+      [1160, VW, "LEARN · BI-WEEKLY"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="sflLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an, extra = ""] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#sfl${c.startsWith("p") ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c} ${extra}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += agent("sflScan", 110, 140, 230, "CI Scanner") + agent("sflFixer", 860, 140, 200, "CI Fixer") + agent("sflFeed", 1252, 140, 210, "Feedback");
+    g += pipes + box("sflKbe", 640, 340, "issue");
+    g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
+    g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
+    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580);
+    g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg sfl-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 900,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const at = (s, o) => s.replace("{o}", o);
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("sflLane" + LANE[nid]).classList.add("on");
+    };
+    slides.push({
+      sound: "loop",
+      palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
+      notes:
+        "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three agentic workflows. The pipelines, failures and rubric results shown are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          o = c % 3;
+        if (c !== cyc) {
+          cyc = c;
+          $("sflCycle").textContent = `CYCLE ${c + 1}`;
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          svg.querySelectorAll(".sfl-pipe").forEach((r, i) => r.classList.toggle("bad", i === FAIL[o]));
+          $("sflBadge").textContent = `✕ ${PIPES[FAIL[o]]}: ${KIND[o]}`;
+          $("sflBeam").style.opacity = 0;
+          light("sflScan");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (eid === "SCAN" || eid === "RUBRIC") {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(at(SEQ[j][1], o));
+          if (eid === "SCAN") scanPipes(f, c);
+          else readRubric(f);
+          return;
+        }
+        const p = $(at(eid, o)),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(at(SEQ[j][1], o));
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(at(nid, o));
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))), svg),
+    });
+  }
+
   // Cost management: guard, measure, optimize (+ model routing)
   {
     resetIndex();
@@ -5033,6 +4995,247 @@
           }
         }
         drawToks(t, dt);
+      },
+      el,
+    });
+  }
+
+  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  {
+    resetIndex();
+    const RUN = [
+      { k: "[self-hosted, linux]", c: "#d29922" },
+      { k: "[self-hosted, arm64]", c: "#ab7df8" },
+      { k: "[self-hosted, gpu]", c: "#4493f8" },
+    ];
+    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
+    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
+    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
+    const STEPS = ["checkout", "setup-node", "cache"];
+    const CHIPS = [
+      ["GitHub Apps", [6, 7, 8]],
+      ["OIDC", [4, 5]],
+      ["Runner groups", [3]],
+      ["Environments", []],
+      ["Org secrets", [8]],
+      ["OpenTelemetry", [13, 14, 15]],
+      ["Rulesets", []],
+      ["Audit log", []],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff",
+      E = "#d2a8ff";
+    const vRun = h("span", { class: "ae-val" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [["runs-on: ", K], vRun],
+      [["permissions:", K]],
+      [
+        ["  id-token: ", K],
+        ["write", V],
+      ],
+      [["github-app:", K]],
+      [
+        ["  client-id: ", K],
+        ["${{ vars.APP_ID }}", E],
+      ],
+      [
+        ["  private-key: ", K],
+        ["${{ secrets.APP_KEY }}", E],
+      ],
+      [["network:", K]],
+      [
+        ["  allowed: ", K],
+        ["[defaults, node]", V],
+      ],
+      [["steps:", K]],
+      [
+        ["  - uses: ", K],
+        ["actions/setup-node@v4", V],
+      ],
+      [["observability:", K]],
+      [["  otlp:", K]],
+      [
+        ["    endpoint: ", K],
+        ["${{ secrets.OTLP_ENDPOINT }}", E],
+      ],
+      [["---", D]],
+      [["# Triage new issues for the platform team", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
+    const SB = 1,
+      RN = 2,
+      EC = 3;
+    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
+    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
+    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
+    const card = (i, c, tag, title, code, ic, extra) => {
+      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
+      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
+      return el;
+    };
+    const spans = h(
+      "div",
+      { class: "er-spans" },
+      [
+        [0, 100],
+        [8, 46],
+        [30, 58],
+        [62, 30],
+      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
+    );
+    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
+    otel.classList.add("otel");
+    const cRun = h("span");
+    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
+    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
+    fw.classList.add("fw");
+    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
+    eco.classList.add("eco");
+    const job = h("div", { class: "er-job" });
+    const trace = h("div", { class: "er-job er-trace" });
+    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
+    const el = h(
+      "section",
+      { class: "slide er" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
+      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
+      ed,
+      arrow,
+      otel,
+      fw,
+      runner,
+      eco,
+      job,
+      trace,
+      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
+    );
+    const fly = (dot, [x0, y0], [x1, y1]) => {
+      dot.style.transition = "none";
+      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
+      void dot.offsetWidth;
+      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
+      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
+    };
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      typed = "",
+      arriveAt = 0,
+      otelAt = 0,
+      chipAt = 0,
+      sbAt = 0,
+      chip = -1;
+    const setRunner = (i, t) => {
+      cur = i;
+      el.style.setProperty("--ec", RUN[i].c);
+      runner.style.setProperty("--rc", RUN[i].c);
+      cRun.textContent = RUN[i].k;
+      runner.classList.add("on");
+      for (const c of [runner, eco, fw]) c.classList.remove("run");
+      eco.classList.remove("on");
+      fw.classList.remove("on");
+      steps.forEach(p => p.classList.remove("up"));
+      fly(job, [840, 460], MID(RN));
+      arriveAt = t + 700;
+      sbAt = otelAt = Infinity;
+    };
+    const setChip = i => {
+      chip = i;
+      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
+      const lit = CHIPS[i][1];
+      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
+    };
+    slides.push({
+      sound: "ship",
+      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
+      notes:
+        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+      enter() {
+        typed = RUN[0].k;
+        vRun.textContent = typed;
+        phase = "hold";
+        since = chipAt = 0;
+        chip = -1;
+        chips.forEach(c => c.classList.remove("lit"));
+        rows.forEach(r => r.classList.remove("lit"));
+        otel.classList.remove("on", "run");
+        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
+        steps.forEach(p => p.classList.remove("up"));
+        cRun.textContent = RUN[0].k;
+        sbAt = Infinity;
+        for (const d of [job, trace]) {
+          d.style.transition = "none";
+          d.style.opacity = "0";
+        }
+        cur = 0;
+        arriveAt = otelAt = Infinity;
+      },
+      tick(t) {
+        if (!since) {
+          since = t;
+          chipAt = t + 1800;
+          setRunner(0, t + 900);
+        }
+        if (t > arriveAt && !runner.classList.contains("run")) {
+          runner.classList.add("run");
+          sbAt = t + 900;
+        }
+        if (t > sbAt) {
+          sbAt = Infinity;
+          fw.classList.remove("run");
+          void fw.offsetWidth;
+          fw.classList.add("on", "run");
+          fly(trace, MID(SB), MID(0));
+          otelAt = t + 700;
+        }
+        if (t > otelAt) {
+          otelAt = Infinity;
+          otel.classList.remove("run");
+          void otel.offsetWidth;
+          otel.classList.add("on", "run");
+        }
+        if (t > arriveAt) {
+          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
+          steps.forEach((p, j) => p.classList.toggle("up", j < n));
+          eco.classList.add("on");
+          eco.classList.toggle("run", n === steps.length);
+        }
+        if (t > chipAt) {
+          chipAt = t + 1500;
+          setChip((chip + 1) % CHIPS.length);
+        }
+        const el2 = t - since;
+        const next = RUN[(cur + 1) % RUN.length].k;
+        if (phase === "hold" && el2 > 3400) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 28) {
+          since = t;
+          typed = typed.slice(0, -1);
+          vRun.textContent = typed;
+          if (!typed) phase = "type";
+        } else if (phase === "type" && el2 > 70) {
+          since = t;
+          typed = next.slice(0, typed.length + 1);
+          vRun.textContent = typed;
+          sfx.key(0.7);
+          if (typed === next) {
+            setRunner((cur + 1) % RUN.length, t);
+            sfx.pop(cur * 2);
+            phase = "hold";
+          }
+        }
       },
       el,
     });
