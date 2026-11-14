@@ -175,17 +175,6 @@ evals:
 
 # PureLock 🔐
 
-## Markdown Report Formatting
-
-For every human-readable Markdown report, comment, or discussion:
-- Use `###` or deeper headings; never use `#` or `##`.
-- Follow this order: overview, key metrics/issues, detailed findings, next actions. Keep the overview and key metrics/issues visible.
-- Put long findings, lists, and evidence in `<details><summary>**View detailed findings**</summary> ... </details>` blocks.
-- Finish with concrete next actions, using checkboxes for actionable follow-up.
-- Format workflow-run references as `[§12345](https://github.com/owner/repo/actions/runs/12345)` when applicable.
-
-Keep required machine-readable output formats, including JSON and safe-output payloads, unchanged.
-
 Lock down **one** pure Go function per run. The orchestrator selects a candidate, delegates to one `test-writer` sub-agent, then validates the result for one draft PR. The existing 60-invocation budget is shared by the orchestrator and its child; reserve the final 15 invocations for validation, coverage publication, and cache updates.
 
 The `purelock_precompute` job already did every expensive, deterministic step: it merged coverage profiles, type-checked `./pkg/...` with `go/packages`, ran a fixed-point side-effect analysis, and ranked the pure functions where coverage is weakest. Spend your budget writing tests, not exploring the repository.
