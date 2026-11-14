@@ -24,9 +24,11 @@
   canvas.bg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
   .stage { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
   .slide { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
-  .slide.active { visibility: visible; pointer-events: auto; animation: wipe-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving { visibility: visible; animation: fade-out .7s cubic-bezier(.6,0,.4,1) both; }
-  @keyframes wipe-in { from { clip-path: circle(0% at var(--ox, 100%) 50%); } to { clip-path: circle(150% at var(--ox, 100%) 50%); } }
+  /* reveal-style horizontal push: --dx is +100% going forward, -100% going back, 0 on first load */
+  .slide.active { visibility: visible; pointer-events: auto; animation: slide-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving { visibility: visible; animation: slide-out .8s cubic-bezier(.26,.86,.44,.985) both; }
+  @keyframes slide-in { from { transform: translateX(var(--dx, 100%)); } to { transform: none; } }
+  @keyframes slide-out { to { transform: translateX(calc(-1 * var(--dx, 100%))); } }
   .slide.active.up-in { animation: up-in 1s cubic-bezier(.7,0,.2,1) both; }
   .slide.leaving.up-out { animation: up-out 1s cubic-bezier(.7,0,.2,1) both; }
   .slide.active.down-in { animation: down-in 1s cubic-bezier(.7,0,.2,1) both; }
@@ -48,7 +50,6 @@
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
   @keyframes down-out { to { transform: translateY(100%); } }
-  @keyframes fade-out { to { opacity: 0; transform: scale(.985); filter: blur(8px); } }
 
   .kicker { font: 500 24px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; font-stretch: 100%; }
   .active .kicker { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .1s; }
@@ -3937,10 +3938,11 @@
     } else if (cur >= 0) {
       const old = slides[cur].el;
       old.classList.remove("active", ...TR);
+      old.style.setProperty("--dx", dir > 0 ? "100%" : "-100%");
       old.classList.add("leaving");
       if (vert) old.classList.add(vert + "-out");
       clearTimeout(old._lt);
-      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), vert ? 1000 : 700);
+      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), vert ? 1000 : 800);
     }
     const el = slides[n].el;
     clearTimeout(el._lt);
@@ -3948,7 +3950,7 @@
     if (vert) el.classList.add(vert + "-in");
     if (horiz) el.classList.add(horiz + "-in");
     wash.classList.remove("cover");
-    el.style.setProperty("--ox", dir > 0 ? "100%" : "0%");
+    el.style.setProperty("--dx", cur < 0 ? "0%" : dir > 0 ? "100%" : "-100%");
     el.classList.remove("leaving");
     void el.offsetWidth; // restart CSS animations on re-entry
     el.classList.add("active");
