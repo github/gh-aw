@@ -1875,6 +1875,10 @@
       $(nid).classList.add("on");
       $("raoLane" + LANE[nid]).classList.add("on");
     };
+    const deploy = () => {
+      deployed = true;
+      SRV.forEach((_, i) => ($("raoVer" + i).textContent = "v1.4.3"));
+    };
     const spark = (el, data, x0, x1, yb, h) =>
       el.setAttribute("points", data.map((v, j) => `${(x0 + ((x1 - x0) * j) / (N - 1)).toFixed(1)},${(yb - (Math.min(v, 600) / 600) * h).toFixed(1)}`).join(" "));
     const sample = () => {
@@ -1982,6 +1986,10 @@
           f = ((u - START) % STEP) / STEP;
         svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
         if (u < START || k >= SEQ.length) {
+          if (k >= SEQ.length) {
+            if (!deployed) deploy();
+            SEQ.forEach(([, id]) => light(id));
+          }
           dot.style.opacity = 0;
           return;
         }
@@ -2000,10 +2008,7 @@
           if (popK !== k) {
             popK = k;
             sfx.pop(k);
-            if (nid === "nProd") {
-              deployed = true;
-              SRV.forEach((_, i) => ($("raoVer" + i).textContent = "v1.4.3"));
-            }
+            if (nid === "nProd") deploy();
           }
           light(nid);
         }
