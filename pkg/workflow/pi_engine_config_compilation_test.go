@@ -128,7 +128,8 @@ func TestCompileDispatchModelAcrossEngines(t *testing.T) {
 		modelEnv      string
 		modelEnvValue string
 	}{
-		{engine: "copilot", model: "${{ inputs.model }}", modelEnv: "COPILOT_MODEL", modelEnvValue: "${{ inputs.model }}"},
+		// Copilot's whole-expression model is resolved once in activation and may route.
+		{engine: "copilot", model: "${{ inputs.model }}", modelEnv: "COPILOT_MODEL", modelEnvValue: "${{ needs.activation.outputs.model-routing != 'true' && (needs.activation.outputs.model-selector) || '' }}"},
 		{engine: "claude", model: "${{ inputs.model }}", modelEnv: "ANTHROPIC_MODEL", modelEnvValue: "${{ inputs.model }}"},
 		{engine: "codex", model: "copilot/${{ inputs.model }}", modelEnv: "GH_AW_MODEL_AGENT_CODEX", modelEnvValue: "${{ inputs.model }}"},
 		{engine: "gemini", model: "${{ inputs.model }}", modelEnv: "GEMINI_MODEL", modelEnvValue: "${{ inputs.model }}"},

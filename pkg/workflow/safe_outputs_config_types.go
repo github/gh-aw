@@ -106,6 +106,7 @@ type SafeOutputsConfig struct {
 	AllowedDomains                         []string                           `yaml:"allowed-domains,omitempty"`           // Allowed domains for URL redaction, unioned with network.allowed; supports ecosystem identifiers
 	AllowGitHubReferences                  []string                           `yaml:"allowed-github-references,omitempty"` // Allowed repositories for GitHub references (e.g., ["repo", "org/repo2"])
 	Staged                                 *TemplatableBool                   `yaml:"staged,omitempty"`                    // Templatable preview-only mode for all safe outputs
+	RequireAgentSuccess                    bool                               `yaml:"require-agent-success,omitempty"`     // Skip detection and safe output processing when the agent job is not successful
 	Env                                    map[string]string                  `yaml:"env,omitempty"`                       // Environment variables to pass to safe output jobs
 	GitHubToken                            string                             `yaml:"github-token,omitempty"`              // GitHub token for safe output jobs
 	MaximumPatchSize                       int                                `yaml:"max-patch-size,omitempty"`            // Maximum allowed patch size in KB (defaults to 4096)

@@ -17,6 +17,27 @@ set -euo pipefail
 CACHE_DIR="${GH_AW_CACHE_DIR:-/tmp/gh-aw/cache-memory}"
 RUN_ID="${GITHUB_RUN_ID:-unknown}"
 
+path_has_symlink_component() {
+  local path="$1"
+  case "$path" in
+    /*) ;;
+    *) path="$PWD/$path" ;;
+  esac
+  while [ "$path" != "/" ] && [[ "$path" == */ ]]; do
+    path="${path%/}"
+  done
+  while [ "$path" != "/" ]; do
+    if [ -L "$path" ]; then return 0; fi
+    path="$(dirname "$path")"
+  done
+  return 1
+}
+
+if path_has_symlink_component "$CACHE_DIR"; then
+  echo "Refusing to commit through a symlinked cache-memory path: $CACHE_DIR" >&2
+  exit 1
+fi
+
 if [ ! -d "$CACHE_DIR/.git" ]; then
   echo "No git repository found at $CACHE_DIR — skipping git commit"
   exit 0
@@ -37,7 +58,7 @@ scrub_git_config_entries() {
 }
 
 has_symlinked_git_metadata() {
-  [ -L .git ] || [ -n "$(find .git -type l -print -quit 2>/dev/null)" ]
+  [ -L .git ] || [ -n "$(find -P .git -type l -print -quit 2>/dev/null)" ]
 }
 
 if has_symlinked_git_metadata; then
@@ -75,7 +96,7 @@ git config core.fsmonitor false
 
 # --- Log cache directory contents before commit ---
 echo "=== Cache directory: non-git files being committed ==="
-_commit_files=$(find . -not -path './.git/*' -type f 2>/dev/null | sort || true)
+_commit_files=$(find -P . -not -path './.git/*' -type f 2>/dev/null | sort || true)
 if [ -n "$_commit_files" ]; then
   echo "$_commit_files"
 else

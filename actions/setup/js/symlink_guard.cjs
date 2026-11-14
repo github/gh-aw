@@ -257,4 +257,42 @@ function writeGuardedFile(filename, content, { mode = 0o600, directoryMode = 0o7
   );
 }
 
-module.exports = { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, resolveIssueArtifactPath, validateUploadSourcePath, withGuardedDirectory, readGuardedFile, writeGuardedFile };
+/**
+ * Append to one regular file without following destination or parent links.
+ * @param {string} filename
+ * @param {Buffer} content
+ */
+function appendGuardedFile(filename, content) {
+  return withGuardedDirectory(path.dirname(filename), false, directory => {
+    const target = path.join(directory, path.basename(filename));
+    /** @type {import('fs').Stats | null} */
+    let expected = null;
+    try {
+      expected = lstatGuard(target);
+      if (!expected) throw assetValidationError("Asset symlinks are not allowed");
+    } catch (error) {
+      if (!error || typeof error !== "object" || Reflect.get(error, "code") !== "ENOENT") throw error;
+      expected = null;
+    }
+    if (expected && (!expected.isFile() || expected.nlink !== 1)) throw assetValidationError("Asset must be an isolated regular file");
+    const fd = fs.openSync(target, fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW, 0o600);
+    try {
+      const opened = fs.fstatSync(fd);
+      if (!opened.isFile() || opened.nlink !== 1 || (expected && (opened.dev !== expected.dev || opened.ino !== expected.ino))) {
+        throw assetValidationError("Asset file changed while opening");
+      }
+      const current = lstatGuard(target);
+      if (!current || current.dev !== opened.dev || current.ino !== opened.ino) throw assetValidationError("Asset file changed while opening");
+      let offset = 0;
+      while (offset < content.length) {
+        const written = fs.writeSync(fd, content, offset, content.length - offset);
+        if (written === 0) throw assetValidationError("Could not append complete summary content");
+        offset += written;
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  });
+}
+
+module.exports = { lstatGuard, normalizeGuardedPath, resolveWorkspaceOrTmpPath, resolveIssueArtifactPath, validateUploadSourcePath, withGuardedDirectory, readGuardedFile, writeGuardedFile, appendGuardedFile };

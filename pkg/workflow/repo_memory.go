@@ -696,7 +696,7 @@ func (c *Compiler) generateRepoMemoryStepsForAgent(builder *strings.Builder, dat
 }
 
 // buildPushRepoMemoryJob creates a job that downloads repo-memory artifacts and pushes them to git branches
-// This job runs after the agent job completes (even if it fails).
+// This job runs after the agent job completes, unless agent success is required and it fails.
 // If threat detection is enabled, only runs if no threats were detected
 func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEnabled bool) (*Job, error) {
 	if data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0 {
@@ -731,7 +731,7 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 	}
 
-	jobCondition, jobNeeds := c.buildPushRepoMemoryJobCondition(threatDetectionEnabled)
+	jobCondition, jobNeeds := c.buildPushRepoMemoryJobCondition(threatDetectionEnabled, data.SafeOutputs)
 	if hasConsolidatedSafeOutputsJob {
 		jobNeeds = append(jobNeeds, string(constants.SafeOutputsJobName))
 	}
@@ -1026,22 +1026,22 @@ func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob 
 }
 
 // buildPushRepoMemoryJobCondition computes the job condition and needs list.
-func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool) (string, []string) {
+func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool, safeOutputs *SafeOutputsConfig) (string, []string) {
 	agentCompleted := BuildNotEquals(
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
 		BuildStringLiteral("skipped"),
 	)
 	notCancelled := &NotNode{Child: BuildFunctionCall("cancelled")}
 	jobNeeds := []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
-	var jobCondition string
+	var jobCondition ConditionNode
 	if threatDetectionEnabled {
-		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentCompleted))
+		jobCondition = BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentCompleted)
 		jobNeeds = append(jobNeeds, string(constants.DetectionJobName))
 	} else {
 		// Without a detection job, only cancellation prevents this cleanup job from running.
-		jobCondition = RenderCondition(BuildAnd(BuildFunctionCall("always"), notCancelled))
+		jobCondition = BuildAnd(BuildFunctionCall("always"), notCancelled)
 	}
-	return jobCondition, jobNeeds
+	return RenderCondition(requireSafeOutputsAgentSuccess(jobCondition, safeOutputs)), jobNeeds
 }
 
 // buildPushRepoMemoryOutputs builds the persistence and validation outputs from all memory steps.

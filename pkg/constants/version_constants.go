@@ -102,6 +102,10 @@ const DefaultRouterVersion Version = "0.1.3"
 // selections through /reflect and accepts apiProxy.routing.
 const AWFModelRoutingMinVersion Version = "v0.28.29"
 
+// AWFCloudHypervisorModelRoutingMinVersion is the first AWF release whose
+// primary-agent model routing supports the cloud-hypervisor runtime.
+const AWFCloudHypervisorModelRoutingMinVersion Version = "v0.29.12"
+
 // AWFRoutingCandidateModelsMinVersion separates router candidates from request policy.
 const AWFRoutingCandidateModelsMinVersion Version = "v0.28.33"
 
@@ -315,7 +319,7 @@ const MCPGDynamicRepositoryDelegationMinVersion Version = "v0.4.19"
 // Used when tools.playwright is enabled.
 // Keep this version outside the default 3-day npm release-age cooldown window enforced by
 // generated Playwright CLI install steps. See TestDefaultPlaywrightCLIVersionOutsideCooldownWindow.
-const DefaultPlaywrightCLIVersion Version = "0.1.23"
+const DefaultPlaywrightCLIVersion Version = "0.1.24"
 
 // DefaultMCPSDKVersion is the default version of the @modelcontextprotocol/sdk package
 const DefaultMCPSDKVersion Version = "1.30.0"

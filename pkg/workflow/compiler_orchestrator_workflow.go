@@ -307,9 +307,14 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := validateRouterModelValuePlacement(ctx.workflowData); err != nil {
 		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
 	}
+	// runs-on is resolved only now, so explicit routing's host check runs here.
+	if err := validateModelRoutingRuntimeCompatibility(ctx.workflowData); err != nil {
+		return c.formatEngineSetupError(ctx, err)
+	}
 	// Shared by every parse entry point so file, string, document, and Wasm
 	// compilation resolve the implicit model-routing default identically.
 	c.applyDefaultModelRouting(ctx)
+	c.applyDynamicModelRouting(ctx)
 	return nil
 }
 

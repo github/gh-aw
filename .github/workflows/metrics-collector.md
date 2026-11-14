@@ -413,9 +413,9 @@ Create a JSON object following this schema:
 - Repo-memory uploads the retained directory as one Actions artifact, not a safe-output
   `upload-artifact` operation. Its dated-snapshot portion is at most 31 files
   and 15.5MiB at the file cap, below the default 100-changed-file persistence limit.
-  Supplemental JSON (for example an existing `daily/summary.json`) is preserved and remains
-  subject to file/count/patch checks; it is not a dated snapshot. The complete eligible
-  metrics upload, including supplemental JSON, is capped at 16MiB and 100 files by the validator.
+  Supplemental JSON is preserved and remains subject to file/count/patch checks; it is not a
+  dated snapshot. The complete eligible metrics upload is capped at 16MiB and 100 files by the
+  validator.
 
 **Create Directory Structure**:
 ```bash
@@ -473,6 +473,11 @@ Consumers can still read older backing-branch snapshots; branch cleanup is a sep
 
 ### 5. Calculate Ecosystem Aggregates
 
+Include the `ecosystem` object from the schema in every daily snapshot and in `latest.json`.
+Keep its keys and value types consistent across snapshots, including when a value is zero or
+unavailable; use `null` for an unavailable rate instead of omitting the field. Do not write a
+separate aggregate file in place of the dated snapshots.
+
 **Total Workflows**:
 - Use the agentic-workflows `status` tool to get count of all workflows
 
@@ -483,8 +488,9 @@ Consumers can still read older backing-branch snapshots; branch cleanup is a sep
 - Sum of all safe outputs (issues + PRs + comments + discussions) across all workflows
 
 **Overall Success Rate**:
-- Calculate: `(sum of successful runs across all workflows) / (sum of executed runs across all workflows)`
+- Calculate from the per-workflow counts: `(sum of successful runs) / (sum of executed runs)`
 - Set it to `null` when the ecosystem has no executed runs
+- Do not average per-workflow or daily success rates to produce the ecosystem rate
 
 **Total Resource Usage**:
 - Sum total tokens used across all workflows

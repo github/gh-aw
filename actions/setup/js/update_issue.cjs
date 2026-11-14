@@ -238,6 +238,7 @@ function buildIssueUpdateData(item, config, resolvedTemporaryIds, targetRepo) {
   // entity-specific fields (state, labels, assignees, milestone, title prefix).
   const { updateData } = buildCommonEntityUpdateData(item, config, {
     defaultOperation: "append",
+    configDefaultOperation: config.default_operation,
     onBodyDisallowed: () => {
       core.warning("Body update not allowed by safe-outputs configuration");
     },

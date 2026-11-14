@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.25<br>
+**Version**: 1.29.26<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-12<br>
+**Publication Date**: 2026-11-13<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -3379,7 +3379,7 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
       "operation": {
         "type": "string",
         "enum": ["replace", "append", "prepend", "replace-island"],
-        "description": "Body update mode (default: append)"
+        "description": "Body update mode (defaults to the workflow-configured operation, or append)"
       },
       "labels": {"type": "array", "items": {"type": "string"}, "description": "Replacement label list"},
       "assignees": {"type": "array", "items": {"type": "string"}, "description": "Replacement assignee list"},
@@ -3409,7 +3409,18 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 **Operational Semantics**:
 
 1. **Partial Updates**: Only fields explicitly provided are modified; omitted fields are unchanged.
-2. **Body Operation Modes**: `replace` overwrites the entire body; `append`/`prepend` add content with separator; `replace-island` updates a run-specific section.
+2. **Body Operation Modes**: The effective body operation MUST be selected in this order:
+   1. the agent-supplied `operation`, when present;
+   2. the workflow-configured `safe-outputs.update-issue.operation`, when present;
+   3. `append`, when neither value is present.
+
+   The permitted values are `replace`, `append`, `prepend`, and
+   `replace-island`. `replace` overwrites the entire body; `append` and
+   `prepend` add content with a separator; `replace-island` updates a
+   run-specific section. The selected operation applies only when body updates
+   are enabled and the request includes `body`. If body updates are disabled or
+   no body is supplied, the implementation MUST leave the existing body
+   unchanged and MUST NOT perform a body operation.
 3. **Label Validation**: Provided labels must exist in the repository; non-existent labels cause failure.
 4. **Assignee Resolution**: Assignees must have repository access; invalid usernames cause failure.
 5. **Cross-Repository**: When `target-repo` is configured, operates on that repository (must be in `allowed-repos`).
@@ -3423,6 +3434,9 @@ None. `comment_memory` MUST NOT be exposed as an agent-callable MCP tool when fi
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+- `operation`: Default body update mode. MUST be one of `replace`, `append`,
+  `prepend`, or `replace-island`; invalid values MUST be rejected during
+  workflow configuration validation.
 - `staged`: Staged mode override
 
 Artifact limits use the same parsing and defaults as `create-issue`: `max-issue-artifacts` is an integer (default: 10; non-positive disables artifacts), and `max-issue-artifact-size` is positive integer bytes or a human-friendly size (default: `1mb`, 1048576 UTF-8 bytes). The compiler MUST emit `max_issue_artifacts` and normalized integer `max_issue_artifact_size`.
@@ -4239,7 +4253,7 @@ or review bodies to returned or persisted decision evidence.
 - Requires `contents: write` for git push operations
 - The handler MUST reject the repository's default branch when identified, regardless of the value of `check-branch-protection`.
 - When branch metadata marks a branch as protected, the handler MUST inspect its active rules before considering an exception. When confirming classic branch protection, implementations MUST query the branch's GraphQL `Ref.refUpdateRule`, not the REST classic-protection endpoint that requires `Administration: read`.
-- An implementation MAY allow a non-default branch that is marked protected only when its metadata explicitly disables classic protection, its complete active-rule list contains only `copilot_code_review`, and GraphQL `Ref.refUpdateRule` is explicitly `null`. A missing field, incomplete or unknown active-rule data, or failed rules/GraphQL query MUST leave the push blocked. An object returned by `refUpdateRule` MUST NOT be treated as absence of classic protection.
+- An implementation MAY allow a non-default branch that is marked protected only when its metadata explicitly disables classic protection, its complete active-rule list contains only non-blocking types, and GraphQL `Ref.refUpdateRule` is explicitly `null`. Non-blocking types are `copilot_code_review`, `branch_name_pattern`, `commit_message_pattern`, `commit_author_email_pattern`, `committer_email_pattern`, `file_path_restriction`, `file_extension_restriction`, `max_file_path_length`, and `max_file_size`; `required_signatures` MAY also be treated as non-blocking only when signed commits are enabled. These rules remain enforced by GitHub during push. A missing field, incomplete or unknown active-rule data, or failed rules/GraphQL query MUST leave the push blocked. An object returned by `refUpdateRule` MUST NOT be treated as absence of classic protection.
 - Enforces maximum patch size limit (default: 10 KB, range: 1–100 KB)
 - Validates changes don't exceed size limits before pushing
 - The handler MUST ignore agent-supplied `diff_size` values and validate patch size from the generated patch artifact.
@@ -4413,9 +4427,89 @@ or review bodies to returned or persisted decision evidence.
 
 **Purpose**: Add labels to issues or pull requests.
 
-**Default Max**: 3  
+**Default Max**: 5  
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "add_labels",
+  "description": "Add labels to an existing GitHub issue or pull request for categorization and filtering. Labels must already exist in the repository.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["labels"],
+    "properties": {
+      "labels": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "oneOf": [
+            {"type": "string", "maxLength": 50},
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": {"type": "string", "maxLength": 50},
+                "rationale": {"type": "string", "maxLength": 280},
+                "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+                "suggest": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "description": "Labels to add. Each entry is a label name string or an object with a name plus optional issue-intent metadata."
+      },
+      "item_number": {
+        "type": ["number", "string"],
+        "pattern": "^(\\d+|#?aw_[A-Za-z0-9_]{3,12})$",
+        "description": "Issue or pull request number, or a temporary ID from the same run. If omitted, the triggering item is used."
+      }
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Target Resolution**: The target issue or pull request is resolved per the Target Authorization rules below. When no item number can be resolved, the item fails without calling the GitHub API.
+2. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the target and skip the operation (without error) if the target lacks any required label or its title does not start with the required prefix.
+3. **Empty Input**: An empty `labels` list is skipped with a warning rather than failing the job.
+4. **Per-Call Limit**: The number of requested labels MUST NOT exceed `max-labels` (default: 10). Exceeding it fails the item; labels are never silently dropped.
+5. **Validation**: Labels are sanitized, de-duplicated, checked against `allowed` and `blocked`, and the item succeeds with no labels added when none remain valid.
+6. **Staged Mode**: In staged mode the handler previews the labels it would add and performs no mutation.
+7. **Additive Application**: Labels are added through the REST add-labels endpoint and existing labels on the target MUST be preserved.
+8. **Missing Labels**: When `create-if-missing` is `true`, labels absent from the target repository are created (with a deterministic color) before they are applied. Otherwise, labels that do not exist produce an API error or warning.
+9. **Issue-Intent Metadata**: When a label object carries `rationale`, `confidence`, or `suggest` and issue intent is not disabled, the handler applies it through the GraphQL `updateIssue` mutation, merging the existing labels so that add-only semantics hold and restoring any pre-existing label the mutation removed. Pull requests have no intent-aware mutation and fall back to the REST endpoint without metadata.
+10. **Strict Intent Mode**: When `issue-intent` is explicitly `true`, plain-string labels MUST be rejected and every label object MUST include both `rationale` and `confidence`.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 5)
+- `max-labels`: Maximum labels per call (default: 10; MUST be a positive integer)
+- `allowed`: Allowlist of label names that MAY be added
+- `blocked`: Glob patterns for label names that MUST NOT be added
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue or pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the target for the operation to proceed
+- `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
+- `create-if-missing`: Create labels that do not exist in the target repository (default: `false`)
+- `issues` / `pull-requests`: Set to `false` to drop the corresponding write permission (at least one MUST remain enabled)
+- `issue-intent`: Controls issue-intent metadata handling (`false` disables, `true` makes it mandatory)
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Label names MUST undergo sanitization and be validated against `allowed` and `blocked` before any API call
+- Cross-repository targets MUST be validated against the `allowed-repos` allowlist
+- The target MUST be selected only according to the Target Authorization rules, enforced at runtime
+- The `rationale` of a label object MUST NOT exceed 280 characters
 
 **Required Permissions**:
 
@@ -4449,9 +4543,84 @@ or review bodies to returned or persisted decision evidence.
 
 **Purpose**: Remove labels from issues or pull requests.
 
-**Default Max**: 3  
+**Default Max**: 5  
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "remove_labels",
+  "description": "Remove labels from an existing GitHub issue or pull request. Silently skips labels that don't exist on the item.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["labels"],
+    "properties": {
+      "labels": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {"type": "string", "maxLength": 50},
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": {"type": "string", "maxLength": 50},
+                "rationale": {"type": "string", "maxLength": 280},
+                "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+                "suggest": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "description": "Labels to remove. Each entry is a label name string or an object with a name plus optional issue-intent metadata."
+      },
+      "item_number": {
+        "type": ["number", "string"],
+        "pattern": "^(\\d+|#?aw_[A-Za-z0-9_]{3,12})$",
+        "description": "Issue or pull request number, or a temporary ID from the same run. If omitted, the triggering item is used."
+      }
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Target Resolution**: The target issue or pull request is resolved per the Target Authorization rules below. When no item number can be resolved, the item fails without calling the GitHub API.
+2. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the target and skip the operation if the target lacks any required label or its title does not start with the required prefix.
+3. **Empty Input**: An empty `labels` list fails the item with a message listing the allowed labels when an allowlist is configured.
+4. **Validation**: Labels are sanitized, de-duplicated, and checked against `allowed` and `blocked`; the number of labels MUST NOT exceed the configured `max`. The item succeeds with no labels removed when none remain valid.
+5. **Staged Mode**: In staged mode the handler previews the labels it would remove and performs no mutation.
+6. **Per-Label Removal**: Labels are removed one at a time because the GitHub API has no bulk-removal endpoint.
+7. **Missing Labels**: A label that is not present on the target (HTTP 404 or "Label does not exist") is skipped silently and is not a failure.
+8. **Partial Failure**: Any other per-label failure is logged and reported in `failedLabels` while the remaining labels are still processed.
+9. **Intent Metadata**: Issue-intent metadata on label objects is accepted by the schema, but only the label names are used for removal.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 5)
+- `allowed`: Allowlist of label names that MAY be removed
+- `blocked`: Glob patterns for label names that MUST NOT be removed
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue or pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the target for the operation to proceed
+- `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
+- `issues` / `pull-requests`: Set to `false` to drop the corresponding write permission (at least one MUST remain enabled)
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Label names MUST undergo sanitization and be validated against `allowed` and `blocked` before any API call
+- Cross-repository targets MUST be validated against the `allowed-repos` allowlist
+- The target MUST be selected only according to the Target Authorization rules, enforced at runtime
+- A configuration that cannot be parsed MUST fail closed by granting neither `issues: write` nor `pull-requests: write`
 
 **Required Permissions**:
 
@@ -6925,6 +7094,12 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.26** (2026-11-13):
+
+- **Specified**: `safe-outputs.update-issue.operation` workflow configuration with `append`, `prepend`, `replace`, and `replace-island` values.
+- **Specified**: Body-operation precedence: explicit agent operation, workflow default, then `append`; body-disabled and no-body behavior is unchanged.
+- **Updated**: Publication metadata to 1.29.26.
 
 **Version 1.29.25** (2026-11-12):
 

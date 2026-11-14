@@ -231,6 +231,10 @@ func (c *Compiler) addActivationEngineOutputs(ctx *activationJobBuildContext, en
 	if decisionStep := generateModelRoutingDecisionStep(ctx.data); decisionStep != "" {
 		ctx.steps = append(ctx.steps, decisionStep)
 		ctx.outputs[modelRoutingDecisionOutput] = "${{ steps." + modelRoutingDecisionStepID + ".outputs." + modelRoutingDecisionOutput + " }}"
+		if isModelRoutingDynamic(ctx.data) {
+			ctx.outputs[modelRoutingModeOutput] = "${{ " + modelRoutingModeInActivation + " }}"
+			ctx.outputs[modelSelectorOutput] = "${{ " + modelSelectorInActivation + " }}"
+		}
 	}
 	var awInfoYAML strings.Builder
 	c.generateCreateAwInfo(&awInfoYAML, ctx.data, engine)

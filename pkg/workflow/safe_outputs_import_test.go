@@ -3,14 +3,47 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSafeOutputsRequireAgentSuccessImports(t *testing.T) {
+	for _, main := range []string{"", "false", "true"} {
+		for _, first := range []string{"false", "true"} {
+			for _, second := range []string{"false", "true"} {
+				t.Run(fmt.Sprintf("main=%s/first=%s/second=%s", main, first, second), func(t *testing.T) {
+					dir := t.TempDir()
+					for name, value := range map[string]string{"first": first, "second": second} {
+						require.NoError(t, os.WriteFile(filepath.Join(dir, name+".md"), []byte(
+							"---\nsafe-outputs:\n  require-agent-success: "+value+"\n---\nShared gate.\n"), 0o600))
+					}
+					config := ""
+					if main != "" {
+						config = "  require-agent-success: " + main + "\n"
+					}
+					source := "---\non: workflow_dispatch\nimports:\n  - ./first.md\n  - ./second.md\nsafe-outputs:\n" +
+						config + "  add-comment:\n---\nMain workflow.\n"
+					path := filepath.Join(dir, "main.md")
+					require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+					compiler := NewCompiler()
+					data, err := compiler.ParseWorkflowFile(path)
+					require.NoError(t, err)
+					enabled := main == "true" || (main == "" && (first == "true" || second == "true"))
+					require.Equal(t, enabled, data.SafeOutputs.RequireAgentSuccess)
+					condition := RenderCondition(buildSafeOutputsJobCondition(data, true))
+					assert.Equal(t, enabled, strings.Contains(condition, "needs.agent.result == 'success'"))
+				})
+			}
+		}
+	}
+}
 
 // TestSafeOutputsImport tests that safe-output types can be imported from shared workflows
 func TestSafeOutputsImport(t *testing.T) {
@@ -2195,48 +2228,176 @@ safe-outputs:
 
 func TestSafeOutputsImportPreservesDisabledDiagnostics(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		safeOutputs string
-		noop        string
+		name                            string
+		mainSafeOutputs                 string
+		importedSafeOutputs             string
+		imports                         string
+		legacyImportKeys                bool
+		wantMissingTool                 bool
+		wantMissingData                 bool
+		wantNoOp                        bool
+		wantReportIncomplete            bool
+		wantAddComment                  bool
+		wantImportedIssueSideEffectsOff bool
 	}{
-		{"metadata only", "messages:\n    footer: \"> custom footer\"", "{}"},
-		{"explicit handlers", "missing-tool: {}\n  missing-data: {}\n  report-incomplete: {}", "{}"},
-		{"disabled noop", "messages:\n    footer: \"> custom footer\"", "false"},
+		{
+			name:                            "own safe outputs",
+			mainSafeOutputs:                 "  add-comment:\n    max: 1\n",
+			imports:                         "[./shared.md]",
+			wantMissingTool:                 true,
+			wantMissingData:                 true,
+			wantNoOp:                        true,
+			wantReportIncomplete:            true,
+			wantAddComment:                  true,
+			wantImportedIssueSideEffectsOff: true,
+		},
+		{
+			name:                            "no local safe outputs",
+			imports:                         "[./shared.md]",
+			wantMissingTool:                 true,
+			wantMissingData:                 true,
+			wantNoOp:                        true,
+			wantReportIncomplete:            true,
+			wantImportedIssueSideEffectsOff: true,
+		},
+		{
+			name:                            "later imports do not re-enable handlers",
+			mainSafeOutputs:                 "  add-comment:\n    max: 1\n",
+			imports:                         "[./shared.md, ./metadata.md]",
+			wantMissingTool:                 true,
+			wantMissingData:                 true,
+			wantNoOp:                        true,
+			wantReportIncomplete:            true,
+			wantAddComment:                  true,
+			wantImportedIssueSideEffectsOff: true,
+		},
+		{
+			name:                            "earlier imports do not re-enable handlers",
+			mainSafeOutputs:                 "  add-comment:\n    max: 1\n",
+			imports:                         "[./metadata.md, ./shared.md]",
+			wantMissingTool:                 true,
+			wantMissingData:                 true,
+			wantNoOp:                        true,
+			wantReportIncomplete:            true,
+			wantAddComment:                  true,
+			wantImportedIssueSideEffectsOff: true,
+		},
+		{
+			name:                 "main enables handlers",
+			mainSafeOutputs:      "  report-missing-tool: {}\n  report-missing-data: {}\n  noop: {}\n  report-incomplete: {}\n",
+			imports:              "[./shared.md]",
+			wantMissingTool:      true,
+			wantMissingData:      true,
+			wantNoOp:             true,
+			wantReportIncomplete: true,
+		},
+		{
+			name:            "main disables handlers",
+			mainSafeOutputs: "  report-missing-tool: false\n  report-missing-data: false\n  noop: false\n  report-incomplete: false\n",
+			imports:         "[./shared.md, ./metadata.md]",
+		},
+		{
+			name:                            "legacy imported keys",
+			mainSafeOutputs:                 "  add-comment:\n    max: 1\n",
+			imports:                         "[./shared.md, ./metadata.md]",
+			legacyImportKeys:                true,
+			wantMissingTool:                 true,
+			wantMissingData:                 true,
+			wantNoOp:                        true,
+			wantReportIncomplete:            true,
+			wantAddComment:                  true,
+			wantImportedIssueSideEffectsOff: true,
+		},
+		{
+			name: "main disables legacy aliases",
+			mainSafeOutputs: "  missing-tool: false\n  missing-data: false\n" +
+				"  noop: {}\n  report-incomplete: false\n",
+			imports:             "[./shared.md]",
+			importedSafeOutputs: "  missing-tool: {}\n  missing-data: {}\n  report-incomplete: {}\n",
+			wantNoOp:            true,
+		},
+		{
+			name:                "main disables handlers with metadata import",
+			mainSafeOutputs:     "  missing-tool: false\n  missing-data: false\n  noop: {}\n  report-incomplete: false\n",
+			imports:             "[./shared.md]",
+			importedSafeOutputs: "  messages:\n    footer: \"> custom footer\"\n",
+			wantNoOp:            true,
+		},
+		{
+			name:                "main disables noop",
+			mainSafeOutputs:     "  missing-tool: false\n  missing-data: false\n  noop: false\n  report-incomplete: false\n",
+			imports:             "[./shared.md]",
+			importedSafeOutputs: "  messages:\n    footer: \"> custom footer\"\n",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			compiler := NewCompiler(WithVersion("1.0.0"))
 			workflowsDir := filepath.Join(t.TempDir(), ".github", "workflows")
 			require.NoError(t, os.MkdirAll(workflowsDir, 0755))
-			shared := "---\nsafe-outputs:\n  " + tc.safeOutputs + "\n---\n"
+			toolKey, dataKey := "report-missing-tool", "report-missing-data"
+			if tc.legacyImportKeys {
+				toolKey, dataKey = "missing-tool", "missing-data"
+			}
+			importedSafeOutputs := tc.importedSafeOutputs
+			if importedSafeOutputs == "" {
+				importedSafeOutputs = "  " + toolKey + ": false\n  " + dataKey +
+					": false\n  noop: false\n  report-incomplete: false\n"
+			}
+			shared := "---\nsafe-outputs:\n" + importedSafeOutputs + "---\n"
 			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "shared.md"), []byte(shared), 0644))
-			main := `---
-on: workflow_dispatch
-imports:
-  - ./shared.md
-safe-outputs:
-  missing-tool: false
-  missing-data: false
-  report-incomplete: false
-  noop: ` + tc.noop + `
----
-Run a task.
-`
+			metadata := "---\nsafe-outputs:\n  messages:\n    footer: \"> custom footer\"\n---\n"
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "metadata.md"), []byte(metadata), 0644))
+			main := "---\non: workflow_dispatch\nimports: " + tc.imports + "\n"
+			if tc.mainSafeOutputs != "" {
+				main += "safe-outputs:\n" + tc.mainSafeOutputs
+			}
+			main += "---\nRun a task.\n"
 			mainFile := filepath.Join(workflowsDir, "main.md")
 			require.NoError(t, os.WriteFile(mainFile, []byte(main), 0644))
 
 			data, err := compiler.ParseWorkflowFile(mainFile)
 			require.NoError(t, err)
 			require.NotNil(t, data.SafeOutputs)
-			assert.Nil(t, data.SafeOutputs.MissingTool)
-			assert.Nil(t, data.SafeOutputs.MissingData)
-			assert.Nil(t, data.SafeOutputs.ReportIncomplete)
-			if tc.noop == "false" {
-				assert.Nil(t, data.SafeOutputs.NoOp)
-			} else {
-				assert.NotNil(t, data.SafeOutputs.NoOp)
+			assert.Equal(t, tc.wantMissingTool, data.SafeOutputs.MissingTool != nil)
+			assert.Equal(t, tc.wantMissingData, data.SafeOutputs.MissingData != nil)
+			assert.Equal(t, tc.wantNoOp, data.SafeOutputs.NoOp != nil)
+			assert.Equal(t, tc.wantReportIncomplete, data.SafeOutputs.ReportIncomplete != nil)
+			assert.Equal(t, tc.wantAddComment, data.SafeOutputs.AddComments != nil)
+			if tc.wantImportedIssueSideEffectsOff {
+				require.NotNil(t, data.SafeOutputs.MissingTool)
+				require.NotNil(t, data.SafeOutputs.MissingTool.CreateIssue)
+				assert.Equal(t, "false", *data.SafeOutputs.MissingTool.CreateIssue)
+				require.NotNil(t, data.SafeOutputs.MissingData)
+				require.NotNil(t, data.SafeOutputs.MissingData.CreateIssue)
+				assert.Equal(t, "false", *data.SafeOutputs.MissingData.CreateIssue)
+				require.NotNil(t, data.SafeOutputs.NoOp)
+				require.NotNil(t, data.SafeOutputs.NoOp.ReportAsIssue)
+				assert.Equal(t, "false", *data.SafeOutputs.NoOp.ReportAsIssue)
+				require.NotNil(t, data.SafeOutputs.ReportIncomplete)
+				require.NotNil(t, data.SafeOutputs.ReportIncomplete.CreateIssue)
+				assert.Equal(t, "false", *data.SafeOutputs.ReportIncomplete.CreateIssue)
 			}
 		})
 	}
+
+	t.Run("imported noop false with repo-memory ledger", func(t *testing.T) {
+		compiler := NewCompiler(WithVersion("1.0.0"))
+		safeOutputs, err := compiler.MergeSafeOutputs(nil, []string{`{"noop":false}`}, nil)
+		require.NoError(t, err)
+		data := &WorkflowData{
+			SafeOutputs: safeOutputs,
+			RepoMemoryConfig: &RepoMemoryConfig{Memories: []RepoMemoryEntry{{
+				ID: "events", Ledger: &RepoMemoryLedgerConfig{},
+			}}},
+		}
+
+		applyDefaultCreateIssue(data)
+
+		require.NotNil(t, data.SafeOutputs.NoOp)
+		require.NotNil(t, data.SafeOutputs.NoOp.ReportAsIssue)
+		assert.Equal(t, "false", *data.SafeOutputs.NoOp.ReportAsIssue)
+		assert.Nil(t, data.SafeOutputs.CreateIssues)
+	})
 }
 
 // TestSafeOutputsDifferentTypesFromImportsMerged reproduces the bug reported in

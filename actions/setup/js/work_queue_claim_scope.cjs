@@ -10,6 +10,8 @@ const { ERR_WORK_QUEUE_CLAIM_SCOPE } = require("./error_codes.cjs");
 
 const MAX_ASSIGNMENT_CLAIMS = 16;
 const claimExecution = new AsyncLocalStorage();
+const claimEffectBatch = new AsyncLocalStorage();
+const claimEffectBatches = new WeakMap();
 /** @type {import("node:async_hooks").AsyncLocalStorage<{identity: ReturnType<typeof claimIdentity>, targets: readonly import("./work_queue_resource_scope.cjs").EffectResource[], operations: readonly string[], verification?: true}>} */
 const resourceExecution = new AsyncLocalStorage();
 /** @type {WeakMap<object, {identity: ReturnType<typeof claimIdentity>, targets: readonly import("./work_queue_resource_scope.cjs").EffectResource[]}>} */
@@ -438,7 +440,47 @@ function recordClaimEffect(effect) {
   if (execution.closedEffectChannel) throw scopeError("Claim write channel is closed for independent delivery verification");
   const attempt = { ...effect, ...claimIdentity(execution.claim_handle) };
   execution.effects.push(attempt);
+  const batch = claimEffectBatch.getStore();
+  if (batch) {
+    if (canonical(batch.identity) !== canonical(claimIdentity(execution.claim_handle))) throw scopeError("Claim effect batch escaped its original Claim context");
+    batch.effects.push(attempt);
+  }
   return attempt;
+}
+
+function createClaimEffectBatch() {
+  const execution = claimExecution.getStore();
+  if (!execution || !Array.isArray(execution.effects)) return null;
+  if (execution.closedEffectChannel) throw scopeError("Claim write channel is closed for independent delivery verification");
+  const batch = Object.freeze({});
+  claimEffectBatches.set(batch, { identity: claimIdentity(execution.claim_handle), effects: [], discarded: false });
+  return batch;
+}
+
+function withClaimEffectBatch(batch, callback) {
+  if (batch === null) return callback();
+  const state = batch && typeof batch === "object" ? claimEffectBatches.get(batch) : undefined;
+  const execution = claimExecution.getStore();
+  if (!state || !execution || state.discarded || canonical(state.identity) !== canonical(claimIdentity(execution.claim_handle))) {
+    throw scopeError("Claim effect batch is unavailable or belongs to another Claim");
+  }
+  return claimEffectBatch.run(state, callback);
+}
+
+function discardClaimEffectBatch(batch) {
+  if (batch === null) return 0;
+  const state = batch && typeof batch === "object" ? claimEffectBatches.get(batch) : undefined;
+  const execution = claimExecution.getStore();
+  if (!state || !execution || execution.closedEffectChannel || canonical(state.identity) !== canonical(claimIdentity(execution.claim_handle))) {
+    throw scopeError("Claim effect batch cannot be discarded outside its original open Claim");
+  }
+  const discarded = new Set(state.effects);
+  if (state.effects.some(effect => !execution.effects.includes(effect))) throw scopeError("Claim effect batch is not present in the original write inventory");
+  for (let index = execution.effects.length - 1; index >= 0; index--) {
+    if (discarded.has(execution.effects[index])) execution.effects.splice(index, 1);
+  }
+  state.discarded = true;
+  return discarded.size;
 }
 
 function scopedArtifactFilename(filename) {
@@ -471,6 +513,9 @@ module.exports = {
   currentClaimResourceEffects,
   isProtectedClaimResourceTarget,
   recordClaimEffect,
+  createClaimEffectBatch,
+  withClaimEffectBatch,
+  discardClaimEffectBatch,
   closeClaimEffectChannel,
   claimEffectChannelMatches,
   scopedArtifactFilename,

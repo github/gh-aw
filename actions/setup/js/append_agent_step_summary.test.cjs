@@ -59,6 +59,17 @@ describe.skipIf(process.platform !== "linux")("agent step summary publication", 
     expectRejected(publish());
   });
 
+  it.each(["existing", "dangling"])("rejects a %s destination symlink", state => {
+    fs.unlinkSync(output);
+    fs.symlinkSync(state === "existing" ? sentinel : path.join(directory, "missing"), output);
+    fs.writeFileSync(source, "sanitized summary\n");
+    const result = publish();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Agent step summary could not be published safely");
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("external-private-sentinel\n");
+    expect(fs.lstatSync(output).isSymbolicLink()).toBe(true);
+  });
+
   it.each(["root", "ancestor"])("rejects a symlink at the %s directory", level => {
     const external = path.join(directory, "external-directory");
     fs.mkdirSync(external);
@@ -129,6 +140,20 @@ fs.openSync = (filename, ...args) => {
     });
     expect(result.status).toBe(0);
     expect(fs.readFileSync(output, "utf8")).toBe("existing\nsanitized summary\n");
+  });
+
+  it("rejects a symlinked deployed script before executing it", () => {
+    const actions = path.join(root, "actions");
+    fs.mkdirSync(actions);
+    fs.writeFileSync(path.join(source, "..", "malicious.cjs"), `require("fs").writeFileSync(${JSON.stringify(sentinel)}, "modified");`);
+    fs.symlinkSync(path.join(source, "..", "malicious.cjs"), path.join(actions, "append_agent_step_summary.cjs"));
+    const result = spawnSync("bash", [path.join(__dirname, "../sh/append_agent_step_summary.sh")], {
+      env: { ...process.env, RUNNER_TEMP: directory, GH_AW_TMP_DIR: root, GITHUB_STEP_SUMMARY: output },
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Refusing to execute an invalid or symlinked agent summary script");
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("external-private-sentinel\n");
   });
 });
 

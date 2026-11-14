@@ -26,9 +26,9 @@ import (
 var logsParsingJsLog = logger.New("cli:logs_parsing_js")
 
 // parseAgentLog parses agent logs and generates a markdown summary
-func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose bool) error {
+func parseAgentLog(ctx context.Context, runDir string, engine workflow.CodingAgentEngine, verbose bool) error {
 	logsParsingJsLog.Printf("Parsing agent logs in: %s", runDir)
-	if rendered, err := parsePersistedAgentLog(runDir); rendered || err != nil {
+	if rendered, err := parsePersistedAgentLog(ctx, runDir); rendered || err != nil {
 		return err
 	}
 	// Determine which parser script to use based on the engine
@@ -37,7 +37,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No engine detected in %s, skipping log parsing", filepath.Base(runDir))))
 		return nil
 	}
-	if rendered, err := parseUnifiedAgentLog(runDir, engine.GetID()); rendered || err != nil {
+	if rendered, err := parseUnifiedAgentLog(ctx, runDir, engine.GetID()); rendered || err != nil {
 		return err
 	}
 
@@ -62,7 +62,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 	if behaviorEngine, ok := engine.(*workflow.BehaviorDefinedEngine); ok {
 		if parserSource := behaviorEngine.GetLogParserScriptSource(); parserSource != "" {
 			output, err = runSessionParserWithSources(
-				context.Background(),
+				ctx,
 				map[string][]byte{"behavior_log_parser.cjs": []byte(parserSource)},
 				"agent-markdown",
 				agentLogPath,
@@ -70,10 +70,10 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 				"behavior_log_parser.cjs",
 			)
 		} else {
-			output, err = runSessionParser(context.Background(), "agent-markdown", agentLogPath, engine.GetID())
+			output, err = runSessionParser(ctx, "agent-markdown", agentLogPath, engine.GetID())
 		}
 	} else {
-		output, err = runSessionParser(context.Background(), "agent-markdown", agentLogPath, engine.GetID())
+		output, err = runSessionParser(ctx, "agent-markdown", agentLogPath, engine.GetID())
 	}
 	if err != nil {
 		return err

@@ -615,7 +615,7 @@ A router value is accepted only as the main agent's model (top-level `model`, `e
 - router values for sub-agents, threat detection, evals, or other jobs;
 - a router value combined with `engine.model-routing` or `engine.fallback-models`.
 
-A main-agent model that is an expression or variable and resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
+A main-agent model that is a single expression, reading only contexts the activation job resolves as later jobs do, on a workflow eligible for routing MAY resolve to a router value at run time. The activation job MUST resolve it once, route the run at that level, and give later jobs the resolved value; any other reserved identifier MUST stop the run before the agent starts. A variable, or an expression on an ineligible workflow, that resolves to a router value at run time MUST stop the run before the agent starts. See [Model Routing](/gh-aw/reference/model-routing/).
 
 ---
 
@@ -1042,6 +1042,7 @@ Model parameters are compile-time configuration values and are not derived from 
 - **Added**: §4.1 support for exact provider-scoped model identifiers whose model token contains multiple nonempty slash-separated namespace segments.
 - **Clarified**: Namespace separators are preserved for exact matching; glob wildcards continue to match within a model token and MUST NOT cross `/`.
 - **Added**: Conformance tests T-MAF-010, T-MAF-011, and T-MAF-029 with implementation mappings for valid/invalid namespaced syntax and full-suffix matching.
+- **Added**: §9.4 lets a main-agent model that is a single expression, on a workflow eligible for routing, resolve to a router value at run time.
 
 ### Version 1.3.1 (Draft)
 

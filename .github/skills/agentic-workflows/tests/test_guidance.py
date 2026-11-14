@@ -135,6 +135,16 @@ class GuidanceTests(unittest.TestCase):
     def test_ad_hoc_recommendations_name_defaults_and_bound_targets(self):
         creator = normalized((ROOT / ".github/aw/create-agentic-workflow.md").read_text())
         self.assertIn("For each material undefined term, propose and clearly label a reasonable `Default:`", creator)
+        for contract in (
+            "Verify config files named in the request",
+            "require `noop` and report, never guess",
+            "what “adds” covers",
+            "lockfile scope",
+            "zero-item behavior",
+            "in the proposed prompt, not only notes",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, creator)
 
         safe_outputs = normalized((ROOT / ".github/aw/safe-outputs-content.md").read_text())
         self.assertIn('Avoid `target: "*"` when a workflow needs to act on the triggering issue/PR and one known tracker', safe_outputs)
@@ -144,6 +154,13 @@ class GuidanceTests(unittest.TestCase):
         triggers = normalized((ROOT / ".github/aw/create-agentic-workflow-trigger-details.md").read_text())
         self.assertIn("`opened` and process that event only when `github.event.issue.milestone != null`", triggers)
         self.assertIn("events-that-trigger-workflows#issues", triggers)
+
+    def test_pr_policy_checks_use_trusted_policy_sources(self):
+        triggers = normalized((ROOT / ".github/aw/triggers.md").read_text())
+        self.assertIn(
+            "read the policy from the default branch or a CODEOWNERS-protected path, never the PR head",
+            triggers,
+        )
 
     def test_workflow_guidance_covers_deterministic_checks_outputs_and_pr_diffs(self):
         patterns = normalized((ROOT / ".github/aw/workflow-patterns.md").read_text())
@@ -497,6 +514,25 @@ class GuidanceTests(unittest.TestCase):
         ):
             self.assertIn(required, guide)
         self.assertNotIn("Dispatch timeout/no run ID |", DEBUG_GUIDE.read_text())
+
+    def test_unmodified_default_branch_runs_do_not_require_dry_run(self):
+        guide = normalized(LIVE_TESTING.read_text().split(
+            "## Run an Unmodified Default-Branch Workflow\n", 1
+        )[1].split("\n## ", 1)[0])
+        for required in (
+            "user explicitly requests",
+            "**dry-run is not required** if the workflow is unmodified",
+            "Do not recompile",
+            "actual default branch",
+            "Review the published source, generated lock, imports and pins",
+            "[Live Debug Loop](#live-debug-loop)",
+            "gh aw run WORKFLOW --ref DEFAULT_BRANCH",
+            "verifying the resulting run SHA",
+            "does not override stricter host or repository restrictions",
+            "Any workflow change returns to the branch preparation and review gates",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, guide)
 
     def test_cli_mapping_uses_capabilities_not_client_assumptions(self):
         commands = (ROOT / ".github/aw/cli-commands.md").read_text()

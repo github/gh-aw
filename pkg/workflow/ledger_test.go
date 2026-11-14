@@ -708,6 +708,26 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	require.Contains(t, jobSteps, "GH_AW_LEDGER_TRANSACTIONS")
 	require.Contains(t, jobSteps, "GH_AW_LEDGER_CONFIG_BASE64")
 
+	var uploadState safeOutputsHandlerOutputsAndActionState
+	NewCompiler().appendLedgerTransactionsArtifactUpload(data, &uploadState)
+	uploadSteps := strings.Join(uploadState.steps, "")
+	require.Contains(t, uploadSteps, "name: "+ledgerTransactionsArtifactName)
+	require.Contains(t, uploadSteps, "path: "+ledgerTransactionsArtifactPath+"\n")
+	require.Contains(t, jobSteps, "GH_AW_LEDGER_TRANSACTIONS: "+ledgerTransactionsArtifactPath+"\n")
+	require.Contains(t, jobSteps, "GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: "+ledgerTransactionsArtifactName+"\n")
+	downloadStart := strings.Index(jobSteps, "      - name: Download validated ledger transactions\n")
+	require.NotEqual(t, -1, downloadStart)
+	downloadStep := jobSteps[downloadStart:]
+	if nextStep := strings.Index(downloadStep, "\n      - name: "); nextStep >= 0 {
+		downloadStep = downloadStep[:nextStep]
+	}
+	require.Contains(t, downloadStep, "          path: "+ledgerTransactionsArtifactDir)
+	handlerManagerSteps, err := NewCompiler().buildHandlerManagerStep(data)
+	require.NoError(t, err)
+	require.Contains(t, strings.Join(handlerManagerSteps, ""), "GH_AW_LEDGER_TRANSACTIONS: "+ledgerTransactionsArtifactPath+"\n")
+	safeOutputsEnv := NewCompiler().buildJobLevelSafeOutputEnvVars(data, "")
+	require.NotContains(t, safeOutputsEnv, "GH_AW_LEDGER_TRANSACTIONS")
+
 	var projectionStep strings.Builder
 	require.NoError(t, NewCompiler().generateLedgerProjectionStep(&projectionStep, data))
 	require.Contains(t, projectionStep.String(), "Create read-only ledger projections")

@@ -2,7 +2,9 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"regexp"
@@ -26,6 +28,25 @@ type CopilotModelRoutingConfig struct {
 	// requested is the router value (for example router/economy) that selected
 	// routing through the main agent's model, or "" for engine.model-routing.
 	requested string
+	// selector is the main agent's model expression, in its downstream-job form,
+	// when the activation job decides from it at run time whether routing applies
+	// and with which mode. It is never emitted.
+	selector string
+}
+
+func decodeModelRoutingJSONDocument(raw string, value any) error {
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return errors.New("unexpected trailing JSON value")
+		}
+		return err
+	}
+	return nil
 }
 
 func isModelRoutingEnabled(data *WorkflowData) bool {
@@ -35,6 +56,9 @@ func isModelRoutingEnabled(data *WorkflowData) bool {
 func applyModelRoutingEnv(env map[string]string, data *WorkflowData) {
 	if isModelRoutingEnabled(data) {
 		env["GH_AW_MODEL_ROUTING"] = modelRoutingRuntimeFlag(data)
+	}
+	if isModelRoutingDynamic(data) {
+		env[modelRoutingModeEnvVar] = "${{ " + modelRoutingModeDownstream + " }}"
 	}
 }
 
@@ -190,7 +214,8 @@ func modelRoutingOverrideWarning(data *WorkflowData) string {
 		return ""
 	}
 	var warnings []string
-	if data.Model != "" {
+	// A dynamic model expression is the routing selector, not a fixed model.
+	if data.Model != "" && !isModelRoutingDynamic(data) {
 		warnings = append(warnings, "model")
 	}
 	if data.EngineConfig != nil {
@@ -205,7 +230,7 @@ func modelRoutingOverrideWarning(data *WorkflowData) string {
 					DefaultThinkingLevel string `json:"defaultThinkingLevel"`
 				} `json:"settings"`
 			}
-			if json.Unmarshal([]byte(data.EngineConfig.Config), &config) == nil && config.Settings.DefaultThinkingLevel != "" {
+			if decodeModelRoutingJSONDocument(data.EngineConfig.Config, &config) == nil && config.Settings.DefaultThinkingLevel != "" {
 				warnings = append(warnings, "engine.config.settings.defaultThinkingLevel")
 			}
 		}
@@ -464,7 +489,7 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 	if !versionAtLeast(version, string(constants.DefaultFirewallVersion), string(constants.AWFModelRoutingMinVersion)) {
 		return NewValidationError("engine.model-routing", version, fmt.Sprintf("task-level model routing requires AWF %s or newer", constants.AWFModelRoutingMinVersion), fmt.Sprintf("The effective AWF version is %s. Set sandbox.agent.version or firewall.version to %s or newer.", version, constants.AWFModelRoutingMinVersion))
 	}
-	return nil
+	return validateModelRoutingRuntimeCompatibility(workflowData)
 }
 
 func generateModelRoutingConversationStep(yaml *strings.Builder, data *WorkflowData) {
