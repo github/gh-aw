@@ -5504,7 +5504,7 @@
     });
   }
 
-  // Docs that heal: an updater writes docs from merged code, unbloat and glossary agents simplify them, reader agents test them, and a healer fixes what was missed and teaches the updater a new rule
+  // Docs that heal: an updater writes docs from merged code, unbloat and glossary agents simplify them, the noob tester reads them as a newcomer, and a healer fixes what was missed and teaches the updater a new rule
   {
     resetIndex();
     const VW = 2160,
@@ -5520,7 +5520,7 @@
       return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#${cls ? "dhHeal" : "dhAgent"})"/>${ico("copilot", x, y + 1, 38)}</g>`;
     };
-    // an illustrative, simplified example: the updater's own workflow, a docs page it edits and a reader agent's report
+    // an illustrative, simplified example: the updater's own workflow, a docs page it edits and the noob tester's report
     const PANELS = [
       [
         "daily-doc-updater.md",
@@ -5533,7 +5533,7 @@
           ["h", "# Daily Doc Updater"],
           ["", "- Read PRs merged since yesterday"],
           ["", "- Document new flags and examples"],
-          ["add", "+ - Note GHES steps for new flags"],
+          ["add", "+ - Explain value formats of flags"],
         ],
       ],
       [
@@ -5547,20 +5547,20 @@
           ["", "  that you can use whenever you"],
           ["", "  want things to stop running."],
           ["api", "  → glossary: stop-after"],
-          ["add", "+ On GHES, allow the API host."],
+          ["add", "+ Units: m, h, d, w (e.g. +48h)."],
         ],
       ],
       [
-        "reader-report.md",
+        "noob-tester-report.md",
         "TEST",
         [
-          ["fn", "walk the docs like a reader"],
-          ["", "  newcomer: quick start"],
-          ["", "  mobile · tablet · desktop"],
-          ["", "  links and code samples"],
-          ["", "  enterprise: GHES setup"],
+          ["fn", "walk the docs as a newcomer"],
+          ["", "  install the extension"],
+          ["", "  quick start, steps 1-3"],
+          ["", "  find stop-after"],
+          ["", "  what does +48h mean?"],
           ["q", ""],
-          ["fail", "issue: GHES step missing"],
+          ["fail", "issue: explain the +48h format"],
         ],
       ],
     ];
@@ -5568,7 +5568,7 @@
     const EDGES = [
       ["dhE0", "M124 106 H232", "p", ["merged"], 178, 90, "middle"],
       ["dhE1", `M${PX[0] + PW + 6} ${AY} H${PX[1] - 8}`, "p", ["docs PR from", "merged code"], 695, AY - 56, "middle"],
-      ["dhE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["read as newcomer,", "phone and GHES"], 1465, AY - 56, "middle"],
+      ["dhE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["read it as a", "newcomer would"], 1465, AY - 56, "middle"],
       ["dhE3", `M${PX[2] + PW / 2} ${PY + PH + 4} V618 H1214`, "g", ["missed gaps"], 1560, 600, "middle"],
       ["dhE5", `M1104 590 V${PY + PH + 10}`, "g", [], 0, 0, "middle"],
       ["dhE4", `M950 618 H${PX[0] + PW / 2} V${PY + PH + 10}`, "g", ["fix the gap, teach the updater"], 600, 600, "middle"],
@@ -5607,7 +5607,7 @@
       if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
     }
     g += `<g class="fm-task" id="dhMerge"><circle cx="88" cy="106" r="32" fill="#8957e5"/>${ico("merge", 88, 106, 30)}</g>`;
-    g += agent("dhUpdater", 400, 106, 240, "Doc Updater") + agent("dhUnbloat", 1080, 106, 300, "Unbloat · Glossary") + agent("dhTester", 1850, 106, 250, "Reader agents");
+    g += agent("dhUpdater", 400, 106, 240, "Doc Updater") + agent("dhUnbloat", 1080, 106, 300, "Unbloat · Glossary") + agent("dhTester", 1850, 106, 240, "Noob Tester");
     g += agent("dhHealer", 1080, 618, 220, "Doc Healer", "g");
     g += `<circle class="fm-dot sdd-dot" r="9"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -5683,7 +5683,7 @@
       sound: "docs",
       palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
       notes:
-        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. Reader agents then walk the site the way people do: a newcomer following the quick start, phones, tablets and desktops, and an enterprise administrator on GHES, filing issues for anything confusing or broken. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The workflow, page and report shown are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
+        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The workflow, page and noob tester report shown are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
       enter() {
         t0 = 0;
         cyc = -1;
