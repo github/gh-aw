@@ -24,7 +24,8 @@ Actions expressions use the native `actionslanguageservice` grammar and quote-aw
 | `ImportError` | struct | Structured error for import resolution failures |
 | `ImportCycleError` | struct | Structured error for circular import chains |
 | `FormattedParserError` | struct | Pre-formatted parser error with display-ready message |
-| `ImportsResult` | struct | Result of `ProcessImportsFromFrontmatterWithSource` |
+| `ImportsResult` | struct | Result of `ProcessImportsFromFrontmatterWithSource`, including connector registrations |
+| `ConnectorImport` | struct | Import source and its connector registrations after input substitution |
 | `ImportInputDefinition` | struct | Input definition from an imported workflow fragment |
 | `ImportSpec` | struct | Resolved import specification (path, ref, optional flag) |
 | `GitHubURLType` | string alias | Classifies a GitHub URL (`tree`, `blob`, `raw`, `run`, `pr`, etc.) |
@@ -82,6 +83,19 @@ truncating existing link targets. Use `ImportCache.ReadFile` or the parser's
 lookup and must not be read with an unconfined filesystem reader. On WebAssembly
 and Plan 9, confined disk caching is unavailable; browser virtual-file reads
 remain unchanged.
+
+#### Connector Imports
+
+Connector registrations are retained in `ImportsResult.Connectors` after import
+schema and `with` input substitution. Imported connectors register services but
+do not select capabilities on behalf of the consuming workflow. Connector
+triggers are recognized only when a registration declares an `on` list.
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `HasConnectorTriggers` | `func(frontmatter map[string]any) bool` | Reports whether a connector registration declares trigger events. |
+| `GetSafeOutputFieldKeys` | `func() ([]string, error)` | Returns sorted safe-output operation and metadata field names reserved by the built-in grammar. |
+| `RemoveConnectorDocumentation` | `func(content string) string` | Removes valid connector authoring documentation from a workflow body while retaining newlines; call before input substitution. Invalid or unrelated comments remain. |
 
 #### GitHub URL Parsing
 

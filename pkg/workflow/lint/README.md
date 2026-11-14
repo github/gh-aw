@@ -22,13 +22,14 @@ Rule constructors in this package provide built-in checks for expression, permis
 
 ### Built-in Rules
 
-`Default()` returns the built-in runner. The following exported constructors
-cover high-impact policy areas:
+`Default()` returns the built-in runner and registers the following rule
+constructors:
 
 | Policy area | Rule constructors |
 |-------------|-------------------|
-| Expressions and secrets | `TemplateInjectionRule`, `PromptExpressionRule`, `SecretLeakRule`, `OTLPSecretLeakRule` |
-| Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule` |
-| Permissions and execution | `PermissionScopeRule`, `ExcessivePermissionsRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule` |
-| Network and outputs | `NetworkScopeRule`, `SafeOutputShellExpansionRule`, `PushTargetRule`, `AllowedLabelsRule`, `ArtifactExecutionRule` |
-| Graders and custom jobs | `GraderFileIORule`, `GraderShellFileWriteRule`, `CustomJobDetectionRule` |
+| Expressions and disclosure | `TemplateInjectionRule`, `PromptExpressionRule`, `SecretLeakRule`, `OTLPSecretLeakRule` |
+| Actions and workflow integrity | `ActionPinRule`, `VersionCheckRule`, `JobTimeoutRule`, `NeedsConsistencyRule`, `StepReferenceRule`, `WorkflowRunScopeRule`, `ConditionalImportRule`, `PrivateToPublicRule`, `InstallScriptsRule`, `GatewayDispatchLiteralsRule`, `BashCasePatternRule`, `ObfuscationRule` |
+| Permissions, jobs, and checkout | `PermissionScopeRule`, `ExcessivePermissionsRule`, `CustomJobDetectionRule`, `PrivilegedCheckoutRule`, `CheckoutModeRule`, `ForkAssociationRule`, `PullRequestTargetRolesRule`, `PullRequestTargetCheckoutRule` |
+| Network, tools, images, and sandbox | `NetworkScopeRule`, `PushTargetRule`, `AllowedLabelsRule`, `ToolScopeRule`, `ImageArgumentRule`, `SandboxConfigRule`, `FirewallSSLBumpRule` |
+| Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |
+| Grader I/O | `GraderFileIORule`, `GraderShellFileWriteRule` |
