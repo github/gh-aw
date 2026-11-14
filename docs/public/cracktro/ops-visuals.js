@@ -12,7 +12,7 @@
   const svg = (label, body) => `<svg class="ov" viewBox="0 0 560 360" role="img" aria-label="${esc(label)}">${body}</svg>`;
 
   const observability = svg(
-    "OpenTelemetry export: workflow job spans, tagged with AI credits, and MCP gateway tool-call spans go over OTLP/HTTP to your backend, which charts AI credit burn per run against the max_ai_credits cap.",
+    "OpenTelemetry export: workflow job spans, tagged with AI credits and firewall request counts, and MCP gateway tool-call spans go over OTLP/HTTP to your backend, which charts AI credit burn per run against the max_ai_credits cap.",
     [
       rect(16, 16, 224, 196),
       text(32, 44, "Workflow run", "ov-b"),
@@ -22,15 +22,24 @@
         ["safe outputs", 70, 26],
         ["conclusion", 82, 22],
       ].map(([n, x, w], i) => text(32, 82 + i * 34, n, "ov-m") + rect(128 + x, 72 + i * 34, w, 12, "ov-bar")),
-      rect(16, 232, 224, 80),
-      text(32, 260, "MCP gateway", "ov-b"),
+      rect(16, 226, 224, 58),
+      text(32, 250, "MCP gateway", "ov-b"),
       ...[
         [32, 50],
         [90, 34],
         [132, 70],
-      ].map(([x, w]) => rect(x, 284, w, 10, "ov-bar")),
+      ].map(([x, w]) => rect(x, 264, w, 8, "ov-bar")),
+      rect(16, 296, 224, 58),
+      text(32, 320, "Firewall", "ov-b"),
+      text(224, 320, "allowed · blocked", "ov-s", "end"),
+      ...[
+        [32, 64, "ov-bar"],
+        [104, 40, "ov-bar"],
+        [152, 16, "ov-bar ov-hot"],
+      ].map(([x, w, c]) => rect(x, 334, w, 8, c)),
       path("M240 114 C252 114 252 160 262 160"),
-      path("M240 272 C252 272 252 184 262 184"),
+      path("M240 255 C252 255 252 178 262 178"),
+      path("M240 325 C256 325 256 190 262 190"),
       rect(262, 146, 118, 52, "ov-card ov-key"),
       text(321, 168, "OTLP/HTTP", "ov-b", "middle"),
       text(321, 188, "secret headers", "ov-s", "middle"),
