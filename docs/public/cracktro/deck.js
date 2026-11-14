@@ -33,7 +33,7 @@
   .slide.active.up-in { animation: up-in .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.leaving.up-out { animation: up-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.active.down-in { animation: down-in .8s cubic-bezier(.26,.86,.44,.985) both; }
-  .slide.fadeout { opacity: 0; transition: opacity .3s ease-in; }
+  .slide.fadeout { opacity: 0; transition: opacity .6s ease-in-out; }
   .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   /* full-screen red wash for the security band (THEME.security.red): fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
@@ -13468,7 +13468,7 @@
     if (cur >= 0 && !!THEME[slides[n].group].light !== !!THEME[slides[cur].group].light && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       const old = slides[cur].el;
       old.classList.add("fadeout");
-      wash.style.transitionDuration = ".3s";
+      wash.style.transitionDuration = ".6s";
       wash.classList.remove("on");
       redT = setTimeout(() => {
         bgN = n;
@@ -13476,8 +13476,8 @@
         redT = setTimeout(() => {
           redT = null;
           show(n, true);
-        }, 450);
-      }, 300);
+        }, 900);
+      }, 600);
       return;
     }
     show(n);
@@ -13619,7 +13619,7 @@
       target = th.pal.map(hex),
       bgt = bgOf(th);
     // light <-> dark swaps the base quickly so text never sits on the wrong background for long
-    bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * (i < 3 && Math.abs(bgt[0] - bgv[0]) > 90 ? 0.2 : 0.04));
+    bgv = REDUCED ? bgt : bgv.map((v, i) => v + (bgt[i] - v) * (i < 3 && Math.abs(bgt[0] - bgv[0]) > 90 ? 0.07 : 0.04));
     colors = REDUCED ? target : colors.map((c, i) => c.map((v, k) => v + (target[i][k] - v) * 0.03));
 
     ctx.globalCompositeOperation = "source-over";
