@@ -348,6 +348,7 @@
   .awd-bk { color: #4493f8; font-size: 15px; }
   .awd-tt { text-align: center; display: grid; } .awd-tt b { font-size: 15px; } .awd-tt small { color: #9198a1; font-size: 11px; }
   .awd-x { all: unset; justify-self: end; color: #4493f8; font-weight: 600; cursor: pointer; }
+  .awd-x:focus-visible, .awd-chat:focus-visible { outline: 2px solid #4493f8; outline-offset: 2px; }
   .awd-chat { flex: 1; overflow-y: auto; padding: 18px 14px; display: flex; flex-direction: column; gap: 16px; scrollbar-width: thin; }
   .awd-me { align-self: flex-end; max-width: 90%; background: #1f6feb; color: #fff; padding: 12px 14px; border-radius: 20px 20px 6px 20px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
   .awd-chip { display: inline-block; margin: 0 6px 4px 0; padding: 1px 8px; border-radius: 8px; background: #ffffff2e; font: 600 12px var(--mono); }
@@ -12133,20 +12134,22 @@
     const p = PROMPTS[ls.map(l => l.textContent).join("").replace(/\s+/g, " ").trim()];
     if (p) s.el.append(h("div", { class: "awp" }, h("button", { type: "button", "aria-haspopup": "dialog", title: "Show the full prompt", onclick: () => openPrompt(...p) }, "/agentic-workflows"), p[1]));
   }
-  // Full-screen phone (GitHub app) dialog showing the full prompt; swallows keys, clicks and swipes while open.
+  // Full-screen phone (GitHub app) dialog showing the full prompt; isolates deck keys, clicks and swipes while open.
   const phone = h("div", { class: "awd", role: "dialog", "aria-modal": "true", "aria-label": "Original prompt" });
-  let phoneBack = null;
+  let phoneBack = null, phoneInert = [];
   function openPrompt(wf, _, full) {
     phoneBack = document.activeElement;
     const close = h("button", { type: "button", class: "awd-x", "aria-label": "Close", onclick: closePrompt }, "Done");
     phone.replaceChildren(h("div", { class: "awd-ph" },
       h("div", { class: "awd-st" }, h("span", {}, "9:41"), h("i", { class: "awd-di" }), h("span", { class: "awd-sig" }, "▂▄▆ ◔")),
       h("div", { class: "awd-nav" }, h("span", { class: "awd-bk" }, "‹ Agents"), h("div", { class: "awd-tt" }, h("b", {}, wf), h("small", {}, "gh-aw · Copilot session")), close),
-      h("div", { class: "awd-chat" },
+      h("div", { class: "awd-chat", tabindex: "0", role: "region", "aria-label": "Prompt" },
         h("div", { class: "awd-me" }, h("span", { class: "awd-chip" }, "/agentic-workflows"), full),
         h("div", { class: "awd-bot" }, h("span", { class: "awd-av" }, "✦"), h("div", {}, h("b", {}, "Copilot"), h("p", {}, `Started work on ${wf}…`)))),
       h("div", { class: "awd-in" }, h("span", {}, "Ask Copilot"), h("i", {}, "↑")),
       h("i", { class: "awd-home" })));
+    phoneInert = [...document.body.children].filter(el => !el.inert);
+    for (const el of phoneInert) el.inert = true;
     document.body.append(phone);
     requestAnimationFrame(() => phone.classList.add("on"));
     close.focus();
@@ -12154,15 +12157,21 @@
   function closePrompt() {
     phone.classList.remove("on");
     phone.remove();
+    for (const el of phoneInert) el.inert = false;
+    phoneInert = [];
     phoneBack?.focus?.();
   }
   phone.addEventListener("click", e => (e.stopPropagation(), e.target === phone && closePrompt()));
   for (const t of ["touchstart", "touchend"]) phone.addEventListener(t, e => e.stopPropagation(), { passive: true });
   addEventListener("keydown", e => {
     if (!phone.isConnected) return;
-    if (e.key === "Escape") closePrompt();
-    if (e.key !== "Tab" && !(e.key === "Enter" && e.target.closest?.("button"))) (e.stopImmediatePropagation(), e.preventDefault());
-    else e.stopImmediatePropagation();
+    e.stopImmediatePropagation();
+    if (e.key === "Escape") (e.preventDefault(), closePrompt());
+    else if (e.key === "Tab") {
+      const f = [...phone.querySelectorAll("button, [tabindex='0']")], i = f.indexOf(document.activeElement);
+      e.preventDefault();
+      f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
+    }
   }, true);
 
   // ---------- bands ----------
