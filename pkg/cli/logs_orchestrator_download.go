@@ -969,7 +969,7 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 		return
 	}
 	processedRun := buildLogsProcessedRun(c.ctx, result, c.opts.verbose, true)
-	parseWorkflowRunArtifacts(result, processedRun, c.opts.parse, c.opts.verbose)
+	parseWorkflowRunArtifacts(c.ctx, result, processedRun, c.opts.parse, c.opts.verbose)
 	exportCompleted := c.exportATIF(processedRun.Run, result.storageReserved)
 	finalizeLogsRunDownload(c.opts.storageLimit, result)
 	if !exportCompleted {
@@ -1058,13 +1058,13 @@ func shouldSkipProcessedWorkflowRun(result DownloadResult, verbose bool) bool {
 	return false
 }
 
-func parseWorkflowRunArtifacts(result DownloadResult, processedRun ProcessedRun, parse, verbose bool) {
+func parseWorkflowRunArtifacts(ctx context.Context, result DownloadResult, processedRun ProcessedRun, parse, verbose bool) {
 	if !parse {
 		return
 	}
 	awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 	detectedEngine := extractEngineFromAwInfo(awInfoPath, verbose)
-	if err := parseAgentLog(result.LogsPath, detectedEngine, verbose); err != nil {
+	if err := parseAgentLog(ctx, result.LogsPath, detectedEngine, verbose); err != nil {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log for run %d: %v", processedRun.Run.DatabaseID, err)))
 	} else if logMdPath := filepath.Join(result.LogsPath, "log.md"); fileutil.FileExists(logMdPath) {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))

@@ -26,13 +26,18 @@ function readTransactions(file = process.env.GH_AW_LEDGER_TRANSACTIONS) {
   if (!file) return { version: 1, ledgers: {} };
   let artifact;
   let fd;
+  const resolved = path.resolve(file);
   try {
-    fd = fs.openSync(path.resolve(file), fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    fd = fs.openSync(resolved, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() || stat.size > MAX_TRANSACTION_BYTES) throw new TypeError("Invalid ledger transaction artifact");
     artifact = JSON.parse(fs.readFileSync(fd, "utf8"));
   } catch (error) {
     if (error instanceof TypeError && error.message === "Invalid ledger transaction artifact") throw error;
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      const artifactName = process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME || "ledger transaction artifact";
+      throw new Error(`Missing validated ledger transaction artifact at ${resolved}; ensure safe_outputs uploads ${artifactName} before push_ledger_changes`, { cause: error });
+    }
     throw new Error("Failed to read validated ledger transaction artifact", { cause: error });
   } finally {
     if (fd !== undefined) fs.closeSync(fd);
