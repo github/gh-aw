@@ -2981,6 +2981,185 @@
     const BD_PERIOD = 15000;
     let bdT0 = 0,
       bdRun = -1;
+    // Issues as intent: how gh-aw itself is built; an on-prem failure is investigated privately with the debug.md agent, an anonymized issue is filed, triaged, assigned to Copilot, reviewed by agents and merged, with real repository counts
+    {
+      resetIndex();
+      const VW = 1800,
+        VH = 600;
+      const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+      const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+      const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#ctAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+      const user = (id, x, y, w) => `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/><image href="assets/avatars/ievangelist.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+      const lock = (x, y, s = 1) =>
+        `<g class="ct-lock" transform="translate(${x},${y}) scale(${s})"><path d="M-7 -2 V-8 A7 7 0 0 1 7 -8 V-2" fill="none" stroke-width="3"/><rect x="-11" y="-3" width="22" height="17" rx="3"/></g>`;
+      // the failing on-prem run
+      const run = (id, x, y) =>
+        `<g class="fm-out ct-run" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/><path class="ct-x" d="M${x - 11} ${y - 11}L${x + 11} ${y + 11}M${x + 11} ${y - 11}L${x - 11} ${y + 11}"/></g>`;
+      // live data the debug agent investigates on prem: always redacted, never shown or filed
+      const data = (id, x, y) =>
+        `<g class="ct-data" id="${id}"><rect class="ct-data-b" x="${x}" y="${y}" width="170" height="160" rx="14"/><text class="ct-data-t" x="${x + 14}" y="${y + 30}">LIVE DATA</text>${lock(x + 148, y + 22, 0.8)}` +
+        ["logs", "audit", "config"].map((l, i) => `<text class="ct-data-l" x="${x + 14}" y="${y + 70 + i * 34}">${l}</text><rect class="ct-bar" x="${x + 90}" y="${y + 58 + i * 34}" width="${66 - i * 12}" height="15" rx="3" style="animation-delay:${i * 0.18}s"/>`).join("") +
+        `</g>`;
+      const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+      const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+      // [edge id, path, color, label, lx, ly, anchor]; g = user, o = private on-prem investigation, r = failure, b = maintainer, p = Copilot and agents
+      const EDGES = [
+        ["r1", "M106 170 H248", "r", ["run fails"], 177, 148, "middle"],
+        ["r2", "M290 206 V388", "g", ["runs it on", "the failed run"], 306, 290, "start"],
+        ["r3", "M256 416 H214", "o", [], 0, 0, "start"],
+        ["r4", "M206 446 H248", "o", [], 0, 0, "start"],
+        ["e1", "M520 430 H545 V170 H686", "g", ["anonymized", "issue"], 572, 112, "start"],
+        ["e2", "M730 206 V397", "b", ["triages", "& plans"], 746, 300, "start"],
+        ["e3", "M858 430 H905 V170 H918", "b", ["assigns", "to Copilot"], 917, 300, "start"],
+        ["e4", "M1060 196 V430 H1206", "p", ["writes code,", "opens PR"], 1076, 300, "start"],
+        ["e5", "M1250 394 V170 H1368", "p", ["ready for", "review"], 1264, 300, "start"],
+        ["e6", "M1555 145 V100 H1020 V137", "p", ["comments → Copilot pushes fixes"], 1288, 90, "middle"],
+        ["e7", "M1410 206 V388", "p", ["threads", "resolved"], 1426, 300, "start"],
+        ["e8", "M1628 430 H1706", "b", ["merges"], 1667, 408, "middle"],
+      ];
+      const SEQ = [
+        ["r1", "nUser"],
+        ["r2", "nDebug"],
+        ["r3", "nData"],
+        ["r4", "nDebug"],
+        ["e1", "nIssue", 1300],
+        ["e2", "nMaint"],
+        ["e3", "nCopilot"],
+        ["e4", "nPR"],
+        ["e5", "nReview"],
+        ["e6", "nCopilot"],
+        ["e4", "nPR"],
+        ["e5", "nReview"],
+        ["e7", "nLead"],
+        ["e8", "nMerge", 1600],
+      ];
+      const LANE = { nRun: 0, nUser: 0, nDebug: 0, nData: 0, nIssue: 1, nMaint: 1, nCopilot: 2, nPR: 2, nReview: 3, nLead: 3, nMerge: 3 };
+      const MK = { g: ["ctG", "#3fb950"], o: ["ctO", "#d29922"], r: ["ctR", "#f85149"], b: ["ctB", "#4493f8"], p: ["ctP", "#ab7df8"] };
+      let g = `<defs><clipPath id="ctClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ctAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>`;
+      for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+      g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+      g += `<rect class="ct-prem" x="4" y="78" width="518" height="470" rx="22"/>${lock(40, 520)}<text class="ct-prem-t" x="62" y="527">live data never leaves</text>`;
+      [
+        [0, 560, "ON PREM"],
+        [560, 900, "INTENT"],
+        [900, 1320, "CODE"],
+        [1320, VW, "REVIEW"],
+      ].forEach(([x0, x1, t], i) => {
+        g += `<text class="fm-lane-t mra-lane" id="ctLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+        if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 60}"/>`;
+      });
+      for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+        g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+        g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+      }
+      g += run("nRun", 70, 170) + user("nUser", 290, 170, 200) + agent("nDebug", 290, 430, 222, "debug.md agent") + data("nData", 36, 350);
+      g += box("nIssue", 730, 170, "issue") + dev("nMaint", 640, 430, 210, "Maintainer");
+      g += agent("nCopilot", 960, 170, 200, "Copilot") + box("nPR", 1250, 430, "pr");
+      g += agent("nReview", 1410, 170, 290, "Agentic reviewers") + dev("nLead", 1410, 430, 210, "Maintainer") + box("nMerge", 1750, 430, "merge");
+      g += `<text class="ct-round" id="ctRound" x="1250" y="500" text-anchor="middle"></text>`;
+      g += `<circle class="fm-dot mra-dot" r="8"/>`;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "fm-svg ct-svg");
+      svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      svg.style.setProperty("--c", "#ab7df8");
+      svg.innerHTML = g;
+      const $ = id => svg.querySelector("#" + id),
+        dot = svg.querySelector(".mra-dot");
+      // real counts for gh-aw issues labelled "community" and the merged pull requests that closed them, snapshot November 2026
+      const STATS = [
+        [450, "", "people filed community issues", "#3fb950", "#79c0ff"],
+        [1383, "", "community issues closed as completed", "#79c0ff", "#4493f8"],
+        [1039, "", "pull requests merged to close them", "#4493f8", "#ab7df8"],
+        [96, "%", "of those pull requests authored by Copilot", "#ab7df8", "#d2a8ff"],
+      ];
+      const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
+      const stats = h(
+        "div",
+        { class: "ct-stats" },
+        ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+      );
+      const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+      const STEP = 1000,
+        START = 900,
+        HOLD = 1200,
+        T = [];
+      let END = START;
+      for (const s of SEQ) {
+        T.push(END);
+        END += s[2] || STEP;
+      }
+      const CYC = END + HOLD;
+      let t0 = 0,
+        cyc = -1,
+        popK = -1;
+      const light = nid => {
+        $(nid).classList.add("on");
+        $("ctLane" + LANE[nid]).classList.add("on");
+      };
+      slides.push({
+        group: "factory",
+        sound: "contrib",
+        palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
+        notes:
+          "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative, with simulated data; David Pine stands in for the community. A workflow run fails on an on-prem, self-hosted setup. He points our debug.md agent at the failing run, and the agent investigates with the live logs, audit data and configuration right there on prem. That evidence never leaves the enclave and we never need to see it: what comes out is an anonymized issue describing the bug and the intent, with no private names, payloads or secrets. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Users contribute intent, not their data; Copilot turns it into code and maintainers review.",
+        enter() {
+          t0 = 0;
+          cyc = -1;
+          nums.forEach((n, i) => (n.textContent = "0" + STATS[i][1]));
+        },
+        tick(t) {
+          if (!t0) t0 = t;
+          const e = t - t0,
+            c = Math.floor(e / CYC),
+            u = e % CYC,
+            f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+          nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * f).toLocaleString("en-US") + STATS[i][1]));
+          if (c !== cyc) {
+            cyc = c;
+            svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+            $("ctRound").textContent = "";
+            light("nRun");
+            popK = -1;
+          }
+          svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+          if (u < START || u >= END) {
+            dot.style.opacity = 0;
+            return;
+          }
+          let k = 0;
+          while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+          const [eid, nid, dur = STEP] = SEQ[k],
+            fr = (u - T[k]) / dur,
+            p = $(eid),
+            n = p.getTotalLength(),
+            q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+          p.classList.add("hot");
+          if (dot.style.opacity !== "1") sfx.pop(0);
+          dot.style.opacity = 1;
+          dot.setAttribute("cx", q.x);
+          dot.setAttribute("cy", q.y);
+          dot.setAttribute("fill", MK[p.classList[1]][1]);
+          for (let j = 0; j < k; j++) light(SEQ[j][1]);
+          if (k >= 8) $("ctRound").textContent = `review round ${k >= 11 ? 2 : 1}`;
+          if (fr >= 0.8) {
+            if (popK !== k) {
+              popK = k;
+              sfx.pop(k);
+            }
+            light(nid);
+          }
+        },
+        el: h(
+          "section",
+          { class: "slide" },
+          h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Intent is all you need"), h("h2", {}, letters("Issues as "), letters("intent", "l-grad"))),
+          svg,
+          stats,
+          h("div", { class: "ct-src" }, "gh-aw issues labelled community · counts as of November 2026")
+        ),
+      });
+    }
+    resetIndex();
     slides.push({
       group: "factory",
       sound: "assist",
@@ -3011,185 +3190,6 @@
         raSvg,
         h("div", { class: "fm-cap ra-cap-chart" }, h("b", { style: "color:#3fb950" }, "Backlog burndown"), h("span", {}, " · open issues after adoption")),
         bdSvg
-      ),
-    });
-  }
-
-  // Issues as intent: how gh-aw itself is built; an on-prem failure is investigated privately with the debug.md agent, an anonymized issue is filed, triaged, assigned to Copilot, reviewed by agents and merged, with real repository counts
-  {
-    resetIndex();
-    const VW = 1800,
-      VH = 600;
-    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
-    const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
-    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#ctAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const user = (id, x, y, w) => `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/><image href="assets/avatars/ievangelist.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
-    const lock = (x, y, s = 1) =>
-      `<g class="ct-lock" transform="translate(${x},${y}) scale(${s})"><path d="M-7 -2 V-8 A7 7 0 0 1 7 -8 V-2" fill="none" stroke-width="3"/><rect x="-11" y="-3" width="22" height="17" rx="3"/></g>`;
-    // the failing on-prem run
-    const run = (id, x, y) =>
-      `<g class="fm-out ct-run" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/><path class="ct-x" d="M${x - 11} ${y - 11}L${x + 11} ${y + 11}M${x + 11} ${y - 11}L${x - 11} ${y + 11}"/></g>`;
-    // live data the debug agent investigates on prem: always redacted, never shown or filed
-    const data = (id, x, y) =>
-      `<g class="ct-data" id="${id}"><rect class="ct-data-b" x="${x}" y="${y}" width="170" height="160" rx="14"/><text class="ct-data-t" x="${x + 14}" y="${y + 30}">LIVE DATA</text>${lock(x + 148, y + 22, 0.8)}` +
-      ["logs", "audit", "config"].map((l, i) => `<text class="ct-data-l" x="${x + 14}" y="${y + 70 + i * 34}">${l}</text><rect class="ct-bar" x="${x + 90}" y="${y + 58 + i * 34}" width="${66 - i * 12}" height="15" rx="3" style="animation-delay:${i * 0.18}s"/>`).join("") +
-      `</g>`;
-    const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
-    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
-    // [edge id, path, color, label, lx, ly, anchor]; g = user, o = private on-prem investigation, r = failure, b = maintainer, p = Copilot and agents
-    const EDGES = [
-      ["r1", "M106 170 H248", "r", ["run fails"], 177, 148, "middle"],
-      ["r2", "M290 206 V388", "g", ["runs it on", "the failed run"], 306, 290, "start"],
-      ["r3", "M256 416 H214", "o", [], 0, 0, "start"],
-      ["r4", "M206 446 H248", "o", [], 0, 0, "start"],
-      ["e1", "M520 430 H545 V170 H686", "g", ["anonymized", "issue"], 572, 112, "start"],
-      ["e2", "M730 206 V397", "b", ["triages", "& plans"], 746, 300, "start"],
-      ["e3", "M858 430 H905 V170 H918", "b", ["assigns", "to Copilot"], 917, 300, "start"],
-      ["e4", "M1060 196 V430 H1206", "p", ["writes code,", "opens PR"], 1076, 300, "start"],
-      ["e5", "M1250 394 V170 H1368", "p", ["ready for", "review"], 1264, 300, "start"],
-      ["e6", "M1555 145 V100 H1020 V137", "p", ["comments → Copilot pushes fixes"], 1288, 90, "middle"],
-      ["e7", "M1410 206 V388", "p", ["threads", "resolved"], 1426, 300, "start"],
-      ["e8", "M1628 430 H1706", "b", ["merges"], 1667, 408, "middle"],
-    ];
-    const SEQ = [
-      ["r1", "nUser"],
-      ["r2", "nDebug"],
-      ["r3", "nData"],
-      ["r4", "nDebug"],
-      ["e1", "nIssue", 1300],
-      ["e2", "nMaint"],
-      ["e3", "nCopilot"],
-      ["e4", "nPR"],
-      ["e5", "nReview"],
-      ["e6", "nCopilot"],
-      ["e4", "nPR"],
-      ["e5", "nReview"],
-      ["e7", "nLead"],
-      ["e8", "nMerge", 1600],
-    ];
-    const LANE = { nRun: 0, nUser: 0, nDebug: 0, nData: 0, nIssue: 1, nMaint: 1, nCopilot: 2, nPR: 2, nReview: 3, nLead: 3, nMerge: 3 };
-    const MK = { g: ["ctG", "#3fb950"], o: ["ctO", "#d29922"], r: ["ctR", "#f85149"], b: ["ctB", "#4493f8"], p: ["ctP", "#ab7df8"] };
-    let g = `<defs><clipPath id="ctClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ctAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>`;
-    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
-    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
-    g += `<rect class="ct-prem" x="4" y="78" width="518" height="470" rx="22"/>${lock(40, 520)}<text class="ct-prem-t" x="62" y="527">live data never leaves</text>`;
-    [
-      [0, 560, "ON PREM"],
-      [560, 900, "INTENT"],
-      [900, 1320, "CODE"],
-      [1320, VW, "REVIEW"],
-    ].forEach(([x0, x1, t], i) => {
-      g += `<text class="fm-lane-t mra-lane" id="ctLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
-      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 60}"/>`;
-    });
-    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
-      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
-      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
-    }
-    g += run("nRun", 70, 170) + user("nUser", 290, 170, 200) + agent("nDebug", 290, 430, 222, "debug.md agent") + data("nData", 36, 350);
-    g += box("nIssue", 730, 170, "issue") + dev("nMaint", 640, 430, 210, "Maintainer");
-    g += agent("nCopilot", 960, 170, 200, "Copilot") + box("nPR", 1250, 430, "pr");
-    g += agent("nReview", 1410, 170, 290, "Agentic reviewers") + dev("nLead", 1410, 430, 210, "Maintainer") + box("nMerge", 1750, 430, "merge");
-    g += `<text class="ct-round" id="ctRound" x="1250" y="500" text-anchor="middle"></text>`;
-    g += `<circle class="fm-dot mra-dot" r="8"/>`;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "fm-svg ct-svg");
-    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
-    svg.style.setProperty("--c", "#ab7df8");
-    svg.innerHTML = g;
-    const $ = id => svg.querySelector("#" + id),
-      dot = svg.querySelector(".mra-dot");
-    // real counts for gh-aw issues labelled "community" and the merged pull requests that closed them, snapshot November 2026
-    const STATS = [
-      [450, "", "people filed community issues", "#3fb950", "#79c0ff"],
-      [1383, "", "community issues closed as completed", "#79c0ff", "#4493f8"],
-      [1039, "", "pull requests merged to close them", "#4493f8", "#ab7df8"],
-      [96, "%", "of those pull requests authored by Copilot", "#ab7df8", "#d2a8ff"],
-    ];
-    const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
-    const stats = h(
-      "div",
-      { class: "ct-stats" },
-      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
-    );
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    const STEP = 1000,
-      START = 900,
-      HOLD = 1200,
-      T = [];
-    let END = START;
-    for (const s of SEQ) {
-      T.push(END);
-      END += s[2] || STEP;
-    }
-    const CYC = END + HOLD;
-    let t0 = 0,
-      cyc = -1,
-      popK = -1;
-    const light = nid => {
-      $(nid).classList.add("on");
-      $("ctLane" + LANE[nid]).classList.add("on");
-    };
-    slides.push({
-      group: "factory",
-      sound: "contrib",
-      palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
-      notes:
-        "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative, with simulated data; David Pine stands in for the community. A workflow run fails on an on-prem, self-hosted setup. He points our debug.md agent at the failing run, and the agent investigates with the live logs, audit data and configuration right there on prem. That evidence never leaves the enclave and we never need to see it: what comes out is an anonymized issue describing the bug and the intent, with no private names, payloads or secrets. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Users contribute intent, not their data; Copilot turns it into code and maintainers review.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-        nums.forEach((n, i) => (n.textContent = "0" + STATS[i][1]));
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC,
-          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
-        nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * f).toLocaleString("en-US") + STATS[i][1]));
-        if (c !== cyc) {
-          cyc = c;
-          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
-          $("ctRound").textContent = "";
-          light("nRun");
-          popK = -1;
-        }
-        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
-        if (u < START || u >= END) {
-          dot.style.opacity = 0;
-          return;
-        }
-        let k = 0;
-        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
-        const [eid, nid, dur = STEP] = SEQ[k],
-          fr = (u - T[k]) / dur,
-          p = $(eid),
-          n = p.getTotalLength(),
-          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
-        p.classList.add("hot");
-        if (dot.style.opacity !== "1") sfx.pop(0);
-        dot.style.opacity = 1;
-        dot.setAttribute("cx", q.x);
-        dot.setAttribute("cy", q.y);
-        dot.setAttribute("fill", MK[p.classList[1]][1]);
-        for (let j = 0; j < k; j++) light(SEQ[j][1]);
-        if (k >= 8) $("ctRound").textContent = `review round ${k >= 11 ? 2 : 1}`;
-        if (fr >= 0.8) {
-          if (popK !== k) {
-            popK = k;
-            sfx.pop(k);
-          }
-          light(nid);
-        }
-      },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Intent is all you need"), h("h2", {}, letters("Issues as "), letters("intent", "l-grad"))),
-        svg,
-        stats,
-        h("div", { class: "ct-src" }, "gh-aw issues labelled community · counts as of November 2026")
       ),
     });
   }
