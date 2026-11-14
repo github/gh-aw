@@ -1738,8 +1738,8 @@
     resetIndex();
     const RUN = [
       { k: "[self-hosted, linux]", c: "#d29922" },
-      { k: "ubuntu-24.04-arm", c: "#ab7df8" },
-      { k: "ubuntu-latest", c: "#4493f8" },
+      { k: "[self-hosted, arm64]", c: "#ab7df8" },
+      { k: "[self-hosted, gpu]", c: "#4493f8" },
     ];
     const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
     const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
@@ -1830,7 +1830,7 @@
     const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
     otel.classList.add("otel");
     const cRun = h("span");
-    const runner = card(RN, RUN[0].c, "Your runners", "Any runner", cRun, SRV);
+    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
     const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
     fw.classList.add("fw");
     const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
