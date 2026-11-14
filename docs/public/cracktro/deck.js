@@ -621,7 +621,7 @@
   .active .er-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
   .er-ed { position: absolute; left: 110px; top: 330px; width: 720px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
   .active .er-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
-  .er-ed .ae-code { font-size: 22px; line-height: 27px; }
+  .er-ed .ae-code { font-size: 21px; line-height: 26px; }
   .er-ed .ae-row { transition: background .4s; }
   .er-ed .ae-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--ec) 24%, transparent), transparent 85%); }
   .er-ed .ae-row.lit { background: linear-gradient(90deg, #d2992255, transparent 85%); box-shadow: inset 4px 0 0 #d29922; }
@@ -646,6 +646,12 @@
   .er-card.on .er-st::before { content: "◌ job queued…"; color: #d29922; }
   .er-card.run .er-st::before { content: "● agent job running"; color: var(--rc); }
   .er-card.eco .er-st { display: none; }
+  .er-card.fw .er-st::before { content: "○ sandbox idle"; color: #656c76; }
+  .er-card.fw.run .er-st::before { content: "● agent sandboxed"; color: var(--rc); }
+  .er-fw { position: absolute; left: 26px; top: 138px; display: flex; gap: 6px; }
+  .er-fw b { padding: 6px 9px; border-radius: 8px; border: 1.5px solid #3d444d; font: 500 15px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .3s; }
+  .er-card.fw.run .er-fw b { border-color: #3fb950; color: #f0f6fc; background: #3fb95022; }
+  .er-card.fw.run .er-fw b.no { border-color: var(--rc); color: var(--rc); background: color-mix(in srgb, var(--rc) 18%, transparent); text-decoration: line-through; }
   .er-steps { position: absolute; left: 26px; right: 26px; bottom: 20px; display: flex; gap: 6px; }
   .er-steps b { padding: 7px 8px; border-radius: 8px; border: 1.5px solid #3d444d; font: 500 14px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .3s; }
   .er-steps b::before { content: "○ "; }
@@ -1727,23 +1733,26 @@
     });
   }
 
-  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
   {
     resetIndex();
     const RUN = [
-      { k: "ubuntu-24.04-arm", tag: "Larger · Arm64", title: "Custom runners", c: "#ab7df8", ic: '<rect x="16" y="16" width="32" height="32" rx="4"/><rect x="25" y="25" width="14" height="14"/><path d="M24 8v8M32 8v8M40 8v8M24 48v8M32 48v8M40 48v8M8 24h8M8 32h8M8 40h8M48 24h8M48 32h8M48 40h8"/>' },
-      { k: "[self-hosted, linux]", tag: "Your network", title: "Self-hosted", c: "#d29922", ic: '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>' },
+      { k: "[self-hosted, linux]", c: "#d29922" },
+      { k: "ubuntu-24.04-arm", c: "#ab7df8" },
+      { k: "ubuntu-latest", c: "#4493f8" },
     ];
     const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
+    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
     const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
     const STEPS = ["checkout", "setup-node", "cache"];
     const CHIPS = [
       ["GitHub Apps", [6, 7, 8]],
       ["OIDC", [4, 5]],
       ["Runner groups", [3]],
-      ["Environments", [9]],
+      ["Environments", []],
       ["Org secrets", [8]],
-      ["OpenTelemetry", [12, 13, 14]],
+      ["OpenTelemetry", [13, 14, 15]],
       ["Rulesets", []],
       ["Audit log", []],
     ];
@@ -1774,9 +1783,10 @@
         ["  private-key: ", K],
         ["${{ secrets.APP_KEY }}", E],
       ],
+      [["network:", K]],
       [
-        ["environment: ", K],
-        ["production", V],
+        ["  allowed: ", K],
+        ["[defaults, node]", V],
       ],
       [["steps:", K]],
       [
@@ -1796,6 +1806,9 @@
     const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
     const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
     arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
+    const SB = 1,
+      RN = 2,
+      EC = 3;
     const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
     const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
     const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
@@ -1816,8 +1829,11 @@
     );
     const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
     otel.classList.add("otel");
-    const cards = RUN.map((r, i) => card(i + 1, r.c, r.tag, r.title, r.k, r.ic));
-    const eco = card(3, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
+    const cRun = h("span");
+    const runner = card(RN, RUN[0].c, "Your runners", "Any runner", cRun, SRV);
+    const fw = card(SB, FW.c, "Firewall · microVM", "Sandbox", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
+    fw.classList.add("fw");
+    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
     eco.classList.add("eco");
     const job = h("div", { class: "er-job" });
     const trace = h("div", { class: "er-job er-trace" });
@@ -1830,7 +1846,8 @@
       ed,
       arrow,
       otel,
-      cards,
+      fw,
+      runner,
       eco,
       job,
       trace,
@@ -1850,17 +1867,21 @@
       arriveAt = 0,
       otelAt = 0,
       chipAt = 0,
+      sbAt = 0,
       chip = -1;
     const setRunner = (i, t) => {
       cur = i;
       el.style.setProperty("--ec", RUN[i].c);
-      cards.forEach((c, j) => c.classList.toggle("on", j === i));
-      cards.forEach(c => c.classList.remove("run"));
-      eco.classList.remove("on", "run");
+      runner.style.setProperty("--rc", RUN[i].c);
+      cRun.textContent = RUN[i].k;
+      runner.classList.add("on");
+      for (const c of [runner, eco, fw]) c.classList.remove("run");
+      eco.classList.remove("on");
+      fw.classList.remove("on");
       steps.forEach(p => p.classList.remove("up"));
-      fly(job, [840, 461], MID(i + 1));
+      fly(job, [840, 460], MID(RN));
       arriveAt = t + 700;
-      otelAt = Infinity;
+      sbAt = otelAt = Infinity;
     };
     const setChip = i => {
       chip = i;
@@ -1872,7 +1893,7 @@
       sound: "ship",
       palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
       notes:
-        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
       enter() {
         typed = RUN[0].k;
         vRun.textContent = typed;
@@ -1882,8 +1903,10 @@
         chips.forEach(c => c.classList.remove("lit"));
         rows.forEach(r => r.classList.remove("lit"));
         otel.classList.remove("on", "run");
-        eco.classList.remove("on", "run");
+        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
         steps.forEach(p => p.classList.remove("up"));
+        cRun.textContent = RUN[0].k;
+        sbAt = Infinity;
         for (const d of [job, trace]) {
           d.style.transition = "none";
           d.style.opacity = "0";
@@ -1897,9 +1920,16 @@
           chipAt = t + 1800;
           setRunner(0, t + 900);
         }
-        if (t > arriveAt && !cards[cur].classList.contains("run")) {
-          cards[cur].classList.add("run");
-          fly(trace, MID(cur + 1), MID(0));
+        if (t > arriveAt && !runner.classList.contains("run")) {
+          runner.classList.add("run");
+          sbAt = t + 900;
+        }
+        if (t > sbAt) {
+          sbAt = Infinity;
+          fw.classList.remove("run");
+          void fw.offsetWidth;
+          fw.classList.add("on", "run");
+          fly(trace, MID(SB), MID(0));
           otelAt = t + 700;
         }
         if (t > otelAt) {
