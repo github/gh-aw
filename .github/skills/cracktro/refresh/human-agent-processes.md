@@ -66,7 +66,7 @@ Baseline (`END=2026-11-14`, 30 days), slide value vs helper:
 |---|---|---|---|
 | IssueOps triage runs | 366 | 366 | |
 | DailyOps issues · done | 30 · 16 | 30 · 16 (10 not planned, 4 open) | |
-| ReviewOps PRs reviewed | 825 | 906 (935 runs) | the slide value came from one query capped at 1000 runs; use the helper |
+| ReviewOps PRs reviewed | 906 | 906 (935 runs) | corrected from 825; the old value came from one query capped at 1000 runs; use the helper |
 | LabelOps PRs labelled | 9 | 9 (11 runs) | |
 | triggers issues/schedule/review/label | 3 / 194 / 8 / 6 | 3 / 193 / 7 / 7 | the helper's heuristic differs slightly; use the helper |
 
