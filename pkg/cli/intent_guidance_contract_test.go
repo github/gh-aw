@@ -42,8 +42,7 @@ func TestIntentGuidanceContract(t *testing.T) {
 	creatorText := string(creatorContent)
 	assert.True(
 		t,
-		strings.Contains(creatorText, "When the request already states a goal") ||
-			strings.Contains(creatorText, "Otherwise skip the opener."),
+		strings.Contains(creatorText, "When a goal is stated, reuse supplied facts; skip the opener."),
 		"Workflow creator must keep explicit requests lightweight",
 	)
 
