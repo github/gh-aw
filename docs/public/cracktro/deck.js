@@ -389,6 +389,14 @@
   .sdd-chips b { font: 600 17px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; margin-right: 6px; }
   .sdd-chips span { padding: 7px 13px; border-radius: 2em; border: 1px solid #3d444d; background: #151b23cc; font: 500 16px/1 var(--mono); color: #c9d1d9; }
   .active .sdd-chips { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .dh-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dh-svg .mra-l.g { fill: #3fb950; }
+  .dh-svg .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
+  .dh-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
+  .dh-svg .sdd-panel.bad .sdd-card { stroke: #f85149; filter: drop-shadow(0 0 16px #da363399); }
+  .dh-svg .sdd-ln.gone { fill: #f85149; opacity: .4; text-decoration: line-through; }
+  .dh-svg .sdd-ln.fail { fill: #ff7b72; font-weight: 700; }
+  .dh-x { fill: #f85149; font: 700 24px var(--mono); text-anchor: end; opacity: 0; transition: opacity .25s; filter: drop-shadow(0 0 6px #f85149); }
+  .dh-x.on { opacity: 1; }
   .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
   .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
@@ -5522,6 +5530,226 @@
     });
   }
 
+  // Docs that heal: an updater writes docs from merged code, unbloat and glossary agents simplify them, the noob tester reads them as a newcomer, and a healer fixes what was missed and teaches the updater a new rule
+  {
+    resetIndex();
+    const VW = 2160,
+      VH = 680,
+      PY = 168,
+      PH = 372,
+      PW = 540,
+      PX = [40, 810, 1580],
+      AY = 300;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, c, y, w, label, cls = "") => {
+      const x = c - (w - 34) / 2;
+      return `<g class="fm-task" id="${id}"><g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#${cls ? "dhHeal" : "dhAgent"})"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    };
+    // an illustrative, simplified example: the updater's own workflow, a docs page it edits and the noob tester's report
+    const PANELS = [
+      [
+        "daily-doc-updater.md",
+        "WORKFLOW",
+        [
+          ["q", "---"],
+          ["", "on: daily"],
+          ["", "safe-outputs: create-pull-request"],
+          ["q", "---"],
+          ["h", "# Daily Doc Updater"],
+          ["", "- Read PRs merged since yesterday"],
+          ["", "- Document new flags and examples"],
+          ["add", "+ - Explain value formats of flags"],
+        ],
+      ],
+      [
+        "docs/reference/frontmatter.md",
+        "DOCS",
+        [
+          ["h", "## stop-after"],
+          ["add", "+ Stop a schedule at a deadline,"],
+          ["add", "+ e.g. stop-after: +48h."],
+          ["", "  This is a really useful option"],
+          ["", "  that you can use whenever you"],
+          ["", "  want things to stop running."],
+          ["api", "  → glossary: stop-after"],
+          ["add", "+ Units: m, h, d, w (e.g. +48h)."],
+        ],
+      ],
+      [
+        "noob-tester-report.md",
+        "TEST",
+        [
+          ["fn", "walk the docs as a newcomer"],
+          ["", "  install the extension"],
+          ["", "  quick start, steps 1-3"],
+          ["", "  find stop-after"],
+          ["", "  what does +48h mean?"],
+          ["q", ""],
+          ["fail", "issue: explain the +48h format"],
+        ],
+      ],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["dhE0", "M124 106 H232", "p", ["merged"], 178, 90, "middle"],
+      ["dhE1", `M${PX[0] + PW + 6} ${AY} H${PX[1] - 8}`, "p", ["docs PR from", "merged code"], 695, AY - 56, "middle"],
+      ["dhE2", `M${PX[1] + PW + 6} ${AY} H${PX[2] - 8}`, "p", ["read it as a", "newcomer would"], 1465, AY - 56, "middle"],
+      ["dhE3", `M${PX[2] + PW / 2} ${PY + PH + 4} V618 H1214`, "g", ["missed gaps"], 1560, 600, "middle"],
+      ["dhE5", `M1104 590 V${PY + PH + 10}`, "g", [], 0, 0, "middle"],
+      ["dhE4", `M950 618 H${PX[0] + PW / 2} V${PY + PH + 10}`, "g", ["fix the gap, teach the updater"], 600, 600, "middle"],
+    ];
+    let g = `<defs><radialGradient id="dhAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <radialGradient id="dhHeal" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#7ee787"/><stop offset=".55" stop-color="#238636"/><stop offset="1" stop-color="#0f3d1c"/></radialGradient>
+      <marker id="dhP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <marker id="dhG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 695, "WRITE"],
+      [695, 1465, "SIMPLIFY"],
+      [1465, VW, "TEST · HEAL"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dhLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 90}"/>`;
+    });
+    const sp = s => s.replace(/ /g, "\u00a0");
+    PANELS.forEach(([file, tag, lines], i) => {
+      const x = PX[i];
+      g += `<g class="sdd-panel" id="dhP${i}"><rect class="sdd-card" x="${x}" y="${PY}" width="${PW}" height="${PH}" rx="16"/>
+        <line class="sdd-hd" x1="${x}" y1="${PY + 50}" x2="${x + PW}" y2="${PY + 50}"/>
+        <text class="sdd-file" x="${x + 22}" y="${PY + 33}">${file}</text><text class="sdd-tag" x="${x + PW - 22}" y="${PY + 32}">${tag}</text>`;
+      lines.forEach(([c, s], j) => {
+        const y = PY + 88 + j * 32;
+        g += `<text class="sdd-ln ${c}" id="dhL${i}_${j}" x="${x + 24}" y="${y}">${sp(s)}</text>`;
+        if (i === 2 && j >= 1 && j <= 4) g += `<text class="sdd-ck" id="dhCk${j}" x="${x + PW - 26}" y="${y + 1}">✓</text>`;
+        if (i === 2 && j === 4) g += `<text class="dh-x" id="dhX4" x="${x + PW - 26}" y="${y + 1}">✗</text>`;
+      });
+      g += `</g>`;
+    });
+    g += `<rect class="sdd-scan" id="dhScan" x="${PX[1] + 4}" y="${PY + 56}" width="${PW - 8}" height="5" rx="2"/>`;
+    g += `<text class="sdd-stamp" id="dhStamp" x="${PX[1] + PW - 24}" y="${PY + PH - 22}">Unbloat: −3 lines</text>`;
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#dh${c === "g" ? "G" : "P"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += `<g class="fm-task" id="dhMerge"><circle cx="88" cy="106" r="32" fill="#8957e5"/>${ico("merge", 88, 106, 30)}</g>`;
+    g += agent("dhUpdater", 400, 106, 240, "Doc Updater") + agent("dhUnbloat", 1080, 106, 300, "Unbloat · Glossary") + agent("dhTester", 1850, 106, 240, "Noob Tester");
+    g += agent("dhHealer", 1080, 618, 220, "Doc Healer", "g");
+    g += `<circle class="fm-dot sdd-dot" r="9"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg mra-svg sdd-svg dh-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".sdd-dot"),
+      scan = $("dhScan");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const CYC = 18000;
+    let t0 = 0,
+      cyc = -1,
+      ev = [],
+      evI = 0,
+      fly = null,
+      scanAt = 0;
+    const on = (id, cls = "on") => $(id).classList.add(cls);
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      const flight = (ms, id, dur, col, k) => {
+        at(ms, () => {
+          fly = { p: $(id), start: ms, dur, col };
+          $(id).classList.add("hot");
+          sfx.pop(k);
+        });
+        at(ms + dur, () => {
+          fly = null;
+          $(id).classList.remove("hot");
+        });
+      };
+      at(200, () => (on("dhLane0"), on("dhP0"), on("dhMerge")));
+      [0, 1, 2, 3, 4, 5, 6].forEach(j => at(400 + j * 170, () => (on(`dhL0_${j}`), sfx.key(0.5))));
+      flight(1500, "dhE0", 500, "#ab7df8", 0);
+      at(2000, () => on("dhUpdater"));
+      flight(2200, "dhE1", 1000, "#ab7df8", 1);
+      at(3200, () => (on("dhLane1"), on("dhP1"), [0, 3, 4, 5].forEach(j => on(`dhL1_${j}`))));
+      at(3600, () => (on("dhL1_1"), sfx.key(0.6)));
+      at(3850, () => (on("dhL1_2"), sfx.key(0.6)));
+      at(4300, () => on("dhUnbloat"));
+      at(4400, () => (scanAt = 4400));
+      [3, 4, 5].forEach((j, k) => at(4800 + k * 300, () => (on(`dhL1_${j}`, "gone"), sfx.pop(2 + k))));
+      at(5800, () => ((scanAt = 0), (scan.style.opacity = 0), on("dhStamp"), on("dhL1_6"), sfx.key(0.7)));
+      at(6300, () => on("dhTester"));
+      flight(6400, "dhE2", 1000, "#ab7df8", 5);
+      at(7400, () => (on("dhLane2"), on("dhP2"), on("dhL2_0"), sfx.key(0.6)));
+      [1, 2, 3, 4].forEach((j, k) => {
+        at(7700 + k * 420, () => (on(`dhL2_${j}`), sfx.key(0.5)));
+        at(7950 + k * 420, () => (j === 4 ? (on("dhX4"), sfx.omen()) : (on(`dhCk${j}`), sfx.pop(5 + k))));
+      });
+      at(9700, () => (on("dhL2_6"), on("dhP2", "bad"), sfx.notify()));
+      flight(10000, "dhE3", 1100, "#3fb950", 6);
+      at(11100, () => (on("dhHealer"), sfx.key(0.8)));
+      flight(11300, "dhE5", 500, "#3fb950", 7);
+      at(11800, () => (on("dhL1_7"), on("dhP1", "ok"), sfx.pop(8)));
+      flight(12100, "dhE4", 1300, "#3fb950", 8);
+      at(13400, () => (on("dhL0_7"), on("dhP0", "ok"), sfx.review()));
+      at(14000, () => ($("dhX4").classList.remove("on"), on("dhCk4"), $("dhP2").classList.remove("bad"), on("dhP2", "ok"), sfx.pop(9)));
+    };
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .ok, .bad, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone"));
+      scan.style.opacity = 0;
+      dot.style.opacity = 0;
+      fly = null;
+      scanAt = 0;
+      script();
+    };
+    slides.push({
+      group: "loops",
+      sound: "docs",
+      palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
+      notes:
+        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The workflow, page and noob tester report shown are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        while (evI < ev.length && ev[evI][0] <= u) ev[evI++][1]();
+        if (scanAt) {
+          const f = Math.min(1, (u - scanAt) / 1300);
+          scan.style.opacity = 1;
+          scan.setAttribute("y", PY + 56 + f * (PH - 66));
+        }
+        if (!fly) {
+          dot.style.opacity = 0;
+          return;
+        }
+        const n = fly.p.getTotalLength(),
+          q = fly.p.getPointAtLength(n * ease(Math.min(1, (u - fly.start) / fly.dur)));
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", fly.col);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
+        svg,
+        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["daily-doc-updater", "unbloat-docs", "glossary-maintainer", "daily-documentation-diagram", "docs-noob-tester", "daily-multi-device-docs-tester", "enterprise-docs-audit", "daily-doc-healer"].map(n => h("span", {}, n))),
+      ),
+    });
+  }
+
   // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
   {
     resetIndex();
@@ -9800,6 +10028,14 @@
         osc("sine", 420, t + 0.65, 0.3, 0.02, { f1: 1300, a: 0.04 });
         [72, 76, 79, 84].forEach((m, i) => tone(m, t + 1.0 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.5 : 0.12, vol: 0.05, cutoff: 2800, detune: 3 }));
         bell(88, t + 1.5, 0.03, 1.2);
+      },
+      // docs that heal: a page typed in, two scissor snips as it is trimmed, then a warm healing chord rising to a bell
+      docs: t => {
+        for (let i = 0; i < 5; i++) click(t + 0.15 + i * 0.08, 2400 + (i % 2) * 600, 0.035, 5);
+        [0, 0.12].forEach(d => click(t + 0.7 + d, 5200, 0.05, 12));
+        pad([60, 64, 67, 72], t + 1.0, 1.4, 0.02, "triangle", 2000);
+        [72, 76, 79].forEach((m, i) => tone(m, t + 1.1 + i * 0.13, { type: "triangle", dur: 0.18, vol: 0.05, cutoff: 2600, detune: 3 }));
+        bell(84, t + 1.55, 0.035, 1.3);
       },
       // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
       cihealth: t => {
