@@ -267,6 +267,50 @@
   .gf-ship-m { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .06em; }
   .gf-ship-t { fill: #f0f6fc; font: 600 26px "Mona Sans"; }
   .gf-add { fill: #3fb950; } .gf-del { fill: #f85149; }
+  .fv-svg { left: 60px; top: 290px; width: 1800px; height: 680px; }
+  .fv-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
+  .fv-t { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .1em; }
+  .fv-req { opacity: .4; transition: opacity .4s; } .fv-req.on { opacity: 1; }
+  .fv-req.fv-new { opacity: 0; } .fv-req.fv-new.on { opacity: 1; animation: mra-in .6s cubic-bezier(.2,.9,.2,1); }
+  .fv-req rect { fill: transparent; stroke: transparent; stroke-width: 2; transition: all .3s; }
+  .fv-req.ok rect { fill: #3fb95014; stroke: #3fb950; }
+  .fv-req.bad rect { fill: #f8514922; stroke: #f85149; filter: drop-shadow(0 0 10px #f8514966); }
+  .fv-req.fv-new.on rect { fill: #ab7df81a; stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .fv-id { fill: #ab7df8; font: 700 21px var(--mono); }
+  .fv-tag { fill: #3fb950; font: 700 14px var(--mono); letter-spacing: .1em; }
+  .fv-rq { fill: #e6edf3; font: 500 22px "Mona Sans"; }
+  .fv-rq .m { fill: #d29922; font-weight: 700; }
+  .fv-code { opacity: 0; transition: opacity .25s; } .fv-code.on { opacity: 1; }
+  .fv-code text { fill: #c9d1d9; font: 500 19px var(--mono); white-space: pre; }
+  .fv-code .k { fill: #ff7b72; } .fv-code .s { fill: #a5d6ff; } .fv-code .n { fill: #d2a8ff; font-weight: 700; } .fv-code .c { fill: #6e7681; }
+  .fv-code rect { fill: transparent; transition: fill .3s; }
+  .fv-code.ok rect { fill: #3fb9501f; } .fv-code.bad rect { fill: #f8514933; } .fv-code.wit rect { fill: #4493f82b; }
+  #fvBroken { transition: fill .3s; } .fv-code.bad #fvBroken { fill: #ff7b72; font-weight: 700; }
+  .fv-e { stroke: #3d444d; stroke-width: 1.5; opacity: 0; transition: opacity .3s, stroke .3s; }
+  .fv-e.on { opacity: .9; }
+  .fv-e.bad { stroke: #f85149; stroke-width: 4; filter: drop-shadow(0 0 6px #f85149); }
+  .fv-e.wit { stroke: #4493f8; stroke-width: 4; filter: drop-shadow(0 0 6px #4493f8); }
+  .fv-n { fill: #161b22; stroke: #6e7681; stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; transition: fill .3s, stroke .3s, opacity .2s; }
+  .fv-n.on { opacity: 1; animation: fm-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  .fv-n.ok { stroke: #3fb950; fill: #23863666; }
+  .fv-n.bad { fill: #f85149; stroke: #ffa198; filter: drop-shadow(0 0 8px #f85149); }
+  .fv-n.wit { fill: #4493f8; stroke: #a5d6ff; filter: drop-shadow(0 0 8px #4493f8); }
+  .fv-count { fill: #9198a1; font: 600 19px var(--mono); text-anchor: middle; }
+  .fv-stat { fill: #9198a1; font: 700 19px var(--mono); text-anchor: middle; }
+  .fv-stat.ok { fill: #3fb950; } .fv-stat.bad { fill: #ff7b72; } .fv-stat.wit { fill: #79c0ff; }
+  .fv-res { opacity: 0; transform: translateX(30px); transition: opacity .5s, transform .5s cubic-bezier(.2,.9,.2,1); }
+  .fv-res.on { opacity: 1; transform: none; }
+  .fv-res.g .fv-card { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); } .fv-res.g .fv-rh { fill: #3fb950; }
+  .fv-res.r .fv-card { stroke: #f85149; filter: drop-shadow(0 0 10px #f8514955); } .fv-res.r .fv-rh { fill: #ff7b72; }
+  .fv-res.b .fv-card { stroke: #4493f8; filter: drop-shadow(0 0 10px #1f6feb66); } .fv-res.b .fv-rh { fill: #79c0ff; }
+  .fv-rh { font: 700 17px var(--mono); letter-spacing: .08em; }
+  .fv-rt { fill: #f0f6fc; font: 600 24px "Mona Sans"; }
+  .fv-rs { fill: #9198a1; font: 500 18px var(--mono); }
+  .fv-tr { fill: #c9d1d9; font: 500 19px var(--mono); }
+  .fv-chip { opacity: .35; transition: opacity .3s; } .fv-chip.on { opacity: 1; }
+  .fv-chip rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; transition: all .3s; }
+  .fv-chip.on rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #3fb950); }
+  .fv-chip text { fill: #f0f6fc; font: 600 20px "Mona Sans"; text-anchor: middle; }
   .gf .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #ab7df8, #79c0ff); }
   .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
   .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
@@ -4180,6 +4224,267 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+    });
+  }
+
+  // Spec → Model → Test: spec requirements become TLA+ invariants; TLC explores every state, a broken mutant must fail, a witness trace becomes a conformance test, and a surprise changes the spec first
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 680;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const REQ = [
+      ["R1", "A running Claim MUST stop", "when its Work expires."],
+      ["R2", "Only a live grant MAY", "start a Claim."],
+      ["R3", "Checkpoints MUST keep", "the expiry watermark."],
+      ["R4", "Expiry MUST use committed", "time, not the wall clock."],
+    ];
+    const CODE = [
+      "---- MODULE Expiry ----",
+      'Broken == "none"',
+      "Next == Grant \\/ Start \\/ Tick",
+      "     \\/ Expire \\/ Checkpoint",
+      "\\* R1",
+      "Expiry == \\A c \\in Claims :",
+      "  run[c] => now < due[c]",
+      "\\* R2",
+      "LiveGrant == \\A c \\in Claims :",
+      "  run[c] => live[c]",
+      "\\* R3",
+      "Watermark == ckpt.mark <= now",
+      "\\* witness: must be reachable",
+      "Seen == ~\\E c : expired[c]",
+      "====",
+    ];
+    const INV_LINES = [4, 5, 6, 7, 8, 9, 10, 11],
+      BAD_LINES = [7, 8, 9],
+      WIT_LINES = [12, 13];
+    const hl = line =>
+      line.startsWith("\\*")
+        ? `<tspan class="c">${esc(line)}</tspan>`
+        : line.match(/"[^"]*"|==|\\\/|\/\\|\\A|\\E|\\in|=>|<=|~|-{4}|={4}|[^"=\\/~<-]+|./g).map((tok, k, all) => {
+            if (tok[0] === '"') return `<tspan class="s"${tok === '"none"' ? ' id="fvBroken"' : ""}>${esc(tok)}</tspan>`;
+            if (/^(==|\\\/|\/\\|\\A|\\E|\\in|=>|<=|~|-{4}|={4})$/.test(tok)) return `<tspan class="k">${esc(tok)}</tspan>`;
+            if (!k && line[0] !== " " && all[1] === "==") return `<tspan class="n">${esc(tok)}</tspan>`;
+            return esc(tok);
+          }).join("");
+    // a small, deterministic state graph explored breadth-first
+    let seed = 11;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const SIZES = [1, 2, 3, 4, 5, 6, 6, 5],
+      NODES = [],
+      GEDGES = [];
+    SIZES.forEach((n, L) => {
+      const prev = NODES.filter(q => q.L === L - 1);
+      for (let j = 0; j < n; j++) {
+        const q = { L, j, id: NODES.length, x: 896 + L * 58, y: 340 + (j - (n - 1) / 2) * 64 + (L ? (rnd() - 0.5) * 18 : 0) };
+        if (L) {
+          const pi = n > 1 ? Math.round((j * (prev.length - 1)) / (n - 1)) : 0,
+            ai = Math.min(prev.length - 1, Math.max(0, pi + (rnd() < 0.5 ? -1 : 1)));
+          q.p = prev[pi].id;
+          GEDGES.push([q.p, q.id]);
+          if (ai !== pi && rnd() < 0.6) GEDGES.push([prev[ai].id, q.id]);
+        }
+        NODES.push(q);
+      }
+    });
+    const pathTo = id => {
+      const p = [];
+      for (let q = NODES[id]; q; q = q.p === undefined ? null : NODES[q.p]) p.unshift(q.id);
+      return p;
+    };
+    const BAD = pathTo(NODES.find(q => q.L === 5 && q.j === 1).id),
+      WIT = pathTo(NODES.find(q => q.L === 6 && q.j === 4).id);
+    let g = `<defs><marker id="fvP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 400, "SPEC"],
+      [400, 860, "MODEL"],
+      [860, 1340, "CHECK"],
+      [1340, 1800, "TEST"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="fvLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 64}"/>`;
+    });
+    g += `<rect class="fv-card" x="16" y="80" width="368" height="520" rx="16"/><text class="fv-t" x="38" y="116">SPEC.MD · WORK EXPIRY</text>`;
+    REQ.forEach(([id, a, b], i) => {
+      const y = 170 + i * 104;
+      g += `<g class="fv-req${i === 3 ? " fv-new" : ""}" id="fvR${i}"><rect x="28" y="${y - 34}" width="344" height="90" rx="10"/><text class="fv-id" x="44" y="${y}">${id}</text>`;
+      if (i === 3) g += `<text class="fv-tag" x="44" y="${y + 32}">NEW</text>`;
+      g += `<text class="fv-rq" x="96" y="${y}">${esc(a).replace(/\b(MUST|MAY)\b/, '<tspan class="m">$1</tspan>')}</text><text class="fv-rq" x="96" y="${y + 32}">${esc(b)}</text></g>`;
+    });
+    g += `<rect class="fv-card" x="416" y="80" width="428" height="520" rx="16"/><text class="fv-t" x="438" y="116">EXPIRY.TLA</text>`;
+    CODE.forEach((line, i) => {
+      const y = 160 + i * 29;
+      g += `<g class="fv-code" id="fvL${i}"><rect x="426" y="${y - 21}" width="408" height="28" rx="5"/><text x="440" y="${y}">${hl(line)}</text></g>`;
+    });
+    g += `<text class="fv-count" id="fvCount" x="1100" y="100"></text><text class="fv-stat" id="fvStat" x="1100" y="594"></text>`;
+    for (const [a, b] of GEDGES) g += `<line class="fv-e" id="fvE${a}_${b}" x1="${NODES[a].x}" y1="${NODES[a].y}" x2="${NODES[b].x}" y2="${NODES[b].y}"/>`;
+    for (const q of NODES) g += `<circle class="fv-n" id="fvN${q.id}" cx="${q.x}" cy="${q.y}" r="9"/>`;
+    g += `<circle class="fm-dot fv-dot" r="8" fill="#79c0ff"/>`;
+    const card = (id, k, y, hgt, head, lines) =>
+      `<g class="fv-res ${k}" id="${id}"><rect class="fv-card" x="1360" y="${y}" width="424" height="${hgt}" rx="16"/><text class="fv-rh" x="1382" y="${y + 36}">${esc(head)}</text>${lines.map(([cls, txt, dy]) => `<text class="${cls}" x="1382" y="${y + dy}">${esc(txt)}</text>`).join("")}</g>`;
+    g += card("fvA", "g", 80, 150, "TLC · INVARIANTS HOLD", [
+      ["fv-rt", "✓ Expiry  ✓ LiveGrant  ✓ Watermark", 80],
+      ["fv-rs", "12,480 states · no counterexample", 118],
+    ]);
+    g += card("fvB", "r", 246, 150, 'MUTANT · Broken = "grant"', [
+      ["fv-rt", "✗ LiveGrant fails, as it must", 80],
+      ["fv-rs", "negative control: the check bites", 118],
+    ]);
+    g += card("fvC", "b", 412, 188, "WITNESS → CONFORMANCE TEST", [
+      ["fv-tr", "Grant → Start → Tick →", 74],
+      ["fv-tr", "Checkpoint → Tick → Expire", 102],
+    ]);
+    [
+      ["fvGo", 1382, "Go engine"],
+      ["fvJs", 1582, "JS engine"],
+    ].forEach(([id, x, t]) => {
+      g += `<g class="fv-chip" id="${id}"><rect x="${x}" y="542" width="184" height="40" rx="20"/><text x="${x + 92}" y="569">${t} ✓</text></g>`;
+    });
+    g += `<path class="fm-wire p" id="fvBack" d="M1572 600 V636 H200 V608" marker-end="url(#fvP)"/><text class="mra-l" x="886" y="668" text-anchor="middle">a surprising trace changes the spec first · then the model · then the code</text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg fv-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".fv-dot"),
+      nEl = NODES.map(q => $("fvN" + q.id)),
+      eEl = GEDGES.map(([a, b]) => $(`fvE${a}_${b}`)),
+      lEl = CODE.map((_, i) => $("fvL" + i)),
+      rEl = REQ.map((_, i) => $("fvR" + i)),
+      laneEl = [0, 1, 2, 3].map(i => $("fvLane" + i)),
+      count = $("fvCount"),
+      stat = $("fvStat"),
+      broken = $("fvBroken");
+    const onPath = (path, a, b) => {
+      const i = path.indexOf(a);
+      return i >= 0 && path[i + 1] === b;
+    };
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // phase starts (ms into the cycle)
+    const T = { model: 600, check: 2600, mutant: 6000, witness: 9400, back: 13200 },
+      EXPLORE = 2600,
+      FOUND = 1300,
+      SEEK = 800,
+      WSTEP = 300,
+      CYC = 16200;
+    let t0 = 0,
+      cyc = -1,
+      fired = new Set(),
+      shown = 0,
+      lastCount = "",
+      lastStat = "";
+    const once = k => !fired.has(k) && fired.add(k);
+    const setText = (el, s, cls, prev) => {
+      if (s === prev) return prev;
+      el.textContent = s;
+      el.setAttribute("class", el.id === "fvStat" ? "fv-stat " + cls : "fv-count");
+      return s;
+    };
+    slides.push({
+      group: "loops",
+      sound: "formal",
+      palette: ["#1f6feb", "#8957e5", "#238636", "#bf3989"],
+      notes:
+        "Spec, model, test: formal methods as the backbone of spec-driven development. Illustrative: the spec, TLA+ model, state counts and traces shown here are synthetic, modelled on how gh-aw's work queue is specified. Write the requirement in the spec first, then encode it as TLA+ invariants. The TLC model checker explores every reachable state of a small bounded model. Every configuration has an expected verdict: correct models must exhaust with no counterexample, deliberately broken mutants must fail with their exact named violation, and witness properties are negated on purpose so TLC prints a trace that reaches an interesting state. Those traces become fixtures replayed against the real Go and JavaScript engines as conformance tests. When a trace surprises you, change the spec first, then the model, then the code. Bounded checks are strong evidence, not a proof.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          fired = new Set();
+          shown = 0;
+          lastCount = lastStat = "";
+          count.textContent = stat.textContent = "";
+        }
+        const ph = u < T.check ? 0 : u < T.mutant ? 1 : u < T.witness ? 2 : 3,
+          d1 = u - T.check,
+          d2 = u - T.mutant,
+          d3 = u - T.witness,
+          passed = ph === 1 && d1 >= EXPLORE + 200,
+          found = ph === 2 && d2 >= FOUND,
+          wk = ph === 3 ? Math.floor((d3 - SEEK) / WSTEP) : -1;
+        // nodes: breadth-first reveal, then the counterexample or the witness path
+        let vis = 0;
+        NODES.forEach((q, i) => {
+          const on = ph === 1 ? d1 >= q.L * 300 + q.j * 40 : ph === 2 ? q.L <= 5 && d2 >= q.L * 170 + q.j * 25 : ph === 3 ? d3 >= q.L * 60 : false,
+            wi = WIT.indexOf(q.id);
+          vis += on;
+          const el = nEl[i];
+          el.classList.toggle("on", on);
+          el.classList.toggle("ok", passed && on);
+          el.classList.toggle("bad", found && BAD.includes(q.id));
+          el.classList.toggle("wit", wi >= 0 && wk >= wi);
+        });
+        GEDGES.forEach(([a, b], i) => {
+          const el = eEl[i];
+          el.classList.toggle("on", nEl[b].classList.contains("on"));
+          el.classList.toggle("bad", found && onPath(BAD, a, b));
+          el.classList.toggle("wit", onPath(WIT, a, b) && wk >= WIT.indexOf(b) - 1);
+        });
+        if ((ph === 1 || ph === 2) && vis > shown) sfx.route(2);
+        shown = vis;
+        // code and spec highlights
+        lEl.forEach((el, i) => {
+          el.classList.toggle("on", u >= T.model + i * 120);
+          el.classList.toggle("ok", passed && INV_LINES.includes(i));
+          el.classList.toggle("bad", (ph === 2 && i === 1) || (found && BAD_LINES.includes(i)));
+          el.classList.toggle("wit", ph === 3 && WIT_LINES.includes(i));
+          if (u >= T.model + i * 120 && once("l" + i)) sfx.key(0.7);
+        });
+        broken.textContent = ph === 2 ? '"grant"' : '"none"';
+        rEl.forEach((el, i) => {
+          el.classList.toggle("on", i < 3 ? u >= 200 : u >= T.back + 600);
+          el.classList.toggle("ok", passed && i < 3);
+          el.classList.toggle("bad", found && i === 1);
+        });
+        laneEl.forEach((el, i) => el.classList.toggle("on", u >= [0, T.model, T.check, T.check + EXPLORE][i]));
+        // counters, verdicts and generated tests
+        if (ph === 1) {
+          const f = Math.min(1, d1 / EXPLORE);
+          lastCount = setText(count, `${Math.round(12480 * f * f).toLocaleString("en-US")} distinct states · depth ${Math.min(8, 1 + Math.floor(f * 8))}`, "", lastCount);
+          lastStat = setText(stat, passed ? "✓ 3 invariants hold" : "exploring every state…", passed ? "ok" : "", lastStat);
+        } else if (ph === 2) {
+          const f = Math.min(1, d2 / FOUND);
+          lastCount = setText(count, `${Math.round(3906 * f).toLocaleString("en-US")} distinct states · depth ${Math.min(6, 1 + Math.floor(f * 6))}`, "", lastCount);
+          lastStat = setText(stat, found ? "✗ LiveGrant violated · 5 steps" : 're-checking Broken = "grant"…', found ? "bad" : "", lastStat);
+        } else if (ph === 3) {
+          lastCount = setText(count, d3 < SEEK ? "negating Seen…" : "6 steps · 1 trace", "", lastCount);
+          lastStat = setText(stat, d3 < SEEK + 6 * WSTEP ? "→ looking for a witness…" : "→ Seen reached · trace saved", d3 < SEEK ? "" : "wit", lastStat);
+        }
+        $("fvA").classList.toggle("on", u >= T.check + EXPLORE + 200);
+        $("fvB").classList.toggle("on", u >= T.mutant + FOUND + 700);
+        $("fvC").classList.toggle("on", u >= T.witness + SEEK + 6 * WSTEP + 200);
+        $("fvGo").classList.toggle("on", u >= T.witness + SEEK + 6 * WSTEP + 900);
+        $("fvJs").classList.toggle("on", u >= T.witness + SEEK + 6 * WSTEP + 1300);
+        $("fvBack").classList.toggle("hot", u >= T.back);
+        if (passed && once("ok")) sfx.compile();
+        if (found && once("bad")) sfx.bug();
+        if (u >= T.mutant + FOUND + 700 && once("B")) sfx.pop(2);
+        if (wk >= 0 && wk < 6 && once("w" + wk)) sfx.pop(wk);
+        if (u >= T.witness + SEEK + 6 * WSTEP + 200 && once("C")) sfx.notify(false);
+        if (u >= T.witness + SEEK + 6 * WSTEP + 900 && once("go")) sfx.pop(5);
+        if (u >= T.witness + SEEK + 6 * WSTEP + 1300 && once("js")) sfx.pop(6);
+        if (u >= T.back + 600 && once("back")) sfx.review();
+        // the witness trace walks its path
+        if (ph === 3 && wk >= 0 && wk < WIT.length - 1) {
+          const a = NODES[WIT[wk]],
+            b = NODES[WIT[wk + 1]],
+            f = ease(((d3 - SEEK) % WSTEP) / WSTEP);
+          dot.style.opacity = 1;
+          dot.setAttribute("cx", a.x + (b.x - a.x) * f);
+          dot.setAttribute("cy", a.y + (b.y - a.y) * f);
+        } else dot.style.opacity = 0;
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Formal methods turn the spec into tests"), h("h2", {}, letters("Spec · Model · "), letters("Test", "l-grad"))), svg),
     });
   }
 
@@ -8508,6 +8813,13 @@
           tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
         });
       },
+      // spec → model → test: a rising run of explored states, a counterexample's buzz, then the trace resolving into a test
+      formal: t => {
+        [0, 2, 4, 7, 9, 12, 14, 16].forEach((d, i) => osc("sine", hz(72 + d), t + 0.2 + i * 0.06, 0.06, 0.016));
+        [52, 53].forEach(m => tone(m, t + 0.8, { type: "square", dur: 0.2, vol: 0.04, cutoff: 900, detune: 20 }));
+        [67, 71, 74].forEach((m, i) => tone(m, t + 1.1 + i * 0.11, { type: "triangle", dur: 0.2, vol: 0.055, cutoff: 2600, detune: 3 }));
+        bell(79, t + 1.5, 0.04, 1.3);
+      },
       // go fan: a cheerful gopher hop, page-flips through the release notes, then a bright "new version" chime
       gofan: t => {
         [67, 72, 76].forEach((m, i) => tone(m, t + 0.2 + i * 0.13, { type: "square", dur: 0.1, vol: 0.04, cutoff: 2200, detune: 4 }));
@@ -8897,6 +9209,8 @@
           });
       })(),
       // compile: a short whir rising into a two-bell success chime
+      // model checker counterexample: a short dissonant buzz
+      bug: () => cue(t => [52, 53].forEach(m => tone(m, t, { type: "square", dur: 0.22, vol: 0.04, cutoff: 900, detune: 20 }))),
       compile: () =>
         cue(t => {
           osc("sawtooth", 80, t, 0.4, 0.035, { f1: 640 });
