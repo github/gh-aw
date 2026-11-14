@@ -5837,6 +5837,7 @@
     };
     const cut = () => {
       if (!ac) return;
+      cueSince = ac.currentTime;
       const old = out,
         t = ac.currentTime;
       old.gain.cancelScheduledValues(t);
@@ -5901,7 +5902,7 @@
         pan.connect(out);
       } else g.connect(out);
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.18, t + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.115, t + 0.18);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
       src.start(t, Math.random() * 0.4);
       src.stop(t + 0.55);
@@ -5913,7 +5914,7 @@
       o.frequency.exponentialRampToValueAtTime(dir > 0 ? 42 : 80, t + 0.5);
       o.connect(og);
       og.connect(out);
-      env(og, t + 0.12, 0.02, 0.35, 0.4);
+      env(og, t + 0.12, 0.02, 0.224, 0.4);
       o.start(t + 0.1);
       o.stop(t + 0.6);
     };
@@ -6254,6 +6255,14 @@
       if (muted || !init()) return;
       fn(ac.currentTime + 0.01);
     };
+    // In-slide event sounds (pops, keys, pings) only play while the slide is fresh, so looping
+    // animations don't repeat their melody forever. Entering a slide or stepping restarts the window.
+    const CUE_WINDOW = 15;
+    let cueSince = 0;
+    const cue = fn => {
+      if (ac && ac.currentTime - cueSince > CUE_WINDOW) return;
+      play(fn);
+    };
     // Berlin techno bed for the post-preview acceleration: 4/4 kick, off-beat hats, acid line, claps, stabs.
     // k in (0..1] sets both tempo (128 → 146 BPM) and how many layers are in.
     const TZ = { k: 0, timer: null, next: 0, i: 0, bus: null, send: null };
@@ -6376,12 +6385,14 @@
     return {
       unlock: init,
       cut,
+      // a presenter step inside a slide restarts the in-slide sound window
+      touch: () => ac && (cueSince = ac.currentTime),
       techno,
       // A soft rising blip for demo steps.
       pop: (() => {
         let lastPop = 0;
         return (n = 0) =>
-          play(t => {
+          cue(t => {
             if (t - lastPop < 0.07) return;
             lastPop = t;
             const f = hz(72 + SCALE[n % 8]);
@@ -6394,7 +6405,7 @@
       key: (() => {
         let last = 0;
         return (vol = 1) =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.025) return;
             last = t;
             click(t, 1800 + Math.random() * 2400, 0.07 * vol, 2);
@@ -6405,7 +6416,7 @@
       review: (() => {
         let last = 0;
         return () =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.3) return;
             last = t;
             osc("triangle", 110, t, 0.18, 0.06, { f1: 55 });
@@ -6417,7 +6428,7 @@
       })(),
       // compile: a short whir rising into a two-bell success chime
       compile: () =>
-        play(t => {
+        cue(t => {
           osc("sawtooth", 80, t, 0.4, 0.035, { f1: 640 });
           bell(79, t + 0.4, 0.05, 1);
           bell(84, t + 0.5, 0.04, 1.2);
@@ -6425,7 +6436,7 @@
       notify: (() => {
         let last = 0;
         return human =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.4) return;
             last = t;
             bell(human ? 88 : 91, t, 0.012, 0.6);
@@ -6437,7 +6448,7 @@
       route: (() => {
         let last = 0;
         return m =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.09) return;
             last = t;
             const f = hz([36, 60, 84][m] + (Math.random() < 0.5 ? 0 : 7));
@@ -6460,13 +6471,13 @@
           },
           // one split-flap tick
           flap: () =>
-            play(t => {
+            cue(t => {
               if (t - lastFlap < 0.04) return;
               lastFlap = t;
               click(t, 2400 + Math.random() * 2000, 0.03, 5);
             }),
           pick: tier =>
-            play(t => {
+            cue(t => {
               const g = grid(t),
                 w = WALK[n++ % WALK.length];
               if (tier === 0) {
@@ -6483,7 +6494,7 @@
             }),
           // measured savings: bells cascading down into a soft A add9 chord and a two-note receipt
           saved: () =>
-            play(t => {
+            cue(t => {
               [93, 90, 88, 85, 81, 78, 76, 73].forEach((m, i) => bell(m, t + 0.05 + i * 0.07, 0.028, 0.9));
               pad([45, 52, 59, 61], t + 0.55, 2.6, 0.03, "triangle", 2000);
               bell(88, t + 0.9, 0.045, 1.4);
@@ -6491,7 +6502,7 @@
             }),
           // a week of runs: one soft mallet note per day, climbing, and a chord when the week is full
           day: i =>
-            play(t => {
+            cue(t => {
               tone([69, 71, 73, 76, 78, 81, 83][i], t, { type: "triangle", dur: 0.25, vol: 0.05, cutoff: 3000, detune: 3 });
               if (i === 6) [81, 85, 88].forEach((m, j) => bell(m, t + 0.12 + j * 0.05, 0.025, 1.6));
             }),
@@ -6627,11 +6638,11 @@
     history.replaceState(null, "", `#${n + 1}`);
   }
   const next = () => {
-      if (slides[cur].onNext?.()) sfx.step(1);
+      if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
       else go(cur + 1);
     },
     prev = () => {
-      if (slides[cur].onPrev?.()) sfx.step(-1);
+      if (slides[cur].onPrev?.()) (sfx.touch(), sfx.step(-1));
       else go(cur - 1);
     };
 
@@ -6639,6 +6650,7 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if ((e.key === "Enter" || e.key === " ") && e.target.closest?.("a, button, input, textarea, select, [contenteditable]")) return;
     if (slides[cur].onKey?.(e)) {
+      sfx.touch();
       e.preventDefault();
       return;
     }
