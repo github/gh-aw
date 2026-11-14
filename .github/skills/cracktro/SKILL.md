@@ -5,7 +5,7 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 # Cracktro talk deck
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fifteen-slide deck with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a sixteen-slide deck with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
@@ -13,7 +13,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fi
 - `docs/public/cracktro/deck.js`: about 200 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
 - `docs/public/cracktro/assets/workflow-run.svg` and `assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer}.jpg`: the only allowed assets, which a test enforces.
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fifteen slide headings, so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of sixteen slide headings, so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -66,7 +66,7 @@ slides.push({
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
 - Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 2, 5, and 7–15 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 2, 5, and 7–16 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop
