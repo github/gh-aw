@@ -95,6 +95,23 @@ slides.push({
 - Speaker notes for slides 3, 4, 7, 9–12, 15–31, 33–35, 37–42, 44–46, 51 and 52 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
+## Refreshing measured data
+
+Each measured process-band slide has a refresh mini skill in `refresh/<slug>.md` (slug = kebab-case slide heading). Each one lists the slide's data constants, the window and snapshot, the exact queries with their baseline values, the update steps (numbers, caption window, notes, and the Exception bullet above), validation, and pitfalls. Some also have a read-only `refresh/<slug>.sh|.mjs` helper that prints JSON. Load only the file for the slide you are refreshing.
+
+| Slide | Refresh skill |
+|---|---|
+| 15 Human Agent Processes | `refresh/human-agent-processes.md` |
+| 16 Pull Request Review² | `refresh/pr-review-squared.md` |
+| 19 Daily Unsloppers | `refresh/daily-unsloppers.md` |
+| 20 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
+| 21 Research · Assign · Observe | `refresh/research-assign-observe.md` |
+| 24 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
+| 26 Spec · Model · Test | `refresh/spec-model-test.md` |
+| 28 Spec-driven testing | `refresh/spec-driven-testing.md` |
+| 29 Docs that heal | `refresh/docs-that-heal.md` |
+| 31 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+
 ## Preview loop
 
 There is no build step. Serve the static folder and open it in the browser canvas:

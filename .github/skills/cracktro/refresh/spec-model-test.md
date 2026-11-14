@@ -7,6 +7,12 @@ description: Recompute the measured data on the cracktro "Spec · Model · Test"
 
 Plan only. Recompute, then edit `docs/public/cracktro/deck.js` per the `cracktro` skill (never read deck.js whole; grep + `view_range`).
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/daily-work-queue-formal-verification.md` | gh-aw | Model checker: daily TLC matrix (FairDAGGitHub, QueueOrdering) | run conclusions and `work-queue-formal-*/result.json` artifacts |
+
 ## 1. Slide
 
 - Heading: `Spec · Model · Test` (process band).

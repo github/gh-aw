@@ -7,6 +7,13 @@ description: Recompute the measured data on the cracktro "Daily Unsloppers" slid
 
 Load `.github/skills/cracktro/SKILL.md` first. Never read `docs/public/cracktro/deck.js` whole; use `grep -n` plus `view_range`.
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/duplicate-code-detector.md` | gh-aw | Detector: files duplicate-code issues | `[duplicate-code]` issues by github-actions |
+| Copilot coding agent (not a workflow) | gh-aw | Fixer: assigned the issues | Copilot assignment (timeline event or current assignee) and merged closing PRs |
+
 ## 1. Slide
 
 - Marker: `grep -n "// Daily Unsloppers (research" docs/public/cracktro/deck.js`. Group `process`, CSS prefix `du-` (styles: `grep -n "\.du-" deck.js`).

@@ -7,6 +7,18 @@ description: Recompute the measured data on the cracktro "Merge fast, unslop dai
 
 Plan for recomputing this slide's measured data. Load `.github/skills/cracktro/SKILL.md` first. Never read `deck.js` whole: grep, then `view_range`.
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/jsweep.md` | gh-aw | Unslopper | merged `[jsweep]` PRs |
+| `.github/workflows/dead-code-remover.md` | gh-aw | Unslopper | merged `[dead-code]` PRs |
+| `.github/workflows/code-simplifier.md` | gh-aw | Unslopper | merged `[code-simplifier]` PRs |
+| `.github/workflows/tidy.md` | gh-aw | Unslopper | merged `[tidy]` PRs |
+| `.github/workflows/daily-file-diet.md` | gh-aw | Unslopper | merged `[file-diet]` PRs |
+| `.github/workflows/duplicate-code-detector.md` | gh-aw | Unslopper | merged `[duplicate-code]` PRs |
+| Copilot coding agent (not a workflow) | gh-aw | Author of many merged PRs | all merged PRs in the 30-day window (rate, size, time to merge) |
+
 ## 1. Slide
 
 - Heading: "Merge fast, unslop daily" (band `process`).

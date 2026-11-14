@@ -7,6 +7,14 @@ description: Recompute the measured data on the cracktro "Research · Assign · 
 
 Load `.github/skills/cracktro/SKILL.md` first. Never read `deck.js` whole; use `grep -n` plus `view_range`.
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/daily-cli-performance.md` | gh-aw | Researcher: benchmarks the CLI daily and files regressions | `[performance] Regression in` issues (label `cookie`); `benchmark_history.jsonl` on repo-memory branch `memory/cli-performance` |
+| `.github/workflows/issue-monster.md` | gh-aw | Assigner: picks issues for Copilot | `Issue Monster selected this for Copilot` comments |
+| Copilot coding agent (not a workflow) | gh-aw | Fixer | Copilot assignment events and merged closing PRs |
+
 ## 1. Slide
 
 - File: `docs/public/cracktro/deck.js`. Marker: `// Research → Assign → Observe: production telemetry`.

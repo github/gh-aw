@@ -7,6 +7,13 @@ description: Recompute the measured data on the cracktro "Explore · Reuse · Li
 
 Recompute → compare with the baseline → edit constants → validate. Never read `deck.js` whole.
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/sergo.md` | gh-aw | Explorer: daily Go static analysis with a strategy cache | repo-memory branch `memory/sergo` (`sergo-stats.json`, `sergo-strategies.jsonl`); issues and PRs labelled `sergo` |
+| Copilot coding agent (not a workflow) | gh-aw | Fixer | merged PRs closing `sergo` issues |
+
 ## 1. Slide
 
 - Heading `Explore · Reuse · Lint` (process band). Find it with `grep -n "// Explore → Reuse → Lint" docs/public/cracktro/deck.js`.

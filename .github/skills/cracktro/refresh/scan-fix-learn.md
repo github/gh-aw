@@ -7,6 +7,15 @@ description: Recompute the measured data on the cracktro "Scan · Fix · Learn" 
 
 Plan to recompute the slide's measured panel. Follow `.github/skills/cracktro/SKILL.md`: never read `deck.js` whole; grep the marker, then `view_range`.
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/ci-failure-scan.md` | .NET runtime | Scanner (every 12 h) | `[ci-scan]` issues, Known Build Error label |
+| `.github/workflows/ci-failure-fix.md` | .NET runtime | Fixer (weekdays) | `[ci-fix]` PRs |
+| `.github/workflows/ci-failure-scan-feedback.md` | .NET runtime | Learner (bi-weekly): edits the scanner prompt | merged `[ci-scan-feedback]` PRs; KPI tracker issue |
+| Copilot coding agent (not a workflow) | .NET runtime | Author of some prompt-edit PRs | `[ci-scan-feedback]` PRs authored by Copilot |
+
 ## 1. Slide
 
 - Heading: `Scan · Fix · Learn` (process band). Kicker: "Continuous CI health · as built by the .NET runtime team".

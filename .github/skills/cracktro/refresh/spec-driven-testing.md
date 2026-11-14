@@ -7,6 +7,16 @@ description: Recompute the measured data on the cracktro "Spec-driven testing" s
 
 Plan only. Follow `.github/skills/cracktro/SKILL.md` (grep markers, never read deck.js whole).
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/spec-extractor.md` | gh-aw | Writes package specs | `[spec-extractor]` PRs |
+| `.github/workflows/spec-enforcer.md` | gh-aw | Adds spec tests | `[spec-enforcer]` PRs; `TestSpec_` count on main |
+| `.github/workflows/spec-librarian.md` | gh-aw | Audits specs | `[spec-librarian]` issues |
+| `.github/workflows/weekly-safe-outputs-spec-review.md` | gh-aw | Reviews the safe-outputs spec | `[spec-review]` PRs |
+| Copilot coding agent (not a workflow) | gh-aw | Fixer for librarian audits | PRs on head branches `copilot/spec-librarian*` |
+
 ## 1. Slide
 
 - Heading: "Spec-driven testing" (kicker: humans state intent, agents write the RFC spec…).
@@ -34,7 +44,7 @@ Plan only. Follow `.github/skills/cracktro/SKILL.md` (grep markers, never read d
 ## 3. Sources
 
 - Repo: gh-aw (public).
-- Workflows (`.github/workflows/`): `spec-extractor.md`, `spec-enforcer.md`, `spec-librarian.md`, `safe-outputs-spec-review` (title prefix `[spec-review]`).
+- Workflows (`.github/workflows/`): `spec-extractor.md`, `spec-enforcer.md`, `spec-librarian.md`, `weekly-safe-outputs-spec-review.md` (title prefix `[spec-review]`).
 - Copilot fix PRs for librarian audits: head branches `copilot/spec-librarian*`.
 - Spec tests: `func TestSpec_` in `pkg/**/spec_test.go` on `origin/main`.
 

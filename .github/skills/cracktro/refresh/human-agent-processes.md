@@ -7,6 +7,15 @@ description: Recompute the measured data on the cracktro "Human Agent Processes"
 
 Plan for recomputing the MEASURED column. Run from the repository root. Read `../SKILL.md` first (preview loop, content rules). Never read `deck.js` whole.
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/auto-triage-issues.md` | gh-aw | IssueOps: triages new issues | successful runs on `issues` events |
+| `.github/workflows/daily-cli-tools-tester.md` | gh-aw | DailyOps: daily tester | `[cli-tools-test]` issues, split by state_reason |
+| `.github/workflows/pr-code-quality-reviewer.md` | gh-aw | ReviewOps: reviews ready PRs | distinct head branches of successful `pull_request` runs |
+| `.github/workflows/changeset.md` | gh-aw | LabelOps: runs on label | distinct head branches of successful `pull_request` (labeled) runs |
+
 ## 1. Slide
 
 - Heading: `Human Agent Processes`. Kicker: `Patterns · measured on gh-aw`. Group: `process`.

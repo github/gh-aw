@@ -7,6 +7,15 @@ description: Recompute the measured data on the cracktro "Docs that heal" slide 
 
 Recompute with `docs-that-heal.mjs`, then patch `deck.js`. Read-only on GitHub; edit only the files listed in step 5.
 
+## Workflows mined
+
+| Workflow file | Repo | Role in the slide's flow | Signal mined |
+|---|---|---|---|
+| `.github/workflows/daily-doc-updater.md` | gh-aw | Updater: edits docs to match code | `[docs]` PRs attributed by `gh-aw-workflow-id` marker or footer |
+| `.github/workflows/unbloat-docs.md` | gh-aw | Unbloater | `[docs]` PRs attributed as above; net lines |
+| `.github/workflows/glossary-maintainer.md` | gh-aw | Glossary | `[docs]` PRs attributed as above |
+| `.github/workflows/daily-doc-healer.md` | gh-aw | Healer: fixes the updater's prompt | `[doc-healer]` issues and `[docs]` PRs; closing PRs that change `daily-doc-updater.md` |
+
 ## 1. Slide
 
 - Heading: **Docs that heal** (`group: "process"`).
