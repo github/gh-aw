@@ -1090,6 +1090,20 @@
   .hist-flag circle { fill: var(--c); stroke: #0d1117; stroke-width: 3; }
   .hist-fl { fill: var(--c); font: 700 22px "Mona Sans"; }
   .hist-fd { fill: #9198a1; font: 500 16px var(--mono); }
+  /* --- how PRs land (measured distributions) --- */
+  .land-panels { position: absolute; left: 110px; top: 290px; width: 1700px; display: flex; gap: 100px; }
+  .land-panel { width: 800px; opacity: 0; }
+  .active .land-panel { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .land-t { font: 600 20px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; }
+  .land-big { display: flex; align-items: baseline; gap: 18px; margin: 12px 0 6px; }
+  .land-big b { font: 700 64px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; }
+  .land-big span { font-size: 22px; color: #c9d1d9; }
+  .land-svg { display: block; width: 800px; height: 470px; overflow: visible; font-family: "Mona Sans"; }
+  .land-med { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 6px; font-size: 19px; color: #c9d1d9; }
+  .land-med-t { width: 100%; font: 600 16px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; }
+  .land-med em { font: 700 19px var(--mono); font-style: normal; color: var(--c); }
+  .land-med span:nth-child(5) em { color: #c3a6f9; }
+  .land-legend.hist-legend { left: 110px; top: 1000px; width: auto; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -6432,224 +6446,6 @@
     });
   }
 
-  // First commit to GA: measured gh-aw history, monthly PRs by opener account and code size, from the first commit to GA at Universe
-  {
-    resetIndex();
-    const NS = "http://www.w3.org/2000/svg";
-    const nf = new Intl.NumberFormat("en-US");
-    // Calendar months Aug 2025 – Oct 2026 (October ends at GA, 28 Oct 2026).
-    const MON = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
-    const PRS = [130, 553, 1249, 1137, 1766, 2402, 2048, 1580, 1987, 2575, 1983, 1889, 2279, 870, 1484];
-    // PR origin by source issue: workflow PRs carry a gh-aw marker; Copilot PRs are split by who wrote the linked issue
-    const PR_AW = [5, 122, 147, 138, 188, 155, 207, 345, 353, 765, 331, 337, 466, 230, 264];
-    const PR_CCA_AW = [0, 0, 112, 323, 528, 588, 414, 345, 704, 878, 331, 951, 1140, 96, 189];
-    const PR_CCA_HUMAN = [21, 10, 48, 31, 31, 65, 161, 256, 289, 210, 71, 181, 201, 168, 233];
-    const PR_CCA_NONE = [7, 320, 848, 564, 962, 1439, 899, 495, 462, 602, 1114, 349, 375, 292, 125];
-    const ISSUES = [128, 253, 374, 644, 783, 1342, 2784, 1970, 2392, 2805, 3267, 3815, 4590, 5384, 5914];
-    const COMMITS = [199, 435, 1209, 1016, 1372, 1835, 1727, 1272, 1568, 1838, 1649, 1459, 1810, 638, 1251];
-    const RELEASES = [14, 25, 44, 20, 21, 47, 97, 52, 26, 30, 34, 22, 23, 34, 36];
-    const GO = [45343, 83895, 167218, 229698, 308671, 384658, 418714, 478675, 551585, 635605, 694490, 774553, 865285, 911402, 1114264];
-    const JS = [4964, 18340, 31187, 56842, 60565, 90464, 125903, 153134, 188628, 242988, 283948, 326296, 372962, 397896, 571579];
-    const LOC = GO.map((g, i) => g + JS[i]);
-    const N = MON.length;
-    const mStart = i => Date.UTC(2025, 7 + i, 1);
-    const DAY = 864e5,
-      T0 = Date.UTC(2025, 7, 12),
-      TGA = Date.UTC(2026, 9, 28);
-    const at = d => {
-      const i = Math.min(N - 1, Math.floor((new Date(d).getUTCFullYear() - 2025) * 12 + new Date(d).getUTCMonth() - 7));
-      return i + (d - mStart(i)) / (mStart(i + 1) - mStart(i));
-    };
-    const P0 = at(T0),
-      PEND = at(TGA + DAY);
-    const MILES = [
-      [T0, "first commit", "12 Aug 2025", "#9198a1"],
-      [Date.UTC(2026, 1, 13), "technical preview", "13 Feb 2026", "#4493f8"],
-      [Date.UTC(2026, 5, 11), "public preview", "11 Jun 2026", "#ab7df8"],
-      [TGA, "GA · Universe", "28 Oct 2026", "#3fb950"],
-    ];
-    // chart frame
-    const CX = 70,
-      SLOT = 66,
-      BW = 40,
-      BASE = 600,
-      TOP = 90,
-      PMAX = 2600,
-      LMAX = 1800000;
-    const xs = p => CX + p * SLOT;
-    const yP = v => BASE - ((BASE - TOP) * v) / PMAX;
-    const yL = v => BASE - ((BASE - TOP) * v) / LMAX;
-    const svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("class", "hist-svg");
-    svg.setAttribute("viewBox", "0 0 1150 700");
-    svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "Measured gh-aw history: pull requests opened per month split by origin: workflow PRs, Copilot coding agent PRs from a workflow-written issue, from a human-written issue or with no linked issue, and other PRs, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026");
-    let grid = "";
-    for (const v of [0, 500, 1000, 1500, 2000, 2500]) grid += `<line x1="${CX - 10}" x2="${xs(N) + 6}" y1="${yP(v)}" y2="${yP(v)}" class="hist-grid"/><text x="${CX - 16}" y="${yP(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
-    for (const v of [500000, 1000000, 1500000]) grid += `<text x="${xs(N) + 14}" y="${yL(v) + 6}" class="hist-ax hist-ax-l">${v / 1e6}M</text>`;
-    let months = "";
-    MON.forEach((m, i) => {
-      months += `<text x="${xs(i + 0.5)}" y="${BASE + 30}" class="hist-ax" text-anchor="middle">${m}</text>`;
-      if (i === 0 || i === 5) months += `<text x="${xs(i + 0.5)}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">${i ? 2026 : 2025}</text>`;
-    });
-    let flags = "";
-    MILES.forEach(([d, label, date, c], k) => {
-      const x = xs(at(d)),
-        end = k === MILES.length - 1,
-        ly = k % 2 ? 26 : 62;
-      flags += `<g class="hist-flag" data-k="${k}" style="--c:${c}"><line x1="${x}" x2="${x}" y1="${ly + 14}" y2="${BASE}"/><circle cx="${x}" cy="${BASE}" r="7"/><text x="${x + (end ? 10 : -6)}" y="${ly - 18}" text-anchor="${end ? "end" : "start"}" class="hist-fl">${label}</text><text x="${x + (end ? 10 : -6)}" y="${ly + 4}" text-anchor="${end ? "end" : "start"}" class="hist-fd">${date}</text></g>`;
-    });
-    svg.innerHTML = `
-      <g>${grid}</g>
-      <g class="hist-bars"></g>
-      <path class="hist-loc" d=""/>
-      <circle class="hist-loc-dot" r="8" cx="${CX}" cy="${BASE}"/>
-      <line class="hist-axis" x1="${CX - 10}" x2="${xs(N) + 6}" y1="${BASE}" y2="${BASE}"/>
-      <g>${months}</g>
-      <g>${flags}</g>
-      <line class="hist-head" x1="${CX}" x2="${CX}" y1="${TOP - 10}" y2="${BASE}"/>`;
-    const barsG = svg.querySelector(".hist-bars");
-    const bars = MON.map((_, i) => {
-      const seg = ["hist-b-bot", "hist-b-copilot", "hist-b-human", "hist-b-none", "hist-b-other"].map(cls => {
-        const r = document.createElementNS(NS, "rect");
-        r.setAttribute("class", cls);
-        r.setAttribute("x", xs(i + 0.5) - BW / 2);
-        r.setAttribute("width", BW);
-        r.setAttribute("rx", 3);
-        barsG.append(r);
-        return r;
-      });
-      return seg;
-    });
-    const locPath = svg.querySelector(".hist-loc"),
-      locDot = svg.querySelector(".hist-loc-dot"),
-      head = svg.querySelector(".hist-head"),
-      flagEls = [...svg.querySelectorAll(".hist-flag")];
-    // share of month i elapsed at playhead p; data spans 12 Aug 2025 to 28 Oct 2026, so the first and last months are partial
-    const fr = (i, p) => {
-      const a = i ? i : P0,
-        b = i === N - 1 ? PEND : i + 1;
-      return Math.max(0, Math.min(1, (p - a) / (b - a)));
-    };
-    const cum = (arr, p) => arr.reduce((s, v, i) => s + v * fr(i, p), 0);
-    const snap = (arr, p) => {
-      const i = Math.min(N - 1, Math.floor(p));
-      return (i ? arr[i - 1] : 0) + (arr[i] - (i ? arr[i - 1] : 0)) * fr(i, p);
-    };
-    const dayAt = p => {
-      const i = Math.min(N - 1, Math.floor(p)),
-        f = Math.min(1, p - i);
-      return Math.max(0, Math.min(TGA, mStart(i) + f * (mStart(i + 1) - mStart(i))) - T0) / DAY;
-    };
-    const TILES = [
-      ["days", p => Math.round(dayAt(p)), "#9198a1", "12 Aug 2025 → 28 Oct 2026"],
-      ["commits", p => cum(COMMITS, p), "#f0f6fc", "on main, all authors"],
-      ["pull requests", p => cum(PRS, p), "#ab7df8", "18,123 merged"],
-      ["issues", p => cum(ISSUES, p), "#4493f8", "33,441 by the workflow bot"],
-      ["releases", p => cum(RELEASES, p), "#3fb950", "v0.0.21 → v1.0.0"],
-      ["lines of Go + JS", p => snap(LOC, p), "#d29922", "incl. tests, at month end"],
-    ];
-    const tileVals = TILES.map(() => h("b", {}, "0"));
-    const fmt = (k, v) => (k === 5 ? (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : `${Math.round(v / 1000)}k`) : nf.format(Math.round(v)));
-    const split = (title, parts) =>
-      h(
-        "div",
-        { class: "hist-split" },
-        h("div", { class: "hist-split-t" }, title),
-        h("div", { class: "hist-split-bar" }, parts.map(([w, c]) => h("i", { style: { width: `${w}%`, background: c } }))),
-        h("div", { class: "hist-split-l" }, parts.map(([w, c, l]) => h("span", { "--c": c }, h("em", {}, `${w}%`), ` ${l}`)))
-      );
-    let p = P0,
-      t0 = 0,
-      lastMonth = -1,
-      lastFlag = -1;
-    const DUR = 9000;
-    const render = () => {
-      const pts = [];
-      for (let i = 0; i < N; i++) {
-        const g = Math.min(1, fr(i, p) * 1.4);
-        const vals = [PR_AW[i], PR_CCA_AW[i], PR_CCA_HUMAN[i], PR_CCA_NONE[i], PRS[i] - PR_AW[i] - PR_CCA_AW[i] - PR_CCA_HUMAN[i] - PR_CCA_NONE[i]];
-        let acc = 0;
-        bars[i].forEach((r, j) => {
-          const hgt = (BASE - yP(vals[j])) * g;
-          r.setAttribute("y", yP(0) - acc - hgt);
-          r.setAttribute("height", Math.max(0, hgt));
-          acc += hgt;
-        });
-        if (p >= i + 1 || i === N - 1) pts.push([xs(i + 1), yL(LOC[i])]);
-      }
-      const cur = [xs(Math.min(p, PEND)), yL(snap(LOC, p))];
-      const line = [[xs(P0), yL(0)], ...pts.filter(([x]) => x < cur[0]), cur];
-      locPath.setAttribute("d", "M" + line.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L"));
-      locDot.setAttribute("cx", cur[0]);
-      locDot.setAttribute("cy", cur[1]);
-      head.setAttribute("x1", cur[0]);
-      head.setAttribute("x2", cur[0]);
-      flagEls.forEach((f, k) => f.classList.toggle("on", p >= at(MILES[k][0]) - 0.02));
-      TILES.forEach(([, fn], k) => (tileVals[k].textContent = fmt(k, fn(p))));
-    };
-    slides.push({
-      group: "scale",
-      sound: "history",
-      palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
-      notes:
-        "Not illustrative: these are measured figures from gh-aw's own public history, from the first commit on 12 August 2025 to general availability at GitHub Universe on 28 October 2026 (v1.0.0 was tagged two days earlier). Commits, release tags and lines of Go and JavaScript (including tests, excluding docs) come from git on main as of the end of 28 October, Pacific time. Pull requests and issues come from GitHub search by creation date; October is a partial month. Bars split pull requests by where they started. Workflow PRs (4,053) are opened by the github-actions bot with a gh-aw workflow marker. Copilot coding agent PRs (17,509) are traced to their source issue through the agent's issue reference, closing links or a closing keyword: 6,599 came from an issue written by an agentic workflow (bot author plus workflow marker), 1,976 from an issue written by a person, 8,853 had no linked issue, and 81 had mixed or other sources. Of the Copilot PRs with an attributed source issue, 77 percent started from a workflow-written issue. Merge rates: 74 percent from workflow issues, 82 percent from human issues. Other PRs (2,451) include people, Dependabot, unmarked bot PRs and the mixed cases. Account type and issue provenance are not proof of who started a session, or of AI use.",
-      enter() {
-        t0 = 0;
-        lastMonth = lastFlag = -1;
-        p = matchMedia("(prefers-reduced-motion: reduce)").matches ? PEND : P0;
-        render();
-      },
-      tick(t) {
-        if (p >= PEND) return;
-        if (!t0) t0 = t;
-        const u = Math.min(1, (t - t0) / DUR);
-        p = P0 + (PEND - P0) * (1 - (1 - u) ** 1.6);
-        const m = Math.floor(p);
-        if (m !== lastMonth && m < N) sfx.pop((lastMonth = m));
-        const f = MILES.reduce((k, mi, j) => (p >= at(mi[0]) ? j : k), -1);
-        if (f > lastFlag) {
-          lastFlag = f;
-          if (f > 0) sfx.notify();
-        }
-        render();
-      },
-      el: h(
-        "section",
-        { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · gh-aw on GitHub"), h("h2", {}, letters("First commit "), letters("to GA", "l-grad"))),
-        h(
-          "div",
-          { class: "hist-tiles" },
-          TILES.map(([label, , c, sub], k) => h("div", { class: "hist-tile", "--c": c, "--i": k }, tileVals[k], h("span", {}, label), h("small", {}, sub)))
-        ),
-        h(
-          "div",
-          { class: "hist-splits" },
-          split("Copilot PRs from an issue written by", [
-            [77.0, "#ab7df8", "an agentic workflow"],
-            [23.0, "#db61a2", "a person"],
-          ]),
-          split("Commits authored by", [
-            [84.2, "#ab7df8", "agent & bot accounts"],
-            [15.8, "#4493f8", "people"],
-          ])
-        ),
-        h(
-          "div",
-          { class: "hist-legend" },
-          h("span", { "--c": "#3fb950" }, "workflow PRs"),
-          h("span", { "--c": "#ab7df8" }, "Copilot ← AW issue"),
-          h("span", { "--c": "#db61a2" }, "Copilot ← human issue"),
-          h("span", { "--c": "#ab7df84d" }, "Copilot, no issue"),
-          h("span", { "--c": "#4493f8" }, "other"),
-          h("span", { "--c": "#d29922", class: "ln" }, "lines of code")
-        ),
-        svg
-      ),
-    });
-  }
-
   // Finale: one control repo dispatching work to hundreds of repos, each running a few agentic processes
   {
     resetIndex();
@@ -6922,6 +6718,368 @@
         h("div", { class: "fin-bg" }, h("h1", {}, "G", iDot, "tHub Agentic Workflows"), h("h1", {}, "Build the factory that works for you")),
         cv,
         h("div", { class: "fin-cap" }, "Illustrative  ·  ", h("b", {}, "1"), " control repo  ·  ", h("b", {}, `${repos.length}`), " repos  ·  ", cRuns, " runs")
+      ),
+    });
+  }
+
+  // First commit to GA: measured gh-aw history, monthly PRs by opener account and code size, from the first commit to GA at Universe
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    const nf = new Intl.NumberFormat("en-US");
+    // Calendar months Aug 2025 – Oct 2026 (October ends at GA, 28 Oct 2026).
+    const MON = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
+    const PRS = [130, 553, 1249, 1137, 1766, 2402, 2048, 1580, 1987, 2575, 1983, 1889, 2279, 870, 1484];
+    // PR origin by source issue: workflow PRs carry a gh-aw marker; Copilot PRs are split by who wrote the linked issue
+    const PR_AW = [5, 122, 147, 138, 188, 155, 207, 345, 353, 765, 331, 337, 466, 230, 264];
+    const PR_CCA_AW = [0, 0, 112, 323, 528, 588, 414, 345, 704, 878, 331, 951, 1140, 96, 189];
+    const PR_CCA_HUMAN = [21, 10, 48, 31, 31, 65, 161, 256, 289, 210, 71, 181, 201, 168, 233];
+    const PR_CCA_NONE = [7, 320, 848, 564, 962, 1439, 899, 495, 462, 602, 1114, 349, 375, 292, 125];
+    const ISSUES = [128, 253, 374, 644, 783, 1342, 2784, 1970, 2392, 2805, 3267, 3815, 4590, 5384, 5914];
+    const COMMITS = [199, 435, 1209, 1016, 1372, 1835, 1727, 1272, 1568, 1838, 1649, 1459, 1810, 638, 1251];
+    const RELEASES = [14, 25, 44, 20, 21, 47, 97, 52, 26, 30, 34, 22, 23, 34, 36];
+    const GO = [45343, 83895, 167218, 229698, 308671, 384658, 418714, 478675, 551585, 635605, 694490, 774553, 865285, 911402, 1114264];
+    const JS = [4964, 18340, 31187, 56842, 60565, 90464, 125903, 153134, 188628, 242988, 283948, 326296, 372962, 397896, 571579];
+    const LOC = GO.map((g, i) => g + JS[i]);
+    const N = MON.length;
+    const mStart = i => Date.UTC(2025, 7 + i, 1);
+    const DAY = 864e5,
+      T0 = Date.UTC(2025, 7, 12),
+      TGA = Date.UTC(2026, 9, 28);
+    const at = d => {
+      const i = Math.min(N - 1, Math.floor((new Date(d).getUTCFullYear() - 2025) * 12 + new Date(d).getUTCMonth() - 7));
+      return i + (d - mStart(i)) / (mStart(i + 1) - mStart(i));
+    };
+    const P0 = at(T0),
+      PEND = at(TGA + DAY);
+    const MILES = [
+      [T0, "first commit", "12 Aug 2025", "#9198a1"],
+      [Date.UTC(2026, 1, 13), "technical preview", "13 Feb 2026", "#4493f8"],
+      [Date.UTC(2026, 5, 11), "public preview", "11 Jun 2026", "#ab7df8"],
+      [TGA, "GA · Universe", "28 Oct 2026", "#3fb950"],
+    ];
+    // chart frame
+    const CX = 70,
+      SLOT = 66,
+      BW = 40,
+      BASE = 600,
+      TOP = 90,
+      PMAX = 2600,
+      LMAX = 1800000;
+    const xs = p => CX + p * SLOT;
+    const yP = v => BASE - ((BASE - TOP) * v) / PMAX;
+    const yL = v => BASE - ((BASE - TOP) * v) / LMAX;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "hist-svg");
+    svg.setAttribute("viewBox", "0 0 1150 700");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Measured gh-aw history: pull requests opened per month split by origin: workflow PRs, Copilot coding agent PRs from a workflow-written issue, from a human-written issue or with no linked issue, and other PRs, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026");
+    let grid = "";
+    for (const v of [0, 500, 1000, 1500, 2000, 2500]) grid += `<line x1="${CX - 10}" x2="${xs(N) + 6}" y1="${yP(v)}" y2="${yP(v)}" class="hist-grid"/><text x="${CX - 16}" y="${yP(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
+    for (const v of [500000, 1000000, 1500000]) grid += `<text x="${xs(N) + 14}" y="${yL(v) + 6}" class="hist-ax hist-ax-l">${v / 1e6}M</text>`;
+    let months = "";
+    MON.forEach((m, i) => {
+      months += `<text x="${xs(i + 0.5)}" y="${BASE + 30}" class="hist-ax" text-anchor="middle">${m}</text>`;
+      if (i === 0 || i === 5) months += `<text x="${xs(i + 0.5)}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">${i ? 2026 : 2025}</text>`;
+    });
+    let flags = "";
+    MILES.forEach(([d, label, date, c], k) => {
+      const x = xs(at(d)),
+        end = k === MILES.length - 1,
+        ly = k % 2 ? 26 : 62;
+      flags += `<g class="hist-flag" data-k="${k}" style="--c:${c}"><line x1="${x}" x2="${x}" y1="${ly + 14}" y2="${BASE}"/><circle cx="${x}" cy="${BASE}" r="7"/><text x="${x + (end ? 10 : -6)}" y="${ly - 18}" text-anchor="${end ? "end" : "start"}" class="hist-fl">${label}</text><text x="${x + (end ? 10 : -6)}" y="${ly + 4}" text-anchor="${end ? "end" : "start"}" class="hist-fd">${date}</text></g>`;
+    });
+    svg.innerHTML = `
+      <g>${grid}</g>
+      <g class="hist-bars"></g>
+      <path class="hist-loc" d=""/>
+      <circle class="hist-loc-dot" r="8" cx="${CX}" cy="${BASE}"/>
+      <line class="hist-axis" x1="${CX - 10}" x2="${xs(N) + 6}" y1="${BASE}" y2="${BASE}"/>
+      <g>${months}</g>
+      <g>${flags}</g>
+      <line class="hist-head" x1="${CX}" x2="${CX}" y1="${TOP - 10}" y2="${BASE}"/>`;
+    const barsG = svg.querySelector(".hist-bars");
+    const bars = MON.map((_, i) => {
+      const seg = ["hist-b-bot", "hist-b-copilot", "hist-b-human", "hist-b-none", "hist-b-other"].map(cls => {
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("class", cls);
+        r.setAttribute("x", xs(i + 0.5) - BW / 2);
+        r.setAttribute("width", BW);
+        r.setAttribute("rx", 3);
+        barsG.append(r);
+        return r;
+      });
+      return seg;
+    });
+    const locPath = svg.querySelector(".hist-loc"),
+      locDot = svg.querySelector(".hist-loc-dot"),
+      head = svg.querySelector(".hist-head"),
+      flagEls = [...svg.querySelectorAll(".hist-flag")];
+    // share of month i elapsed at playhead p; data spans 12 Aug 2025 to 28 Oct 2026, so the first and last months are partial
+    const fr = (i, p) => {
+      const a = i ? i : P0,
+        b = i === N - 1 ? PEND : i + 1;
+      return Math.max(0, Math.min(1, (p - a) / (b - a)));
+    };
+    const cum = (arr, p) => arr.reduce((s, v, i) => s + v * fr(i, p), 0);
+    const snap = (arr, p) => {
+      const i = Math.min(N - 1, Math.floor(p));
+      return (i ? arr[i - 1] : 0) + (arr[i] - (i ? arr[i - 1] : 0)) * fr(i, p);
+    };
+    const dayAt = p => {
+      const i = Math.min(N - 1, Math.floor(p)),
+        f = Math.min(1, p - i);
+      return Math.max(0, Math.min(TGA, mStart(i) + f * (mStart(i + 1) - mStart(i))) - T0) / DAY;
+    };
+    const TILES = [
+      ["days", p => Math.round(dayAt(p)), "#9198a1", "12 Aug 2025 → 28 Oct 2026"],
+      ["commits", p => cum(COMMITS, p), "#f0f6fc", "on main, all authors"],
+      ["pull requests", p => cum(PRS, p), "#ab7df8", "18,137 merged"],
+      ["issues", p => cum(ISSUES, p), "#4493f8", "33,441 by the workflow bot"],
+      ["releases", p => cum(RELEASES, p), "#3fb950", "v0.0.21 → v1.0.0"],
+      ["lines of Go + JS", p => snap(LOC, p), "#d29922", "incl. tests, at month end"],
+    ];
+    const tileVals = TILES.map(() => h("b", {}, "0"));
+    const fmt = (k, v) => (k === 5 ? (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : `${Math.round(v / 1000)}k`) : nf.format(Math.round(v)));
+    const split = (title, parts) =>
+      h(
+        "div",
+        { class: "hist-split" },
+        h("div", { class: "hist-split-t" }, title),
+        h("div", { class: "hist-split-bar" }, parts.map(([w, c]) => h("i", { style: { width: `${w}%`, background: c } }))),
+        h("div", { class: "hist-split-l" }, parts.map(([w, c, l]) => h("span", { "--c": c }, h("em", {}, `${w}%`), ` ${l}`)))
+      );
+    let p = P0,
+      t0 = 0,
+      lastMonth = -1,
+      lastFlag = -1;
+    const DUR = 9000;
+    const render = () => {
+      const pts = [];
+      for (let i = 0; i < N; i++) {
+        const g = Math.min(1, fr(i, p) * 1.4);
+        const vals = [PR_AW[i], PR_CCA_AW[i], PR_CCA_HUMAN[i], PR_CCA_NONE[i], PRS[i] - PR_AW[i] - PR_CCA_AW[i] - PR_CCA_HUMAN[i] - PR_CCA_NONE[i]];
+        let acc = 0;
+        bars[i].forEach((r, j) => {
+          const hgt = (BASE - yP(vals[j])) * g;
+          r.setAttribute("y", yP(0) - acc - hgt);
+          r.setAttribute("height", Math.max(0, hgt));
+          acc += hgt;
+        });
+        if (p >= i + 1 || i === N - 1) pts.push([xs(i + 1), yL(LOC[i])]);
+      }
+      const cur = [xs(Math.min(p, PEND)), yL(snap(LOC, p))];
+      const line = [[xs(P0), yL(0)], ...pts.filter(([x]) => x < cur[0]), cur];
+      locPath.setAttribute("d", "M" + line.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L"));
+      locDot.setAttribute("cx", cur[0]);
+      locDot.setAttribute("cy", cur[1]);
+      head.setAttribute("x1", cur[0]);
+      head.setAttribute("x2", cur[0]);
+      flagEls.forEach((f, k) => f.classList.toggle("on", p >= at(MILES[k][0]) - 0.02));
+      TILES.forEach(([, fn], k) => (tileVals[k].textContent = fmt(k, fn(p))));
+    };
+    slides.push({
+      group: "scale",
+      sound: "history",
+      palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
+      notes:
+        "Not illustrative: these are measured figures from gh-aw's own public history, from the first commit on 12 August 2025 to general availability at GitHub Universe on 28 October 2026 (v1.0.0 was tagged two days earlier). Commits, release tags and lines of Go and JavaScript (including tests, excluding docs) come from git on main as of the end of 28 October, Pacific time. Pull requests and issues come from GitHub search by creation date; October is a partial month. Bars split pull requests by where they started. Workflow PRs (4,053) are opened by the github-actions bot with a gh-aw workflow marker. Copilot coding agent PRs (17,509) are traced to their source issue through the agent's issue reference, closing links or a closing keyword: 6,599 came from an issue written by an agentic workflow (bot author plus workflow marker), 1,976 from an issue opened under a person's account, 8,853 had no linked issue, and 81 had mixed or other sources. A person's account does not mean no AI: GitHub records no creating app for issues written through the Copilot app or Copilot CLI, so those count as human here. Of the 1,976, only 74 carry a visible machine signal: 48 trace to issues a workflow filed with a personal token (they carry a workflow marker but a user author, so the rules keep them on the human side), 21 to issues whose text says Copilot drafted them, and 5 to issues GitHub records as created by the Copilot coding agent app. Of the Copilot PRs with an attributed source issue, 77 percent started from a workflow-written issue. Merge rates: 74 percent from workflow issues, 82 percent from human issues. Other PRs (2,451) include people, Dependabot, unmarked bot PRs and the mixed cases. Account type and issue provenance are not proof of who started a session, or of AI use.",
+      enter() {
+        t0 = 0;
+        lastMonth = lastFlag = -1;
+        p = matchMedia("(prefers-reduced-motion: reduce)").matches ? PEND : P0;
+        render();
+      },
+      tick(t) {
+        if (p >= PEND) return;
+        if (!t0) t0 = t;
+        const u = Math.min(1, (t - t0) / DUR);
+        p = P0 + (PEND - P0) * (1 - (1 - u) ** 1.6);
+        const m = Math.floor(p);
+        if (m !== lastMonth && m < N) sfx.pop((lastMonth = m));
+        const f = MILES.reduce((k, mi, j) => (p >= at(mi[0]) ? j : k), -1);
+        if (f > lastFlag) {
+          lastFlag = f;
+          if (f > 0) sfx.notify();
+        }
+        render();
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · gh-aw on GitHub"), h("h2", {}, letters("First commit "), letters("to GA", "l-grad"))),
+        h(
+          "div",
+          { class: "hist-tiles" },
+          TILES.map(([label, , c, sub], k) => h("div", { class: "hist-tile", "--c": c, "--i": k }, tileVals[k], h("span", {}, label), h("small", {}, sub)))
+        ),
+        h(
+          "div",
+          { class: "hist-splits" },
+          split("Copilot PRs from an issue written by", [
+            [77.0, "#ab7df8", "an agentic workflow"],
+            [23.0, "#db61a2", "a person's account"],
+          ]),
+          split("Commits authored by", [
+            [84.2, "#ab7df8", "agent & bot accounts"],
+            [15.8, "#4493f8", "people"],
+          ])
+        ),
+        h(
+          "div",
+          { class: "hist-legend" },
+          h("span", { "--c": "#3fb950" }, "workflow PRs"),
+          h("span", { "--c": "#ab7df8" }, "Copilot ← AW issue"),
+          h("span", { "--c": "#db61a2" }, "Copilot ← human issue"),
+          h("span", { "--c": "#ab7df84d" }, "Copilot, no issue"),
+          h("span", { "--c": "#4493f8" }, "other"),
+          h("span", { "--c": "#d29922", class: "ln" }, "lines of code")
+        ),
+        svg
+      ),
+    });
+  }
+
+  // How PRs land: measured time-to-merge and lines-changed distributions of merged gh-aw PRs, split by origin
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    const nf = new Intl.NumberFormat("en-US");
+    // origins: workflow PRs, Copilot from a workflow-written issue, from a human-written issue, with no linked issue, other
+    const ORIG = [
+      ["workflow PRs", "#3fb950"],
+      ["Copilot ← AW issue", "#ab7df8"],
+      ["Copilot ← human issue", "#db61a2"],
+      ["Copilot, no issue", "#ab7df84d"],
+      ["other", "#4493f8"],
+    ];
+    const CHARTS = [
+      {
+        title: "Time to merge",
+        big: "51 min",
+        sub: "median · 90% merged within 6.1 h",
+        bins: ["<10m", "10–30m", "30m–1h", "1–6h", "6–24h", "1–7d", ">7d"],
+        data: [
+          [638, 447, 324, 1047, 243, 25, 0],
+          [129, 1385, 957, 1879, 497, 33, 0],
+          [7, 154, 230, 897, 295, 37, 3],
+          [876, 1978, 1466, 2121, 425, 61, 2],
+          [581, 353, 254, 553, 173, 49, 18],
+        ],
+        medians: ["55m", "58m", "2.2h", "39m", "35m"],
+        ticks: [0, 2000, 4000, 6000],
+      },
+      {
+        title: "Lines changed per PR",
+        big: "120",
+        sub: "median lines added + removed · 90% under 1,560",
+        bins: ["<10", "10–49", "50–199", "200–999", "1k–5k", "5k+"],
+        data: [
+          [519, 1172, 676, 317, 31, 9],
+          [515, 1192, 1470, 1290, 350, 63],
+          [52, 177, 476, 604, 210, 104],
+          [668, 1260, 1693, 2005, 1011, 292],
+          [237, 373, 401, 541, 337, 92],
+        ],
+        medians: ["34", "102", "257", "176", "187"],
+        ticks: [0, 2000, 4000, 6000],
+      },
+    ];
+    const W = 800,
+      H = 470,
+      CX = 64,
+      BASE = 420,
+      TOP = 20,
+      YMAX = 6600;
+    const yv = v => BASE - ((BASE - TOP) * v) / YMAX;
+    const charts = CHARTS.map((c, ci) => {
+      const svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("class", "land-svg");
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", `${c.title} for ${nf.format(18137)} merged gh-aw pull requests, stacked by origin`);
+      const slot = (W - CX) / c.bins.length,
+        bw = slot * 0.62;
+      let g = "";
+      for (const v of c.ticks) g += `<line x1="${CX - 8}" x2="${W}" y1="${yv(v)}" y2="${yv(v)}" class="hist-grid"/><text x="${CX - 14}" y="${yv(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
+      c.bins.forEach((b, i) => (g += `<text x="${CX + slot * (i + 0.5)}" y="${BASE + 32}" class="hist-ax" text-anchor="middle">${b}</text>`));
+      svg.innerHTML = `<g>${g}</g><g class="land-bars"></g><line class="hist-axis" x1="${CX - 8}" x2="${W}" y1="${BASE}" y2="${BASE}"/>`;
+      const gb = svg.querySelector(".land-bars");
+      const rects = c.bins.map((_, i) =>
+        ORIG.map(([, col]) => {
+          const r = document.createElementNS(NS, "rect");
+          r.setAttribute("x", CX + slot * (i + 0.5) - bw / 2);
+          r.setAttribute("width", bw);
+          r.setAttribute("rx", 3);
+          r.setAttribute("fill", col);
+          gb.append(r);
+          return r;
+        })
+      );
+      return { c, svg, rects, ci };
+    });
+    const render = u => {
+      for (const { c, rects } of charts)
+        rects.forEach((seg, i) => {
+          const g = Math.max(0, Math.min(1, u * 1.6 - i * 0.1));
+          const e = 1 - (1 - g) ** 3;
+          let acc = 0;
+          seg.forEach((r, k) => {
+            const hgt = (BASE - yv(c.data[k][i])) * e;
+            r.setAttribute("y", BASE - acc - hgt);
+            r.setAttribute("height", Math.max(0, hgt));
+            acc += hgt;
+          });
+        });
+    };
+    let t0 = 0,
+      u = 0,
+      lastBin = -1;
+    const DUR = 2200;
+    const panel = ({ c, svg, ci }) =>
+      h(
+        "div",
+        { class: "land-panel", "--i": ci },
+        h("div", { class: "land-t" }, c.title),
+        h("div", { class: "land-big" }, h("b", {}, c.big), h("span", {}, c.sub)),
+        svg,
+        h(
+          "div",
+          { class: "land-med" },
+          h("span", { class: "land-med-t" }, "median by origin"),
+          ORIG.map(([label, col], k) => h("span", { "--c": col }, h("em", {}, c.medians[k]), ` ${label}`))
+        )
+      );
+    slides.push({
+      group: "scale",
+      sound: "land",
+      palette: ["#ab7df8", "#db61a2", "#3fb950", "#4493f8"],
+      notes:
+        "Not illustrative: measured from all 18,137 gh-aw pull requests opened between the first commit and GA at Universe (12 August 2025 to 28 October 2026) that were merged by 13 November 2026, from the GitHub API. Time to merge is mergedAt minus createdAt; bands include the lower bound. Lines changed are GitHub's additions plus deletions for the whole PR, across all files, including regenerated workflow lock files. Origins use the same rules as the history slide: workflow PRs carry a gh-aw workflow marker; Copilot coding agent PRs are traced to their source issue, which counts as workflow-written when a bot opened it with a workflow marker. Median time to merge: 51 minutes overall, 58 minutes from workflow-written issues and 2.2 hours from human-written issues. Median size: 120 lines overall, 102 from workflow-written issues and 257 from human-written issues. Workflow PRs are the smallest, at 34 lines. Human-written means opened under a person's account; issues drafted in the Copilot app or CLI leave no trace and count as human. Account type and issue provenance are not proof of who started a session, or of AI use.",
+      enter() {
+        t0 = 0;
+        lastBin = -1;
+        u = matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0;
+        render(u);
+      },
+      tick(t) {
+        if (u >= 1) return;
+        if (!t0) t0 = t;
+        u = Math.min(1, (t - t0) / DUR);
+        const b = Math.floor(u * 7);
+        if (b !== lastBin && b < 7) sfx.pop((lastBin = b));
+        render(u);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · merged gh-aw pull requests"), h("h2", {}, letters("How PRs "), letters("land", "l-grad"))),
+        h("div", { class: "land-panels" }, charts.map(panel)),
+        h(
+          "div",
+          { class: "land-legend hist-legend" },
+          ORIG.map(([label, col]) => h("span", { "--c": col }, label))
+        )
       ),
     });
   }
@@ -7482,6 +7640,12 @@
         [48, 52, 55, 60, 64, 67, 72, 76].forEach((m, i) => tone(m, t + 0.15 + i * 0.22, { type: "triangle", dur: 0.3, vol: 0.05, cutoff: 2600, detune: 5 }));
         pad([48, 55, 60, 64], t + 0.1, 3.4, 0.022, "triangle", 1400);
         [79, 84, 88].forEach((m, i) => bell(m, t + 2 + i * 0.09, 0.035, 1.6));
+      },
+      // how PRs land: a burst of quick ticks that thins out, like a skewed merge-time distribution, then a settling chord
+      land: t => {
+        [0, 0.07, 0.13, 0.2, 0.28, 0.4, 0.58, 0.85, 1.25].forEach((d, i) => tone(76 - i * 2, t + 0.15 + d, { type: "square", dur: 0.08, vol: 0.04, cutoff: 3000, detune: 3 }));
+        pad([50, 57, 62, 66], t + 1.3, 2.4, 0.024, "triangle", 1500);
+        bell(86, t + 1.4, 0.035, 1.4);
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
