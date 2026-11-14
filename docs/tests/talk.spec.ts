@@ -59,11 +59,11 @@ test("presents the fifty-one slides in bands without the removed sections", asyn
     "Patch to PR",
     "Enterprise ready",
     "Centralized campaigns",
-    "G\u0131tHub Agentic Workflows",
-    "By the numbers",
+    "AW factory",
     "First commit to GA",
     "How PRs land",
     "How workflows evolve",
+    "G\u0131tHub Agentic Workflows",
   ];
   for (const [index, heading] of headings.entries()) {
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
@@ -193,7 +193,7 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("gh-aw · May–Nov 2026");
   await page.keyboard.press("n");
-  for (const slide of [3, 4, 7, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43, 44, 45, 46, 47]) {
+  for (const slide of [3, 4, 7, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43, 44, 45, 46, 51]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }

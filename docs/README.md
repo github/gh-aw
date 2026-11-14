@@ -59,7 +59,7 @@ The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 It is a standalone fifty-one-slide deck, separate from the homepage slideshow, linked
 from the site footer. The deck is laid out as a table of horizontal bands: the
 title and the finale are rows of their own, and every other band (Workflows,
-Security, Human agent processes, Cost & context, Enterprise, By the numbers) starts with a header
+Security, Human agent processes, Cost & context, Enterprise, AW factory) starts with a header
 slide that lists the band's slides (click a tile to jump) and a map of all bands.
 Use Left/Right, Space, or Page Up/Page Down to walk the deck in reading order,
 Up/Down to jump to the previous/next band (each band remembers the slide you
@@ -86,7 +86,7 @@ counts and dates, measured from that red-team workflow's repository memory and
 the firewall fix it led to (its attack diagram is a simplified illustration),
 the Semantic
 clustering slide's functions, files and counts from one Semantic Function
-Refactoring report (7 May 2026) and the merged pull request that closed it, and the three data slides after the finale: "First
+Refactoring report (7 May 2026) and the merged pull request that closed it, and the three data slides before the finale: "First
 commit to GA", which shows this repository's measured public history from its
 first commit to general availability at GitHub Universe, and "How PRs land",
 which shows measured time-to-merge and lines-changed distributions of its

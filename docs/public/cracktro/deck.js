@@ -1294,7 +1294,7 @@
   .dots button.kept { background: #ffffff90; }
   .dots button.on { width: 24px; background: #f0f6fc; box-shadow: none; }
   /* --- band header --- */
-  .bh-head { position: absolute; left: 140px; top: 170px; width: 1080px; }
+  .bh-head { position: absolute; left: 140px; top: 170px; width: 960px; }
   .bh-head h2 { margin: 26px 0 0; font-size: 150px; line-height: .95; }
   .bh-head h2 .line { display: inline-block; white-space: nowrap; }
   .bh .l-grad .ch { background-image: linear-gradient(90deg, var(--bh), var(--bh2), #f0f6fc, var(--bh2), var(--bh)); }
@@ -11174,14 +11174,14 @@
 
   // ---------- bands ----------
   // The deck is a table: each group is one horizontal band (row) led by a header slide.
-  // The title and the finale are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
+  // The title and the finale (last) are rows of their own. Right/left walk the deck in reading order; up/down jump between bands.
   const BANDS = {
     platform: ["Workflows", "Markdown in, GitHub Actions out"],
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
     cost: ["Cost & context", "Debug, spend less, remember more, measure everything"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
-    data: ["By the numbers", "Measured on gh-aw's own history"],
+    data: ["AW factory", "Measured on gh-aw's own history"],
   };
   // Rows follow each group's first appearance, so a slide joins its band wherever its code sits.
   const rows = [];
@@ -11190,6 +11190,8 @@
     if (row) row.items.push(s);
     else rows.push({ group: s.group, items: [s] });
   }
+  // The finale closes the deck, after the data band.
+  rows.push(...rows.splice(rows.findIndex(r => r.group === "finale"), 1));
   {
     const label = s => {
       const hd = s.el.querySelector("h1, h2, h3");
@@ -12429,6 +12431,8 @@
   // ---------- animated background ----------
   const ctx = canvas.getContext("2d");
   const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  const BLUEPRINT = ["#0b3d91", "#123a73", "#06204a", "#1a4f9c"];
+  let bp = 0;
   let colors = slides[0].palette.map(hex),
     gAng = 0;
   const blobs = [0, 1, 2, 3].map(i => ({ a: Math.random() * 6.28, b: Math.random() * 6.28, s: 0.00007 + i * 0.00003 }));
@@ -12450,11 +12454,15 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const target = (slides[cur] || slides[0]).palette.map(hex);
+    const cs = slides[cur] || slides[0],
+      isBp = cs.group === "process",
+      target = (isBp ? BLUEPRINT : cs.palette).map(hex);
+    bp = REDUCED ? +isBp : bp + (+isBp - bp) * 0.04;
     colors = REDUCED ? target : colors.map((c, i) => c.map((v, k) => v + (target[i][k] - v) * 0.03));
 
     ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "#0d1117";
+    // Blueprint band (Human agent processes): the base eases from ink to blueprint blue.
+    ctx.fillStyle = `rgb(${13 + (6 - 13) * bp | 0},${17 + (19 - 17) * bp | 0},${23 + (40 - 23) * bp | 0})`;
     ctx.fillRect(0, 0, cw, ch);
     ctx.globalCompositeOperation = "lighter";
     const R = Math.max(cw, ch) * 0.55,
@@ -12479,7 +12487,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : 0;
+    const gTarget = wash.classList.contains("on") && !isBp ? Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),
@@ -12487,7 +12495,12 @@
       D = Math.hypot(cw, ch) / 2 + minor;
     g.translate(cw / 2, ch / 2);
     g.rotate(gAng);
-    const line = i => (((i % 5) + 5) % 5 ? "rgba(240,246,252,0.028)" : "rgba(240,246,252,0.07)");
+    const gr = 240 + (150 - 240) * bp | 0,
+      gg = 246 + (205 - 246) * bp | 0,
+      gb = 252 + (255 - 252) * bp | 0,
+      lmin = `rgba(${gr},${gg},${gb},${0.028 + 0.022 * bp})`,
+      lmaj = `rgba(${gr},${gg},${gb},${0.07 + 0.05 * bp})`;
+    const line = i => (((i % 5) + 5) % 5 ? lmin : lmaj);
     const snap = gAng ? v => v : v => Math.round(v);
     for (let i = -Math.ceil(D / minor); i * minor <= D; i++) {
       g.fillStyle = line(i);
