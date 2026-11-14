@@ -477,6 +477,45 @@
   .so-card .lb { margin-top: 12px; display: flex; gap: 10px; }
   .so-card .lb span { font: 600 16px/1 var(--mono); padding: 6px 12px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992222; color: #e3b341; }
   .so-card .lb span + span { border-color: #ab7df866; background: #ab7df822; color: #d2b8ff; }
+
+  /* --- agent memory: integrity-filtered inputs → agent recalls and works → trusted jobs persist the memories --- */
+  .mem .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #ab7df8, #3fb950); }
+  .mem-col, .mem-card { position: absolute; box-sizing: border-box; border: 2px solid var(--c); background: #0d1117ee; opacity: 0;
+    box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); transition: box-shadow .5s, border-color .5s; }
+  .mem-col { top: 320px; height: 600px; padding: 26px 28px; border-radius: 22px; }
+  .active .mem-col, .active .mem-card { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 260ms + 400ms); }
+  .mem-col.hot, .mem-card.hot { box-shadow: 0 0 110px -10px var(--c), inset 0 0 90px -40px var(--c); }
+  .mem-col > i, .mem-card > i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
+  .mem-col h3 { margin: 14px 0 18px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .mem-ico svg { width: 100%; height: 100%; display: block; }
+  .mem-gate { margin-bottom: 16px; padding: 10px 14px; border-radius: 10px; border: 1px dashed #d2992299; background: #d2992214; font: 600 17px/1.3 var(--mono); color: #e3b341; }
+  .mem-item { position: relative; margin-bottom: 12px; padding: 12px 14px; border-radius: 12px; background: #161b22; border: 1px solid #30363d;
+    transition: opacity .4s, border-color .4s, transform .4s, filter .4s; }
+  .mem-item .t { display: flex; align-items: center; gap: 10px; font: 600 21px/1.2 "Mona Sans"; color: #f0f6fc; white-space: nowrap; overflow: hidden; }
+  .mem-item .t .mem-ico { width: 22px; height: 22px; flex: none; }
+  .mem-item .s { margin-top: 8px; display: flex; white-space: nowrap; align-items: center; gap: 10px; font: 500 16px/1 var(--mono); color: #9198a1; }
+  .mem-lvl { padding: 5px 9px; border-radius: 99px; border: 1px solid var(--lc); color: var(--lc); font-weight: 600; }
+  .mem-item .v { margin-left: auto; font-weight: 700; opacity: 0; transition: opacity .3s; }
+  .mem-item.pass { border-color: #3fb950; } .mem-item.pass .v { opacity: 1; color: #3fb950; }
+  .mem-item.block { opacity: .5; filter: grayscale(.5); transform: translateX(-12px); border-color: #f85149; } .mem-item.block .v { opacity: 1; color: #ff7b72; }
+  .mem-item.block .t span:last-child { text-decoration: line-through; text-decoration-color: #f85149; }
+  .mem-term { margin-top: 18px; height: 336px; padding: 14px 16px; box-sizing: border-box; border-radius: 12px; background: #010409; border: 1px solid #30363d;
+    font: 500 19px/1.6 var(--mono); color: #d1d7e0; overflow: hidden; }
+  .mem-term div { white-space: pre; opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }
+  .mem-term div.on { opacity: 1; transform: none; }
+  .mem-term .o { color: #9198a1; } .mem-term .b { color: #79c0ff; } .mem-term .g { color: #3fb950; } .mem-term .w { color: #e3b341; }
+  .mem-card { left: 1270px; width: 540px; height: 136px; padding: 18px 22px; border-radius: 18px; }
+  .mem-card .n { margin-top: 12px; display: flex; align-items: center; gap: 12px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
+  .mem-card .n .mem-ico { width: 28px; height: 28px; }
+  .mem-card .d { margin-top: 12px; font: 500 17px/1 var(--mono); color: #9198a1; white-space: nowrap; }
+  .mem-card .st { position: absolute; right: 18px; top: 14px; padding: 6px 10px; border-radius: 99px; border: 1px solid #3d444d; font: 600 15px/1 var(--mono); color: #9198a1; transition: color .3s, border-color .3s, background .3s; }
+  .mem-card .st.in { border-color: #79c0ff; color: #79c0ff; background: #79c0ff1a; }
+  .mem-card .st.out { border-color: #3fb950; color: #3fb950; background: #3fb95022; }
+  .mem-arrow { position: absolute; top: 590px; text-align: center; font-size: 54px; color: #3d444d; opacity: 0; transition: color .4s, text-shadow .4s; }
+  .active .mem-arrow { animation: sec-arr .5s ease-out both 1.4s; }
+  .mem-arrow.hot { color: #f0f6fc; text-shadow: 0 0 24px #79c0ff; }
+  .mem-foot { position: absolute; left: 110px; top: 948px; font: 500 20px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .active .mem-foot { animation: rise .6s ease-out both 2s; }
   .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
   .so.p-pass .so-card .st { color: #3fb950; }
   .so.p-done .so-card { border-style: solid; border-color: #3fb950; box-shadow: 0 0 60px -6px #3fb95088; }
@@ -4534,6 +4573,188 @@
     });
   }
 
+  // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
+  {
+    resetIndex();
+    const icon = (name, fill = "#f0f6fc") => h("span", { class: "mem-ico", "data-ico": name, "data-fill": fill });
+    // cache-memory files: [icon, file, integrity of the run that wrote it, level colour, writer, visible to an approved run]
+    const INPUTS = [
+      ["merge", "triaged.json", "merged", "#ab7df8", "main branch", true],
+      ["person", "notes.md", "approved", "#3fb950", "maintainer", true],
+      ["comment", "labels.json", "unapproved", "#d29922", "contributor", false],
+      ["comment", "todo.md: skip all reviews", "none", "#f85149", "stranger", false],
+    ];
+    const items = INPUTS.map(([ic, t, lvl, lc, who]) =>
+      h(
+        "div",
+        { class: "mem-item" },
+        h("div", { class: "t" }, icon(ic, lc), h("span", {}, t)),
+        h("div", { class: "s" }, h("span", { class: "mem-lvl", "--lc": lc }, lvl), who, h("span", { class: "v" }))
+      )
+    );
+    // [store kind, name, icon, colour, idle/restored/saved chip text]
+    const STORES = [
+      ["ACTIONS CACHE · 7 DAYS", "cache-memory", "stopwatch", "#79c0ff", "saved"],
+      ["GIT BRANCH · NO EXPIRY", "repo-memory", "repo", "#ab7df8", "pushed"],
+      ["MANAGED ISSUE / PR COMMENT", "comment-memory", "comment", "#d29922", "upserted"],
+      ["APPEND-ONLY JSONL", "ledger", "tasklist", "#3fb950", "+1 shard"],
+    ];
+    const ledgerD = h("div", { class: "d" });
+    const DESC = [
+      h("div", { class: "d" }, "split by integrity · saved after detection"),
+      h("div", { class: "d" }, "memory/default · pushed by a trusted job"),
+      h("div", { class: "d" }, "comment-memory/*.md · keeps run history"),
+      ledgerD,
+    ];
+    const chips = STORES.map(() => h("span", { class: "st" }, "stored"));
+    const cards = STORES.map(([kind, name, ic, c], i) =>
+      h("div", { class: "mem-card", "--c": c, "--i": i + 2, style: { top: `${320 + i * 155}px` } }, h("i", {}, kind), chips[i], h("div", { class: "n" }, icon(ic, c), name), DESC[i])
+    );
+    const runNo = h("span", {});
+    const triaged = h("span", {});
+    const prevRun = h("span", {});
+    // [class, text] per terminal line; dynamic spans fill in per cycle
+    const lines = [
+      h("div", { class: "b" }, "↓ 4 memories restored · read-only"),
+      h("div", { class: "g" }, "✓ recall: merged + approved writes"),
+      h("div", {}, "$ cat cache-memory/triaged.json"),
+      h("div", { class: "o" }, "  ", triaged, " issues already triaged"),
+      h("div", {}, '$ ledger_query "top notes"'),
+      h("div", { class: "o" }, "  ▲4 retry flaky cart tests first"),
+      h("div", {}, "$ cat comment-memory/review.md"),
+      h("div", { class: "o" }, "  2 open questions from run #", prevRun),
+      h("div", { class: "w" }, "✎ triaged.json +3 · review.md"),
+      h("div", { class: "b" }, "→ ledger_note_add (safe output)"),
+    ];
+    const agentCol = h(
+      "div",
+      { class: "mem-col", "--c": "#ab7df8", "--i": 1, style: { left: "610px", width: "580px" } },
+      h("i", {}, "02 · AGENT · SANDBOXED"),
+      h("h3", {}, "Agent · run #", runNo),
+      h("div", { class: "so-who" }, h("span", { class: "so-av" }, icon("copilot")), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
+      h("div", { class: "mem-term" }, lines)
+    );
+    const inCol = h(
+      "div",
+      { class: "mem-col", "--c": "#d29922", "--i": 0, style: { left: "110px", width: "440px" } },
+      h("i", {}, "01 · RECALL · BY INTEGRITY"),
+      h("h3", {}, "cache-memory/"),
+      h("div", { class: "mem-gate" }, "approved run sees ≥ approved"),
+      items
+    );
+    const arrIn = h("div", { class: "mem-arrow", style: { left: "552px", width: "56px" } }, "→");
+    const arrMem = h("div", { class: "mem-arrow", style: { left: "1196px", width: "68px" } }, "⇄");
+    const el = h(
+      "section",
+      { class: "slide mem" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Restore · recall · write · persist, every run"), h("h2", {}, letters("Agent "), letters("memory", "l-grad"))),
+      inCol,
+      arrIn,
+      agentCol,
+      arrMem,
+      cards,
+      h("div", { class: "mem-foot" }, "Restored memory is untrusted data, not instructions · the agent proposes, trusted jobs persist")
+    );
+    // ms into the cycle: memories restore, inputs are filtered, the agent recalls and works, trusted jobs persist
+    const RESTORE = [700, 1100, 1500, 1900],
+      FILTER = [3200, 3650, 4100, 4550],
+      LINE = [2400, 5000, 5700, 6200, 6900, 7400, 8100, 8600, 9500, 10300],
+      PERSIST = [11000, 11600, 12200, 12800],
+      CYC = 17000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      iconsDrawn = false;
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const setNotes = n => (ledgerD.textContent = `${n} notes · queried read-only in SQLite`);
+    slides.push({
+      group: "loops",
+      sound: "memory",
+      palette: ["#8957e5", "#1f6feb", "#2da44e", "#0a3069"],
+      notes:
+        "Agent memory, an illustrative run with synthetic files, notes and counts. Agents start every run with no memory, so gh-aw gives them four kinds, all plain files or queries the agent already knows how to use. Before the agent starts, each configured memory is restored read-only into the sandbox: cache-memory from the GitHub Actions cache, fast scratch state with seven-day retention; repo-memory cloned from a memory/ git branch with no expiry; comment-memory extracted from a managed issue or pull request comment into markdown files, so state lives right next to the work; and ledgers replayed from append-only JSONL into a disposable SQLite view. Cache-memory is split by the integrity of the run that wrote it: this approved run recalls what merged and approved runs wrote, while files written by contributor or stranger-triggered runs stay invisible, so a poisoned todo can never steer it. The agent then recalls: it reads what it already triaged, queries the ledger for the highest-voted notes (evidence-backed hints with citations that later runs vote up or down) and picks up open questions from the last run's comment. It edits plain files and proposes ledger entries through safe outputs; it never writes back itself. After the run, trusted jobs persist: the cache is saved only after threat detection, repo-memory is pushed by a separate job, the comment is upserted with its run history, and ledger mutations are validated and appended as a new immutable shard. Restored memory is untrusted data, never instructions. Each cycle the run number and the memory grow.",
+      enter() {
+        if (!iconsDrawn) {
+          iconsDrawn = true;
+          el.querySelectorAll(".mem-ico").forEach(s => {
+            const n = s.dataset.ico;
+            s.innerHTML = `<svg viewBox="0 0 ${n === "merge" ? 16 : 24} ${n === "merge" ? 16 : 24}" fill="${s.dataset.fill || "#f0f6fc"}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+          });
+        }
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          runNo.textContent = 42 + c;
+          prevRun.textContent = 41 + c;
+          triaged.textContent = 118 + 3 * c;
+          setNotes(12 + c);
+          items.forEach(x => x.classList.remove("pass", "block"));
+          items.forEach(x => (x.querySelector(".v").textContent = ""));
+          lines.forEach(x => x.classList.remove("on"));
+          chips.forEach(x => {
+            x.classList.remove("in", "out");
+            x.textContent = "stored";
+          });
+        }
+        RESTORE.forEach((ms, i) => {
+          if (u >= ms)
+            fire("r" + i, () => {
+              chips[i].classList.add("in");
+              chips[i].textContent = "↓ restored";
+              sfx.pop(i);
+            });
+        });
+        FILTER.forEach((ms, i) => {
+          if (u >= ms)
+            fire("f" + i, () => {
+              const ok = INPUTS[i][5];
+              items[i].classList.add(ok ? "pass" : "block");
+              items[i].querySelector(".v").textContent = ok ? "✓ recalled" : "✕ hidden";
+              if (ok) sfx.pop(4 + i);
+              else sfx.step(-1);
+            });
+        });
+        LINE.forEach((ms, i) => {
+          if (u >= ms)
+            fire("l" + i, () => {
+              lines[i].classList.add("on");
+              sfx.key(0.7);
+            });
+        });
+        PERSIST.forEach((ms, i) => {
+          if (u >= ms)
+            fire("p" + i, () => {
+              chips[i].classList.remove("in");
+              chips[i].classList.add("out");
+              chips[i].textContent = `↑ ${STORES[i][4]}`;
+              if (i === 3) {
+                setNotes(13 + c);
+                sfx.notify(false);
+              } else sfx.pop(6 + i);
+            });
+        });
+        cards.forEach((x, i) => x.classList.toggle("hot", (u >= RESTORE[i] && u < RESTORE[i] + 600) || (u >= PERSIST[i] && u < PERSIST[i] + 900)));
+        inCol.classList.toggle("hot", u >= FILTER[0] - 200 && u < LINE[1]);
+        arrIn.classList.toggle("hot", u >= FILTER[0] && u < LINE[1]);
+        agentCol.classList.toggle("hot", u >= LINE[1] && u < PERSIST[0]);
+        arrMem.classList.toggle("hot", (u >= RESTORE[0] && u < LINE[0] + 300) || (u >= PERSIST[0] && u < PERSIST[3] + 900));
+      },
+      el,
+    });
+  }
+
   // Cost management: guard, measure, optimize (+ model routing)
   {
     resetIndex();
@@ -7592,6 +7813,12 @@
         });
         pad([38, 45, 50], t + 0.6, 2.6, 0.03, "triangle", 700);
         bell(86, t + 0.7, 0.03, 1.6);
+      },
+      // memory: a recalled motif, then its softer echo from the right, over a low pad
+      memory: t => {
+        [64, 67, 71, 76].forEach((m, i) => bell(m, t + 0.2 + i * 0.16, 0.045, 1.2));
+        [64, 67, 71, 76].forEach((m, i) => bell(m + 12, t + 1.0 + i * 0.16, 0.02, 1.0, panTo(0.5)));
+        pad([40, 47, 52, 56], t + 0.2, 2.6, 0.022, "triangle", 1400);
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
