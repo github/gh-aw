@@ -490,7 +490,7 @@
   .active .sdm-spark .ar { animation: sdmFade .8s ease-out both 2.3s; }
   @keyframes sdmDraw { to { stroke-dashoffset: 0; } }
   @keyframes sdmFade { to { opacity: 1; } }
-  .sdm-cap { position: absolute; left: 460px; width: 1350px; top: 936px; text-align: right; font: 500 14px/1.4 var(--mono); letter-spacing: .04em; color: #9198a1; }
+  .sdm-cap { position: absolute; left: 460px; width: 1350px; top: 936px; text-align: right; font: 500 14px/1.4 var(--mono); letter-spacing: .04em; color: #9198a1; white-space: nowrap; }
   .sdm-cap b { color: #3fb950; font-weight: 700; letter-spacing: .12em; }
   .active .sdm-cap { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
   .dh-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dh-svg .mra-l.g { fill: #3fb950; }
@@ -6411,7 +6411,7 @@
       sound: "spec",
       palette: ["#8957e5", "#238636", "#1f6feb", "#d29922"],
       notes:
-        "Spec-driven testing, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt in the flow is an illustrative, simplified view of gh-aw's ctxutil package. The strip below is measured on gh-aw's public history, snapshot 14 November 2026: 83 merged spec-extractor pull requests updating package README specs; 69 merged spec-enforcer pull requests adding 12,731 lines of spec tests; 68 spec-librarian audit issues, which led to 38 merged Copilot fix pull requests; 22 merged pull requests from the weekly safe outputs spec review; and TestSpec functions in pkg on main growing from 0 at the start of April to 415 across 48 spec test files. The real ctxutil helper followed this path too: added on 3 August, spec tests on 14 August after a librarian audit, enforced on 6 October. Counts come from pull requests and issues matched by each workflow's title prefix, and from git history on main. pr-specification-reviewer and the W3C specification writer agent also take part.",
+        "Spec-driven testing, as gh-aw practices it on itself. Agents keep the specification alive instead of letting it rot: on every pull request a reviewer extracts the spec delta from the code diff and updates the package spec on the branch, while a daily extractor walks every package README round-robin. Humans join in plain natural language: a maintainer states the intent, and the W3C Specification Writer agent turns it into W3C-style normative text with RFC 2119 keywords such as MUST and MUST NOT. A librarian audits all specs daily for staleness and cross-package conflicts. An enforcer then writes spec tests from the README, deliberately not from the source, so the tests check the contract rather than the implementation, and those tests guard the next change. The code, spec and test excerpt in the flow is an illustrative, simplified view of gh-aw's ctxutil package. The strip below is measured on gh-aw's public history over the whole life of these workflows, 30 March to 14 November 2026 (229 days, snapshot 14 November 2026): 83 merged spec-extractor pull requests updating package README specs; 69 merged spec-enforcer pull requests adding 12,731 lines of spec tests; 68 spec-librarian audit issues, which led to 38 merged Copilot fix pull requests; 22 merged pull requests from the weekly safe outputs spec review; and TestSpec functions in pkg on main growing from 0 at the start of April to 415 across 48 spec test files. The real ctxutil helper followed this path too: added on 3 August, spec tests on 14 August after a librarian audit, enforced on 6 October. Counts come from pull requests and issues matched by each workflow's title prefix, and from git history on main. pr-specification-reviewer and the W3C specification writer agent also take part.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -6448,7 +6448,7 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Humans state intent, agents write the RFC spec, test it and extract it from every change"), h("h2", {}, letters("Spec-driven "), letters("testing", "l-grad"))),
         svg,
         sdmStrip,
-        h("div", { class: "sdm-cap" }, h("b", {}, "MEASURED "), "gh-aw, 30 Mar – 14 Nov 2026 · merged PRs and audits by title prefix · TestSpec_ funcs on main · ctxutil flow illustrative"),
+        h("div", { class: "sdm-cap" }, h("b", {}, "MEASURED "), "all-time · 30 Mar – 14 Nov 2026 (229 days) · snapshot 14 Nov 2026 · PRs/issues by title prefix · flow illustrative"),
       ),
     });
   }
