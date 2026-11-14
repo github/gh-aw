@@ -27,6 +27,7 @@ type WorkflowListItem struct {
 	Compiled string   `json:"compiled" console:"header:compiled"`
 	Labels   []string `json:"labels,omitempty" console:"-"`
 	On       any      `json:"on,omitempty" console:"-"`
+	Source   string   `json:"source,omitempty" console:"-"`
 }
 
 // NewListCommand creates the list command
@@ -181,7 +182,7 @@ func localWorkflowListItem(file, name, labelFilter string, staleOnly bool, impor
 		return WorkflowListItem{}, false
 	}
 
-	onField, labels := workflowFrontmatterFields(file)
+	onField, labels, source := workflowFrontmatterFields(file)
 	if labelFilter != "" && !slices.ContainsFunc(labels, func(label string) bool {
 		return strings.EqualFold(label, labelFilter)
 	}) {
@@ -193,20 +194,25 @@ func localWorkflowListItem(file, name, labelFilter string, staleOnly bool, impor
 		Compiled: compiled,
 		Labels:   labels,
 		On:       onField,
+		Source:   source,
 	}, true
 }
 
-func workflowFrontmatterFields(file string) (any, []string) {
+func workflowFrontmatterFields(file string) (any, []string, string) {
 	content, err := os.ReadFile(file)
 	if err != nil {
-		return nil, nil
+		return nil, nil, ""
 	}
 	result, err := parser.ExtractFrontmatterFromContent(string(content))
 	if err != nil || result.Frontmatter == nil {
-		return nil, nil
+		return nil, nil, ""
 	}
+	return frontmatterListFields(result.Frontmatter)
+}
+
+func frontmatterListFields(frontmatter map[string]any) (any, []string, string) {
 	var labels []string
-	if labelsField, ok := result.Frontmatter["labels"]; ok {
+	if labelsField, ok := frontmatter["labels"]; ok {
 		if labelsArray, ok := labelsField.([]any); ok {
 			for _, label := range labelsArray {
 				if labelStr, ok := label.(string); ok {
@@ -215,7 +221,8 @@ func workflowFrontmatterFields(file string) (any, []string) {
 			}
 		}
 	}
-	return result.Frontmatter["on"], labels
+	source, _ := frontmatter["source"].(string)
+	return frontmatter["on"], labels, source
 }
 
 func outputWorkflowList(workflows []WorkflowListItem, jsonOutput bool) error {

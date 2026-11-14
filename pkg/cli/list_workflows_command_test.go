@@ -221,6 +221,62 @@ name: test-workflow
 	})
 }
 
+func TestRunListWorkflows_SourceField(t *testing.T) {
+	tests := []struct {
+		name        string
+		sourceLine  string
+		wantSource  string
+		wantPresent bool
+	}{
+		{name: "string source exported", sourceLine: "source: githubnext/agentic-ops/workflows/audit.md@v1.2.3\n", wantSource: "githubnext/agentic-ops/workflows/audit.md@v1.2.3", wantPresent: true},
+		{name: "empty source omitted", sourceLine: "source: \"\"\n"},
+		{name: "non-string source omitted", sourceLine: "source: 42\n"},
+		{name: "missing source omitted"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			content := "---\non:\n  workflow_dispatch:\n" + tt.sourceLine + "---\n\n# Source Test\n"
+			require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "source-test.md"), []byte(content), 0644), "Should write workflow")
+
+			output := captureListOutput(t, tmpDir, "")
+
+			var items []map[string]any
+			require.NoError(t, json.Unmarshal([]byte(output), &items), "Should unmarshal JSON output")
+			require.Len(t, items, 1, "Should have one workflow")
+			source, ok := items[0]["source"]
+			assert.Equal(t, tt.wantPresent, ok, "Source key presence should match")
+			if tt.wantPresent {
+				assert.Equal(t, tt.wantSource, source, "Source should be exported in JSON")
+			}
+		})
+	}
+}
+
+func TestRunListWorkflows_SourceHiddenInTableOutput(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := "---\non:\n  workflow_dispatch:\nsource: githubnext/agentic-ops/workflows/audit.md@v1.2.3\n---\n\n# With Source\n"
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "with-source.md"), []byte(content), 0644), "Should write workflow with source")
+
+	oldStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err, "Should create pipe")
+	os.Stderr = w
+
+	runErr := RunListWorkflows(t.Context(), "", tmpDir, "", false, false, "", false)
+
+	w.Close()
+	os.Stderr = oldStderr
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	require.NoError(t, runErr, "RunListWorkflows table output should not error")
+	output := buf.String()
+	assert.Contains(t, output, "with-source", "Table output should include the workflow name")
+	assert.NotContains(t, output, "githubnext/agentic-ops", "Table output should not include the source")
+}
+
 func TestRunListWorkflows_StaleOnlyRejectsRemoteRepository(t *testing.T) {
 	err := RunListWorkflows(t.Context(), "owner/repo", ".github/workflows", "", false, false, "", true)
 	require.EqualError(t, err, "--stale cannot be used with --repo because remote workflow compilation status is unavailable")
