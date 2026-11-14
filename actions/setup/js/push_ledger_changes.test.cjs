@@ -58,10 +58,18 @@ test("reads and validates only versioned transaction artifacts", () => {
 
 test("push reports a missing ledger transaction artifact handoff", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-missing-"));
-  const file = path.join(directory, "ledger-transactions.json");
+  const file = path.relative(process.cwd(), path.join(directory, "ledger-transactions.json"));
+  const previousArtifactName = process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME;
+  process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME = "gh-aw-ledger-transactions";
   try {
-    await assert.rejects(main({ file, ledgerConfigs }), /Missing validated ledger transaction artifact.*safe_outputs uploads gh-aw-ledger-transactions before push_ledger_changes/);
+    await assert.rejects(main({ file, ledgerConfigs }), error => {
+      assert.equal(error.message, `Missing validated ledger transaction artifact at ${path.resolve(file)}; ensure safe_outputs uploads gh-aw-ledger-transactions before push_ledger_changes`);
+      assert.equal(error.cause.code, "ENOENT");
+      return true;
+    });
   } finally {
+    if (previousArtifactName === undefined) delete process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME;
+    else process.env.GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME = previousArtifactName;
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
