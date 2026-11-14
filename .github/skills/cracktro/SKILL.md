@@ -37,8 +37,8 @@ slides.push({
   sound: "loop",          // THEMES key played on entry
   palette: [c1, c2, c3, c4],
   notes: "...",           // speaker notes (N key); public text
-  trans: "up" | "down",   // optional vertical transition (reversed going back)
-  red: true,              // optional: red wash, then slides in from right ("left-in")
+  group: "security",      // section id; crossing groups slides up (down going back), siblings push left
+  red: true,              // optional: red wash covers the old slide, then this one enters
   techno: 1,              // optional techno layer level
   el: h("section", { class: "slide" }, ...),
   enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back
@@ -49,7 +49,7 @@ slides.push({
 
 ## Mechanics worth knowing
 
-- **Transitions:** the default is a reveal-style horizontal push using `slide-in`/`slide-out` keyframes. `show()` sets `--dx` to `100%` going forward, `-100%` going back, and `0%` on first load. Up/down transitions use the `up-in`/`up-out` and `down-in`/`down-out` classes; red slides use `left-in`. The old slide keeps the `.leaving` class until a timeout clears it.
+- **Transitions:** derived from each slide's `group` (intro, platform, security, factory, loops, cost, enterprise, scale). Siblings in a group use a reveal-style horizontal push (`slide-in`/`slide-out`); `show()` sets `--dx` to `100%` going forward, `-100%` going back, and `0%` on first load. Crossing into another group slides up (`up-in`/`up-out`) going forward and down (`down-in`/`down-out`) going back. All use the same 0.8 s curve. Every slide needs a `group`; never add per-slide transition overrides. The old slide keeps the `.leaving` class until a timeout clears it.
 - **Audio isolation:** `master` is a persistent gain that feeds the compressor and delay. `out` is a per-slide bus. `show()` calls `sfx.cut()`, which fades the current bus and replaces it, so long themes cannot leak into the next slide. Any new sound must connect to `out`, or to `master` if it must persist across slides (as techno does).
 - **CSS animations restart** through `void el.offsetWidth` before `.active` is added. Prefer `.active .x { animation: ... }` for entry effects.
 - **Animated SVG flow diagrams** (for example "Research · Assign · Refine"):

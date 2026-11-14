@@ -63,6 +63,8 @@ The navigation dots jump directly to a slide (on narrow screens they become
 previous/next arrow buttons); `#1` through `#22` are shareable
 slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
+Slides are grouped into sections: slides within a section push left, and
+moving to the next section slides up (reversed when going back).
 
 Examples, review activity, repository counts, and cost figures are synthetic,
 except the model routing slide's results, which are measured on this

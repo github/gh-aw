@@ -24,17 +24,16 @@
   canvas.bg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
   .stage { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
   .slide { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
-  /* reveal-style horizontal push: --dx is +100% going forward, -100% going back, 0 on first load */
+  /* siblings in a group: reveal-style horizontal push; --dx is +100% going forward, -100% going back, 0 on first load.
+     crossing groups: vertical push, up going forward and down going back (same duration and easing) */
   .slide.active { visibility: visible; pointer-events: auto; animation: slide-in .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.leaving { visibility: visible; animation: slide-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   @keyframes slide-in { from { transform: translateX(var(--dx, 100%)); } to { transform: none; } }
   @keyframes slide-out { to { transform: translateX(calc(-1 * var(--dx, 100%))); } }
-  .slide.active.up-in { animation: up-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving.up-out { animation: up-out 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.active.down-in { animation: down-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving.down-out { animation: down-out 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.active.left-in { animation: left-in 1s cubic-bezier(.7,0,.2,1) both; }
-  @keyframes left-in { from { transform: translateX(100%); } to { transform: none; } }
+  .slide.active.up-in { animation: up-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving.up-out { animation: up-out .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.active.down-in { animation: down-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   /* full-screen red wash for "Safety and control": fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
     background: radial-gradient(ellipse 80% 75% at 50% 55%, #6e0b12 0%, #3a0408 55%, #140103 100%); }
@@ -953,6 +952,7 @@
   {
     resetIndex();
     slides.push({
+      group: "intro",
       sound: "title",
       palette: ["#0fbf3e", "#08872b", "#5fed83", "#0a241b"],
       notes: "GitHub Agentic Workflows. Coding agents running inside GitHub Actions, written in Markdown, with guardrails.",
@@ -1137,8 +1137,8 @@
       GA_MORPH = 1600;
     const gaLen = p => GA_RUNS[p][5].reduce((a, j) => a + j[3], 0) + GA_HOLD[p];
     slides.push({
+      group: "platform",
       sound: "ship",
-      trans: "up",
       enter() {
         gaT0 = performance.now();
         gaM = -1;
@@ -1291,6 +1291,7 @@
       if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
     };
     slides.push({
+      group: "platform",
       sound: "ship",
       palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
       notes:
@@ -1429,8 +1430,8 @@
       pre.append(caret());
     };
     slides.push({
+      group: "platform",
       sound: "typing",
-      trans: "up",
       palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
         "Turn Intent to Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning a pull request removing duplicated code shows up for review. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
@@ -1733,6 +1734,7 @@
       ctx.globalAlpha = 1;
     };
     slides.push({
+      group: "security",
       sound: "forge",
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
@@ -1878,6 +1880,7 @@
       lastSpawn = 0,
       last = 0;
     slides.push({
+      group: "security",
       sound: "omen",
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
@@ -2071,6 +2074,7 @@
       fn();
     };
     slides.push({
+      group: "security",
       sound: "factory",
       green: true,
       palette: ["#238636", "#0e3a1f", "#1f6feb", "#0b2f3a"],
@@ -2334,6 +2338,7 @@
       script();
     };
     slides.push({
+      group: "security",
       sound: "vault",
       green: true,
       palette: ["#238636", "#0e3a1f", "#8957e5", "#0b2f3a"],
@@ -2426,6 +2431,7 @@
     }
     let last = 0;
     slides.push({
+      group: "factory",
       sound: "factory",
       palette: ["#bf3989", "#238636", "#9e6a03", "#8957e5"],
       notes:
@@ -2858,8 +2864,8 @@
       });
     };
     slides.push({
+      group: "factory",
       sound: "loop",
-      trans: "up",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
         "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. These are illustrative patterns with synthetic examples, not activity attributed to particular people or teams.",
@@ -2986,6 +2992,7 @@
         thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
       };
       slides.push({
+        group: "factory",
         sound: "loop",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
@@ -3048,6 +3055,7 @@
     let bdT0 = 0,
       bdRun = -1;
     slides.push({
+      group: "factory",
       sound: "loop",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
@@ -3213,6 +3221,7 @@
       $("rpaLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
+      group: "loops",
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
@@ -3505,6 +3514,7 @@
     };
     let prevT = 0;
     slides.push({
+      group: "loops",
       sound: "loop",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
@@ -3719,6 +3729,7 @@
       $("lane0").classList.add("on");
     };
     slides.push({
+      group: "loops",
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
@@ -3908,6 +3919,7 @@
       $("sflLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
+      group: "loops",
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
       notes:
@@ -4273,6 +4285,7 @@
       pk = pk.filter(q => q.p < 1);
     };
     slides.push({
+      group: "cost",
       sound: "coins",
       palette: ["#9e6a03", "#238636", "#1f6feb", "#8957e5"],
       notes:
@@ -4692,6 +4705,7 @@
       if (b < 2) weekAt = 0;
     };
     slides.push({
+      group: "cost",
       sound: "router",
       palette: ["#8957e5", "#238636", "#1f6feb", "#6e40c9"],
       notes:
@@ -4950,6 +4964,7 @@
       tokN.textContent = "↓ " + Math.round(shown).toLocaleString("en-US") + " tokens";
     };
     slides.push({
+      group: "enterprise",
       sound: "engine",
       palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
       notes:
@@ -5157,6 +5172,7 @@
       rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
     };
     slides.push({
+      group: "enterprise",
       sound: "ship",
       palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
       notes:
@@ -5374,6 +5390,7 @@
       ctx.fillText("WORKERS · ONE TARGET EACH", 470 + 2.5 * 110 + 27, CH - 6);
     };
     slides.push({
+      group: "scale",
       sound: "radar",
       palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
       notes:
@@ -5532,6 +5549,7 @@
       return [u * u * ax + 2 * u * f * mx + f * f * bx, u * u * ay + 2 * u * f * my + f * f * by];
     };
     slides.push({
+      group: "scale",
       sound: "finale",
       palette: ["#0fbf3e", "#1f6feb", "#8957e5", "#238636"],
       notes:
@@ -6469,7 +6487,7 @@
   // ---------- navigation ----------
   let cur = -1,
     redT = null;
-  // entering a "red" slide forward: the current slide first fades to red, then the red slide slides in from the right
+  // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
   function go(n) {
     n = Math.max(0, Math.min(slides.length - 1, n));
     if (n === cur || redT) return;
@@ -6477,24 +6495,23 @@
       wash.classList.add("on", "cover");
       redT = setTimeout(() => {
         redT = null;
-        show(n, "left");
+        show(n, true);
       }, 1000);
       return;
     }
     show(n);
   }
-  function show(n, horiz) {
+  // siblings in a group push left (right going back); crossing into another group slides up (down going back)
+  function show(n, covered) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
     gwash.classList.toggle("on", !!slides[n].green);
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
-    // "up"/"down" on a slide: it enters that way going forward, and reverses going back
-    const flip = { up: "down", down: "up" };
-    const vert = horiz || cur < 0 ? null : dir > 0 && flip[slides[n].trans] ? slides[n].trans : dir < 0 && flip[slides[cur].trans] ? flip[slides[cur].trans] : null;
-    const TR = ["up-in", "up-out", "down-in", "down-out", "left-in"];
-    if (cur >= 0 && horiz) {
+    const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : null;
+    const TR = ["up-in", "up-out", "down-in", "down-out"];
+    if (cur >= 0 && covered) {
       // already hidden under the red wash: drop it instantly so it doesn't flash back when the wash moves behind the stage
       const old = slides[cur].el;
       clearTimeout(old._lt);
@@ -6506,13 +6523,12 @@
       old.classList.add("leaving");
       if (vert) old.classList.add(vert + "-out");
       clearTimeout(old._lt);
-      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), vert ? 1000 : 800);
+      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), 800);
     }
     const el = slides[n].el;
     clearTimeout(el._lt);
     el.classList.remove(...TR);
     if (vert) el.classList.add(vert + "-in");
-    if (horiz) el.classList.add(horiz + "-in");
     wash.classList.remove("cover");
     el.style.setProperty("--dx", cur < 0 ? "0%" : dir > 0 ? "100%" : "-100%");
     el.classList.remove("leaving");
