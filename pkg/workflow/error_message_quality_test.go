@@ -66,7 +66,8 @@ func TestErrorMessageQuality(t *testing.T) {
 						// Missing url
 					},
 				}
-				return ValidateMCPConfigs(tools)
+				_, err := validateMCPConfigsWithWarnings(tools)
+				return err
 			},
 			shouldContain: []string{
 				"missing required property",
@@ -84,7 +85,8 @@ func TestErrorMessageQuality(t *testing.T) {
 						"command": "test",
 					},
 				}
-				return ValidateMCPConfigs(tools)
+				_, err := validateMCPConfigsWithWarnings(tools)
+				return err
 			},
 			shouldContain: []string{
 				"must be one of",
@@ -104,7 +106,8 @@ func TestErrorMessageQuality(t *testing.T) {
 						"container": "my-image",
 					},
 				}
-				return ValidateMCPConfigs(tools)
+				_, err := validateMCPConfigsWithWarnings(tools)
+				return err
 			},
 			shouldContain: []string{
 				"cannot specify both",
@@ -250,7 +253,8 @@ func TestErrorMessageQuality(t *testing.T) {
 						"command": 123, // Wrong type: integer instead of string
 					},
 				}
-				return ValidateMCPConfigs(tools)
+				_, err := validateMCPConfigsWithWarnings(tools)
+				return err
 			},
 			shouldContain: []string{
 				"must be a string",
@@ -417,7 +421,7 @@ func TestMCPValidationErrorQuality(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateMCPConfigs(tt.tools)
+			_, err := validateMCPConfigsWithWarnings(tt.tools)
 			require.Error(t, err)
 
 			errMsg := err.Error()

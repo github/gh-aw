@@ -580,16 +580,16 @@ func TestValidateMCPConfigs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateMCPConfigs(tt.tools)
+			_, err := validateMCPConfigsWithWarnings(tt.tools)
 
 			if tt.wantErr != (err != nil) {
-				t.Errorf("ValidateMCPConfigs() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("validateMCPConfigsWithWarnings() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if tt.wantErr && err != nil && tt.errMsg != "" {
 				if !strings.Contains(err.Error(), tt.errMsg) {
-					t.Errorf("ValidateMCPConfigs() error = %v, expected to contain %v", err, tt.errMsg)
+					t.Errorf("validateMCPConfigsWithWarnings() error = %v, expected to contain %v", err, tt.errMsg)
 				}
 			}
 		})

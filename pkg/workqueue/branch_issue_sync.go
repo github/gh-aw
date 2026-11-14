@@ -106,10 +106,6 @@ func (b Branch) synchronizeConfiguredIssueTransition(ctx context.Context, reques
 	return b.synchronizeCheckedIssueTransition(ctx, requestID, settings.Issues, graph.DoWithContext, publication)
 }
 
-func (b Branch) synchronizeIssueTransition(ctx context.Context, requestID string, config *IssuesSettings, graph issueGraphQL) (IssueSynchronization, error) {
-	return b.synchronizeCheckedIssueTransition(ctx, requestID, config, graph, nil)
-}
-
 func (b Branch) synchronizeCheckedIssueTransition(ctx context.Context, requestID string, config *IssuesSettings, graph issueGraphQL, publication *QueueCommit) (IssueSynchronization, error) {
 	result := IssueSynchronization{RequestID: requestID}
 	commits, err := b.Read(ctx)

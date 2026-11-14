@@ -62,8 +62,8 @@ func TestHeredocInjectionControls(t *testing.T) {
 				strings.ReplaceAll(tt.script, "\n", "\n          ") + "\n"
 
 			assert.Contains(t, tt.script, expression)
-			require.Error(t, validateNoTemplateInjectionFromParsed(parsed))
-			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(parsed))
+			require.Error(t, validateRunScriptTemplateInjection(parsed, true))
+			require.Error(t, validateRunScriptExpressions(parsed, true))
 			scan := scanRunContentExpressions(yaml)
 			assert.True(t, scan.hasUnsafe, "raw YAML unsafe scan")
 			assert.True(t, scan.hasDisallowed, "raw YAML expression guardrail")
@@ -77,14 +77,14 @@ func TestHeredocInjectionControls(t *testing.T) {
 				assert.Equal(t, expression, sanitized["env"].(map[string]any)["GH_AW_GITHUB_EVENT_ISSUE_TITLE"])
 				assert.NotContains(t, shellExpansionContent(sanitized["run"].(string)), expression)
 				if strings.Contains(sanitized["run"].(string), expression) {
-					require.Error(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
+					require.Error(t, validateRunScriptTemplateInjection(map[string]any{"steps": []any{sanitized}}, true))
 				} else {
-					require.NoError(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
+					require.NoError(t, validateRunScriptTemplateInjection(map[string]any{"steps": []any{sanitized}}, true))
 				}
 			} else {
 				assert.Empty(t, warnings)
 				assert.Equal(t, tt.script, sanitized["run"], "quoted body must remain literal")
-				require.Error(t, validateNoTemplateInjectionFromParsed(map[string]any{"steps": []any{sanitized}}))
+				require.Error(t, validateRunScriptTemplateInjection(map[string]any{"steps": []any{sanitized}}, true))
 			}
 		})
 	}
@@ -96,14 +96,14 @@ func TestHeredocSanitizerPreservesQuotedCopy(t *testing.T) {
 	sanitized, _, changed := sanitizeRunStepExpressions(map[string]any{"run": script})
 	require.True(t, changed)
 	assert.Equal(t, "cat <<'FIRST_EOF'\n"+expression+"\nFIRST_EOF\ncat <<SECOND_EOF\n# $GH_AW_GITHUB_EVENT_ISSUE_TITLE\nSECOND_EOF", sanitized["run"])
-	require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{sanitized}}))
+	require.Error(t, validateRunScriptExpressions(map[string]any{"steps": []any{sanitized}}, true))
 }
 
 func TestHeredocMalformedExpressionFailsValidation(t *testing.T) {
 	step := map[string]any{"run": "cat <<EOF\n${{}}${{\nEOF"}
 	sanitized, _, changed := sanitizeRunStepExpressions(step)
 	require.False(t, changed, "malformed shell syntax must not be rewritten")
-	require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{sanitized}}))
+	require.Error(t, validateRunScriptExpressions(map[string]any{"steps": []any{sanitized}}, true))
 }
 
 func TestHeredocUnknownBoundariesPreserveScript(t *testing.T) {
@@ -132,8 +132,8 @@ func TestHeredocUnknownBoundariesPreserveScript(t *testing.T) {
 			assert.Empty(t, warnings)
 			assert.Equal(t, tt.script, sanitized["run"])
 			parsedSteps := map[string]any{"steps": []any{sanitized}}
-			require.Error(t, validateNoTemplateInjectionFromParsed(parsedSteps))
-			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(parsedSteps))
+			require.Error(t, validateRunScriptTemplateInjection(parsedSteps, true))
+			require.Error(t, validateRunScriptExpressions(parsedSteps, true))
 			yaml := "steps:\n  - run: |\n      " + strings.ReplaceAll(tt.script, "\n", "\n      ") + "\n"
 			scan := scanRunContentExpressions(yaml)
 			assert.True(t, scan.hasUnsafe)
@@ -148,7 +148,7 @@ func TestHeredocSanitizerPreservesNestedQuotedCopy(t *testing.T) {
 	sanitized, _, changed := sanitizeRunStepExpressions(map[string]any{"run": script})
 	require.True(t, changed)
 	assert.Equal(t, "cat <<OUTER\n$(cat <<'INNER'\n"+expression+"\nINNER\n)\n$GH_AW_GITHUB_EVENT_ISSUE_TITLE\nOUTER", sanitized["run"])
-	require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{sanitized}}))
+	require.Error(t, validateRunScriptExpressions(map[string]any{"steps": []any{sanitized}}, true))
 }
 
 func TestHeredocCommentsPreserveFullScriptContext(t *testing.T) {
@@ -158,7 +158,7 @@ func TestHeredocCommentsPreserveFullScriptContext(t *testing.T) {
 	require.True(t, changed)
 	assert.Equal(t, "# $GH_AW_GITHUB_EVENT_ISSUE_TITLE\necho \"$(cat <<'EOF'\nliteral\nEOF\n) # $GH_AW_GITHUB_EVENT_ISSUE_TITLE\"\n# $GH_AW_GITHUB_EVENT_ISSUE_TITLE", sanitized["run"])
 	assert.NotContains(t, shellExpansionContent(sanitized["run"].(string)), expression)
-	require.NoError(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{sanitized}}))
+	require.NoError(t, validateRunScriptExpressions(map[string]any{"steps": []any{sanitized}}, true))
 }
 
 func TestHeredocParserFailureDoesNotLogScript(t *testing.T) {
@@ -221,12 +221,12 @@ func TestQuotedHeredocEnvExpressionRejectedInBothValidationPaths(t *testing.T) {
 		"run": script,
 	}}}
 
-	err := validateNoTemplateInjectionFromParsed(workflow)
+	err := validateRunScriptTemplateInjection(workflow, true)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "quoted heredoc")
 	assert.Contains(t, err.Error(), "unquoted heredoc or printf")
 
-	err = validateNoGitHubExpressionsInRunScriptsFromParsed(workflow)
+	err = validateRunScriptExpressions(workflow, true)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unquoted heredoc or printf")
 
@@ -258,7 +258,7 @@ func TestQuotedHeredocGuardrailDiagnostic(t *testing.T) {
 			workflow := map[string]any{"steps": []any{map[string]any{
 				"run": "cat <<'EOF'\n" + expression + "\nEOF",
 			}}}
-			err := validateNoGitHubExpressionsInRunScriptsFromParsed(workflow)
+			err := validateRunScriptExpressions(workflow, true)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "Quoted heredoc contents are still interpolated by GitHub Actions before Bash")
 			assert.Contains(t, err.Error(), "printf '%s\\n' \"$VALUE\"")
@@ -270,7 +270,7 @@ func TestQuotedHeredocEnvExpressionWithUnprovenBoundaryRejected(t *testing.T) {
 	const script = "cat <<'EOF'\n${{ env.BODY }}\nEOF\nif"
 	workflow := map[string]any{"steps": []any{map[string]any{"run": script}}}
 
-	err := validateNoTemplateInjectionFromParsed(workflow)
+	err := validateRunScriptTemplateInjection(workflow, true)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unproven heredoc boundary")
 
