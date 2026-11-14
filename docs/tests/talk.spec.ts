@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 
 test.use({ reducedMotion: "reduce" });
 
@@ -71,7 +71,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#1$/);
 
-  const assets = ["deck.js", "assets/workflow-run.svg", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -80,16 +80,13 @@ test("ships local assets with the docs and links to the talk from the footer", a
   }
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.fonts.check('16px "Monaspace Neon"'))).toBe(true);
-  expect(await page.locator(".shot img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
 });
 
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
-  expect(readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true })).toEqual(["workflow-run.svg"]);
+  expect(existsSync(new URL("../public/cracktro/assets/", import.meta.url))).toBe(false);
   const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
   expect(source.match(/assets\/avatars|<image\b|\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/"]);
-  const illustration = await (await request.get("/gh-aw/cracktro/assets/workflow-run.svg")).text();
-  expect(illustration).not.toMatch(/<(?:image|script|foreignObject|metadata)\b/i);
 
   const externalRequests: string[] = [];
   const errors: string[] = [];

@@ -11,7 +11,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a fo
 
 - `docs/public/cracktro/index.html`: only loads `deck.js`.
 - `docs/public/cracktro/deck.js`: about 200 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
-- `docs/public/cracktro/assets/workflow-run.svg`: the only allowed asset, which a test enforces.
+- No image assets: diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline), and a test asserts that `docs/public/cracktro/assets/` does not exist.
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
 - `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of fourteen slide headings, so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
