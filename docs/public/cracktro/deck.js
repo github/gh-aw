@@ -423,6 +423,38 @@
   .dh-svg .sdd-ln.fail { fill: #ff7b72; font-weight: 700; }
   .dh-x { fill: #f85149; font: 700 24px var(--mono); text-anchor: end; opacity: 0; transition: opacity .25s; filter: drop-shadow(0 0 6px #f85149); }
   .dh-x.on { opacity: 1; }
+  .dg-svg { left: 110px; top: 280px; width: 1700px; height: 586px; }
+  .dg-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dg-svg .mra-l.g { fill: #3fb950; }
+  .dg-band { fill: #ffffff06; }
+  .dg-mic { opacity: .5; transition: opacity .3s; }
+  .dg-mic.on { opacity: 1; }
+  .dg-ring { fill: none; stroke: #4493f8; stroke-width: 3; opacity: 0; transform-box: fill-box; transform-origin: center; }
+  .dg-mic.on .dg-ring { animation: dg-ring 1.2s ease-out infinite; }
+  @keyframes dg-ring { from { opacity: .8; transform: scale(1); } to { opacity: 0; transform: scale(1.7); } }
+  .dg-hd { fill: #9198a1; font: 600 16px var(--mono); letter-spacing: .1em; }
+  .dg-raw { fill: #f0883e; font: 600 26px var(--mono); }
+  .dg-miss { fill: #f85149; font: 500 17px var(--mono); }
+  .dg-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; transition: all .3s; }
+  .dg-dict.on .dg-card { stroke: var(--c); filter: drop-shadow(0 0 14px var(--c)); }
+  .dg-row text, .dg-new text { fill: #6e7681; font: 500 20px var(--mono); transition: fill .3s; }
+  .dg-row .dg-id { fill: #9198a1; }
+  .dg-row rect { fill: transparent; stroke: transparent; stroke-width: 2; transition: all .3s; }
+  .dg-row.pick rect { fill: #4493f814; stroke: #4493f8; filter: drop-shadow(0 0 10px #4493f866); }
+  .dg-row.pick text { fill: #f0f6fc; } .dg-row.pick .dg-id { fill: #3fb950; }
+  .dg-new { opacity: 0; transition: opacity .5s; }
+  .dg-new.on { opacity: 1; }
+  .dg-new rect { fill: #3fb95014; stroke: #3fb950; stroke-width: 2; stroke-dasharray: 6 5; }
+  .dg-new text { fill: #f0f6fc; } .dg-new .dg-id { fill: #3fb950; }
+  .dg-ident { opacity: 0; fill: #3fb950; font: 600 22px var(--mono); transition: opacity .4s; }
+  .dg-ident.on { opacity: 1; } .dg-ident .dg-k { fill: #9198a1; }
+  .dg-term .dg-tb { fill: #010409; }
+  .dg-term .dg-tl { opacity: 0; transition: opacity .3s .25s; }
+  .dg-term.on .dg-tl { opacity: 1; }
+  .dg-cmd { fill: #f0f6fc; font: 500 22px var(--mono); }
+  .dg-hit { fill: #3fb950; font: 600 22px var(--mono); }
+  .dg-chip text { fill: #f0f6fc; font: 600 20px var(--mono); text-anchor: middle; }
+  .dg-chip .dg-old { fill: #f85149; text-decoration: line-through; } .dg-chip .dg-nn { fill: #3fb950; }
+  .dg-cap { fill: #9198a1; font: 500 16px var(--mono); letter-spacing: .06em; text-anchor: middle; }
   .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
   .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
   .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
@@ -5977,6 +6009,189 @@
     });
   }
 
+  // Speak → Map → Grep: a DICTATION.md glossary turns misheard speech-to-text into the exact identifiers agents can grep; a namer agent renames APIs to be findable and a dictation agent adds the new names to the glossary
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const pill = (x, y, w, label) => `<g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#dgAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    // illustrative: misheard speech-to-text, the glossary identifier it maps to, and synthetic grep counts
+    const EX = [
+      ["cash memory", "cache-memory", 214, 31],
+      ["depend a bot", "Dependabot", 57, 12],
+      ["fire wall", "firewall", 163, 27],
+      ["A W dot Y M L", "aw.yml", 42, 9],
+    ];
+    // synthetic renames: [old, new, how it is spoken, glossary identifier]
+    const REN = [
+      ["procSO()", "parseSafeOutputs()", "parse safe outputs", "parseSafeOutputs"],
+      ["doCfg()", "loadConfig()", "load config", "loadConfig"],
+      ["hndl()", "handleComment()", "handle comment", "handleComment"],
+      ["chk()", "checkPermissions()", "check permissions", "checkPermissions"],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]; b = the speaker, p = agents, g = keeping names and glossary in sync
+    const EDGES = [
+      ["e0", "M106 190 H142", "b", [], 0, 0, "start"],
+      ["e1", "M476 190 H556", "b", ["maps"], 516, 162, "middle"],
+      ["e2", "M1112 190 H1198", "p", ["prompt"], 1155, 162, "middle"],
+      ["e3", "M1236 226 V272", "p", ["greps"], 1252, 256, "start"],
+      ["e4", "M1290 422 V502", "g", ["rename for", "findability"], 1306, 452, "start"],
+      ["e5", "M1254 540 H1094", "g", ["proposes"], 1174, 512, "middle"],
+      ["e6", "M698 540 H488", "g", ["new name"], 593, 512, "middle"],
+      ["e7", "M200 504 V390", "g", ["opens PR"], 216, 456, "start"],
+      ["e8", "M454 350 H556", "g", ["merges"], 505, 322, "middle"],
+    ];
+    const SEQ = [
+      ["e0", "nRaw", 900],
+      ["e1", "nDict"],
+      ["e2", "nAgent"],
+      ["e3", "nGrep", 1200],
+      ["e4", "nNamer", 1200],
+      ["e5", "nRen"],
+      ["e6", "nDP"],
+      ["e7", "nMaint", 1200],
+      ["e8", "dgNew", 1200],
+    ];
+    const LANE = { nMic: 0, nRaw: 0, nMaint: 0, nDict: 1, nAgent: 2, nGrep: 2 };
+    const MK = { g: ["dgG", "#3fb950"], b: ["dgB", "#4493f8"], p: ["dgP", "#ab7df8"] };
+    let g = `<defs><radialGradient id="dgAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient><radialGradient id="dgMicG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#79c0ff"/><stop offset=".55" stop-color="#1f6feb"/><stop offset="1" stop-color="#0c2d6b"/></radialGradient>`;
+    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+    g += `<clipPath id="dgClip"><circle cx="200" cy="350" r="31"/></clipPath>`;
+    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/><rect class="dg-band" x="0" y="470" width="${VW}" height="150"/>`;
+    g += `<text class="fm-lane-t" x="1680" y="546">KEEP IN SYNC</text>`;
+    [
+      [0, 520, "SPEAK"],
+      [520, 1150, "MAP"],
+      [1150, VW, "GREP"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dgLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="430"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += `<g class="dg-mic" id="nMic"><circle class="dg-ring" cx="70" cy="190" r="34"/><circle cx="70" cy="190" r="34" fill="url(#dgMicG)"/><rect x="62" y="170" width="16" height="26" rx="8" fill="#f0f6fc"/><path d="M57 190a13 13 0 0 0 26 0M70 203v9M63 212h14" fill="none" stroke="#f0f6fc" stroke-width="3" stroke-linecap="round"/></g>`;
+    g += `<text class="dg-cap" x="70" y="254">voice</text>`;
+    g += `<g class="fm-out" id="nRaw"><rect x="146" y="120" width="328" height="142" rx="14"/><text class="dg-hd" x="166" y="156">SPEECH-TO-TEXT</text><text class="dg-raw" x="166" y="206" id="dgRaw"></text><text class="dg-miss" x="166" y="242">grep → 0 matches</text></g>`;
+    g += `<g class="dg-dict" id="nDict"><rect class="dg-card" x="560" y="84" width="550" height="326" rx="16"/>${ico("tasklist", 590, 116, 22, "#9198a1")}<text class="dg-hd" x="610" y="122">DICTATION.md</text><text class="dg-hd" x="1090" y="122" text-anchor="end">SPOKEN → CODE</text>`;
+    const row = (cls, id, y, spoken, ident, sid = "", iid = "") =>
+      `<g class="${cls}" id="${id}"><rect x="570" y="${y - 22}" width="530" height="44" rx="10"/><text x="590" y="${y + 7}"${sid}>${spoken}</text><text x="870" y="${y + 7}" text-anchor="middle">→</text><text class="dg-id" x="894" y="${y + 7}"${iid}>${ident}</text></g>`;
+    EX.forEach(([s, id], i) => (g += row("dg-row", "dgRow" + i, 168 + i * 50, `"${s}"`, id)));
+    g += row("dg-new", "dgNew", 372, "", "", ' id="dgNewS"', ' id="dgNewI"') + `</g>`;
+    g += agent("nAgent", 1236, 190, 160, "Agent");
+    g += `<text class="dg-ident" id="dgIdent" x="1424" y="198"><tspan class="dg-k">uses </tspan><tspan id="dgIdentV"></tspan></text>`;
+    g += `<g class="fm-out dg-term" id="nGrep"><rect class="dg-tb" x="1180" y="276" width="600" height="144" rx="14"/>${["#f85149", "#d29922", "#3fb950"].map((c, k) => `<circle cx="${1204 + k * 22}" cy="298" r="6" fill="${c}"/>`).join("")}<text class="dg-hd" x="1272" y="304">bash</text><text class="dg-cmd dg-tl" x="1204" y="352" id="dgCmd"></text><text class="dg-hit dg-tl" x="1204" y="396" id="dgHit"></text></g>`;
+    g += agent("nNamer", 1290, 540, 250, "Function Namer") + `<text class="dg-cap" x="1290" y="604">daily</text>`;
+    g += `<g class="fm-out dg-chip" id="nRen"><rect x="700" y="512" width="390" height="56" rx="14"/><text x="895" y="548"><tspan class="dg-old" id="dgOld"></tspan> → <tspan class="dg-nn" id="dgNN"></tspan></text></g>`;
+    g += agent("nDP", 200, 540, 280, "Dictation Prompt") + `<text class="dg-cap" x="200" y="604">weekly</text>`;
+    g += `<g class="fm-task mra-dev" id="nMaint"><g class="fm-pill b"><rect x="200" y="325" width="250" height="50" rx="25"/><text x="343" y="358">Maintainer</text></g><circle cx="200" cy="350" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="169" y="319" width="62" height="62" clip-path="url(#dgClip)"/></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg dg-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute(
+      "aria-label",
+      "Speak, map, grep: a misheard speech-to-text phrase is mapped by the DICTATION.md glossary to the exact identifier, the agent greps it and finds matches; a daily namer agent proposes clearer API names, a weekly dictation agent opens a pull request adding them to the glossary, and the maintainer reviews and merges it"
+    );
+    svg.style.setProperty("--c", "#4493f8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1000,
+      START = 900,
+      HOLD = 2000,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      if (nid in LANE) $("dgLane" + LANE[nid]).classList.add("on");
+      if (nid === "nDict") $("dgRow" + (cyc % EX.length)).classList.add("pick");
+      if (nid === "nAgent") $("dgIdent").classList.add("on");
+    };
+    const fill = c => {
+      const [s, id, n, f] = EX[c % EX.length],
+        [old, nn, rs, ri] = REN[c % REN.length];
+      $("dgRaw").textContent = `"${s}"`;
+      $("dgIdentV").textContent = id;
+      $("dgCmd").textContent = `$ grep -rn "${id}" .`;
+      $("dgHit").textContent = `✓ ${n} matches in ${f} files`;
+      $("dgOld").textContent = old;
+      $("dgNN").textContent = nn;
+      $("dgNewS").textContent = `+ "${rs}"`;
+      $("dgNewI").textContent = ri;
+    };
+    slides.push({
+      group: "loops",
+      sound: "dictate",
+      palette: ["#1f6feb", "#8957e5", "#3fb950", "#79c0ff"],
+      notes:
+        "Speak, map, grep: talking to agents instead of typing. The run is illustrative; the phrases and corrections come from gh-aw's real DICTATION.md, while the grep counts and the renamed functions are synthetic. When you dictate a prompt, speech-to-text hears words, not identifiers: you say cache-memory and it writes cash memory, you say Dependabot and it writes depend a bot. Agents search the codebase with grep, which matches exact tokens, so cash memory finds nothing. DICTATION.md is a prompt you paste into your voice dictation app: a project glossary plus a list of spoken forms and the exact identifiers they map to, hyphens, dots and casing included. The app's model rewrites the transcript, the agent receives cache-memory, and grep lands on every definition and call site. Two agentic workflows keep it true. A daily namer agent reviews one package at a time and proposes renames so functions say what they do, procSO becomes parseSafeOutputs, which is also how you would say it out loud; Copilot implements the rename. A weekly dictation prompt agent re-reads the docs and code, extracts the vocabulary and opens a pull request that adds the new terms to DICTATION.md; the maintainer, the same person who dictates, reviews and merges it, so the glossary only holds words they actually say. Names you can say map to names you can grep.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .pick").forEach(x => x.classList.remove("on", "hot", "pick"));
+          fill(c);
+          light("nMic");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          fr = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", MK[p.classList[1]][1]);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (fr >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Dictate to agents · say the word, hit the symbol"), h("h2", {}, letters("Speak · Map · "), letters("Grep", "l-grad"))),
+        svg,
+        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["DICTATION.md", "dictation-prompt", "daily-function-namer"].map(n => h("span", {}, n)))
+      ),
+    });
+  }
+
   // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
   {
     resetIndex();
@@ -10430,6 +10645,13 @@
         [0, 0.1, 0.2, 0.3].forEach((d, i) => click(t + 0.75 + d, 3400 - i * 250, 0.035, 10));
         [79, 84, 88].forEach((m, i) => bell(m, t + 1.25 + i * 0.08, 0.035, 1.2));
         pad([52, 59, 64, 71], t + 1.25, 1.8, 0.025, "triangle", 1800);
+      },
+      // speak → map → grep: a vowel-like spoken glide, glossary lookup ticks snapping to the exact word, then a found-it chime
+      dictate: t => {
+        [67, 71, 69].forEach((m, i) => osc("sine", hz(m), t + 0.15 + i * 0.18, 0.2, 0.03, { f1: hz(m + 2), a: 0.03 }));
+        [0, 0.08, 0.16, 0.24].forEach((d, i) => click(t + 0.8 + d, 2400 + i * 300, 0.035, 10));
+        tone(72, t + 1.15, { type: "triangle", dur: 0.14, vol: 0.05, cutoff: 2600, detune: 3 });
+        [79, 84, 88].forEach((m, i) => bell(m, t + 1.4 + i * 0.07, 0.035, 1.2));
       },
       // spec-driven: the diff typed in, a page swish as the spec is written, then four rising test passes resolving on a bell
       spec: t => {
