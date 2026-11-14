@@ -162,6 +162,7 @@
   .hap-mw { fill: #f0f6fc; font: 600 20px "Mona Sans"; }
   .hap-mf { fill: #d1d7e0; font: 500 16px var(--mono); }
   .hap-mo { fill: #9198a1; font: 500 15px var(--mono); }
+  .hap-lw { font-size: 14px; letter-spacing: .12em; fill: #6e7681; }
   .hap-cap { fill: #9198a1; font: 500 16px var(--mono); letter-spacing: .06em; text-anchor: middle; }
   .fm-lane-t.hap-lt { text-anchor: start; }
   .hap-r { opacity: 0; }
@@ -3778,8 +3779,8 @@
       ["TRIGGER", "AGENT", "OUTPUT", "HUMAN"].forEach((t, k) => {
         g += `<text class="fm-lane-t" x="${HCX[k] + HPW / 2 - 10}" y="40">${t}</text>`;
       });
-      g += `<line class="fm-div" x1="${HMX - 22}" y1="0" x2="${HMX - 22}" y2="${HY[3] + 54}"/><text class="fm-lane-t hap-lt" x="${HMX}" y="40">MEASURED</text>`;
-      g += `<text class="hap-cap" x="${HVW / 2}" y="${HVH - 8}">measured on gh-aw · 15 Oct – 14 Nov 2026 · successful Actions runs, filed issues and workflow triggers · flows illustrative</text>`;
+      g += `<line class="fm-div" x1="${HMX - 22}" y1="0" x2="${HMX - 22}" y2="${HY[3] + 54}"/><text class="fm-lane-t hap-lt" x="${HMX}" y="40">MEASURED<tspan class="hap-lw" dx="12">30 DAYS</tspan></text>`;
+      g += `<text class="hap-cap" x="${HVW / 2}" y="${HVH - 8}">measured on gh-aw · 15 Oct – 14 Nov 2026 (30 days) · "1 of N": workflow files, snapshot 14 Nov 2026 · flows illustrative</text>`;
       HAP.forEach(([name, sub, c, nodes, [num, what, wf, of]], r) => {
         const y = HY[r];
         g += `<g class="hap-r" style="--c:${c};animation-delay:${0.6 + r * 0.15}s">`;
@@ -3862,7 +3863,7 @@
       sound: "loop",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
-        "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself, 15 October to 14 November 2026: auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed runs on 825 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals come from the triggers in gh-aw's own workflow files, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
+        "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself over a 30-day window, 15 October to 14 November 2026 (snapshot taken 14 November 2026): auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed runs on 825 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals are a snapshot of the triggers in gh-aw's own workflow files on 14 November 2026, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
       enter() {
         hT0 = 0;
         hCyc = -1;
