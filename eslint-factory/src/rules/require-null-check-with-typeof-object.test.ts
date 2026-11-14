@@ -23,19 +23,81 @@ describe("require-null-check-with-typeof-object", () => {
       invalid: [
         {
           code: `function f(headers) { if (typeof headers === "object") { return Object.values(headers); } }`,
-          errors: [{ message: messageFor("headers") }],
+          errors: [
+            {
+              message: messageFor("headers"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `function f(headers) { if (headers !== null && typeof headers === "object") { return Object.values(headers); } }`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: `if (other && typeof value === "object") use(value);`,
+          errors: [
+            {
+              message: messageFor("value"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `if (other && value !== null && typeof value === "object") use(value);`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: `if (typeof value === "object" || other) use(value);`,
+          errors: [{ message: messageFor("value"), suggestions: [] }],
+        },
+        {
+          code: `if (typeof value === "object" && other || fallback) use(value);`,
+          errors: [{ message: messageFor("value"), suggestions: [] }],
         },
         {
           code: `const states = typeof result === "object" ? Object.values(result.claims || {}) : [];`,
-          errors: [{ message: messageFor("result") }],
+          errors: [
+            {
+              message: messageFor("result"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `const states = result !== null && typeof result === "object" ? Object.values(result.claims || {}) : [];`,
+                },
+              ],
+            },
+          ],
         },
         {
           code: `const ok = !!parsed && typeof parsed.counts === "object";`,
-          errors: [{ message: messageFor("parsed.counts") }],
+          errors: [
+            {
+              message: messageFor("parsed.counts"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `const ok = !!parsed && parsed.counts !== null && typeof parsed.counts === "object";`,
+                },
+              ],
+            },
+          ],
         },
         {
           code: `if (value !== undefined && typeof value === "object") Object.keys(value);`,
-          errors: [{ message: messageFor("value") }],
+          errors: [
+            {
+              message: messageFor("value"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `if (value !== undefined && value !== null && typeof value === "object") Object.keys(value);`,
+                },
+              ],
+            },
+          ],
         },
         {
           code: `const isObj = "object" === typeof value;`,
@@ -43,7 +105,17 @@ describe("require-null-check-with-typeof-object", () => {
         },
         {
           code: `function f(value) { if (value !== undefined) return; return typeof value === "object" ? Object.keys(value) : []; }`,
-          errors: [{ message: messageFor("value") }],
+          errors: [
+            {
+              message: messageFor("value"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `function f(value) { if (value !== undefined) return; return value !== null && typeof value === "object" ? Object.keys(value) : []; }`,
+                },
+              ],
+            },
+          ],
         },
         {
           code: `function f(a, b) { if (b !== null) {} return typeof a === "object"; }`,
@@ -55,15 +127,45 @@ describe("require-null-check-with-typeof-object", () => {
         },
         {
           code: `function f(value) { function helper(value) { if (value) return; } if (typeof value === "object") return Object.keys(value); }`,
-          errors: [{ message: messageFor("value") }],
+          errors: [
+            {
+              message: messageFor("value"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `function f(value) { function helper(value) { if (value) return; } if (value !== null && typeof value === "object") return Object.keys(value); }`,
+                },
+              ],
+            },
+          ],
         },
         {
           code: `function f(value, condition) { const result = condition && value; return typeof value === "object" ? Object.keys(value) : result; }`,
-          errors: [{ message: messageFor("value") }],
+          errors: [
+            {
+              message: messageFor("value"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `function f(value, condition) { const result = condition && value; return value !== null && typeof value === "object" ? Object.keys(value) : result; }`,
+                },
+              ],
+            },
+          ],
         },
         {
           code: `function f(value) { if (value) log("set"); return typeof value === "object" ? Object.keys(value) : []; }`,
-          errors: [{ message: messageFor("value") }],
+          errors: [
+            {
+              message: messageFor("value"),
+              suggestions: [
+                {
+                  messageId: "addNullCheck",
+                  output: `function f(value) { if (value) log("set"); return value !== null && typeof value === "object" ? Object.keys(value) : []; }`,
+                },
+              ],
+            },
+          ],
         },
         {
           code: `if (value == null || typeof value === "object") Object.keys(value);`,

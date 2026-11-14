@@ -53,7 +53,7 @@ safe-outputs:
       client-id: ${{ vars.FORK_APP_CLIENT_ID }}
       private-key: ${{ secrets.FORK_APP_PRIVATE_KEY }}
     github-token-for-extra-empty-commit: ${{ secrets.CI_TOKEN }} # optional token to push empty commit triggering CI
-    signed-commits: true          # signed commits via GraphQL API (default: true); set false to use git push directly
+    signed-commits: true          # signed commits via GitHub APIs (default: true); set false to use git push directly
     protected-files: fallback-to-issue  # push branch, create review issue if protected files modified
 ```
 
@@ -152,7 +152,9 @@ The agent's commits are packaged as a **git bundle** and uploaded as an Actions 
 
 1. Checks out the target repository at the base branch (shallow, depth 1). Any additional `fetch:` refs declared in `checkout:` frontmatter for the target repository are fetched so their commits are locally available.
 2. Imports the local bundle offline with `git bundle unbundle`. If prerequisite commits are missing, the handler fails by default; provision the required objects during authenticated checkout or opt in to prerequisite recovery with `allow-full-history-fetch: true` on that specific PR handler. The opt-in permits potentially unbounded recovery downloads, but bundle import and validation remain offline.
-3. Pushes the branch using the GitHub GraphQL API (signed commits) and creates the pull request.
+3. Publishes signed commits through GitHub's APIs and creates the pull request. For a new branch, it creates the first commit through the REST API, requires GitHub to verify its signature, and creates the branch at that commit. Subsequent commits use GraphQL `createCommitOnBranch`.
+
+The new branch first appears with the proposed changes, rather than pointing temporarily at the base commit. This prevents branch-push CI from reporting skipped or cancelled builds against the base commit. If GitHub does not verify the initial signature, the handler refuses to publish the branch.
 
 If the base branch advances between agent start and `safe_outputs` apply, the PR can be created slightly behind the current base and addressed with a rebase when the necessary bundle objects are available. Otherwise, missing prerequisites cause the handler to fail unless recovery is explicitly enabled as described above. If a non-fast-forward race occurs during the push itself, the job creates a fallback PR from a temporary branch so no changes are lost.
 

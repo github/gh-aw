@@ -27,7 +27,7 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", ledgerTransactionsArtifactName),
-		"          path: ${{ runner.temp }}/gh-aw\n",
+		fmt.Sprintf("          path: %s\n", ledgerTransactionsArtifactDir),
 	)
 	steps = append(steps,
 		"      - name: Checkout repository\n",
@@ -39,7 +39,8 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_TOKEN: ${{ github.token }}\n",
-		"          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json\n",
+		fmt.Sprintf("          GH_AW_LEDGER_TRANSACTIONS: %s\n", ledgerTransactionsArtifactPath),
+		fmt.Sprintf("          GH_AW_LEDGER_TRANSACTIONS_ARTIFACT_NAME: %s\n", ledgerTransactionsArtifactName),
 		fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig),
 	)
 	steps = append(steps, ledgerCommentMemoryCredentialEnv(data)...)

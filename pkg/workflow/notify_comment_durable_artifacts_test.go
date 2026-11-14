@@ -21,6 +21,8 @@ func TestUsageArtifactUploadIncludesDurableSessionMetadata(t *testing.T) {
 func TestUsageArtifactCollectionDurableSessionCopy(t *testing.T) {
 	script, err := os.ReadFile("../../actions/setup/sh/collect_usage_artifact_files.sh")
 	require.NoError(t, err)
+	cpExecutable, err := exec.LookPath("cp")
+	require.NoError(t, err)
 
 	for _, scenario := range []struct {
 		name       string
@@ -50,19 +52,26 @@ func TestUsageArtifactCollectionDurableSessionCopy(t *testing.T) {
 			}
 
 			collector := strings.ReplaceAll(string(script), "/tmp/gh-aw", dir)
+			pathPrefix := ""
 			if scenario.failCopy {
-				collector = `cp() {
-  case "$1" in
-    */agent/durable-session.jsonl)
-      echo "private-copy-error-sentinel" >&2
-      return 1
-      ;;
+				binDir := filepath.Join(dir, "bin")
+				require.NoError(t, os.MkdirAll(binDir, 0755))
+				cpShim := `#!/usr/bin/env bash
+for arg in "$@"; do
+  case "$arg" in
+    */agent/durable-session.jsonl) echo "private-copy-error-sentinel" >&2; exit 1 ;;
   esac
-  command cp "$@"
-}
-` + collector
+done
+exec "$REAL_CP" "$@"
+`
+				require.NoError(t, os.WriteFile(filepath.Join(binDir, "cp"), []byte(cpShim), 0755))
+				pathPrefix = binDir + string(os.PathListSeparator)
 			}
-			output, err := exec.Command("bash", "-c", collector).CombinedOutput()
+			command := exec.Command("bash", "-c", collector)
+			if scenario.failCopy {
+				command.Env = append(os.Environ(), "PATH="+pathPrefix+os.Getenv("PATH"), "REAL_CP="+cpExecutable)
+			}
+			output, err := command.CombinedOutput()
 			require.NoError(t, err, "%s", output)
 			require.NotContains(t, string(output), "private-copy-error-sentinel")
 			warning := "::warning::Durable session metadata could not be copied; continuing usage evidence collection."

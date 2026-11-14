@@ -89,10 +89,54 @@ func TestSpec_PublicAPI_CanonicalValue(t *testing.T) {
 		require.NoError(t, json.Unmarshal(encoded, &decoded), "typed JSON should decode without a float conversion")
 		assert.Equal(t, value, decoded.Count, "typed canonicalization should retain the exact integer")
 	})
-	t.Run("invalid UTF-8 string", func(t *testing.T) {
-		_, err := workqueue.CanonicalValue(map[string]string{"text": string([]byte{0xff})})
-		require.Error(t, err, "typed JSON must reject a string that would require repair")
+	for _, tt := range []struct {
+		name  string
+		value any
+	}{
+		{name: "invalid UTF-8 string", value: map[string]string{"text": string([]byte{0xff})}},
+		{name: "invalid UTF-8 map key", value: map[string]string{string([]byte{0xff}): "value"}},
+		{name: "nested invalid UTF-8 string", value: map[string][]string{"items": {string([]byte{0xff})}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := workqueue.CanonicalValue(tt.value)
+			require.Error(t, err, "typed JSON must reject strings that would require repair")
+		})
+	}
+	t.Run("valid Unicode remains unchanged", func(t *testing.T) {
+		t.Parallel()
+		input := map[string][]string{
+			"日本語": {"café", "こんにちは", "🚀", "e\u0301"},
+		}
+		encoded, err := workqueue.CanonicalValue(input)
+		require.NoError(t, err, "valid Unicode strings and keys should encode without repair")
+		var decoded map[string][]string
+		require.NoError(t, json.Unmarshal(encoded, &decoded), "typed Unicode JSON should decode")
+		assert.Equal(t, input, decoded, "encoding should preserve exact Unicode values, including combining characters")
 	})
+}
+
+// TestSpec_PublicAPI_Canonical_EquivalentObjects checks Public API / Functions:
+// canonical encoding is independent of insignificant object order and spacing.
+func TestSpec_PublicAPI_Canonical_EquivalentObjects(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name  string
+		first string
+		other string
+	}{
+		{name: "object order", first: `{"name":"task","count":1}`, other: "{ \"count\": 1, \"name\": \"task\" }\n"},
+		{name: "nested object order", first: `{"outer":{"b":2,"a":1},"items":[3,4]}`, other: `{"items":[3,4],"outer":{"a":1,"b":2}}`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			first, err := workqueue.Canonical([]byte(tt.first))
+			require.NoError(t, err, "integer-valued JSON should have a canonical representation")
+			other, err := workqueue.Canonical([]byte(tt.other))
+			require.NoError(t, err, "equivalent integer-valued JSON should encode")
+			assert.Equal(t, first, other, "equivalent objects should produce identical canonical bytes")
+		})
+	}
 }
 
 // TestSpec_PublicAPI_IndependentGraphID validates Public API / Functions:
@@ -202,6 +246,36 @@ func TestSpec_Types_PublicContracts(t *testing.T) {
 		{name: "NativeDeliveryOutput", value: workqueue.NativeDeliveryOutput{}},
 		{name: "NativeDeliveryInventory", value: workqueue.NativeDeliveryInventory{}},
 		{name: "NativeOutputVerifier", value: new(workqueue.NativeOutputVerifier)},
+		{name: "CheckpointOperation", value: workqueue.CheckpointOperation{}},
+		{name: "CheckpointParameters", value: workqueue.CheckpointParameters{}},
+		{name: "ClaimOperation", value: workqueue.ClaimOperation{}},
+		{name: "Dependency", value: workqueue.Dependency{}},
+		{name: "Replacement", value: workqueue.Replacement{}},
+		{name: "ResultReference", value: workqueue.ResultReference{}},
+		{name: "OperationsParameters", value: workqueue.OperationsParameters{}},
+		{name: "SubmitParameters", value: workqueue.SubmitParameters{}},
+		{name: "Position", value: workqueue.Position{}},
+		{name: "IssueLinkOperation", value: workqueue.IssueLinkOperation{}},
+		{name: "IssueCommentOperation", value: workqueue.IssueCommentOperation{}},
+		{name: "IssueSynchronizationPending", value: workqueue.IssueSynchronizationPending{}},
+		{name: "IssuesSettings", value: workqueue.IssuesSettings{}},
+		{name: "ProducerRule", value: workqueue.ProducerRule{}},
+		{name: "ProjectorRule", value: workqueue.ProjectorRule{}},
+		{name: "PoolPolicy", value: workqueue.PoolPolicy{}},
+		{name: "PoolInstallOperation", value: workqueue.PoolInstallOperation{}},
+		{name: "WorkerProfile", value: workqueue.WorkerProfile{}},
+		{name: "WorkerRevision", value: workqueue.WorkerRevision{}},
+		{name: "WorkerDeployment", value: workqueue.WorkerDeployment{}},
+		{name: "RetryPolicy", value: workqueue.RetryPolicy{}},
+		{name: "ReconciliationPolicy", value: workqueue.ReconciliationPolicy{}},
+		{name: "Limits", value: workqueue.Limits{}},
+		{name: "Capacity", value: workqueue.Capacity{}},
+		{name: "NativeRun", value: workqueue.NativeRun{}},
+		{name: "RunBinding", value: workqueue.RunBinding{}},
+		{name: "DeliveryVerification", value: workqueue.DeliveryVerification{}},
+		{name: "RemediationVerifier", value: new(workqueue.RemediationVerifier)},
+		{name: "Clock", value: workqueue.Clock{}},
+		{name: "PoolClocks", value: workqueue.PoolClocks{}},
 	}
 
 	for _, tt := range tests {

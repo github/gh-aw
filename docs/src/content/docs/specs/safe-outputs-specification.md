@@ -4427,9 +4427,89 @@ or review bodies to returned or persisted decision evidence.
 
 **Purpose**: Add labels to issues or pull requests.
 
-**Default Max**: 3  
+**Default Max**: 5  
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "add_labels",
+  "description": "Add labels to an existing GitHub issue or pull request for categorization and filtering. Labels must already exist in the repository.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["labels"],
+    "properties": {
+      "labels": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "oneOf": [
+            {"type": "string", "maxLength": 50},
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": {"type": "string", "maxLength": 50},
+                "rationale": {"type": "string", "maxLength": 280},
+                "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+                "suggest": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "description": "Labels to add. Each entry is a label name string or an object with a name plus optional issue-intent metadata."
+      },
+      "item_number": {
+        "type": ["number", "string"],
+        "pattern": "^(\\d+|#?aw_[A-Za-z0-9_]{3,12})$",
+        "description": "Issue or pull request number, or a temporary ID from the same run. If omitted, the triggering item is used."
+      }
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Target Resolution**: The target issue or pull request is resolved per the Target Authorization rules below. When no item number can be resolved, the item fails without calling the GitHub API.
+2. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the target and skip the operation (without error) if the target lacks any required label or its title does not start with the required prefix.
+3. **Empty Input**: An empty `labels` list is skipped with a warning rather than failing the job.
+4. **Per-Call Limit**: The number of requested labels MUST NOT exceed `max-labels` (default: 10). Exceeding it fails the item; labels are never silently dropped.
+5. **Validation**: Labels are sanitized, de-duplicated, checked against `allowed` and `blocked`, and the item succeeds with no labels added when none remain valid.
+6. **Staged Mode**: In staged mode the handler previews the labels it would add and performs no mutation.
+7. **Additive Application**: Labels are added through the REST add-labels endpoint and existing labels on the target MUST be preserved.
+8. **Missing Labels**: When `create-if-missing` is `true`, labels absent from the target repository are created (with a deterministic color) before they are applied. Otherwise, labels that do not exist produce an API error or warning.
+9. **Issue-Intent Metadata**: When a label object carries `rationale`, `confidence`, or `suggest` and issue intent is not disabled, the handler applies it through the GraphQL `updateIssue` mutation, merging the existing labels so that add-only semantics hold and restoring any pre-existing label the mutation removed. Pull requests have no intent-aware mutation and fall back to the REST endpoint without metadata.
+10. **Strict Intent Mode**: When `issue-intent` is explicitly `true`, plain-string labels MUST be rejected and every label object MUST include both `rationale` and `confidence`.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 5)
+- `max-labels`: Maximum labels per call (default: 10; MUST be a positive integer)
+- `allowed`: Allowlist of label names that MAY be added
+- `blocked`: Glob patterns for label names that MUST NOT be added
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue or pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the target for the operation to proceed
+- `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
+- `create-if-missing`: Create labels that do not exist in the target repository (default: `false`)
+- `issues` / `pull-requests`: Set to `false` to drop the corresponding write permission (at least one MUST remain enabled)
+- `issue-intent`: Controls issue-intent metadata handling (`false` disables, `true` makes it mandatory)
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Label names MUST undergo sanitization and be validated against `allowed` and `blocked` before any API call
+- Cross-repository targets MUST be validated against the `allowed-repos` allowlist
+- The target MUST be selected only according to the Target Authorization rules, enforced at runtime
+- The `rationale` of a label object MUST NOT exceed 280 characters
 
 **Required Permissions**:
 
@@ -4463,9 +4543,84 @@ or review bodies to returned or persisted decision evidence.
 
 **Purpose**: Remove labels from issues or pull requests.
 
-**Default Max**: 3  
+**Default Max**: 5  
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
+
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "remove_labels",
+  "description": "Remove labels from an existing GitHub issue or pull request. Silently skips labels that don't exist on the item.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["labels"],
+    "properties": {
+      "labels": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {"type": "string", "maxLength": 50},
+            {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": {"type": "string", "maxLength": 50},
+                "rationale": {"type": "string", "maxLength": 280},
+                "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+                "suggest": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "description": "Labels to remove. Each entry is a label name string or an object with a name plus optional issue-intent metadata."
+      },
+      "item_number": {
+        "type": ["number", "string"],
+        "pattern": "^(\\d+|#?aw_[A-Za-z0-9_]{3,12})$",
+        "description": "Issue or pull request number, or a temporary ID from the same run. If omitted, the triggering item is used."
+      }
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
+**Operational Semantics**:
+
+1. **Target Resolution**: The target issue or pull request is resolved per the Target Authorization rules below. When no item number can be resolved, the item fails without calling the GitHub API.
+2. **Filter Evaluation**: When `required-labels` or `required-title-prefix` is configured, the handler MUST fetch the target and skip the operation if the target lacks any required label or its title does not start with the required prefix.
+3. **Empty Input**: An empty `labels` list fails the item with a message listing the allowed labels when an allowlist is configured.
+4. **Validation**: Labels are sanitized, de-duplicated, and checked against `allowed` and `blocked`; the number of labels MUST NOT exceed the configured `max`. The item succeeds with no labels removed when none remain valid.
+5. **Staged Mode**: In staged mode the handler previews the labels it would remove and performs no mutation.
+6. **Per-Label Removal**: Labels are removed one at a time because the GitHub API has no bulk-removal endpoint.
+7. **Missing Labels**: A label that is not present on the target (HTTP 404 or "Label does not exist") is skipped silently and is not a failure.
+8. **Partial Failure**: Any other per-label failure is logged and reported in `failedLabels` while the remaining labels are still processed.
+9. **Intent Metadata**: Issue-intent metadata on label objects is accepted by the schema, but only the label names are used for removal.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 5)
+- `allowed`: Allowlist of label names that MAY be removed
+- `blocked`: Glob patterns for label names that MUST NOT be removed
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue or pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the target for the operation to proceed
+- `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
+- `issues` / `pull-requests`: Set to `false` to drop the corresponding write permission (at least one MUST remain enabled)
+- `staged`: Staged mode override
+
+**Security Requirements**:
+
+- Label names MUST undergo sanitization and be validated against `allowed` and `blocked` before any API call
+- Cross-repository targets MUST be validated against the `allowed-repos` allowlist
+- The target MUST be selected only according to the Target Authorization rules, enforced at runtime
+- A configuration that cannot be parsed MUST fail closed by granting neither `issues: write` nor `pull-requests: write`
 
 **Required Permissions**:
 
