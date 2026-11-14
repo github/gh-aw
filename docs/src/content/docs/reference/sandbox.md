@@ -326,22 +326,9 @@ Use this for OpenAI-compatible proxies and gateways that expect additional reque
 
 #### Go cache paths in AWF (`GOMODCACHE` / `GOCACHE`)
 
-When using `actions/setup-go` in AWF, pin Go cache paths explicitly so restore behavior is predictable:
+Runner-home cache directories may not be writable inside AWF. Set `GOMODCACHE` and `GOCACHE` to explicit writable paths in workflow-level `env` or `engine.env`, and make the cache's `path` match. Environment variables written to `$GITHUB_ENV` in a custom setup job do not carry over to the agent job.
 
-```yaml wrap
-jobs:
-  setup:
-    steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-          cache: false
-      - run: |
-          echo "GOMODCACHE=$HOME/go/pkg/mod" >> "$GITHUB_ENV"
-          echo "GOCACHE=$HOME/.cache/go-build" >> "$GITHUB_ENV"
-```
-
-Then cache those paths via top-level `cache:` (see [Frontmatter cache configuration](/gh-aw/reference/frontmatter/)). Keep cache keys scoped to trusted contexts and avoid sharing writeable keys between untrusted and protected runs.
+See [Go cache configuration](/gh-aw/reference/faq/#how-should-i-configure-go-caches-safely-in-agentic-workflows) for separate module and build caches, checksum verification, trust scopes, and a pre-build artifact handoff.
 
 ## MCP Gateway
 

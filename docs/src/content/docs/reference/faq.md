@@ -325,30 +325,60 @@ See [Conditional Execution](/gh-aw/reference/frontmatter/#conditional-execution-
 
 ### How should I configure Go caches safely in agentic workflows?
 
-For Go workflows, cache module downloads and build artifacts explicitly, and scope cache keys tightly:
+Cache module downloads (`GOMODCACHE`) separately from compiled packages (`GOCACHE`). Separate entries let you discard build artifacts without discarding downloaded modules. Use keys that include the trust scope, Go version, OS, and `go.sum`; include the architecture for compiled packages.
 
-```yaml wrap
+```aw wrap
+runtimes:
+  go:
+    version: "1.27.4"
+env:
+  GOMODCACHE: /tmp/gh-aw/agent/go-mod
+  GOCACHE: /tmp/gh-aw/agent/go-build
 cache:
-  key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-  path: |
-    ~/go/pkg/mod
-    ~/.cache/go-build
-  restore-keys: |
-    go-${{ runner.os }}-
-
-jobs:
-  setup:
-    steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-          cache: false
-      - run: |
-          echo "GOMODCACHE=$HOME/go/pkg/mod" >> "$GITHUB_ENV"
-          echo "GOCACHE=$HOME/.cache/go-build" >> "$GITHUB_ENV"
+  - key: go-mod-trusted-${{ runner.os }}-1.27.4-${{ hashFiles('go.sum') }}
+    path: /tmp/gh-aw/agent/go-mod
+  - key: go-build-trusted-${{ runner.os }}-${{ runner.arch }}-1.27.4-${{ hashFiles('go.sum') }}
+    path: /tmp/gh-aw/agent/go-build
 ```
 
-Keep cache keys specific to the OS and `go.sum`, do not share writable keys across trust boundaries such as untrusted forks and protected branches, and never place secrets in `GOMODCACHE` or `GOCACHE`.
+The explicit paths avoid relying on runner-home directories being writable inside AWF. Workflow-level `env` applies to every job; use `engine.env` when only the agent needs the override. Writing to `$GITHUB_ENV` inside `jobs.setup` affects that job only and does not configure the agent job.
+
+The compiler's generated Go setup disables `actions/setup-go` caching by default. An explicit setup action can override this with `cache: true`, but its automatic cache is separate from top-level `cache:` and must be reviewed for the same trust boundaries. Prefer one explicit caching strategy.
+
+Omit `restore-keys` for an exact match, as above. If module downloads need a fallback, keep its prefix within the same trust scope, OS, and Go version. A `trusted` prefix is a naming convention, not an access control: only trusted producers should populate caches used by protected runs. `tools.github.min-integrity` filters GitHub tool data; it does not validate Go cache contents or scope arbitrary `cache:` entries like [cache memory](/gh-aw/reference/cache-memory/).
+
+Restoring an Actions cache does not verify Go checksums. Go checks downloads against `go.sum` and its configured checksum database policy; `go mod verify` detects changes to downloaded module content. Keep checksum verification enabled and use `-mod=readonly` when builds must not update module manifests. Build caches contain compiled artifacts and need trusted provenance even when module verification passes.
+
+For a repository with `cmd/app`, a pre-build job can produce a binary for the agent. Add the following job and artifact download to the same workflow; the download transfers files between runners, while environment variables and local directories do not:
+
+```aw wrap
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.4"
+          cache: false
+      - run: |
+          go mod download
+          go mod verify
+          mkdir -p build
+          go build -mod=readonly -o build/app ./cmd/app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go-build-output
+          path: build/
+steps:
+  - uses: actions/download-artifact@v4
+    with:
+      name: go-build-output
+      path: /tmp/gh-aw/agent/build-output
+  - run: chmod +x /tmp/gh-aw/agent/build-output/app
+```
+
+Artifact downloads do not preserve executable permissions, so the final step restores them for the binary. Top-level `cache:` runs in the agent job, so a custom setup job needs its own cache configuration if it also requires persistent caching. See [importing top-level jobs](/gh-aw/reference/imports/#importing-top-level-jobs) for dependency ordering and artifact handoffs.
 
 ## Guardrails
 

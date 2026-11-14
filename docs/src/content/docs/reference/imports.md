@@ -322,7 +322,7 @@ Step fields merge in dependency order: a file's steps follow those of everything
 | `mcp-servers:` | Imported servers override same-named main servers; first-wins across imports. |
 | `network:` | `allowed` domains union (deduped, sorted). Main `mode` and `firewall` take precedence. |
 | `permissions:` | Validation only. Main must declare all imported permissions at sufficient levels (`write` ≥ `read` ≥ `none`). |
-| `safe-outputs:` | Each type may be defined once; main overrides imports. Duplicate types across imports fail. |
+| `safe-outputs:` | Each type may be defined once; explicit main settings override imports. Duplicate types across imports fail. System reporting settings and `require-agent-success` follow the rules below. |
 | `runtimes:` | Main overrides imports; imported values fill unspecified fields. |
 | `plugins:` | Union by plugin path. Identical refs are deduplicated; compatible semantic versions select the highest version. Incompatible majors or conflicting non-semver refs fail. |
 | `services:` | All services merge; duplicate names fail compilation. |
@@ -335,6 +335,18 @@ Step fields merge in dependency order: a file's steps follow those of everything
 | `jobs:` | Imported jobs are added and main definitions win. Same-named jobs follow [Importing Top-level `jobs:`](#importing-top-level-jobs). |
 | `safe-outputs.jobs` | Names must be unique; duplicates fail. Order is determined by `needs:` dependencies. |
 | `env:` | Main env vars take precedence. Duplicate keys across imports fail compilation; move the override to the main workflow. |
+
+For the auto-enabled system handlers `report-missing-tool`, `report-missing-data`, `noop`, and `report-incomplete`, an explicit imported setting overrides an implicit default even when the main workflow declares other safe outputs. An imported `false` suppresses the handler's issue creation; the reporting tool remains available to record the outcome. Later imports that omit the setting do not restore issue creation. An explicit setting in the main workflow takes precedence.
+
+For example, a shared workflow can suppress missing-tool and missing-data issues:
+
+```aw wrap
+safe-outputs:
+  report-missing-tool: false
+  report-missing-data: false
+```
+
+For [`require-agent-success`](/gh-aw/reference/safe-outputs/#require-agent-success-require-agent-success), an explicit main-workflow value wins. Otherwise, any imported `true` enables the publication gate.
 
 Example — `tools.bash.allowed` merging:
 
