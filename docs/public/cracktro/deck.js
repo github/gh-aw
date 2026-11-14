@@ -1038,18 +1038,18 @@
     });
   }
 
-  // Anatomy of a workflow: one synthetic .md dissected into front matter, schedule, inputs, steps, safe outputs and prompt
+  // Anatomy of a workflow: one synthetic .md dissected into front matter, schedule, tools, steps, safe outputs and prompt
   {
     resetIndex();
     const YAML = [
       "---",
       "on:",
       "  schedule: daily on weekdays",
-      "  workflow_dispatch:",
-      "    inputs:",
-      "      focus:",
-      "        description: Area to audit",
-      "        default: docs",
+      "tools:",
+      "  github:",
+      "    toolsets: [issues]",
+      "  repo-memory:",
+      "    branch-name: memory/docs-audit",
       "permissions: read-all",
       "steps:",
       "  - run: npm ci",
@@ -1060,7 +1060,7 @@
       "    max: 1",
       "---",
     ];
-    const C = { fm: "#d1d7e0", sch: "#d29922", in: "#4493f8", st: "#39c5cf", so: "#3fb950", pr: "#ab7df8" };
+    const C = { fm: "#d1d7e0", sch: "#d29922", tl: "#4493f8", st: "#39c5cf", so: "#3fb950", pr: "#ab7df8" };
     const tok = (k, text) => h("span", { class: `an-tok an-tok-${k}`, "--c": C[k], style: { color: C[k] } }, text);
     const yamlLine = l => {
       if (l === "---") return [h("span", { style: { color: "#656c76" } }, l)];
@@ -1069,8 +1069,8 @@
     };
     const BODY = [
       [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, "# Docs audit")],
-      ["Audit ", tok("in", "${{ inputs.focus }}"), " using ", tok("st", "lint.json"), "."],
-      ["Group findings by severity, then open"],
+      ["Triage ", tok("st", "lint.json"), ". Skip findings already in"],
+      [tok("tl", "memory"), " or ", tok("tl", "open issues"), ", then file"],
       [tok("so", "one issue"), " with a checklist of fixes."],
     ];
     const lines = [...YAML.map(yamlLine), ...BODY].map(kids => h("div", { class: "an-ln" }, kids));
@@ -1078,7 +1078,7 @@
       CODE_TOP = 345;
     const CALLS = [
       ["sch", [2, 3], "Schedule", "on: schedule", "Fuzzy schedule in plain words; the compiler scatters it to a concrete cron."],
-      ["in", [4, 8], "Inputs", "workflow_dispatch", ["Typed parameters for manual runs; the prompt reads ", h("code", {}, "inputs.focus"), "."]],
+      ["tl", [4, 8], "Tools", "tools:", ["Read-only GitHub toolsets, plus ", h("code", {}, "repo-memory"), ": a git branch the agent keeps notes in across runs."]],
       ["st", [10, 12], "Steps", "deterministic", ["Plain shell runs before the agent and leaves ", h("code", {}, "lint.json"), " in the workspace."]],
       ["so", [13, 16], "Safe outputs", "max: 1", "The agent stays read-only. It can only request one issue; a separate job writes it."],
       ["pr", [18, 21], "Prompt", "markdown body", "Everything below the front matter is the agent prompt: plain-English instructions it follows on every run."],
@@ -1107,7 +1107,7 @@
     }).join("");
     const paths = [...wires.querySelectorAll("path")],
       dots = [...wires.querySelectorAll("circle")];
-    const toks = { in: lines[18].querySelector(".an-tok-in"), st: lines[18].querySelector(".an-tok-st"), so: lines[20].querySelector(".an-tok-so") };
+    const toks = { tl: [...lines[19].querySelectorAll(".an-tok-tl")], st: [lines[18].querySelector(".an-tok-st")], so: [lines[20].querySelector(".an-tok-so")] };
     // reveal order: front matter brace, then each callout (the prompt callout also brings the body brace)
     const REVEAL = 0.6,
       GAP = 1,
@@ -1131,14 +1131,14 @@
       sound: "ship",
       palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
       notes:
-        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that the compiler turns into a hardened lock file, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. workflow_dispatch inputs give manual runs a typed parameter that the prompt reads as inputs.focus. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
+        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that the compiler turns into a hardened lock file, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
       enter() {
         t0 = 0;
         seen = -1;
         skip = false;
         if (!botSvg.firstChild) botSvg.innerHTML = OCTI.copilot.map(d => `<path d="${d}"/>`).join("");
         [bot, lock].forEach(e => e.classList.remove("on", "hot"));
-        [...lines, ...bands, ...calls, ...paths, ...dots, ...braces, ...Object.values(toks)].forEach(e => e.classList.remove("on", "hot"));
+        [...lines, ...bands, ...calls, ...paths, ...dots, ...braces, ...Object.values(toks).flat()].forEach(e => e.classList.remove("on", "hot"));
       },
       onNext() {
         if (seen >= 5) return false;
@@ -1161,9 +1161,7 @@
         braces[1].classList.toggle("hot", hot === 5);
         bot.classList.toggle("hot", hot === 5);
         [bands, calls, paths].forEach(list => list.forEach((el, i) => el.classList.toggle("hot", hot === i + 1)));
-        toks.in.classList.toggle("hot", hot === 2);
-        toks.st.classList.toggle("hot", hot === 3);
-        toks.so.classList.toggle("hot", hot === 4);
+        ["tl", "st", "so"].forEach((k, i) => toks[k].forEach(el => el.classList.toggle("hot", hot === i + 2)));
       },
       el: h(
         "section",
