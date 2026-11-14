@@ -3072,7 +3072,7 @@
       sound: "unslop",
       palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
       notes:
-        "Merge fast, unslop daily. This is an illustrative, synthetic timeline. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is three quarters done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: thirty fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. The feature ships a slice at a time, so its percentage climbs with every merge and the feature is complete while the polished lane is still in review. The slop that gets through is eaten by many background unsloppers, daily workflows such as code simplifier, dead code remover, duplicate code detector and file diet, which open their own small clean-up pull requests. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
+        "Merge fast, unslop daily. This is an illustrative, synthetic timeline. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: thirty fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. The feature ships a slice at a time, so its percentage climbs with every merge and the feature is complete while the polished lane is still in review. The slop that gets through is eaten by many background unsloppers, daily workflows such as code simplifier, dead code remover, duplicate code detector and file diet, which open their own small clean-up pull requests. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -3108,7 +3108,7 @@
         nitT.textContent = NITS[k * per + r - 1];
         nit.style.opacity = !review || v < 0 ? 0 : f < 0.12 ? f / 0.12 : f > 0.85 ? (1 - f) / 0.15 : 1;
         if (review && v >= 0) once(`n${k}_${r}`, () => sfx.key(0.5));
-        $("usNA").textContent = `${m * 25}%`;
+        $("usNA").textContent = `${Math.round((m * 40) / A_N)}%`;
         $("usMA").textContent = `${m} PR${m === 1 ? "" : "s"} merged`;
         $("usCA").textContent = `${m} slop left`;
         // lane B: a fast pull request every beat, reviewed by agents and merged; sweeps eat what slipped through
