@@ -1391,6 +1391,23 @@
   .land-med em { font: 700 19px var(--mono); font-style: normal; color: var(--c); }
   .land-med span:nth-child(5) em { color: #c3a6f9; }
   .land-legend.hist-legend { left: 110px; top: 1000px; width: auto; }
+  .evo-main, .evo-side { position: absolute; top: 280px; opacity: 0; }
+  .evo-main { left: 110px; width: 1060px; }
+  .evo-side { left: 1250px; width: 560px; }
+  .active .evo-main, .active .evo-side { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
+  .evo-svg { display: block; width: 100%; height: 440px; overflow: visible; font-family: "Mona Sans"; }
+  .evo-main .hist-legend { position: static; width: auto; margin-top: 4px; opacity: 1; animation: none; }
+  .evo-wf { fill: none; stroke: #3fb950; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #3fb95088); }
+  .evo-wf-dot { fill: #3fb950; filter: drop-shadow(0 0 12px #3fb950); }
+  .evo-ax-r { fill: #3fb950; }
+  .evo-med { fill: #f0f6fc; font: 700 17px var(--mono); }
+  .evo-side .evo-svg { margin-top: 34px; }
+  .evo-sx { font-size: 14px; }
+  .evo-facts { position: absolute; left: 110px; top: 880px; width: 1700px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 26px; }
+  .evo-fact { border-left: 4px solid var(--c); padding: 4px 0 4px 18px; opacity: 0; }
+  .active .evo-fact { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 140ms + 1.4s); }
+  .evo-fact b { display: block; font: 700 40px/1 var(--mono); color: var(--c); white-space: nowrap; }
+  .evo-fact span { display: block; margin-top: 8px; font-size: 19px; line-height: 1.25; color: #c9d1d9; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -9357,6 +9374,180 @@
     });
   }
 
+  // How workflows evolve: measured commits that changed gh-aw's own workflow Markdown, the live workflow count and a statistical look at edit sizes
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    // Calendar months Aug 2025 – Oct 2026 (October ends at GA, 28 Oct 2026); first-parent commits on main touching .github/workflows/**/*.md
+    const MON = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
+    const AGENT = [11, 18, 225, 208, 249, 277, 161, 152, 279, 324, 293, 229, 399, 97, 100];
+    const PEOPLE = [19, 48, 70, 50, 52, 69, 73, 16, 22, 41, 16, 5, 19, 4, 161];
+    // live workflows (top-level .md files) at month end
+    const WF = [16, 4, 65, 90, 128, 147, 162, 179, 205, 237, 258, 266, 297, 300, 349];
+    // lines added + removed in workflow .md files per commit
+    const SIZE_BINS = ["1–2", "3–9", "10–29", "30–99", "100–299", "300–999", "1k+"];
+    const SIZE = [621, 793, 726, 777, 524, 218, 28];
+    const N = MON.length;
+    const W = 1060,
+      H = 470,
+      CX = 60,
+      BASE = 400,
+      TOP = 20,
+      YMAX = 450,
+      SLOT = (W - CX - 70) / N,
+      BW = SLOT * 0.6;
+    const xs = p => CX + p * SLOT;
+    const y = v => BASE - ((BASE - TOP) * v) / YMAX;
+    const main = document.createElementNS(NS, "svg");
+    main.setAttribute("class", "evo-svg");
+    main.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    main.setAttribute("role", "img");
+    main.setAttribute("aria-label", "Measured: commits on gh-aw's main branch that changed workflow Markdown, per month, split into agent and bot accounts and people, with the number of live workflows at month end, from August 2025 to general availability in October 2026");
+    let g = "";
+    for (const v of [0, 100, 200, 300, 400])
+      g += `<line x1="${CX - 8}" x2="${xs(N) + 6}" y1="${y(v)}" y2="${y(v)}" class="hist-grid"/><text x="${CX - 14}" y="${y(v) + 6}" class="hist-ax" text-anchor="end">${v}</text><text x="${xs(N) + 16}" y="${y(v) + 6}" class="hist-ax evo-ax-r">${v}</text>`;
+    MON.forEach((m, i) => {
+      g += `<text x="${xs(i + 0.5)}" y="${BASE + 30}" class="hist-ax" text-anchor="middle">${m}</text>`;
+      if (i === 0 || i === 5) g += `<text x="${xs(i + 0.5)}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">${i ? 2026 : 2025}</text>`;
+    });
+    main.innerHTML = `<g>${g}</g><g class="evo-bars"></g><path class="evo-wf" d=""/><circle class="evo-wf-dot" r="8" cx="${xs(0.5)}" cy="${y(WF[0])}"/><line class="hist-axis" x1="${CX - 8}" x2="${xs(N) + 6}" y1="${BASE}" y2="${BASE}"/>`;
+    const mk = (parent, cls, fill) => {
+      const r = document.createElementNS(NS, "rect");
+      if (cls) r.setAttribute("class", cls);
+      if (fill) r.setAttribute("fill", fill);
+      r.setAttribute("rx", 3);
+      parent.append(r);
+      return r;
+    };
+    const barsG = main.querySelector(".evo-bars");
+    const bars = MON.map((_, i) =>
+      ["hist-b-copilot", "hist-b-other"].map(cls => {
+        const r = mk(barsG, cls);
+        r.setAttribute("x", xs(i + 0.5) - BW / 2);
+        r.setAttribute("width", BW);
+        return r;
+      })
+    );
+    const wfPath = main.querySelector(".evo-wf"),
+      wfDot = main.querySelector(".evo-wf-dot");
+    // size histogram
+    const SW = 560,
+      SX = 50,
+      SYMAX = 900,
+      sslot = (SW - SX) / SIZE.length,
+      sbw = sslot * 0.66;
+    const sy = v => BASE - ((BASE - TOP) * v) / SYMAX;
+    const side = document.createElementNS(NS, "svg");
+    side.setAttribute("class", "evo-svg");
+    side.setAttribute("viewBox", `0 0 ${SW} ${H}`);
+    side.setAttribute("role", "img");
+    side.setAttribute("aria-label", "Measured: distribution of lines added plus removed in workflow Markdown per commit, on log-spaced bins; median 18 lines");
+    let sg = "";
+    for (const v of [0, 200, 400, 600, 800]) sg += `<line x1="${SX - 8}" x2="${SW}" y1="${sy(v)}" y2="${sy(v)}" class="hist-grid"/><text x="${SX - 14}" y="${sy(v) + 6}" class="hist-ax" text-anchor="end">${v}</text>`;
+    SIZE_BINS.forEach((b, i) => (sg += `<text x="${SX + sslot * (i + 0.5)}" y="${BASE + 30}" class="hist-ax evo-sx" text-anchor="middle">${b}</text>`));
+    // median 18 sits in the 10–29 bin; place the marker by log position within it
+    const mx = SX + sslot * (2 + Math.log(18 / 10) / Math.log(30 / 10));
+    sg += `<text x="${SX + sslot * 3.5}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">lines per commit (log bins)</text>`;
+    side.innerHTML = `<g>${sg}</g><g class="evo-sbars"></g><line class="hist-head" x1="${mx}" x2="${mx}" y1="${TOP + 10}" y2="${BASE}"/><text x="${mx + 8}" y="${TOP + 24}" class="evo-med">median 18</text><line class="hist-axis" x1="${SX - 8}" x2="${SW}" y1="${BASE}" y2="${BASE}"/>`;
+    const sbG = side.querySelector(".evo-sbars");
+    const sbars = SIZE.map((_, i) => {
+      const r = mk(sbG, "", "#db61a2");
+      r.setAttribute("x", SX + sslot * (i + 0.5) - sbw / 2);
+      r.setAttribute("width", sbw);
+      return r;
+    });
+    const ease = v => 1 - (1 - Math.max(0, Math.min(1, v))) ** 3;
+    const render = u => {
+      const p = u * N;
+      const pts = [];
+      for (let i = 0; i < N; i++) {
+        const e = ease((p - i) * 1.5);
+        const ha = (BASE - y(AGENT[i])) * e,
+          hp = (BASE - y(PEOPLE[i])) * e;
+        bars[i][0].setAttribute("y", BASE - ha);
+        bars[i][0].setAttribute("height", ha);
+        bars[i][1].setAttribute("y", BASE - ha - hp);
+        bars[i][1].setAttribute("height", hp);
+        if (p >= i) pts.push([xs(i + 0.5), y(WF[i])]);
+      }
+      const k = Math.min(N - 1, Math.floor(p)),
+        f = Math.min(1, p - k);
+      const cur = k < N - 1 ? [xs(k + 0.5 + f), y(WF[k] + (WF[k + 1] - WF[k]) * f)] : [xs(N - 0.5), y(WF[N - 1])];
+      const line = [...pts, cur];
+      wfPath.setAttribute("d", "M" + line.map(([a, b]) => `${a.toFixed(1)} ${b.toFixed(1)}`).join(" L"));
+      wfDot.setAttribute("cx", cur[0]);
+      wfDot.setAttribute("cy", cur[1]);
+      sbars.forEach((r, i) => {
+        const hgt = (BASE - sy(SIZE[i])) * ease(u * 2.2 - 0.9 - i * 0.08);
+        r.setAttribute("y", BASE - hgt);
+        r.setAttribute("height", hgt);
+      });
+    };
+    let t0 = 0,
+      u = 0,
+      lastMonth = -1;
+    const DUR = 4200;
+    const FACTS = [
+      ["ρ = −0.03", "edit size vs date · Spearman: no trend", "#f0f6fc"],
+      ["p = 0.22", "Mann–Whitney, before vs after Mar 2026 · both medians 18", "#4493f8"],
+      ["4.5 → 0.75", "commits per live workflow per month, Oct ’25 → Oct ’26", "#3fb950"],
+      ["61%", "of lines changed sit in the largest 10% of commits", "#db61a2"],
+      ["G = 0.52", "Gini of edits over 527 workflow files", "#ab7df8"],
+    ];
+    slides.push({
+      group: "scale",
+      sound: "evolve",
+      palette: ["#3fb950", "#ab7df8", "#db61a2", "#4493f8"],
+      notes:
+        "Not illustrative: measured from git on gh-aw's main branch, from the first commit on 12 August 2025 to the end of 28 October 2026 (GA at Universe), Pacific time. Commits are first-parent commits on main (squash merges, about one per merged pull request): 3,687 of 18,045 changed at least one Markdown file under .github/workflows, meaning workflows or their shared imports (497 files at GA); compiled lock files are excluded. Lines changed are lines added plus removed in those Markdown files only. Live workflows are top-level workflow Markdown files at each month end: 545 were created and 196 retired, leaving 349; September dips to 4 because 48 early examples were removed. 82 percent of these commits are authored by agent and bot accounts, mostly the Copilot coding agent; people's accounts may still have used AI. Size distribution: median 18 lines, mean 83, 90th percentile 209, 99th percentile 886. It is heavy-tailed: 38 percent change fewer than 10 lines, 71 percent touch one file, and the largest 10 percent of commits carry 61 percent of all lines changed. Statistical tests: the Spearman rank correlation between commit date and size is -0.03, so edit size shows no trend; a Mann-Whitney U test comparing sizes before and after 1 March 2026 (1,530 vs 2,157 commits) gives z = 1.23, p of about 0.22, with both medians at 18 lines and a common-language effect size of 0.51, so no detectable shift. Monthly commit volume is only weakly related to time (Spearman 0.32) while the fleet grew more than fivefold after October 2025, so commits per live workflow per month fell from 4.5 to 0.75: workflows settle after creation and are then tuned with small edits. Edits are concentrated: 527 workflow files were edited, a median of 15 times each, with a Gini coefficient of 0.52; the busiest are the engine smoke tests.",
+      enter() {
+        t0 = 0;
+        lastMonth = -1;
+        u = matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0;
+        render(u);
+      },
+      tick(t) {
+        if (u >= 1) return;
+        if (!t0) t0 = t;
+        u = Math.min(1, (t - t0) / DUR);
+        const m = Math.floor(u * N);
+        if (m !== lastMonth && m < N) sfx.pop((lastMonth = m));
+        render(u);
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · workflow Markdown on gh-aw main"), h("h2", {}, letters("How workflows "), letters("evolve", "l-grad"))),
+        h(
+          "div",
+          { class: "evo-main", "--i": 0 },
+          h("div", { class: "land-t" }, "Commits per month · live workflows"),
+          h("div", { class: "land-big" }, h("b", {}, "3,687"), h("span", {}, "commits changed a workflow .md · 545 created, 196 retired, 349 live")),
+          h(
+            "div",
+            { class: "hist-legend" },
+            h("span", { "--c": "#ab7df8" }, "agent & bot accounts · 82%"),
+            h("span", { "--c": "#4493f8" }, "people · 18%"),
+            h("span", { "--c": "#3fb950", class: "ln" }, "live workflows")
+          ),
+          main
+        ),
+        h(
+          "div",
+          { class: "evo-side", "--i": 1 },
+          h("div", { class: "land-t" }, "Lines changed per commit"),
+          h("div", { class: "land-big" }, h("b", {}, "18"), h("span", {}, "median · p90 209 · 71% touch one file")),
+          side
+        ),
+        h(
+          "div",
+          { class: "evo-facts" },
+          FACTS.map(([big, txt, c], i) => h("div", { class: "evo-fact", "--c": c, "--i": i }, h("b", {}, big), h("span", {}, txt)))
+        )
+      ),
+    });
+  }
+
   const stage = h(
     "div",
     { class: "stage" },
@@ -9990,6 +10181,12 @@
         [0, 0.07, 0.13, 0.2, 0.28, 0.4, 0.58, 0.85, 1.25].forEach((d, i) => tone(76 - i * 2, t + 0.15 + d, { type: "square", dur: 0.08, vol: 0.04, cutoff: 3000, detune: 3 }));
         pad([50, 57, 62, 66], t + 1.3, 2.4, 0.024, "triangle", 1500);
         bell(86, t + 1.4, 0.035, 1.4);
+      },
+      // how workflows evolve: a walk that branches upward as the fleet grows, then settles into small repeated steps
+      evolve: t => {
+        [55, 59, 62, 67, 66, 67, 71, 74, 72, 74, 74, 74].forEach((m, i) => tone(m, t + 0.15 + i * 0.16, { type: "triangle", dur: 0.22, vol: 0.045, cutoff: 2400, detune: 4 }));
+        pad([43, 50, 55, 59, 62], t + 0.2, 3.2, 0.022, "triangle", 1400);
+        [79, 83].forEach((m, i) => bell(m, t + 2.1 + i * 0.12, 0.035, 1.5));
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
