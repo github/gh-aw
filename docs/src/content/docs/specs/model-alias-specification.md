@@ -7,9 +7,9 @@ sidebar:
 
 # Model Alias Format Specification
 
-**Version**: 1.3.1\
+**Version**: 1.4.0\
 **Status**: Draft  
-**Publication Date**: 2026-05-03  
+**Publication Date**: 2026-11-14\
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [model-alias-specification](/gh-aw/specs/model-alias-specification/)  
 **Latest Published Version**: This document
@@ -157,10 +157,12 @@ provider-token    = ALPHA 0*( ALPHA / DIGIT / "-" )
                     ; starts with a letter; hyphens allowed but not at end
 
 model-token       = model-segment *( "/" model-segment )
-                    ; slash-separated namespaces are preserved in exact model IDs
+                    ; one or more nonempty slash-separated namespace segments;
+                    ; the complete token is preserved for exact model IDs
 
 model-segment     = model-char 0*( model-char / "." model-char )
-                    ; segments separated by "."; each segment starts with ALPHA or DIGIT
+                    ; segments separated by "."; each component starts with
+                    ; ALPHA or DIGIT
 
 model-char        = ALPHA / DIGIT / "-" / "_"
                     ; the underscore is permitted inside model tokens only
@@ -185,7 +187,7 @@ param-value       = 1*( ALPHA / DIGIT / "-" / "_" / "." )
 | Segment | Allowed characters | Notes |
 |---------|-------------------|-------|
 | Provider token | `[A-Za-z0-9-]` | MUST start with a letter; MUST NOT end with `-` |
-| Model token | `[A-Za-z0-9-_./]` | Slash separates nonempty namespace segments; dot separates version segments |
+| Model token | `[A-Za-z0-9-_./]` | Contains one or more nonempty slash-separated segments; dot separates version components |
 | Bare name | `[A-Za-z0-9-_.]` | MUST NOT start with `-` or `.` |
 | Glob wildcard | `*` | Only in model-glob-token; provider token MUST NOT contain `*` |
 | Parameter key | `[A-Za-z0-9-]` | MUST start with a letter |
@@ -196,7 +198,7 @@ Characters explicitly PROHIBITED in all segments: whitespace, `@`, `!`, `#`, `$`
 **Notes:**
 
 - The `?` character separates the base identifier from the query string.
-- The first `/` separates the provider from the exact model ID. Remaining slashes belong to the model ID, for example `openrouter/anthropic/claude-sonnet-4`. Empty namespace segments are invalid. Glob tokens retain their separate grammar; `*` does not match `/`.
+- The first `/` separates the provider from the model token. Any remaining `/` characters are part of the exact model token and delimit nonempty namespace segments; for example, `openrouter/anthropic/claude-sonnet-4`. Glob tokens retain their separate grammar: `*` does not match `/`.
 - An implementation MUST NOT percent-encode or percent-decode the model identifier string; the syntax is self-contained.
 - Multiple parameters are separated by `&`.
 - A bare identifier with no `?` and no `/` is treated as an alias name during resolution (see Section 8).
@@ -724,6 +726,8 @@ At compile time, an implementation SHOULD:
 - **T-MAF-007**: Reject `temperature=3.0` (out of range)
 - **T-MAF-008**: Reject `my model` (whitespace in identifier)
 - **T-MAF-009**: Reject `my:model` (colon in identifier); error message MUST identify the offending character
+- **T-MAF-010**: Parse namespaced exact model identifiers such as `openrouter/anthropic/claude-sonnet-4`, `openrouter/moonshotai/kimi-k3`, and `openrouter/vendor/team/model.v2`; preserve the complete model token and attached parameters.
+- **T-MAF-011**: Reject namespaced identifiers containing an empty segment, invalid dot/dash placement, whitespace, prohibited punctuation, or percent-encoded separators.
 
 #### 12.1.2 Resolution Tests
 
@@ -736,6 +740,7 @@ At compile time, an implementation SHOULD:
 - **T-MAF-026**: Given catalog `[copilot/claude-opus-4, copilot/claude-opus-4.5]` and pattern `copilot/*opus*`, resolution returns `copilot/claude-opus-4.5` (latest semver wins)
 - **T-MAF-027**: Given catalog `[copilot/claude-sonnet-4.5-20250310, copilot/claude-sonnet-4.5-20250514]` and pattern `copilot/*sonnet*`, resolution returns `copilot/claude-sonnet-4.5-20250514` (latest date wins when versions are equal)
 - **T-MAF-028**: Given catalog entries with no version string, they are ranked as `0.0.0` and lose to entries with a version
+- **T-MAF-029**: Preserve and match the complete namespaced suffix during exact and glob resolution: `openrouter/anthropic/claude-sonnet-4` matches the identical catalog entry, does not match `openrouter/anthropic/claude-opus-4`, and `openrouter/*` does not match the namespaced entry.
 
 #### 12.1.3 Merge Precedence Tests
 
@@ -763,6 +768,8 @@ At compile time, an implementation SHOULD:
 | Temperature range validation | T-MAF-007 | 1 | Required |
 | Whitespace rejection (V-MAF-006) | T-MAF-008 | 1 | Required |
 | Illegal character rejection with message | T-MAF-009 | 1 | Required |
+| Namespaced exact-model parsing | T-MAF-010, 011 | 1 | Required |
+| Full namespaced suffix preservation and matching | T-MAF-029 | 2 | Required |
 | Single-hop alias resolution | T-MAF-020 | 2 | Required |
 | Transitive alias resolution | T-MAF-021 | 2 | Required |
 | Parameter propagation | T-MAF-022 | 2 | Required |
@@ -825,9 +832,14 @@ This section maps normative sections of this specification to the implementation
 
 | Spec Section | Description | Implementation File(s) |
 |---|---|---|
-| §4 Model Identifier Syntax | Grammar for bare names, provider-scoped names, glob patterns, parameter encoding | `pkg/workflow/model_aliases.go` (`parseModelIdentifier`) |
+| §4 Model Identifier Syntax | Grammar for bare names, provider-scoped names, namespaced exact model tokens, glob patterns, parameter encoding | `pkg/workflow/model_identifier.go` (`ParseModelIdentifier`, `validateModelToken`); `actions/setup/js/resolve_model_alias.cjs` (`globMatch`) |
 | §5 URL-Style Parameter Encoding | `?key=value` parsing, percent-decoding, duplicate key handling | `pkg/workflow/model_aliases.go` (`parseModelIdentifier`) |
 | §6 Defined Parameters | `effort` and `temperature` normalization and validation | `pkg/workflow/model_alias_validation.go` (V-MAF-002, V-MAF-003) |
+
+### Namespaced Syntax Test Reference (§4.1 / V-MAF-001 / V-MAF-006)
+
+- **T-MAF-010/T-MAF-011**: `pkg/workflow/model_alias_validation_test.go`, `TestParseModelIdentifier_NamespacedModel` — covers valid namespaced identifiers and invalid empty, malformed, whitespace-containing, prohibited-character, and percent-encoded forms.
+- **T-MAF-029**: `actions/setup/js/resolve_model_alias.test.cjs`, `preserves the full namespaced model token when matching` — verifies complete-suffix preservation and matching behavior.
 
 ### §7–§10 Alias Map and Resolution
 
@@ -1024,6 +1036,12 @@ Model parameters are compile-time configuration values and are not derived from 
 ---
 
 ## Change Log
+
+### Version 1.4.0 (Draft)
+
+- **Added**: §4.1 support for exact provider-scoped model identifiers whose model token contains multiple nonempty slash-separated namespace segments.
+- **Clarified**: Namespace separators are preserved for exact matching; glob wildcards continue to match within a model token and MUST NOT cross `/`.
+- **Added**: Conformance tests T-MAF-010, T-MAF-011, and T-MAF-029 with implementation mappings for valid/invalid namespaced syntax and full-suffix matching.
 
 ### Version 1.3.1 (Draft)
 
