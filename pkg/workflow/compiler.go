@@ -441,10 +441,10 @@ func (c *Compiler) validateTemplateInjection(yamlContent, lockFile, markdownPath
 		// references (e.g. ${{ runner.temp }}, ${{ env.FOO }}).
 		//
 		// needsUnsafeCheck:    true when user-controlled contexts appear in run: blocks
-		//                      → triggers validateNoTemplateInjectionFromParsed
+		//                      → triggers validateRunScriptTemplateInjection
 		// needsDisallowedCheck: true when any expression outside the compiler allow-list
 		//                      appears in run: blocks
-		//                      → triggers validateNoGitHubExpressionsInRunScriptsFromParsed
+		//                      → triggers validateRunScriptExpressions
 		scan := scanRunContentExpressions(yamlContent)
 		needsUnsafeCheck := scan.hasUnsafe
 		needsDisallowedCheck := scan.hasDisallowed
@@ -458,7 +458,7 @@ func (c *Compiler) validateTemplateInjection(yamlContent, lockFile, markdownPath
 				reparsed = nil
 			}
 			if reparsed != nil {
-				// validateNoTemplateInjectionFromParsed only catches user-controlled contexts,
+				// validateRunScriptTemplateInjection(…, false) only catches user-controlled contexts,
 				// so it is intentionally skipped when the UnsafeContextPattern scan found none.
 				if needsUnsafeCheck {
 					templateErr = validateRunScriptTemplateInjection(reparsed, false)
