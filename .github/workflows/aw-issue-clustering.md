@@ -115,6 +115,9 @@ safe-outputs:
               setupGlobals(core, github, context, exec, io, getOctokit);
               const { publish } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/aw_issue_clustering_publish.cjs`);
               await publish({ github, context, core, createIssue });
+imports:
+  - shared/reporting.md
+
 ---
 
 # AW essential ten
