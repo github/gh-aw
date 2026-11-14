@@ -1,0 +1,116 @@
+{
+ "date": "2026-11-14",
+ "window": "2026-10-15..2026-11-14",
+ "total_prs": 606,
+ "merged": 521,
+ "closed": 77,
+ "open": 8,
+ "merge_rate": 0.871,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "feature": [
+   111,
+   99,
+   12,
+   0
+  ],
+  "bug_fix": [
+   79,
+   68,
+   11,
+   0
+  ],
+  "security": [
+   52,
+   46,
+   6,
+   0
+  ],
+  "testing": [
+   45,
+   40,
+   4,
+   1
+  ],
+  "documentation": [
+   44,
+   41,
+   2,
+   1
+  ],
+  "refactor": [
+   35,
+   26,
+   9,
+   0
+  ],
+  "dependency": [
+   24,
+   21,
+   3,
+   0
+  ],
+  "other": [
+   216,
+   180,
+   30,
+   6
+  ]
+ },
+ "category_format": "[total,merged,closed,open]",
+ "length_buckets_completed": {
+  "0-100": [
+   313,
+   267
+  ],
+  "100-150": [
+   166,
+   142
+  ],
+  "150-250": [
+   29,
+   25
+  ],
+  "250+": [
+   90,
+   87
+  ]
+ },
+ "signals_completed": {
+  "acceptance": [
+   30,
+   29
+  ],
+  "docs_terms": [
+   70,
+   68
+  ],
+  "test_cmd": [
+   43,
+   41
+  ],
+  "code_block": [
+   344,
+   316
+  ],
+  "file_path": [
+   155,
+   145
+  ]
+ },
+ "negative_titles": {
+  "wip": [
+   10,
+   3
+  ],
+  "triage_verify_investigate": [
+   21,
+   9
+  ],
+  "noop": [
+   3,
+   0
+  ]
+ },
+ "category_rules": "v4 (conventional-commit prefix, else title keyword regex)"
+}
