@@ -433,6 +433,11 @@
   .an-band.hot { background: color-mix(in srgb, var(--c) 22%, transparent); box-shadow: inset 0 0 40px -12px var(--c); }
   .an-tok { border-radius: 6px; transition: background .4s, box-shadow .4s; }
   .an-tok.hot { background: color-mix(in srgb, var(--c) 30%, transparent); box-shadow: 0 0 0 2px var(--c), 0 0 24px var(--c); }
+  .an-bot { position: absolute; z-index: 2; right: 18px; display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 14px 0 10px; border-radius: 99px; background: var(--c); color: #0d1117;
+    font: 700 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; opacity: 0; transform: scale(.8); transition: opacity .5s, transform .6s cubic-bezier(.3,1.6,.4,1), box-shadow .5s; }
+  .an-bot.on { opacity: 1; transform: none; }
+  .an-bot svg { width: 22px; height: 22px; fill: #0d1117; }
+  .an-bot.hot { box-shadow: 0 0 30px var(--c); }
   .an-brace { position: absolute; left: 150px; width: 26px; border: 3px solid var(--c); border-right: 0; border-radius: 14px 0 0 14px; opacity: 0; transform: translateX(-16px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), box-shadow .5s; }
   .an-brace.on { opacity: 1; transform: none; }
   .an-brace.hot { box-shadow: -10px 0 30px -12px var(--c); }
@@ -1076,7 +1081,7 @@
       ["in", [4, 8], "Inputs", "workflow_dispatch", ["Typed parameters for manual runs; the prompt reads ", h("code", {}, "inputs.focus"), "."]],
       ["st", [10, 12], "Steps", "deterministic", ["Plain shell runs before the agent and leaves ", h("code", {}, "lint.json"), " in the workspace."]],
       ["so", [13, 16], "Safe outputs", "max: 1", "The agent stays read-only. It can only request one issue; a separate job writes it."],
-      ["pr", [18, 21], "Prompt", "markdown body", "Plain-English instructions the coding agent follows on every run."],
+      ["pr", [18, 21], "Prompt", "markdown body", "Everything below the front matter is the agent prompt: plain-English instructions it follows on every run."],
     ];
     const CALL_TOP = [295, 440, 585, 730, 875];
     const bands = CALLS.map(([k, [a, b]]) => h("div", { class: "an-band", "--c": C[k], style: { top: `${18 + (a - 1) * LH}px`, height: `${(b - a + 1) * LH}px` } }));
@@ -1084,7 +1089,14 @@
       h("div", { class: "an-call", "--c": C[k], style: { top: `${CALL_TOP[i]}px` } }, h("div", { class: "an-num" }, String(i + 1).padStart(2, "0")), h("h3", {}, title, h("code", {}, chip)), h("p", {}, text))
     );
     const brace = (k, [a, b], label) => h("div", { class: "an-brace", "--c": C[k], style: { top: `${CODE_TOP + (a - 1) * LH + 2}px`, height: `${(b - a + 1) * LH - 4}px` } }, h("span", {}, label));
-    const braces = [brace("fm", [1, 17], "Front matter · YAML"), brace("pr", [18, 21], "Body")];
+    const braces = [brace("fm", [1, 17], "Front matter"), brace("pr", [18, 21], "Prompt")];
+    const botSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    botSvg.setAttribute("viewBox", "0 0 24 24");
+    const bot = h("div", { class: "an-bot", "--c": C.pr, style: { top: `${18 + 17 * LH}px` } }, botSvg, "Agent prompt");
+    const lockSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    lockSvg.setAttribute("viewBox", "0 0 24 24");
+    lockSvg.innerHTML = '<path d="M12 1.5 3 5v6.5c0 5.2 3.8 9.6 9 11 5.2-1.4 9-5.8 9-11V5L12 1.5Zm0 6a2.5 2.5 0 0 1 1.25 4.67V15.5h-2.5v-3.33A2.5 2.5 0 0 1 12 7.5Z"/>';
+    const lock = h("div", { class: "an-bot", "--c": C.fm, style: { top: "18px" } }, lockSvg, "Deterministic security config");
     const wires = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     wires.setAttribute("class", "an-wires");
     wires.setAttribute("viewBox", "0 0 1920 1080");
@@ -1106,24 +1118,26 @@
       skip = false;
     const lit = (idx, on) => {
       if (idx === 0) {
-        braces[0].classList.toggle("on", on);
+        [braces[0], lock].forEach(e => e.classList.toggle("on", on));
         [0, 8, 16].forEach(n => lines[n].classList.toggle("on", on));
         return;
       }
       const [, [a, b]] = CALLS[idx - 1];
       for (let n = a - 1; n < b; n++) lines[n].classList.toggle("on", on);
       [bands, calls, paths, dots].forEach(list => list[idx - 1].classList.toggle("on", on));
-      if (idx === 5) braces[1].classList.toggle("on", on);
+      if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
     };
     slides.push({
       sound: "ship",
       palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
       notes:
-        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: YAML the compiler reads. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. workflow_dispatch inputs give manual runs a typed parameter that the prompt reads as inputs.focus. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the prompt, natural-language instructions the coding agent follows on every run.",
+        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that the compiler turns into a hardened lock file, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. workflow_dispatch inputs give manual runs a typed parameter that the prompt reads as inputs.focus. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
       enter() {
         t0 = 0;
         seen = -1;
         skip = false;
+        if (!botSvg.firstChild) botSvg.innerHTML = OCTI.copilot.map(d => `<path d="${d}"/>`).join("");
+        [bot, lock].forEach(e => e.classList.remove("on", "hot"));
         [...lines, ...bands, ...calls, ...paths, ...dots, ...braces, ...Object.values(toks)].forEach(e => e.classList.remove("on", "hot"));
       },
       onNext() {
@@ -1143,7 +1157,9 @@
         }
         const hot = e >= CYCLE ? Math.floor((e - CYCLE) / HOT) % 6 : -1;
         braces[0].classList.toggle("hot", hot === 0);
+        lock.classList.toggle("hot", hot === 0);
         braces[1].classList.toggle("hot", hot === 5);
+        bot.classList.toggle("hot", hot === 5);
         [bands, calls, paths].forEach(list => list.forEach((el, i) => el.classList.toggle("hot", hot === i + 1)));
         toks.in.classList.toggle("hot", hot === 2);
         toks.st.classList.toggle("hot", hot === 3);
@@ -1153,7 +1169,7 @@
         "section",
         { class: "slide an" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Inside one file"), h("h2", { class: "pf-h" }, letters("Anatomy of a "), letters("workflow", "l-grad"))),
-        h("div", { class: "an-file" }, h("div", { class: "file" }, "📄 .github/workflows/docs-audit.md"), h("div", { class: "an-code" }, bands, lines)),
+        h("div", { class: "an-file" }, h("div", { class: "file" }, "📄 .github/workflows/docs-audit.md"), h("div", { class: "an-code" }, bands, lines, lock, bot)),
         braces,
         wires,
         calls
