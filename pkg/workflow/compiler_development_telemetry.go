@@ -31,6 +31,7 @@ func (c *Compiler) prepareDryRunWorkflowData(data *WorkflowData) (*WorkflowData,
 	// Remove authored code and credentials before job construction and token wiring.
 	result.CustomSteps = ""
 	result.PostSteps = ""
+	omitDryRunHostEffects(result)
 	if err := prepareDryRunWorkflowDispatch(result); err != nil {
 		return nil, err
 	}

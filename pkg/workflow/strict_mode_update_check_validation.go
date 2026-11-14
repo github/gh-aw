@@ -50,7 +50,7 @@ func (c *Compiler) validateUpdateCheck(frontmatter map[string]any) error {
 			"The workflow will not verify that it was compiled with a supported version of gh-aw. "+
 			"It is strongly recommended to keep check-for-updates enabled.",
 	))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 
 	return nil
 }

@@ -120,7 +120,7 @@ func (c *Compiler) validateCheckoutPersistCredentials(frontmatter map[string]any
 
 	// Non-strict mode: emit a warning
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 	return nil
 }
 

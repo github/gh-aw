@@ -68,3 +68,11 @@ Dry-run compilation now rejects workflows that previously compiled with unsuppor
 Disabled jobs preserve graph references but reduce coverage: dependent jobs can skip, and empty or absent outputs do not exercise production data flow. A successful diagnostic run cannot validate the disabled jobs or reusable workflow bodies. The explicit policy and tests must also evolve when new execution surfaces are added.
 
 A successful dry-run compile is only one precondition for hosted execution, not proof of a side-effect-free workflow. Agent shell execution, custom engines, supplied credentials, runner identity, and external services still require independent review. Dispatch must use the exact reviewed source and compiled lock revision under the [active debugging gates](../../.github/aw/debug-agentic-workflow.md); `--dry-run` compilation alone neither starts a run nor authorizes one.
+
+## Amendment: Omit Common Host Effects and Advisory Warnings
+
+Rejecting `pre-steps`, `pre-agent-steps`, custom MCP servers, `mcp-scripts`, and enabled Bash graders, and failing on every compiler warning, made dry-run compilation fail for roughly a third of repository workflows, so authors abandoned it. These declarations are now omitted from dry-run locks, including imports, exactly like `steps` and `post-steps`, and reported in `disabled_effects` and the scope message. Omission removes their code and credentials; the agent runs without those tools, and engines installed via `pre-agent-steps` cannot run. Network allowlist entries derived from omitted servers are retained.
+
+`on.steps`, safe-output/threat-detection/secret-masking steps, unsafe built-in job overrides, custom safe-output scripts/actions, and authored OIDC permissions remain rejected because they run in privileged or credential-bearing contexts that a reduced workflow cannot represent faithfully.
+
+Compiler warnings are split: lint and security-relevant warnings (strict-mode secrets, `pull_request_target`, permissions, checkout, firewall, install scripts) remain blocking; generic warnings (deprecations, style, schedule hints) are advisory and reported as `advisory_compiler_warnings`. Scanner, validation, safe-update, and model-inventory gates are unchanged.

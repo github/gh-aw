@@ -167,7 +167,7 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 						fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
 						c.permissionWarningShown[markdownPath] = warningFingerprint
 					}
-					c.IncrementWarningCount()
+					c.IncrementSecurityWarningCount()
 				}
 			}
 		}
@@ -212,7 +212,7 @@ Ensure proper audience validation and trust policies are configured.`
 	if shouldWarnClaudeCopilotRequestsPermission(workflowData, workflowPermissions) {
 		warnMsg := `Claude engine with model-provider: github uses the COPILOT_GITHUB_TOKEN secret because this workflow does not grant permissions: { copilot-requests: write }. Personal access tokens may be rejected by the Copilot model catalog (401 from /models), which leaves Claude-on-Copilot without models. Set permissions: { copilot-requests: write } to use ${{ github.token }} instead — see https://github.github.com/gh-aw/reference/billing/ for details. To keep using COPILOT_GITHUB_TOKEN and silence this warning, set permissions.copilot-requests: none.`
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warnMsg))
-		c.IncrementWarningCount()
+		c.IncrementSecurityWarningCount()
 	}
 
 	return workflowPermissions, nil

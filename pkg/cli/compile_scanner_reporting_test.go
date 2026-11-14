@@ -548,7 +548,7 @@ func TestShellcheckReportingDisambiguatesScriptLocations(t *testing.T) {
 func TestDryRunLowScannerWarningsDoNotMaskCompilerWarnings(t *testing.T) {
 	t.Parallel()
 	compiler := workflow.NewCompiler()
-	compiler.IncrementWarningCount()
+	compiler.IncrementSecurityWarningCount()
 	results := []ValidationResult{{
 		Scope: "batch", Workflow: "shellcheck", Valid: true,
 		Warnings: []ValidationIssue{{Message: "advice", Severity: scanfindings.SeverityInfo}},

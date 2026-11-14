@@ -10,6 +10,14 @@ include generated locks before execution/upload. Reviewer stays read-only.
 Follow [debugger restrictions](debug-agentic-workflow.md). PASS grants no dispatch
 permission. Preserve scanners, isolation, credential restrictions and human live gates.
 
+## When Review Is Required
+
+Keep review proportional. No reviewer is needed for read-only inspection, trusted
+`gh aw compile`/`validate` (including `--dry-run`), `gh aw audit`/`logs`, or existing
+repository tests and builds on unchanged code. Review is required before executing
+changed code, harnesses, build hooks or MCP startup, and before upload/dispatch.
+Small changes need a small packet; do not expand scope to unrelated code.
+
 ## Dry-Run Dangerous Features
 
 - Strict validation must reject enabled `dangerously-*` fields in dry-run workflow
@@ -44,7 +52,7 @@ secrets or infer credential validity/expiry from insufficient metadata.
   Before each upload/dispatch, re-review changed source/locks, compile and record
   exact revisions/hashes. No new destinations, broader effects or bypassed host/
   protected-environment gates. Longer authorization does not increase caps.
-- Any compiler security warning revokes the grant immediately. Record it; stop
+- Any lint or security-classified compiler warning (not advisory warnings) revokes the grant immediately. Record it; stop
   affected uploads/dispatches. Fix, re-review and obtain fresh explicit authorization.
   A clean compile alone cannot restore approval. Other failed checks still block.
 - Revocation, exhausted bounds or session end also end the grant; no inheritance.
@@ -154,8 +162,9 @@ evidence: path:lines; credential source -> sink/destination or relevant control
 reason: <one evidence-grounded sentence>
 ```
 
-UNKNOWN = missing evidence/applicability, never success.
-Absent path: YES requires code-grounded not-applicable explanation.
+UNKNOWN = missing evidence for a reachable path, never success.
+Absent path: answer YES with a one-line code-grounded not-applicable reason
+(for example, "no credential references in the diff"); this is not a gap.
 
 ## Decision
 
@@ -164,6 +173,8 @@ Absent path: YES requires code-grounded not-applicable explanation.
 - PASS only if every question has an evidence-backed YES from the single reviewer;
   all findings resolved, coverage complete. Otherwise block affected execution/upload.
   Continue static diagnosis/fixes; no reviewer shopping or endless debate.
+- Advisory compiler warnings, low-severity scanner findings and style issues are
+  not review findings; do not block on them.
 - Store intent/provenance, base/hashes, reviewer/model, answers, confirmed findings
   with paths/lines, gaps and PASS/BLOCKED/UNAVAILABLE in session artifacts. Never commit raw logs.
 - Intent/code/import/dependency/lock changes invalidate affected verdicts.

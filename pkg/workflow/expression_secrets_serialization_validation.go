@@ -185,6 +185,6 @@ func (c *Compiler) validateSecretsSerializationExpressions(workflowData *Workflo
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
-	c.IncrementWarningCount()
+	c.IncrementSecurityWarningCount()
 	return nil
 }

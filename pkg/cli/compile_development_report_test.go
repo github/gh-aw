@@ -49,7 +49,7 @@ func TestDryRunCompileReport(t *testing.T) {
 			assert.Equal(t, DryRunScannerCheck{Requested: true, Status: "not_run"}, summary.DryRun.Scanners["shellcheck"])
 			assert.Equal(t, DryRunScannerCheck{Status: "not_run"}, summary.DryRun.Scanners["zizmor"])
 			assert.Contains(t, summary.DryRun.UnverifiedEffects, "custom credentials")
-			assert.Equal(t, []string{"steps", "post-steps"}, summary.DryRun.DisabledEffects)
+			assert.Equal(t, []string{"steps", "post-steps", "pre-steps", "pre-agent-steps", "custom MCP servers", "mcp-scripts", "Bash graders"}, summary.DryRun.DisabledEffects)
 			output, err := formatValidationOutput(test.results)
 			require.NoError(t, err)
 			var decoded []ValidationResult
@@ -61,9 +61,9 @@ func TestDryRunCompileReport(t *testing.T) {
 
 func TestDryRunScopeReportsOmittedSteps(t *testing.T) {
 	t.Parallel()
-	assert.Contains(t, dryRunScopeMessage, "Authored steps and post-steps are omitted from emitted locks")
+	assert.Contains(t, dryRunScopeMessage, "pre-steps, pre-agent-steps, custom MCP servers, mcp-scripts, and Bash graders are omitted from emitted locks")
 	assert.Contains(t, dryRunScopeMessage, "separate dispatch does not execute them")
-	assert.Contains(t, dryRunScopeMessage, "Pre-steps, pre-agent-steps, on.steps")
+	assert.Contains(t, dryRunScopeMessage, "On.steps, custom safe-output scripts, and authored OIDC permissions are rejected")
 	assert.NotContains(t, dryRunScopeMessage, "Host scripts")
 }
 
@@ -78,8 +78,13 @@ func TestDryRunExperimentalOptIn(t *testing.T) {
 	}{
 		{name: "low-severity notices do not block by default", passed: true},
 		{name: "explicit acceptance", allow: true, passed: true},
-		{name: "ordinary warning", allow: true, setup: func(c *workflow.Compiler, _ *CompilationStats, _ *[]ValidationResult, _ *CompileConfig) {
+		{name: "advisory warning", allow: true, passed: true, setup: func(c *workflow.Compiler, stats *CompilationStats, _ *[]ValidationResult, _ *CompileConfig) {
 			c.IncrementWarningCount()
+			stats.Warnings++
+		}},
+		{name: "security warning", allow: true, setup: func(c *workflow.Compiler, stats *CompilationStats, _ *[]ValidationResult, _ *CompileConfig) {
+			c.IncrementSecurityWarningCount()
+			stats.Warnings++
 		}},
 		{name: "aggregate warning", allow: true, setup: func(_ *workflow.Compiler, stats *CompilationStats, _ *[]ValidationResult, _ *CompileConfig) {
 			stats.Warnings++

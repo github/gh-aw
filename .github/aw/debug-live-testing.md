@@ -82,7 +82,7 @@ effects, rather than performing the technical review. Specify run-count, time/sp
 caps and monitoring deadline/poll interval; default to one run.
 An explicit [session authorization](debug-security-review.md#session-authorization)
 may cover subsequent agent-reviewed iterations within the recorded scope and
-bounds without repeated human approval. Any compiler security warning revokes it;
+bounds without repeated human approval. Any lint or security-classified compiler warning (not advisory warnings) revokes it;
 a later clean compile does not reinstate it.
 Record host/repo, workflow, inputs, reviewed commit and remote ref. Recheck the
 ref before `gh aw run WORKFLOW --ref REVIEWED_REF`; verify the resulting run SHA.

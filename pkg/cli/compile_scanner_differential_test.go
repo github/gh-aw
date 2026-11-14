@@ -739,7 +739,7 @@ func TestDryRunLowSeverityWorkflowWarnings(t *testing.T) {
 			config.dryRunReport = newDryRunCompileReport(config)
 			compiler := workflow.NewCompiler()
 			if compilerWarning {
-				compiler.IncrementWarningCount()
+				compiler.IncrementSecurityWarningCount()
 			}
 			stats := &CompilationStats{Succeeded: 1, Warnings: 1}
 			results := []ValidationResult{{
