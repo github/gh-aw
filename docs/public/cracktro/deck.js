@@ -1055,6 +1055,40 @@
   .en-sens span { padding: 7px 12px; border-radius: 8px; font: 500 16px/1 var(--mono); color: #656c76; border: 1px solid #30363d; }
   .en-sens span.on { color: #0d1117; background: #3fb950; border-color: #3fb950; font-weight: 700; }
 
+  /* --- first commit to GA (measured history) --- */
+  .hist-tiles { position: absolute; left: 110px; top: 300px; width: 640px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
+  .hist-tile { border-left: 4px solid var(--c); padding: 6px 0 6px 20px; opacity: 0; }
+  .active .hist-tile { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 110ms + 400ms); }
+  .hist-tile b { display: block; font: 700 60px/1 var(--mono); color: var(--c); font-variant-numeric: tabular-nums; }
+  .hist-tile span { display: block; margin-top: 8px; font-size: 26px; font-variation-settings: "wght" 650, "wdth" 100; color: #f0f6fc; }
+  .hist-tile small { display: block; margin-top: 4px; font: 500 17px/1.2 var(--mono); color: #9198a1; }
+  .hist-splits { position: absolute; left: 110px; top: 800px; width: 640px; display: flex; flex-direction: column; gap: 26px; opacity: 0; }
+  .active .hist-splits { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.2s; }
+  .hist-split-t { font: 600 18px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #9198a1; }
+  .hist-split-bar { display: flex; height: 18px; margin: 12px 0 10px; border-radius: 9px; overflow: hidden; gap: 3px; }
+  .hist-split-l { display: flex; gap: 24px; font-size: 20px; color: #c9d1d9; }
+  .hist-split-l em { font: 700 20px var(--mono); font-style: normal; color: var(--c); }
+  .hist-legend { position: absolute; left: 830px; top: 300px; display: flex; gap: 30px; opacity: 0; }
+  .active .hist-legend { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .hist-legend span { font: 600 19px/1 var(--mono); color: #ffffffd0; display: flex; align-items: center; gap: 10px; }
+  .hist-legend span::before { content: ""; width: 16px; height: 16px; border-radius: 3px; background: var(--c); }
+  .hist-legend span.ln::before { height: 4px; border-radius: 2px; }
+  .hist-svg { position: absolute; left: 760px; top: 340px; width: 1150px; height: 700px; overflow: visible; font-family: "Mona Sans"; }
+  .hist-grid { stroke: #ffffff12; stroke-width: 1; }
+  .hist-axis { stroke: #ffffff40; stroke-width: 2; }
+  .hist-ax { fill: #9198a1; font: 500 17px var(--mono); }
+  .hist-ax-l { fill: #d29922; }
+  .hist-yr { fill: #f0f6fc; font: 700 18px var(--mono); }
+  .hist-b-copilot { fill: #ab7df8; } .hist-b-bot { fill: #3fb950; } .hist-b-other { fill: #4493f8; }
+  .hist-loc { fill: none; stroke: #d29922; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 10px #d2992288); }
+  .hist-loc-dot { fill: #d29922; filter: drop-shadow(0 0 12px #d29922); }
+  .hist-head { stroke: #f0f6fc55; stroke-width: 2; stroke-dasharray: 4 6; }
+  .hist-flag { opacity: 0; transition: opacity .5s; }
+  .hist-flag.on { opacity: 1; }
+  .hist-flag line { stroke: var(--c); stroke-width: 2; stroke-dasharray: 6 6; }
+  .hist-flag circle { fill: var(--c); stroke: #0d1117; stroke-width: 3; }
+  .hist-fl { fill: var(--c); font: 700 22px "Mona Sans"; }
+  .hist-fd { fill: #9198a1; font: 500 16px var(--mono); }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -6397,6 +6431,220 @@
     });
   }
 
+  // First commit to GA: measured gh-aw history, monthly PRs by opener account and code size, from the first commit to GA at Universe
+  {
+    resetIndex();
+    const NS = "http://www.w3.org/2000/svg";
+    const nf = new Intl.NumberFormat("en-US");
+    // Calendar months Aug 2025 – Oct 2026 (October ends at GA, 28 Oct 2026).
+    const MON = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
+    const PRS = [130, 553, 1249, 1137, 1766, 2402, 2048, 1580, 1987, 2575, 1983, 1889, 2279, 870, 1484];
+    const PR_COPILOT = [30, 330, 1016, 947, 1525, 2094, 1486, 1097, 1459, 1690, 1522, 1484, 1720, 557, 552];
+    const PR_BOT = [7, 123, 147, 138, 188, 155, 207, 359, 385, 774, 340, 345, 476, 230, 268];
+    const ISSUES = [128, 253, 374, 644, 783, 1342, 2784, 1970, 2392, 2805, 3267, 3815, 4590, 5384, 5914];
+    const COMMITS = [199, 435, 1209, 1016, 1372, 1835, 1727, 1272, 1568, 1838, 1649, 1459, 1810, 638, 1251];
+    const RELEASES = [14, 25, 44, 20, 21, 47, 97, 52, 26, 30, 34, 22, 23, 34, 36];
+    const GO = [45343, 83895, 167218, 229698, 308671, 384658, 418714, 478675, 551585, 635605, 694490, 774553, 865285, 911402, 1114264];
+    const JS = [4964, 18340, 31187, 56842, 60565, 90464, 125903, 153134, 188628, 242988, 283948, 326296, 372962, 397896, 571579];
+    const LOC = GO.map((g, i) => g + JS[i]);
+    const N = MON.length;
+    const mStart = i => Date.UTC(2025, 7 + i, 1);
+    const DAY = 864e5,
+      T0 = Date.UTC(2025, 7, 12),
+      TGA = Date.UTC(2026, 9, 28);
+    const at = d => {
+      const i = Math.min(N - 1, Math.floor((new Date(d).getUTCFullYear() - 2025) * 12 + new Date(d).getUTCMonth() - 7));
+      return i + (d - mStart(i)) / (mStart(i + 1) - mStart(i));
+    };
+    const P0 = at(T0),
+      PEND = at(TGA + DAY);
+    const MILES = [
+      [T0, "first commit", "12 Aug 2025", "#9198a1"],
+      [Date.UTC(2026, 1, 13), "technical preview", "13 Feb 2026", "#4493f8"],
+      [Date.UTC(2026, 5, 11), "public preview", "11 Jun 2026", "#ab7df8"],
+      [TGA, "GA · Universe", "28 Oct 2026", "#3fb950"],
+    ];
+    // chart frame
+    const CX = 70,
+      SLOT = 66,
+      BW = 40,
+      BASE = 600,
+      TOP = 90,
+      PMAX = 2600,
+      LMAX = 1800000;
+    const xs = p => CX + p * SLOT;
+    const yP = v => BASE - ((BASE - TOP) * v) / PMAX;
+    const yL = v => BASE - ((BASE - TOP) * v) / LMAX;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "hist-svg");
+    svg.setAttribute("viewBox", "0 0 1150 700");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Measured gh-aw history: pull requests opened per month by the Copilot coding agent, the workflow bot and other accounts, with total Go and JavaScript lines, from the first commit in August 2025 to general availability at GitHub Universe in October 2026");
+    let grid = "";
+    for (const v of [0, 500, 1000, 1500, 2000, 2500]) grid += `<line x1="${CX - 10}" x2="${xs(N) + 6}" y1="${yP(v)}" y2="${yP(v)}" class="hist-grid"/><text x="${CX - 16}" y="${yP(v) + 6}" class="hist-ax" text-anchor="end">${v ? `${v / 1000}k` : "0"}</text>`;
+    for (const v of [500000, 1000000, 1500000]) grid += `<text x="${xs(N) + 14}" y="${yL(v) + 6}" class="hist-ax hist-ax-l">${v / 1e6}M</text>`;
+    let months = "";
+    MON.forEach((m, i) => {
+      months += `<text x="${xs(i + 0.5)}" y="${BASE + 30}" class="hist-ax" text-anchor="middle">${m}</text>`;
+      if (i === 0 || i === 5) months += `<text x="${xs(i + 0.5)}" y="${BASE + 58}" class="hist-yr" text-anchor="middle">${i ? 2026 : 2025}</text>`;
+    });
+    let flags = "";
+    MILES.forEach(([d, label, date, c], k) => {
+      const x = xs(at(d)),
+        end = k === MILES.length - 1,
+        ly = k % 2 ? 26 : 62;
+      flags += `<g class="hist-flag" data-k="${k}" style="--c:${c}"><line x1="${x}" x2="${x}" y1="${ly + 14}" y2="${BASE}"/><circle cx="${x}" cy="${BASE}" r="7"/><text x="${x + (end ? 10 : -6)}" y="${ly - 18}" text-anchor="${end ? "end" : "start"}" class="hist-fl">${label}</text><text x="${x + (end ? 10 : -6)}" y="${ly + 4}" text-anchor="${end ? "end" : "start"}" class="hist-fd">${date}</text></g>`;
+    });
+    svg.innerHTML = `
+      <g>${grid}</g>
+      <g class="hist-bars"></g>
+      <path class="hist-loc" d=""/>
+      <circle class="hist-loc-dot" r="8" cx="${CX}" cy="${BASE}"/>
+      <line class="hist-axis" x1="${CX - 10}" x2="${xs(N) + 6}" y1="${BASE}" y2="${BASE}"/>
+      <g>${months}</g>
+      <g>${flags}</g>
+      <line class="hist-head" x1="${CX}" x2="${CX}" y1="${TOP - 10}" y2="${BASE}"/>`;
+    const barsG = svg.querySelector(".hist-bars");
+    const bars = MON.map((_, i) => {
+      const seg = ["hist-b-copilot", "hist-b-bot", "hist-b-other"].map(cls => {
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("class", cls);
+        r.setAttribute("x", xs(i + 0.5) - BW / 2);
+        r.setAttribute("width", BW);
+        r.setAttribute("rx", 3);
+        barsG.append(r);
+        return r;
+      });
+      return seg;
+    });
+    const locPath = svg.querySelector(".hist-loc"),
+      locDot = svg.querySelector(".hist-loc-dot"),
+      head = svg.querySelector(".hist-head"),
+      flagEls = [...svg.querySelectorAll(".hist-flag")];
+    // share of month i elapsed at playhead p; data spans 12 Aug 2025 to 28 Oct 2026, so the first and last months are partial
+    const fr = (i, p) => {
+      const a = i ? i : P0,
+        b = i === N - 1 ? PEND : i + 1;
+      return Math.max(0, Math.min(1, (p - a) / (b - a)));
+    };
+    const cum = (arr, p) => arr.reduce((s, v, i) => s + v * fr(i, p), 0);
+    const snap = (arr, p) => {
+      const i = Math.min(N - 1, Math.floor(p));
+      return (i ? arr[i - 1] : 0) + (arr[i] - (i ? arr[i - 1] : 0)) * fr(i, p);
+    };
+    const dayAt = p => {
+      const i = Math.min(N - 1, Math.floor(p)),
+        f = Math.min(1, p - i);
+      return Math.max(0, Math.min(TGA, mStart(i) + f * (mStart(i + 1) - mStart(i))) - T0) / DAY;
+    };
+    const TILES = [
+      ["days", p => Math.round(dayAt(p)), "#9198a1", "12 Aug 2025 → 28 Oct 2026"],
+      ["commits", p => cum(COMMITS, p), "#f0f6fc", "on main, all authors"],
+      ["pull requests", p => cum(PRS, p), "#ab7df8", "18,123 merged"],
+      ["issues", p => cum(ISSUES, p), "#4493f8", "33,441 by the workflow bot"],
+      ["releases", p => cum(RELEASES, p), "#3fb950", "v0.0.21 → v1.0.0"],
+      ["lines of Go + JS", p => snap(LOC, p), "#d29922", "incl. tests, at month end"],
+    ];
+    const tileVals = TILES.map(() => h("b", {}, "0"));
+    const fmt = (k, v) => (k === 5 ? (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : `${Math.round(v / 1000)}k`) : nf.format(Math.round(v)));
+    const split = (title, parts) =>
+      h(
+        "div",
+        { class: "hist-split" },
+        h("div", { class: "hist-split-t" }, title),
+        h("div", { class: "hist-split-bar" }, parts.map(([w, c]) => h("i", { style: { width: `${w}%`, background: c } }))),
+        h("div", { class: "hist-split-l" }, parts.map(([w, c, l]) => h("span", { "--c": c }, h("em", {}, `${w}%`), ` ${l}`)))
+      );
+    let p = P0,
+      t0 = 0,
+      lastMonth = -1,
+      lastFlag = -1;
+    const DUR = 9000;
+    const render = () => {
+      const pts = [];
+      for (let i = 0; i < N; i++) {
+        const g = Math.min(1, fr(i, p) * 1.4);
+        const vals = [PR_COPILOT[i], PR_BOT[i], PRS[i] - PR_COPILOT[i] - PR_BOT[i]];
+        let acc = 0;
+        bars[i].forEach((r, j) => {
+          const hgt = (BASE - yP(vals[j])) * g;
+          r.setAttribute("y", yP(0) - acc - hgt);
+          r.setAttribute("height", Math.max(0, hgt));
+          acc += hgt;
+        });
+        if (p >= i + 1 || i === N - 1) pts.push([xs(i + 1), yL(LOC[i])]);
+      }
+      const cur = [xs(Math.min(p, PEND)), yL(snap(LOC, p))];
+      const line = [[xs(P0), yL(0)], ...pts.filter(([x]) => x < cur[0]), cur];
+      locPath.setAttribute("d", "M" + line.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L"));
+      locDot.setAttribute("cx", cur[0]);
+      locDot.setAttribute("cy", cur[1]);
+      head.setAttribute("x1", cur[0]);
+      head.setAttribute("x2", cur[0]);
+      flagEls.forEach((f, k) => f.classList.toggle("on", p >= at(MILES[k][0]) - 0.02));
+      TILES.forEach(([, fn], k) => (tileVals[k].textContent = fmt(k, fn(p))));
+    };
+    slides.push({
+      group: "scale",
+      sound: "history",
+      palette: ["#ab7df8", "#3fb950", "#4493f8", "#d29922"],
+      notes:
+        "Not illustrative: these are measured figures from gh-aw's own public history, from the first commit on 12 August 2025 to general availability at GitHub Universe on 28 October 2026 (v1.0.0 was tagged two days earlier). Commits, release tags and lines of Go and JavaScript (including tests, excluding docs) come from git on main as of the end of 28 October, Pacific time. Pull requests and issues come from GitHub search by creation date; October is a partial month. Bars split pull requests by the account that opened them: the Copilot coding agent, the github-actions bot that agentic workflows use for safe outputs, and every other account, including people and Dependabot. Account attribution is not proof of AI use.",
+      enter() {
+        t0 = 0;
+        lastMonth = lastFlag = -1;
+        p = matchMedia("(prefers-reduced-motion: reduce)").matches ? PEND : P0;
+        render();
+      },
+      tick(t) {
+        if (p >= PEND) return;
+        if (!t0) t0 = t;
+        const u = Math.min(1, (t - t0) / DUR);
+        p = P0 + (PEND - P0) * (1 - (1 - u) ** 1.6);
+        const m = Math.floor(p);
+        if (m !== lastMonth && m < N) sfx.pop((lastMonth = m));
+        const f = MILES.reduce((k, mi, j) => (p >= at(mi[0]) ? j : k), -1);
+        if (f > lastFlag) {
+          lastFlag = f;
+          if (f > 0) sfx.notify();
+        }
+        render();
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Measured · gh-aw on GitHub"), h("h2", {}, letters("First commit "), letters("to GA", "l-grad"))),
+        h(
+          "div",
+          { class: "hist-tiles" },
+          TILES.map(([label, , c, sub], k) => h("div", { class: "hist-tile", "--c": c, "--i": k }, tileVals[k], h("span", {}, label), h("small", {}, sub)))
+        ),
+        h(
+          "div",
+          { class: "hist-splits" },
+          split("Pull requests opened by", [
+            [73.2, "#ab7df8", "Copilot coding agent"],
+            [17.3, "#3fb950", "workflow bot"],
+            [9.5, "#4493f8", "other"],
+          ]),
+          split("Commits authored by", [
+            [84.2, "#ab7df8", "agent & bot accounts"],
+            [15.8, "#4493f8", "people"],
+          ])
+        ),
+        h(
+          "div",
+          { class: "hist-legend" },
+          h("span", { "--c": "#ab7df8" }, "Copilot coding agent PRs"),
+          h("span", { "--c": "#3fb950" }, "workflow bot PRs"),
+          h("span", { "--c": "#4493f8" }, "other PRs"),
+          h("span", { "--c": "#d29922", class: "ln" }, "lines of code")
+        ),
+        svg
+      ),
+    });
+  }
+
   // Finale: one control repo dispatching work to hundreds of repos, each running a few agentic processes
   {
     resetIndex();
@@ -7223,6 +7471,12 @@
         });
         pad([38, 45, 50], t + 0.6, 2.6, 0.03, "triangle", 700);
         bell(86, t + 0.7, 0.03, 1.6);
+      },
+      // first commit to GA: a climbing arpeggio that keeps rising, landing on a bright major chord
+      history: t => {
+        [48, 52, 55, 60, 64, 67, 72, 76].forEach((m, i) => tone(m, t + 0.15 + i * 0.22, { type: "triangle", dur: 0.3, vol: 0.05, cutoff: 2600, detune: 5 }));
+        pad([48, 55, 60, 64], t + 0.1, 3.4, 0.022, "triangle", 1400);
+        [79, 84, 88].forEach((m, i) => bell(m, t + 2 + i * 0.09, 0.035, 1.6));
       },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
