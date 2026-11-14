@@ -49,7 +49,21 @@ set +o histexpand
 set -euo pipefail
 
 AUDIT_FILE="/tmp/gh-aw/pre-agent-audit.txt"
+if [ -L /tmp/gh-aw ]; then
+  echo "::error::Refusing to use a symlinked gh-aw temporary directory" >&2
+  exit 1
+fi
 mkdir -p /tmp/gh-aw
+if [ -L /tmp/gh-aw ] || [ ! -d /tmp/gh-aw ]; then
+  echo "::error::gh-aw temporary path is not a real directory" >&2
+  exit 1
+fi
+if [ -L "$AUDIT_FILE" ] || [ -L "${GITHUB_OUTPUT}" ] || { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -L "${GITHUB_STEP_SUMMARY}" ]; }; then
+  echo "::error::Refusing to write through a symlinked audit output path" >&2
+  exit 1
+fi
+AUDIT_TMP="$(mktemp /tmp/gh-aw/.pre-agent-audit.XXXXXX)"
+trap 'rm -f -- "$AUDIT_TMP"' EXIT
 
 # list_dir prints a section header and runs find on the given directory,
 # pruning common cache folders so find does not descend into them.
@@ -58,7 +72,7 @@ list_dir() {
   local label="$1"
   local dir="$2"
   echo "--- ${label}: ${dir} ---"
-  find "${dir}" \
+  find -P "${dir}" \
     \( \
       -name 'node_modules' \
       -o -name '__pycache__' \
@@ -99,7 +113,7 @@ list_dir() {
 
   echo "--- Runner ---"
   list_dir "gh-aw temp directory"    "${RUNNER_TEMP}/gh-aw"
-} > "${AUDIT_FILE}"
+} > "${AUDIT_TMP}"
 
 # Render the audit listing as a collapsed, compact tree in the step summary.
 render_summary_tree() {
@@ -124,13 +138,18 @@ render_summary_tree() {
       "") continue ;;
       *) echo "│   │   └── ${line}" ;;
     esac
-  done < "${AUDIT_FILE}"
+  done < "${AUDIT_TMP}"
   echo '```'
   echo "</details>"
 }
 
-LINE_COUNT="$(wc -l < "${AUDIT_FILE}" | tr -d ' ')"
+LINE_COUNT="$(wc -l < "${AUDIT_TMP}" | tr -d ' ')"
 render_summary_tree >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+if [ -L "$AUDIT_FILE" ]; then
+  echo "::error::Refusing to replace a symlinked audit file" >&2
+  exit 1
+fi
+mv -f -- "$AUDIT_TMP" "$AUDIT_FILE"
 echo "pre-agent-audit-file=${AUDIT_FILE}" >> "${GITHUB_OUTPUT}"
 echo "pre-agent-audit-line-count=${LINE_COUNT}" >> "${GITHUB_OUTPUT}"
 echo "Pre-agent audit written to ${AUDIT_FILE} (${LINE_COUNT} lines)"

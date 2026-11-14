@@ -56,16 +56,25 @@ to verify that the locked versions can be downloaded.
 
 The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
-It is a standalone seventeen-slide deck, separate from the homepage slideshow, linked
+It is a standalone twenty-seven-slide deck, separate from the homepage slideshow, linked
 from the site footer. Use arrows, Space, or Page Up/Page Down to navigate,
 Home/End to jump, F for fullscreen, N for speaker notes, and M to toggle sound.
-The navigation dots jump directly to a slide; `#1` through `#17` are shareable
+The navigation dots jump directly to a slide (on narrow screens they become
+previous/next arrow buttons); `#1` through `#27` are shareable
 slide links. Clicking the left third goes back; clicking elsewhere advances.
 On touch screens, swipe left or right.
+Slides are grouped into sections: slides within a section push left, and
+moving to the next section slides up (reversed when going back).
+Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
+1200x630 render of the title slide; regenerate it if the title slide changes.
 
-Examples, review activity, repository counts, and cost figures are synthetic.
+Examples, review activity, repository counts, and cost figures are synthetic,
+except the model routing slide's results, which are measured on this
+repository's own workflows, and the Issues as intent slide's counts of
+issues labelled `community` and the merged pull requests that closed them
+(November 2026 snapshot); both say so in their speaker notes.
 Use role icons rather than employee profiles. The only exceptions are the
-local avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` in `public/cracktro/assets/avatars/`.
+local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` in `public/cracktro/assets/avatars/`.
 Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.
