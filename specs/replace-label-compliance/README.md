@@ -70,10 +70,10 @@ labels are denied before any allowlist permit path is considered.
 `replace-label` requires the minimum GitHub token scope `issues: write`, including
 for pull-request labels. A cross-repository operation must use a token authorized
 for that target repository with this scope; it must not assume the workflow's
-default token grants access there. The handler-level conformance suite does not
-yet verify target-repository grants (RL-051), the minimum scope (RL-054), or the
-dedicated per-type token rule when the default token is broader (RL-055); these
-remain explicit security gaps.
+default token grants access there. `TestFormalSec_P8_TokenScopeMinimum` verifies
+the minimum-scope predicate, but does not inspect a live workflow token. Target
+repository grants (RL-051) and conditional dedicated-token selection (RL-055)
+remain accepted integration-level gaps; see the evidence index below.
 
 ## Behavioral Coverage Map
 
@@ -93,6 +93,10 @@ remain explicit security gaps.
 | P13 — TitlePrefixGate | `TestFormalTitlePrefixGate` | Matching prefix → proceed; non-matching → skip |
 | P14 — AddDeduplication | `TestFormalAddDeduplication` | label_to_add appears exactly once in output |
 | P15 — HardErrorOnSetLabelsFail | `TestFormalHardErrorOnRESTFail` | REST failure yields success=false, non-nil error |
+| RL-009 — Common validation config | `TestFormalReplaceLabelRL009_CommonValidationConfig` | Shared validation-config output includes the configured replace-label entry |
+| RL-011 — Max expression | `TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime` | Expression is accepted during compilation and preserved for GitHub Actions |
+| RL-014 — Repository format | `TestFormalReplaceLabelRL014_RepositoryFormat` | Slugs require exactly one slash and non-empty owner/repository components |
+| RL-054 — Minimum token scope | `TestFormalSec_P8_TokenScopeMinimum` | Formal predicate requires `issues:write`; does not inspect a live token |
 | Q1 — TransitionSetEmpty | `TestFormalTransitionSetEmptyAllowsAny` | Empty/absent `allowed-transitions` permits any (from, to) pair |
 | Q2 — TransitionExactMatch | `TestFormalTransitionExactMatchRequired` | Only exact (from, to) pairs in the list are allowed; reverse/unrelated pairs rejected |
 | Q4 — TransitionRejectedYieldsSoftSkip | `TestFormalTransitionRejectedYieldsSoftSkip` | Disallowed transition yields `success=false` without a hard workflow failure |
@@ -188,21 +192,21 @@ or to a specific evidence gap. This index is complete when every requirement in
 §§5–8 of `specs/replace-label-spec.md` appears below with a test mapping or an
 explicit gap; completion does not depend on an owner or a review date.
 
-The remaining gaps are grouped by risk: **pipeline** (RL-009, RL-011, RL-033),
-**validation** (RL-014), **observability** (RL-027), **external guarantee**
-(RL-043), and **security** (RL-051, RL-054, RL-055). Each remaining gap below
-has a risk tag and a one-line rationale.
+The remaining evidence gaps are **pipeline** (RL-033), **observability**
+(RL-027), **external guarantee** (RL-043), and **security** (RL-051, RL-055).
+Each accepted gap below has a rationale; RL-054 has formal predicate coverage
+but not live-token verification.
 
 | Requirement | Test ID(s) or documented gap | Implementation evidence |
 |---|---|---|
 | §5 ordered processing pipeline | **Partial:** handler test verifies read → read → write order and one gate-skip cutoff; schema, count, target, label, staged, computation, and REST failure cutoffs remain untested. | “executes the label pipeline in order and stops before writes on a gate skip” does not establish early-stop behavior for all eight stages. |
 | RL-008 | T-RL-001–006 | `TestFormalSchemaRequiredFields` |
-| RL-009 | **Gap [Pipeline]:** common-pipeline invocation is not directly tested; execution-path coverage is needed to detect divergence from shared safe-output processing. | `TestFormalReplaceLabelP3_ValidationConfigFields` covers config shape only. |
+| RL-009 | T-RL-009 | `TestFormalReplaceLabelRL009_CommonValidationConfig` checks that the shared validation-config generator emits the configured `replace_label` entry and field rules. |
 | RL-010 | T-RL-010–011 | `TestFormalCountGate` |
-| RL-011 | **Gap [Pipeline]:** expression resolution for `max` is not directly tested; unresolved limits could bypass or misapply the processing bound. | — |
+| RL-011 | T-RL-013 | `TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime` verifies the compiler accepts and preserves the expression; GitHub Actions performs runtime resolution. |
 | RL-012 | T-RL-012 | `TestFormalReplaceLabelP3_DefaultMaxFive` |
 | RL-013 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
-| RL-014 | **Gap [Validation]:** malformed `owner/repo` rejection is not directly tested; malformed identifiers may route a request incorrectly or cause avoidable API failures. | — |
+| RL-014 | T-RL-073 | `TestFormalReplaceLabelRL014_RepositoryFormat`; `repo_helpers.test.cjs` checks malformed identifiers against the runtime repository helper. |
 | RL-015 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
 | RL-016 | T-RL-014–018 | `TestFormalReplaceLabelP15_TargetModeEnforcement` |
 | RL-017 | T-RL-019 | `T-RL-019 rejects when no item number is available` |
@@ -241,9 +245,9 @@ has a risk tag and a one-line rationale.
 | RL-049 | T-RL-020–025 | `TestFormalBlocklistOrdering`; JS allow/blocklist tests |
 | RL-049a | T-RL-026 | `T-RL-026 rechecks blocklist state before setLabels`; `TestFormalBlockedLabelAddedViaReplaceLabelMidBlocklistChange_NoWriteAPI` |
 | RL-050 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
-| RL-051 | **Gap [Security]:** target-repository token grants are not tested; repository allowlisting alone does not establish write authorization. | — |
+| RL-051 | **Accepted gap [Security]:** GitHub enforces token grants on the target repository at the write endpoint. Offline tests cannot inspect a live token's repository grant; a denied write is handled as a hard error, but no proactive scope check is performed. |
 | RL-052 | T-RL-041 | JS nonexistent-label hard-error test |
 | RL-053 | T-RL-030–031 | JS required-label gate test uses the REST response; the agent message has no label-state field. |
-| RL-054 | **Gap [Security]:** the minimum `issues: write` scope is unverified; weaker grants could fail at runtime while broader grants violate least privilege. | — |
-| RL-055 | **Gap [Security]:** per-type token selection is unverified; the workflow-wide token may carry unrelated permissions. | — |
+| RL-054 | `TestFormalSec_P8_TokenScopeMinimum` | The formal predicate accepts `issues:write` and rejects read-only/unrelated scopes. It does not inspect a live token. |
+| RL-055 | **Accepted gap [Security]:** the SHOULD applies only when the default token is broader; confirming per-type token selection and its relative grants requires workflow-level credential integration. |
 | RL-056 | T-RL-060 | `T-RL-060 does not call setLabels in staged mode` |

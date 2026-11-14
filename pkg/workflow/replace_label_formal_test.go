@@ -21,6 +21,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -227,6 +228,11 @@ func formalRepoAllowed(targetRepo, defaultRepo string, allowedRepos []string) bo
 	return slices.Contains(allowedRepos, repo)
 }
 
+func formalRepoSlugValid(repo string) bool {
+	parts := strings.Split(repo, "/")
+	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
+}
+
 func formalResolveTargetNumber(targetMode string, triggeringNumber int, requestedNumber int) (int, bool) {
 	switch targetMode {
 	case "triggering", "":
@@ -401,6 +407,28 @@ func TestFormalReplaceLabelP3_ValidationConfigFields(t *testing.T) {
 	assert.Equal(t, 256, cfg.Fields["repo"].MaxLength)
 }
 
+func TestFormalReplaceLabelRL009_CommonValidationConfig(t *testing.T) {
+	configJSON, err := GetValidationConfigJSONWithDataSchema([]string{"replace_label"}, nil, false, nil)
+	require.NoError(t, err)
+
+	var config map[string]TypeValidationConfig
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+	require.Contains(t, config, "replace_label")
+	assert.Equal(t, ValidationConfig["replace_label"], config["replace_label"])
+}
+
+func TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime(t *testing.T) {
+	max := "${{ inputs.max }}"
+	config := &SafeOutputsConfig{
+		ReplaceLabel: &ReplaceLabelConfig{
+			BaseSafeOutputConfig: BaseSafeOutputConfig{Max: &max},
+		},
+	}
+
+	require.NoError(t, validateSafeOutputsMax(config))
+	assert.Equal(t, "${{ inputs.max }}", *config.ReplaceLabel.Max)
+}
+
 func TestFormalReplaceLabelP4_AllowlistEnforcement(t *testing.T) {
 	err := formalValidateSingleLabel("state-done", []string{"state-*"}, nil, "label_to_add")
 	require.NoError(t, err)
@@ -488,6 +516,26 @@ func TestFormalReplaceLabelP14_CrossRepoRestriction(t *testing.T) {
 	assert.True(t, formalRepoAllowed("octo/current", "octo/current", []string{"octo/other"}))
 	assert.True(t, formalRepoAllowed("octo/other", "octo/current", []string{"octo/other"}))
 	assert.False(t, formalRepoAllowed("evil/repo", "octo/current", []string{"octo/other"}))
+}
+
+func TestFormalReplaceLabelRL014_RepositoryFormat(t *testing.T) {
+	tests := []struct {
+		repo  string
+		valid bool
+	}{
+		{repo: "octo/widgets", valid: true},
+		{repo: "", valid: false},
+		{repo: "widgets", valid: false},
+		{repo: "/widgets", valid: false},
+		{repo: "octo/", valid: false},
+		{repo: "octo/widgets/archive", valid: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.repo, func(t *testing.T) {
+			assert.Equal(t, tt.valid, formalRepoSlugValid(tt.repo))
+		})
+	}
 }
 
 func TestFormalReplaceLabelP15_TargetModeEnforcement(t *testing.T) {
