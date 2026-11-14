@@ -24,17 +24,16 @@
   canvas.bg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
   .stage { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
   .slide { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
-  /* reveal-style horizontal push: --dx is +100% going forward, -100% going back, 0 on first load */
+  /* siblings in a group: reveal-style horizontal push; --dx is +100% going forward, -100% going back, 0 on first load.
+     crossing groups: vertical push, up going forward and down going back (same duration and easing) */
   .slide.active { visibility: visible; pointer-events: auto; animation: slide-in .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.leaving { visibility: visible; animation: slide-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   @keyframes slide-in { from { transform: translateX(var(--dx, 100%)); } to { transform: none; } }
   @keyframes slide-out { to { transform: translateX(calc(-1 * var(--dx, 100%))); } }
-  .slide.active.up-in { animation: up-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving.up-out { animation: up-out 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.active.down-in { animation: down-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving.down-out { animation: down-out 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.active.left-in { animation: left-in 1s cubic-bezier(.7,0,.2,1) both; }
-  @keyframes left-in { from { transform: translateX(100%); } to { transform: none; } }
+  .slide.active.up-in { animation: up-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving.up-out { animation: up-out .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.active.down-in { animation: down-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   /* full-screen red wash for "Safety and control": fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
     background: radial-gradient(ellipse 80% 75% at 50% 55%, #6e0b12 0%, #3a0408 55%, #140103 100%); }
@@ -46,6 +45,9 @@
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
   .wash.cover { z-index: 4; }
+  /* green wash for "Safe outputs" and "Private enclaves": the inverse of the red one, with the grid tilted the other way */
+  .wash.green { background: radial-gradient(ellipse 80% 75% at 50% 55%, #0b4a2a 0%, #04261a 55%, #01100a 100%); }
+  .wash.green::after { background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #031f13aa 70%, #000503f0 100%); }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
@@ -261,6 +263,22 @@
   .fm-wire.hot { opacity: 1; stroke-width: 3; }
   .fm-wire.hot + .mra-l { opacity: 1; }
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
+  .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
+  .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
+  .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
+  .sfl-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
+  .sfl-box.on .sfl-card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .sfl-title { fill: #9198a1; font: 500 15px var(--mono); letter-spacing: .08em; }
+  .sfl-row { opacity: .45; transition: opacity .3s; } .sfl-row.seen { opacity: 1; }
+  .sfl-row text { fill: #c9d1d9; font: 500 17px var(--mono); }
+  .sfl-row circle { fill: #3d444d; transition: fill .3s; } .sfl-row.seen circle { fill: #3fb950; }
+  .sfl-row.seen.bad circle { fill: #f85149; filter: drop-shadow(0 0 6px #f85149); } .sfl-row.seen.bad text { fill: #ff7b72; }
+  .sfl-row .ok { fill: #3fb950; } .sfl-row .ko { fill: #f85149; } .sfl-row .ed { fill: #d29922; }
+  .sfl-badge { fill: #ff7b72; font: 600 17px var(--mono); opacity: 0; transition: opacity .4s; } .sfl-badge.on { opacity: 1; }
+  .sfl-scan { opacity: 0; } .sfl-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
+  .sfl-rule { fill: #ff7b72; font: 600 18px var(--mono); }
+  #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
+  #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
   @keyframes fm-pop { from { transform: scale(.4); } }
   .ra-flow { left: 60px; top: 340px; width: 880px; height: 512px; }
@@ -341,6 +359,69 @@
   .sec-ent span { font-size: 24px; padding: 8px 20px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992214; color: #f0f6fc; opacity: 0; }
   .active .sec-ent span { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 120ms + 2900ms); }
   .sec-lane { position: absolute; left: 0; top: 880px; width: 1920px; height: 120px; }
+
+  /* --- safe outputs: boxed agent → threat detection → write job --- */
+  .so .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #3fb950); }
+  .so-box { position: absolute; top: 300px; width: 500px; height: 620px; padding: 30px 34px; border-radius: 22px; border: 2px solid var(--c);
+    background: #0d1117ee; box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); opacity: 0; transition: box-shadow .5s, border-color .5s; }
+  .active .so-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 400ms); }
+  .so-box.hot { box-shadow: 0 0 110px -10px var(--c), inset 0 0 90px -40px var(--c); }
+  .so-box i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
+  .so-box h3 { margin: 16px 0 22px; font-size: 50px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .so-who { display: flex; align-items: center; gap: 16px; font-size: 25px; color: #d1d7e0; }
+  .so-av { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; flex: none; background: radial-gradient(circle at 35% 30%, #c297ff, #8957e5 55%, #3b1d8f); }
+  .so-av.det { background: radial-gradient(circle at 35% 30%, #ffc28a, #d29922 55%, #6e4a00); }
+  .so-av svg { width: 36px; height: 36px; }
+  .so-perm { margin-left: auto; font: 600 17px/1 var(--mono); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+  /* the agent's box is a cage: bars that flash red when it tries to write directly */
+  .so-cage { position: absolute; inset: 0; border-radius: 20px; pointer-events: none; opacity: .5; transition: opacity .3s;
+    background: repeating-linear-gradient(90deg, transparent 0 46px, #3fb95033 46px 50px); }
+  .so-cage::after { content: ""; position: absolute; inset: 0; border-radius: 20px; opacity: 0; background: repeating-linear-gradient(90deg, transparent 0 46px, #f85149aa 46px 50px); }
+  .so.p-deny:not(.p-safe) .so-cage::after { animation: so-bars .9s ease-out both; }
+  @keyframes so-bars { 0%, 40% { opacity: 1; } 20%, 60% { opacity: .3; } 100% { opacity: .9; } }
+  .so.p-deny:not(.p-safe) .so-b0 { border-color: #f85149; box-shadow: 0 0 110px -10px #f85149, inset 0 0 90px -40px #f85149; }
+  .so.p-deny:not(.p-safe) .so-b0 .so-shake { animation: so-shake .45s linear both; }
+  @keyframes so-shake { 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+  .so-term { margin-top: 22px; padding: 16px 14px; border-radius: 12px; background: #010409; border: 1px solid #30363d; font: 500 17px/1.55 var(--mono); color: #d1d7e0; min-height: 132px; }
+  .so-term div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .so-term .l2, .so-term .l3 { opacity: 0; transition: opacity .3s; }
+  .so-term .l2 { color: #ff7b72; }
+  .so-term .l3 { color: #79c0ff; }
+  .so.p-deny .so-term .l2, .so.p-safe .so-term .l3 { opacity: 1; }
+  .so-term .cur::after { content: "▍"; color: #3fb950; animation: blink 1s steps(1) infinite; }
+  .so.p-deny .so-term .cur::after { content: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .so-checks { margin: 22px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .so-checks li { font-size: 24px; color: #9198a1; padding-left: 40px; position: relative; transition: color .3s; }
+  .so-checks li::before { content: "·"; position: absolute; left: 0; top: -3px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    font: 700 18px/28px var(--mono); border: 2px solid #3d444d; color: #3d444d; transition: all .3s; }
+  .so-checks li.ok { color: #f0f6fc; }
+  .so-checks li.ok::before { content: "✓"; border-color: #3fb950; background: #3fb950; color: #0d1117; box-shadow: 0 0 16px #3fb950aa; }
+  .so-arrow { position: absolute; top: 560px; width: 100px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
+  .active .so-arrow { animation: sec-arr .5s ease-out both calc(var(--i) * 500ms + 900ms), nudge 1.6s ease-in-out infinite calc(var(--i) * 500ms + 1400ms); }
+  .so-call { position: absolute; top: 508px; width: 100px; text-align: center; white-space: nowrap; font: 600 12px/1.2 var(--mono); color: #9198a1; opacity: 0; }
+  .active .so-call { animation: rise .5s ease-out both calc(var(--i) * 500ms + 1100ms); }
+  /* the proposed issue travels box to box */
+  .so-card { position: absolute; top: 742px; width: 420px; height: 150px; padding: 18px 22px; border-radius: 14px; background: #161b22; border: 2px dashed #4493f8;
+    box-shadow: 0 10px 40px -10px #000; opacity: 0; transform: scale(.85); overflow: hidden; z-index: 3;
+    transition: left .9s cubic-bezier(.6,0,.2,1), opacity .4s, transform .5s cubic-bezier(.3,1.6,.4,1), border-color .4s, box-shadow .4s; }
+  .so.p-safe .so-card { opacity: 1; transform: none; }
+  .so.p-safe .so-card.moving { transform: translateY(-26px) rotate(-2deg); }
+  .so-card .t { display: flex; align-items: center; gap: 12px; font: 600 25px/1.2 "Mona Sans"; color: #f0f6fc; }
+  .so-card .t svg { width: 28px; height: 28px; flex: none; }
+  .so-card .lb { margin-top: 12px; display: flex; gap: 10px; }
+  .so-card .lb span { font: 600 16px/1 var(--mono); padding: 6px 12px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992222; color: #e3b341; }
+  .so-card .lb span + span { border-color: #ab7df866; background: #ab7df822; color: #d2b8ff; }
+  .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
+  .so.p-pass .so-card .st { color: #3fb950; }
+  .so.p-done .so-card { border-style: solid; border-color: #3fb950; box-shadow: 0 0 60px -6px #3fb95088; }
+  .so.p-done .so-card .st { color: #0d1117; background: #3fb950; padding: 7px 12px; border-radius: 99px; letter-spacing: .04em; }
+  .so-beam { position: absolute; left: 0; right: 0; top: -40px; height: 40px; opacity: 0;
+    background: linear-gradient(180deg, transparent, #d2992266); border-bottom: 2px solid #e3b341; box-shadow: 0 4px 18px #d29922; }
+  .so.p-scan:not(.p-pass) .so-beam { opacity: 1; animation: so-scan 1s ease-in-out infinite alternate; }
+  @keyframes so-scan { from { top: -40px; } to { top: 150px; } }
+  .so-note { margin-top: 18px; font-size: 22px; line-height: 1.35; color: #9198a1; }
+  .so-note code { font: 600 19px var(--mono); color: #79c0ff; }
 
   /* --- compiler hardening --- */
   .ch-slide .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8, #3fb950); }
@@ -520,12 +601,107 @@
   .cm-route.on i { color: #d2a8ff; }
   .cm-route canvas { position: absolute; left: 0; top: -14px; width: 630px; height: 284px; }
 
+  /* --- model routing --- */
+  .mr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #ab7df8); }
+  /* the run card starts centred, then glides left when the results arrive */
+  .mr-hero { position: absolute; left: 110px; top: 350px; width: 1040px; height: 590px; transform: translateX(330px); transition: transform 1.1s cubic-bezier(.7,0,.2,1); }
+  .mr.side .mr-hero { transform: none; }
+  .mr-run { position: absolute; left: 0; top: 0; width: 1040px; height: 420px; border-radius: 18px; background: #0d1117f0; border: 1px solid #3d444d; overflow: hidden; opacity: 0;
+    box-shadow: 0 30px 80px -30px #000, 0 0 70px -30px #ab7df8; }
+  .active .mr-run { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .mr-bar { display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 16px 0 20px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .mr-bar > i { width: 14px; height: 14px; border-radius: 50%; }
+  .mr-wf { margin-left: 12px; }
+  .mr-wf small { margin-left: 12px; font-size: 16px; color: #656c76; }
+  .mr-gap { flex: 1; }
+  .mr-model { font: 600 19px/1 var(--mono); padding: 8px 14px; border-radius: 8px; background: #0d1117; border: 1px solid #ab7df8; box-shadow: 0 0 30px -6px #ab7df8; color: #ff7b72; }
+  .mr-model b { font-weight: 600; color: #d2a8ff; text-shadow: 0 0 12px #ab7df8; }
+  /* run-card transitions run at the same slower pace as the router animation (SLOW in the slide) */
+  .mr-text { position: absolute; left: 36px; top: 84px; width: 572px; font: 600 36px/1.3 "Mona Sans"; color: #e6edf3; text-wrap: balance; transition: opacity .44s; }
+  .mr-hide { color: transparent; }
+  .mr-w { border-radius: 6px; transition: color .53s, background .53s, box-shadow .53s; }
+  .mr-w.k { --c: #f778ba; } .mr-w.s { --c: #39c5cf; } .mr-w.d { --c: #e3b341; }
+  .mr-w.on { color: #fff; background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -3px 0 var(--c), 0 0 24px -8px var(--c); }
+  .mr-beam { position: absolute; left: 30px; top: 70px; width: 3px; height: 190px; border-radius: 2px; background: #e2c5ff; box-shadow: 0 0 16px 4px #ab7df8; opacity: 0; pointer-events: none; transition: opacity .27s; }
+  .mr-beam::before { content: ""; position: absolute; right: 3px; top: 0; width: 150px; height: 100%; background: linear-gradient(90deg, transparent, #ab7df838); }
+  .mr-ghost { position: absolute; z-index: 3; font: 600 36px/1.3 "Mona Sans"; color: var(--c); text-shadow: 0 0 18px var(--c); white-space: nowrap; pointer-events: none; transform-origin: 0 0;
+    transition: transform .89s cubic-bezier(.2,.9,.2,1), opacity .53s ease .44s; }
+  .mr-chips { position: absolute; left: 36px; top: 300px; display: flex; gap: 12px; transition: opacity .44s; }
+  .mr-chip { display: flex; align-items: baseline; gap: 8px; padding: 9px 15px; border-radius: 99px; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 14%, #0d1117);
+    opacity: 0; transform: scale(.6); transition: opacity .53s, transform .89s cubic-bezier(.3,1.6,.4,1); }
+  .mr-chip.on { opacity: 1; transform: none; box-shadow: 0 0 24px -8px var(--c); }
+  .mr-chip i { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); font-style: normal; }
+  .mr-chip b { font: 700 22px/1 "Mona Sans"; color: #f0f6fc; }
+  .mr-out { opacity: 0 !important; }
+  .mr-gauge { position: absolute; right: 26px; top: 76px; width: 380px; height: 270px; }
+  .mr-track { fill: none; stroke: #ffffff12; stroke-width: 26; }
+  .mr-z { fill: none; stroke-width: 26; opacity: .38; transition: opacity .71s, filter .71s; }
+  .mr-z.on { opacity: 1; filter: drop-shadow(0 0 10px currentColor); }
+  .mr-zl { font: 600 18px "Mona Sans"; text-anchor: middle; opacity: .45; transition: opacity .71s; }
+  .mr-zl.on { opacity: 1; }
+  .mr-needle path { fill: #f0f6fc; filter: drop-shadow(0 0 6px #ffffff88); }
+  .mr-needle circle { fill: #0d1117; stroke: #f0f6fc; stroke-width: 3; }
+  .mr-read { font: 700 22px var(--mono); letter-spacing: .12em; text-anchor: middle; fill: #9198a1; }
+  .mr-read2 { font: 500 15px var(--mono); text-anchor: middle; fill: #9198a1; }
+  .mr-why { position: absolute; right: 26px; top: 358px; width: 380px; text-align: center; font: 500 21px/1.2 "Mona Sans"; color: #d1d7e0; opacity: 0; transform: translateY(8px); transition: opacity .62s, transform .62s; }
+  .mr-why.on { opacity: 1; transform: none; }
+  /* split-flap board: every tile rattles through letters, then lands on the pick */
+  .mr-flap { position: absolute; left: 0; top: 464px; display: flex; align-items: flex-end; gap: 24px; opacity: 0; }
+  .active .mr-flap { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .mr-arrow { font: 700 46px/64px var(--mono); color: #656c76; }
+  .mr-field i { display: block; margin: 0 0 10px 2px; font: 700 18px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: #e6edf3; font-style: normal; }
+  .mr-tiles { display: flex; gap: 4px; }
+  .mr-t { position: relative; width: 44px; height: 64px; border-radius: 7px; background: linear-gradient(#262c36 0 50%, #151a21 50% 100%); box-shadow: inset 0 1px 0 #ffffff1a, 0 10px 20px -10px #000;
+    font: 700 40px/64px var(--mono); text-align: center; color: #f0f6fc; white-space: pre; transition: opacity .4s; }
+  .mr-t::after { content: ""; position: absolute; left: 0; right: 0; top: 31px; height: 2px; background: #05070a; }
+  .mr-t.old { opacity: .25; }
+  .mr-t.set { color: var(--c); text-shadow: 0 0 16px var(--c); animation: mr-thunk .44s cubic-bezier(.3,1.6,.4,1); }
+  @keyframes mr-thunk { from { transform: scaleY(.3); } }
+  .mr-proof, .mr-rep { position: absolute; left: 1210px; width: 600px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000;
+    opacity: 0; transform: translateY(40px); transition: opacity .6s, transform .9s cubic-bezier(.2,.9,.2,1); }
+  .mr-proof.on, .mr-rep.on { opacity: 1; transform: none; }
+  .mr-proof { top: 276px; padding: 24px 28px 22px; }
+  .mr-pf-h { display: flex; align-items: center; gap: 14px; font: 700 26px/1 "Mona Sans"; color: #f0f6fc; }
+  .mr-pf-h em { font: 600 13px/1 var(--mono); font-style: normal; letter-spacing: .16em; text-transform: uppercase; color: #3fb950; border: 1px solid #3fb95088; border-radius: 99px; padding: 6px 10px; }
+  .mr-big { display: flex; align-items: center; gap: 22px; margin: 16px 0 8px; }
+  .mr-big b { min-width: 280px; font: 700 96px/1 var(--mono); letter-spacing: -.05em; color: #3fb950; text-shadow: 0 0 40px #3fb95066; font-variant-numeric: tabular-nums; }
+  .mr-big span { font: 600 26px/1.2 "Mona Sans"; color: #f0f6fc; }
+  .mr-big small { display: block; margin-top: 8px; font: 500 18px/1 var(--mono); color: #9198a1; }
+  .mr-strip { display: block; width: 544px; height: 150px; overflow: visible; }
+  .mr-strip rect { transform: scaleY(0); transform-box: fill-box; transform-origin: 50% 100%; transition: transform .5s cubic-bezier(.2,.9,.2,1) calc(var(--i) * 45ms + 300ms); }
+  .mr-proof.on .mr-strip rect { transform: none; }
+  .mr-strip .pre { fill: #8957e5; } .mr-strip .post { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95088); }
+  .mr-strip line { stroke: #ffffff40; stroke-width: 1.5; stroke-dasharray: 4 6; }
+  .mr-strip line.mk { stroke: #d2a8ff; stroke-width: 2; stroke-dasharray: 6 5; }
+  .mr-strip text { font: 600 14px var(--mono); fill: #9198a1; }
+  .mr-strip text.mk { fill: #d2a8ff; }
+  .mr-held { display: flex; gap: 26px; margin-top: 12px; font: 500 18px/1.2 "Mona Sans"; color: #d1d7e0; }
+  .mr-held i { margin-right: 8px; font-style: normal; font-weight: 800; color: #3fb950; }
+  .mr-held b { margin-left: 6px; font: 600 17px var(--mono); color: #f0f6fc; white-space: nowrap; }
+  /* a week of runs, one square each, filled in like a sequencer */
+  .mr-rep { top: 670px; padding: 22px 28px 20px; }
+  .mr-rh { margin-bottom: 20px; font: 700 26px/1 "Mona Sans"; color: #f0f6fc; }
+  .mr-week { display: grid; grid-template-columns: 22px repeat(24, 17px); gap: 4px; }
+  .mr-week i { font: 700 16px/17px var(--mono); color: #e6edf3; font-style: normal; }
+  .mr-week b { height: 17px; border-radius: 4px; background: #ffffff10; transition: background .35s, box-shadow .35s; }
+  .mr-week b.t0 { background: #3fb950; box-shadow: 0 0 10px -3px #3fb950; }
+  .mr-week b.t1 { background: #4493f8; box-shadow: 0 0 10px -3px #4493f8; }
+  .mr-week b.t2 { background: #ab7df8; box-shadow: 0 0 10px -3px #ab7df8; }
+  .mr-week b.hot { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  @keyframes mr-pop { from { transform: scale(.2); } }
+  .mr-rf { display: flex; align-items: center; gap: 18px; margin-top: 18px; font: 600 16px/1 var(--mono); color: #d1d7e0; }
+  .mr-rf > span { display: flex; align-items: center; gap: 8px; }
+  .mr-rf > span::before { content: ""; width: 14px; height: 14px; border-radius: 3px; background: var(--c); }
+  .mr-rf em { margin-left: auto; font-style: normal; color: #d1d7e0; }
+  .mr-rf em b { font-size: 18px; color: #f0f6fc; font-variant-numeric: tabular-nums; }
+  .mr-cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
   /* --- finale --- */
   .fin-bg { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
-  .fin-bg h1 { margin: 0; font-size: 300px; line-height: .86; letter-spacing: -.045em; font-variation-settings: "wght" 800, "wdth" 112; white-space: nowrap;
+  .fin-bg h1 { margin: 0; font-size: 150px; line-height: 1.1; letter-spacing: -.01em; font-variation-settings: "wght" 700, "wdth" 100; white-space: nowrap;
     background: linear-gradient(100deg, #0fbf3e 0%, #5fed83 30%, #4493f8 65%, #ab7df8 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
-    opacity: .2; animation: finShimmer 14s ease-in-out infinite alternate; }
-  .fin-bg h1 + h1 { font-size: 210px; }
+    opacity: .5; animation: finShimmer 14s ease-in-out infinite alternate; }
+  .fin-bg h1 + h1 { font-size: 72px; line-height: 1.2; margin-top: 36px; }
   @keyframes finShimmer { to { background-position: 100% 0; } }
   .fin-cap { position: absolute; left: 0; right: 0; bottom: 64px; text-align: center; font: 600 18px/1 var(--mono); letter-spacing: .3em; text-transform: uppercase; color: #9198a1; }
   .fin-cap b { color: #f0f6fc; font-weight: 700; }
@@ -537,6 +713,14 @@
   .dots button { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
     transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
   .dots button.on { width: 40px; background: #f0f6fc; }
+  .arrows { position: fixed; left: 16px; bottom: 10px; display: none; gap: 8px; z-index: 5; }
+  .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
+    color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; }
+  .arrows button:hover { color: #f0f6fc; border-color: #9198a1; }
+  .arrows button:disabled { opacity: .35; cursor: default; }
+  .arrows svg { width: 100%; height: 100%; display: block; }
+  body.compact-nav .dots { display: none; }
+  body.compact-nav .arrows { display: flex; }
   .snd { position: fixed; right: 124px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
   .snd:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -613,6 +797,128 @@
   .ae-tag em { font-style: normal; color: var(--ec); }
   .active .ae-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.1s; }
 
+  /* --- enterprise ready --- */
+  .er { --ec: #4493f8; }
+  .er .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #a5d6ff, #d29922, #4493f8); }
+  .er-tag { position: absolute; right: 110px; top: 118px; width: 600px; text-align: right; font: 500 30px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
+  .er-tag b { color: #f0f6fc; font-weight: 700; }
+  .active .er-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .er-ed { position: absolute; left: 110px; top: 330px; width: 720px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .er-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .er-ed .ae-code { font-size: 21px; line-height: 26px; }
+  .er-ed .ae-row { transition: background .4s; }
+  .er-ed .ae-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--ec) 24%, transparent), transparent 85%); }
+  .er-ed .ae-row.lit { background: linear-gradient(90deg, #d2992255, transparent 85%); box-shadow: inset 4px 0 0 #d29922; }
+  .er-arrow { position: absolute; left: 846px; top: 430px; width: 150px; text-align: center; font: 500 17px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .er-arrow svg { display: block; width: 150px; height: 40px; margin-top: 12px; overflow: visible; }
+  .er-arrow path { fill: none; stroke: #9198a1; stroke-width: 3; stroke-dasharray: 10 8; animation: ae-flow .8s linear infinite; }
+  .er-arrow small { display: block; margin-top: 10px; white-space: nowrap; font: 600 15px/1 var(--mono); color: #3fb950; letter-spacing: .06em; }
+  .active .er-arrow { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .er-card { position: absolute; width: 390px; height: 230px; padding: 24px 26px; border-radius: 20px; background: #161b22e8; border: 2px solid #3d444d; opacity: 0;
+    transition: border-color .4s, box-shadow .4s, background .4s; }
+  .active .er-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(.5s + var(--i) * 120ms); }
+  .er-card.on { border-color: var(--rc); background: color-mix(in srgb, var(--rc) 9%, #0d1117f0); box-shadow: 0 0 60px -14px var(--rc), inset 0 0 40px -24px var(--rc); }
+  .er-card svg.ic { position: absolute; right: 24px; top: 22px; width: 56px; height: 56px; fill: none; stroke: #656c76; stroke-width: 2; stroke-linejoin: round; transition: stroke .4s; }
+  .er-card.on svg.ic { stroke: var(--rc); filter: drop-shadow(0 0 10px var(--rc)); }
+  .er-card i { display: block; font: normal 600 16px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: #9198a1; }
+  .er-card.on i { color: var(--rc); }
+  .er-card h3 { margin: 14px 56px 0 0; font: 700 34px/1 "Mona Sans"; white-space: nowrap; color: #f0f6fc; }
+  .er-card code { display: block; margin-top: 16px; font: 500 20px/1 var(--mono); color: #9198a1; }
+  .er-card.on code { color: var(--rc); }
+  .er-st { position: absolute; left: 26px; bottom: 22px; font: 600 17px/1 var(--mono); color: #656c76; letter-spacing: .04em; }
+  .er-st::before { content: "○ idle"; }
+  .er-card.on .er-st::before { content: "◌ job queued…"; color: #d29922; }
+  .er-card.run .er-st::before { content: "● agent job running"; color: var(--rc); }
+  .er-card.eco .er-st { display: none; }
+  .er-card.fw .er-st::before { content: "○ sandbox idle"; color: #656c76; }
+  .er-card.fw.run .er-st::before { content: "● agent sandboxed"; color: var(--rc); }
+  .er-fw { position: absolute; left: 26px; top: 138px; display: flex; gap: 6px; }
+  .er-fw b { padding: 6px 9px; border-radius: 8px; border: 1.5px solid #3d444d; font: 500 15px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .3s; }
+  .er-card.fw.run .er-fw b { border-color: #3fb950; color: #f0f6fc; background: #3fb95022; }
+  .er-card.fw.run .er-fw b.no { border-color: var(--rc); color: var(--rc); background: color-mix(in srgb, var(--rc) 18%, transparent); text-decoration: line-through; }
+  .er-steps { position: absolute; left: 26px; right: 26px; bottom: 20px; display: flex; gap: 6px; }
+  .er-steps b { padding: 7px 8px; border-radius: 8px; border: 1.5px solid #3d444d; font: 500 14px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .3s; }
+  .er-steps b::before { content: "○ "; }
+  .er-steps b.up { border-color: var(--rc); color: #f0f6fc; background: color-mix(in srgb, var(--rc) 30%, transparent); box-shadow: 0 0 14px -2px var(--rc); }
+  .er-steps b.up::before { content: "✓ "; color: var(--rc); }
+  .er-card.otel .er-st::before { content: "○ waiting for spans"; color: #656c76; }
+  .er-card.otel.run .er-st::before { content: "● trace exported"; color: var(--rc); }
+  .er-spans { position: absolute; right: 26px; bottom: 20px; width: 150px; display: flex; flex-direction: column; gap: 5px; }
+  .er-spans b { display: block; height: 9px; margin-left: var(--x); width: var(--w); border-radius: 3px; background: #3d444d; transform-origin: left; }
+  .er-card.otel.run .er-spans b { background: var(--rc); box-shadow: 0 0 10px var(--rc); animation: er-span .5s cubic-bezier(.2,.9,.2,1) both calc(var(--j) * 140ms); }
+  @keyframes er-span { from { transform: scaleX(0); } to { transform: none; } }
+  .er-job.er-trace { width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #f0883e; box-shadow: 0 0 22px #f0883e, 0 0 4px #fff; }
+  .er-job { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 8px; background: var(--ec); box-shadow: 0 0 26px var(--ec), 0 0 6px #fff; opacity: 0; z-index: 3; pointer-events: none; }
+  .er-chips { position: absolute; left: 110px; right: 110px; top: 880px; display: flex; align-items: center; gap: 12px; }
+  .er-chips > i { font: normal 600 17px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #d29922; margin-right: 6px; white-space: nowrap; opacity: 0; }
+  .active .er-chips > i { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .er-chip { padding: 10px 16px; border-radius: 99px; border: 1.5px solid #d2992255; background: #d2992210; font: 500 19px/1 var(--mono); color: #c9d1d9; white-space: nowrap; opacity: 0; transition: all .35s; }
+  .active .er-chip { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(1.1s + var(--i) * 90ms); }
+  .er-chip.lit { border-color: #d29922; background: #d2992230; color: #f0f6fc; box-shadow: 0 0 30px -6px #d29922; }
+  .en .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #39c5cf, #3fb950, #ab7df8); }
+  .en-card { position: absolute; top: 310px; height: 580px; box-sizing: border-box; padding: 30px 34px; border-radius: 22px; background: #0d1117f0;
+    border: 2px solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: 0 0 60px -30px var(--c); opacity: 0; }
+  .active .en-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(.3s + var(--i) * .25s); }
+  .en-card > i { font: 600 18px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
+  .en-card h3 { margin: 14px 0 12px; font-size: 44px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .en-pub { left: 110px; width: 480px; }
+  .en-vault { left: 1010px; width: 800px; border-style: dashed; border-width: 3px; background: #08130cf0; transition: box-shadow .4s; }
+  .en-vault.busy { box-shadow: 0 0 90px -20px var(--c), inset 0 0 80px -50px var(--c); }
+  .en-lock { position: absolute; right: 26px; top: 26px; padding: 8px 14px; border-radius: 8px; background: var(--c); color: #0d1117;
+    font: 600 16px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  .en-facts { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .en-facts span { padding: 7px 12px; border-radius: 99px; border: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #d1d7e0; }
+  .en-facts b { color: var(--c); }
+  .en-call { padding: 16px 18px; border-radius: 12px; background: #151b23; border: 1px solid #3d444d; font: 500 18px/1.35 var(--mono); color: #d1d7e0; }
+  .en-call > b { display: block; color: #4493f8; font-weight: 700; margin-bottom: 6px; }
+  .en-call small { display: block; margin-top: 8px; color: #656c76; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
+  .en-task { color: #f0f6fc; min-height: 50px; }
+  .en-schema { color: #a5d6ff; }
+  .en-call.flash { animation: en-flash .6s ease-out; }
+  @keyframes en-flash { from { border-color: #4493f8; box-shadow: 0 0 30px -4px #4493f8; } }
+  .en-log { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .en-log li { font: 500 19px/1.2 var(--mono); color: #d1d7e0; padding-left: 28px; position: relative; animation: rise .5s cubic-bezier(.2,.9,.2,1) both; }
+  .en-log li::before { content: "✓"; position: absolute; left: 0; color: #3fb950; font-weight: 800; }
+  .en-out { position: absolute; left: 34px; right: 34px; bottom: 26px; padding: 12px 16px; border-radius: 12px; border: 2px solid #ab7df8; background: #1c1430;
+    font: 600 19px/1.2 "Mona Sans"; color: #f0f6fc; opacity: 0; transform: translateY(12px); transition: all .5s cubic-bezier(.2,.9,.2,1); }
+  .en-out.show { opacity: 1; transform: none; box-shadow: 0 0 40px -10px #ab7df8; }
+  .en-out code { font: 600 17px var(--mono); color: #ab7df8; margin-right: 8px; }
+  .en-code { border-radius: 12px; background: #0d1117; border: 1px solid #263a2c; padding: 12px 0; font: 500 19px/30px var(--mono); color: #9198a1; }
+  .en-line { display: flex; white-space: pre; padding-right: 16px; transition: background .3s, color .3s; }
+  .en-line .no { width: 56px; padding-right: 18px; text-align: right; color: #3d444d; flex: none; }
+  .en-line.hot { color: #f0f6fc; background: linear-gradient(90deg, #3fb95040, transparent 85%); }
+  .en-status { margin-top: 14px; font: 600 19px/1 var(--mono); color: #3fb950; letter-spacing: .06em; min-height: 20px; }
+  .en-vault.busy .en-status::after { content: "▍"; animation: ga-blink .7s steps(1) infinite; }
+  .en-gate { position: absolute; left: 700px; top: 290px; width: 200px; height: 620px; text-align: center; opacity: 0; }
+  .active .en-gate { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .55s; }
+  .en-gate > i { display: block; font: 600 17px/1.25 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #d29922; font-style: normal; }
+  .en-gate small { position: absolute; left: 0; right: 0; bottom: 0; font: 500 16px/1.4 var(--mono); color: #9198a1; }
+  .en-pillar { position: absolute; left: 92px; top: 60px; bottom: 60px; width: 16px; border-radius: 8px; background: linear-gradient(#d2992200, #d29922, #d2992200);
+    box-shadow: 0 0 30px #d2992288; }
+  .en-gnote { position: absolute; left: 50%; top: 360px; transform: translate(-50%, 10px); white-space: nowrap; padding: 10px 16px; border-radius: 10px;
+    font: 700 19px/1 var(--mono); background: #0d1117; border: 2px solid; opacity: 0; transition: opacity .3s, transform .3s; z-index: 4; }
+  .en-gnote.show { opacity: 1; transform: translate(-50%, 0); }
+  .en-gnote.ok { color: #3fb950; border-color: #3fb950; }
+  .en-gnote.no { color: #ff7b72; border-color: #f85149; box-shadow: 0 0 40px -6px #f85149; }
+  .en-pk { position: absolute; left: 0; top: 582px; padding: 9px 16px; border-radius: 99px; white-space: nowrap; font: 600 17px/1 var(--mono); z-index: 3;
+    background: #0d1117; border: 2px solid var(--c); color: var(--c); box-shadow: 0 0 26px -4px var(--c); }
+  .en-pk.q { --c: #4493f8; }
+  .en-pk.a { --c: #3fb950; }
+  .en-pk.leak { --c: #f85149; }
+  .en-pk.burst { animation: en-burst .6s ease-out forwards; }
+  @keyframes en-burst { to { opacity: 0; filter: blur(8px); scale: 1.6; } }
+  .en-ledger { position: absolute; left: 110px; top: 930px; width: 1700px; display: flex; align-items: center; gap: 22px; opacity: 0; }
+  .active .en-ledger { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .en-ledger > i { font: 600 17px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; font-style: normal; white-space: nowrap; }
+  .en-bar { flex: 1; height: 18px; border-radius: 9px; background: #21262d; overflow: hidden; }
+  .en-fill { height: 100%; width: 100%; border-radius: 9px; background: linear-gradient(90deg, #3fb950, #39c5cf); transition: width .8s cubic-bezier(.2,.9,.2,1); }
+  .en-fill.low { background: linear-gradient(90deg, #d29922, #f0883e); }
+  .en-left { font: 600 20px/1 var(--mono); color: #d1d7e0; white-space: nowrap; }
+  .en-left b { color: #f0f6fc; font-size: 26px; }
+  .en-sens { display: flex; gap: 8px; }
+  .en-sens span { padding: 7px 12px; border-radius: 8px; font: 500 16px/1 var(--mono); color: #656c76; border: 1px solid #30363d; }
+  .en-sens span.on { color: #0d1117; background: #3fb950; border-color: #3fb950; font-weight: 700; }
+
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; } }
   `;
   document.head.append(Object.assign(document.createElement("style"), { textContent: css }));
@@ -646,6 +952,7 @@
   {
     resetIndex();
     slides.push({
+      group: "intro",
       sound: "title",
       palette: ["#0fbf3e", "#08872b", "#5fed83", "#0a241b"],
       notes: "GitHub Agentic Workflows. Coding agents running inside GitHub Actions, written in Markdown, with guardrails.",
@@ -830,8 +1137,8 @@
       GA_MORPH = 1600;
     const gaLen = p => GA_RUNS[p][5].reduce((a, j) => a + j[3], 0) + GA_HOLD[p];
     slides.push({
+      group: "platform",
       sound: "ship",
-      trans: "up",
       enter() {
         gaT0 = performance.now();
         gaM = -1;
@@ -984,6 +1291,7 @@
       if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
     };
     slides.push({
+      group: "platform",
       sound: "ship",
       palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
       notes:
@@ -1122,8 +1430,8 @@
       pre.append(caret());
     };
     slides.push({
+      group: "platform",
       sound: "typing",
-      trans: "up",
       palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
         "Turn Intent to Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning a pull request removing duplicated code shows up for review. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
@@ -1426,6 +1734,7 @@
       ctx.globalAlpha = 1;
     };
     slides.push({
+      group: "security",
       sound: "forge",
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
@@ -1571,6 +1880,7 @@
       lastSpawn = 0,
       last = 0;
     slides.push({
+      group: "security",
       sound: "omen",
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
@@ -1674,6 +1984,397 @@
     });
   }
 
+  // Safe outputs: the boxed agent can't create an issue, so it proposes create-issue; threat detection scans it; a separate job writes it
+  {
+    resetIndex();
+    const BX = [110, 710, 1310];
+    const CMD = 'gh issue create -t "Flaky test"';
+    const typed = h("span", { class: "cur" });
+    const status = h("span", { class: "st" }, "proposed");
+    const card = h(
+      "div",
+      { class: "so-card" },
+      h("div", { class: "so-beam" }),
+      h("div", { class: "t" }, h("span", { class: "so-ico", "data-ico": "issue", "data-fill": "#3fb950" }), "Flaky test in cart handler"),
+      h("div", { class: "lb" }, h("span", {}, "bug"), h("span", {}, "agentic")),
+      status
+    );
+    const checks = ["Prompt injection", "Secret leaks", "Malicious links", "Harmful code"].map(x => h("li", {}, x));
+    const boxes = [
+      h(
+        "div",
+        { class: "so-box so-b0", "--c": "#3fb950", "--i": 0, style: { left: `${BX[0]}px`, borderStyle: "dashed", borderWidth: "3px" } },
+        h("div", { class: "so-cage" }),
+        h(
+          "div",
+          { class: "so-shake" },
+          h("i", {}, "01 · AGENT · SANDBOXED"),
+          h("h3", {}, "Agent job"),
+          h("div", { class: "so-who" }, h("span", { class: "so-av" }, h("span", { class: "so-ico", "data-ico": "copilot" })), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
+          h("div", { class: "so-term" }, h("div", {}, "$ ", typed), h("div", { class: "l2" }, "✕ 403 · token is read-only"), h("div", { class: "l3" }, "→ safe output: create_issue"))
+        )
+      ),
+      h(
+        "div",
+        { class: "so-box so-b1", "--c": "#d29922", "--i": 1, style: { left: `${BX[1]}px` } },
+        h("i", {}, "02 · DETECT · ISOLATED"),
+        h("h3", {}, "Threat detection"),
+        h("div", { class: "so-who" }, h("span", { class: "so-av det" }, h("span", { class: "so-ico", "data-ico": "copilot" })), "Detection agent", h("span", { class: "so-perm" }, "no tools")),
+        h("ul", { class: "so-checks" }, checks)
+      ),
+      h(
+        "div",
+        { class: "so-box so-b2", "--c": "#4493f8", "--i": 2, style: { left: `${BX[2]}px` } },
+        h("i", {}, "03 · WRITE · SCOPED"),
+        h("h3", {}, "Safe output job"),
+        h("div", { class: "so-note" }, "Holds ", h("code", {}, "issues: write"), ", applies only declared outputs")
+      ),
+    ];
+    // [phase class, ms into the cycle]
+    const P = [
+      ["p-type", 600],
+      ["p-deny", 2000],
+      ["p-safe", 3100],
+      ["p-to1", 4100],
+      ["p-scan", 5100],
+      ["p-pass", 7300],
+      ["p-to2", 8100],
+      ["p-run", 9100],
+      ["p-done", 10600],
+    ];
+    const at = Object.fromEntries(P),
+      CYC = 14000,
+      CHECK0 = 5500,
+      CHECKDT = 420;
+    const el = h(
+      "section",
+      { class: "slide so" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents propose, jobs write"), h("h2", {}, letters("Safe "), letters("outputs", "l-grad"))),
+      boxes,
+      [0, 1].map(i => h("div", { class: "so-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
+      [0, 1].map(i => h("div", { class: "so-call", "--i": i, style: { left: `${BX[i] + 500}px` } }, i ? "verdict" : "create-issue")),
+      card
+    );
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      nTyped = -1,
+      iconsDrawn = false;
+    const place = (i, instant) => {
+      if (instant) card.style.transition = "none";
+      card.style.left = `${BX[i] + 40}px`;
+      if (instant) {
+        void card.offsetWidth;
+        card.style.transition = "";
+      }
+    };
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    slides.push({
+      group: "security",
+      sound: "factory",
+      green: true,
+      palette: ["#238636", "#0e3a1f", "#1f6feb", "#0b2f3a"],
+      notes:
+        "Safe outputs, an illustrative run with a synthetic issue. The agent runs boxed in: its token is read-only, so when it tries to create an issue directly the call is refused. Instead it calls the create-issue safe output, which only records a proposal. A separate threat detection job, an isolated agent with no tools, reads the proposed issue and looks for prompt injection, leaked secrets, malicious links and harmful code. Only when the verdict is clean does a third job, the only one holding issues: write, apply the declared output and actually create the issue. The agent never holds write credentials, and every write is limited to the outputs declared in the front matter.",
+      enter() {
+        if (!iconsDrawn) {
+          iconsDrawn = true;
+          el.querySelectorAll(".so-ico").forEach(s => {
+            s.innerHTML = `<svg viewBox="0 0 24 24" fill="${s.dataset.fill || "#f0f6fc"}">${OCTI[s.dataset.ico].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+          });
+        }
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          nTyped = -1;
+          P.forEach(([cls]) => el.classList.remove(cls));
+          checks.forEach(li => li.classList.remove("ok"));
+          boxes.forEach(b => b.classList.remove("hot"));
+          status.textContent = "proposed";
+          place(0, true);
+        }
+        for (const [cls, ms] of P) el.classList.toggle(cls, u >= ms);
+        const n = Math.max(0, Math.min(CMD.length, Math.floor(((u - at["p-type"]) / (at["p-deny"] - at["p-type"] - 200)) * CMD.length)));
+        if (n !== nTyped) {
+          if (n > nTyped && nTyped >= 0 && u >= at["p-type"]) sfx.key(0.7);
+          nTyped = n;
+          typed.textContent = CMD.slice(0, n);
+        }
+        boxes[0].classList.toggle("hot", u >= at["p-type"] && u < at["p-to1"]);
+        boxes[1].classList.toggle("hot", u >= at["p-to1"] && u < at["p-to2"]);
+        boxes[2].classList.toggle("hot", u >= at["p-to2"]);
+        card.classList.toggle("moving", (u >= at["p-to1"] && u < at["p-to1"] + 900) || (u >= at["p-to2"] && u < at["p-to2"] + 900));
+        if (u >= at["p-deny"]) fire("deny", () => sfx.step(-1));
+        if (u >= at["p-safe"]) fire("safe", () => sfx.pop(2));
+        if (u >= at["p-to1"])
+          fire("to1", () => {
+            place(1);
+            sfx.pop(3);
+          });
+        if (u >= at["p-scan"]) fire("scan", () => (status.textContent = "scanning…"));
+        checks.forEach((li, i) => {
+          if (u >= CHECK0 + i * CHECKDT)
+            fire("c" + i, () => {
+              li.classList.add("ok");
+              sfx.pop(4 + i);
+            });
+        });
+        if (u >= at["p-pass"])
+          fire("pass", () => {
+            status.textContent = "✓ no threats";
+            sfx.review();
+          });
+        if (u >= at["p-to2"])
+          fire("to2", () => {
+            place(2);
+            sfx.pop(5);
+          });
+        if (u >= at["p-run"]) fire("run", () => sfx.compile());
+        if (u >= at["p-done"])
+          fire("done", () => {
+            status.textContent = "● open · #42";
+            sfx.notify(false);
+          });
+      },
+      el,
+    });
+  }
+
+  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
+  {
+    resetIndex();
+    const BUDGET = 8;
+    const ROUNDS = [
+      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
+      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
+      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
+      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
+    ];
+    const CODE = [
+      "// billing/client.ts",
+      'import { charge } from "./v1/billing";',
+      "export async function renew(acct) {",
+      "  const plan = await lookup(acct);",
+      '  return charge(plan, { api: "v1" });',
+      "}",
+      "// auth/session.ts",
+      'import { sign } from "auth-lib@2.3.0";',
+      "// tests/integration/sync.test.ts",
+      'test.retry(3)("sync settles", run);',
+    ];
+    const PX = 560,
+      GX = 800,
+      VX = 1040;
+    const qTask = h("div", { class: "en-task" });
+    const qSchema = h("div", { class: "en-schema" });
+    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
+    const log = h("ul", { class: "en-log" });
+    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
+    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
+    const vaultStatus = h("div", { class: "en-status" });
+    const vault = h(
+      "div",
+      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
+      h("b", { class: "en-lock" }, "🔒 enclave"),
+      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
+      h("h3", {}, "octo-org/private-service"),
+      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
+      h("div", { class: "en-code" }, lines),
+      vaultStatus
+    );
+    const gNote = h("div", { class: "en-gnote" });
+    const fill = h("div", { class: "en-fill" });
+    const leftN = h("b");
+    const invN = h("span", { class: "en-left" });
+    const el = h(
+      "section",
+      { class: "slide en" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
+      h(
+        "div",
+        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
+        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
+        h("h3", {}, "Asks, never reads"),
+        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
+        call,
+        log,
+        out
+      ),
+      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
+      vault,
+      h(
+        "div",
+        { class: "en-ledger" },
+        h("i", {}, "Information budget"),
+        h("div", { class: "en-bar" }, fill),
+        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
+        invN,
+        h(
+          "div",
+          { class: "en-sens" },
+          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
+        )
+      )
+    );
+    let ev = [],
+      evI = 0,
+      pks = [],
+      used = 0,
+      calls = 0,
+      t0 = 0,
+      now = 0,
+      fresh = true;
+    const fmt = n => (Math.round(n * 10) / 10).toString();
+    const ledger = () => {
+      const left = BUDGET - used;
+      fill.style.width = `${(left / BUDGET) * 100}%`;
+      fill.classList.toggle("low", left < 3);
+      leftN.textContent = fmt(left);
+      invN.textContent = `· ${calls} / 4 invocations`;
+    };
+    const say = (txt, ok) => {
+      gNote.textContent = txt;
+      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
+    };
+    const launch = (txt, cls, x0, x1, dur, blocked) => {
+      const p = h("div", { class: `en-pk ${cls}` }, txt);
+      el.append(p);
+      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
+    };
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      let T = 600;
+      ROUNDS.forEach((r, k) => {
+        const s = T;
+        at(s, () => {
+          qTask.textContent = r.q;
+          qSchema.textContent = r.schema;
+          call.classList.remove("flash");
+          void call.offsetWidth;
+          call.classList.add("flash");
+          lines.forEach(l => l.classList.remove("hot"));
+          gNote.classList.remove("show");
+          sfx.key();
+        });
+        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
+        if (r.over) {
+          at(s + 1400, () => {
+            say(`✗ over budget · needs ${r.bits} bits`, 0);
+            sfx.route(0);
+          });
+          T = s + 3200;
+          return;
+        }
+        at(s + 1350, () => say("✓ masked capability", 1));
+        at(s + 2000, () => {
+          calls++;
+          ledger();
+          vault.classList.add("busy");
+          vaultStatus.textContent = "sub-agent reading ";
+          gNote.classList.remove("show");
+        });
+        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
+        let u = s + 3600;
+        at(u, () => {
+          vault.classList.remove("busy");
+          vaultStatus.textContent = "answer ready";
+        });
+        if (r.leak) {
+          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
+          at(u + 800, () => {
+            say("✗ free-form string · denied", 0);
+            sfx.route(0);
+          });
+          u += 1800;
+        }
+        at(u, () => launch(r.a, "a", VX, PX, 1400));
+        at(u + 700, () => {
+          used += r.bits;
+          ledger();
+          say(`✓ schema · −${r.bits} bits`, 1);
+          sfx.route(2);
+        });
+        at(u + 1400, () => {
+          log.append(h("li", {}, r.log));
+          sfx.pop(k * 2);
+        });
+        T = u + 2200;
+      });
+      at(T, () => {
+        out.classList.add("show");
+        gNote.classList.remove("show");
+        sfx.review();
+      });
+      at(T + 4000, () => (fresh = true));
+    };
+    const reset = () => {
+      pks.forEach(p => p.el.remove());
+      pks = [];
+      used = calls = 0;
+      log.replaceChildren();
+      out.classList.remove("show");
+      vault.classList.remove("busy");
+      vaultStatus.textContent = "";
+      gNote.className = "en-gnote";
+      qTask.textContent = "";
+      qSchema.textContent = "";
+      lines.forEach(l => l.classList.remove("hot"));
+      ledger();
+      t0 = now;
+      script();
+    };
+    slides.push({
+      group: "security",
+      sound: "vault",
+      green: true,
+      palette: ["#238636", "#0e3a1f", "#8957e5", "#0b2f3a"],
+      notes:
+        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
+      enter() {
+        fresh = true;
+      },
+      tick(t) {
+        now = t;
+        if (fresh) {
+          fresh = false;
+          reset();
+        }
+        const e = t - t0;
+        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
+        for (const p of pks) {
+          if (p.dead) continue;
+          const u = Math.min(1, (t - p.start) / p.dur);
+          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
+          if (u >= 1) {
+            p.dead = t + 600;
+            if (p.blocked) p.el.classList.add("burst");
+            else p.dead = t;
+          }
+        }
+        pks = pks.filter(p => {
+          if (p.dead && t >= p.dead) p.el.remove();
+          return !p.dead || t < p.dead;
+        });
+      },
+      el,
+    });
+  }
+
   // The factory mindset: engineer processes, not code
   {
     resetIndex();
@@ -1730,6 +2431,7 @@
     }
     let last = 0;
     slides.push({
+      group: "factory",
       sound: "factory",
       palette: ["#bf3989", "#238636", "#9e6a03", "#8957e5"],
       notes:
@@ -2162,8 +2864,8 @@
       });
     };
     slides.push({
+      group: "factory",
       sound: "loop",
-      trans: "up",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
         "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. These are illustrative patterns with synthetic examples, not activity attributed to particular people or teams.",
@@ -2290,6 +2992,7 @@
         thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
       };
       slides.push({
+        group: "factory",
         sound: "loop",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
@@ -2352,6 +3055,7 @@
     let bdT0 = 0,
       bdRun = -1;
     slides.push({
+      group: "factory",
       sound: "loop",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
@@ -2517,6 +3221,7 @@
       $("rpaLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
+      group: "loops",
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
@@ -2809,6 +3514,7 @@
     };
     let prevT = 0;
     slides.push({
+      group: "loops",
       sound: "loop",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
@@ -3023,6 +3729,7 @@
       $("lane0").classList.add("on");
     };
     slides.push({
+      group: "loops",
       sound: "loop",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
@@ -3084,6 +3791,194 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+    });
+  }
+
+  // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#sflAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const maint = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
+    const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
+    const FAIL = [1, 3, 4],
+      KIND = ["test hang", "assertion failure", "build break"];
+    const ROW0 = 284,
+      ROWH = 26;
+    let pipes = `<g class="sfl-box" id="sflPipes"><rect class="sfl-card" x="24" y="220" width="460" height="232" rx="12"/><text class="sfl-title" x="40" y="246">OUTER-LOOP PIPELINES</text>`;
+    PIPES.forEach((p, i) => (pipes += `<g class="sfl-row sfl-pipe" data-y="${ROW0 + i * ROWH}"><text x="40" y="${ROW0 + i * ROWH}">${p}</text><circle cx="462" cy="${ROW0 + i * ROWH - 6}" r="7"/></g>`));
+    pipes += `<text class="sfl-badge" id="sflBadge" x="40" y="440"></text>`;
+    pipes += `<g class="sfl-scan" id="sflBeam"><rect x="24" y="-28" width="460" height="28" fill="url(#sflBeamG)"/><line x1="24" y1="0" x2="484" y2="0"/></g></g>`;
+    const RUB = [
+      ["ok", "✓ signature is specific"],
+      ["ok", "✓ known-error data is valid"],
+      ["ok", "✓ fixed, never muted"],
+      ["ko", "✗ owner pinged wrongly"],
+      ["ed", "+ prompt edit proposed"],
+    ];
+    let rubric = `<g class="sfl-box" id="sflRubric"><rect class="sfl-card" x="1316" y="270" width="364" height="190" rx="12"/><text class="sfl-title" x="1332" y="296">KPI TRACKER · RUBRIC</text>`;
+    RUB.forEach(([c, t], i) => (rubric += `<g class="sfl-row sfl-rub"><text class="${c}" x="1332" y="${330 + i * 27}">${t}</text></g>`));
+    rubric += `</g>`;
+    const scanPipes = (f, c) => {
+      const s = $("sflBeam"),
+        y = 262 + Math.min(1, f / 0.75) * 166;
+      s.setAttribute("transform", `translate(0,${y})`);
+      s.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      svg.querySelectorAll(".sfl-pipe").forEach(r => r.classList.toggle("seen", +r.dataset.y <= y));
+      if (ROW0 + FAIL[c % 3] * ROWH <= y && !$("sflBadge").classList.contains("on")) {
+        $("sflBadge").classList.add("on");
+        sfx.pop(5);
+      }
+    };
+    const readRubric = f => svg.querySelectorAll(".sfl-rub").forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.5) / (RUB.length + 0.5)));
+    // [edge id, path, color, label, lx, ly, anchor, extra label class]
+    const EDGES = [
+      ["sflE0", "M110 174 V212", "p", ["scans failing runs"], 132, 200, "start"],
+      ["sflE1", "M492 340 H596", "p", ["files Known", "Build Error"], 640, 404, "middle"],
+      ["sflE2", "M640 304 V140 H818", "p", ["picks up", "open errors"], 662, 222, "start"],
+      ["sflO0", "M860 174 V274 H760 V320", "p", ["small and build-validated:", "draft fix PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO1", "M860 174 V274 H900 V320", "p", ["plausible, unverified:", "help-wanted PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO2", "M860 174 V274 H1040 V320", "p", ["no code change possible:", "root-cause comment"], 880, 222, "start", "sfl-ol"],
+      ["sflR0", "M760 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR1", "M900 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR2", "M1040 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflE3", "M1072 580 H1190 V140 H1214", "b", ["reactions & reviews"], 1140, 622, "middle"],
+      ["sflE4", "M1252 174 V292", "p", ["scores both", "against rubrics"], 1274, 222, "start"],
+      ["sflE5", "M1252 366 V542", "p", ["proposes", "prompt edits"], 1274, 494, "start"],
+      ["sflE6", "M1464 580 H1640 V655 H10 V140 H72", "b day", ["sharper prompts · the loop runs again"], 700, 642, "middle"],
+    ];
+    // the token's journey: [edge, node lit on arrival, duration]; SCAN and RUBRIC are in-place steps, {o} is this cycle's outcome
+    const SEQ = [
+      ["sflE0", "sflPipes"],
+      ["SCAN", "sflPipes", 2600],
+      ["sflE1", "sflKbe"],
+      ["sflE2", "sflFixer"],
+      ["sflO{o}", "sflOut{o}"],
+      ["sflR{o}", "sflDev"],
+      ["sflE3", "sflFeed"],
+      ["sflE4", "sflKpi"],
+      ["RUBRIC", "sflRubric", 2400],
+      ["sflE5", "sflDev2"],
+      ["sflE6", "sflScan", 1800],
+    ];
+    const LANE = { sflScan: 0, sflPipes: 0, sflKbe: 1, sflFixer: 1, sflOut0: 1, sflOut1: 1, sflOut2: 1, sflDev: 1, sflFeed: 2, sflKpi: 2, sflRubric: 2, sflDev2: 2 };
+    let g = `<defs><radialGradient id="sflAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="sflP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="sflBeamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
+      <marker id="sflB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "SCAN · EVERY 12H"],
+      [520, 1160, "FIX · WEEKDAYS"],
+      [1160, VW, "LEARN · BI-WEEKLY"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="sflLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an, extra = ""] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#sfl${c.startsWith("p") ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c} ${extra}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += agent("sflScan", 110, 140, 230, "CI Scanner") + agent("sflFixer", 860, 140, 200, "CI Fixer") + agent("sflFeed", 1252, 140, 210, "Feedback");
+    g += pipes + box("sflKbe", 640, 340, "issue");
+    g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
+    g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
+    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580);
+    g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg sfl-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 900,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const at = (s, o) => s.replace("{o}", o);
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("sflLane" + LANE[nid]).classList.add("on");
+    };
+    slides.push({
+      group: "loops",
+      sound: "loop",
+      palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
+      notes:
+        "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three agentic workflows. The pipelines, failures and rubric results shown are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          o = c % 3;
+        if (c !== cyc) {
+          cyc = c;
+          $("sflCycle").textContent = `CYCLE ${c + 1}`;
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          svg.querySelectorAll(".sfl-pipe").forEach((r, i) => r.classList.toggle("bad", i === FAIL[o]));
+          $("sflBadge").textContent = `✕ ${PIPES[FAIL[o]]}: ${KIND[o]}`;
+          $("sflBeam").style.opacity = 0;
+          light("sflScan");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (eid === "SCAN" || eid === "RUBRIC") {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(at(SEQ[j][1], o));
+          if (eid === "SCAN") scanPipes(f, c);
+          else readRubric(f);
+          return;
+        }
+        const p = $(at(eid, o)),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(at(SEQ[j][1], o));
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(at(nid, o));
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))), svg),
     });
   }
 
@@ -3390,6 +4285,7 @@
       pk = pk.filter(q => q.p < 1);
     };
     slides.push({
+      group: "cost",
       sound: "coins",
       palette: ["#9e6a03", "#238636", "#1f6feb", "#8957e5"],
       notes:
@@ -3431,6 +4327,487 @@
         drawRoute(t, dt);
       },
       el: h("section", { class: "slide cm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Guard · measure · optimize"), h("h2", {}, letters("Cost "), letters("management", "l-grad"))), ed, meter, route),
+    });
+  }
+
+  // Model routing: the router reads each run, weighs what a mistake would cost and picks the cheapest model and effort that is good enough
+  {
+    resetIndex();
+    // Illustrative runs: each tagged phrase (k kind, s scope, d difficulty) lifts out into a label chip.
+    const RUNS = [
+      {
+        wf: "daily-report",
+        text: [["Summarize "], ["yesterday's activity", "s"], [" into a "], ["short", "d"], [" "], ["daily report", "k"], ["."]],
+        chips: ["report", "repo-wide", "easy"],
+        stakes: 0,
+        why: "a report is easy to ignore",
+        tier: 0,
+        effort: "HIGH",
+      },
+      {
+        wf: "security-audit",
+        text: [["Audit", "k"], [" "], ["the auth module", "s"], [" for "], ["subtle injection bugs", "d"], ["."]],
+        chips: ["security", "subsystem", "hard"],
+        stakes: 1,
+        why: "a missed bug would be silent",
+        tier: 1,
+        effort: "HIGH",
+      },
+      {
+        wf: "pr-review",
+        text: [["Review", "k"], [" "], ["this pull request", "s"], [" for "], ["common code smells", "d"], ["."]],
+        chips: ["review", "multi-file", "medium"],
+        stakes: 0,
+        why: "a review is only a suggestion",
+        tier: 0,
+        effort: "XHIGH",
+      },
+      {
+        wf: "release",
+        text: [["Merge", "k"], [" "], ["the release branch", "s"], [" once "], ["checks are green", "d"], ["."]],
+        chips: ["release", "repo-wide", "easy"],
+        stakes: 2,
+        why: "easy, but a merge can't be undone",
+        tier: 2,
+        effort: "MEDIUM",
+      },
+      {
+        wf: "issue-triage",
+        text: [["Label", "k"], [" "], ["the new issue", "s"], [" with "], ["one area tag", "d"], ["."]],
+        chips: ["triage", "one issue", "trivial"],
+        stakes: 0,
+        why: "a label is easy to change",
+        tier: 0,
+        effort: "LOW",
+      },
+      {
+        wf: "docs-sync",
+        text: [["Update the docs", "k"], [" to match "], ["the new CLI flags", "s"], [" in "], ["a few lines", "d"], ["."]],
+        chips: ["docs", "multi-file", "easy"],
+        stakes: 0,
+        why: "docs are easy to fix",
+        tier: 0,
+        effort: "MEDIUM",
+      },
+    ];
+    const TIERS = [
+      ["SMALL", "#3fb950", "$", "small"],
+      ["MID-SIZE", "#4493f8", "$$", "mid-size"],
+      ["FRONTIER", "#ab7df8", "$$$", "frontier"],
+    ];
+    const ZONES = [
+      ["low", "economy", "#3fb950", 150],
+      ["medium", "balanced", "#4493f8", 90],
+      ["high", "robust", "#ab7df8", 30],
+    ];
+    const CHIPS = [
+      ["kind", "#f778ba", "k"],
+      ["scope", "#39c5cf", "s"],
+      ["difficulty", "#e3b341", "d"],
+    ];
+    // Measured on gh-aw's own workflows: cost per run by day, relative to each workflow's own two weeks before routing (through 12 Nov 2026).
+    const DAYS = [1.02, 1.02, 0.97, 1.06, 1.04, 1.05, 0.95, 1.06, 0.95, 1.05, 0.99, 0.99, 0.93, 0.89, 0.63, 0.5, 0.2, 0.2, 0.23, 0.31, 0.24, 0.15, 0.15];
+    const ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$-";
+    // each run plays out at about 56% of its first pace (0.75 x 0.75), so the eye can follow every step
+    const SLOW = 16 / 9;
+    const svgOf = (cls, vb, inner) => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      s.setAttribute("class", cls);
+      s.setAttribute("viewBox", vb);
+      s.innerHTML = inner;
+      return s;
+    };
+
+    // the stakes gauge: three zones on a half dial, and a sprung needle
+    const GX = 190,
+      GY = 200,
+      GR = 128;
+    const pt = (a, r) => [GX + r * Math.cos((a * Math.PI) / 180), GY - r * Math.sin((a * Math.PI) / 180)];
+    const arc = (a0, a1) => {
+      const [x0, y0] = pt(a0, GR),
+        [x1, y1] = pt(a1, GR);
+      return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${GR} ${GR} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+    };
+    let gs = `<path class="mr-track" d="${arc(180, 0)}"/>`;
+    ZONES.forEach(([lab, , c, mid], i) => {
+      const [lx, ly] = pt(mid, 164);
+      gs += `<path class="mr-z" d="${arc(180 - i * 60 - (i ? 1.5 : 0), 120 - i * 60 + (i < 2 ? 1.5 : 0))}" stroke="${c}" style="color:${c}"/>`;
+      gs += `<text class="mr-zl" x="${lx.toFixed(1)}" y="${(ly + 6).toFixed(1)}" fill="${c}">${lab}</text>`;
+    });
+    gs += `<g class="mr-needle"><path d="M${GX - 5} ${GY}L${GX} ${GY - 112}L${GX + 5} ${GY}Z"/><circle cx="${GX}" cy="${GY}" r="13"/></g>`;
+    gs += `<text class="mr-read" x="${GX}" y="${GY + 46}"></text><text class="mr-read2" x="${GX}" y="${GY + 66}"></text>`;
+    const gauge = svgOf("mr-gauge", "0 0 380 270", gs);
+    const zones = [...gauge.querySelectorAll(".mr-z")],
+      zlabs = [...gauge.querySelectorAll(".mr-zl")],
+      needleEl = gauge.querySelector(".mr-needle"),
+      read = gauge.querySelector(".mr-read"),
+      read2 = gauge.querySelector(".mr-read2");
+
+    // the run card: the workflow's model line, the task, its labels, the gauge and the reason
+    const wf = h("span", { class: "mr-wf" }),
+      text = h("div", { class: "mr-text" }),
+      caret = h("span", { class: "pf-caret" }),
+      beam = h("div", { class: "mr-beam" }),
+      chips = CHIPS.map(([l, c]) => h("div", { class: "mr-chip", "--c": c }, h("i", {}, l), h("b", {}))),
+      chipRow = h("div", { class: "mr-chips" }, chips),
+      why = h("div", { class: "mr-why" });
+    const card = h(
+      "div",
+      { class: "mr-run" },
+      h(
+        "div",
+        { class: "mr-bar" },
+        ["#ff5f57", "#febc2e", "#28c840"].map(c => h("i", { style: { background: c } })),
+        wf,
+        h("span", { class: "mr-gap" }),
+        h("span", { class: "mr-model" }, "model: ", h("b", {}, "router"))
+      ),
+      text,
+      beam,
+      chipRow,
+      gauge,
+      why
+    );
+    const fields = [
+      ["model", 8],
+      ["effort", 7],
+      ["cost", 3],
+    ].map(([l, n]) => {
+      const tiles = Array.from({ length: n }, () => h("span", { class: "mr-t" }, " "));
+      return { el: h("div", { class: "mr-field" }, h("i", {}, l), h("div", { class: "mr-tiles" }, tiles)), tiles };
+    });
+    const tiles = fields.flatMap(f => f.tiles);
+    const hero = h(
+      "div",
+      { class: "mr-hero" },
+      card,
+      h(
+        "div",
+        { class: "mr-flap" },
+        h("b", { class: "mr-arrow" }, "→"),
+        fields.map(f => f.el)
+      )
+    );
+
+    // measured results: the day-by-day cost strip, with the switch to model: router on day 0
+    let ss = `<line x1="0" y1="25" x2="544" y2="25"/>`;
+    DAYS.forEach((v, i) => {
+      ss += `<rect class="${i < 14 ? "pre" : "post"}" x="${(i * 23.6).toFixed(1)}" y="${(125 - v * 100).toFixed(1)}" width="18" height="${(v * 100).toFixed(1)}" rx="3" style="--i:${i}"/>`;
+    });
+    ss += `<line class="mk" x1="327.6" y1="6" x2="327.6" y2="128"/><text class="mk" x="336" y="46">model: router</text>`;
+    ss += `<text x="0" y="148">two weeks before</text><text x="336" y="148">after</text>`;
+    const big = h("b", {}, "0%");
+    const proof = h(
+      "div",
+      { class: "mr-proof" },
+      h("div", { class: "mr-pf-h" }, "gh-aw's own workflows", h("em", {}, "measured")),
+      h("div", { class: "mr-big" }, big, h("span", {}, "cost per run", h("small", {}, "65 → 16 AI credits"))),
+      svgOf("mr-strip", "0 0 544 150", ss),
+      h("div", { class: "mr-held" }, h("span", {}, h("i", {}, "✓"), "run success", h("b", {}, "87.6% → 88.5%")), h("span", {}, h("i", {}, "✓"), "quality", h("b", {}, "83.9 → 83.6")))
+    );
+
+    // built for workflows that repeat: a week of one workflow's runs, one square each, coloured by the model it got (illustrative)
+    const week = h("div", { class: "mr-week" }, ["M", "T", "W", "T", "F", "S", "S"].map(d => [h("i", {}, d), Array.from({ length: 24 }, () => h("b", {}))]).flat(2));
+    const cells = [...week.querySelectorAll("b")];
+    const runCount = h("b", {}, "0"),
+      weekNo = h("span", {}, "week 1");
+    const rep = h(
+      "div",
+      { class: "mr-rep" },
+      h("div", { class: "mr-rh" }, "Built for workflows that repeat"),
+      week,
+      h(
+        "div",
+        { class: "mr-rf" },
+        TIERS.map(([, c, , name]) => h("span", { "--c": c }, name)),
+        h("em", {}, runCount, " runs · ", weekNo)
+      )
+    );
+    const cv = h("canvas", { class: "mr-cv", width: 1920, height: 1080 }),
+      cx = cv.getContext("2d");
+    const sec = h("section", { class: "slide mr" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The right model for every run"), h("h2", {}, letters("Model "), letters("routing", "l-grad"))), hero, proof, rep, cv);
+
+    // builds: 0 the router at work, 1 measured results, 2 built for workflows that repeat
+    let t0 = 0,
+      last = 0,
+      build = 0,
+      tb = 0,
+      si = 0,
+      no = 0,
+      run = null,
+      needle = -90,
+      nv = 0,
+      nt = -90,
+      flipT = 0,
+      savedAt = 0,
+      saved = false,
+      weekAt = 0,
+      wk = 1,
+      lit = 0,
+      picks = [],
+      bits = [],
+      ghosts = [];
+    // sparks from an element's centre, in stage coordinates
+    const burst = (el, c, n) => {
+      const r = el.getBoundingClientRect(),
+        s = sec.getBoundingClientRect(),
+        k = 1920 / s.width,
+        x = (r.left + r.width / 2 - s.left) * k,
+        y = (r.top + r.height / 2 - s.top) * k;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2,
+          v = 0.1 + Math.random() * 0.3;
+        bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.1, life: 1, c, s: 2 + Math.random() * 3 });
+      }
+    };
+    const startRun = t => {
+      const r = RUNS[si++ % RUNS.length];
+      no += 1 + ((Math.random() * 4) | 0);
+      run = { ...r, t, words: [], typed: -1, ok: [], read: false, gauged: false, said: false, flap: false, done: false };
+      wf.replaceChildren(`${r.wf}.md`, h("small", {}, `run #${no}`));
+      text.replaceChildren();
+      let n = 0;
+      for (const [s, k] of r.text) {
+        const el = h("span", { class: k ? `mr-w ${k}` : "" });
+        text.append(el);
+        run.words.push({ el, s, k, at: n, lit: false });
+        n += s.length;
+      }
+      run.len = n;
+      chips.forEach((c, j) => {
+        c.classList.remove("on");
+        c.lastChild.textContent = r.chips[j];
+      });
+      [text, chipRow].forEach(x => x.classList.remove("mr-out"));
+      [why, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
+      // the previous pick fades back until the board flips to this run's pick
+      tiles.forEach(x => x.classList.add("old"));
+      nt = -90;
+      read.textContent = read2.textContent = "";
+    };
+    const lift = (w, t) => {
+      w.lit = true;
+      w.el.classList.add("on");
+      const j = CHIPS.findIndex(c => c[2] === w.k),
+        chip = chips[j];
+      const g = h("div", { class: "mr-ghost", "--c": CHIPS[j][1], style: { left: `${36 + w.el.offsetLeft}px`, top: `${84 + w.el.offsetTop}px` } }, w.s);
+      card.append(g);
+      void g.offsetWidth;
+      g.style.transform = `translate(${chip.offsetLeft - w.el.offsetLeft}px, ${300 + chip.offsetTop - 84 - w.el.offsetTop}px) scale(.6)`;
+      g.style.opacity = "0";
+      ghosts.push({ g, t, chip });
+      sfx.pop(j + 3);
+    };
+    const stepRun = t => {
+      // run time at the first pace, so the steps below keep their relative timing
+      const e = (t - run.t) / SLOW,
+        n = Math.min(run.len, Math.floor((e / 520) * run.len));
+      // untyped letters keep their place but stay invisible, so the lines never reflow while typing
+      if (n !== run.typed) {
+        run.typed = n;
+        for (const w of run.words) {
+          const k = Math.max(0, Math.min(w.s.length, n - w.at));
+          w.el.replaceChildren(w.s.slice(0, k), ...(n >= w.at && k < w.s.length ? [caret] : []), h("span", { class: "mr-hide" }, w.s.slice(k)));
+        }
+      }
+      // the beam reads the task; each tagged phrase lifts out into its label chip
+      const u = (e - 620) / 600;
+      beam.style.opacity = u > 0 && u < 1 ? 1 : 0;
+      if (u > 0 && !run.read) {
+        const x = Math.min(1, u) * 584;
+        beam.style.transform = `translateX(${x}px)`;
+        for (const w of run.words) if (w.k && !w.lit && x > w.el.offsetLeft + w.el.offsetWidth / 2) lift(w, t);
+        run.read = u >= 1;
+      }
+      if (!run.gauged && e > 1350) {
+        run.gauged = true;
+        const [lab, mode, c, deg] = ZONES[run.stakes];
+        nt = 90 - deg;
+        zones[run.stakes].classList.add("on");
+        zlabs[run.stakes].classList.add("on");
+        read.textContent = `${lab.toUpperCase()} STAKES`;
+        read.style.fill = c;
+        read2.textContent = mode;
+      }
+      if (!run.said && e > 1600) {
+        run.said = true;
+        why.textContent = run.why;
+        why.classList.add("on");
+      }
+      if (!run.flap && e > 1800) {
+        run.flap = true;
+        const [m, c, co] = TIERS[run.tier];
+        run.target = m.padEnd(8) + run.effort.padEnd(7) + co.padEnd(3);
+        run.c = c;
+        run.settle = tiles.map((_, i) => t + (220 + i * 28) * SLOW);
+        tiles.forEach((x, i) => {
+          x.classList.remove("set", "old");
+          x.style.setProperty("--c", c);
+          run.ok[i] = false;
+        });
+        flipT = 0;
+      }
+      if (run.flap && !run.done) {
+        const flip = t - flipT > 55 * SLOW;
+        if (flip) {
+          flipT = t;
+          sfx.mr.flap();
+        }
+        let left = 0;
+        tiles.forEach((x, i) => {
+          if (run.ok[i]) return;
+          if (t >= run.settle[i]) {
+            run.ok[i] = true;
+            x.textContent = run.target[i];
+            if (run.target[i] !== " ") x.classList.add("set");
+          } else {
+            left++;
+            if (flip) x.textContent = ALPH[(Math.random() * ALPH.length) | 0];
+          }
+        });
+        if (!left) {
+          run.done = true;
+          burst(fields[0].el, run.c, 26);
+          sfx.mr.pick(run.tier);
+        }
+      }
+      if (run.done && e > 3440) [text, chipRow].forEach(x => x.classList.add("mr-out"));
+      if (run.done && e > 3700) startRun(t);
+    };
+    const newWeek = () => {
+      picks = cells.map(() => {
+        const r = Math.random();
+        return r < 0.71 ? 0 : r < 0.87 ? 1 : 2;
+      });
+      lit = 0;
+      cells.forEach(c => (c.className = ""));
+    };
+    const setBuild = (b, t) => {
+      const was = build;
+      build = b;
+      tb = t;
+      sec.classList.toggle("side", b >= 1);
+      proof.classList.toggle("on", b >= 1);
+      rep.classList.toggle("on", b >= 2);
+      if (b === 1 && was < 1) {
+        savedAt = t;
+        saved = false;
+        big.textContent = "0%";
+      }
+      if (b === 2 && was < 2) {
+        wk = 1;
+        weekNo.textContent = "week 1";
+        newWeek();
+        weekAt = t;
+      }
+      // stepping back cancels a count-up or a week that hasn't finished
+      if (b < 1) savedAt = 0;
+      if (b < 2) weekAt = 0;
+    };
+    slides.push({
+      group: "cost",
+      sound: "router",
+      palette: ["#8957e5", "#238636", "#1f6feb", "#6e40c9"],
+      notes:
+        "Model routing. Every workflow run pays for a model, and the usual habit is to pin one strong model for every run. With one line, model: router, the router reads each run's task before the agent starts, labels the kind of work, its scope and its difficulty, weighs what a mistake would cost (low, medium or high stakes, which gh-aw calls economy, balanced and robust), then picks the cheapest model and reasoning effort that is good enough, using benchmark results that ship with the AWF firewall. It runs inside the firewall, respects the workflow's model policy, and gh aw audit shows what it picked and why. The tasks, labels and picks in the animation are illustrative. The results are measured on gh-aw's own workflows: across 127 routed workflows and 3,097 routed runs through 12 Nov 2026, each compared with its own two weeks before routing, cost per run fell 75% (65 to 16 AI credits) while run success (87.6% to 88.5%) and judged quality (83.9 to 83.6 out of 100) held steady. Most routers pick a model for one prompt in a chat, with a person watching. This one is built for workflows that repeat: the same job runs on every schedule, issue and pull request with no one watching, so the router weighs the stakes of each run itself, and the saving repeats on every run. The week of runs is illustrative. Keys: → next step.",
+      enter() {
+        t0 = last = build = si = 0;
+        run = null;
+        // jump straight back to the centred layout instead of gliding there
+        hero.style.transition = "none";
+        sec.classList.remove("side");
+        void hero.offsetWidth;
+        [proof, rep, why, ...chips, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
+        big.textContent = "0%";
+        savedAt = weekAt = 0;
+        ghosts.forEach(g => g.g.remove());
+        ghosts = [];
+        bits = [];
+        tiles.forEach(x => {
+          x.textContent = " ";
+          x.classList.remove("set", "old");
+        });
+        text.replaceChildren();
+        wf.replaceChildren();
+        read.textContent = read2.textContent = "";
+        beam.style.opacity = 0;
+        needle = nt = -90;
+        nv = 0;
+        no = 4180 + ((Math.random() * 60) | 0);
+        sfx.mr.reset();
+        cx.clearRect(0, 0, 1920, 1080);
+      },
+      onNext() {
+        if (build >= 2) return false;
+        setBuild(build + 1, performance.now());
+        return true;
+      },
+      onPrev() {
+        if (!build) return false;
+        setBuild(build - 1, performance.now());
+        return true;
+      },
+      tick(t) {
+        if (!t0) {
+          t0 = last = tb = t;
+          hero.style.transition = "";
+        }
+        const dt = Math.min(50, t - last);
+        last = t;
+        // two full runs before the results, then the week
+        if (build === 0 && t - tb > 900 + 2 * 3700 * SLOW) setBuild(1, t);
+        else if (build === 1 && t - tb > 7500) setBuild(2, t);
+        if (!run && t - t0 > 900) startRun(t);
+        if (run) stepRun(t);
+        // damped spring at the slower pace, so the needle overshoots and settles
+        const ds = dt / SLOW;
+        nv += (0.00025 * (nt - needle) - 0.011 * nv) * ds;
+        needle += nv * ds;
+        needleEl.setAttribute("transform", `rotate(${needle.toFixed(2)} ${GX} ${GY})`);
+        ghosts = ghosts.filter(g => {
+          if (t - g.t > 380 * SLOW) g.chip.classList.add("on");
+          if (t - g.t < 700 * SLOW) return true;
+          g.g.remove();
+          return false;
+        });
+        if (savedAt) {
+          const u = Math.max(0, Math.min(1, (t - savedAt - 950) / 800));
+          if (u > 0 && !saved) {
+            saved = true;
+            sfx.mr.saved();
+          }
+          big.textContent = `${u ? "−" : ""}${Math.round(75 * (1 - (1 - u) ** 3))}%`;
+          if (u >= 1) savedAt = 0;
+        }
+        // the week fills run by run at the same slower pace, then the next week starts
+        if (weekAt) {
+          const e = t - weekAt,
+            n = Math.max(0, Math.min(cells.length, Math.floor((e - 600) / 35)));
+          for (; lit < n; lit++) {
+            cells[lit].className = `t${picks[lit]} hot`;
+            if (wk === 1 && lit % 24 === 23) sfx.mr.day(Math.floor(lit / 24));
+          }
+          runCount.textContent = ((wk - 1) * cells.length + lit).toLocaleString("en-US");
+          if (lit === cells.length && e > 600 + cells.length * 35 + 2400) {
+            weekNo.textContent = `week ${++wk}`;
+            newWeek();
+            weekAt = t - 200;
+          }
+        }
+        cx.clearRect(0, 0, 1920, 1080);
+        for (const b of bits) {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.vy += 0.0005 * dt;
+          b.life -= dt / 850;
+          cx.globalAlpha = Math.max(0, b.life);
+          cx.fillStyle = b.c;
+          cx.fillRect(b.x - b.s / 2, b.y - b.s / 2, b.s, b.s);
+        }
+        cx.globalAlpha = 1;
+        bits = bits.filter(b => b.life > 0);
+      },
+      el: sec,
     });
   }
 
@@ -3587,6 +4964,7 @@
       tokN.textContent = "↓ " + Math.round(shown).toLocaleString("en-US") + " tokens";
     };
     slides.push({
+      group: "enterprise",
       sound: "engine",
       palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
       notes:
@@ -3632,6 +5010,248 @@
           }
         }
         drawToks(t, dt);
+      },
+      el,
+    });
+  }
+
+  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  {
+    resetIndex();
+    const RUN = [
+      { k: "[self-hosted, linux]", c: "#d29922" },
+      { k: "[self-hosted, arm64]", c: "#ab7df8" },
+      { k: "[self-hosted, gpu]", c: "#4493f8" },
+    ];
+    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
+    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
+    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
+    const STEPS = ["checkout", "setup-node", "cache"];
+    const CHIPS = [
+      ["GitHub Apps", [6, 7, 8]],
+      ["OIDC", [4, 5]],
+      ["Runner groups", [3]],
+      ["Environments", []],
+      ["Org secrets", [8]],
+      ["OpenTelemetry", [13, 14, 15]],
+      ["Rulesets", []],
+      ["Audit log", []],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff",
+      E = "#d2a8ff";
+    const vRun = h("span", { class: "ae-val" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [["runs-on: ", K], vRun],
+      [["permissions:", K]],
+      [
+        ["  id-token: ", K],
+        ["write", V],
+      ],
+      [["github-app:", K]],
+      [
+        ["  client-id: ", K],
+        ["${{ vars.APP_ID }}", E],
+      ],
+      [
+        ["  private-key: ", K],
+        ["${{ secrets.APP_KEY }}", E],
+      ],
+      [["network:", K]],
+      [
+        ["  allowed: ", K],
+        ["[defaults, node]", V],
+      ],
+      [["steps:", K]],
+      [
+        ["  - uses: ", K],
+        ["actions/setup-node@v4", V],
+      ],
+      [["observability:", K]],
+      [["  otlp:", K]],
+      [
+        ["    endpoint: ", K],
+        ["${{ secrets.OTLP_ENDPOINT }}", E],
+      ],
+      [["---", D]],
+      [["# Triage new issues for the platform team", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
+    const SB = 1,
+      RN = 2,
+      EC = 3;
+    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
+    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
+    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
+    const card = (i, c, tag, title, code, ic, extra) => {
+      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
+      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
+      return el;
+    };
+    const spans = h(
+      "div",
+      { class: "er-spans" },
+      [
+        [0, 100],
+        [8, 46],
+        [30, 58],
+        [62, 30],
+      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
+    );
+    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
+    otel.classList.add("otel");
+    const cRun = h("span");
+    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
+    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
+    fw.classList.add("fw");
+    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
+    eco.classList.add("eco");
+    const job = h("div", { class: "er-job" });
+    const trace = h("div", { class: "er-job er-trace" });
+    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
+    const el = h(
+      "section",
+      { class: "slide er" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
+      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
+      ed,
+      arrow,
+      otel,
+      fw,
+      runner,
+      eco,
+      job,
+      trace,
+      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
+    );
+    const fly = (dot, [x0, y0], [x1, y1]) => {
+      dot.style.transition = "none";
+      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
+      void dot.offsetWidth;
+      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
+      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
+    };
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      typed = "",
+      arriveAt = 0,
+      otelAt = 0,
+      chipAt = 0,
+      sbAt = 0,
+      chip = -1;
+    const setRunner = (i, t) => {
+      cur = i;
+      el.style.setProperty("--ec", RUN[i].c);
+      runner.style.setProperty("--rc", RUN[i].c);
+      cRun.textContent = RUN[i].k;
+      runner.classList.add("on");
+      for (const c of [runner, eco, fw]) c.classList.remove("run");
+      eco.classList.remove("on");
+      fw.classList.remove("on");
+      steps.forEach(p => p.classList.remove("up"));
+      fly(job, [840, 460], MID(RN));
+      arriveAt = t + 700;
+      sbAt = otelAt = Infinity;
+    };
+    const setChip = i => {
+      chip = i;
+      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
+      const lit = CHIPS[i][1];
+      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "ship",
+      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
+      notes:
+        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+      enter() {
+        typed = RUN[0].k;
+        vRun.textContent = typed;
+        phase = "hold";
+        since = chipAt = 0;
+        chip = -1;
+        chips.forEach(c => c.classList.remove("lit"));
+        rows.forEach(r => r.classList.remove("lit"));
+        otel.classList.remove("on", "run");
+        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
+        steps.forEach(p => p.classList.remove("up"));
+        cRun.textContent = RUN[0].k;
+        sbAt = Infinity;
+        for (const d of [job, trace]) {
+          d.style.transition = "none";
+          d.style.opacity = "0";
+        }
+        cur = 0;
+        arriveAt = otelAt = Infinity;
+      },
+      tick(t) {
+        if (!since) {
+          since = t;
+          chipAt = t + 1800;
+          setRunner(0, t + 900);
+        }
+        if (t > arriveAt && !runner.classList.contains("run")) {
+          runner.classList.add("run");
+          sbAt = t + 900;
+        }
+        if (t > sbAt) {
+          sbAt = Infinity;
+          fw.classList.remove("run");
+          void fw.offsetWidth;
+          fw.classList.add("on", "run");
+          fly(trace, MID(SB), MID(0));
+          otelAt = t + 700;
+        }
+        if (t > otelAt) {
+          otelAt = Infinity;
+          otel.classList.remove("run");
+          void otel.offsetWidth;
+          otel.classList.add("on", "run");
+        }
+        if (t > arriveAt) {
+          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
+          steps.forEach((p, j) => p.classList.toggle("up", j < n));
+          eco.classList.add("on");
+          eco.classList.toggle("run", n === steps.length);
+        }
+        if (t > chipAt) {
+          chipAt = t + 1500;
+          setChip((chip + 1) % CHIPS.length);
+        }
+        const el2 = t - since;
+        const next = RUN[(cur + 1) % RUN.length].k;
+        if (phase === "hold" && el2 > 3400) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 28) {
+          since = t;
+          typed = typed.slice(0, -1);
+          vRun.textContent = typed;
+          if (!typed) phase = "type";
+        } else if (phase === "type" && el2 > 70) {
+          since = t;
+          typed = next.slice(0, typed.length + 1);
+          vRun.textContent = typed;
+          sfx.key(0.7);
+          if (typed === next) {
+            setRunner((cur + 1) % RUN.length, t);
+            sfx.pop(cur * 2);
+            phase = "hold";
+          }
+        }
       },
       el,
     });
@@ -3770,6 +5390,7 @@
       ctx.fillText("WORKERS · ONE TARGET EACH", 470 + 2.5 * 110 + 27, CH - 6);
     };
     slides.push({
+      group: "scale",
       sound: "radar",
       palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
       notes:
@@ -3900,8 +5521,7 @@
       if (!iDot.offsetWidth) return;
       const cs = getComputedStyle(iDot),
         fs = parseFloat(cs.fontSize);
-      mctx.font = `800 ${fs}px "Mona Sans"`;
-      if ("fontStretch" in mctx) mctx.fontStretch = "semi-expanded";
+      mctx.font = `700 ${fs}px "Mona Sans"`;
       const m = mctx.measureText("ı");
       // ink of the dotless i stem, relative to the span's origin and baseline
       const left = iDot.offsetLeft - m.actualBoundingBoxLeft,
@@ -3928,6 +5548,7 @@
       return [u * u * ax + 2 * u * f * mx + f * f * bx, u * u * ay + 2 * u * f * my + f * f * by];
     };
     slides.push({
+      group: "scale",
       sound: "finale",
       palette: ["#0fbf3e", "#1f6feb", "#8957e5", "#238636"],
       notes:
@@ -4107,7 +5728,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "fin-bg" }, h("h1", {}, "G", iDot, "tHub"), h("h1", {}, "Agentic Workflows")),
+        h("div", { class: "fin-bg" }, h("h1", {}, "G", iDot, "tHub Agentic Workflows"), h("h1", {}, "Build the factory that works for you")),
         cv,
         h("div", { class: "fin-cap" }, "Illustrative  ·  ", h("b", {}, "1"), " control repo  ·  ", h("b", {}, `${repos.length}`), " repos  ·  ", cRuns, " runs")
       ),
@@ -4133,6 +5754,21 @@
       })
     )
   );
+  const arrowBtn = (label, d, fn) => {
+    const b = h("button", {
+      "aria-label": label,
+      title: label,
+      onclick: e => {
+        e.stopPropagation();
+        fn();
+      },
+    });
+    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+    return b;
+  };
+  const prevBtn = arrowBtn("Previous slide", "M15 5l-7 7 7 7", () => prev());
+  const nextBtn = arrowBtn("Next slide", "M9 5l7 7-7 7", () => next());
+  const arrows = h("div", { class: "arrows" }, prevBtn, nextBtn);
   const count = h("div", { class: "count" });
   const snd = h("button", {
     class: "snd",
@@ -4149,12 +5785,16 @@
     '<g class="x"><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></g></svg>';
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
+  const gwash = h("div", { class: "wash green" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, count, snd, notes);
+  document.body.append(canvas, gwash, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
 
+  // Dot row: left offset + 12px dots + 12px gaps + 28px for the wide active dot; sound/count need ~170px on the right.
+  const dotsWidth = 28 + slides.length * 24 - 12 + 28;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 170);
   };
   addEventListener("resize", fit);
   fit();
@@ -4491,6 +6131,38 @@
         bell(84, t + 0.75, 0.06);
         bell(91, t + 0.9, 0.05, 1.8);
       },
+      // model routing: a filtered-noise riser into a rising A major arpeggio over a soft pad
+      router: t => {
+        const src = ac.createBufferSource(),
+          f = ac.createBiquadFilter(),
+          g = ac.createGain(),
+          s = 60 / 111 / 4;
+        src.buffer = noise();
+        f.type = "bandpass";
+        f.Q.value = 2;
+        f.frequency.setValueAtTime(300, t + 0.3);
+        f.frequency.exponentialRampToValueAtTime(6000, t + 0.9);
+        src.connect(f);
+        f.connect(g);
+        g.connect(out);
+        g.gain.setValueAtTime(0.0001, t + 0.3);
+        g.gain.exponentialRampToValueAtTime(0.08, t + 0.8);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1);
+        src.start(t + 0.3, Math.random() * 0.2);
+        src.stop(t + 1.05);
+        [57, 61, 64, 69, 73].forEach((m, i) => tone(m, t + 0.9 + i * s, { type: "sawtooth", dur: i === 4 ? 0.9 : 0.16, vol: 0.05, cutoff: 3600, detune: 6 }));
+        bell(81, t + 0.9 + 5 * s, 0.04, 1.4);
+        pad([45, 52, 57, 61], t + 0.9, 2.2, 0.022, "triangle", 1600);
+      },
+      // enclaves: a heavy vault bolt sliding shut, then a low sealed hum
+      vault: t => {
+        [0, 0.18].forEach((d, i) => {
+          click(t + 0.2 + d, 900 - i * 300, 0.12, 5);
+          osc("sine", 90 - i * 20, t + 0.2 + d, 0.25, 0.25, { f1: 40 });
+        });
+        pad([38, 45, 50], t + 0.6, 2.6, 0.03, "triangle", 700);
+        bell(86, t + 0.7, 0.03, 1.6);
+      },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
         pad([48, 55, 60, 64, 67], t + 0.1, 4.2, 0.04, "triangle", 2400);
@@ -4691,6 +6363,59 @@
             osc(m ? "sine" : "triangle", f * (m ? 1.2 : 1.6), t, m ? 0.06 : 0.16, [0.05, 0.025, 0.014][m], { f1: f });
           });
       })(),
+      // model routing slide: every run is a note, and its pitch is the model it got: high glass for a small model,
+      // a mallet for mid-size, bass for frontier, walking A major pentatonic. Notes snap to 16ths at 111 BPM, so the
+      // 270 ms echo lands on the eighth notes.
+      mr: (() => {
+        const S = 60 / 111 / 4,
+          WALK = [0, 4, 7, 9, 12, 9, 7, 4];
+        let g0 = 0,
+          n = 0,
+          lastFlap = 0;
+        const grid = t => (g0 ? g0 + Math.ceil((t - g0) / S) * S : (g0 = t));
+        return {
+          reset() {
+            g0 = n = 0;
+          },
+          // one split-flap tick
+          flap: () =>
+            play(t => {
+              if (t - lastFlap < 0.04) return;
+              lastFlap = t;
+              click(t, 2400 + Math.random() * 2000, 0.03, 5);
+            }),
+          pick: tier =>
+            play(t => {
+              const g = grid(t),
+                w = WALK[n++ % WALK.length];
+              if (tier === 0) {
+                bell(81 + w, g, 0.035, 0.9);
+                osc("sine", hz(93 + w), g + S, 0.12, 0.012);
+              } else if (tier === 1) {
+                tone(57 + w, g, { type: "triangle", dur: 0.35, vol: 0.1, cutoff: 2600, detune: 3 });
+                tone(64 + w, g + S, { type: "triangle", dur: 0.3, vol: 0.07, cutoff: 2600, detune: 3 });
+              } else {
+                tone(45, g, { type: "triangle", dur: 0.6, vol: 0.16, cutoff: 700, detune: 3 });
+                osc("sine", hz(33), g, 0.6, 0.12);
+                bell(69 + w, g + 2 * S, 0.02, 1);
+              }
+            }),
+          // measured savings: bells cascading down into a soft A add9 chord and a two-note receipt
+          saved: () =>
+            play(t => {
+              [93, 90, 88, 85, 81, 78, 76, 73].forEach((m, i) => bell(m, t + 0.05 + i * 0.07, 0.028, 0.9));
+              pad([45, 52, 59, 61], t + 0.55, 2.6, 0.03, "triangle", 2000);
+              bell(88, t + 0.9, 0.045, 1.4);
+              bell(93, t + 1.02, 0.035, 1.6);
+            }),
+          // a week of runs: one soft mallet note per day, climbing, and a chord when the week is full
+          day: i =>
+            play(t => {
+              tone([69, 71, 73, 76, 78, 81, 83][i], t, { type: "triangle", dur: 0.25, vol: 0.05, cutoff: 3000, detune: 3 });
+              if (i === 6) [81, 85, 88].forEach((m, j) => bell(m, t + 0.12 + j * 0.05, 0.025, 1.6));
+            }),
+        };
+      })(),
       slide: (n, dir, theme) =>
         play(t => {
           if (theme === "omen") return; // security: only the dark drone (played on enter)
@@ -4761,7 +6486,7 @@
   // ---------- navigation ----------
   let cur = -1,
     redT = null;
-  // entering a "red" slide forward: the current slide first fades to red, then the red slide slides in from the right
+  // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
   function go(n) {
     n = Math.max(0, Math.min(slides.length - 1, n));
     if (n === cur || redT) return;
@@ -4769,23 +6494,23 @@
       wash.classList.add("on", "cover");
       redT = setTimeout(() => {
         redT = null;
-        show(n, "left");
+        show(n, true);
       }, 1000);
       return;
     }
     show(n);
   }
-  function show(n, horiz) {
+  // siblings in a group push left (right going back); crossing into another group slides up (down going back)
+  function show(n, covered) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
+    gwash.classList.toggle("on", !!slides[n].green);
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
-    // "up"/"down" on a slide: it enters that way going forward, and reverses going back
-    const flip = { up: "down", down: "up" };
-    const vert = horiz || cur < 0 ? null : dir > 0 && flip[slides[n].trans] ? slides[n].trans : dir < 0 && flip[slides[cur].trans] ? flip[slides[cur].trans] : null;
-    const TR = ["up-in", "up-out", "down-in", "down-out", "left-in"];
-    if (cur >= 0 && horiz) {
+    const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : null;
+    const TR = ["up-in", "up-out", "down-in", "down-out"];
+    if (cur >= 0 && covered) {
       // already hidden under the red wash: drop it instantly so it doesn't flash back when the wash moves behind the stage
       const old = slides[cur].el;
       clearTimeout(old._lt);
@@ -4797,13 +6522,12 @@
       old.classList.add("leaving");
       if (vert) old.classList.add(vert + "-out");
       clearTimeout(old._lt);
-      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), vert ? 1000 : 800);
+      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), 800);
     }
     const el = slides[n].el;
     clearTimeout(el._lt);
     el.classList.remove(...TR);
     if (vert) el.classList.add(vert + "-in");
-    if (horiz) el.classList.add(horiz + "-in");
     wash.classList.remove("cover");
     el.style.setProperty("--dx", cur < 0 ? "0%" : dir > 0 ? "100%" : "-100%");
     el.classList.remove("leaving");
@@ -4813,6 +6537,8 @@
     slides[n].enter?.(dir);
     progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
     [...dots.children].forEach((d, i) => d.classList.toggle("on", i === n));
+    prevBtn.disabled = n === 0;
+    nextBtn.disabled = n === slides.length - 1;
     count.textContent = `${String(n + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
@@ -4904,7 +6630,8 @@
     });
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up.
+    // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up,
+    // and to -45° while the green "Safe outputs" / "Private enclaves" wash is up.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -4912,7 +6639,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : 0;
+    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : gwash.classList.contains("on") ? -Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),

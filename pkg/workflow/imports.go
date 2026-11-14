@@ -384,16 +384,19 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 	// Track explicit settings so later imports cannot replace disables with defaults.
 	explicitSafeOutputs := make(map[string]any)
 	maps.Copy(explicitSafeOutputs, topRawSafeOutputs)
-	_, requireAgentSuccessDefined := topRawSafeOutputs["require-agent-success"]
 
 	// Merge each imported config
 	for _, config := range importedConfigs {
 		var err error
-		result, err = mergeSafeOutputConfig(result, config, explicitSafeOutputs, requireAgentSuccessDefined, c)
+		result, err = mergeSafeOutputConfig(result, config, explicitSafeOutputs, topRawSafeOutputs, c)
 		if err != nil {
 			return nil, err
 		}
 		maps.Copy(explicitSafeOutputs, config)
+		// Imported require-agent-success values are OR-combined; only the main workflow can override them.
+		if _, defined := topRawSafeOutputs["require-agent-success"]; !defined {
+			delete(explicitSafeOutputs, "require-agent-success")
+		}
 	}
 
 	if len(importedCreatePullRequestDefaults) > 0 && result.CreatePullRequests != nil {
@@ -506,7 +509,7 @@ func preserveImportedSystemHandlers(config map[string]any) map[string]any {
 // mergeSafeOutputConfig merges a single imported config map into the result SafeOutputsConfig
 //
 //nolint:largefunc // Existing meta-field merge flow remains centralized for consistent import semantics.
-func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutputs map[string]any, requireAgentSuccessDefined bool, c *Compiler) (*SafeOutputsConfig, error) {
+func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutputs, topRawSafeOutputs map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
 	config = normalizeMissingReportKeys(config)
 	config = preserveImportedSystemHandlers(config)
 	explicitSafeOutputs = normalizeMissingReportKeys(explicitSafeOutputs)
@@ -583,7 +586,7 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutput
 	}
 
 	// Merge meta-configuration fields (only set if empty/zero in result)
-	if !requireAgentSuccessDefined {
+	if _, defined := explicitSafeOutputs["require-agent-success"]; !defined {
 		result.RequireAgentSuccess = result.RequireAgentSuccess || importedConfig.RequireAgentSuccess
 	}
 	if !result.Steer && importedConfig.Steer {
