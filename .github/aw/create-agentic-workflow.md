@@ -1,5 +1,5 @@
 ---
-description: Design and compile gh-aw workflows with explicit intent, scope and safety.
+description: Design, evaluate, create and compile gh-aw workflows with explicit intent, scope and safety.
 disable-model-invocation: true
 ---
 
@@ -39,7 +39,7 @@ If no automation goal is stated, start with exactly:
 
 > What do you want to automate today?
 
-With a goal, reuse supplied facts and skip the opener. Ask only for missing
+When a goal is stated, reuse supplied facts; skip the opener. Ask only for missing
 decisions; follow the [interview](designer.md#interview-framework) and generate
 after confirmation.
 
@@ -99,11 +99,12 @@ Use for exploration, persona walkthroughs, and scenario recommendations.
 - When requirements conflict with a trigger, recommend the trigger that satisfies the requirement first;
   explain the conflicting alternative's consequence.
 - For each material undefined term, propose and clearly label a reasonable `Default:`.
-  Ask 1-2 questions only if answers change the recommendation; otherwise state assumptions.
+  Ask 1-2 questions only if answers change the recommendation; otherwise state assumptions and alternatives.
+  Keep it short, iterative and without option dumps.
 - Resolve each responsible owner from CODEOWNERS or maintainer metadata. If unresolved,
   say so and identify who must confirm. For later edits, state whether to update the
   same target or noop; update changed content and noop only when no change is needed.
-  If required input is missing, call `report_incomplete`; never silently noop.
+  Call `report_incomplete` only in workflow/issue-form runs when required data or tools are unavailable; in interactive/ad hoc mode, ask one focused question.
 - For non-technical personas, lead with one plain-language line naming the
   operator and output reader, before pre-step details.
 - Return trigger, scoped paths/time window, read tools, safe outputs, read permissions,

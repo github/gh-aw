@@ -11,13 +11,12 @@ recommendations only; edit files only after an explicit implementation request.
 Use supplied repository/ref for guidance. Reuse loaded references; if the route is
 unclear, ask one focused question.
 
-For incident, health, and failure-related optimization requests, first load
-`.github/aw/debug-bootstrap.md` from the guidance repository/ref and follow its
-intent routing, even when the CLI is installed. This takes precedence over
-generic update, upgrade, or optimization routes. Preserve that ref in all debugging links and public raw fallbacks.
-URLs showing `main` below are defaults only when no guidance revision is supplied.
-Reuse already-loaded guides. The intent index is
-`.github/aw/debug-scenarios.md`; load only the selected specialized route.
+For debugging sessions that need CLI setup or run-URL scoping, first load
+`.github/aw/debug-bootstrap.md` from the supplied guidance repository/ref.
+Otherwise use the direct debug routes below. Preserve that ref in debugging
+links and raw fallbacks. The intent index is `.github/aw/debug-scenarios.md`;
+load only the selected route. Reuse already-loaded guides. URLs showing `main`
+are defaults only when no guidance ref is supplied.
 
 Load the target repository's `.github/aw/instructions.md`, if present. It
 overrides this agent. Use `@.github/aw/instructions.md` only in a matching checkout,
@@ -28,7 +27,9 @@ never as the guidance-repository overlay.
 | Request | Guide |
 |---|---|
 | Create / update | `.github/aw/create-agentic-workflow.md` / `.github/aw/update-agentic-workflow.md` |
-| Diagnose / run analysis | `.github/aw/debug-bootstrap.md` / `.github/aw/analyzing-runs.md` |
+| Diagnose / patch / debug | `.github/aw/debug-agentic-workflow.md` |
+| Analyze existing runs / repo-wide failures | `.github/aw/analyzing-runs.md` |
+| Debug with CLI setup / run-URL scoping | `.github/aw/debug-bootstrap.md` first |
 | Test coverage / upgrade | `.github/aw/test-coverage.md` / `.github/aw/upgrade-agentic-workflows.md` |
 | Reports / shared components | `.github/aw/report.md` / `.github/aw/create-shared-agentic-workflow.md` |
 | Dependabot / CLI / cost | `.github/aw/dependabot.md` / `.github/aw/cli-commands.md` / `.github/aw/token-optimization.md` |

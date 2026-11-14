@@ -93,12 +93,29 @@ class GuidanceTests(unittest.TestCase):
                 with self.subTest(path=name, rule=rule):
                     self.assertIn(rule, prefix)
 
+        creator = normalized((ROOT / ".github/aw/create-agentic-workflow.md").read_text())
+        sentences = re.split(r"(?<=[.!?])\s+", creator)
+        owner_rule = next(sentence for sentence in sentences if "CODEOWNERS" in sentence)
+        self.assertIn("responsible owner", owner_rule)
+        self.assertIn("maintainer metadata", owner_rule)
+        edit_rule = next(sentence for sentence in sentences if "later edits" in sentence)
+        self.assertIn("update changed content", edit_rule)
+        self.assertIn("noop only when no change is needed", edit_rule)
+        missing_input_rule = next(sentence for sentence in sentences if "`report_incomplete`" in sentence)
+        self.assertIn("workflow/issue-form runs", missing_input_rule)
+        self.assertIn("required data or tools are unavailable", missing_input_rule)
+        self.assertIn("interactive/ad hoc mode", missing_input_rule)
+        self.assertIn("ask one focused question", missing_input_rule)
+
     def test_agent_dispatch_contract_fits_instruction_prefix(self):
         data = (ROOT / ".github/agents/agentic-workflows.md").read_bytes()
         marker = b"<!-- instruction-prefix-end -->"
-        self.assertLessEqual(data.index(marker) + len(marker), 7500)
-        prefix = data[:8000].decode("utf-8")
+        marker_end = data.index(marker) + len(marker)
+        self.assertLessEqual(marker_end, 7500)
+        prefix = data[:marker_end].decode("utf-8")
         for route in (
+            ".github/aw/debug-agentic-workflow.md",
+            ".github/aw/debug-bootstrap.md",
             ".github/aw/analyzing-runs.md",
             ".github/aw/test-coverage.md",
             ".github/aw/upgrade-agentic-workflows.md",
@@ -106,6 +123,7 @@ class GuidanceTests(unittest.TestCase):
         ):
             with self.subTest(route=route):
                 self.assertIn(route, prefix)
+        self.assertIn("CLI setup or run-URL scoping", prefix)
         for rule in (
             "Non-dry-run dispatch is prohibited",
             "Create one primary workflow `.md`",
@@ -738,24 +756,32 @@ class GuidanceTests(unittest.TestCase):
         self.assertLessEqual(len(SCENARIOS.read_text().split()), 800)
 
     def test_installed_routers_preserve_debug_ref_and_intent_precedence(self):
-        for path in (
+        routers = (
             SKILL / "SKILL.md",
             ROOT / "pkg/cli/data/agentic_workflows_skill.md",
             ROOT / ".github/agents/agentic-workflows.md",
             ROOT / "pkg/cli/data/agentic_workflows_agent.md",
-        ):
+        )
+        for path in routers:
             with self.subTest(router=path):
-                text = path.read_text()
+                text = normalized(path.read_text())
                 for required in (
-                    "incident, health, and failure-related optimization requests",
-                    "intent routing",
-                    "even when the CLI is installed",
-                    "generic update, upgrade, or optimization routes",
-                    "all debugging links and public raw fallbacks",
-                    "defaults only when no guidance revision is supplied",
-                    "Reuse already-loaded guides",
+                    "CLI setup or run-URL scoping",
+                    "guidance repository/ref",
+                    "debugging links",
+                    "raw fallbacks",
                     ".github/aw/debug-scenarios.md",
                     "load only the selected",
+                ):
+                    self.assertIn(required, text)
+        for path in routers[2:]:
+            with self.subTest(router=path):
+                text = normalized(path.read_text())
+                for required in (
+                    "Otherwise use the direct debug routes below",
+                    ".github/aw/debug-agentic-workflow.md",
+                    ".github/aw/analyzing-runs.md",
+                    "Reuse already-loaded guides",
                 ):
                     self.assertIn(required, text)
 

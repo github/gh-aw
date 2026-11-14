@@ -298,7 +298,7 @@ func TestBuildAgenticWorkflowsAgentContent(t *testing.T) {
 		t.Fatalf("expected generated agent content to avoid skill cross-references:\n%s", content)
 	}
 	assert.Contains(t, content, ".github/aw/instructions.md")
-	assert.Contains(t, content, "repository overlay instructions override defaults in this agent when they conflict")
+	assert.Contains(t, content, ".github/aw/debug-agentic-workflow.md")
 }
 
 func TestCheckedInAgenticWorkflowsAgentMatchesGeneratedContent(t *testing.T) {
