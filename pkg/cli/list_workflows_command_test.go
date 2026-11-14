@@ -221,6 +221,39 @@ name: test-workflow
 	})
 }
 
+func TestRunListWorkflows_SourceField(t *testing.T) {
+	tmpDir := t.TempDir()
+	withSource := `---
+on:
+  workflow_dispatch:
+source: githubnext/agentic-ops/workflows/audit.md@v1.2.3
+---
+
+# With Source
+`
+	withoutSource := `---
+on:
+  workflow_dispatch:
+---
+
+# Without Source
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "with-source.md"), []byte(withSource), 0644), "Should write workflow with source")
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "without-source.md"), []byte(withoutSource), 0644), "Should write workflow without source")
+
+	output := captureListOutput(t, tmpDir, "")
+
+	var items []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(output), &items), "Should unmarshal JSON output")
+	require.Len(t, items, 2, "Should have two workflows")
+	sources := map[string]any{}
+	for _, item := range items {
+		sources[item["workflow"].(string)] = item["source"]
+	}
+	assert.Equal(t, "githubnext/agentic-ops/workflows/audit.md@v1.2.3", sources["with-source"], "Source should be exported in JSON")
+	assert.Nil(t, sources["without-source"], "Source should be omitted when not set")
+}
+
 func TestRunListWorkflows_StaleOnlyRejectsRemoteRepository(t *testing.T) {
 	err := RunListWorkflows(t.Context(), "owner/repo", ".github/workflows", "", false, false, "", true)
 	require.EqualError(t, err, "--stale cannot be used with --repo because remote workflow compilation status is unavailable")
