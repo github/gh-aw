@@ -368,7 +368,7 @@
   .ch-scan { position: absolute; left: 1340px; top: 928px; width: 480px; font: 500 15px/1 var(--mono); letter-spacing: .08em; color: #9198a1; text-align: center; opacity: 0; }
   .active .ch-scan { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.4s; }
 
-  /* --- spec driven automation --- */
+  /* --- turn intent to automation --- */
   .slide-head h2.pf-h { font-size: 100px; }
   .pf-card { position: absolute; top: 360px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000, 0 0 50px -25px var(--c); opacity: 0; transform: translateY(30px) scale(.97); transition: opacity .6s, transform .8s cubic-bezier(.2,.9,.2,1); }
   .pf-card.on { opacity: 1; transform: none; }
@@ -420,6 +420,55 @@
   .pf-tag { position: absolute; top: 860px; font: 600 17px/1.3 var(--mono); color: #9198a1; text-align: center; width: 320px; opacity: 0; transition: opacity .5s; }
   .pf-tag.on { opacity: 1; }
   .pf-tag em { display: block; font-style: normal; color: #f0f6fc; font-size: 23px; margin-bottom: 6px; }
+
+  /* --- anatomy of a workflow --- */
+  .an .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #4493f8, #39c5cf, #3fb950, #ab7df8); }
+  .an-file { position: absolute; left: 200px; top: 270px; width: 780px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; }
+  .an-file .file { height: 56px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .an-code { position: relative; padding: 18px 0; font: 500 21px/30px var(--mono); white-space: pre; }
+  .an-ln { position: relative; z-index: 1; padding: 0 26px; height: 30px; opacity: .38; transition: opacity .5s; }
+  .an-ln.on { opacity: 1; }
+  .an-band { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--c) 9%, transparent); border-left: 4px solid var(--c); opacity: 0; transition: opacity .5s, background .5s, box-shadow .5s; }
+  .an-band.on { opacity: 1; }
+  .an-band.hot { background: color-mix(in srgb, var(--c) 22%, transparent); box-shadow: inset 0 0 40px -12px var(--c); }
+  .an-tok { border-radius: 6px; transition: background .4s, box-shadow .4s; }
+  .an-tok.hot { background: color-mix(in srgb, var(--c) 30%, transparent); box-shadow: 0 0 0 2px var(--c), 0 0 24px var(--c); }
+  .an-bot { position: absolute; z-index: 2; right: 18px; display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 14px 0 10px; border-radius: 99px; background: var(--c); color: #0d1117;
+    font: 700 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; opacity: 0; transform: scale(.8); transition: opacity .5s, transform .6s cubic-bezier(.3,1.6,.4,1), box-shadow .5s; }
+  .an-bot.on { opacity: 1; transform: none; }
+  .an-bot svg { width: 22px; height: 22px; fill: #0d1117; }
+  .an-bot.hot { box-shadow: 0 0 30px var(--c); }
+  .an-brace { position: absolute; left: 150px; width: 26px; border: 3px solid var(--c); border-right: 0; border-radius: 14px 0 0 14px; opacity: 0; transform: translateX(-16px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), box-shadow .5s; }
+  .an-brace.on { opacity: 1; transform: none; }
+  .an-brace.hot { box-shadow: -10px 0 30px -12px var(--c); }
+  .an-brace span { position: absolute; left: -24px; top: 50%; transform: translate(-50%, -50%) rotate(-90deg); white-space: nowrap; font: 600 18px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: var(--c); }
+  .an-wires { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; overflow: visible; }
+  .an-wires path { fill: none; stroke: var(--c); stroke-width: 2.5; opacity: 0; stroke-dasharray: 6 8; transition: opacity .5s; }
+  .an-wires path.on { opacity: .55; }
+  .an-wires path.hot { opacity: 1; animation: an-flow .8s linear infinite; }
+  .an-wires circle { fill: var(--c); opacity: 0; transition: opacity .5s; }
+  .an-wires circle.on { opacity: 1; }
+  @keyframes an-flow { to { stroke-dashoffset: -28; } }
+  .an-call { position: absolute; left: 1140px; width: 670px; height: 126px; box-sizing: border-box; padding: 18px 24px 0 96px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d;
+    opacity: 0; transform: translateX(30px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1), border-color .5s, box-shadow .5s; }
+  .an-call.on { opacity: 1; transform: none; }
+  .an-call.hot { border-color: var(--c); box-shadow: 0 0 50px -16px var(--c); }
+  .an-cc { position: absolute; left: 1210px; top: 140px; width: 600px; height: 96px; display: flex; align-items: center; gap: 14px; font: 500 20px/1 var(--mono); opacity: 0; transform: translateY(-12px); transition: opacity .6s, transform .7s cubic-bezier(.2,.9,.2,1); }
+  .an-cc.on { opacity: 1; transform: none; }
+  .an-cc .term { padding: 14px 18px; border-radius: 12px; background: #0d1117; border: 1px solid #3d444d; color: #f0f6fc; white-space: nowrap; }
+  .an-cc .term b { color: #3fb950; font-weight: 500; }
+  .an-cc .arr { flex: 1; height: 3px; min-width: 40px; position: relative; background: repeating-linear-gradient(90deg, #d29922 0 8px, transparent 8px 14px); background-size: 14px 3px; }
+  .an-cc .arr::after { content: ""; position: absolute; right: -2px; top: -7px; border: 8px solid transparent; border-left: 12px solid #d29922; border-right: 0; }
+  .an-cc.hot .arr { animation: an-arr .6s linear infinite; }
+  @keyframes an-arr { to { background-position: 14px 0; } }
+  .an-cc .lockf { padding: 10px 16px; border-radius: 12px; background: #161b22; border: 1px solid #d29922; color: #f0f6fc; white-space: nowrap; transition: box-shadow .5s; }
+  .an-cc .lockf small { display: block; margin-top: 6px; font: 500 14px/1 var(--mono); color: #9198a1; }
+  .an-cc.hot .lockf { box-shadow: 0 0 36px -8px #d29922; }
+  .an-call .an-num { position: absolute; left: 24px; top: 22px; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font: 700 22px/1 var(--mono); color: #0d1117; background: var(--c); }
+  .an-call h3 { margin: 0 0 10px; display: flex; align-items: center; gap: 14px; font-size: 32px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .an-call h3 code { font: 500 16px/1 var(--mono); color: var(--c); padding: 6px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); }
+  .an-call p { margin: 0; font-size: 21px; line-height: 1.3; color: #d1d7e0; }
+  .an-call p code { font: 500 18px var(--mono); color: var(--c); }
 
   /* --- cost management --- */
   .cm .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #4493f8, #d29922); }
@@ -844,7 +893,147 @@
     });
   }
 
-  // Spec Driven Automation: prompt → markdown → issue (from the gh-aw hero)
+  // Anatomy of a workflow: one synthetic .md dissected into front matter, schedule, tools, steps, safe outputs and prompt
+  {
+    resetIndex();
+    const YAML = [
+      "---",
+      "on:",
+      "  schedule: daily on weekdays",
+      "tools:",
+      "  github:",
+      "    toolsets: [issues]",
+      "  repo-memory:",
+      "    branch-name: memory/docs-audit",
+      "permissions: read-all",
+      "steps:",
+      "  - run: npm ci",
+      "  - run: npm run lint -- --json > lint.json",
+      "safe-outputs:",
+      "  create-issue:",
+      '    title-prefix: "[audit] "',
+      "    max: 1",
+      "---",
+    ];
+    const C = { fm: "#d1d7e0", sch: "#d29922", tl: "#4493f8", st: "#39c5cf", so: "#3fb950", pr: "#ab7df8" };
+    const tok = (k, text) => h("span", { class: `an-tok an-tok-${k}`, "--c": C[k], style: { color: C[k] } }, text);
+    const yamlLine = l => {
+      if (l === "---") return [h("span", { style: { color: "#656c76" } }, l)];
+      const [, ind, key, val] = l.match(/^(\s*(?:- )?)([\w-]+:)(.*)$/);
+      return [ind, h("span", { style: { color: ind ? "#7ee787" : "#ff7b72" } }, key), h("span", { style: { color: "#a5d6ff" } }, val)];
+    };
+    const BODY = [
+      [h("span", { style: { color: "#79c0ff", fontWeight: 700 } }, "# Docs audit")],
+      ["Triage ", tok("st", "lint.json"), ". Skip findings already in"],
+      [tok("tl", "memory"), " or ", tok("tl", "open issues"), ", then file"],
+      [tok("so", "one issue"), " with a checklist of fixes."],
+    ];
+    const lines = [...YAML.map(yamlLine), ...BODY].map(kids => h("div", { class: "an-ln" }, kids));
+    const LH = 30,
+      CODE_TOP = 345;
+    const CALLS = [
+      ["sch", [2, 3], "Schedule", "on: schedule", "Fuzzy schedule in plain words; the compiler scatters it to a concrete cron."],
+      ["tl", [4, 8], "Tools", "tools:", ["Read-only GitHub toolsets, plus ", h("code", {}, "repo-memory"), ": a git branch the agent keeps notes in across runs."]],
+      ["st", [10, 12], "Steps", "deterministic", ["Plain shell runs before the agent and leaves ", h("code", {}, "lint.json"), " in the workspace."]],
+      ["so", [13, 16], "Safe outputs", "max: 1", "The agent stays read-only. It can only request one issue; a separate job writes it."],
+      ["pr", [18, 21], "Prompt", "markdown body", "Everything below the front matter is the agent prompt: plain-English instructions it follows on every run."],
+    ];
+    const CALL_TOP = [295, 440, 585, 730, 875];
+    const bands = CALLS.map(([k, [a, b]]) => h("div", { class: "an-band", "--c": C[k], style: { top: `${18 + (a - 1) * LH}px`, height: `${(b - a + 1) * LH}px` } }));
+    const calls = CALLS.map(([k, , title, chip, text], i) =>
+      h("div", { class: "an-call", "--c": C[k], style: { top: `${CALL_TOP[i]}px` } }, h("div", { class: "an-num" }, String(i + 1).padStart(2, "0")), h("h3", {}, title, h("code", {}, chip)), h("p", {}, text))
+    );
+    const brace = (k, [a, b], label) => h("div", { class: "an-brace", "--c": C[k], style: { top: `${CODE_TOP + (a - 1) * LH + 2}px`, height: `${(b - a + 1) * LH - 4}px` } }, h("span", {}, label));
+    const braces = [brace("fm", [1, 17], "Front matter"), brace("pr", [18, 21], "Prompt")];
+    const botSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    botSvg.setAttribute("viewBox", "0 0 24 24");
+    const bot = h("div", { class: "an-bot", "--c": C.pr, style: { top: `${18 + 17 * LH}px` } }, botSvg, "Agent prompt");
+    const lockSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    lockSvg.setAttribute("viewBox", "0 0 24 24");
+    lockSvg.innerHTML = '<path d="M12 1.5 3 5v6.5c0 5.2 3.8 9.6 9 11 5.2-1.4 9-5.8 9-11V5L12 1.5Zm0 6a2.5 2.5 0 0 1 1.25 4.67V15.5h-2.5v-3.33A2.5 2.5 0 0 1 12 7.5Z"/>';
+    const lock = h("div", { class: "an-bot", "--c": C.fm, style: { top: "18px" } }, lockSvg, "Deterministic security config");
+    const cc = h("div", { class: "an-cc" }, h("div", { class: "term" }, h("b", {}, "$ "), "gh aw compile"), h("div", { class: "arr" }), h("div", { class: "lockf" }, "🔒 docs-audit.lock.yml", h("small", {}, "hardened Actions YAML")));
+    const wires = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    wires.setAttribute("class", "an-wires");
+    wires.setAttribute("viewBox", "0 0 1920 1080");
+    wires.innerHTML = CALLS.map(([k, [a, b]], i) => {
+      const ry = CODE_TOP + (a - 1) * LH + ((b - a + 1) * LH) / 2,
+        cy = CALL_TOP[i] + 63;
+      return `<path style="--c:${C[k]}" d="M 984 ${ry} H 1050 C 1095 ${ry} 1095 ${cy} 1140 ${cy}"/><circle style="--c:${C[k]}" cx="984" cy="${ry}" r="6"/>`;
+    }).join("");
+    const paths = [...wires.querySelectorAll("path")],
+      dots = [...wires.querySelectorAll("circle")];
+    const toks = { tl: [...lines[19].querySelectorAll(".an-tok-tl")], st: [lines[18].querySelector(".an-tok-st")], so: [lines[20].querySelector(".an-tok-so")] };
+    // reveal order: front matter brace, then each callout (the prompt callout also brings the body brace)
+    const REVEAL = 0.6,
+      GAP = 1,
+      CYCLE = REVEAL + GAP * 6,
+      HOT = 2.4;
+    let t0 = 0,
+      seen = -1,
+      skip = false;
+    const lit = (idx, on) => {
+      if (idx === 0) {
+        [braces[0], lock, cc].forEach(e => e.classList.toggle("on", on));
+        [0, 8, 16].forEach(n => lines[n].classList.toggle("on", on));
+        return;
+      }
+      const [, [a, b]] = CALLS[idx - 1];
+      for (let n = a - 1; n < b; n++) lines[n].classList.toggle("on", on);
+      [bands, calls, paths, dots].forEach(list => list[idx - 1].classList.toggle("on", on));
+      if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
+    };
+    slides.push({
+      sound: "ship",
+      palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
+      notes:
+        "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
+      enter() {
+        t0 = 0;
+        seen = -1;
+        skip = false;
+        if (!botSvg.firstChild) botSvg.innerHTML = OCTI.copilot.map(d => `<path d="${d}"/>`).join("");
+        [bot, lock, cc].forEach(e => e.classList.remove("on", "hot"));
+        [...lines, ...bands, ...calls, ...paths, ...dots, ...braces, ...Object.values(toks).flat()].forEach(e => e.classList.remove("on", "hot"));
+      },
+      onNext() {
+        if (seen >= 5) return false;
+        skip = true;
+        return true;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        if (skip) ((skip = false), (t0 = Math.min(t0, t - CYCLE * 1000)));
+        const e = (t - t0) / 1000;
+        const n = Math.min(5, Math.floor((e - REVEAL) / GAP));
+        while (seen < n) {
+          seen++;
+          lit(seen, true);
+          sfx.pop(seen * 2);
+        }
+        const hot = e >= CYCLE ? Math.floor((e - CYCLE) / HOT) % 6 : -1;
+        braces[0].classList.toggle("hot", hot === 0);
+        lock.classList.toggle("hot", hot === 0);
+        cc.classList.toggle("hot", hot === 0);
+        braces[1].classList.toggle("hot", hot === 5);
+        bot.classList.toggle("hot", hot === 5);
+        [bands, calls, paths].forEach(list => list.forEach((el, i) => el.classList.toggle("hot", hot === i + 1)));
+        ["tl", "st", "so"].forEach((k, i) => toks[k].forEach(el => el.classList.toggle("hot", hot === i + 2)));
+      },
+      el: h(
+        "section",
+        { class: "slide an" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agent as code"), h("h2", { class: "pf-h" }, letters("Anatomy of a "), letters("workflow", "l-grad"))),
+        h("div", { class: "an-file" }, h("div", { class: "file" }, "📄 .github/workflows/docs-audit.md"), h("div", { class: "an-code" }, bands, lines, lock, bot)),
+        braces,
+        wires,
+        calls,
+        cc
+      ),
+    });
+  }
+
+  // Turn Intent to Automation: prompt → markdown → issue (from the gh-aw hero)
   {
     resetIndex();
     const PROMPT = "Create a daily agent that removes code duplication";
@@ -907,7 +1096,12 @@
     ttaSvg.innerHTML = `<circle class="bg" cx="48" cy="48" r="40"/><circle class="fg" cx="48" cy="48" r="40" stroke-dasharray="${RC}" stroke-dashoffset="${RC}"/>`;
     const tta = h("div", { class: "pf-tta" }, ttaSvg, h("div", {}, h("i", {}, "Time to agent"), ttaT, h("small", {}, "min")));
     let t0 = 0,
+      now = 0,
       snd = { p: 0, m: -2, go: false, card: [] };
+    // → / space fast-forwards to the next stage: prompt sent, markdown written, lock file compiled, pull request done
+    const MD_END = 4.2 + MDLEN / 45,
+      YML_END = MD_END + 0.8 + YML.length / 22,
+      STAGES = [3.2, MD_END + 0.5, YML_END + 0.5, YML_END + 2.6];
     const renderMd = k => {
       pre.replaceChildren();
       for (const [a, ca, b, cb] of MD) {
@@ -932,7 +1126,7 @@
       trans: "up",
       palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
-        "Spec Driven Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning a pull request removing duplicated code shows up for review. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
+        "Turn Intent to Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning a pull request removing duplicated code shows up for review. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
       enter() {
         t0 = 0;
         snd = { p: 0, m: -2, go: false, card: [] };
@@ -941,8 +1135,17 @@
         pre.replaceChildren();
         ypre.replaceChildren();
       },
+      onNext() {
+        if (!t0) return false;
+        const e = (now - t0) / 1000,
+          next = STAGES.find(s => s > e + 0.05);
+        if (next === undefined) return false;
+        t0 = now - next * 1000;
+        return true;
+      },
       tick(t) {
         if (!t0) t0 = t;
+        now = t;
         const e = (t - t0) / 1000,
           on = (el, at) => el.classList.toggle("on", e >= at);
         on(cards[0], 0.3);
@@ -964,13 +1167,13 @@
             sfx.key(0.6);
           }
         }
-        const mdEnd = 4.2 + MDLEN / 45;
+        const mdEnd = MD_END;
         on(links[1], mdEnd + 0.3);
         on(tags[1], mdEnd + 0.5);
         on(cards[2], mdEnd + 0.5);
         const yk = Math.max(0, Math.min(YML.length, Math.floor((e - mdEnd - 0.8) * 22))); // compiles in a blink
         if (ypre.childElementCount !== yk) ypre.replaceChildren(...YML.slice(0, yk).flatMap(([l, c]) => [h("span", { style: { color: c } }, l), "\n"]));
-        const ymlEnd = mdEnd + 0.8 + YML.length / 22;
+        const ymlEnd = YML_END;
         on(go, ymlEnd + 0.1);
         if (go.classList.contains("on") && !snd.go) {
           snd.go = true;
@@ -996,7 +1199,324 @@
         n2.textContent = Math.round(38 * ez);
         n3.textContent = Math.round(212 * ez);
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Spec Driven "), letters("Automation", "l-grad"))), tta, links, tags, cards),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))), tta, links, tags, cards),
+    });
+  }
+
+  // Supply chain hardening: the compiler threat detection spec as concentric layers around the lock file
+  {
+    resetIndex();
+    const CX = 975,
+      CY = 650,
+      CORE = 92;
+    // outermost layer first: attacks pierce until the layer whose rules catch them
+    const layers = [
+      ["Trigger admission", "fork PRs · PR target · bot sync", "CTR-008 · 027 · 034", "#d29922"],
+      ["Expression safety", "untrusted ${{ }} → env vars", "CTR-006 · 010 · 026", "#f778ba"],
+      ["Pinned supply chain", "SHA pins · manifest drift", "CTR-002 · 016 · 018", "#ab7df8"],
+      ["Package & arg hygiene", "install scripts · arg injection", "CTR-013 · 014 · 022", "#79c0ff"],
+      ["Least privilege", "read-only token · safe outputs", "CTR-001 · 005 · 015", "#4493f8"],
+      ["Secret & content scans", "secret sinks · markdown · imports", "CTR-007 · 017 · 020", "#3fb950"],
+    ].map(([title, sub, ids, c], i) => ({ title, sub, ids, c, r: 330 - i * 40, flash: 0, n: 0, rot: Math.random() * 6 }));
+    const attacks = [
+      [0, "fork PR pwn request"],
+      [0, "pull_request_target + secrets"],
+      [0, "spoofed bot sync"],
+      [1, "${{ github.event.issue.title }}"],
+      [1, "timeout-minutes: ${{ … }}"],
+      [1, "multiline expression"],
+      [2, "tag moved: @v4"],
+      [2, "unpinned action"],
+      [2, "new secret vs manifest"],
+      [3, "npm postinstall"],
+      [3, "--upload-pack=evil"],
+      [3, "-rf as package name"],
+      [4, "contents: write"],
+      [4, "direct push to main"],
+      [4, "labels: *"],
+      [5, "echo ${{ secrets.TOKEN }}"],
+      [5, "hidden prompt in markdown"],
+      [5, "conditional import swap"],
+    ];
+    const rows = layers.map((l, i) => h("div", { class: "ch-row", "--c": l.c, "--i": i }, h("i", {}, String(i + 1).padStart(2, "0")), h("b", {}, l.title), h("em", {}, "0"), h("span", {}, l.sub, h("br"), l.ids)));
+    const line = (...parts) =>
+      h(
+        "span",
+        { class: parts[0] === "g" ? "ch-g" : "" },
+        parts.filter(p => p !== "g").map(([cls, t]) => (cls ? h("span", { class: cls, style: { display: "inline" } }, t) : t))
+      );
+    const md = h(
+      "div",
+      { class: "ch-file", "--c": "#9198a1", "--i": 0, style: { top: "296px" } },
+      h("div", { class: "cm-tab" }, "triage.md", h("span", { class: "sv" }, "AUTHORED")),
+      h(
+        "pre",
+        {},
+        line([null, "---"]),
+        line(["ch-k", "on"], [null, ":"]),
+        line(["ch-k", "  issues"], [null, ": "], ["ch-v", "{ types: [opened] }"]),
+        line(["ch-k", "permissions"], [null, ": "], ["ch-v", "read-all"]),
+        line(["ch-k", "strict"], [null, ": "], ["ch-v", "true"]),
+        line(["ch-k", "safe-outputs"], [null, ":"]),
+        line(["ch-k", "  add-labels"], [null, ": "], ["ch-v", "{ allowed: [bug] }"]),
+        line([null, "---"]),
+        line(["ch-p", "Triage issue #${{ github.event.issue.number }}"]),
+        line(["ch-p", "and label it."])
+      )
+    );
+    const cmd = h("div", { class: "ch-cmd", style: { top: "640px" } }, h("b", {}, "$"), "gh aw compile --strict", h("b", {}, "↓"));
+    const lock = h(
+      "div",
+      { class: "ch-file", "--c": "#3fb950", "--i": 1, style: { top: "684px" } },
+      h("div", { class: "cm-tab" }, "triage.lock.yml", h("span", { class: "sv" }, "HARDENED")),
+      h(
+        "pre",
+        {},
+        line("g", ["ch-k", "uses"], [null, ": "], ["ch-v", "actions/checkout@de0fac2"], ["ch-c", " # v6"]),
+        line("g", ["ch-k", "permissions"], [null, ": "], ["ch-v", "{ issues: read }"]),
+        line("g", ["ch-k", "env"], [null, ": "], ["ch-v", "{ ISSUE_NUMBER: ${{ … }} }"]),
+        line("g", ["ch-k", "persist-credentials"], [null, ": "], ["ch-v", "false"]),
+        line("g", ["ch-k", "needs"], [null, ": "], ["ch-v", "[agent, detection]"]),
+        line("g", ["ch-k", "timeout-minutes"], [null, ": "], ["ch-v", "20"])
+      )
+    );
+    const cv = h("canvas", { class: "ch-cv", width: 1920, height: 1080 });
+    const ctx = cv.getContext("2d");
+    let shots = [],
+      bits = [],
+      pops = [],
+      flow = [],
+      last = 0,
+      spawn = 0,
+      total = 0,
+      deck = [];
+    const draw = t => {
+      ctx.clearRect(0, 0, 1920, 1080);
+      // compile path: triage.md → core → triage.lock.yml
+      ctx.setLineDash([4, 10]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffffff22";
+      ctx.beginPath();
+      ctx.moveTo(630, 470);
+      ctx.quadraticCurveTo(800, 470, CX - CORE, CY - 20);
+      ctx.moveTo(CX - CORE, CY + 20);
+      ctx.quadraticCurveTo(800, 830, 630, 830);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (const f of flow) {
+        const p = f.p,
+          q = 1 - p;
+        let x, y, col;
+        if (f.out) {
+          x = q * q * (CX - CORE) + 2 * q * p * 800 + p * p * 630;
+          y = q * q * (CY + 20) + 2 * q * p * 830 + p * p * 830;
+          col = "#3fb950";
+        } else {
+          x = q * q * 630 + 2 * q * p * 800 + p * p * (CX - CORE);
+          y = q * q * 470 + 2 * q * p * 470 + p * p * (CY - 20);
+          col = "#9198a1";
+        }
+        ctx.fillStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 10;
+        ctx.fillRect(x - 4, y - 4, 8, 8);
+      }
+      ctx.shadowBlur = 0;
+      // layers: rotating dashed shells that flare when they catch something
+      layers.forEach((l, i) => {
+        ctx.save();
+        ctx.translate(CX, CY);
+        ctx.rotate(l.rot + t * 0.00012 * (i % 2 ? -1 : 1) * (1 + i * 0.25));
+        ctx.strokeStyle = l.c;
+        ctx.globalAlpha = 0.28 + l.flash * 0.72;
+        ctx.lineWidth = 3 + l.flash * 4;
+        ctx.shadowColor = l.c;
+        ctx.shadowBlur = 8 + l.flash * 30;
+        ctx.setLineDash([l.r * 0.42, 14 + i * 3]);
+        ctx.beginPath();
+        ctx.arc(0, 0, l.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        const a = -Math.PI / 2 - 0.62;
+        const bx = CX + Math.cos(a) * l.r,
+          by = CY + Math.sin(a) * l.r;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#0d1117";
+        ctx.beginPath();
+        ctx.arc(bx, by, 15, 0, 7);
+        ctx.fill();
+        ctx.strokeStyle = l.c;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = l.c;
+        ctx.font = "700 14px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1), bx, by + 1);
+      });
+      ctx.setLineDash([]);
+      // core: the hardened lock file
+      const pulse = 0.5 + 0.5 * Math.sin(t / 420);
+      const g = ctx.createRadialGradient(CX, CY, 10, CX, CY, CORE + 40);
+      g.addColorStop(0, "#3fb95055");
+      g.addColorStop(0.7, "#3fb95018");
+      g.addColorStop(1, "#3fb95000");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(CX, CY, CORE + 40, 0, 7);
+      ctx.fill();
+      ctx.fillStyle = "#0d1117";
+      ctx.strokeStyle = "#3fb950";
+      ctx.lineWidth = 3;
+      ctx.shadowColor = "#3fb950";
+      ctx.shadowBlur = 18 + pulse * 18;
+      ctx.beginPath();
+      ctx.arc(CX, CY, CORE, 0, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#3fb950";
+      ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+      ctx.fillText(".lock.yml", CX, CY - 34);
+      ctx.fillStyle = "#f0f6fc";
+      ctx.font = "800 46px 'Mona Sans', sans-serif";
+      ctx.fillText(String(total), CX, CY + 4);
+      ctx.fillStyle = "#9198a1";
+      ctx.font = "600 13px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+      ctx.fillText("BLOCKED", CX, CY + 40);
+      // incoming attacks
+      ctx.textBaseline = "middle";
+      for (const s of shots) {
+        const x = CX + Math.cos(s.a) * s.d,
+          y = CY + Math.sin(s.a) * s.d;
+        ctx.globalAlpha = Math.min(1, (s.d0 - s.d) / 50 + 0.15);
+        ctx.fillStyle = "#ff7b72";
+        ctx.shadowColor = "#f85149";
+        ctx.shadowBlur = 16;
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, 7);
+        ctx.fill();
+        ctx.strokeStyle = "#f8514966";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(s.a) * 40, y + Math.sin(s.a) * 40);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.font = "500 17px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+        const right = Math.cos(s.a) >= 0;
+        ctx.textAlign = right ? "left" : "right";
+        ctx.fillText(s.label, x + (right ? 16 : -16), y - 16);
+      }
+      ctx.globalAlpha = 1;
+      for (const b of bits) {
+        ctx.globalAlpha = Math.max(0, b.life);
+        ctx.fillStyle = b.c;
+        ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+      }
+      ctx.textAlign = "center";
+      ctx.font = "700 16px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+      for (const p of pops) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
+        ctx.fillStyle = p.c;
+        ctx.fillText(p.text, p.x, p.y);
+      }
+      ctx.globalAlpha = 1;
+    };
+    slides.push({
+      sound: "forge",
+      red: true,
+      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
+      notes:
+        "Supply chain hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and secret and content scans (secrets kept away from logs and telemetry, markdown scanned for hidden instructions, conditional imports checked). All of these are static checks on the authored file; the runtime sandbox and egress firewall come on the next slide. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
+      enter() {
+        shots = [];
+        bits = [];
+        pops = [];
+        flow = [];
+        deck = [];
+        last = spawn = total = 0;
+        layers.forEach((l, i) => {
+          l.flash = 0;
+          l.n = 0;
+          rows[i].querySelector("em").textContent = "0";
+          rows[i].classList.remove("hit");
+        });
+      },
+      tick(t) {
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (t - spawn > 520) {
+          spawn = t;
+          if (!deck.length) deck = attacks.map((_, i) => i).sort(() => Math.random() - 0.5);
+          const [k, label] = attacks[deck.pop()];
+          // stay clear of the file cards on the left
+          const a = -Math.PI * 0.62 + Math.random() * Math.PI * 1.24;
+          // start off-screen-ish, but below the heading and above the slide chrome
+          const sn = Math.sin(a),
+            d0 = Math.min(600, sn < 0 ? (CY - 300) / -sn : (1030 - CY) / Math.max(0.01, sn));
+          shots.push({ a, d: d0, d0, k, label, v: 0.24 + Math.random() * 0.08 });
+          if (Math.random() < 0.8) flow.push({ p: 0, out: false });
+        }
+        for (const s of shots) {
+          s.d -= dt * s.v;
+          const l = layers[s.k];
+          if (s.d <= l.r) {
+            s.dead = true;
+            l.flash = 1;
+            l.n++;
+            total++;
+            const row = rows[s.k];
+            row.querySelector("em").textContent = String(l.n);
+            row.classList.add("hit");
+            clearTimeout(row._t);
+            row._t = setTimeout(() => row.classList.remove("hit"), 260);
+            const x = CX + Math.cos(s.a) * l.r,
+              y = CY + Math.sin(s.a) * l.r;
+            for (let j = 0; j < 16; j++) {
+              const ang = s.a + (Math.random() - 0.5) * 2.4,
+                sp = 0.08 + Math.random() * 0.25;
+              bits.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, c: j % 3 ? l.c : "#ff7b72" });
+            }
+            pops.push({ x: x + Math.cos(s.a) * 34, y: y + Math.sin(s.a) * 34, text: l.ids.split(" · ")[0] + " ✓", c: l.c, life: 1 });
+          }
+        }
+        shots = shots.filter(s => !s.dead);
+        for (const b of bits) {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.life -= dt / 700;
+        }
+        bits = bits.filter(b => b.life > 0);
+        for (const p of pops) {
+          p.y -= dt * 0.03;
+          p.life -= dt / 1300;
+        }
+        pops = pops.filter(p => p.life > 0);
+        for (const f of flow) {
+          f.p += dt / 1100;
+          if (f.p >= 1 && !f.out) {
+            f.out = true;
+            f.p = 0;
+          }
+        }
+        flow = flow.filter(f => !(f.out && f.p >= 1));
+        for (const l of layers) l.flash = Math.max(0, l.flash - dt / 600);
+        draw(t);
+      },
+      el: h(
+        "section",
+        { class: "slide ch-slide" },
+        cv,
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Compiler threat detection spec"), h("h2", {}, letters("Supply chain "), letters("hardening", "l-grad"))),
+        md,
+        cmd,
+        lock,
+        h("div", { class: "ch-legend" }, rows),
+        h("div", { class: "ch-scan" }, "+ --validate · actionlint · zizmor · poutine")
+      ),
     });
   }
 
@@ -1150,322 +1670,6 @@
         ),
         [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
         lane
-      ),
-    });
-  }
-
-  // Automation hardening: the compiler threat detection spec as concentric layers around the lock file
-  {
-    resetIndex();
-    const CX = 975,
-      CY = 650,
-      CORE = 92;
-    // outermost layer first: attacks pierce until the layer whose rules catch them
-    const layers = [
-      ["Trigger admission", "fork PRs · PR target · bot sync", "CTR-008 · 027 · 034", "#d29922"],
-      ["Expression safety", "untrusted ${{ }} → env vars", "CTR-006 · 010 · 026", "#f778ba"],
-      ["Pinned supply chain", "SHA pins · manifest drift", "CTR-002 · 016 · 018", "#ab7df8"],
-      ["Package & arg hygiene", "install scripts · arg injection", "CTR-013 · 014 · 022", "#79c0ff"],
-      ["Least privilege", "read-only token · safe outputs", "CTR-001 · 005 · 015", "#4493f8"],
-      ["Sandbox & egress", "egress allowlist · no bypass", "CTR-004 · 011 · 031", "#3fb950"],
-    ].map(([title, sub, ids, c], i) => ({ title, sub, ids, c, r: 330 - i * 40, flash: 0, n: 0, rot: Math.random() * 6 }));
-    const attacks = [
-      [0, "fork PR pwn request"],
-      [0, "pull_request_target + secrets"],
-      [0, "spoofed bot sync"],
-      [1, "${{ github.event.issue.title }}"],
-      [1, "timeout-minutes: ${{ … }}"],
-      [1, "multiline expression"],
-      [2, "tag moved: @v4"],
-      [2, "unpinned action"],
-      [2, "new secret vs manifest"],
-      [3, "npm postinstall"],
-      [3, "--upload-pack=evil"],
-      [3, "-rf as package name"],
-      [4, "contents: write"],
-      [4, "direct push to main"],
-      [4, "labels: *"],
-      [5, "curl | sh"],
-      [5, "egress to *.com"],
-      [5, "sandbox: false"],
-    ];
-    const rows = layers.map((l, i) => h("div", { class: "ch-row", "--c": l.c, "--i": i }, h("i", {}, String(i + 1).padStart(2, "0")), h("b", {}, l.title), h("em", {}, "0"), h("span", {}, l.sub, h("br"), l.ids)));
-    const line = (...parts) =>
-      h(
-        "span",
-        { class: parts[0] === "g" ? "ch-g" : "" },
-        parts.filter(p => p !== "g").map(([cls, t]) => (cls ? h("span", { class: cls, style: { display: "inline" } }, t) : t))
-      );
-    const md = h(
-      "div",
-      { class: "ch-file", "--c": "#9198a1", "--i": 0, style: { top: "296px" } },
-      h("div", { class: "cm-tab" }, "triage.md", h("span", { class: "sv" }, "AUTHORED")),
-      h(
-        "pre",
-        {},
-        line([null, "---"]),
-        line(["ch-k", "on"], [null, ":"]),
-        line(["ch-k", "  issues"], [null, ": "], ["ch-v", "{ types: [opened] }"]),
-        line(["ch-k", "permissions"], [null, ": "], ["ch-v", "read-all"]),
-        line(["ch-k", "network"], [null, ": "], ["ch-v", "defaults"]),
-        line(["ch-k", "safe-outputs"], [null, ":"]),
-        line(["ch-k", "  add-labels"], [null, ": "], ["ch-v", "{ allowed: [bug] }"]),
-        line([null, "---"]),
-        line(["ch-p", "Triage issue #${{ github.event.issue.number }}"]),
-        line(["ch-p", "and label it."])
-      )
-    );
-    const cmd = h("div", { class: "ch-cmd", style: { top: "640px" } }, h("b", {}, "$"), "gh aw compile --strict", h("b", {}, "↓"));
-    const lock = h(
-      "div",
-      { class: "ch-file", "--c": "#3fb950", "--i": 1, style: { top: "684px" } },
-      h("div", { class: "cm-tab" }, "triage.lock.yml", h("span", { class: "sv" }, "HARDENED")),
-      h(
-        "pre",
-        {},
-        line("g", ["ch-k", "uses"], [null, ": "], ["ch-v", "actions/checkout@de0fac2"], ["ch-c", " # v6"]),
-        line("g", ["ch-k", "permissions"], [null, ": "], ["ch-v", "{ issues: read }"]),
-        line("g", ["ch-k", "env"], [null, ": "], ["ch-v", "{ ISSUE_NUMBER: ${{ … }} }"]),
-        line("g", ["ch-k", "run"], [null, ": "], ["ch-v", 'awf --allow-domains "$ALLOW"']),
-        line("g", ["ch-k", "needs"], [null, ": "], ["ch-v", "[agent, detection]"]),
-        line("g", ["ch-k", "timeout-minutes"], [null, ": "], ["ch-v", "20"])
-      )
-    );
-    const cv = h("canvas", { class: "ch-cv", width: 1920, height: 1080 });
-    const ctx = cv.getContext("2d");
-    let shots = [],
-      bits = [],
-      pops = [],
-      flow = [],
-      last = 0,
-      spawn = 0,
-      total = 0,
-      deck = [];
-    const draw = t => {
-      ctx.clearRect(0, 0, 1920, 1080);
-      // compile path: triage.md → core → triage.lock.yml
-      ctx.setLineDash([4, 10]);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#ffffff22";
-      ctx.beginPath();
-      ctx.moveTo(630, 470);
-      ctx.quadraticCurveTo(800, 470, CX - CORE, CY - 20);
-      ctx.moveTo(CX - CORE, CY + 20);
-      ctx.quadraticCurveTo(800, 830, 630, 830);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      for (const f of flow) {
-        const p = f.p,
-          q = 1 - p;
-        let x, y, col;
-        if (f.out) {
-          x = q * q * (CX - CORE) + 2 * q * p * 800 + p * p * 630;
-          y = q * q * (CY + 20) + 2 * q * p * 830 + p * p * 830;
-          col = "#3fb950";
-        } else {
-          x = q * q * 630 + 2 * q * p * 800 + p * p * (CX - CORE);
-          y = q * q * 470 + 2 * q * p * 470 + p * p * (CY - 20);
-          col = "#9198a1";
-        }
-        ctx.fillStyle = col;
-        ctx.shadowColor = col;
-        ctx.shadowBlur = 10;
-        ctx.fillRect(x - 4, y - 4, 8, 8);
-      }
-      ctx.shadowBlur = 0;
-      // layers: rotating dashed shells that flare when they catch something
-      layers.forEach((l, i) => {
-        ctx.save();
-        ctx.translate(CX, CY);
-        ctx.rotate(l.rot + t * 0.00012 * (i % 2 ? -1 : 1) * (1 + i * 0.25));
-        ctx.strokeStyle = l.c;
-        ctx.globalAlpha = 0.28 + l.flash * 0.72;
-        ctx.lineWidth = 3 + l.flash * 4;
-        ctx.shadowColor = l.c;
-        ctx.shadowBlur = 8 + l.flash * 30;
-        ctx.setLineDash([l.r * 0.42, 14 + i * 3]);
-        ctx.beginPath();
-        ctx.arc(0, 0, l.r, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-        const a = -Math.PI / 2 - 0.62;
-        const bx = CX + Math.cos(a) * l.r,
-          by = CY + Math.sin(a) * l.r;
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = "#0d1117";
-        ctx.beginPath();
-        ctx.arc(bx, by, 15, 0, 7);
-        ctx.fill();
-        ctx.strokeStyle = l.c;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.fillStyle = l.c;
-        ctx.font = "700 14px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(i + 1), bx, by + 1);
-      });
-      ctx.setLineDash([]);
-      // core: the hardened lock file
-      const pulse = 0.5 + 0.5 * Math.sin(t / 420);
-      const g = ctx.createRadialGradient(CX, CY, 10, CX, CY, CORE + 40);
-      g.addColorStop(0, "#3fb95055");
-      g.addColorStop(0.7, "#3fb95018");
-      g.addColorStop(1, "#3fb95000");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(CX, CY, CORE + 40, 0, 7);
-      ctx.fill();
-      ctx.fillStyle = "#0d1117";
-      ctx.strokeStyle = "#3fb950";
-      ctx.lineWidth = 3;
-      ctx.shadowColor = "#3fb950";
-      ctx.shadowBlur = 18 + pulse * 18;
-      ctx.beginPath();
-      ctx.arc(CX, CY, CORE, 0, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#3fb950";
-      ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText(".lock.yml", CX, CY - 34);
-      ctx.fillStyle = "#f0f6fc";
-      ctx.font = "800 46px 'Mona Sans', sans-serif";
-      ctx.fillText(String(total), CX, CY + 4);
-      ctx.fillStyle = "#9198a1";
-      ctx.font = "600 13px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      ctx.fillText("BLOCKED", CX, CY + 40);
-      // incoming attacks
-      ctx.textBaseline = "middle";
-      for (const s of shots) {
-        const x = CX + Math.cos(s.a) * s.d,
-          y = CY + Math.sin(s.a) * s.d;
-        ctx.globalAlpha = Math.min(1, (s.d0 - s.d) / 50 + 0.15);
-        ctx.fillStyle = "#ff7b72";
-        ctx.shadowColor = "#f85149";
-        ctx.shadowBlur = 16;
-        ctx.beginPath();
-        ctx.arc(x, y, 7, 0, 7);
-        ctx.fill();
-        ctx.strokeStyle = "#f8514966";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.cos(s.a) * 40, y + Math.sin(s.a) * 40);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.font = "500 17px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-        const right = Math.cos(s.a) >= 0;
-        ctx.textAlign = right ? "left" : "right";
-        ctx.fillText(s.label, x + (right ? 16 : -16), y - 16);
-      }
-      ctx.globalAlpha = 1;
-      for (const b of bits) {
-        ctx.globalAlpha = Math.max(0, b.life);
-        ctx.fillStyle = b.c;
-        ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
-      }
-      ctx.textAlign = "center";
-      ctx.font = "700 16px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-      for (const p of pops) {
-        ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
-        ctx.fillStyle = p.c;
-        ctx.fillText(p.text, p.x, p.y);
-      }
-      ctx.globalAlpha = 1;
-    };
-    slides.push({
-      sound: "forge",
-      palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
-      notes:
-        "Automation hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and the sandbox with an egress firewall. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
-      enter() {
-        shots = [];
-        bits = [];
-        pops = [];
-        flow = [];
-        deck = [];
-        last = spawn = total = 0;
-        layers.forEach((l, i) => {
-          l.flash = 0;
-          l.n = 0;
-          rows[i].querySelector("em").textContent = "0";
-          rows[i].classList.remove("hit");
-        });
-      },
-      tick(t) {
-        const dt = last ? Math.min(50, t - last) : 16;
-        last = t;
-        if (t - spawn > 520) {
-          spawn = t;
-          if (!deck.length) deck = attacks.map((_, i) => i).sort(() => Math.random() - 0.5);
-          const [k, label] = attacks[deck.pop()];
-          // stay clear of the file cards on the left
-          const a = -Math.PI * 0.62 + Math.random() * Math.PI * 1.24;
-          // start off-screen-ish, but below the heading and above the slide chrome
-          const sn = Math.sin(a),
-            d0 = Math.min(600, sn < 0 ? (CY - 300) / -sn : (1030 - CY) / Math.max(0.01, sn));
-          shots.push({ a, d: d0, d0, k, label, v: 0.24 + Math.random() * 0.08 });
-          if (Math.random() < 0.8) flow.push({ p: 0, out: false });
-        }
-        for (const s of shots) {
-          s.d -= dt * s.v;
-          const l = layers[s.k];
-          if (s.d <= l.r) {
-            s.dead = true;
-            l.flash = 1;
-            l.n++;
-            total++;
-            const row = rows[s.k];
-            row.querySelector("em").textContent = String(l.n);
-            row.classList.add("hit");
-            clearTimeout(row._t);
-            row._t = setTimeout(() => row.classList.remove("hit"), 260);
-            const x = CX + Math.cos(s.a) * l.r,
-              y = CY + Math.sin(s.a) * l.r;
-            for (let j = 0; j < 16; j++) {
-              const ang = s.a + (Math.random() - 0.5) * 2.4,
-                sp = 0.08 + Math.random() * 0.25;
-              bits.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, c: j % 3 ? l.c : "#ff7b72" });
-            }
-            pops.push({ x: x + Math.cos(s.a) * 34, y: y + Math.sin(s.a) * 34, text: l.ids.split(" · ")[0] + " ✓", c: l.c, life: 1 });
-          }
-        }
-        shots = shots.filter(s => !s.dead);
-        for (const b of bits) {
-          b.x += b.vx * dt;
-          b.y += b.vy * dt;
-          b.life -= dt / 700;
-        }
-        bits = bits.filter(b => b.life > 0);
-        for (const p of pops) {
-          p.y -= dt * 0.03;
-          p.life -= dt / 1300;
-        }
-        pops = pops.filter(p => p.life > 0);
-        for (const f of flow) {
-          f.p += dt / 1100;
-          if (f.p >= 1 && !f.out) {
-            f.out = true;
-            f.p = 0;
-          }
-        }
-        flow = flow.filter(f => !(f.out && f.p >= 1));
-        for (const l of layers) l.flash = Math.max(0, l.flash - dt / 600);
-        draw(t);
-      },
-      el: h(
-        "section",
-        { class: "slide ch-slide" },
-        cv,
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Compiler threat detection spec"), h("h2", {}, letters("Automation "), letters("hardening", "l-grad"))),
-        md,
-        cmd,
-        lock,
-        h("div", { class: "ch-legend" }, rows),
-        h("div", { class: "ch-scan" }, "+ --validate · actionlint · zizmor · poutine")
       ),
     });
   }
@@ -2149,7 +2353,6 @@
       bdRun = -1;
     slides.push({
       sound: "loop",
-      trans: "up",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
