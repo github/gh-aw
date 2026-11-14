@@ -137,7 +137,7 @@ engine: copilot
     it.each(["API", "local fallback"])("should verify the compiled smoke workflow through %s", async mode => {
       const repoRoot = path.resolve(__dirname, "../../..");
       const files = new Map(
-        ["smoke-issues.md", "smoke-issues.lock.yml", "connectors/jira.md", "connectors/linear.md"].map(file => {
+        ["smoke-issues.md", "smoke-issues.lock.yml", "shared/reporting.md", "connectors/jira.md", "connectors/linear.md"].map(file => {
           const filePath = `.github/workflows/${file}`;
           return [filePath, fs.readFileSync(path.join(repoRoot, filePath), "utf8")];
         })

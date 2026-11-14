@@ -96,6 +96,7 @@ func (c *Compiler) dryRunConclusionData(data *WorkflowData) *WorkflowData {
 	result := *data
 	defer logDryRunWorkflowChanges(data, &result)
 	result.DryRun = true
+	result.ReactionRemoveOnComplete = false
 	if result.RunName == workQueueWorkerRunName {
 		result.RunName = ""
 	}
