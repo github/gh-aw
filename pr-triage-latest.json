@@ -1,21 +1,133 @@
 {
-  "run_id": "43565893870",
-  "run_date": "2026-11-14T06:26:58Z",
+  "run_id": "43594075702",
+  "run_date": "2026-11-14T12:20:04Z",
   "source": "pr-triage",
-  "eligible_total": 0,
-  "open_copilot_prs": 0,
-  "cooldown_skipped": 0,
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
+  "eligible_total": 9,
+  "open_copilot_prs": 9,
+  "cooldown_skipped": 32,
+  "category_counts": {
+    "bug": 5,
+    "test": 1,
+    "refactor": 1,
+    "chore": 1,
+    "feature": 1
+  },
+  "risk_counts": {
+    "low": 2,
+    "medium": 4,
+    "high": 3
+  },
+  "priority_counts": {
+    "low": 2,
+    "medium": 4,
+    "high": 3
+  },
   "action_counts": {
     "auto_merge": 0,
-    "fast_track": 0,
-    "batch_review": 0,
-    "defer": 0,
+    "fast_track": 3,
+    "batch_review": 5,
+    "defer": 1,
     "close": 0
   },
-  "selected_candidates": [],
-  "batches": [],
-  "summary": "No currently open PRs authored by app/github-copilot were found; the review queue is empty and no labels/comments were required."
+  "selected_candidates": [
+    {
+      "number": 77471,
+      "title": "Remove bundled model pricing catalog in favor of AWF",
+      "category": "feature",
+      "risk": "medium",
+      "score": 40,
+      "action": "batch_review"
+    },
+    {
+      "number": 77573,
+      "title": "Capture startup failure log details",
+      "category": "bug",
+      "risk": "medium",
+      "score": 47,
+      "action": "batch_review"
+    },
+    {
+      "number": 77574,
+      "title": "Update Playwright CLI pin to 0.1.24",
+      "category": "chore",
+      "risk": "low",
+      "score": 29,
+      "action": "batch_review"
+    },
+    {
+      "number": 77644,
+      "title": "Report missing ledger transaction artifacts clearly",
+      "category": "bug",
+      "risk": "high",
+      "score": 70,
+      "action": "fast_track"
+    },
+    {
+      "number": 77645,
+      "title": "Harden setup shell security tests",
+      "category": "test",
+      "risk": "low",
+      "score": 32,
+      "action": "batch_review"
+    },
+    {
+      "number": 77646,
+      "title": "Align compiler-generated workflow step names",
+      "category": "refactor",
+      "risk": "low",
+      "score": 25,
+      "action": "defer"
+    },
+    {
+      "number": 77654,
+      "title": "Add safe null-check suggestions for typeof object checks",
+      "category": "bug",
+      "risk": "medium",
+      "score": 44,
+      "action": "batch_review"
+    },
+    {
+      "number": 77662,
+      "title": "Handle request-budget exhaustion after complete auditor failure discovery",
+      "category": "bug",
+      "risk": "high",
+      "score": 64,
+      "action": "fast_track"
+    },
+    {
+      "number": 77668,
+      "title": "Accept complete request-budget results in Auditor",
+      "category": "bug",
+      "risk": "high",
+      "score": 67,
+      "action": "fast_track"
+    }
+  ],
+  "batches": [
+    {
+      "id": "pr-batch:health-ops",
+      "numbers": [
+        77644,
+        77662,
+        77668
+      ]
+    },
+    {
+      "id": "pr-batch:quality-fixes",
+      "numbers": [
+        77645,
+        77646,
+        77654
+      ]
+    },
+    {
+      "id": "pr-batch:runtime-ops",
+      "numbers": [
+        77471,
+        77573,
+        77574
+      ]
+    }
+  ],
+  "summary": "9 eligible app/github-copilot PRs were triaged; 3 fast-track fixes address workflow health and ledger artifacts, 5 are batch-review candidates, and 1 low-impact refactor is deferred."
 }
