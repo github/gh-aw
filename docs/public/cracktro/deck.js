@@ -2338,7 +2338,6 @@
       bdRun = -1;
     slides.push({
       sound: "loop",
-      trans: "up",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
