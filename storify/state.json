@@ -1,29 +1,31 @@
 {
-  "last_run_date": "2026-11-13",
+  "last_run_date": "2026-11-14",
   "last_window": {
-    "start": "2026-11-12T07:55:53Z",
-    "end": "2026-11-13T07:55:53Z"
+    "start": "2026-11-13T07:55:59Z",
+    "end": "2026-11-14T07:55:59Z"
   },
   "observed_window": {
-    "coverage": "Partial: 265 cached runs created 2026-11-13T00:05:36Z through 07:52:54Z. Count-limit continuation identifies uncollected window 2026-11-12T07:55:53Z through 2026-11-13T00:05:03Z; no fleet refetch.",
+    "coverage": "Partial: 255 cached runs created 2026-11-13T23:50:23Z through 2026-11-14T07:54:11Z. Count-limit continuation identifies uncollected window 2026-11-13T07:55:59Z through 23:46:46Z; no fleet refetch.",
     "representative_audits": [
-      43385967406,
-      43372175805,
-      43373463533,
-      43378720530,
-      43378720525,
-      43358513161,
-      43334642380
+      43571242815,
+      43563607650,
+      43553145754,
+      43551265838,
+      43556706803,
+      43562505048,
+      43563606942,
+      43565779985
     ]
   },
   "key_themes": [
-    "Eight Auditor collection failures continued after optimizer replaced issue #77084 with #77364 focused on AWF installation.",
-    "Conformance PR #77365 merged as reviews began; reviewer, ESLint Refiner and Smoke Project had separate safe-output processing failures."
+    "Auditor collection failed in eight cached runs; Health Manager refiled P1 #77641 and Issue Monster requested assignment.",
+    "Three workflows failed safe-output processing; reviewer and Sous Chef feedback drove revisions in open ledger PR #77644.",
+    "Dashboard comparability PR #77676 merged after Health Manager issue and Issue Monster assignment."
   ],
   "carry_forward_questions": [
-    "Did Auditor collection recover, and was its previous partial time-budget diagnosis confirmed?",
-    "Did the safe-output processing failures recur or recover, and what caused each?",
-    "Did conformance changes pass subsequent tests and review after the merge?",
+    "Did Auditor collection recover, and what was its actual error?",
+    "Did the ledger reviewer publication failure recur, and was the reported invalid-append cause confirmed?",
+    "Did the dashboard tier and trend changes produce comparable subsequent snapshots?",
     "What happened in the uncollected earlier window?"
   ]
 }
