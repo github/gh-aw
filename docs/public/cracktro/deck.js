@@ -3883,7 +3883,7 @@
         <circle cx="${x}" cy="${y}" r="34" fill="url(#prqAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
       // measured on gh-aw merged PRs, 15 Oct to 13 Nov 2026; [edge that lights it, value, label lines]
       const STATS = [
-        ["p1", "938", ["of 1,263 merged PRs", "checked by agents"]],
+        ["p1", "938", ["of 1,263 PRs merged", "in 30 days checked"]],
         ["p1", "1,337", ["agentic reviews", "submitted"]],
         ["p2", "1,612", ["inline review", "threads opened"]],
         ["p3", "517", ["Sous Chef nudges", "on 336 PRs"]],
@@ -3939,7 +3939,7 @@
         g += `<text class="fm-lane-t mra-lane" id="prqLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
         if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="664"/>`;
       });
-      g += `<rect class="prq-card" x="0" y="680" width="${VW}" height="150" rx="16"/><text class="prq-cap" x="24" y="716">MEASURED · gh-aw merged pull requests, 15 Oct – 13 Nov 2026 · flow above is illustrative</text>`;
+      g += `<rect class="prq-card" x="0" y="680" width="${VW}" height="150" rx="16"/><text class="prq-cap" x="24" y="716">MEASURED · only PRs merged 15 Oct – 13 Nov 2026 (30 days), snapshot 14 Nov · flow above is illustrative</text>`;
       STATS.forEach(([, v, lab], i) => {
         const x = 24 + i * 280;
         g += `<g class="prq-stat" id="prqS${i}"><text class="prq-v" x="${x}" y="768">${v}</text>${lab.map((l, k) => `<text class="prq-sl" x="${x}" y="${794 + k * 24}">${l}</text>`).join("")}</g>`;
@@ -3995,7 +3995,7 @@
         sound: "reviews",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
-          "Pull Request Review squared. The flow is illustrative and its open-thread counter is synthetic; the bottom strip is measured on gh-aw's own merged pull requests from 15 October to 13 November 2026. Of 1,263 merged pull requests, 938 were checked by the Matt Pocock Skills Reviewer, PR Code Quality Reviewer or Test Quality Sentinel workflows, which submitted 1,337 reviews and opened 1,612 inline review threads. PR Sous Chef posted 517 @copilot nudges on 336 pull requests, and Copilot pushed 965 fix commits after a nudge on 305 of them. 660 of the 682 reviewed pull requests merged after a single review round per reviewer, with a median of 1.8 hours from ready for review to merge. Reviewers are identified by their workflow footers and nudges by the Sous Chef workflow marker. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
+          "Pull Request Review squared. The flow is illustrative and its open-thread counter is synthetic; the bottom strip is measured only on gh-aw pull requests merged in the 30 days from 15 October to 13 November 2026, snapshot taken 14 November, not on all pull requests. Of the 1,263 pull requests merged in that window, 938 were checked by the Matt Pocock Skills Reviewer, PR Code Quality Reviewer or Test Quality Sentinel workflows, which submitted 1,337 reviews and opened 1,612 inline review threads. PR Sous Chef posted 517 @copilot nudges on 336 pull requests, and Copilot pushed 965 fix commits after a nudge on 305 of them. 660 of the 682 reviewed pull requests merged after a single review round per reviewer, with a median of 1.8 hours from ready for review to merge. Reviewers are identified by their workflow footers and nudges by the Sous Chef workflow marker. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
         enter() {
           t0 = 0;
           cyc = -1;
