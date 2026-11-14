@@ -94,8 +94,10 @@ first commit to general availability at GitHub Universe, and "How PRs land",
 which shows measured time-to-merge and lines-changed distributions of its
 merged pull requests, and "How workflows evolve", which shows a statistical
 study of the commits that changed its own workflow Markdown. All say so in their speaker notes.
-Use role icons rather than employee profiles. The only exceptions are the
-local avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, `ievangelist`, and `mona` (Mona the Octocat) in `public/cracktro/assets/avatars/`.
+Use role icons rather than employee profiles, and never real GitHub avatars or
+handles. The only people shown are the fake users `mona` (Mona the Octocat) and
+`ducky` (the rubber duck), GitHub's two mascots, as local avatars in
+`public/cracktro/assets/avatars/`.
 Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.

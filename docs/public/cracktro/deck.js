@@ -3940,7 +3940,7 @@
       g += `<g class="fm-sched">${pill(40, SY, 200, L.pick)}${agent(p, 40, SY)}</g>`;
       g += `<g class="fm-watch">${ico("stopwatch", 150, 530, 64, "#f0f6fc")}<line id="fmHand" x1="150" y1="532" x2="150" y2="512" stroke="#f0f6fc" stroke-width="4" stroke-linecap="round"/></g>`;
       g += `<g class="fm-maint"><g class="fm-pill b"><rect x="${MX}" y="${MY - 23}" width="172" height="46" rx="23"/><text x="${MX + 38 + 67}" y="${MY + 8}">Maintainer</text></g>
-        <circle cx="${MX}" cy="${MY}" r="38" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/dsyme.jpg" x="${MX - 35}" y="${MY - 35}" width="70" height="70" clip-path="url(#${p}Clip)"/></g>`;
+        <circle cx="${MX}" cy="${MY}" r="38" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${MX - 35}" y="${MY - 35}" width="70" height="70" clip-path="url(#${p}Clip)"/></g>`;
       g += `<circle class="fm-dot" r="7"/><circle class="fm-dot" r="7"/>`;
       return g;
     };
@@ -4281,7 +4281,7 @@
         ["p4", "965", ["Copilot fix commits", "on 305 PRs"]],
         ["p6", "1.8 h", ["median ready", "for review → merge"]],
       ];
-      const human = (id, x, y, w, label, avatar = "assets/avatars/pelikhan.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      const human = (id, x, y, w, label, avatar = "assets/avatars/mona.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
         <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#prqClip)"/></g>`;
       const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
       const REV = ["nRevA", "nRevB", "nRevC"];
@@ -4340,10 +4340,10 @@
         g += `<path class="fm-wire ${c}" id="${id}" d="${d}"${fan ? "" : ` marker-end="url(#prq${c === "p" ? "P" : c === "b" ? "B" : "G"})"`}/>`;
         if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
       }
-      g += human("nAuthor", 90, 140, 200, "Developer") + box("nPRq", 90, 340, "pr");
+      g += human("nAuthor", 90, 140, 200, "Developer", "assets/avatars/ducky.jpg") + box("nPRq", 90, 340, "pr");
       g += agent("nRevA", 500, 220, 290, "Matt Pocock skills") + agent("nRevB", 500, 340, 290, "Code quality") + agent("nRevC", 500, 460, 290, "Test quality");
       g += agent("nChef", 1080, 140, 242, "PR Sous Chef") + agent("nCopilotq", 1080, 560, 200, "Copilot");
-      g += human("nMaint", 1460, 340, 220, "Developer", "assets/avatars/lpcox.jpg") + box("nMergeq", 1460, 560, "merge");
+      g += human("nMaint", 1460, 340, 220, "Developer") + box("nMergeq", 1460, 560, "merge");
       g += `<text class="prq-thr" id="prqThr" x="968" y="356"></text>`;
       g += `<circle class="fm-dot mra-dot" r="8"/>`;
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -4455,7 +4455,7 @@
       const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
       const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
       const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#ctAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-      const user = (id, x, y, w) => `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/><image href="assets/avatars/ievangelist.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+      const user = (id, x, y, w) => `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/><image href="assets/avatars/ducky.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
       const lock = (x, y, s = 1) =>
         `<g class="ct-lock" transform="translate(${x},${y}) scale(${s})"><path d="M-7 -2 V-8 A7 7 0 0 1 7 -8 V-2" fill="none" stroke-width="3"/><rect x="-11" y="-3" width="22" height="17" rx="3"/></g>`;
       // the failing on-prem run
@@ -4466,7 +4466,7 @@
         `<g class="ct-data" id="${id}"><rect class="ct-data-b" x="${x}" y="${y}" width="170" height="160" rx="14"/><text class="ct-data-t" x="${x + 14}" y="${y + 30}">LIVE DATA</text>${lock(x + 148, y + 22, 0.8)}` +
         ["logs", "audit", "config"].map((l, i) => `<text class="ct-data-l" x="${x + 14}" y="${y + 70 + i * 34}">${l}</text><rect class="ct-bar" x="${x + 90}" y="${y + 58 + i * 34}" width="${66 - i * 12}" height="15" rx="3" style="animation-delay:${i * 0.18}s"/>`).join("") +
         `</g>`;
-      const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+      const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
       const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
       // [edge id, path, color, label, lx, ly, anchor]; g = user, o = private on-prem investigation, r = failure, b = maintainer, p = Copilot and agents
       const EDGES = [
@@ -4567,7 +4567,7 @@
         sound: "contrib",
         palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
         notes:
-          "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative, with simulated data; David Pine stands in for the community. A workflow run fails on an on-prem, self-hosted setup. He points our debug.md agent at the failing run, and the agent investigates with the live logs, audit data and configuration right there on prem. That evidence never leaves the enclave and we never need to see it: what comes out is an anonymized issue describing the bug and the intent, with no private names, payloads or secrets. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Users contribute intent, not their data; Copilot turns it into code and maintainers review.",
+          "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative, with simulated data; Ducky stands in for an external contributor and Mona for the maintainers. A workflow run fails on an on-prem, self-hosted setup. Ducky points our debug.md agent at the failing run, and the agent investigates with the live logs, audit data and configuration right there on prem. That evidence never leaves the enclave and we never need to see it: what comes out is an anonymized issue describing the bug and the intent, with no private names, payloads or secrets. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Users contribute intent, not their data; Copilot turns it into code and maintainers review.",
         enter() {
           t0 = 0;
           cyc = -1;
@@ -4669,7 +4669,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#rpaAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mnkiefer.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rpaClip)"/></g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rpaClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // Two synthetic source files as syntax-coloured bars; rows 3–6 of A repeat as rows 4–7 of B.
     const TOK = ["#ff7b72", "#d2a8ff", "#79c0ff", "#a5d6ff", "#8b949e"];
@@ -5033,7 +5033,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#raoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mnkiefer.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#raoClip)"/></g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/ducky.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#raoClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
@@ -5595,7 +5595,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#mraAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#mraClip)"/></g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#mraClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
@@ -6572,7 +6572,7 @@
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#gfAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#gfClip)"/></g>`;
+    const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#gfClip)"/></g>`;
     const box = (id, x, y, icon, cap = []) =>
       `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>` + cap.map((l, k) => `<text class="gf-cap" x="${x}" y="${y + 64 + k * 20}">${l}</text>`).join("");
     const chip = (cx, y, w, icon, label) => `<rect x="${cx - w / 2}" y="${y - 26}" width="${w}" height="52" rx="14"/>${ico(icon, cx - w / 2 + 26, y, 24)}<text x="${cx - w / 2 + 46}" y="${y + 7}">${label}</text>`;
@@ -7327,7 +7327,7 @@
     g += agent("nNamer", 1290, 540, 250, "Function Namer") + `<text class="dg-cap" x="1290" y="604">daily</text>`;
     g += `<g class="fm-out dg-chip" id="nRen"><rect x="700" y="512" width="390" height="56" rx="14"/><text x="895" y="548"><tspan class="dg-old" id="dgOld"></tspan> → <tspan class="dg-nn" id="dgNN"></tspan></text></g>`;
     g += agent("nDP", 200, 540, 280, "Dictation Prompt") + `<text class="dg-cap" x="200" y="604">weekly</text>`;
-    g += `<g class="fm-task mra-dev" id="nMaint"><g class="fm-pill b"><rect x="200" y="325" width="250" height="50" rx="25"/><text x="343" y="358">Maintainer</text></g><circle cx="200" cy="350" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="169" y="319" width="62" height="62" clip-path="url(#dgClip)"/></g>`;
+    g += `<g class="fm-task mra-dev" id="nMaint"><g class="fm-pill b"><rect x="200" y="325" width="250" height="50" rx="25"/><text x="343" y="358">Maintainer</text></g><circle cx="200" cy="350" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mona.jpg" x="169" y="319" width="62" height="62" clip-path="url(#dgClip)"/></g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "fm-svg dg-svg");
@@ -7440,7 +7440,7 @@
     const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#sflAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
-    const maint = (id, x, y, avatar = "assets/avatars/ievangelist.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
+    const maint = (id, x, y, avatar = "assets/avatars/mona.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
@@ -7527,7 +7527,7 @@
     g += pipes + box("sflKbe", 640, 340, "issue");
     g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
     g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
-    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580, "assets/avatars/pelikhan.jpg");
+    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580, "assets/avatars/mona.jpg");
     g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
     g += `<circle class="fm-dot mra-dot" r="8"/>`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -9638,7 +9638,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/ducky.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     // synthetic run metrics: [label, before, after, format]
