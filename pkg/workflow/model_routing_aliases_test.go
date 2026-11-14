@@ -213,6 +213,14 @@ func mustRoutingGroups(t *testing.T, data *WorkflowData, engine string) []modelR
 	return groups
 }
 
+func TestModelRoutingPolicyNamespacedModelRules(t *testing.T) {
+	const candidate = "openrouter/anthropic/claude-opus-4"
+
+	require.Empty(t, narrowModelRoutingCandidate(candidate, nil, []string{candidate}, true), "an exact namespaced blocked rule excludes the candidate")
+	require.False(t, modelPolicyRulesCover([]string{"openrouter/*"}, candidate), "a single-segment wildcard must not cover nested model namespaces")
+	require.Empty(t, narrowModelRoutingCandidate(candidate, []string{"openrouter/*"}, nil, true), "a single-segment allowed rule must not authorize a nested model namespace")
+}
+
 func TestRoutingAllowedModelsIntersectsExpandedPolicy(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
