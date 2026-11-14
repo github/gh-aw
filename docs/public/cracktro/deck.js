@@ -931,12 +931,24 @@
   .zs-area { opacity: 0; } .active .zs-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
   .zs-vm { fill: #8957e52a; stroke: #a371f7; stroke-width: 4; }
   .zs-wall { fill: none; stroke: #a371f7; stroke-width: 2; stroke-dasharray: 3 7; opacity: .6; }
-  .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 1.4s; }
+  .active .zs-vm { animation: zs-seal 3.2s ease-in-out infinite 2.6s; }
   @keyframes zs-seal { 50% { filter: drop-shadow(0 0 22px #a371f7aa); } }
   .zs-lock circle { fill: #0d1117; stroke: #a371f7; stroke-width: 3; filter: drop-shadow(0 0 10px #a371f788); }
   .zs-lock rect { fill: #d2a8ff; } .zs-lock path { fill: none; stroke: #d2a8ff; stroke-width: 3.5; stroke-linecap: round; }
   .zs-vt { fill: #f0f6fc; font: 800 24px "Mona Sans"; text-anchor: middle; }
   .zs-port { fill: #0d1117; stroke: #d2a8ff; stroke-width: 3; }
+  .zs-bars { opacity: 0; } .active .zs-bars { animation: zs-dim .8s ease both 2.5s; }
+  @keyframes zs-dim { from { opacity: 1; } to { opacity: .2; } }
+  .zs-bar { fill: url(#zsSteel); stroke: #0d1117; stroke-width: 1.5; transform: translateY(-470px); }
+  .active .zs-bar { animation: zs-slam .42s cubic-bezier(.5,0,1,1) both calc(var(--b) * 70ms + 950ms); }
+  @keyframes zs-slam { 0% { transform: translateY(-470px); } 78% { transform: translateY(8px); } 90% { transform: translateY(-5px); } 100% { transform: none; } }
+  .zs-cross { fill: url(#zsSteelH); stroke: #0d1117; stroke-width: 1.5; transform: scaleX(0); transform-box: fill-box; transform-origin: left; }
+  .active .zs-cross { animation: zs-cross .3s cubic-bezier(.2,.9,.2,1) both calc(var(--b) * 90ms + 1620ms); }
+  @keyframes zs-cross { to { transform: none; } }
+  .zs-lock path { transform: translateY(-7px); } .active .zs-lock path { animation: zs-shackle .18s ease-in both 2.05s; }
+  @keyframes zs-shackle { to { transform: none; } }
+  .active .zs-lock circle { animation: zs-snap .5s ease-out both 2.05s; transform-box: fill-box; transform-origin: center; }
+  @keyframes zs-snap { 0% { transform: scale(1); } 35% { transform: scale(1.3); filter: drop-shadow(0 0 22px #f778ba); stroke: #f778ba; } 100% { transform: scale(1); } }
   .zs-host { fill: #3fb95012; stroke: #3fb950; stroke-width: 2.5; stroke-dasharray: 10 8; }
   .zs-kern.g { fill: #8957e526; stroke: #8957e5; stroke-width: 2; } .zs-kern.h { fill: #3fb9501f; stroke: #2ea043; stroke-width: 2; }
   .zs-kern.r { fill: #3fb95014; stroke: #3fb95088; stroke-width: 2; }
@@ -3139,13 +3151,15 @@
           isKey ? key(x + w / 2 - 15, y + ht - 28) : sub ? `<text class="zs-s" x="${x + w / 2}" y="${y + ht / 2 + 24}">${sub}</text>` : ""
         }</g>`;
       let g = `<defs><marker id="zsM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>`;
-      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient></defs>`;
+      g += `<radialGradient id="zsAgentG" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d2a8ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3c1e70"/></radialGradient>`;
+      g += `<linearGradient id="zsSteel"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
+      g += `<linearGradient id="zsSteelH" x2="0" y2="1"><stop offset="0" stop-color="#484f58"/><stop offset=".45" stop-color="#e6edf3"/><stop offset="1" stop-color="#30363d"/></linearGradient>`;
+      g += `<clipPath id="zsCell"><rect x="0" y="0" width="300" height="450" rx="18"/></clipPath></defs>`;
       // runner VM, kernels and the two areas
       g += `<g class="zs-area" style="--i:0"><rect class="zs-kern r" x="0" y="540" width="1500" height="56" rx="14"/><text class="zs-kt r" x="750" y="577">GitHub Actions Runner VM</text></g>`;
       g += `<g class="zs-area" style="--i:1"><rect class="zs-kern g" x="0" y="470" width="300" height="54" rx="14"/><text class="zs-kt g" x="150" y="506">Guest Kernel</text>`;
       g += `<rect class="zs-kern h" x="330" y="470" width="1170" height="54" rx="14"/><text class="zs-kt h" x="915" y="506">Host Kernel</text></g>`;
       g += `<g class="zs-area zs-vm-g" style="--i:2"><rect class="zs-wall" x="-10" y="-10" width="320" height="470" rx="26"/><rect class="zs-vm" x="0" y="0" width="300" height="450" rx="18"/>`;
-      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g>`;
       g += `<text class="zs-vt" x="150" y="58">Agent micro-VM</text><text class="zs-at g" x="150" y="84">ISOLATED · NO AUTH</text>`;
       g += `<circle cx="150" cy="156" r="48" fill="url(#zsAgentG)"/>${ico("copilot", 150, 158, 56)}<text class="zs-s" x="150" y="232">CODING AGENT RUNTIME</text>`;
       [
@@ -3155,7 +3169,11 @@
       ].forEach(([n, x]) => (g += `<g class="zs-eng"><rect x="${x}" y="248" width="86" height="38" rx="19"/><text x="${x + 43}" y="273">${n}</text></g>`));
       g += `<g class="zs-nokey" transform="translate(138,340)"><circle cx="0" cy="0" r="9"/><path d="M9 0 H34 M25 0 V9 M32 0 V7"/><path class="x" d="M-10 -16 L42 16"/></g>`;
       g += `<text class="zs-none" x="150" y="394">0 SECRETS</text><text class="zs-s" x="150" y="422">no tokens · no keys</text>`;
-      g += `<rect class="zs-port" x="290" y="226" width="20" height="28" rx="5"/></g>`;
+      g += `<rect class="zs-port" x="290" y="226" width="20" height="28" rx="5"/>`;
+      // jail cell: bars slam down, crossbars slide in, then the lock snaps shut and the bars dim
+      g += `<g class="zs-bars" clip-path="url(#zsCell)">${[0, 1, 2, 3, 4, 5, 6].map(b => `<rect class="zs-bar" style="--b:${b}" x="${26 + b * 40}" y="-4" width="10" height="458" rx="5"/>`).join("")}`;
+      g += `${[94, 303].map((y, b) => `<rect class="zs-cross" style="--b:${b}" x="-4" y="${y}" width="308" height="10" rx="5"/>`).join("")}</g>`;
+      g += `<g class="zs-lock"><circle cx="150" cy="0" r="24"/><path d="M142 -2 V-9 a8 8 0 0 1 16 0 V-2"/><rect x="138" y="-3" width="24" height="16" rx="3"/></g></g>`;
       g += `<g class="zs-area" style="--i:3"><rect class="zs-host" x="330" y="0" width="1170" height="450" rx="18"/><text class="zs-at h" x="356" y="34">HOST · HOLDS THE KEYS</text></g>`;
       // wires and labels
       g += `<g class="zs-area" style="--i:4">`;
@@ -3200,7 +3218,9 @@
     let built = false,
       t0 = 0,
       cyc = -1,
-      state = "";
+      state = "",
+      jail = 0;
+    const JAIL = 1300;
     const $ = id => svg.querySelector("#" + id);
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     slides.push({
@@ -3208,7 +3228,7 @@
       sound: "vault",
       palette: ["#8957e5", "#238636", "#3c1e70", "#1f6feb"],
       notes:
-        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The next two principles are controlling untrusted reads and auditing all writes. The request flows animated here are illustrative.",
+        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; the bars slam shut and the cell locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The next two principles are controlling untrusted reads and auditing all writes. The request flows animated here are illustrative.",
       enter() {
         if (!built) {
           built = true;
@@ -3217,10 +3237,19 @@
         t0 = 0;
         cyc = -1;
         state = "";
+        jail = 0;
       },
       tick(t) {
         if (!t0) t0 = t;
-        const e = t - t0,
+        const raw = t - t0;
+        if (jail === 0 && raw >= 1330) {
+          jail = 1;
+          sfx.block();
+        } else if (jail === 1 && raw >= 2050) {
+          jail = 2;
+          sfx.key(1);
+        }
+        const e = Math.max(0, raw - JAIL),
           c = Math.floor(e / CYC),
           u = e % CYC;
         if (c !== cyc) {
