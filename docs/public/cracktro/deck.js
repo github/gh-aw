@@ -46,7 +46,7 @@
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
   .wash.cover { z-index: 4; }
-  /* green wash for "Private enclaves": the inverse of the red one, with the grid tilted the other way */
+  /* green wash for "Safe outputs" and "Private enclaves": the inverse of the red one, with the grid tilted the other way */
   .wash.green { background: radial-gradient(ellipse 80% 75% at 50% 55%, #0b4a2a 0%, #04261a 55%, #01100a 100%); }
   .wash.green::after { background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #031f13aa 70%, #000503f0 100%); }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
@@ -344,6 +344,69 @@
   .sec-ent span { font-size: 24px; padding: 8px 20px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992214; color: #f0f6fc; opacity: 0; }
   .active .sec-ent span { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 120ms + 2900ms); }
   .sec-lane { position: absolute; left: 0; top: 880px; width: 1920px; height: 120px; }
+
+  /* --- safe outputs: boxed agent → threat detection → write job --- */
+  .so .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #4493f8, #3fb950); }
+  .so-box { position: absolute; top: 300px; width: 500px; height: 620px; padding: 30px 34px; border-radius: 22px; border: 2px solid var(--c);
+    background: #0d1117ee; box-shadow: 0 0 50px -24px var(--c), inset 0 0 60px -50px var(--c); opacity: 0; transition: box-shadow .5s, border-color .5s; }
+  .active .so-box { animation: sec-in .9s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 500ms + 400ms); }
+  .so-box.hot { box-shadow: 0 0 110px -10px var(--c), inset 0 0 90px -40px var(--c); }
+  .so-box i { font: 600 17px/1 var(--mono); letter-spacing: .18em; color: var(--c); font-style: normal; }
+  .so-box h3 { margin: 16px 0 22px; font-size: 50px; line-height: 1; font-variation-settings: "wght" 700, "wdth" 100; }
+  .so-who { display: flex; align-items: center; gap: 16px; font-size: 25px; color: #d1d7e0; }
+  .so-av { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; flex: none; background: radial-gradient(circle at 35% 30%, #c297ff, #8957e5 55%, #3b1d8f); }
+  .so-av.det { background: radial-gradient(circle at 35% 30%, #ffc28a, #d29922 55%, #6e4a00); }
+  .so-av svg { width: 36px; height: 36px; }
+  .so-perm { margin-left: auto; font: 600 17px/1 var(--mono); padding: 8px 12px; border-radius: 99px; border: 1px solid var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+  /* the agent's box is a cage: bars that flash red when it tries to write directly */
+  .so-cage { position: absolute; inset: 0; border-radius: 20px; pointer-events: none; opacity: .5; transition: opacity .3s;
+    background: repeating-linear-gradient(90deg, transparent 0 46px, #3fb95033 46px 50px); }
+  .so-cage::after { content: ""; position: absolute; inset: 0; border-radius: 20px; opacity: 0; background: repeating-linear-gradient(90deg, transparent 0 46px, #f85149aa 46px 50px); }
+  .so.p-deny:not(.p-safe) .so-cage::after { animation: so-bars .9s ease-out both; }
+  @keyframes so-bars { 0%, 40% { opacity: 1; } 20%, 60% { opacity: .3; } 100% { opacity: .9; } }
+  .so.p-deny:not(.p-safe) .so-b0 { border-color: #f85149; box-shadow: 0 0 110px -10px #f85149, inset 0 0 90px -40px #f85149; }
+  .so.p-deny:not(.p-safe) .so-b0 .so-shake { animation: so-shake .45s linear both; }
+  @keyframes so-shake { 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+  .so-term { margin-top: 22px; padding: 16px 14px; border-radius: 12px; background: #010409; border: 1px solid #30363d; font: 500 17px/1.55 var(--mono); color: #d1d7e0; min-height: 132px; }
+  .so-term div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .so-term .l2, .so-term .l3 { opacity: 0; transition: opacity .3s; }
+  .so-term .l2 { color: #ff7b72; }
+  .so-term .l3 { color: #79c0ff; }
+  .so.p-deny .so-term .l2, .so.p-safe .so-term .l3 { opacity: 1; }
+  .so-term .cur::after { content: "▍"; color: #3fb950; animation: blink 1s steps(1) infinite; }
+  .so.p-deny .so-term .cur::after { content: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .so-checks { margin: 22px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .so-checks li { font-size: 24px; color: #9198a1; padding-left: 40px; position: relative; transition: color .3s; }
+  .so-checks li::before { content: "·"; position: absolute; left: 0; top: -3px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    font: 700 18px/28px var(--mono); border: 2px solid #3d444d; color: #3d444d; transition: all .3s; }
+  .so-checks li.ok { color: #f0f6fc; }
+  .so-checks li.ok::before { content: "✓"; border-color: #3fb950; background: #3fb950; color: #0d1117; box-shadow: 0 0 16px #3fb950aa; }
+  .so-arrow { position: absolute; top: 560px; width: 100px; text-align: center; font-size: 60px; color: #3d444d; opacity: 0; }
+  .active .so-arrow { animation: sec-arr .5s ease-out both calc(var(--i) * 500ms + 900ms), nudge 1.6s ease-in-out infinite calc(var(--i) * 500ms + 1400ms); }
+  .so-call { position: absolute; top: 508px; width: 100px; text-align: center; white-space: nowrap; font: 600 12px/1.2 var(--mono); color: #9198a1; opacity: 0; }
+  .active .so-call { animation: rise .5s ease-out both calc(var(--i) * 500ms + 1100ms); }
+  /* the proposed issue travels box to box */
+  .so-card { position: absolute; top: 742px; width: 420px; height: 150px; padding: 18px 22px; border-radius: 14px; background: #161b22; border: 2px dashed #4493f8;
+    box-shadow: 0 10px 40px -10px #000; opacity: 0; transform: scale(.85); overflow: hidden; z-index: 3;
+    transition: left .9s cubic-bezier(.6,0,.2,1), opacity .4s, transform .5s cubic-bezier(.3,1.6,.4,1), border-color .4s, box-shadow .4s; }
+  .so.p-safe .so-card { opacity: 1; transform: none; }
+  .so.p-safe .so-card.moving { transform: translateY(-26px) rotate(-2deg); }
+  .so-card .t { display: flex; align-items: center; gap: 12px; font: 600 25px/1.2 "Mona Sans"; color: #f0f6fc; }
+  .so-card .t svg { width: 28px; height: 28px; flex: none; }
+  .so-card .lb { margin-top: 12px; display: flex; gap: 10px; }
+  .so-card .lb span { font: 600 16px/1 var(--mono); padding: 6px 12px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992222; color: #e3b341; }
+  .so-card .lb span + span { border-color: #ab7df866; background: #ab7df822; color: #d2b8ff; }
+  .so-card .st { position: absolute; right: 18px; bottom: 16px; font: 600 16px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #79c0ff; }
+  .so.p-pass .so-card .st { color: #3fb950; }
+  .so.p-done .so-card { border-style: solid; border-color: #3fb950; box-shadow: 0 0 60px -6px #3fb95088; }
+  .so.p-done .so-card .st { color: #0d1117; background: #3fb950; padding: 7px 12px; border-radius: 99px; letter-spacing: .04em; }
+  .so-beam { position: absolute; left: 0; right: 0; top: -40px; height: 40px; opacity: 0;
+    background: linear-gradient(180deg, transparent, #d2992266); border-bottom: 2px solid #e3b341; box-shadow: 0 4px 18px #d29922; }
+  .so.p-scan:not(.p-pass) .so-beam { opacity: 1; animation: so-scan 1s ease-in-out infinite alternate; }
+  @keyframes so-scan { from { top: -40px; } to { top: 150px; } }
+  .so-note { margin-top: 18px; font-size: 22px; line-height: 1.35; color: #9198a1; }
+  .so-note code { font: 600 19px var(--mono); color: #79c0ff; }
 
   /* --- compiler hardening --- */
   .ch-slide .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8, #3fb950); }
@@ -1891,6 +1954,173 @@
         [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
         lane
       ),
+    });
+  }
+
+  // Safe outputs: the boxed agent can't create an issue, so it proposes create-issue; threat detection scans it; a separate job writes it
+  {
+    resetIndex();
+    const BX = [110, 710, 1310];
+    const CMD = 'gh issue create -t "Flaky test"';
+    const typed = h("span", { class: "cur" });
+    const status = h("span", { class: "st" }, "proposed");
+    const card = h(
+      "div",
+      { class: "so-card" },
+      h("div", { class: "so-beam" }),
+      h("div", { class: "t" }, h("span", { class: "so-ico", "data-ico": "issue", "data-fill": "#3fb950" }), "Flaky test in cart handler"),
+      h("div", { class: "lb" }, h("span", {}, "bug"), h("span", {}, "agentic")),
+      status
+    );
+    const checks = ["Prompt injection", "Secret leaks", "Malicious links", "Harmful code"].map(x => h("li", {}, x));
+    const boxes = [
+      h(
+        "div",
+        { class: "so-box so-b0", "--c": "#3fb950", "--i": 0, style: { left: `${BX[0]}px`, borderStyle: "dashed", borderWidth: "3px" } },
+        h("div", { class: "so-cage" }),
+        h(
+          "div",
+          { class: "so-shake" },
+          h("i", {}, "01 · AGENT · SANDBOXED"),
+          h("h3", {}, "Agent job"),
+          h("div", { class: "so-who" }, h("span", { class: "so-av" }, h("span", { class: "so-ico", "data-ico": "copilot" })), "Agent", h("span", { class: "so-perm" }, "🔒 read-only")),
+          h("div", { class: "so-term" }, h("div", {}, "$ ", typed), h("div", { class: "l2" }, "✕ 403 · token is read-only"), h("div", { class: "l3" }, "→ safe output: create_issue"))
+        )
+      ),
+      h(
+        "div",
+        { class: "so-box so-b1", "--c": "#d29922", "--i": 1, style: { left: `${BX[1]}px` } },
+        h("i", {}, "02 · DETECT · ISOLATED"),
+        h("h3", {}, "Threat detection"),
+        h("div", { class: "so-who" }, h("span", { class: "so-av det" }, h("span", { class: "so-ico", "data-ico": "copilot" })), "Detection agent", h("span", { class: "so-perm" }, "no tools")),
+        h("ul", { class: "so-checks" }, checks)
+      ),
+      h(
+        "div",
+        { class: "so-box so-b2", "--c": "#4493f8", "--i": 2, style: { left: `${BX[2]}px` } },
+        h("i", {}, "03 · WRITE · SCOPED"),
+        h("h3", {}, "Safe output job"),
+        h("div", { class: "so-note" }, "Holds ", h("code", {}, "issues: write"), ", applies only declared outputs")
+      ),
+    ];
+    // [phase class, ms into the cycle]
+    const P = [
+      ["p-type", 600],
+      ["p-deny", 2000],
+      ["p-safe", 3100],
+      ["p-to1", 4100],
+      ["p-scan", 5100],
+      ["p-pass", 7300],
+      ["p-to2", 8100],
+      ["p-run", 9100],
+      ["p-done", 10600],
+    ];
+    const at = Object.fromEntries(P),
+      CYC = 14000,
+      CHECK0 = 5500,
+      CHECKDT = 420;
+    const el = h(
+      "section",
+      { class: "slide so" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents propose, jobs write"), h("h2", {}, letters("Safe "), letters("outputs", "l-grad"))),
+      boxes,
+      [0, 1].map(i => h("div", { class: "so-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
+      [0, 1].map(i => h("div", { class: "so-call", "--i": i, style: { left: `${BX[i] + 500}px` } }, i ? "verdict" : "create-issue")),
+      card
+    );
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set(),
+      nTyped = -1,
+      iconsDrawn = false;
+    const place = (i, instant) => {
+      if (instant) card.style.transition = "none";
+      card.style.left = `${BX[i] + 40}px`;
+      if (instant) {
+        void card.offsetWidth;
+        card.style.transition = "";
+      }
+    };
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    slides.push({
+      sound: "factory",
+      green: true,
+      palette: ["#238636", "#0e3a1f", "#1f6feb", "#0b2f3a"],
+      notes:
+        "Safe outputs, an illustrative run with a synthetic issue. The agent runs boxed in: its token is read-only, so when it tries to create an issue directly the call is refused. Instead it calls the create-issue safe output, which only records a proposal. A separate threat detection job, an isolated agent with no tools, reads the proposed issue and looks for prompt injection, leaked secrets, malicious links and harmful code. Only when the verdict is clean does a third job, the only one holding issues: write, apply the declared output and actually create the issue. The agent never holds write credentials, and every write is limited to the outputs declared in the front matter.",
+      enter() {
+        if (!iconsDrawn) {
+          iconsDrawn = true;
+          el.querySelectorAll(".so-ico").forEach(s => {
+            s.innerHTML = `<svg viewBox="0 0 24 24" fill="${s.dataset.fill || "#f0f6fc"}">${OCTI[s.dataset.ico].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+          });
+        }
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          seen = new Set();
+          nTyped = -1;
+          P.forEach(([cls]) => el.classList.remove(cls));
+          checks.forEach(li => li.classList.remove("ok"));
+          boxes.forEach(b => b.classList.remove("hot"));
+          status.textContent = "proposed";
+          place(0, true);
+        }
+        for (const [cls, ms] of P) el.classList.toggle(cls, u >= ms);
+        const n = Math.max(0, Math.min(CMD.length, Math.floor(((u - at["p-type"]) / (at["p-deny"] - at["p-type"] - 200)) * CMD.length)));
+        if (n !== nTyped) {
+          if (n > nTyped && nTyped >= 0 && u >= at["p-type"]) sfx.key(0.7);
+          nTyped = n;
+          typed.textContent = CMD.slice(0, n);
+        }
+        boxes[0].classList.toggle("hot", u >= at["p-type"] && u < at["p-to1"]);
+        boxes[1].classList.toggle("hot", u >= at["p-to1"] && u < at["p-to2"]);
+        boxes[2].classList.toggle("hot", u >= at["p-to2"]);
+        card.classList.toggle("moving", (u >= at["p-to1"] && u < at["p-to1"] + 900) || (u >= at["p-to2"] && u < at["p-to2"] + 900));
+        if (u >= at["p-deny"]) fire("deny", () => sfx.step(-1));
+        if (u >= at["p-safe"]) fire("safe", () => sfx.pop(2));
+        if (u >= at["p-to1"])
+          fire("to1", () => {
+            place(1);
+            sfx.pop(3);
+          });
+        if (u >= at["p-scan"]) fire("scan", () => (status.textContent = "scanning…"));
+        checks.forEach((li, i) => {
+          if (u >= CHECK0 + i * CHECKDT)
+            fire("c" + i, () => {
+              li.classList.add("ok");
+              sfx.pop(4 + i);
+            });
+        });
+        if (u >= at["p-pass"])
+          fire("pass", () => {
+            status.textContent = "✓ no threats";
+            sfx.review();
+          });
+        if (u >= at["p-to2"])
+          fire("to2", () => {
+            place(2);
+            sfx.pop(5);
+          });
+        if (u >= at["p-run"]) fire("run", () => sfx.compile());
+        if (u >= at["p-done"])
+          fire("done", () => {
+            status.textContent = "● open · #42";
+            sfx.notify(false);
+          });
+      },
+      el,
     });
   }
 
@@ -6155,7 +6385,7 @@
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
     // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up,
-    // and to -45° while the green "Private enclaves" wash is up.
+    // and to -45° while the green "Safe outputs" / "Private enclaves" wash is up.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
