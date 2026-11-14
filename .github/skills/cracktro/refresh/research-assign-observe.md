@@ -3,7 +3,7 @@ name: cracktro-refresh-research-assign-observe
 description: Recompute the measured data on the cracktro "Research · Assign · Observe" slide and update deck.js.
 ---
 
-# Refresh: Research · Assign · Observe (slide 21)
+# Refresh: Research · Assign · Observe (slide 22)
 
 Load `.github/skills/cracktro/SKILL.md` first. Never read `deck.js` whole; use `grep -n` plus `view_range`.
 
@@ -95,7 +95,7 @@ Pick FIXES rows from `issues.fixes`: 5 rows spread across the window, sorted by 
 2. Replace `FIXES` with 5 new rows; keep the `["DD Mon", "Bench", "+N%", "H.H h"]` format.
 3. Update the subtitle window, the median/within-a-day line, the comment above `const RX`, and the caption (issue window, benchmark count and window, snapshot date, `fleet and spans simulated`).
 4. Update `notes:` with the same numbers and windows. Keep the sentence `Illustrative: the production fleet, its numbers and the span stream are simulated in the browser.` so notes still match `/illustrative|synthetic|simulated/i`.
-5. Update the `Research · Assign · Observe slide (21, rob- classes)` Exception bullet in `.github/skills/cracktro/content-rules.md` (window, counts, median, snapshots).
+5. Update the `Research · Assign · Observe slide (22, rob- classes)` Exception bullet in `.github/skills/cracktro/content-rules.md` (window, counts, median, snapshots).
 6. Do not add issue/PR numbers, SHAs or `github/<repo>` text to deck.js.
 
 ## 6. Validation
@@ -106,7 +106,7 @@ grep -c 'Research · Assign · Observe' docs/tests/talk.spec.ts   # heading unch
 cd docs && npx playwright test tests/talk.spec.ts                 # needs npm ci; say so if not run
 ```
 
-Preview `http://127.0.0.1:4329/cracktro/#21` (see SKILL.md "Preview loop"): panel bars fit inside the card, the longest FIXES row does not overlap the `+N%` column, the caption fits on one line at 1920 px, and rows highlight in turn.
+Preview `http://127.0.0.1:4329/cracktro/#22` (see SKILL.md "Preview loop"): panel bars fit inside the card, the longest FIXES row does not overlap the `+N%` column, the caption fits on one line at 1920 px, and rows highlight in turn.
 
 ## 7. Pitfalls
 
