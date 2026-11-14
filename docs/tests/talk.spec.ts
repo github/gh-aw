@@ -1,77 +1,36 @@
 import { test, expect } from "@playwright/test";
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+
+// The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its row position.
+const SLIDES = readFileSync(new URL("../../.github/skills/cracktro/slides.md", import.meta.url), "utf8")
+  .split("\n")
+  .map(line => line.match(/^\| (.+?) \| (illustrative)? *\|$/))
+  .filter((m): m is RegExpMatchArray => !!m && m[1] !== "Heading")
+  .map(m => ({ heading: m[1], illustrative: !!m[2] }));
+const TOTAL = SLIDES.length;
+const slideNo = (heading: string) => {
+  const n = SLIDES.findIndex(s => s.heading === heading) + 1;
+  if (!n) throw new Error(`slide "${heading}" missing from slides.md`);
+  return n;
+};
+const at = (n: number) => `${String(n).padStart(2, "0")} / ${TOTAL}`;
+const SECURITY = slideNo("Security");
 
 test.use({ reducedMotion: "reduce" });
 
-test("presents the fifty-five slides in bands without the removed sections", async ({ page }) => {
+test("presents the slides listed in slides.md in bands without the removed sections", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/gh-aw/cracktro/");
   await expect(page).toHaveTitle("GitHub Agentic Workflows Talk");
-  await expect(page.locator(".slide")).toHaveCount(55);
+  await expect(page.locator(".slide")).toHaveCount(TOTAL);
   await expect(page.locator(".stage")).not.toContainText(/the crew|the story|akeso|security at (?:hyper)?scale/i);
 
-  const headings = [
-    "GitHubAgenticWorkflows",
-    "Workflows",
-    "AI-poweredworkflowsfor GitHub",
-    "Anatomy of a workflow",
-    "Turn Intent to Automation",
-    "Security",
-    "Agentic attacks",
-    "Safety and control",
-    "Supply chain hardening",
-    "Safe outputs",
-    "Continuous Security",
-    "Private enclaves",
-    "Stop manually translating intent into code.",
-    "Human agent processes",
-    "Human Agent Processes",
-    "Pull Request Review²",
-    "Issues as intent",
-    "Repo Assist",
-    "Daily Unsloppers",
-    "Merge fast, unslop daily",
-    "Research · Assign · Observe",
-    "Query · Ask · Grow",
-    "Mine · Refine · Apply",
-    "Explore · Reuse · Lint",
-    "Semantic clustering",
-    "Spec · Model · Test",
-    "Go Fan",
-    "Spec-driven testing",
-    "Docs that heal",
-    "Speak · Map · Grep",
-    "Scan · Fix · Learn",
-    "Cost & context",
-    "Cost management",
-    "Model routing",
-    "Agents that debug agents",
-    "Agentic Engineering",
-    "Any agent, any provider",
-    "Agent memory",
-    "Ephemerals",
-    "Index & search",
-    "Experiments, graders & evals",
-    "Audit & Optimize",
-    "Enterprise",
-    "Connectors",
-    "Enterprise ready",
-    "OpenTelemetry",
-    "GitHub-native governance",
-    "Operator-owned infrastructure",
-    "Centralized campaigns",
-    "AW factory",
-    "First commit to GA",
-    "How PRs land",
-    "How workflows evolve",
-    "Patch to PR",
-    "G\u0131tHub Agentic Workflows",
-  ];
+  const headings = SLIDES.map(s => s.heading);
   for (const [index, heading] of headings.entries()) {
     await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
-    await expect(page.locator(".count")).toHaveText(`${String(index + 1).padStart(2, "0")} / 55`);
+    await expect(page.locator(".count")).toHaveText(at(index + 1));
     await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(heading);
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
@@ -79,8 +38,8 @@ test("presents the fifty-five slides in bands without the removed sections", asy
 });
 
 test("preserves navigation, slide links, speaker notes, and sound controls", async ({ page }) => {
-  await page.goto("/gh-aw/cracktro/#15");
-  await expect(page.locator(".count")).toHaveText("15 / 55");
+  await page.goto("/gh-aw/cracktro/#16");
+  await expect(page.locator(".count")).toHaveText(at(16));
   await page.keyboard.press("n");
   await expect(page.locator(".notes")).toBeVisible();
   await expect(page.locator(".notes")).toContainText("LabelOps");
@@ -94,36 +53,36 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await page.getByRole("button", { name: "Toggle sound (M)", exact: true }).evaluate(button => button.blur());
 
   await page.keyboard.press("Space");
-  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#16$/);
+  await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#17$/);
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("15 / 55");
+  await expect(page.locator(".count")).toHaveText(at(16));
   await page.reload();
-  await expect(page.locator(".count")).toHaveText("15 / 55");
+  await expect(page.locator(".count")).toHaveText(at(16));
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".count")).toHaveText("01 / 55");
+  await expect(page.locator(".count")).toHaveText(at(1));
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator(".count")).toHaveText("55 / 55");
+  await expect(page.locator(".count")).toHaveText(at(TOTAL));
 });
 
 test("moves through the bands, up/down landing on each band's first slide", async ({ page }) => {
   const count = page.locator(".count");
   await page.goto("/gh-aw/cracktro/#1");
   await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveText("02 / 55");
-  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Workflows");
+  await expect(count).toHaveText(at(2));
+  await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText("Agentic Workflows");
   await page.keyboard.press("ArrowRight");
-  await expect(count).toHaveText("03 / 55");
+  await expect(count).toHaveText(at(3));
   await page.keyboard.press("ArrowDown");
-  await expect(count).toHaveText("06 / 55");
+  await expect(count).toHaveText(at(SECURITY));
   // left from a band header wraps to the last slide of the band above
   await page.keyboard.press("ArrowLeft");
-  await expect(count).toHaveText("05 / 55");
+  await expect(count).toHaveText(at(SECURITY - 1));
   await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveText("01 / 55");
+  await expect(count).toHaveText(at(1));
   await page.keyboard.press("ArrowUp");
-  await expect(count).toHaveText("01 / 55");
+  await expect(count).toHaveText(at(1));
 });
 
 test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
@@ -134,13 +93,109 @@ test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
   const next = page.getByRole("button", { name: "Next slide", exact: true });
   await expect(prev).toBeDisabled();
   await next.click();
-  await expect(page.locator(".count")).toHaveText("02 / 55");
+  await expect(page.locator(".count")).toHaveText(at(2));
+  // clicks in the gaps between the arrows do not fall through to the slide click handler
+  const nb = (await page.getByRole("button", { name: "Next band", exact: true }).boundingBox())!;
+  await page.mouse.click(nb.x - 3, nb.y + nb.height / 2);
+  await expect(page.locator(".count")).toHaveText(at(2));
   await prev.click();
-  await expect(page.locator(".count")).toHaveText("01 / 55");
+  await expect(page.locator(".count")).toHaveText(at(1));
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeVisible();
   await expect(next).toBeHidden();
+  await expect(page.getByRole("button", { name: "Previous band", exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Next band", exact: true })).toBeHidden();
+});
+
+test("jumps between bands with the compact track buttons", async ({ page }) => {
+  const count = page.locator(".count");
+  const prevBand = page.getByRole("button", { name: "Previous band", exact: true });
+  const nextBand = page.getByRole("button", { name: "Next band", exact: true });
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/gh-aw/cracktro/#1");
+  await expect(prevBand).toBeDisabled();
+  await expect(nextBand).toBeEnabled();
+  await nextBand.click();
+  await expect(count).toHaveText(at(2));
+  // from an interior slide, next band lands on the header below and previous band on the header above
+  await page.goto("/gh-aw/cracktro/#3");
+  await expect(count).toHaveText(at(3));
+  await nextBand.click();
+  await expect(count).toHaveText(at(SECURITY));
+  await page.goto(`/gh-aw/cracktro/#${SECURITY + 2}`);
+  await expect(count).toHaveText(at(SECURITY + 2));
+  await prevBand.click();
+  await expect(count).toHaveText(at(2));
+  await prevBand.click();
+  await expect(count).toHaveText(at(1));
+  await expect(prevBand).toBeDisabled();
+  await page.goto(`/gh-aw/cracktro/#${TOTAL}`);
+  await expect(count).toHaveText(at(TOTAL));
+  await expect(nextBand).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Next slide", exact: true })).toBeDisabled();
+  await expect(prevBand).toBeEnabled();
+  // keyboard activation of a focused button navigates exactly once
+  await page.goto("/gh-aw/cracktro/#3");
+  await expect(count).toHaveText(at(3));
+  await nextBand.focus();
+  await page.keyboard.press("Enter");
+  await expect(count).toHaveText(at(SECURITY));
+
+  // at 320px the four buttons fit left of the sound toggle, which stays clear of the count
+  const boxes = await page.evaluate(() =>
+    [...document.querySelectorAll(".arrows button"), document.querySelector(".snd")!, document.querySelector(".count")!].map(e => {
+      const r = e.getBoundingClientRect();
+      return { left: r.left, right: r.right };
+    })
+  );
+  expect(boxes).toHaveLength(6);
+  const [, , , lastArrow, snd, countBox] = boxes;
+  expect(boxes[0].left).toBeGreaterThanOrEqual(0);
+  for (let i = 1; i < 4; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].right);
+  expect(snd.left).toBeGreaterThan(lastArrow.right);
+  expect(countBox.left).toBeGreaterThan(snd.right);
+  expect(countBox.right).toBeLessThanOrEqual(320);
+});
+
+test.describe("compact navigation on touch screens", () => {
+  test.use({ hasTouch: true, viewport: { width: 320, height: 640 } });
+
+  test("navigates once per tap and cancels the touch defaults", async ({ page }) => {
+    const count = page.locator(".count");
+    await page.goto("/gh-aw/cracktro/#3");
+    await expect(count).toHaveText(at(3));
+    await page.getByRole("button", { name: "Next slide", exact: true }).tap();
+    await expect(count).toHaveText(at(4));
+    await page.getByRole("button", { name: "Next band", exact: true }).tap();
+    await expect(count).toHaveText(at(SECURITY));
+
+    // rapid taps: every touchend is cancelled (no synthetic click, no double-tap zoom), never reaches
+    // the window swipe handlers, and moves exactly one band per tap
+    const result = await page.evaluate(() => {
+      const btn = document.querySelector('[aria-label="Previous band"]') as HTMLButtonElement;
+      const seen: string[] = [];
+      for (const type of ["touchstart", "touchend"]) addEventListener(type, () => seen.push(type));
+      const r = btn.getBoundingClientRect();
+      const fire = (type: string) => {
+        const t = new Touch({ identifier: 1, target: btn, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+        const e = new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === "touchend" ? [] : [t], changedTouches: [t] });
+        btn.dispatchEvent(e);
+        return e.defaultPrevented;
+      };
+      const prevented: boolean[] = [];
+      for (let i = 0; i < 2; i++) {
+        fire("touchstart");
+        prevented.push(fire("touchend"));
+      }
+      return { prevented, seen, count: document.querySelector(".count")!.textContent };
+    });
+    expect(result.prevented).toEqual([true, true]);
+    expect(result.seen).toEqual([]);
+    expect(result.count).toBe(at(1));
+    await expect(count).toHaveText(at(1));
+    await expect(page.locator(".arrows")).toHaveCSS("touch-action", "manipulation");
+  });
 });
 
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {
@@ -148,7 +203,7 @@ test("ships local assets with the docs and links to the talk from the footer", a
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();
   await expect(page).toHaveURL(/\/gh-aw\/cracktro\/#1$/);
 
-  const assets = ["deck.js", "ops-visuals.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
+  const assets = ["deck.js", "fonts/MonaspaceNeonVF.woff", "fonts/Monaspace-LICENSE.txt", "../fonts/MonaSansVF.woff2"];
   for (const asset of assets) {
     const response = await request.get(`/gh-aw/cracktro/${asset}`);
     expect(response.ok(), asset).toBe(true);
@@ -171,14 +226,12 @@ test("publishes a social card for link previews", async ({ page, request }) => {
 });
 
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
-  const allowedAvatar = /^assets\/avatars\/(?:pelikhan|lpcox|dsyme|mnkiefer|ievangelist)\.jpg$/;
+  const allowedAvatar = /^assets\/avatars\/(?:mona|ducky)\.jpg$/;
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
     expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
   }
-  const visuals = await (await request.get("/gh-aw/cracktro/ops-visuals.js")).text();
-  expect(visuals.match(/\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b|https?:|<image|\bhref=|\bid=/i)).toBeNull();
   const source = await (await request.get("/gh-aw/cracktro/deck.js")).text();
-  expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
+  expect(source.match(/\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i)).toBeNull();
   for (const ref of source.match(/assets\/avatars\/[^"'`\s)]*/g) ?? []) expect(ref).toMatch(allowedAvatar);
   expect(source.match(/https:\/\/[^"'\s]+/g)).toEqual(["https://github.github.com/gh-aw/introduction/overview/"]);
 
@@ -191,7 +244,7 @@ test("publishes synthetic examples without profile assets or private source refe
     return route.abort();
   });
   await page.clock.install();
-  await page.goto("/gh-aw/cracktro/#22");
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Mine · Refine · Apply")}`);
   await page.clock.runFor(15_000);
   for (const author of await page.locator(".mra-who").allTextContents()) {
     expect(author).toMatch(/^(?:linter miner|lintmonster|copilot) · /);
@@ -201,45 +254,10 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   await expect(page.locator(".mra-repo-t")).toContainText("gh-aw · May–Nov 2026");
   await page.keyboard.press("n");
-  for (const slide of [3, 4, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 37, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 54, 55]) {
+  for (const slide of SLIDES.flatMap((s, i) => (s.illustrative ? [i + 1] : []))) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
     await expect(page.locator(".notes")).toContainText(/illustrative|synthetic|simulated/i);
   }
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
-});
-
-test("shares the enterprise operations visuals with the landing page", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", error => errors.push(error.message));
-  await page.goto("/gh-aw/cracktro/");
-  const deck: string[] = [];
-  for (const [slide, heading] of [
-    [46, "OpenTelemetry"],
-    [47, "GitHub-native governance"],
-    [48, "Operator-owned infrastructure"],
-  ] as const) {
-    await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
-    const active = page.locator(".slide.active");
-    await expect(active.locator("h2")).toHaveText(heading);
-    await expect(active.locator(".ops-fig svg.ov")).toHaveCount(1);
-    await expect(active.locator(".ops-facts li")).toHaveCount(4);
-    deck.push((await active.locator(".ops-fig svg.ov").getAttribute("aria-label")) ?? "");
-  }
-  expect(errors).toEqual([]);
-
-  await page.goto("/gh-aw/");
-  const landing: string[] = [];
-  for (const [id, heading] of [
-    ["observability", "OpenTelemetry"],
-    ["governance", "GitHub-native governance"],
-    ["infrastructure", "Operator-owned infrastructure"],
-  ]) {
-    const section = page.locator(`section#${id}`);
-    await expect(section.getByRole("heading", { level: 2 })).toHaveText(heading);
-    await expect(section.locator("svg.ov")).toHaveCount(1);
-    landing.push((await section.locator("svg.ov").getAttribute("aria-label")) ?? "");
-  }
-  expect(landing).toEqual(deck);
-  expect(deck.every(label => label.length > 40)).toBe(true);
 });
