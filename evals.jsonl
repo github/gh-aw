@@ -82,3 +82,5 @@
 {"id":"report_created","question":"Was a data science report produced with quality trends and adoption metrics?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-08T12:41:28.636Z","runid":"42480849728"}
 {"id":"evals_data_analyzed","question":"Did the agent analyze evals feature adoption and per-question pass rates across agentic workflows?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-12T12:47:49.470Z","runid":"43219853785"}
 {"id":"report_created","question":"Was a data science report produced with quality trends and adoption metrics?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-12T12:47:49.470Z","runid":"43219853785"}
+{"id":"evals_data_analyzed","question":"Did the agent analyze evals feature adoption and per-question pass rates across agentic workflows?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-14T12:42:54.241Z","runid":"43595487344"}
+{"id":"report_created","question":"Was a data science report produced with quality trends and adoption metrics?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-14T12:42:54.241Z","runid":"43595487344"}
