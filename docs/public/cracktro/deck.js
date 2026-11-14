@@ -1367,12 +1367,12 @@
       MX = 930,
       MY = 330,
       OX = 790;
-    const agent = (x, y, r = 30) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#fmAgent)"/>${ico("copilot", x, y + 1, r * 1.15)}`;
+    const agent = (p, x, y, r = 30) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#${p}Agent)"/>${ico("copilot", x, y + 1, r * 1.15)}`;
     const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 23}" width="${w}" height="46" rx="23"/><text x="${x + 15 + w / 2}" y="${y + 8}">${label}</text></g>`;
-    const svgFor = L => {
-      let g = `<defs><radialGradient id="fmAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
-        <marker id="fmArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
-        <marker id="fmArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    const svgFor = (L, p) => {
+      let g = `<defs><radialGradient id="${p}Agent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+        <marker id="${p}ArrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+        <marker id="${p}ArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
       g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
       [
         [0, 250, "SCHEDULE"],
@@ -1384,15 +1384,15 @@
       });
       g += `<path class="fm-wire p" d="M240 ${SY} H272"/><path class="fm-wire p" d="M272 ${TY[0]} V${TY[4]}"/>`;
       TY.forEach((y, i) => {
-        g += `<path class="fm-wire p" id="fmIn${i}" d="M240 ${SY} H272 V${y} H${300 - 4}" marker-end="url(#fmArrP)" style="opacity:${y === SY ? 1 : 0}"/>`;
-        g += `<path class="fm-wire p" d="M272 ${y} H296" marker-end="url(#fmArrP)"/>`;
-        g += `<path class="fm-wire p" id="fmOut${i}" d="M610 ${y} H${OX - 2}" marker-end="url(#fmArrP)"/>`;
-        g += `<path class="fm-wire b" id="fmRev${i}" d="M${OX + 58} ${y} H${OX + 72} V${MY} H${MX - 42}" marker-end="url(#fmArrB)"/>`;
-        g += `<g class="fm-task" id="fmTask${i}">${pill(320, y, 290, L.tasks[i][0])}${agent(320, y)}</g>`;
+        g += `<path class="fm-wire p" id="fmIn${i}" d="M240 ${SY} H272 V${y} H${300 - 4}" marker-end="url(#${p}ArrP)" style="opacity:${y === SY ? 1 : 0}"/>`;
+        g += `<path class="fm-wire p" d="M272 ${y} H296" marker-end="url(#${p}ArrP)"/>`;
+        g += `<path class="fm-wire p" id="fmOut${i}" d="M610 ${y} H${OX - 2}" marker-end="url(#${p}ArrP)"/>`;
+        g += `<path class="fm-wire b" id="fmRev${i}" d="M${OX + 58} ${y} H${OX + 72} V${MY} H${MX - 42}" marker-end="url(#${p}ArrB)"/>`;
+        g += `<g class="fm-task" id="fmTask${i}">${pill(320, y, 290, L.tasks[i][0])}${agent(p, 320, y)}</g>`;
         g += `<g class="fm-out" id="fmOutI${i}"><rect x="${OX}" y="${y - 30}" width="58" height="60" rx="12"/>${ico(L.tasks[i][1], OX + 29, y, 30)}</g>`;
       });
-      g += `<path class="fm-wire b" id="fmLoop" d="M${MX} ${MY + 38} V${VH - 20} H52 V${SY + 36}" marker-end="url(#fmArrB)"/>`;
-      g += `<g class="fm-sched">${pill(40, SY, 200, L.pick)}${agent(40, SY)}</g>`;
+      g += `<path class="fm-wire b" id="fmLoop" d="M${MX} ${MY + 38} V${VH - 20} H52 V${SY + 36}" marker-end="url(#${p}ArrB)"/>`;
+      g += `<g class="fm-sched">${pill(40, SY, 200, L.pick)}${agent(p, 40, SY)}</g>`;
       g += `<g class="fm-watch">${ico("stopwatch", 150, 530, 64, "#f0f6fc")}<line id="fmHand" x1="150" y1="532" x2="150" y2="512" stroke="#f0f6fc" stroke-width="4" stroke-linecap="round"/></g>`;
       g += `<g class="fm-maint"><g class="fm-pill b"><rect x="${MX}" y="${MY - 23}" width="172" height="46" rx="23"/><text x="${MX + 38 + 67}" y="${MY + 8}">Maintainer</text></g>
         <circle cx="${MX}" cy="${MY}" r="38" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", MX, MY, 46)}</g>`;
@@ -1452,14 +1452,10 @@
           .map((p, i) => `${x(D0 + i).toFixed(1)} ${y(p).toFixed(1)}`)
           .join("H")
           .replace(/H([\d.]+) ([\d.]+)/g, (_, a, b) => `H${a}V${b}`);
-      const medY = d => {
-        const f = Math.min(D1 - D0, Math.max(0, d - D0)),
-          i = Math.floor(f);
-        return y(med[i] + (med[Math.min(i + 1, med.length - 1)] - med[i]) * (f - i));
-      };
+      const medY = d => y(med[Math.min(med.length - 1, Math.max(0, Math.floor(d - D0)))]);
       const drop = Math.round(100 - med[med.length - 1]);
       const svgFor = () => {
-        let g = `<defs><radialGradient id="fmAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+        let g = `<defs><radialGradient id="bdAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
           <clipPath id="bdClip"><rect id="bdClipR" x="0" y="0" width="${X0}" height="${VH}"/></clipPath></defs>`;
         g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
         g += `<text class="fm-lane-t" x="${(X0 + XA) / 2}" y="40">BEFORE</text><text class="fm-lane-t" x="${(XA + X1) / 2}" y="40">WITH REPO ASSIST</text>`;
@@ -1470,7 +1466,7 @@
         g += `<line id="bdHead" class="bd-head" x1="${X0}" y1="${YT - 10}" x2="${X0}" y2="${YB}"/>`;
         g += `<line id="bdAdopt" class="bd-adopt" x1="${XA}" y1="${YT - 30}" x2="${XA}" y2="${YB}" pathLength="1"/>`;
         g += `<g id="bdPill" class="bd-pill"><rect x="${XA - 120}" y="${YT - 62}" width="240" height="48" rx="24"/>${ico("calendar", XA - 82, YT - 38, 26)}<text x="${XA + 18}" y="${YT - 30}">Adoption day</text></g>`;
-        g += `<g id="bdBot" class="bd-bot"><circle cx="0" cy="0" r="22" fill="url(#fmAgent)"/>${ico("copilot", 0, 1, 26)}</g>`;
+        g += `<g id="bdBot" class="bd-bot"><circle cx="0" cy="0" r="22" fill="url(#bdAgent)"/>${ico("copilot", 0, 1, 26)}</g>`;
         g += `<g id="bdRes" class="bd-res"><text x="${X1 + 34}" y="${y(med[med.length - 1]) + 2}">−${drop}%</text><text class="s" x="${X1 + 36}" y="${y(med[med.length - 1]) + 26}">median</text></g>`;
         g += `<text class="bd-note" x="${(X0 + X1) / 2}" y="${YB + 100}">illustrative redraw · F# open-source repositories</text>`;
         return g;
@@ -1504,7 +1500,9 @@
       return el;
     };
     // An animated SCHEDULE → ACT → REVIEW swimlane cycling through the given LOOPS, two cycles each.
+    let flowSeq = 0;
     const makeFlow = (svg, cap, loops) => {
+      const idp = `fm${++flowSeq}`;
       const capB = h("b", {}, ""),
         capS = h("span", {}, "");
       cap.append(capB, capS);
@@ -1516,7 +1514,7 @@
       const setMode = m => {
         mode = m;
         const L = LOOPS[loops[m]];
-        svg.innerHTML = svgFor(L);
+        svg.innerHTML = svgFor(L, idp);
         svg.style.setProperty("--c", L.c);
         capB.textContent = L.key;
         capB.style.color = L.c;
