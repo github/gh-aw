@@ -17,6 +17,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Security |  |
 | Agentic attacks | illustrative |
 | Safety and control |  |
+| Zero-secret agents | illustrative |
 | Supply chain hardening | illustrative |
 | Safe outputs | illustrative |
 | Continuous Security | illustrative |

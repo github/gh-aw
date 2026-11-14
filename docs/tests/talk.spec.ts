@@ -261,3 +261,14 @@ test("publishes synthetic examples without profile assets or private source refe
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
 });
+
+test("keeps every key on the host side of the zero-secret agents diagram", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Zero-secret agents")}`);
+  await expect(page.locator(".slide.active h2")).toContainText("Zero-secret agents");
+  await expect(page.locator(".zs-vm-g .zs-key")).toHaveCount(0);
+  await expect(page.locator(".zs-svg .zs-key")).toHaveCount(2);
+  await expect(page.locator(".zs-pr .on")).toHaveText(/Zero-secret agents/);
+  expect(errors).toEqual([]);
+});
