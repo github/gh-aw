@@ -58,6 +58,13 @@ slides.push({
 | `content-rules.md` | Adding any public text, data, avatar or image; contains the per-slide Exception bullets for measured data. |
 | `data-refresh.md` | Adding, changing or refreshing a data slide; holds the refresh mini-skill convention and the slide→`refresh/<slug>.md` index. |
 
+## People and mascots
+
+- Never use a real GitHub user's avatar, handle or name for a person, in slides, speaker notes or comments. Never fetch `github.com/<login>.png`.
+- People are only the fake users `mona` and `ducky`, drawn from `assets/avatars/{mona,ducky}.jpg`. Pick Mona by default (community, maintainer, contributor) and Ducky for debugging or developer roles (fixing CI, audits, linting). Use both on one slide to tell two people apart.
+- Follow https://brand.github.com/graphic-elements/mascots: use mascots sparingly, never as logos, and never on serious topics (security, enterprise, money). Use role icons there.
+- Never generate or redraw mascots. Both avatars are 160x160 clips of official brand.github.com art in the modern three-quarter 3D style: `mona.jpg` is the dark-mode purple Mona from `mona-2026-versions.png`, `ducky.jpg` the middle Ducky from `mascots-03.png`. Their backgrounds are recoloured to the deck's `#0d1117` (never white) so they blend into the dark avatar circles.
+
 Core rules (details in `content-rules.md`): everything is public; no real GitHub avatars, handles or people, only the fake users Mona and Ducky (per the brand mascot guidelines); no 40-hex SHAs or private repos; the only URL is `https://github.github.com/gh-aw/introduction/overview/`; speaker notes of illustrative slides must match `/illustrative|synthetic|simulated/i`.
 
 ## Preview loop
