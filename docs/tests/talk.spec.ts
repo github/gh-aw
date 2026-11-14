@@ -155,12 +155,12 @@ test("publishes synthetic examples without profile assets or private source refe
   await page.goto("/gh-aw/cracktro/#18");
   await page.clock.runFor(15_000);
   for (const author of await page.locator(".mra-who").allTextContents()) {
-    expect(author).toMatch(/^(?:reviewer|maintainer|copilot) · /);
+    expect(author).toMatch(/^(?:linter miner|lintmonster|copilot) · /);
   }
   for (const href of await page.locator("svg image").evaluateAll(images => images.map(image => image.getAttribute("href")))) {
     expect(href).toMatch(allowedAvatar);
   }
-  await expect(page.locator(".mra-repo-t")).toContainText("synthetic activity");
+  await expect(page.locator(".mra-repo-t")).toContainText("gh-aw · May–Nov 2026");
   await page.keyboard.press("n");
   for (const slide of [2, 3, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]) {
     await page.getByRole("button", { name: `Slide ${slide}`, exact: true }).click();
