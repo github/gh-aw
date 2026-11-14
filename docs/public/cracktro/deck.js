@@ -535,6 +535,24 @@
   .dh-svg .sdd-ln.fail { fill: #ff7b72; font-weight: 700; }
   .dh-x { fill: #f85149; font: 700 24px var(--mono); text-anchor: end; opacity: 0; transition: opacity .25s; filter: drop-shadow(0 0 6px #f85149); }
   .dh-x.on { opacity: 1; }
+  .dhm { position: absolute; left: 470px; top: 872px; width: 1250px; display: flex; align-items: flex-end; gap: 34px; font-family: var(--mono); }
+  .active .dhm { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .dhm-k { display: flex; gap: 22px; }
+  .dhm-k div { display: flex; flex-direction: column; gap: 6px; }
+  .dhm-k b { font: 700 36px/1 var(--mono); color: #f0f6fc; }
+  .dhm-k b.g { color: #3fb950; } .dhm-k b.r { color: #ff7b72; }
+  .dhm-k span { font: 500 14px/1.2 var(--mono); color: #9198a1; white-space: nowrap; }
+  .dhm-k em { font-style: normal; color: #ff7b72; }
+  .dhm-k i { font-style: normal; color: #c9d1d9; }
+  .dhm-tl { flex: none; overflow: visible; }
+  .dhm-tl .t { fill: #c9d1d9; font: 600 14px var(--mono); letter-spacing: .06em; }
+  .dhm-tl .m { fill: #6e7681; font: 500 13px var(--mono); text-anchor: middle; }
+  .dhm-tl .ax { stroke: #3d444d; stroke-width: 2; }
+  .dhm-tl rect { transform-box: fill-box; transform-origin: bottom; }
+  .active .dhm-tl rect { animation: dhm-up .5s cubic-bezier(.2,.9,.2,1) both; animation-delay: calc(1s + var(--i) * 60ms); }
+  @keyframes dhm-up { from { transform: scaleY(0); } }
+  .dhm-tl .u { fill: #3fb950; } .dhm-tl .h { fill: #7ee78799; } .dhm-tl .x { fill: #6e7681; }
+  .dhm-cap { position: absolute; left: 470px; top: 1036px; font: 500 14px/1 var(--mono); letter-spacing: .04em; color: #6e7681; }
   .dg-svg { left: 110px; top: 280px; width: 1700px; height: 586px; }
   .dg-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .dg-svg .mra-l.g { fill: #3fb950; }
   .dg-band { fill: #ffffff06; }
@@ -6792,6 +6810,29 @@
       at(13400, () => (on("dhL0_7"), on("dhP0", "ok"), sfx.review()));
       at(14000, () => ($("dhX4").classList.remove("on"), on("dhCk4"), $("dhP2").classList.remove("bad"), on("dhP2", "ok"), sfx.pop(9)));
     };
+    // measured: merged [docs] PRs per agent (Oct 2025 to 14 Nov 2026) and [doc-healer] issues by day since 26 Feb 2026;
+    // u = rule merged into the updater's prompt, h = merged elsewhere (healer prompt or docs), x = declined
+    const RULES = [[0,"u"],[19,"u"],[32,"x"],[38,"u"],[44,"h"],[48,"u"],[52,"u"],[56,"u"],[77,"h"],[85,"h"],[93,"u"],[112,"x"],[115,"x"],[116,"x"],[117,"x"],[123,"x"],[125,"u"],[126,"x"],[132,"h"],[136,"x"],[144,"x"],[146,"x"],[149,"x"],[155,"u"],[195,"x"],[207,"x"],[243,"x"],[244,"x"],[246,"x"]];
+    const TW = 520,
+      TX = d => 10 + (d * (TW - 20)) / 250;
+    let tl = `<text class="t" x="0" y="16">29 HEALER RULES · 13 MERGED · 9 IN UPDATER PROMPT</text><line class="ax" x1="0" y1="96" x2="${TW}" y2="96"/>`;
+    RULES.forEach(([d, s], i) => {
+      const hh = s === "u" ? 50 : s === "h" ? 36 : 18;
+      tl += `<rect class="${s}" style="--i:${i}" x="${TX(d) - 3}" y="${96 - hh}" width="6" height="${hh}" rx="2"/>`;
+    });
+    [[3, "Mar"], [64, "May"], [125, "Jul"], [187, "Sep"], [248, "Nov"]].forEach(([d, m]) => (tl += `<text class="m" x="${TX(d)}" y="118">${m}</text>`));
+    const tlSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tlSvg.setAttribute("class", "dhm-tl");
+    tlSvg.setAttribute("width", TW);
+    tlSvg.setAttribute("height", 122);
+    tlSvg.innerHTML = tl;
+    const kpi = (n, name, what, cls = "") => h("div", {}, h("b", { class: cls }, n), h("span", {}, h("i", {}, name), h("br"), ...[what].flat()));
+    const dhm = h(
+      "div",
+      { class: "dhm" },
+      h("div", { class: "dhm-k" }, kpi("189", "daily-doc-updater", "PRs merged"), kpi("250", "unbloat-docs", ["PRs merged", h("br"), h("em", {}, "−22,043 net lines")]), kpi("146", "glossary-maintainer", "PRs merged"), kpi("64", "daily-doc-healer", "PRs merged", "g")),
+      tlSvg,
+    );
     const reset = () => {
       svg.querySelectorAll(".on, .hot, .ok, .bad, .gone").forEach(x => x.classList.remove("on", "hot", "ok", "bad", "gone"));
       scan.style.opacity = 0;
@@ -6805,7 +6846,7 @@
       sound: "docs",
       palette: ["#1f6feb", "#238636", "#8957e5", "#d29922"],
       notes:
-        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The workflow, page and noob tester report shown are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
+        "Docs that heal, as gh-aw maintains its own documentation. Nobody owns the docs; a set of small agents does. Every day the Doc Updater reads the pull requests merged since its last run and opens a docs pull request for new flags and behaviour. Unbloat trims verbose pages (daily, or on demand with /unbloat in a pull request), the Glossary Maintainer keeps terms in sync with the code, and other daily agents spellcheck and draw diagrams. The Noob Tester then reads the site as a newcomer would: it installs the extension, follows the quick start and files an issue for anything confusing or broken, here a duration format nobody explained. Sibling reader agents do the same on phones, tablets and desktops, and as an enterprise administrator on GHES. The Doc Healer closes the loop: it looks for documentation issues the updater missed, fixes the gap, and proposes a new rule for the updater's own prompt so the same gap does not recur. The bottom strip is measured on gh-aw (snapshot 14 November 2026): merged pull requests titled [docs] and attributed to each agent by their workflow marker or footer, October 2025 to November 2026: 189 from the Doc Updater, 250 from Unbloat cutting a net 22,043 lines, 146 from the Glossary Maintainer and 64 from the Doc Healer. The timeline shows all 29 [doc-healer] improvement issues, 26 February to 30 October 2026: 13 were closed by merged Copilot pull requests, 9 of which changed the updater's own prompt; the other 16 were closed without a merge, ten of them about fix directions a maintainer had already rejected and four about filtered issue reads. The workflow, page and noob tester report in the loop above are an illustrative, simplified example; the workflow names listed are gh-aw's own docs workflows.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -6841,7 +6882,8 @@
         { class: "slide" },
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agents write, trim and test the docs every day, and a healer teaches the writer what it missed"), h("h2", {}, letters("Docs that "), letters("heal", "l-grad"))),
         svg,
-        h("div", { class: "sdd-chips" }, h("b", {}, "in gh-aw"), ...["daily-doc-updater", "unbloat-docs", "glossary-maintainer", "daily-documentation-diagram", "docs-noob-tester", "daily-multi-device-docs-tester", "enterprise-docs-audit", "daily-doc-healer"].map(n => h("span", {}, n))),
+        dhm,
+        h("div", { class: "dhm-cap" }, "Measured on gh-aw, Oct 2025 to 14 Nov 2026: merged [docs] PRs per agent, [doc-healer] issues. Loop is illustrative."),
       ),
     });
   }
