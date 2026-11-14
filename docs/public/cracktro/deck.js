@@ -249,6 +249,25 @@
   .ct-num { font: 800 64px/1 "Mona Sans"; font-variant-numeric: tabular-nums; background: linear-gradient(90deg, var(--a), var(--b)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .ct-lab { margin-top: 10px; font: 500 22px/1.2 "Mona Sans"; color: #9198a1; }
   .ct-src { position: absolute; right: 150px; top: 846px; font: 500 16px var(--mono); color: #6e7681; letter-spacing: .06em; }
+  .gf-svg { left: 150px; top: 282px; width: 1620px; height: 540px; }
+  .gf-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .gf-svg .mra-l.g { fill: #3fb950; }
+  .gf-card { fill: #0d1117d9; stroke: #3d444d; stroke-width: 2; }
+  .gf-card-t { fill: #9198a1; font: 600 17px var(--mono); letter-spacing: .1em; }
+  .gf-row text { fill: #9198a1; font: 500 21px var(--mono); transition: fill .3s; }
+  .gf-row .gf-n { text-anchor: end; fill: #6e7681; }
+  .gf-row rect { fill: transparent; stroke: transparent; stroke-width: 2; transition: all .3s; }
+  .gf-row.pick text { fill: #f0f6fc; } .gf-row.pick .gf-n { fill: #3fb950; }
+  .gf-row.pick rect { fill: #3fb95014; stroke: #3fb950; filter: drop-shadow(0 0 10px #3fb95066); }
+  .gf-cap { fill: #9198a1; font: 500 16px var(--mono); letter-spacing: .06em; text-anchor: middle; }
+  .gf-chip rect { fill: #0d1117; stroke: #9198a1; stroke-width: 2; }
+  .gf-chip text { fill: #f0f6fc; font: 600 20px "Mona Sans"; }
+  .gf-chip.on rect { stroke: var(--c); filter: drop-shadow(0 0 12px var(--c)); }
+  .gf-ship { opacity: 0; transition: opacity .5s; }
+  .gf-ship.on { opacity: 1; }
+  .gf-ship-m { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .06em; }
+  .gf-ship-t { fill: #f0f6fc; font: 600 26px "Mona Sans"; }
+  .gf-add { fill: #3fb950; } .gf-del { fill: #f85149; }
+  .gf .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #ab7df8, #79c0ff); }
   .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
   .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
@@ -4161,6 +4180,199 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+    });
+  }
+
+  // Go Fan: a daily agent picks the next Go dependency, studies its README, releases and changelog, compares them with how the repo uses it and files a review; Copilot ships the fix. Counts and pull request titles are mined from gh-aw's history
+  {
+    resetIndex();
+    const VW = 1800,
+      VH = 600;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#gfAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#gfClip)"/></g>`;
+    const box = (id, x, y, icon, cap = []) =>
+      `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>` + cap.map((l, k) => `<text class="gf-cap" x="${x}" y="${y + 64 + k * 20}">${l}</text>`).join("");
+    const chip = (cx, y, w, icon, label) => `<rect x="${cx - w / 2}" y="${y - 26}" width="${w}" height="52" rx="14"/>${ico(icon, cx - w / 2 + 26, y, 24)}<text x="${cx - w / 2 + 46}" y="${y + 7}">${label}</text>`;
+    // measured: the eight most-reviewed modules, how often Go Fan reviewed each, and one merged Copilot pull request that closed a review (titles shortened)
+    const REAL = [
+      ["go-sdk", 22, "Fix silent pagination truncation in inspect", 339, 103],
+      ["x/tools", 15, "Migrate custom linters to the Cursor API", 524, 220],
+      ["go-gh", 11, "Enable the go-gh disk cache for API calls", 198, 12],
+      ["testify", 7, "assert.Contains(err.Error()) → ErrorContains", 703, 631],
+      ["lipgloss", 6, "Honor NO_COLOR across Lip Gloss v2 output", 205, 56],
+      ["gosec", 6, "Move tools.go to Go 1.24 tool directives", 19, 148],
+      ["bubbletea", 5, "Bump bubbletea v2.0.7 → v2.0.8", 10, 10],
+      ["huh", 4, "Treat ErrUserAborted as a graceful exit", 51, 1],
+    ];
+    // [edge id, path, color, label, lx, ly, anchor]; g = schedule and memory, p = agents, b = maintainer
+    const EDGES = [
+      ["e0", "M100 170 H132", "g", [], 0, 0, "start"],
+      ["e1", "M484 170 H552", "p", ["next"], 518, 142, "middle"],
+      ["e2", "M700 196 V298", "p", ["reads what's new"], 716, 256, "start"],
+      ["e3", "M795 358 V438", "p", ["compares with", "our usage"], 811, 392, "start"],
+      ["e4", "M927 470 H1130 V210", "p", ["files a", "review issue"], 1146, 300, "start"],
+      ["e5", "M1168 170 H1252", "b", ["assigns"], 1210, 142, "middle"],
+      ["e6", "M1466 170 H1580", "p", ["opens PR"], 1523, 142, "middle"],
+      ["e7", "M1620 206 V362", "b", ["reviews"], 1636, 290, "start"],
+      ["e8", "M1584 400 H1398", "b", ["merges"], 1491, 380, "middle"],
+      ["e9", "M1322 400 H1190 V575 H64 V468", "g", ["notes saved for the next pick"], 640, 562, "middle"],
+    ];
+    const SEQ = [
+      ["e0", "nMod", 800],
+      ["e1", "nFan"],
+      ["e2", "nUp", 1200],
+      ["e3", "nOurs", 1200],
+      ["e4", "nIssue"],
+      ["e5", "nCopilot"],
+      ["e6", "nPR"],
+      ["e7", "nDev"],
+      ["e8", "nMerge"],
+      ["e9", "nCache", 1400],
+    ];
+    const LANE = { nSched: 0, nMod: 0, nCache: 0, nFan: 1, nUp: 1, nOurs: 1, nIssue: 2, nCopilot: 2, nPR: 2, nDev: 2, nMerge: 2 };
+    const MK = { g: ["gfG", "#3fb950"], b: ["gfB", "#4493f8"], p: ["gfP", "#ab7df8"] };
+    let g = `<defs><clipPath id="gfClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="gfAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>`;
+    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "PICK"],
+      [520, 1060, "LEARN"],
+      [1060, VW, "SHIP"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="gfLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 50}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += box("nSched", 64, 170, "calendar", ["weekdays"]) + box("nCache", 64, 430, "tasklist", ["cache", "memory"]);
+    g += `<g id="nMod"><rect class="gf-card" x="136" y="82" width="344" height="478" rx="16"/><text class="gf-card-t" x="156" y="118">GO.MOD DEPS</text><text class="gf-card-t" x="458" y="118" text-anchor="end">REVIEWS</text>`;
+    REAL.forEach(([m, n], i) => {
+      const y = 162 + i * 50;
+      g += `<g class="gf-row" id="gfRow${i}"><rect x="146" y="${y - 22}" width="324" height="44" rx="10"/><text x="166" y="${y + 7}">${m}</text><text class="gf-n" x="456" y="${y + 7}">${n}×</text></g>`;
+    });
+    g += `</g>`;
+    g += agent("nFan", 590, 170, 190, "Go Fan");
+    g += `<g class="fm-out gf-chip" id="nUp">${chip(640, 330, 140, "repo", "README")}${chip(795, 330, 150, "tag", "releases")}${chip(955, 330, 160, "tasklist", "changelog")}</g>`;
+    g += `<g class="fm-out gf-chip" id="nOurs">${chip(795, 470, 264, "repo", "how we use it")}</g>`;
+    g += box("nIssue", 1130, 170, "issue") + agent("nCopilot", 1290, 170, 170, "Copilot") + box("nPR", 1620, 170, "pr");
+    g += dev("nDev", 1620, 400, 200, "Maintainer") + box("nMerge", 1360, 400, "merge");
+    g += `<g class="gf-ship" id="gfShip"><text class="gf-ship-m" x="1214" y="482"><tspan id="gfShipM"></tspan> · <tspan class="gf-add" id="gfShipA"></tspan> <tspan class="gf-del" id="gfShipD"></tspan> · merged</text><text class="gf-ship-t" x="1214" y="522" id="gfShipT"></text></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg gf-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Go Fan loop: every weekday an agent picks the next Go dependency, reads its README, releases and changelog, compares them with how the repository uses it, and files a review issue that Copilot turns into a merged pull request");
+    svg.style.setProperty("--c", "#3fb950");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    // measured on gh-aw: [go-fan] review issues and the merged pull requests that closed them, February to November 2026
+    const STATS = [
+      [121, "", "daily module reviews filed", "#79c0ff", "#3fb950"],
+      [28, "", "Go modules studied", "#3fb950", "#79c0ff"],
+      [43, "", "review pull requests merged, all by Copilot", "#79c0ff", "#ab7df8"],
+      [16372, "", "lines changed by those pull requests", "#ab7df8", "#d2a8ff"],
+    ];
+    const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
+    const stats = h(
+      "div",
+      { class: "ct-stats" },
+      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+    );
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1000,
+      START = 700,
+      HOLD = 1800,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      if (nid in LANE) $("gfLane" + LANE[nid]).classList.add("on");
+    };
+    const pick = c => {
+      const i = c % REAL.length,
+        [m, , title, add, del] = REAL[i];
+      svg.querySelectorAll(".gf-row.pick").forEach(r => r.classList.remove("pick"));
+      $("gfRow" + i).classList.add("pick");
+      $("gfShipM").textContent = m;
+      $("gfShipA").textContent = "+" + add;
+      $("gfShipD").textContent = "−" + del;
+      $("gfShipT").textContent = title;
+    };
+    slides.push({
+      group: "loops",
+      sound: "gofan",
+      palette: ["#238636", "#1f6feb", "#8957e5", "#3fb950"],
+      notes:
+        "Go Fan: learning the libraries you depend on and keeping up with their releases. The loop is illustrative of what the Go Fan workflow does. Every weekday it reads go.mod, picks the next direct dependency, most recently updated upstream first and skipping the ones it remembers reviewing in cache memory, then studies the module's README, release notes and changelog and compares them with how our code actually uses it: new APIs we ignore, deprecated calls we still make, defaults that changed. It files one review issue; a maintainer assigns the good ones to Copilot, which opens a pull request that a maintainer reviews and merges. Dependabot bumps the version; Go Fan teaches you what changed and how to use it. The numbers and pull request titles are mined from gh-aw's own history, February to November 2026: 121 daily review issues covering 28 modules, most often the MCP Go SDK (22) and x/tools (15); 43 merged pull requests closed those reviews, all authored by Copilot, changing 16,372 lines. Titles are shortened. Before February the reviews were posted as discussions and are not counted.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+        nums.forEach((n, i) => (n.textContent = "0" + STATS[i][1]));
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * f).toLocaleString("en-US") + STATS[i][1]));
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .pick").forEach(x => x.classList.remove("on", "hot", "pick"));
+          light("nSched");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          fr = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", MK[p.classList[1]][1]);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (fr >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+            if (nid === "nMod") pick(cyc);
+            if (nid === "nPR") $("gfShip").classList.add("on");
+          }
+          light(nid);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide gf" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Learn your libraries · keep up with every release"), h("h2", {}, letters("Go "), letters("Fan", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "mined from gh-aw [go-fan] issues and the merged PRs that closed them · Feb–Nov 2026")
+      ),
     });
   }
 
@@ -8295,6 +8507,13 @@
           click(t + 1.25 + i * 0.1, 3000, 0.04, 6);
           tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
         });
+      },
+      // go fan: a cheerful gopher hop, page-flips through the release notes, then a bright "new version" chime
+      gofan: t => {
+        [67, 72, 76].forEach((m, i) => tone(m, t + 0.2 + i * 0.13, { type: "square", dur: 0.1, vol: 0.04, cutoff: 2200, detune: 4 }));
+        [0, 0.1, 0.2, 0.3].forEach((d, i) => click(t + 0.75 + d, 3400 - i * 250, 0.035, 10));
+        [79, 84, 88].forEach((m, i) => bell(m, t + 1.25 + i * 0.08, 0.035, 1.2));
+        pad([52, 59, 64, 71], t + 1.25, 1.8, 0.025, "triangle", 1800);
       },
       // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
       cihealth: t => {
