@@ -19,6 +19,7 @@ Base persona-to-trigger/tool/output facts are canonical in the [Persona-to-Patte
 | Persona or scenario | Trigger and scope | Typical tools and outputs | Required prompt details |
 |---|---|---|---|
 | Program Manager or information-worker digest | `schedule` plus `workflow_dispatch` for previews, reruns, and backfills | `github` (`gh-proxy`); `create-issue` by default | Define the report window, grouping dimensions, deduplication key, and `noop` behavior for empty windows |
+| Code / PR reviewer | `pull_request` with `types: [ready_for_review]`; add `opened`/`synchronize`/`reopened` only for required checks | `github` (`gh-proxy`); PR review outputs per [pr-reviewer.md](pr-reviewer.md) | Define the review rubric and call `noop` when nothing actionable is found |
 | Designer or design-governance review | `pull_request` with `paths:` scoped to UI, design-token, copy, or asset files | `github` (`gh-proxy`); optional `playwright`; `add-comment` on the PR | State the review rubric (for example accessibility, token consistency, asset policy), and call `noop` when scoped files are unchanged |
 | Legal / compliance / documentation-policy review | `pull_request` with scoped `paths:` or `schedule` for recurring audits | `github` (`gh-proxy`); `add-comment` for findings; `create-issue` only for violations needing follow-up | Classify findings against the policy, search for existing open issues before escalating, and call `noop` when there is no in-scope change or violation |
 
