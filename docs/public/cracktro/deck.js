@@ -1137,7 +1137,7 @@
       GA_MORPH = 1600;
     const gaLen = p => GA_RUNS[p][5].reduce((a, j) => a + j[3], 0) + GA_HOLD[p];
     slides.push({
-      sound: "ship",
+      sound: "actions",
       trans: "up",
       enter() {
         gaT0 = performance.now();
@@ -1291,7 +1291,7 @@
       if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
     };
     slides.push({
-      sound: "ship",
+      sound: "anatomy",
       palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
       notes:
         "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
@@ -2071,7 +2071,7 @@
       fn();
     };
     slides.push({
-      sound: "factory",
+      sound: "safe",
       green: true,
       palette: ["#238636", "#0e3a1f", "#1f6feb", "#0b2f3a"],
       notes:
@@ -2986,7 +2986,7 @@
         thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
       };
       slides.push({
-        sound: "loop",
+        sound: "reviews",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
           "Pull Request Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
@@ -3048,7 +3048,7 @@
     let bdT0 = 0,
       bdRun = -1;
     slides.push({
-      sound: "loop",
+      sound: "assist",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
@@ -3213,7 +3213,7 @@
       $("rpaLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
-      sound: "loop",
+      sound: "research",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
         "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
@@ -3505,7 +3505,7 @@
     };
     let prevT = 0;
     slides.push({
-      sound: "loop",
+      sound: "telemetry",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
         "Research, assign, observe: an agentic feedback loop. The production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
@@ -3719,7 +3719,7 @@
       $("lane0").classList.add("on");
     };
     slides.push({
-      sound: "loop",
+      sound: "mine",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
         "Mine, refine, apply: harvesting developer interventions into linters. All activity and review messages shown here are synthetic examples, not quotations or records of real people. Repeated corrections can become analyzer proposals, reviewed and refined by a developer, then applied across the repository through cleanup pull requests. Human corrections become deterministic checks.",
@@ -3908,7 +3908,7 @@
       $("sflLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
-      sound: "loop",
+      sound: "cihealth",
       palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
       notes:
         "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three agentic workflows. The pipelines, failures and rubric results shown are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
@@ -5157,7 +5157,7 @@
       rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
     };
     slides.push({
-      sound: "ship",
+      sound: "enterprise",
       palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
       notes:
         "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
@@ -5954,13 +5954,20 @@
       o.start(t);
       o.stop(t + a + dur + 0.05);
     };
-    const bell = (m, t, vol = 0.08, dur = 1.6) =>
+    const bell = (m, t, vol = 0.08, dur = 1.6, dest = out) =>
       [
         [1, 1],
         [2.76, 0.4],
         [5.4, 0.18],
         [8.93, 0.08],
-      ].forEach(([r, v]) => osc("sine", hz(m) * r, t, dur / r ** 0.4, vol * v));
+      ].forEach(([r, v]) => osc("sine", hz(m) * r, t, dur / r ** 0.4, vol * v, { dest }));
+    const panTo = p => {
+      const n = ac.createStereoPanner?.();
+      if (!n) return out;
+      n.pan.value = p;
+      n.connect(out);
+      return n;
+    };
     const click = (t, f = 3000, vol = 0.12, q = 4) => {
       const src = ac.createBufferSource(),
         bp = ac.createBiquadFilter(),
@@ -6005,16 +6012,107 @@
         pad([48, 55, 64, 71], t + 0.1, 3.2, 0.045);
         [72, 76, 79, 83, 86, 91].forEach((m, i) => bell(m, t + 0.5 + i * 0.11, 0.05, 1.4));
       },
-      ship: t => {
+      // built on Actions: build, test, deploy job ticks, then the agent step slots in with a shimmer and a green-check chime
+      actions: t => {
+        [60, 64, 67].forEach((m, i) => {
+          click(t + 0.2 + i * 0.16, 1800, 0.06, 6);
+          tone(m, t + 0.2 + i * 0.16, { type: "square", dur: 0.12, vol: 0.05, cutoff: 2400, detune: 3 });
+        });
+        tone(48, t + 0.2, { type: "triangle", dur: 0.9, vol: 0.14, cutoff: 800 });
+        [79, 83, 86].forEach((m, i) => bell(m, t + 0.62 + i * 0.06, 0.03, 0.9));
+        pad([60, 67, 71, 76], t + 0.6, 1.6, 0.02, "triangle", 2600);
+        bell(84, t + 1.05, 0.05, 1.4);
+        bell(91, t + 1.17, 0.04, 1.6);
+      },
+      // anatomy: a scanning glide down the file, one tick per section (front matter … prompt), settling on a chord
+      anatomy: t => {
+        osc("sine", 1800, t + 0.15, 1.1, 0.012, { f1: 300, a: 0.05 });
+        [84, 81, 79, 76, 74, 72].forEach((m, i) => {
+          click(t + 0.2 + i * 0.17, 2600, 0.04, 8);
+          bell(m, t + 0.2 + i * 0.17, 0.025, 0.6);
+        });
+        pad([48, 55, 62, 64], t + 1.2, 1.8, 0.025, "triangle", 1400);
+      },
+      // safe outputs: the direct write is refused (dull buzz), a proposal slides out, a detection sweep, then the separate job writes it
+      safe: t => {
+        osc("square", 110, t + 0.2, 0.14, 0.04, { f1: 98 });
+        osc("square", 104, t + 0.36, 0.18, 0.035, { f1: 92 });
+        osc("sine", hz(72), t + 0.65, 0.3, 0.03, { f1: hz(79) });
+        osc("sine", 2400, t + 0.95, 0.35, 0.01, { f1: 600 });
+        bell(79, t + 1.35, 0.045, 1.2);
+        bell(84, t + 1.47, 0.04, 1.4);
+      },
+      // review squared: "ready for review" fans out to agent reviewers (panned left, right, centre), then a human approves
+      reviews: t => {
+        tone(67, t + 0.2, { type: "triangle", dur: 0.2, vol: 0.06, cutoff: 2000, detune: 3 });
         [
-          [60, 0],
-          [64, 0.12],
-          [67, 0.24],
-          [72, 0.4],
-        ].forEach(([m, d]) => tone(m, t + 0.2 + d, { type: "sawtooth", dur: d > 0.3 ? 0.9 : 0.2, vol: 0.08, cutoff: 3600 }));
-        tone(48, t + 0.6, { type: "triangle", dur: 0.9, vol: 0.18, cutoff: 900 });
-        bell(84, t + 0.75, 0.07);
-        bell(91, t + 0.9, 0.05);
+          [-0.7, 76],
+          [0.7, 79],
+          [0, 83],
+        ].forEach(([p, m], i) => {
+          const d = panTo(p),
+            tt = t + 0.4 + i * 0.16;
+          bell(m, tt, 0.035, 0.7, d);
+          bell(m + 5, tt + 0.07, 0.025, 0.8, d);
+        });
+        osc("triangle", 110, t + 1.0, 0.18, 0.06, { f1: 55 });
+        click(t + 1.0, 600, 0.05, 4);
+        pad([55, 62, 67, 71], t + 1.0, 2, 0.03, "triangle", 2000);
+      },
+      // repo assist: a scheduled tick-tock, then a calm descending line as the open-issue count falls, resolving home
+      assist: t => {
+        [0, 0.25].forEach((d, i) => click(t + 0.2 + d, i ? 2400 : 3200, 0.05, 10));
+        [79, 76, 74, 72, 67].forEach((m, i) => tone(m, t + 0.7 + i * 0.15, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 2400, detune: 3 }));
+        bell(72, t + 1.45, 0.04, 1.6);
+        pad([48, 55, 64], t + 1.4, 1.8, 0.025, "triangle", 1400);
+      },
+      // research → assign → refine: two sonar pings (the second finds something), a hand-off, then a refining back-and-forth
+      research: t => {
+        [74, 79].forEach((m, i) => {
+          osc("sine", hz(m), t + 0.2 + i * 0.45, 0.7, 0.05, { a: 0.003 });
+          osc("sine", hz(m) * 2, t + 0.2 + i * 0.45, 0.2, 0.01);
+        });
+        [67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.15, { type: "triangle", dur: 0.18, vol: 0.06, cutoff: 2400, detune: 3 }));
+        [76, 74, 76, 79].forEach((m, i) => tone(m, t + 1.45 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.6 : 0.14, vol: 0.05, cutoff: 3000, detune: 3 }));
+      },
+      // research → assign → observe: a stream of span blips, a dissonant SLO-breach alert, then back under budget
+      telemetry: t => {
+        const P = [0, 2, 4, 7, 9];
+        for (let i = 0; i < 10; i++) osc("sine", hz(84 + P[(i * 3) % 5]), t + 0.2 + i * 0.07, 0.05, 0.015);
+        [78, 72].forEach((m, i) => tone(m, t + 1.0 + i * 0.16, { type: "square", dur: 0.16, vol: 0.04, cutoff: 1800, detune: 12 }));
+        [72, 76, 79].forEach((m, i) => bell(m, t + 1.5 + i * 0.07, 0.035, 1.2));
+      },
+      // mine → refine → apply: pickaxe strikes, a crystal forming (the rule), then stamped across the repo one PR at a time
+      mine: t => {
+        [0, 0.22, 0.44].forEach((d, i) => {
+          click(t + 0.2 + d, 1400 - i * 200, 0.1, 3);
+          osc("triangle", 160, t + 0.2 + d, 0.1, 0.08, { f1: 70 });
+        });
+        [88, 91, 95, 100].forEach((m, i) => bell(m, t + 0.8 + i * 0.05, 0.02, 1.1));
+        [67, 69, 71, 74].forEach((m, i) => {
+          click(t + 1.25 + i * 0.1, 3000, 0.04, 6);
+          tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
+        });
+      },
+      // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
+      cihealth: t => {
+        osc("sawtooth", 200, t + 0.2, 0.45, 0.02, { f1: 1600, a: 0.05 });
+        [52, 53].forEach(m => tone(m, t + 0.7, { type: "square", dur: 0.25, vol: 0.045, cutoff: 900, detune: 20 }));
+        [64, 67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.11, { type: "triangle", dur: 0.22, vol: 0.06, cutoff: 2600, detune: 3 }));
+        bell(76, t + 1.45, 0.04, 1.2);
+        bell(79, t + 1.57, 0.035, 1.4);
+      },
+      // enterprise: a solid low root, the same workflow fanning out across runners (left to right), on a broad chord
+      enterprise: t => {
+        tone(36, t + 0.15, { type: "triangle", dur: 1.2, vol: 0.16, cutoff: 600 });
+        [
+          [72, -0.8],
+          [76, -0.3],
+          [79, 0.3],
+          [84, 0.8],
+        ].forEach(([m, p], i) => bell(m, t + 0.3 + i * 0.1, 0.03, 1.2, panTo(p)));
+        pad([48, 55, 60, 64, 67], t + 0.3, 2.4, 0.025, "triangle", 1800);
+        bell(91, t + 0.9, 0.04, 1.6);
       },
       // prompt: keyboard typing then a compile whir and success chime
       typing: () => {}, // live keystrokes + compile chime are played by the slide itself
