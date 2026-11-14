@@ -74,6 +74,23 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await expect(page.locator(".count")).toHaveText("22 / 22");
 });
 
+test("swaps the slide dots for arrows on narrow screens", async ({ page }) => {
+  await page.setViewportSize({ width: 480, height: 720 });
+  await page.goto("/gh-aw/cracktro/#1");
+  await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeHidden();
+  const prev = page.getByRole("button", { name: "Previous slide", exact: true });
+  const next = page.getByRole("button", { name: "Next slide", exact: true });
+  await expect(prev).toBeDisabled();
+  await next.click();
+  await expect(page.locator(".count")).toHaveText("02 / 22");
+  await prev.click();
+  await expect(page.locator(".count")).toHaveText("01 / 22");
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(page.getByRole("button", { name: "Slide 1", exact: true })).toBeVisible();
+  await expect(next).toBeHidden();
+});
+
 test("ships local assets with the docs and links to the talk from the footer", async ({ page, request }) => {
   await page.goto("/gh-aw/");
   await page.locator(".site-footer").getByRole("link", { name: "Interactive talk", exact: true }).click();

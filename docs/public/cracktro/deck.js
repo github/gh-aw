@@ -714,6 +714,14 @@
   .dots button { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
     transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
   .dots button.on { width: 40px; background: #f0f6fc; }
+  .arrows { position: fixed; left: 16px; bottom: 10px; display: none; gap: 8px; z-index: 5; }
+  .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
+    color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; }
+  .arrows button:hover { color: #f0f6fc; border-color: #9198a1; }
+  .arrows button:disabled { opacity: .35; cursor: default; }
+  .arrows svg { width: 100%; height: 100%; display: block; }
+  body.compact-nav .dots { display: none; }
+  body.compact-nav .arrows { display: flex; }
   .snd { position: fixed; right: 124px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
   .snd:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -5729,6 +5737,21 @@
       })
     )
   );
+  const arrowBtn = (label, d, fn) => {
+    const b = h("button", {
+      "aria-label": label,
+      title: label,
+      onclick: e => {
+        e.stopPropagation();
+        fn();
+      },
+    });
+    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+    return b;
+  };
+  const prevBtn = arrowBtn("Previous slide", "M15 5l-7 7 7 7", () => prev());
+  const nextBtn = arrowBtn("Next slide", "M9 5l7 7-7 7", () => next());
+  const arrows = h("div", { class: "arrows" }, prevBtn, nextBtn);
   const count = h("div", { class: "count" });
   const snd = h("button", {
     class: "snd",
@@ -5747,11 +5770,14 @@
   const wash = h("div", { class: "wash" });
   const gwash = h("div", { class: "wash green" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, gwash, wash, gridc, stage, progress, dots, count, snd, notes);
+  document.body.append(canvas, gwash, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
 
+  // Dot row: left offset + 12px dots + 12px gaps + 28px for the wide active dot; sound/count need ~170px on the right.
+  const dotsWidth = 28 + slides.length * 24 - 12 + 28;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 170);
   };
   addEventListener("resize", fit);
   fit();
@@ -6496,6 +6522,8 @@
     slides[n].enter?.(dir);
     progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
     [...dots.children].forEach((d, i) => d.classList.toggle("on", i === n));
+    prevBtn.disabled = n === 0;
+    nextBtn.disabled = n === slides.length - 1;
     count.textContent = `${String(n + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
