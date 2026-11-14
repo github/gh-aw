@@ -520,6 +520,101 @@
   .cm-route.on i { color: #d2a8ff; }
   .cm-route canvas { position: absolute; left: 0; top: -14px; width: 630px; height: 284px; }
 
+  /* --- model routing --- */
+  .mr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #ab7df8); }
+  /* the run card starts centred, then glides left when the results arrive */
+  .mr-hero { position: absolute; left: 110px; top: 350px; width: 1040px; height: 590px; transform: translateX(330px); transition: transform 1.1s cubic-bezier(.7,0,.2,1); }
+  .mr.side .mr-hero { transform: none; }
+  .mr-run { position: absolute; left: 0; top: 0; width: 1040px; height: 420px; border-radius: 18px; background: #0d1117f0; border: 1px solid #3d444d; overflow: hidden; opacity: 0;
+    box-shadow: 0 30px 80px -30px #000, 0 0 70px -30px #ab7df8; }
+  .active .mr-run { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .mr-bar { display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 16px 0 20px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .mr-bar > i { width: 14px; height: 14px; border-radius: 50%; }
+  .mr-wf { margin-left: 12px; }
+  .mr-wf small { margin-left: 12px; font-size: 16px; color: #656c76; }
+  .mr-gap { flex: 1; }
+  .mr-model { font: 600 19px/1 var(--mono); padding: 8px 14px; border-radius: 8px; background: #0d1117; border: 1px solid #ab7df8; box-shadow: 0 0 30px -6px #ab7df8; color: #ff7b72; }
+  .mr-model b { font-weight: 600; color: #d2a8ff; text-shadow: 0 0 12px #ab7df8; }
+  /* run-card transitions run at the same slower pace as the router animation (SLOW in the slide) */
+  .mr-text { position: absolute; left: 36px; top: 84px; width: 572px; font: 600 36px/1.3 "Mona Sans"; color: #e6edf3; text-wrap: balance; transition: opacity .44s; }
+  .mr-hide { color: transparent; }
+  .mr-w { border-radius: 6px; transition: color .53s, background .53s, box-shadow .53s; }
+  .mr-w.k { --c: #f778ba; } .mr-w.s { --c: #39c5cf; } .mr-w.d { --c: #e3b341; }
+  .mr-w.on { color: #fff; background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -3px 0 var(--c), 0 0 24px -8px var(--c); }
+  .mr-beam { position: absolute; left: 30px; top: 70px; width: 3px; height: 190px; border-radius: 2px; background: #e2c5ff; box-shadow: 0 0 16px 4px #ab7df8; opacity: 0; pointer-events: none; transition: opacity .27s; }
+  .mr-beam::before { content: ""; position: absolute; right: 3px; top: 0; width: 150px; height: 100%; background: linear-gradient(90deg, transparent, #ab7df838); }
+  .mr-ghost { position: absolute; z-index: 3; font: 600 36px/1.3 "Mona Sans"; color: var(--c); text-shadow: 0 0 18px var(--c); white-space: nowrap; pointer-events: none; transform-origin: 0 0;
+    transition: transform .89s cubic-bezier(.2,.9,.2,1), opacity .53s ease .44s; }
+  .mr-chips { position: absolute; left: 36px; top: 300px; display: flex; gap: 12px; transition: opacity .44s; }
+  .mr-chip { display: flex; align-items: baseline; gap: 8px; padding: 9px 15px; border-radius: 99px; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 14%, #0d1117);
+    opacity: 0; transform: scale(.6); transition: opacity .53s, transform .89s cubic-bezier(.3,1.6,.4,1); }
+  .mr-chip.on { opacity: 1; transform: none; box-shadow: 0 0 24px -8px var(--c); }
+  .mr-chip i { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); font-style: normal; }
+  .mr-chip b { font: 700 22px/1 "Mona Sans"; color: #f0f6fc; }
+  .mr-out { opacity: 0 !important; }
+  .mr-gauge { position: absolute; right: 26px; top: 76px; width: 380px; height: 270px; }
+  .mr-track { fill: none; stroke: #ffffff12; stroke-width: 26; }
+  .mr-z { fill: none; stroke-width: 26; opacity: .38; transition: opacity .71s, filter .71s; }
+  .mr-z.on { opacity: 1; filter: drop-shadow(0 0 10px currentColor); }
+  .mr-zl { font: 600 18px "Mona Sans"; text-anchor: middle; opacity: .45; transition: opacity .71s; }
+  .mr-zl.on { opacity: 1; }
+  .mr-needle path { fill: #f0f6fc; filter: drop-shadow(0 0 6px #ffffff88); }
+  .mr-needle circle { fill: #0d1117; stroke: #f0f6fc; stroke-width: 3; }
+  .mr-read { font: 700 22px var(--mono); letter-spacing: .12em; text-anchor: middle; fill: #9198a1; }
+  .mr-read2 { font: 500 15px var(--mono); text-anchor: middle; fill: #9198a1; }
+  .mr-why { position: absolute; right: 26px; top: 358px; width: 380px; text-align: center; font: 500 21px/1.2 "Mona Sans"; color: #d1d7e0; opacity: 0; transform: translateY(8px); transition: opacity .62s, transform .62s; }
+  .mr-why.on { opacity: 1; transform: none; }
+  /* split-flap board: every tile rattles through letters, then lands on the pick */
+  .mr-flap { position: absolute; left: 0; top: 464px; display: flex; align-items: flex-end; gap: 24px; opacity: 0; }
+  .active .mr-flap { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .mr-arrow { font: 700 46px/64px var(--mono); color: #656c76; }
+  .mr-field i { display: block; margin: 0 0 10px 2px; font: 700 18px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: #e6edf3; font-style: normal; }
+  .mr-tiles { display: flex; gap: 4px; }
+  .mr-t { position: relative; width: 44px; height: 64px; border-radius: 7px; background: linear-gradient(#262c36 0 50%, #151a21 50% 100%); box-shadow: inset 0 1px 0 #ffffff1a, 0 10px 20px -10px #000;
+    font: 700 40px/64px var(--mono); text-align: center; color: #f0f6fc; white-space: pre; transition: opacity .4s; }
+  .mr-t::after { content: ""; position: absolute; left: 0; right: 0; top: 31px; height: 2px; background: #05070a; }
+  .mr-t.old { opacity: .25; }
+  .mr-t.set { color: var(--c); text-shadow: 0 0 16px var(--c); animation: mr-thunk .44s cubic-bezier(.3,1.6,.4,1); }
+  @keyframes mr-thunk { from { transform: scaleY(.3); } }
+  .mr-proof, .mr-rep { position: absolute; left: 1210px; width: 600px; border-radius: 18px; background: #161b22e8; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000;
+    opacity: 0; transform: translateY(40px); transition: opacity .6s, transform .9s cubic-bezier(.2,.9,.2,1); }
+  .mr-proof.on, .mr-rep.on { opacity: 1; transform: none; }
+  .mr-proof { top: 276px; padding: 24px 28px 22px; }
+  .mr-pf-h { display: flex; align-items: center; gap: 14px; font: 700 26px/1 "Mona Sans"; color: #f0f6fc; }
+  .mr-pf-h em { font: 600 13px/1 var(--mono); font-style: normal; letter-spacing: .16em; text-transform: uppercase; color: #3fb950; border: 1px solid #3fb95088; border-radius: 99px; padding: 6px 10px; }
+  .mr-big { display: flex; align-items: center; gap: 22px; margin: 16px 0 8px; }
+  .mr-big b { min-width: 280px; font: 700 96px/1 var(--mono); letter-spacing: -.05em; color: #3fb950; text-shadow: 0 0 40px #3fb95066; font-variant-numeric: tabular-nums; }
+  .mr-big span { font: 600 26px/1.2 "Mona Sans"; color: #f0f6fc; }
+  .mr-big small { display: block; margin-top: 8px; font: 500 18px/1 var(--mono); color: #9198a1; }
+  .mr-strip { display: block; width: 544px; height: 150px; overflow: visible; }
+  .mr-strip rect { transform: scaleY(0); transform-box: fill-box; transform-origin: 50% 100%; transition: transform .5s cubic-bezier(.2,.9,.2,1) calc(var(--i) * 45ms + 300ms); }
+  .mr-proof.on .mr-strip rect { transform: none; }
+  .mr-strip .pre { fill: #8957e5; } .mr-strip .post { fill: #3fb950; filter: drop-shadow(0 0 6px #3fb95088); }
+  .mr-strip line { stroke: #ffffff40; stroke-width: 1.5; stroke-dasharray: 4 6; }
+  .mr-strip line.mk { stroke: #d2a8ff; stroke-width: 2; stroke-dasharray: 6 5; }
+  .mr-strip text { font: 600 14px var(--mono); fill: #9198a1; }
+  .mr-strip text.mk { fill: #d2a8ff; }
+  .mr-held { display: flex; gap: 26px; margin-top: 12px; font: 500 18px/1.2 "Mona Sans"; color: #d1d7e0; }
+  .mr-held i { margin-right: 8px; font-style: normal; font-weight: 800; color: #3fb950; }
+  .mr-held b { margin-left: 6px; font: 600 17px var(--mono); color: #f0f6fc; white-space: nowrap; }
+  /* a week of runs, one square each, filled in like a sequencer */
+  .mr-rep { top: 670px; padding: 22px 28px 20px; }
+  .mr-rh { margin-bottom: 20px; font: 700 26px/1 "Mona Sans"; color: #f0f6fc; }
+  .mr-week { display: grid; grid-template-columns: 22px repeat(24, 17px); gap: 4px; }
+  .mr-week i { font: 700 16px/17px var(--mono); color: #e6edf3; font-style: normal; }
+  .mr-week b { height: 17px; border-radius: 4px; background: #ffffff10; transition: background .35s, box-shadow .35s; }
+  .mr-week b.t0 { background: #3fb950; box-shadow: 0 0 10px -3px #3fb950; }
+  .mr-week b.t1 { background: #4493f8; box-shadow: 0 0 10px -3px #4493f8; }
+  .mr-week b.t2 { background: #ab7df8; box-shadow: 0 0 10px -3px #ab7df8; }
+  .mr-week b.hot { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  @keyframes mr-pop { from { transform: scale(.2); } }
+  .mr-rf { display: flex; align-items: center; gap: 18px; margin-top: 18px; font: 600 16px/1 var(--mono); color: #d1d7e0; }
+  .mr-rf > span { display: flex; align-items: center; gap: 8px; }
+  .mr-rf > span::before { content: ""; width: 14px; height: 14px; border-radius: 3px; background: var(--c); }
+  .mr-rf em { margin-left: auto; font-style: normal; color: #d1d7e0; }
+  .mr-rf em b { font-size: 18px; color: #f0f6fc; font-variant-numeric: tabular-nums; }
+  .mr-cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
   /* --- finale --- */
   .fin-bg { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
   .fin-bg h1 { margin: 0; font-size: 300px; line-height: .86; letter-spacing: -.045em; font-variation-settings: "wght" 800, "wdth" 112; white-space: nowrap;
@@ -3434,6 +3529,486 @@
     });
   }
 
+  // Model routing: the router reads each run, weighs what a mistake would cost and picks the cheapest model and effort that is good enough
+  {
+    resetIndex();
+    // Illustrative runs: each tagged phrase (k kind, s scope, d difficulty) lifts out into a label chip.
+    const RUNS = [
+      {
+        wf: "daily-report",
+        text: [["Summarize "], ["yesterday's activity", "s"], [" into a "], ["short", "d"], [" "], ["daily report", "k"], ["."]],
+        chips: ["report", "repo-wide", "easy"],
+        stakes: 0,
+        why: "a report is easy to ignore",
+        tier: 0,
+        effort: "HIGH",
+      },
+      {
+        wf: "security-audit",
+        text: [["Audit", "k"], [" "], ["the auth module", "s"], [" for "], ["subtle injection bugs", "d"], ["."]],
+        chips: ["security", "subsystem", "hard"],
+        stakes: 1,
+        why: "a missed bug would be silent",
+        tier: 1,
+        effort: "HIGH",
+      },
+      {
+        wf: "pr-review",
+        text: [["Review", "k"], [" "], ["this pull request", "s"], [" for "], ["common code smells", "d"], ["."]],
+        chips: ["review", "multi-file", "medium"],
+        stakes: 0,
+        why: "a review is only a suggestion",
+        tier: 0,
+        effort: "XHIGH",
+      },
+      {
+        wf: "release",
+        text: [["Merge", "k"], [" "], ["the release branch", "s"], [" once "], ["checks are green", "d"], ["."]],
+        chips: ["release", "repo-wide", "easy"],
+        stakes: 2,
+        why: "easy, but a merge can't be undone",
+        tier: 2,
+        effort: "MEDIUM",
+      },
+      {
+        wf: "issue-triage",
+        text: [["Label", "k"], [" "], ["the new issue", "s"], [" with "], ["one area tag", "d"], ["."]],
+        chips: ["triage", "one issue", "trivial"],
+        stakes: 0,
+        why: "a label is easy to change",
+        tier: 0,
+        effort: "LOW",
+      },
+      {
+        wf: "docs-sync",
+        text: [["Update the docs", "k"], [" to match "], ["the new CLI flags", "s"], [" in "], ["a few lines", "d"], ["."]],
+        chips: ["docs", "multi-file", "easy"],
+        stakes: 0,
+        why: "docs are easy to fix",
+        tier: 0,
+        effort: "MEDIUM",
+      },
+    ];
+    const TIERS = [
+      ["SMALL", "#3fb950", "$", "small"],
+      ["MID-SIZE", "#4493f8", "$$", "mid-size"],
+      ["FRONTIER", "#ab7df8", "$$$", "frontier"],
+    ];
+    const ZONES = [
+      ["low", "economy", "#3fb950", 150],
+      ["medium", "balanced", "#4493f8", 90],
+      ["high", "robust", "#ab7df8", 30],
+    ];
+    const CHIPS = [
+      ["kind", "#f778ba", "k"],
+      ["scope", "#39c5cf", "s"],
+      ["difficulty", "#e3b341", "d"],
+    ];
+    // Measured on gh-aw's own workflows: cost per run by day, relative to each workflow's own two weeks before routing (through 12 Nov 2026).
+    const DAYS = [1.02, 1.02, 0.97, 1.06, 1.04, 1.05, 0.95, 1.06, 0.95, 1.05, 0.99, 0.99, 0.93, 0.89, 0.63, 0.5, 0.2, 0.2, 0.23, 0.31, 0.24, 0.15, 0.15];
+    const ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$-";
+    // each run plays out at about 56% of its first pace (0.75 x 0.75), so the eye can follow every step
+    const SLOW = 16 / 9;
+    const svgOf = (cls, vb, inner) => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      s.setAttribute("class", cls);
+      s.setAttribute("viewBox", vb);
+      s.innerHTML = inner;
+      return s;
+    };
+
+    // the stakes gauge: three zones on a half dial, and a sprung needle
+    const GX = 190,
+      GY = 200,
+      GR = 128;
+    const pt = (a, r) => [GX + r * Math.cos((a * Math.PI) / 180), GY - r * Math.sin((a * Math.PI) / 180)];
+    const arc = (a0, a1) => {
+      const [x0, y0] = pt(a0, GR),
+        [x1, y1] = pt(a1, GR);
+      return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${GR} ${GR} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+    };
+    let gs = `<path class="mr-track" d="${arc(180, 0)}"/>`;
+    ZONES.forEach(([lab, , c, mid], i) => {
+      const [lx, ly] = pt(mid, 164);
+      gs += `<path class="mr-z" d="${arc(180 - i * 60 - (i ? 1.5 : 0), 120 - i * 60 + (i < 2 ? 1.5 : 0))}" stroke="${c}" style="color:${c}"/>`;
+      gs += `<text class="mr-zl" x="${lx.toFixed(1)}" y="${(ly + 6).toFixed(1)}" fill="${c}">${lab}</text>`;
+    });
+    gs += `<g class="mr-needle"><path d="M${GX - 5} ${GY}L${GX} ${GY - 112}L${GX + 5} ${GY}Z"/><circle cx="${GX}" cy="${GY}" r="13"/></g>`;
+    gs += `<text class="mr-read" x="${GX}" y="${GY + 46}"></text><text class="mr-read2" x="${GX}" y="${GY + 66}"></text>`;
+    const gauge = svgOf("mr-gauge", "0 0 380 270", gs);
+    const zones = [...gauge.querySelectorAll(".mr-z")],
+      zlabs = [...gauge.querySelectorAll(".mr-zl")],
+      needleEl = gauge.querySelector(".mr-needle"),
+      read = gauge.querySelector(".mr-read"),
+      read2 = gauge.querySelector(".mr-read2");
+
+    // the run card: the workflow's model line, the task, its labels, the gauge and the reason
+    const wf = h("span", { class: "mr-wf" }),
+      text = h("div", { class: "mr-text" }),
+      caret = h("span", { class: "pf-caret" }),
+      beam = h("div", { class: "mr-beam" }),
+      chips = CHIPS.map(([l, c]) => h("div", { class: "mr-chip", "--c": c }, h("i", {}, l), h("b", {}))),
+      chipRow = h("div", { class: "mr-chips" }, chips),
+      why = h("div", { class: "mr-why" });
+    const card = h(
+      "div",
+      { class: "mr-run" },
+      h(
+        "div",
+        { class: "mr-bar" },
+        ["#ff5f57", "#febc2e", "#28c840"].map(c => h("i", { style: { background: c } })),
+        wf,
+        h("span", { class: "mr-gap" }),
+        h("span", { class: "mr-model" }, "model: ", h("b", {}, "router"))
+      ),
+      text,
+      beam,
+      chipRow,
+      gauge,
+      why
+    );
+    const fields = [
+      ["model", 8],
+      ["effort", 7],
+      ["cost", 3],
+    ].map(([l, n]) => {
+      const tiles = Array.from({ length: n }, () => h("span", { class: "mr-t" }, " "));
+      return { el: h("div", { class: "mr-field" }, h("i", {}, l), h("div", { class: "mr-tiles" }, tiles)), tiles };
+    });
+    const tiles = fields.flatMap(f => f.tiles);
+    const hero = h(
+      "div",
+      { class: "mr-hero" },
+      card,
+      h(
+        "div",
+        { class: "mr-flap" },
+        h("b", { class: "mr-arrow" }, "→"),
+        fields.map(f => f.el)
+      )
+    );
+
+    // measured results: the day-by-day cost strip, with the switch to model: router on day 0
+    let ss = `<line x1="0" y1="25" x2="544" y2="25"/>`;
+    DAYS.forEach((v, i) => {
+      ss += `<rect class="${i < 14 ? "pre" : "post"}" x="${(i * 23.6).toFixed(1)}" y="${(125 - v * 100).toFixed(1)}" width="18" height="${(v * 100).toFixed(1)}" rx="3" style="--i:${i}"/>`;
+    });
+    ss += `<line class="mk" x1="327.6" y1="6" x2="327.6" y2="128"/><text class="mk" x="336" y="46">model: router</text>`;
+    ss += `<text x="0" y="148">two weeks before</text><text x="336" y="148">after</text>`;
+    const big = h("b", {}, "0%");
+    const proof = h(
+      "div",
+      { class: "mr-proof" },
+      h("div", { class: "mr-pf-h" }, "gh-aw's own workflows", h("em", {}, "measured")),
+      h("div", { class: "mr-big" }, big, h("span", {}, "cost per run", h("small", {}, "65 → 16 AI credits"))),
+      svgOf("mr-strip", "0 0 544 150", ss),
+      h("div", { class: "mr-held" }, h("span", {}, h("i", {}, "✓"), "run success", h("b", {}, "87.6% → 88.5%")), h("span", {}, h("i", {}, "✓"), "quality", h("b", {}, "83.9 → 83.6")))
+    );
+
+    // built for workflows that repeat: a week of one workflow's runs, one square each, coloured by the model it got (illustrative)
+    const week = h("div", { class: "mr-week" }, ["M", "T", "W", "T", "F", "S", "S"].map(d => [h("i", {}, d), Array.from({ length: 24 }, () => h("b", {}))]).flat(2));
+    const cells = [...week.querySelectorAll("b")];
+    const runCount = h("b", {}, "0"),
+      weekNo = h("span", {}, "week 1");
+    const rep = h(
+      "div",
+      { class: "mr-rep" },
+      h("div", { class: "mr-rh" }, "Built for workflows that repeat"),
+      week,
+      h(
+        "div",
+        { class: "mr-rf" },
+        TIERS.map(([, c, , name]) => h("span", { "--c": c }, name)),
+        h("em", {}, runCount, " runs · ", weekNo)
+      )
+    );
+    const cv = h("canvas", { class: "mr-cv", width: 1920, height: 1080 }),
+      cx = cv.getContext("2d");
+    const sec = h("section", { class: "slide mr" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The right model for every run"), h("h2", {}, letters("Model "), letters("routing", "l-grad"))), hero, proof, rep, cv);
+
+    // builds: 0 the router at work, 1 measured results, 2 built for workflows that repeat
+    let t0 = 0,
+      last = 0,
+      build = 0,
+      tb = 0,
+      si = 0,
+      no = 0,
+      run = null,
+      needle = -90,
+      nv = 0,
+      nt = -90,
+      flipT = 0,
+      savedAt = 0,
+      saved = false,
+      weekAt = 0,
+      wk = 1,
+      lit = 0,
+      picks = [],
+      bits = [],
+      ghosts = [];
+    // sparks from an element's centre, in stage coordinates
+    const burst = (el, c, n) => {
+      const r = el.getBoundingClientRect(),
+        s = sec.getBoundingClientRect(),
+        k = 1920 / s.width,
+        x = (r.left + r.width / 2 - s.left) * k,
+        y = (r.top + r.height / 2 - s.top) * k;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2,
+          v = 0.1 + Math.random() * 0.3;
+        bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.1, life: 1, c, s: 2 + Math.random() * 3 });
+      }
+    };
+    const startRun = t => {
+      const r = RUNS[si++ % RUNS.length];
+      no += 1 + ((Math.random() * 4) | 0);
+      run = { ...r, t, words: [], typed: -1, ok: [], read: false, gauged: false, said: false, flap: false, done: false };
+      wf.replaceChildren(`${r.wf}.md`, h("small", {}, `run #${no}`));
+      text.replaceChildren();
+      let n = 0;
+      for (const [s, k] of r.text) {
+        const el = h("span", { class: k ? `mr-w ${k}` : "" });
+        text.append(el);
+        run.words.push({ el, s, k, at: n, lit: false });
+        n += s.length;
+      }
+      run.len = n;
+      chips.forEach((c, j) => {
+        c.classList.remove("on");
+        c.lastChild.textContent = r.chips[j];
+      });
+      [text, chipRow].forEach(x => x.classList.remove("mr-out"));
+      [why, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
+      // the previous pick fades back until the board flips to this run's pick
+      tiles.forEach(x => x.classList.add("old"));
+      nt = -90;
+      read.textContent = read2.textContent = "";
+    };
+    const lift = (w, t) => {
+      w.lit = true;
+      w.el.classList.add("on");
+      const j = CHIPS.findIndex(c => c[2] === w.k),
+        chip = chips[j];
+      const g = h("div", { class: "mr-ghost", "--c": CHIPS[j][1], style: { left: `${36 + w.el.offsetLeft}px`, top: `${84 + w.el.offsetTop}px` } }, w.s);
+      card.append(g);
+      void g.offsetWidth;
+      g.style.transform = `translate(${chip.offsetLeft - w.el.offsetLeft}px, ${300 + chip.offsetTop - 84 - w.el.offsetTop}px) scale(.6)`;
+      g.style.opacity = "0";
+      ghosts.push({ g, t, chip });
+      sfx.pop(j + 3);
+    };
+    const stepRun = t => {
+      // run time at the first pace, so the steps below keep their relative timing
+      const e = (t - run.t) / SLOW,
+        n = Math.min(run.len, Math.floor((e / 520) * run.len));
+      // untyped letters keep their place but stay invisible, so the lines never reflow while typing
+      if (n !== run.typed) {
+        run.typed = n;
+        for (const w of run.words) {
+          const k = Math.max(0, Math.min(w.s.length, n - w.at));
+          w.el.replaceChildren(w.s.slice(0, k), ...(n >= w.at && k < w.s.length ? [caret] : []), h("span", { class: "mr-hide" }, w.s.slice(k)));
+        }
+      }
+      // the beam reads the task; each tagged phrase lifts out into its label chip
+      const u = (e - 620) / 600;
+      beam.style.opacity = u > 0 && u < 1 ? 1 : 0;
+      if (u > 0 && !run.read) {
+        const x = Math.min(1, u) * 584;
+        beam.style.transform = `translateX(${x}px)`;
+        for (const w of run.words) if (w.k && !w.lit && x > w.el.offsetLeft + w.el.offsetWidth / 2) lift(w, t);
+        run.read = u >= 1;
+      }
+      if (!run.gauged && e > 1350) {
+        run.gauged = true;
+        const [lab, mode, c, deg] = ZONES[run.stakes];
+        nt = 90 - deg;
+        zones[run.stakes].classList.add("on");
+        zlabs[run.stakes].classList.add("on");
+        read.textContent = `${lab.toUpperCase()} STAKES`;
+        read.style.fill = c;
+        read2.textContent = mode;
+      }
+      if (!run.said && e > 1600) {
+        run.said = true;
+        why.textContent = run.why;
+        why.classList.add("on");
+      }
+      if (!run.flap && e > 1800) {
+        run.flap = true;
+        const [m, c, co] = TIERS[run.tier];
+        run.target = m.padEnd(8) + run.effort.padEnd(7) + co.padEnd(3);
+        run.c = c;
+        run.settle = tiles.map((_, i) => t + (220 + i * 28) * SLOW);
+        tiles.forEach((x, i) => {
+          x.classList.remove("set", "old");
+          x.style.setProperty("--c", c);
+          run.ok[i] = false;
+        });
+        flipT = 0;
+      }
+      if (run.flap && !run.done) {
+        const flip = t - flipT > 55 * SLOW;
+        if (flip) {
+          flipT = t;
+          sfx.mr.flap();
+        }
+        let left = 0;
+        tiles.forEach((x, i) => {
+          if (run.ok[i]) return;
+          if (t >= run.settle[i]) {
+            run.ok[i] = true;
+            x.textContent = run.target[i];
+            if (run.target[i] !== " ") x.classList.add("set");
+          } else {
+            left++;
+            if (flip) x.textContent = ALPH[(Math.random() * ALPH.length) | 0];
+          }
+        });
+        if (!left) {
+          run.done = true;
+          burst(fields[0].el, run.c, 26);
+          sfx.mr.pick(run.tier);
+        }
+      }
+      if (run.done && e > 3440) [text, chipRow].forEach(x => x.classList.add("mr-out"));
+      if (run.done && e > 3700) startRun(t);
+    };
+    const newWeek = () => {
+      picks = cells.map(() => {
+        const r = Math.random();
+        return r < 0.71 ? 0 : r < 0.87 ? 1 : 2;
+      });
+      lit = 0;
+      cells.forEach(c => (c.className = ""));
+    };
+    const setBuild = (b, t) => {
+      const was = build;
+      build = b;
+      tb = t;
+      sec.classList.toggle("side", b >= 1);
+      proof.classList.toggle("on", b >= 1);
+      rep.classList.toggle("on", b >= 2);
+      if (b === 1 && was < 1) {
+        savedAt = t;
+        saved = false;
+        big.textContent = "0%";
+      }
+      if (b === 2 && was < 2) {
+        wk = 1;
+        weekNo.textContent = "week 1";
+        newWeek();
+        weekAt = t;
+      }
+      // stepping back cancels a count-up or a week that hasn't finished
+      if (b < 1) savedAt = 0;
+      if (b < 2) weekAt = 0;
+    };
+    slides.push({
+      sound: "router",
+      palette: ["#8957e5", "#238636", "#1f6feb", "#6e40c9"],
+      notes:
+        "Model routing. Every workflow run pays for a model, and the usual habit is to pin one strong model for every run. With one line, model: router, the router reads each run's task before the agent starts, labels the kind of work, its scope and its difficulty, weighs what a mistake would cost (low, medium or high stakes, which gh-aw calls economy, balanced and robust), then picks the cheapest model and reasoning effort that is good enough, using benchmark results that ship with the AWF firewall. It runs inside the firewall, respects the workflow's model policy, and gh aw audit shows what it picked and why. The tasks, labels and picks in the animation are illustrative. The results are measured on gh-aw's own workflows: across 127 routed workflows and 3,097 routed runs through 12 Nov 2026, each compared with its own two weeks before routing, cost per run fell 75% (65 to 16 AI credits) while run success (87.6% to 88.5%) and judged quality (83.9 to 83.6 out of 100) held steady. Most routers pick a model for one prompt in a chat, with a person watching. This one is built for workflows that repeat: the same job runs on every schedule, issue and pull request with no one watching, so the router weighs the stakes of each run itself, and the saving repeats on every run. The week of runs is illustrative. Keys: → next step.",
+      enter() {
+        t0 = last = build = si = 0;
+        run = null;
+        // jump straight back to the centred layout instead of gliding there
+        hero.style.transition = "none";
+        sec.classList.remove("side");
+        void hero.offsetWidth;
+        [proof, rep, why, ...chips, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
+        big.textContent = "0%";
+        savedAt = weekAt = 0;
+        ghosts.forEach(g => g.g.remove());
+        ghosts = [];
+        bits = [];
+        tiles.forEach(x => {
+          x.textContent = " ";
+          x.classList.remove("set", "old");
+        });
+        text.replaceChildren();
+        wf.replaceChildren();
+        read.textContent = read2.textContent = "";
+        beam.style.opacity = 0;
+        needle = nt = -90;
+        nv = 0;
+        no = 4180 + ((Math.random() * 60) | 0);
+        sfx.mr.reset();
+        cx.clearRect(0, 0, 1920, 1080);
+      },
+      onNext() {
+        if (build >= 2) return false;
+        setBuild(build + 1, performance.now());
+        return true;
+      },
+      onPrev() {
+        if (!build) return false;
+        setBuild(build - 1, performance.now());
+        return true;
+      },
+      tick(t) {
+        if (!t0) {
+          t0 = last = tb = t;
+          hero.style.transition = "";
+        }
+        const dt = Math.min(50, t - last);
+        last = t;
+        // two full runs before the results, then the week
+        if (build === 0 && t - tb > 900 + 2 * 3700 * SLOW) setBuild(1, t);
+        else if (build === 1 && t - tb > 7500) setBuild(2, t);
+        if (!run && t - t0 > 900) startRun(t);
+        if (run) stepRun(t);
+        // damped spring at the slower pace, so the needle overshoots and settles
+        const ds = dt / SLOW;
+        nv += (0.00025 * (nt - needle) - 0.011 * nv) * ds;
+        needle += nv * ds;
+        needleEl.setAttribute("transform", `rotate(${needle.toFixed(2)} ${GX} ${GY})`);
+        ghosts = ghosts.filter(g => {
+          if (t - g.t > 380 * SLOW) g.chip.classList.add("on");
+          if (t - g.t < 700 * SLOW) return true;
+          g.g.remove();
+          return false;
+        });
+        if (savedAt) {
+          const u = Math.max(0, Math.min(1, (t - savedAt - 950) / 800));
+          if (u > 0 && !saved) {
+            saved = true;
+            sfx.mr.saved();
+          }
+          big.textContent = `${u ? "−" : ""}${Math.round(75 * (1 - (1 - u) ** 3))}%`;
+          if (u >= 1) savedAt = 0;
+        }
+        // the week fills run by run at the same slower pace, then the next week starts
+        if (weekAt) {
+          const e = t - weekAt,
+            n = Math.max(0, Math.min(cells.length, Math.floor((e - 600) / 35)));
+          for (; lit < n; lit++) {
+            cells[lit].className = `t${picks[lit]} hot`;
+            if (wk === 1 && lit % 24 === 23) sfx.mr.day(Math.floor(lit / 24));
+          }
+          runCount.textContent = ((wk - 1) * cells.length + lit).toLocaleString("en-US");
+          if (lit === cells.length && e > 600 + cells.length * 35 + 2400) {
+            weekNo.textContent = `week ${++wk}`;
+            newWeek();
+            weekAt = t - 200;
+          }
+        }
+        cx.clearRect(0, 0, 1920, 1080);
+        for (const b of bits) {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.vy += 0.0005 * dt;
+          b.life -= dt / 850;
+          cx.globalAlpha = Math.max(0, b.life);
+          cx.fillStyle = b.c;
+          cx.fillRect(b.x - b.s / 2, b.y - b.s / 2, b.s, b.s);
+        }
+        cx.globalAlpha = 1;
+        bits = bits.filter(b => b.life > 0);
+      },
+      el: sec,
+    });
+  }
+
   // Any agent, any provider: one Markdown workflow retargets engine + model provider; tokens stream from the provider through the same guardrails
   {
     resetIndex();
@@ -4491,6 +5066,29 @@
         bell(84, t + 0.75, 0.06);
         bell(91, t + 0.9, 0.05, 1.8);
       },
+      // model routing: a filtered-noise riser into a rising A major arpeggio over a soft pad
+      router: t => {
+        const src = ac.createBufferSource(),
+          f = ac.createBiquadFilter(),
+          g = ac.createGain(),
+          s = 60 / 111 / 4;
+        src.buffer = noise();
+        f.type = "bandpass";
+        f.Q.value = 2;
+        f.frequency.setValueAtTime(300, t + 0.3);
+        f.frequency.exponentialRampToValueAtTime(6000, t + 0.9);
+        src.connect(f);
+        f.connect(g);
+        g.connect(out);
+        g.gain.setValueAtTime(0.0001, t + 0.3);
+        g.gain.exponentialRampToValueAtTime(0.08, t + 0.8);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1);
+        src.start(t + 0.3, Math.random() * 0.2);
+        src.stop(t + 1.05);
+        [57, 61, 64, 69, 73].forEach((m, i) => tone(m, t + 0.9 + i * s, { type: "sawtooth", dur: i === 4 ? 0.9 : 0.16, vol: 0.05, cutoff: 3600, detune: 6 }));
+        bell(81, t + 0.9 + 5 * s, 0.04, 1.4);
+        pad([45, 52, 57, 61], t + 0.9, 2.2, 0.022, "triangle", 1600);
+      },
       // finale: a warm major swell with a cascade of bells radiating out
       finale: t => {
         pad([48, 55, 60, 64, 67], t + 0.1, 4.2, 0.04, "triangle", 2400);
@@ -4690,6 +5288,59 @@
             const f = hz([36, 60, 84][m] + (Math.random() < 0.5 ? 0 : 7));
             osc(m ? "sine" : "triangle", f * (m ? 1.2 : 1.6), t, m ? 0.06 : 0.16, [0.05, 0.025, 0.014][m], { f1: f });
           });
+      })(),
+      // model routing slide: every run is a note, and its pitch is the model it got: high glass for a small model,
+      // a mallet for mid-size, bass for frontier, walking A major pentatonic. Notes snap to 16ths at 111 BPM, so the
+      // 270 ms echo lands on the eighth notes.
+      mr: (() => {
+        const S = 60 / 111 / 4,
+          WALK = [0, 4, 7, 9, 12, 9, 7, 4];
+        let g0 = 0,
+          n = 0,
+          lastFlap = 0;
+        const grid = t => (g0 ? g0 + Math.ceil((t - g0) / S) * S : (g0 = t));
+        return {
+          reset() {
+            g0 = n = 0;
+          },
+          // one split-flap tick
+          flap: () =>
+            play(t => {
+              if (t - lastFlap < 0.04) return;
+              lastFlap = t;
+              click(t, 2400 + Math.random() * 2000, 0.03, 5);
+            }),
+          pick: tier =>
+            play(t => {
+              const g = grid(t),
+                w = WALK[n++ % WALK.length];
+              if (tier === 0) {
+                bell(81 + w, g, 0.035, 0.9);
+                osc("sine", hz(93 + w), g + S, 0.12, 0.012);
+              } else if (tier === 1) {
+                tone(57 + w, g, { type: "triangle", dur: 0.35, vol: 0.1, cutoff: 2600, detune: 3 });
+                tone(64 + w, g + S, { type: "triangle", dur: 0.3, vol: 0.07, cutoff: 2600, detune: 3 });
+              } else {
+                tone(45, g, { type: "triangle", dur: 0.6, vol: 0.16, cutoff: 700, detune: 3 });
+                osc("sine", hz(33), g, 0.6, 0.12);
+                bell(69 + w, g + 2 * S, 0.02, 1);
+              }
+            }),
+          // measured savings: bells cascading down into a soft A add9 chord and a two-note receipt
+          saved: () =>
+            play(t => {
+              [93, 90, 88, 85, 81, 78, 76, 73].forEach((m, i) => bell(m, t + 0.05 + i * 0.07, 0.028, 0.9));
+              pad([45, 52, 59, 61], t + 0.55, 2.6, 0.03, "triangle", 2000);
+              bell(88, t + 0.9, 0.045, 1.4);
+              bell(93, t + 1.02, 0.035, 1.6);
+            }),
+          // a week of runs: one soft mallet note per day, climbing, and a chord when the week is full
+          day: i =>
+            play(t => {
+              tone([69, 71, 73, 76, 78, 81, 83][i], t, { type: "triangle", dur: 0.25, vol: 0.05, cutoff: 3000, detune: 3 });
+              if (i === 6) [81, 85, 88].forEach((m, j) => bell(m, t + 0.12 + j * 0.05, 0.025, 1.6));
+            }),
+        };
       })(),
       slide: (n, dir, theme) =>
         play(t => {
