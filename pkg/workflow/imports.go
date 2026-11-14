@@ -381,13 +381,18 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 		result = &SafeOutputsConfig{}
 	}
 
+	// Track explicit settings so later imports cannot replace disables with defaults.
+	explicitSafeOutputs := make(map[string]any)
+	maps.Copy(explicitSafeOutputs, topRawSafeOutputs)
+
 	// Merge each imported config
 	for _, config := range importedConfigs {
 		var err error
-		result, err = mergeSafeOutputConfig(result, config, topRawSafeOutputs, c)
+		result, err = mergeSafeOutputConfig(result, config, explicitSafeOutputs, c)
 		if err != nil {
 			return nil, err
 		}
+		maps.Copy(explicitSafeOutputs, config)
 	}
 
 	if len(importedCreatePullRequestDefaults) > 0 && result.CreatePullRequests != nil {
@@ -472,20 +477,38 @@ func hasSafeOutputType(config *SafeOutputsConfig, key string) bool {
 	return hasSafeOutputFieldSet(config, handler.StructField)
 }
 
-func mergeAutoDefaultedSafeOutput[T any](result **T, imported *T, config, topRawSafeOutputs map[string]any, key string) {
+func mergeAutoDefaultedSafeOutput[T any](result **T, imported *T, config, explicitSafeOutputs map[string]any, key string) {
 	_, hasImported := config[key]
-	_, hasMain := topRawSafeOutputs[key]
-	if (hasImported || (*result == nil && !hasMain)) && imported != nil {
+	_, hasExplicit := explicitSafeOutputs[key]
+	if hasImported || (*result == nil && !hasExplicit && imported != nil) {
 		*result = imported
 	}
+}
+
+// preserveImportedSystemHandlers keeps mandatory system handlers enabled while
+// honoring false as a request to disable their issue-producing side effects.
+func preserveImportedSystemHandlers(config map[string]any) map[string]any {
+	config = maps.Clone(config)
+	for key, field := range map[string]string{
+		"report-missing-tool": "create-issue",
+		"report-missing-data": "create-issue",
+		"noop":                "report-as-issue",
+		"report-incomplete":   "create-issue",
+	} {
+		if disabled, ok := config[key].(bool); ok && !disabled {
+			config[key] = map[string]any{field: false}
+		}
+	}
+	return config
 }
 
 // mergeSafeOutputConfig merges a single imported config map into the result SafeOutputsConfig
 //
 //nolint:largefunc // Existing meta-field merge flow remains centralized for consistent import semantics.
-func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
+func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutputs map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
 	config = normalizeMissingReportKeys(config)
-	topRawSafeOutputs = normalizeMissingReportKeys(topRawSafeOutputs)
+	config = preserveImportedSystemHandlers(config)
+	explicitSafeOutputs = normalizeMissingReportKeys(explicitSafeOutputs)
 	importsLog.Printf("Merging imported safe-output config: key_count=%d", len(config))
 	// Create a frontmatter-like structure for extractSafeOutputsConfig
 	frontmatter := map[string]any{
@@ -541,18 +564,14 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs 
 			importedConfig.PushToPullRequestBranch.ProtectedFilesExclude...,
 		)
 	}
-	// missing-tool, missing-data, noop, and report-incomplete are auto-defaulted by
-	// extractSafeOutputsConfig whenever any safe-outputs are present, even when the user
-	// has not explicitly configured those types. This means result.X can be non-nil (the
-	// auto-default) even though the main workflow never explicitly set it. We therefore use
-	// the presence of the key in the raw imported config map as the authoritative signal:
-	// if the import explicitly carries the key, its value wins over any auto-default in result.
-	// The nil fallback applies only when the main workflow did not explicitly configure
-	// the type (an explicit false also produces nil in the parsed result).
-	mergeAutoDefaultedSafeOutput(&result.MissingTool, importedConfig.MissingTool, config, topRawSafeOutputs, "report-missing-tool")
-	mergeAutoDefaultedSafeOutput(&result.MissingData, importedConfig.MissingData, config, topRawSafeOutputs, "report-missing-data")
-	mergeAutoDefaultedSafeOutput(&result.NoOp, importedConfig.NoOp, config, topRawSafeOutputs, "noop")
-	mergeAutoDefaultedSafeOutput(&result.ReportIncomplete, importedConfig.ReportIncomplete, config, topRawSafeOutputs, "report-incomplete")
+	// System handlers are mandatory. Imported `false` values are normalized to enabled
+	// handlers with issue creation disabled before extraction. Use the raw key's presence
+	// to let an explicit import replace an auto-default without allowing later imports to
+	// replace it with implicit defaults.
+	mergeAutoDefaultedSafeOutput(&result.MissingTool, importedConfig.MissingTool, config, explicitSafeOutputs, "report-missing-tool")
+	mergeAutoDefaultedSafeOutput(&result.MissingData, importedConfig.MissingData, config, explicitSafeOutputs, "report-missing-data")
+	mergeAutoDefaultedSafeOutput(&result.NoOp, importedConfig.NoOp, config, explicitSafeOutputs, "noop")
+	mergeAutoDefaultedSafeOutput(&result.ReportIncomplete, importedConfig.ReportIncomplete, config, explicitSafeOutputs, "report-incomplete")
 	// ThreatDetection is also auto-defaulted by extractSafeOutputsConfig; apply the same
 	// pattern — the import's explicit threat-detection key takes precedence over the result's
 	// auto-default empty struct (which is not user-authored). If the main workflow explicitly
