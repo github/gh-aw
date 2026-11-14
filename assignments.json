@@ -1,3 +1,3 @@
 {
-  "sub_agent_strategy": "per_scenario"
+  "sub_agent_strategy_prefix_v1": "per_scenario"
 }
