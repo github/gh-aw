@@ -5,15 +5,16 @@ description: Edit, preview, and verify the standalone interactive talk deck in d
 
 # Cracktro talk deck
 
-The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a twenty-one-slide deck with no dependencies, separate from the docs homepage slideshow.
+The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a twenty-seven-slide deck with no dependencies, separate from the docs homepage slideshow.
 
 ## Files
 
-- `docs/public/cracktro/index.html`: only loads `deck.js`.
+- `docs/public/cracktro/index.html`: loads `deck.js` and holds the SEO/Open Graph/Twitter meta (absolute `https://github.github.com/gh-aw/cracktro/` URLs).
+- `docs/public/cracktro/og-image.png`: 1200x630 social card rendered from slide 1 with the dots/count/sound/progress UI hidden. Keep it outside `assets/` (the asset test only allows avatars there).
 - `docs/public/cracktro/deck.js`: about 200 KB holding everything (CSS, slides, navigation, synth, background). **Never read it whole.** Use `grep -n` on the `// ---------- <section> ----------` and `// <Slide title>` comment markers, then `view_range`.
-- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
+- `docs/public/cracktro/assets/avatars/{pelikhan,lpcox,dsyme,mnkiefer,ievangelist}.jpg`: the only allowed assets, which a test enforces. Diagrams are inline SVG built in `deck.js` (for example slide 2's CI-to-agentic `GA_RUNS` pipeline).
 - `docs/public/cracktro/fonts/`: Monaspace Neon plus its OFL licence. Mona Sans comes from `docs/public/fonts/`.
-- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of twenty-one slide headings, so update it when a heading changes.
+- `docs/tests/talk.spec.ts`: Playwright tests. They contain the list of twenty-seven slide headings, so update it when a heading changes.
 - `docs/README.md`, "Interactive talk" section: user-facing description (keys, public-content rules).
 
 ## deck.js layout (search for these markers)
@@ -37,8 +38,8 @@ slides.push({
   sound: "loop",          // THEMES key played on entry
   palette: [c1, c2, c3, c4],
   notes: "...",           // speaker notes (N key); public text
-  trans: "up" | "down",   // optional vertical transition (reversed going back)
-  red: true,              // optional: red wash, then slides in from right ("left-in")
+  group: "security",      // section id; crossing groups slides up (down going back), siblings push left
+  red: true,              // optional: red wash covers the old slide, then this one enters
   techno: 1,              // optional techno layer level
   el: h("section", { class: "slide" }, ...),
   enter(dir) {},          // reset per-slide state; dir = 1 forward, -1 back
@@ -49,10 +50,10 @@ slides.push({
 
 ## Mechanics worth knowing
 
-- **Transitions:** the default is a reveal-style horizontal push using `slide-in`/`slide-out` keyframes. `show()` sets `--dx` to `100%` going forward, `-100%` going back, and `0%` on first load. Up/down transitions use the `up-in`/`up-out` and `down-in`/`down-out` classes; red slides use `left-in`. The old slide keeps the `.leaving` class until a timeout clears it.
+- **Transitions:** derived from each slide's `group` (intro, platform, security, factory, loops, cost, enterprise, scale). Siblings in a group use a reveal-style horizontal push (`slide-in`/`slide-out`); `show()` sets `--dx` to `100%` going forward, `-100%` going back, and `0%` on first load. Crossing into another group slides up (`up-in`/`up-out`) going forward and down (`down-in`/`down-out`) going back. All use the same 0.8 s curve. Every slide needs a `group`; never add per-slide transition overrides. The old slide keeps the `.leaving` class until a timeout clears it.
 - **Audio isolation:** `master` is a persistent gain that feeds the compressor and delay. `out` is a per-slide bus. `show()` calls `sfx.cut()`, which fades the current bus and replaces it, so long themes cannot leak into the next slide. Any new sound must connect to `out`, or to `master` if it must persist across slides (as techno does).
 - **CSS animations restart** through `void el.offsetWidth` before `.active` is added. Prefer `.active .x { animation: ... }` for entry effects.
-- **Animated SVG flow diagrams** (for example "Research · Assign · Refine"):
+- **Animated SVG flow diagrams** (for example "Daily Unsloppers"):
   - Built with helpers such as `agent()`, `dev()`, `box()`, `codeScan()` and `ico()`.
   - `EDGES` entries are `[id, svgPath, class, labelLines, lx, ly, anchor]`.
   - `SEQ` entries are `[edgeId|null, nodeLitOnArrival, durationMs?]`.
@@ -64,10 +65,11 @@ slides.push({
 ## Content rules (enforced by tests)
 
 - Everything is public. Use only synthetic examples and role icons, never people. Do not include private repos, `github/<repo>`-style references, 40-hex SHAs, or `who:` fields.
-- Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, and `mnkiefer` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
+- Exception: the avatars of `pelikhan`, `lpcox`, `dsyme`, `mnkiefer`, and `ievangelist` only, as local files `assets/avatars/<login>.jpg` referenced from SVG `<image>` elements. No other avatars or `<image>` sources.
 - Exception: the Model routing slide's results panel shows figures measured on gh-aw's own workflows; its speaker notes say so.
+- Exception: the Issues as intent slide (12) shows real counts for gh-aw issues labelled `community` and the merged PRs that closed them (November 2026 snapshot); its notes and caption say so.
 - The only URL allowed in `deck.js` is `https://github.github.com/gh-aw/introduction/overview/`.
-- Speaker notes for slides 2, 3, 5, 7, 8, 9, and 11–21 must match `/illustrative|synthetic|simulated/i`.
+- Speaker notes for slides 2, 3, 6, 7, and 9–27 must match `/illustrative|synthetic|simulated/i`.
 - No external requests and no page errors.
 
 ## Preview loop

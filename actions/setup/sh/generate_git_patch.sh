@@ -1,5 +1,62 @@
 #!/usr/bin/env bash
 set +o histexpand
+
+PATCH_DIR="${GH_AW_TMP_DIR:-/tmp/gh-aw}"
+path_has_symlink_component() {
+  local path="$1"
+  case "$path" in
+    /*) ;;
+    *) path="$PWD/$path" ;;
+  esac
+  while [ "$path" != "/" ] && [[ "$path" == */ ]]; do
+    path="${path%/}"
+  done
+  while [ "$path" != "/" ]; do
+    if [ -L "$path" ]; then return 0; fi
+    path="$(dirname "$path")"
+  done
+  return 1
+}
+
+if path_has_symlink_component "$PATCH_DIR"; then
+  echo "::error::Refusing to use a symlinked patch directory" >&2
+  exit 1
+fi
+mkdir -p "$PATCH_DIR"
+if path_has_symlink_component "$PATCH_DIR" || [ ! -d "$PATCH_DIR" ]; then
+  echo "::error::Patch path is not a real directory" >&2
+  exit 1
+fi
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ] && path_has_symlink_component "$GITHUB_STEP_SUMMARY"; then
+  echo "::error::Refusing to append to a symlinked step summary" >&2
+  exit 1
+fi
+
+write_patch_file() {
+  local target="$1"
+  local error_message="$2"
+  local revision_range="$3"
+  local staged_patch
+
+  if [ -L "$target" ]; then
+    echo "::error::Refusing to replace a symlinked patch file: $target" >&2
+    return 1
+  fi
+  if ! staged_patch="$(mktemp "${PATCH_DIR}/.aw-patch.XXXXXX")"; then
+    echo "::error::Could not create a private patch staging file" >&2
+    return 1
+  fi
+  if ! git format-patch "$revision_range" --stdout > "$staged_patch"; then
+    printf '%s\n' "$error_message" > "$staged_patch"
+  fi
+  if [ -L "$target" ]; then
+    rm -f -- "$staged_patch"
+    echo "::error::Refusing to replace a symlinked patch file: $target" >&2
+    return 1
+  fi
+  mv -f -- "$staged_patch" "$target"
+}
+
 # Diagnostic logging: Show environment information
 echo "=== Diagnostic: Environment Information ==="
 echo "GITHUB_SHA: ${GITHUB_SHA@Q}"
@@ -30,12 +87,12 @@ get_patch_path() {
   if [ -z "$sanitized" ]; then
     sanitized="unknown"
   fi
-  echo "/tmp/gh-aw/aw-${sanitized}.patch"
+  echo "${PATCH_DIR}/aw-${sanitized}.patch"
 }
 
 # Extract all branch names from JSONL output (for all create_pull_request and push_to_pull_request_branch entries)
 BRANCH_NAMES=()
-if [ -f "$GH_AW_SAFE_OUTPUTS" ]; then
+if [ -f "$GH_AW_SAFE_OUTPUTS" ] && ! path_has_symlink_component "$GH_AW_SAFE_OUTPUTS"; then
   echo ""
   echo "Checking for branch names in JSONL output..."
   echo "JSONL file path: $GH_AW_SAFE_OUTPUTS"
@@ -63,9 +120,6 @@ if [ "${#BRANCH_NAMES[@]}" -eq 0 ]; then
   echo "No branch names found in JSONL output"
   echo "Will check for commits made to current HEAD instead"
 fi
-
-# Ensure /tmp/gh-aw directory exists
-mkdir -p /tmp/gh-aw
 
 # Strategy 1: If we have branch names, generate a patch for each one
 PATCH_GENERATED=false
@@ -126,7 +180,7 @@ if [ "${#BRANCH_NAMES[@]}" -gt 0 ]; then
       echo "Command: git format-patch ${BASE_REF@Q}..${BRANCH_NAME@Q} --stdout > ${PATCH_PATH@Q}"
 
       # Generate patch from the determined base to the branch
-      git format-patch "$BASE_REF".."$BRANCH_NAME" --stdout > "$PATCH_PATH" || echo "Failed to generate patch from branch" > "$PATCH_PATH"
+      write_patch_file "$PATCH_PATH" "Failed to generate patch from branch" "$BASE_REF..$BRANCH_NAME" || exit 1
       echo "Patch file created from branch: ${BRANCH_NAME@Q} (base: ${BASE_REF@Q})"
       PATCH_GENERATED=true
     else
@@ -186,7 +240,7 @@ if [ "$PATCH_GENERATED" = false ]; then
         echo ""
         echo "=== Diagnostic: Generating patch ==="
         echo "Command: git format-patch ${GITHUB_SHA@Q}..HEAD --stdout > ${PATCH_PATH@Q}"
-        git format-patch "${GITHUB_SHA}..HEAD" --stdout > "$PATCH_PATH" || echo "Failed to generate patch from HEAD" > "$PATCH_PATH"
+        write_patch_file "$PATCH_PATH" "Failed to generate patch from HEAD" "${GITHUB_SHA}..HEAD" || exit 1
         echo "Patch file created from commits on HEAD (base: ${GITHUB_SHA@Q})"
         PATCH_GENERATED=true
       else
@@ -210,8 +264,8 @@ else
 fi
 
 # Show patch info for all aw-*.patch files
-for patch_file in /tmp/gh-aw/aw-*.patch; do
-  if [ -f "$patch_file" ]; then
+for patch_file in "$PATCH_DIR"/aw-*.patch; do
+  if [ -f "$patch_file" ] && [ ! -L "$patch_file" ]; then
     echo ""
     echo "=== Diagnostic: Patch file information: ${patch_file} ==="
     ls -lh "$patch_file"

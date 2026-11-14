@@ -24,18 +24,17 @@
   canvas.bg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
   .stage { position: absolute; left: 50%; top: 50%; width: ${W}px; height: ${H}px; transform-origin: 0 0; }
   .slide { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
-  /* reveal-style horizontal push: --dx is +100% going forward, -100% going back, 0 on first load */
+  /* siblings in a group: reveal-style horizontal push; --dx is +100% going forward, -100% going back, 0 on first load.
+     crossing groups: vertical push, up going forward and down going back (same duration and easing) */
   .slide.active { visibility: visible; pointer-events: auto; animation: slide-in .8s cubic-bezier(.26,.86,.44,.985) both; }
   .slide.leaving { visibility: visible; animation: slide-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   @keyframes slide-in { from { transform: translateX(var(--dx, 100%)); } to { transform: none; } }
   @keyframes slide-out { to { transform: translateX(calc(-1 * var(--dx, 100%))); } }
-  .slide.active.up-in { animation: up-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving.up-out { animation: up-out 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.active.down-in { animation: down-in 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.leaving.down-out { animation: down-out 1s cubic-bezier(.7,0,.2,1) both; }
-  .slide.active.left-in { animation: left-in 1s cubic-bezier(.7,0,.2,1) both; }
-  @keyframes left-in { from { transform: translateX(100%); } to { transform: none; } }
-  /* full-screen red wash for "Safety and control": fades over the previous slide, then sits behind the stage */
+  .slide.active.up-in { animation: up-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving.up-out { animation: up-out .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.active.down-in { animation: down-in .8s cubic-bezier(.26,.86,.44,.985) both; }
+  .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
+  /* full-screen red wash for "Safety and control", "Supply chain hardening" and "Safe outputs": fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
     background: radial-gradient(ellipse 80% 75% at 50% 55%, #6e0b12 0%, #3a0408 55%, #140103 100%); }
   /* blueprint grid on its own layer above the wash, so it can rotate to 45° as the red fades in */
@@ -46,9 +45,6 @@
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
   .wash.cover { z-index: 4; }
-  /* green wash for "Safe outputs" and "Private enclaves": the inverse of the red one, with the grid tilted the other way */
-  .wash.green { background: radial-gradient(ellipse 80% 75% at 50% 55%, #0b4a2a 0%, #04261a 55%, #01100a 100%); }
-  .wash.green::after { background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #031f13aa 70%, #000503f0 100%); }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
@@ -64,12 +60,12 @@
   .ch { display: inline-block; font-variation-settings: "wght" 700, "wdth" 100; }
   .l-grad .ch { color: transparent; -webkit-background-clip: text; background-clip: text;
     background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #4493f8, #ab7df8);
-    background-size: 1800px 100%; background-position: var(--bx) 0; }
+    background-size: 1800px 100%; background-position: var(--bx) 0; padding-bottom: .14em; margin-bottom: -.14em; }
   @keyframes settle { from { opacity: 0; transform: translateY(.25em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
   @keyframes breathe { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
   .l-out .ch { color: transparent; -webkit-text-stroke: 3px #f0f6fc; }
   /* Hero: GitHub brand "AI green" (brand.github.com Green 1–5) */
-  .title .l-grad .ch { background-image: linear-gradient(90deg, #0fbf3e, #5fed83, #bfffd1, #8cf2a6, #0fbf3e); filter: drop-shadow(0 0 28px #5fed8355); padding-bottom: .14em; margin-bottom: -.14em; }
+  .title .l-grad .ch { background-image: linear-gradient(90deg, #0fbf3e, #5fed83, #bfffd1, #8cf2a6, #0fbf3e); filter: drop-shadow(0 0 28px #5fed8355); }
   .title .l-out .ch { -webkit-text-stroke-color: #5fed83; }
   @keyframes rise { from { opacity: 0; transform: translateY(.3em) scale(.94); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
   @keyframes flex { 0%, 100% { font-variation-settings: "wght" 700, "wdth" 100; } 50% { font-variation-settings: "wght" 700, "wdth" 100; } }
@@ -226,6 +222,18 @@
   .rpa-day text { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
   .fm-wire.classic { stroke: #9198a1; stroke-dasharray: 6 8; opacity: .4; }
   .mra-l.classic { fill: #9198a1; font: 500 19px var(--mono); opacity: .8; }
+  .ct-svg { left: 150px; top: 282px; width: 1620px; height: 572px; }
+  .ct-svg .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 10px #23863666); }
+  .ct-svg .fm-wire.g { stroke: #3fb950; stroke-dasharray: 10 8; } .ct-svg .mra-l.g { fill: #3fb950; }
+  .ct-svg .fm-task.on .fm-pill.g rect { stroke: #3fb950; filter: drop-shadow(0 0 18px #3fb950); }
+  .ct-round { fill: #ab7df8; font: 600 19px var(--mono); letter-spacing: .12em; }
+  .ct-stats { position: absolute; left: 150px; right: 150px; top: 878px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; }
+  .ct-stat { padding: 20px 28px 22px; border-radius: 18px; background: #0d1117d9; border: 2px solid #3d444d; }
+  .active .ct-stat { animation: rise .9s cubic-bezier(.2,.9,.2,1) both; }
+  .active .ct-stat:nth-child(2) { animation-delay: .15s; } .active .ct-stat:nth-child(3) { animation-delay: .3s; } .active .ct-stat:nth-child(4) { animation-delay: .45s; }
+  .ct-num { font: 800 64px/1 "Mona Sans"; font-variant-numeric: tabular-nums; background: linear-gradient(90deg, var(--a), var(--b)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ct-lab { margin-top: 10px; font: 500 22px/1.2 "Mona Sans"; color: #9198a1; }
+  .ct-src { position: absolute; right: 150px; top: 846px; font: 500 16px var(--mono); color: #6e7681; letter-spacing: .06em; }
   .prq-thr { fill: #d29922; font: 600 20px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .4s, fill .4s; }
   .prq-thr.show { opacity: 1; } .prq-thr.ok { fill: #3fb950; }
   .rao-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s, filter .4s; }
@@ -264,10 +272,71 @@
   .fm-wire.hot { opacity: 1; stroke-width: 3; }
   .fm-wire.hot + .mra-l { opacity: 1; }
   .mra-dev.on rect { stroke: #4493f8; filter: drop-shadow(0 0 18px #4493f8); }
+  .sfl-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
+  .sfl-svg .mra-l.sfl-ol { opacity: 0; } .sfl-svg .fm-wire.hot + .mra-l.sfl-ol { opacity: 1; }
+  .sfl-box { opacity: .6; transition: opacity .4s; } .sfl-box.on { opacity: 1; }
+  .sfl-card { fill: #0d1117e8; stroke: #3d444d; stroke-width: 2; transition: stroke .4s; }
+  .sfl-box.on .sfl-card { stroke: #ab7df8; filter: drop-shadow(0 0 10px #8957e566); }
+  .sfl-title { fill: #9198a1; font: 500 15px var(--mono); letter-spacing: .08em; }
+  .sfl-row { opacity: .45; transition: opacity .3s; } .sfl-row.seen { opacity: 1; }
+  .sfl-row text { fill: #c9d1d9; font: 500 17px var(--mono); }
+  .sfl-row circle { fill: #3d444d; transition: fill .3s; } .sfl-row.seen circle { fill: #3fb950; }
+  .sfl-row.seen.bad circle { fill: #f85149; filter: drop-shadow(0 0 6px #f85149); } .sfl-row.seen.bad text { fill: #ff7b72; }
+  .sfl-row .ok { fill: #3fb950; } .sfl-row .ko { fill: #f85149; } .sfl-row .ed { fill: #d29922; }
+  .sfl-badge { fill: #ff7b72; font: 600 17px var(--mono); opacity: 0; transition: opacity .4s; } .sfl-badge.on { opacity: 1; }
+  .sfl-scan { opacity: 0; } .sfl-scan line { stroke: #c297ff; stroke-width: 3; filter: drop-shadow(0 0 8px #ab7df8); }
+  .sfl-rule { fill: #ff7b72; font: 600 18px var(--mono); }
+  .ao-svg { left: 150px; top: 300px; width: 1620px; height: 648px; }
+  .ao-run .sfl-card { transition: stroke .4s, filter .4s; }
+  .ao-run.bad .sfl-card { stroke: #f85149; filter: drop-shadow(0 0 10px #f8514966); }
+  .ao-run.good .sfl-card { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb95088); }
+  .ao-h { fill: #f0f6fc; font: 700 24px "Mona Sans"; }
+  .ao-stat { font: 600 18px var(--mono); fill: #9198a1; } .ao-stat.ko { fill: #ff7b72; } .ao-stat.ok { fill: #3fb950; }
+  .ao-k { fill: #9198a1; font: 500 16px var(--mono); }
+  .ao-sc { font: 600 16px var(--mono); text-anchor: end; } .ao-sc.ok { fill: #3fb950; } .ao-sc.ko { fill: #ff7b72; }
+  .ao-hrow rect { fill: transparent; stroke: transparent; transition: fill .3s, stroke .3s; } .ao-pick.on rect { fill: #f8514922; stroke: #f85149; } .ao-pick.on .ao-k { fill: #f0f6fc; }
+  .ao-v { fill: #e6edf3; font: 600 18px var(--mono); text-anchor: end; }
+  .ao-run.good .ao-v { fill: #3fb950; }
+  .ao-delta { fill: #3fb950; font: 700 18px var(--mono); opacity: 0; transition: opacity .4s; } .ao-delta.on { opacity: 1; }
+  .ao-svg .sfl-row text.cmd { fill: #f0f6fc; } .ao-svg .sfl-row text.dl { fill: #79c0ff; }
+  .ao-diff text { font: 500 16px var(--mono); white-space: pre; }
+  .ao-diff .add rect { fill: #2ea04326; } .ao-diff .add text { fill: #3fb950; }
+  .ao-diff .ctx text { fill: #9198a1; } .ao-diff .ok text { fill: #3fb950; font-weight: 700; }
+  .ao-bar { fill: #3d444d; transition: fill .3s; }
+  .ao-bar.seen.m { fill: #8957e5; } .ao-bar.seen.t { fill: #1f6feb; } .ao-bar.seen.x { fill: #f85149; } .ao-bar.seen.r, .ao-bar.seen.f { fill: #d29922; }
+  .ao-leg { font: 500 14px var(--mono); }
+  .ao-axis { stroke: #3d444d; stroke-width: 2; }
+  #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
+  #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
   @keyframes fm-pop { from { transform: scale(.4); } }
   .ra-flow { left: 60px; top: 340px; width: 880px; height: 512px; }
   .ra-chart { left: 990px; top: 340px; width: 880px; height: 512px; }
+  .us-svg { position: absolute; left: 110px; top: 330px; width: 1700px; height: 660px; overflow: visible; font-family: "Mona Sans"; }
+  .us-lane { font: 600 32px "Mona Sans"; fill: #9198a1; } .us-lane.good { fill: #3fb950; }
+  .us-main { stroke: #30363d; stroke-width: 6; stroke-linecap: round; }
+  .us-mainl { font: 500 18px var(--mono); fill: #6e7681; }
+  .us-div { stroke: #30363d; stroke-width: 2; stroke-dasharray: 4 10; }
+  .us-card rect.c { fill: #161b22; stroke: #9198a1; stroke-width: 2; }
+  .us-card text { font: 600 26px "Mona Sans"; fill: #e6edf3; }
+  .us-card text.us-diff { font: 500 19px var(--mono); fill: #9198a1; }
+  .us-card text.us-round { font: 500 20px var(--mono); fill: #d29922; }
+  .us-diff { font: 500 18px var(--mono); fill: #6e7681; } .us-diff .add { fill: #3fb950; } .us-diff .del { fill: #f85149; }
+  .us-nit rect { fill: #2b2111; stroke: #d29922; stroke-width: 1.5; }
+  .us-nit text { font: 500 20px var(--mono); fill: #f0c46a; }
+  .us-commit { fill: #0d1117; stroke: #9198a1; stroke-width: 4; opacity: 0; transition: opacity .3s, stroke .5s, fill .5s; }
+  .us-commit.on { opacity: 1; } .us-commit.clean { stroke: #3fb950; fill: #12361f; }
+  .us-slop { fill: #d29922; opacity: 0; transform-box: fill-box; transform-origin: center; transition: opacity .3s, transform .3s; }
+  .us-slop.on { opacity: 1; } .us-slop.on.eaten { opacity: 0; transform: scale(0); }
+  .us-pr { opacity: 0; transform: translateY(-60px); transition: opacity .3s, transform .45s cubic-bezier(.2,.9,.2,1); }
+  .us-pr.on { opacity: 1; transform: none; }
+  .us-pr rect { fill: #161b22; stroke: #ab7df8; stroke-width: 2; }
+  .us-chomp { opacity: 0; transition: opacity .3s; } .us-chomp.on { opacity: 1; }
+  .us-chomp text { font: 600 20px var(--mono); fill: #ab7df8; text-anchor: middle; }
+  .us-bots { font: 500 19px var(--mono); fill: #8957e5; }
+  .us-num { font: 700 68px "Mona Sans"; fill: #e6edf3; text-anchor: middle; }
+  .us-cap { font: 500 20px var(--mono); fill: #9198a1; text-anchor: middle; }
+  .us-cap.bad { fill: #d29922; } .us-cap.ok { fill: #3fb950; }
   .ra-cap-flow { left: 62px; top: 282px; }
   .ra-cap-chart { left: 992px; top: 282px; }
   .bd-grid { stroke: #ffffff12; stroke-width: 1; }
@@ -339,10 +408,6 @@
   .active .sec-arrow { animation: sec-arr .5s ease-out both calc(var(--i) * 800ms + 1100ms), nudge 1.6s ease-in-out infinite calc(var(--i) * 800ms + 1600ms); }
   @keyframes sec-arr { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: none; } }
   @keyframes nudge { 50% { transform: translateX(10px); color: #9198a1; } }
-  .sec-ent { position: absolute; left: 110px; top: 268px; display: flex; align-items: center; gap: 14px; }
-  .sec-ent i { font: 600 18px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: #d29922; font-style: normal; margin-right: 10px; }
-  .sec-ent span { font-size: 24px; padding: 8px 20px; border-radius: 99px; border: 1px solid #d2992266; background: #d2992214; color: #f0f6fc; opacity: 0; }
-  .active .sec-ent span { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 120ms + 2900ms); }
   .sec-lane { position: absolute; left: 0; top: 880px; width: 1920px; height: 120px; }
 
   /* --- safe outputs: boxed agent → threat detection → write job --- */
@@ -681,12 +746,75 @@
   .mr-rf em b { font-size: 18px; color: #f0f6fc; font-variant-numeric: tabular-nums; }
   .mr-cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
 
+  /* --- experiments, graders & evals --- */
+  .xp .slide-head h2 { font-size: 100px; }
+  .xp .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #4493f8, #ab7df8, #3fb950, #4493f8); }
+  /* yes/no use cyan vs orange plus fill and glyph, so they stay distinct for red-green colour blindness */
+  .xp { --a: #4493f8; --b: #ab7df8; --yes: #39c5cf; --no: #f0883e; }
+  /* the run conveyor: five station columns, two variant lanes running through them */
+  .xp-flow { position: absolute; left: 110px; top: 270px; width: 1700px; height: 250px; opacity: 0; }
+  .active .xp-flow { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
+  .xp-st { position: absolute; top: 0; width: 260px; height: 250px; border-radius: 18px; background: #0d1117d0; border: 1px solid #3d444d; transition: border-color .3s, box-shadow .3s; }
+  .xp-st.hot { border-color: var(--c); box-shadow: 0 0 40px -12px var(--c), inset 0 0 40px -24px var(--c); }
+  .xp-st i { display: block; margin: 20px 0 0 22px; font: 600 14px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--c); font-style: normal; }
+  .xp-st b { display: block; margin: 10px 0 0 22px; font: 700 34px/1 "Mona Sans"; color: #f0f6fc; }
+  .xp-st small { display: block; margin: 8px 0 0 22px; font: 500 16px/1.2 var(--mono); color: #9198a1; }
+  .xp-lane { position: absolute; left: 0; width: 1700px; height: 0; border-top: 2px dashed var(--c); opacity: .35; }
+  .xp-ll { position: absolute; font: 600 15px/1 var(--mono); color: var(--c); letter-spacing: .06em; }
+  .xp-run { position: absolute; left: 0; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; width: 190px; height: 46px; padding: 0 10px; box-sizing: border-box; border-radius: 10px;
+    background: #161b22; border: 2px solid #656c76; font: 600 16px/1 var(--mono); color: #d1d7e0; white-space: nowrap; transition: border-color .3s, box-shadow .3s, opacity .25s; }
+  .xp-run.a { border-color: var(--a); box-shadow: 0 0 20px -6px var(--a); }
+  .xp-run.b { border-color: var(--b); box-shadow: 0 0 20px -6px var(--b); }
+  .xp-run > b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: #30363d; color: #f0f6fc; font: 700 16px/1 var(--mono); }
+  .xp-run.a > b { background: var(--a); } .xp-run.b > b { background: var(--b); }
+  .xp-run em { font-style: normal; color: #f0f6fc; font-variant-numeric: tabular-nums; }
+  .xp-run em:empty, .xp-run u:empty { display: none; }
+  .xp-run em, .xp-run u { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  .xp-run u { margin-left: auto; text-decoration: none; padding: 4px 7px; border-radius: 6px; font-weight: 700; }
+  .xp-run u.yes { color: #0d1117; background: var(--yes); } .xp-run u.no { color: var(--no); background: transparent; box-shadow: inset 0 0 0 2px var(--no); }
+  .xp-run.gone { opacity: 0; }
+  /* the workflow frontmatter: each block lights up as its stage acts on a run */
+  .xp-code { position: absolute; left: 110px; top: 550px; width: 620px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .xp-code { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .45s; }
+  .xp-code pre { margin: 0; padding: 12px 0 14px; font: 500 19px/24px var(--mono); color: #e6edf3; }
+  .xp-code pre > span { display: block; padding: 0 22px; border-left: 4px solid transparent; transition: background .5s, border-color .5s; }
+  .xp-code pre > span.on { background: color-mix(in srgb, var(--c) 20%, transparent); border-left-color: var(--c); transition: none; }
+  .xp-k { color: #7ee787; } .xp-s { color: #a5d6ff; } .xp-n { color: #79c0ff; }
+  /* the analysis: every finished run lands in its variant's row */
+  .xp-an { position: absolute; left: 770px; top: 550px; width: 1040px; height: 386px; box-sizing: border-box; padding: 0 30px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d;
+    box-shadow: 0 30px 80px -30px #000; opacity: 0; }
+  .active .xp-an { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .xp-an-h { display: flex; align-items: center; gap: 14px; height: 64px; font: 500 19px/1 var(--mono); color: #d1d7e0; }
+  .xp-an-h > span:first-child::before { content: "$ "; color: #3fb950; }
+  .xp-pill { margin-left: auto; padding: 7px 12px; border-radius: 99px; border: 1px solid #d29922; color: #e3b341; font: 700 15px/1 var(--mono); letter-spacing: .1em; font-variant-numeric: tabular-nums; }
+  .xp-pill.ready { border-color: var(--yes); color: var(--yes); box-shadow: 0 0 20px -6px var(--yes); }
+  .xp-row { display: grid; grid-template-columns: 210px 1fr 96px; align-items: center; gap: 18px; height: 70px; }
+  .xp-row > i { font: 600 18px/1.25 "Mona Sans"; font-style: normal; color: #f0f6fc; }
+  .xp-row > i small { display: block; font: 500 14px/1.2 var(--mono); color: #9198a1; }
+  .xp-row > i::before { content: attr(data-v); display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 10px; border-radius: 6px; background: var(--c); font: 700 15px/1 var(--mono); color: #0d1117; }
+  .xp-cells { display: grid; grid-template-columns: repeat(25, 1fr); gap: 5px; }
+  .xp-cells b { display: grid; place-items: center; height: 26px; border-radius: 5px; background: #ffffff10; font: 800 15px/1 var(--mono); }
+  .xp-cells b.yes { background: var(--yes); color: #0d1117; box-shadow: 0 0 10px -3px var(--yes); }
+  .xp-cells b.yes::after { content: "✓"; }
+  .xp-cells b.no { background: transparent; color: var(--no); box-shadow: inset 0 0 0 2px var(--no); }
+  .xp-cells b.no::after { content: "✗"; }
+  .xp-cells b.yes, .xp-cells b.no { animation: mr-pop .4s cubic-bezier(.3,1.6,.4,1); }
+  .xp-rate { font: 700 34px/1 var(--mono); color: #f0f6fc; text-align: right; font-variant-numeric: tabular-nums; }
+  .xp-m { display: flex; align-items: center; gap: 14px; height: 44px; border-top: 1px solid #3d444d; font: 500 17px/1 var(--mono); color: #9198a1; }
+  .xp-m b { color: #f0f6fc; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .xp-m .ok { color: var(--yes); font-weight: 800; }
+  .xp-m > span:last-child { margin-left: auto; }
+  .xp-dec { position: absolute; right: 30px; bottom: 22px; padding: 12px 20px; border-radius: 12px; border: 3px solid #656c76; font: 800 30px/1 var(--mono); letter-spacing: .08em; color: #9198a1; transition: color .3s, border-color .3s; }
+  .xp-dec.promote { color: var(--yes); border-color: var(--yes); box-shadow: 0 0 40px -8px var(--yes); animation: xp-stamp .5s cubic-bezier(.3,1.6,.4,1); }
+  @keyframes xp-stamp { from { transform: scale(1.8) rotate(-6deg); opacity: 0; } }
+  .xp-why { position: absolute; left: 30px; bottom: 34px; width: 640px; font: 500 18px/1.3 "Mona Sans"; color: #9198a1; }
+
   /* --- finale --- */
   .fin-bg { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
-  .fin-bg h1 { margin: 0; font-size: 300px; line-height: .86; letter-spacing: -.045em; font-variation-settings: "wght" 800, "wdth" 112; white-space: nowrap;
+  .fin-bg h1 { margin: 0; font-size: 150px; line-height: 1.1; letter-spacing: -.01em; font-variation-settings: "wght" 700, "wdth" 100; white-space: nowrap;
     background: linear-gradient(100deg, #0fbf3e 0%, #5fed83 30%, #4493f8 65%, #ab7df8 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
-    opacity: .2; animation: finShimmer 14s ease-in-out infinite alternate; }
-  .fin-bg h1 + h1 { font-size: 210px; }
+    opacity: .5; animation: finShimmer 14s ease-in-out infinite alternate; }
+  .fin-bg h1 + h1 { font-size: 72px; line-height: 1.2; margin-top: 36px; }
   @keyframes finShimmer { to { background-position: 100% 0; } }
   .fin-cap { position: absolute; left: 0; right: 0; bottom: 64px; text-align: center; font: 600 18px/1 var(--mono); letter-spacing: .3em; text-transform: uppercase; color: #9198a1; }
   .fin-cap b { color: #f0f6fc; font-weight: 700; }
@@ -698,6 +826,14 @@
   .dots button { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
     transition: width .5s cubic-bezier(.3,1.6,.4,1), background .3s; }
   .dots button.on { width: 40px; background: #f0f6fc; }
+  .arrows { position: fixed; left: 16px; bottom: 10px; display: none; gap: 8px; z-index: 5; }
+  .arrows button { width: 34px; height: 34px; padding: 7px; border: 1px solid #3d444d; border-radius: 8px; background: #151b23cc;
+    color: #9198a1; cursor: pointer; transition: color .2s, border-color .2s; }
+  .arrows button:hover { color: #f0f6fc; border-color: #9198a1; }
+  .arrows button:disabled { opacity: .35; cursor: default; }
+  .arrows svg { width: 100%; height: 100%; display: block; }
+  body.compact-nav .dots { display: none; }
+  body.compact-nav .arrows { display: flex; }
   .snd { position: fixed; right: 124px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
   .snd:hover { color: #f0f6fc; border-color: #9198a1; }
@@ -773,6 +909,59 @@
   .ae-tag { position: absolute; left: 1000px; top: 944px; width: 880px; text-align: center; font: 600 30px/1 "Mona Sans"; color: #f0f6fc; opacity: 0; }
   .ae-tag em { font-style: normal; color: var(--ec); }
   .active .ae-tag { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1.1s; }
+
+  /* --- connectors --- */
+  .cn { --r: #3fb950; --w: #ab7df8; }
+  .cn .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #ab7df8, #79c0ff); }
+  .cn-col { position: absolute; top: 290px; opacity: 0; }
+  .active .cn-col { animation: rise .8s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .cn-col b { display: flex; align-items: center; gap: 14px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
+  .cn-col b i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 99px; background: #f0f6fc; color: #0d1117; font: normal 800 20px/1 "Mona Sans"; }
+  .cn-col span { display: block; margin: 10px 0 0 50px; font: 500 17px/1 var(--mono); color: #9198a1; letter-spacing: .04em; white-space: nowrap; }
+  .cn-card, .cn-ed { position: absolute; top: 380px; height: 520px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .cn-card { left: 110px; width: 460px; }
+  .cn-ed { left: 600px; width: 730px; }
+  .active .cn-card { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
+  .active .cn-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .cn-tab { display: flex; align-items: center; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; white-space: nowrap; }
+  .cn-tab em { font-style: normal; color: var(--pc); transition: color .4s; }
+  .cn-tab > span { margin-left: auto; color: #656c76; font-size: 16px; letter-spacing: .1em; }
+  .cn-body { padding: 4px 22px; }
+  .cn-body.swap { animation: cn-swap .5s cubic-bezier(.3,1.4,.4,1); }
+  @keyframes cn-swap { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: none; } }
+  .cn-sec { padding: 13px 0; border-bottom: 1px solid #21262d; }
+  .cn-sec:last-child { border: 0; }
+  .cn-sec > small { display: block; margin-bottom: 10px; font: 600 14px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #656c76; }
+  .cn-host { font: 500 19px/1 var(--mono); color: var(--pc); }
+  .cn-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cn-chip { padding: 6px 11px; border-radius: 99px; border: 1.5px solid #3d444d; font: 500 14px/1 var(--mono); color: #656c76; white-space: nowrap; transition: all .35s calc(var(--i, 0) * .15s); }
+  .cn-chip.more { border-style: dashed; }
+  .cn-chip.r { --k: var(--r); } .cn-chip.w { --k: var(--w); }
+  .lit .cn-chip.pick { color: var(--k); border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); box-shadow: 0 0 22px -6px var(--k); }
+  .lit .cn-chip.pick::before { content: "✓ "; }
+  .cn-code { padding: 12px 0 16px; font: 500 19px/33px var(--mono); }
+  .cn-row { display: flex; white-space: pre; }
+  .cn-row .no { width: 62px; padding-right: 22px; text-align: right; color: #656c76; flex: none; }
+  .cn-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 20%, transparent), transparent 80%); }
+  .cn-v { color: var(--k); text-shadow: 0 0 16px var(--k); }
+  .cn-rt { position: absolute; left: 1360px; top: 380px; width: 450px; height: 520px; overflow: visible; opacity: 0; }
+  .active .cn-rt { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .8s; }
+  .cn-rt .box { fill: #0d1117; stroke-width: 2.5; transition: filter .3s; }
+  .cn-rt .box.pv { stroke: var(--pc); transition: stroke .4s; }
+  .cn-rt .box.ag { stroke: var(--r); } .cn-rt .box.so { stroke: var(--w); }
+  .cn-rt .box.hot { filter: drop-shadow(0 0 16px var(--k)); }
+  .cn-rt .t { font: 700 26px/1 "Mona Sans"; fill: #f0f6fc; }
+  .cn-rt .s { font: 500 15px/1 var(--mono); fill: #9198a1; }
+  .cn-rt .m { font: 500 15px/1 var(--mono); }
+  .cn-rt .pvt { fill: var(--pc); transition: fill .4s; }
+  .cn-rt .e { fill: none; stroke-width: 3; stroke-dasharray: 8 7; }
+  .cn-rt .e.r { stroke: var(--r); } .cn-rt .e.w { stroke: var(--w); } .cn-rt .e.p { stroke: #9198a1; }
+  .cn-rt .pk { opacity: 0; }
+  .cn-cat { position: absolute; left: 110px; top: 940px; display: flex; align-items: center; gap: 10px; opacity: 0; }
+  .active .cn-cat { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .cn-cat small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
+  .cn-p { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .4s; }
+  .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px var(--pc); }
 
   /* --- enterprise ready --- */
   .er { --ec: #4493f8; }
@@ -929,6 +1118,7 @@
   {
     resetIndex();
     slides.push({
+      group: "intro",
       sound: "title",
       palette: ["#0fbf3e", "#08872b", "#5fed83", "#0a241b"],
       notes: "GitHub Agentic Workflows. Coding agents running inside GitHub Actions, written in Markdown, with guardrails.",
@@ -1113,8 +1303,8 @@
       GA_MORPH = 1600;
     const gaLen = p => GA_RUNS[p][5].reduce((a, j) => a + j[3], 0) + GA_HOLD[p];
     slides.push({
-      sound: "ship",
-      trans: "up",
+      group: "platform",
+      sound: "actions",
       enter() {
         gaT0 = performance.now();
         gaM = -1;
@@ -1267,7 +1457,8 @@
       if (idx === 5) [braces[1], bot].forEach(e => e.classList.toggle("on", on));
     };
     slides.push({
-      sound: "ship",
+      group: "platform",
+      sound: "anatomy",
       palette: ["#d29922", "#4493f8", "#3fb950", "#8957e5"],
       notes:
         "Anatomy of an agentic workflow, using a synthetic docs-audit example. Everything between the --- fences is front matter: a deterministic security configuration (triggers, permissions, pre-agent steps, allowed writes) that gh aw compile turns into a hardened docs-audit.lock.yml Actions workflow, independent of the model. The schedule is written in plain words, daily on weekdays, and the compiler scatters it to a concrete cron. The tools block grants read-only GitHub issue toolsets and repo-memory, a git branch where the agent keeps notes between runs. Steps are plain deterministic shell that runs before the agent, here producing lint.json. Safe outputs keep the agent read-only: it can only ask for one issue, which a separate job validates and writes. Below the fences, the markdown body is the agent prompt, natural-language instructions the coding agent follows on every run.",
@@ -1405,8 +1596,8 @@
       pre.append(caret());
     };
     slides.push({
+      group: "platform",
       sound: "typing",
-      trans: "up",
       palette: ["#8957e5", "#1f6feb", "#238636", "#8957e5"],
       notes:
         "Turn Intent to Automation: ask your coding agent in plain language, it writes a markdown workflow, then gh aw compile — a deterministic Go compiler, no AI involved — turns the .md into a hardened .lock.yml Actions workflow with pinned actions, a firewall and safe-output jobs. Same markdown in, same YAML out, so it is reviewable and diffable, and the next morning a pull request removing duplicated code shows up for review. Time to agent: about 1 minute from prompt to a running workflow. This mirrors the gh-aw hero page.",
@@ -1483,6 +1674,155 @@
         n3.textContent = Math.round(212 * ez);
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How it works"), h("h2", { class: "pf-h" }, letters("Turn Intent to "), letters("Automation", "l-grad"))), tta, links, tags, cards),
+    });
+  }
+
+  // Safety and control (security architecture): filtered inputs → sandbox → safe outputs
+  {
+    resetIndex();
+    const boxes = [
+      ["01 · IN · UNTRUSTED", "Filtered inputs", "#f85149", "", ["Untrusted content sanitized before the agent sees it", h("span", {}, "Read-only ", h("code", {}, "GITHUB_TOKEN"))]],
+      [
+        "02 · RUN · SAFE",
+        "Sandbox",
+        "#3fb950",
+        "sandbox",
+        [
+          h("span", {}, "Isolated container or ", h("code", {}, "NVX"), " microVM"),
+          "Enclaves: sub-agents scoped by repo sensitivity",
+          "Integrity filtering in the MCP gateway",
+          "Egress firewall: domain allowlist only",
+          "Model routing via API proxy: no keys inside",
+        ],
+      ],
+      [
+        "03 · OUT · SAFE",
+        "Safe outputs",
+        "#4493f8",
+        "out",
+        [h("span", {}, "Agent only ", h("em", {}, "proposes"), ": ", h("code", {}, "create-issue"), ", ", h("code", {}, "create-pull-request"), "…"), "Threat detection scans every output", "Separate job holds write permissions"],
+      ],
+    ];
+    const BX = [110, 710, 1310];
+    const threats = [
+      ["prompt injection", 80, 360],
+      ["secret exfiltration", 1420, 130],
+      ["poisoned pull request", 1300, 900],
+      ["token theft", 640, 960],
+      ["rogue MCP server", 1500, 250],
+      ["jailbreak", 60, 880],
+      ["supply-chain attack", 1640, 420],
+      ["data leak", 300, 230],
+      ["malicious issue comment", 1180, 60],
+      ["typosquatted package", 200, 990],
+      ["curl | sh", 1720, 820],
+      ["ignore previous instructions", 520, 30],
+    ];
+    const lane = h("canvas", { class: "sec-lane", width: 1920, height: 120 });
+    const ctx = lane.getContext("2d");
+    const GATE1 = 660,
+      GATE2 = 1260,
+      END = 1810,
+      LY = 60;
+    let pk = [],
+      lastSpawn = 0,
+      last = 0;
+    slides.push({
+      group: "security",
+      sound: "omen",
+      red: true,
+      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
+      notes:
+        "Safety and control: the security architecture is a big selling point of gh-aw. Inputs are filtered and sanitized, the agent runs in a sandbox (container or NVX microVM, with enclaves scoping sub-agents by repo sensitivity and integrity filtering in the MCP gateway) with a read-only token, model calls routed through an API proxy so no keys live inside, behind an egress firewall and MCP gateway, and it can only request safe outputs, which are scanned by threat detection and applied by a separate job that holds the write permissions.",
+      enter() {
+        pk = [];
+        lastSpawn = last = 0;
+        sfx.omen();
+      },
+      tick(t) {
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (t - lastSpawn > 260) {
+          lastSpawn = t;
+          const r = Math.random();
+          pk.push({ x: 20, y: LY + (Math.random() - 0.5) * 50, bad: r < 0.22 ? 1 : r < 0.32 ? 2 : 0, a: 1, ph: Math.random() * 6 });
+        }
+        ctx.clearRect(0, 0, 1920, 120);
+        ctx.strokeStyle = "#ffffff14";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 10]);
+        ctx.beginPath();
+        ctx.moveTo(0, LY);
+        ctx.lineTo(1920, LY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (const [x, c] of [
+          [GATE1, "#f85149"],
+          [GATE2, "#4493f8"],
+        ]) {
+          ctx.fillStyle = c;
+          ctx.shadowColor = c;
+          ctx.shadowBlur = 20;
+          ctx.fillRect(x - 3, 8, 6, 104);
+          ctx.shadowBlur = 0;
+        }
+        ctx.fillStyle = "#3fb95018";
+        ctx.fillRect(GATE1 + 50, 6, GATE2 - GATE1 - 100, 108);
+        ctx.fillStyle = "#9198a1";
+        ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("FILTER", GATE1, 2 + 12);
+        ctx.fillText("THREAT DETECTION", GATE2, 2 + 12);
+        ctx.fillText("GITHUB", END + 40, LY + 5);
+        for (const p of pk) {
+          const blockAt = p.bad === 1 ? GATE1 - 8 : p.bad === 2 ? GATE2 - 8 : Infinity;
+          if (p.x < blockAt) p.x += dt * 0.32;
+          else {
+            p.a -= dt / 500;
+            p.y += dt * 0.08;
+          }
+          const inBox = p.x > GATE1 && p.x < GATE2;
+          const y = p.y + (inBox ? Math.sin(t / 180 + p.ph) * 14 : 0);
+          const col = p.x >= blockAt ? "#ff7b72" : p.x > GATE2 ? "#4493f8" : inBox ? "#3fb950" : p.bad ? "#f85149" : "#8b949e";
+          ctx.globalAlpha = Math.max(0, p.a);
+          ctx.fillStyle = col;
+          ctx.shadowColor = col;
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(p.x, y, 7, 0, 7);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+        ctx.globalAlpha = 1;
+        pk = pk.filter(p => p.a > 0 && p.x < END);
+      },
+      el: h(
+        "section",
+        { class: "slide sec" },
+        h("div", { class: "sec-omen" }),
+        h(
+          "div",
+          { class: "sec-threats" },
+          threats.map(([w, x, y], i) => h("span", { "--i": i, style: { left: `${x}px`, top: `${y}px` } }, w))
+        ),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Secure by design"), h("h2", {}, letters("Safety "), letters("and control", "l-grad"))),
+        boxes.map(([tag, title, c, cls, items], i) =>
+          h(
+            "div",
+            { class: `sec-box ${cls}`, "--c": c, "--i": i, style: { left: `${BX[i]}px` } },
+            cls === "sandbox" ? h("b", { class: "sec-shield" }, "🛡 safe zone") : null,
+            h("i", {}, tag),
+            h("h3", {}, title),
+            h(
+              "ul",
+              {},
+              items.map((x, j) => h("li", { "--j": j }, x))
+            )
+          )
+        ),
+        [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
+        lane
+      ),
     });
   }
 
@@ -1709,11 +2049,12 @@
       ctx.globalAlpha = 1;
     };
     slides.push({
+      group: "security",
       sound: "forge",
       red: true,
       palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
-        "Supply chain hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and secret and content scans (secrets kept away from logs and telemetry, markdown scanned for hidden instructions, conditional imports checked). All of these are static checks on the authored file; the runtime sandbox and egress firewall come on the next slide. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
+        "Supply chain hardening: the compiler threat detection specification turns every workflow into a hardened lock file before it ever runs. Defense in depth, one shell per concern: trigger admission (fork PRs, pull_request_target, bot provenance), expression safety (untrusted ${{ }} moved to env vars, no expression timeouts), a pinned supply chain (actions pinned to commit SHAs, manifest drift rejected, update checks kept on), package and argument hygiene (install scripts, flag-prefixed names, git ref injection), least privilege (read-only token, writes only through safe outputs, no bare label wildcards) and secret and content scans (secrets kept away from logs and telemetry, markdown scanned for hidden instructions, conditional imports checked). All of these are static checks on the authored file; the runtime sandbox and egress firewall were on the previous slide. Strict mode turns warnings into errors; --validate, actionlint, zizmor and poutine add parser and scanner checks on the generated YAML. The attacks are simulated and the SHA is shortened for illustration.",
       enter() {
         shots = [];
         bits = [];
@@ -1799,160 +2140,6 @@
         lock,
         h("div", { class: "ch-legend" }, rows),
         h("div", { class: "ch-scan" }, "+ --validate · actionlint · zizmor · poutine")
-      ),
-    });
-  }
-
-  // Safety and control (security architecture): filtered inputs → sandbox → safe outputs
-  {
-    resetIndex();
-    const boxes = [
-      ["01 · IN · UNTRUSTED", "Filtered inputs", "#f85149", "", ["Untrusted content sanitized before the agent sees it", h("span", {}, "Read-only ", h("code", {}, "GITHUB_TOKEN"))]],
-      [
-        "02 · RUN · SAFE",
-        "Sandbox",
-        "#3fb950",
-        "sandbox",
-        [
-          h("span", {}, "Isolated container or ", h("code", {}, "NVX"), " microVM"),
-          "Enclaves: sub-agents scoped by repo sensitivity",
-          "Integrity filtering in the MCP gateway",
-          "Egress firewall: domain allowlist only",
-          "Model routing via API proxy: no keys inside",
-        ],
-      ],
-      [
-        "03 · OUT · SAFE",
-        "Safe outputs",
-        "#4493f8",
-        "out",
-        [h("span", {}, "Agent only ", h("em", {}, "proposes"), ": ", h("code", {}, "create-issue"), ", ", h("code", {}, "create-pull-request"), "…"), "Threat detection scans every output", "Separate job holds write permissions"],
-      ],
-    ];
-    const BX = [110, 710, 1310];
-    const threats = [
-      ["prompt injection", 80, 360],
-      ["secret exfiltration", 1420, 130],
-      ["poisoned pull request", 1300, 900],
-      ["token theft", 640, 960],
-      ["rogue MCP server", 1500, 250],
-      ["jailbreak", 60, 880],
-      ["supply-chain attack", 1640, 420],
-      ["data leak", 300, 230],
-      ["malicious issue comment", 1180, 60],
-      ["typosquatted package", 200, 990],
-      ["curl | sh", 1720, 820],
-      ["ignore previous instructions", 520, 30],
-    ];
-    const lane = h("canvas", { class: "sec-lane", width: 1920, height: 120 });
-    const ctx = lane.getContext("2d");
-    const GATE1 = 660,
-      GATE2 = 1260,
-      END = 1810,
-      LY = 60;
-    let pk = [],
-      lastSpawn = 0,
-      last = 0;
-    slides.push({
-      sound: "omen",
-      red: true,
-      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
-      notes:
-        "Safety and control: the security architecture is a big selling point of gh-aw. Inputs are filtered and sanitized, the agent runs in a sandbox (container or NVX microVM, with enclaves scoping sub-agents by repo sensitivity and integrity filtering in the MCP gateway) with a read-only token, model calls routed through an API proxy so no keys live inside, behind an egress firewall and MCP gateway, and it can only request safe outputs, which are scanned by threat detection and applied by a separate job that holds the write permissions. Enterprise ready: self-hosted runners, ARC with Docker-in-Docker, OpenTelemetry, GitHub Apps auth and multi-repo workflows.",
-      enter() {
-        pk = [];
-        lastSpawn = last = 0;
-        sfx.omen();
-      },
-      tick(t) {
-        const dt = last ? Math.min(50, t - last) : 16;
-        last = t;
-        if (t - lastSpawn > 260) {
-          lastSpawn = t;
-          const r = Math.random();
-          pk.push({ x: 20, y: LY + (Math.random() - 0.5) * 50, bad: r < 0.22 ? 1 : r < 0.32 ? 2 : 0, a: 1, ph: Math.random() * 6 });
-        }
-        ctx.clearRect(0, 0, 1920, 120);
-        ctx.strokeStyle = "#ffffff14";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 10]);
-        ctx.beginPath();
-        ctx.moveTo(0, LY);
-        ctx.lineTo(1920, LY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        for (const [x, c] of [
-          [GATE1, "#f85149"],
-          [GATE2, "#4493f8"],
-        ]) {
-          ctx.fillStyle = c;
-          ctx.shadowColor = c;
-          ctx.shadowBlur = 20;
-          ctx.fillRect(x - 3, 8, 6, 104);
-          ctx.shadowBlur = 0;
-        }
-        ctx.fillStyle = "#3fb95018";
-        ctx.fillRect(GATE1 + 50, 6, GATE2 - GATE1 - 100, 108);
-        ctx.fillStyle = "#9198a1";
-        ctx.font = "600 15px 'Monaspace Neon', ui-monospace, Menlo, monospace";
-        ctx.textAlign = "center";
-        ctx.fillText("FILTER", GATE1, 2 + 12);
-        ctx.fillText("THREAT DETECTION", GATE2, 2 + 12);
-        ctx.fillText("GITHUB", END + 40, LY + 5);
-        for (const p of pk) {
-          const blockAt = p.bad === 1 ? GATE1 - 8 : p.bad === 2 ? GATE2 - 8 : Infinity;
-          if (p.x < blockAt) p.x += dt * 0.32;
-          else {
-            p.a -= dt / 500;
-            p.y += dt * 0.08;
-          }
-          const inBox = p.x > GATE1 && p.x < GATE2;
-          const y = p.y + (inBox ? Math.sin(t / 180 + p.ph) * 14 : 0);
-          const col = p.x >= blockAt ? "#ff7b72" : p.x > GATE2 ? "#4493f8" : inBox ? "#3fb950" : p.bad ? "#f85149" : "#8b949e";
-          ctx.globalAlpha = Math.max(0, p.a);
-          ctx.fillStyle = col;
-          ctx.shadowColor = col;
-          ctx.shadowBlur = 14;
-          ctx.beginPath();
-          ctx.arc(p.x, y, 7, 0, 7);
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        }
-        ctx.globalAlpha = 1;
-        pk = pk.filter(p => p.a > 0 && p.x < END);
-      },
-      el: h(
-        "section",
-        { class: "slide sec" },
-        h("div", { class: "sec-omen" }),
-        h(
-          "div",
-          { class: "sec-threats" },
-          threats.map(([w, x, y], i) => h("span", { "--i": i, style: { left: `${x}px`, top: `${y}px` } }, w))
-        ),
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Secure by design"), h("h2", {}, letters("Safety "), letters("and control", "l-grad"))),
-        h(
-          "div",
-          { class: "sec-ent" },
-          h("i", {}, "Enterprise ready"),
-          ["Self-hosted runners", "ARC + DinD", "OpenTelemetry", "GitHub Apps", "Multi-repo"].map((x, i) => h("span", { "--i": i }, x))
-        ),
-        boxes.map(([tag, title, c, cls, items], i) =>
-          h(
-            "div",
-            { class: `sec-box ${cls}`, "--c": c, "--i": i, style: { left: `${BX[i]}px` } },
-            cls === "sandbox" ? h("b", { class: "sec-shield" }, "🛡 safe zone") : null,
-            h("i", {}, tag),
-            h("h3", {}, title),
-            h(
-              "ul",
-              {},
-              items.map((x, j) => h("li", { "--j": j }, x))
-            )
-          )
-        ),
-        [0, 1].map(i => h("div", { class: "sec-arrow", "--i": i, style: { left: `${BX[i] + 500}px` } }, "→")),
-        lane
       ),
     });
   }
@@ -2047,9 +2234,10 @@
       fn();
     };
     slides.push({
-      sound: "factory",
-      green: true,
-      palette: ["#238636", "#0e3a1f", "#1f6feb", "#0b2f3a"],
+      group: "security",
+      sound: "safe",
+      red: true,
+      palette: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"],
       notes:
         "Safe outputs, an illustrative run with a synthetic issue. The agent runs boxed in: its token is read-only, so when it tries to create an issue directly the call is refused. Instead it calls the create-issue safe output, which only records a proposal. A separate threat detection job, an isolated agent with no tools, reads the proposed issue and looks for prompt injection, leaked secrets, malicious links and harmful code. Only when the verdict is clean does a third job, the only one holding issues: write, apply the declared output and actually create the issue. The agent never holds write credentials, and every write is limited to the outputs declared in the front matter.",
       enter() {
@@ -2124,469 +2312,6 @@
     });
   }
 
-  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
-  {
-    resetIndex();
-    const RUN = [
-      { k: "[self-hosted, linux]", c: "#d29922" },
-      { k: "[self-hosted, arm64]", c: "#ab7df8" },
-      { k: "[self-hosted, gpu]", c: "#4493f8" },
-    ];
-    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
-    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
-    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
-    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
-    const STEPS = ["checkout", "setup-node", "cache"];
-    const CHIPS = [
-      ["GitHub Apps", [6, 7, 8]],
-      ["OIDC", [4, 5]],
-      ["Runner groups", [3]],
-      ["Environments", []],
-      ["Org secrets", [8]],
-      ["OpenTelemetry", [13, 14, 15]],
-      ["Rulesets", []],
-      ["Audit log", []],
-    ];
-    const K = "#ff7b72",
-      D = "#656c76",
-      T = "#f0f6fc",
-      V = "#a5d6ff",
-      E = "#d2a8ff";
-    const vRun = h("span", { class: "ae-val" });
-    const LINES = [
-      [["---", D]],
-      [
-        ["on: ", K],
-        ["issues", V],
-      ],
-      [["runs-on: ", K], vRun],
-      [["permissions:", K]],
-      [
-        ["  id-token: ", K],
-        ["write", V],
-      ],
-      [["github-app:", K]],
-      [
-        ["  client-id: ", K],
-        ["${{ vars.APP_ID }}", E],
-      ],
-      [
-        ["  private-key: ", K],
-        ["${{ secrets.APP_KEY }}", E],
-      ],
-      [["network:", K]],
-      [
-        ["  allowed: ", K],
-        ["[defaults, node]", V],
-      ],
-      [["steps:", K]],
-      [
-        ["  - uses: ", K],
-        ["actions/setup-node@v4", V],
-      ],
-      [["observability:", K]],
-      [["  otlp:", K]],
-      [
-        ["    endpoint: ", K],
-        ["${{ secrets.OTLP_ENDPOINT }}", E],
-      ],
-      [["---", D]],
-      [["# Triage new issues for the platform team", T]],
-    ];
-    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
-    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
-    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
-    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
-    const SB = 1,
-      RN = 2,
-      EC = 3;
-    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
-    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
-    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
-    const card = (i, c, tag, title, code, ic, extra) => {
-      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
-      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
-      return el;
-    };
-    const spans = h(
-      "div",
-      { class: "er-spans" },
-      [
-        [0, 100],
-        [8, 46],
-        [30, 58],
-        [62, 30],
-      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
-    );
-    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
-    otel.classList.add("otel");
-    const cRun = h("span");
-    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
-    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
-    fw.classList.add("fw");
-    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
-    eco.classList.add("eco");
-    const job = h("div", { class: "er-job" });
-    const trace = h("div", { class: "er-job er-trace" });
-    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
-    const el = h(
-      "section",
-      { class: "slide er" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
-      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
-      ed,
-      arrow,
-      otel,
-      fw,
-      runner,
-      eco,
-      job,
-      trace,
-      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
-    );
-    const fly = (dot, [x0, y0], [x1, y1]) => {
-      dot.style.transition = "none";
-      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
-      void dot.offsetWidth;
-      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
-      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
-    };
-    let cur = 0,
-      phase = "hold",
-      since = 0,
-      typed = "",
-      arriveAt = 0,
-      otelAt = 0,
-      chipAt = 0,
-      sbAt = 0,
-      chip = -1;
-    const setRunner = (i, t) => {
-      cur = i;
-      el.style.setProperty("--ec", RUN[i].c);
-      runner.style.setProperty("--rc", RUN[i].c);
-      cRun.textContent = RUN[i].k;
-      runner.classList.add("on");
-      for (const c of [runner, eco, fw]) c.classList.remove("run");
-      eco.classList.remove("on");
-      fw.classList.remove("on");
-      steps.forEach(p => p.classList.remove("up"));
-      fly(job, [840, 460], MID(RN));
-      arriveAt = t + 700;
-      sbAt = otelAt = Infinity;
-    };
-    const setChip = i => {
-      chip = i;
-      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
-      const lit = CHIPS[i][1];
-      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
-    };
-    slides.push({
-      sound: "ship",
-      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
-      notes:
-        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
-      enter() {
-        typed = RUN[0].k;
-        vRun.textContent = typed;
-        phase = "hold";
-        since = chipAt = 0;
-        chip = -1;
-        chips.forEach(c => c.classList.remove("lit"));
-        rows.forEach(r => r.classList.remove("lit"));
-        otel.classList.remove("on", "run");
-        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
-        steps.forEach(p => p.classList.remove("up"));
-        cRun.textContent = RUN[0].k;
-        sbAt = Infinity;
-        for (const d of [job, trace]) {
-          d.style.transition = "none";
-          d.style.opacity = "0";
-        }
-        cur = 0;
-        arriveAt = otelAt = Infinity;
-      },
-      tick(t) {
-        if (!since) {
-          since = t;
-          chipAt = t + 1800;
-          setRunner(0, t + 900);
-        }
-        if (t > arriveAt && !runner.classList.contains("run")) {
-          runner.classList.add("run");
-          sbAt = t + 900;
-        }
-        if (t > sbAt) {
-          sbAt = Infinity;
-          fw.classList.remove("run");
-          void fw.offsetWidth;
-          fw.classList.add("on", "run");
-          fly(trace, MID(SB), MID(0));
-          otelAt = t + 700;
-        }
-        if (t > otelAt) {
-          otelAt = Infinity;
-          otel.classList.remove("run");
-          void otel.offsetWidth;
-          otel.classList.add("on", "run");
-        }
-        if (t > arriveAt) {
-          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
-          steps.forEach((p, j) => p.classList.toggle("up", j < n));
-          eco.classList.add("on");
-          eco.classList.toggle("run", n === steps.length);
-        }
-        if (t > chipAt) {
-          chipAt = t + 1500;
-          setChip((chip + 1) % CHIPS.length);
-        }
-        const el2 = t - since;
-        const next = RUN[(cur + 1) % RUN.length].k;
-        if (phase === "hold" && el2 > 3400) {
-          phase = "del";
-          since = t;
-        } else if (phase === "del" && el2 > 28) {
-          since = t;
-          typed = typed.slice(0, -1);
-          vRun.textContent = typed;
-          if (!typed) phase = "type";
-        } else if (phase === "type" && el2 > 70) {
-          since = t;
-          typed = next.slice(0, typed.length + 1);
-          vRun.textContent = typed;
-          sfx.key(0.7);
-          if (typed === next) {
-            setRunner((cur + 1) % RUN.length, t);
-            sfx.pop(cur * 2);
-            phase = "hold";
-          }
-        }
-      },
-      el,
-    });
-  }
-
-  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
-  {
-    resetIndex();
-    const BUDGET = 8;
-    const ROUNDS = [
-      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
-      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
-      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
-      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
-    ];
-    const CODE = [
-      "// billing/client.ts",
-      'import { charge } from "./v1/billing";',
-      "export async function renew(acct) {",
-      "  const plan = await lookup(acct);",
-      '  return charge(plan, { api: "v1" });',
-      "}",
-      "// auth/session.ts",
-      'import { sign } from "auth-lib@2.3.0";',
-      "// tests/integration/sync.test.ts",
-      'test.retry(3)("sync settles", run);',
-    ];
-    const PX = 560,
-      GX = 800,
-      VX = 1040;
-    const qTask = h("div", { class: "en-task" });
-    const qSchema = h("div", { class: "en-schema" });
-    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
-    const log = h("ul", { class: "en-log" });
-    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
-    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
-    const vaultStatus = h("div", { class: "en-status" });
-    const vault = h(
-      "div",
-      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
-      h("b", { class: "en-lock" }, "🔒 enclave"),
-      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
-      h("h3", {}, "octo-org/private-service"),
-      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
-      h("div", { class: "en-code" }, lines),
-      vaultStatus
-    );
-    const gNote = h("div", { class: "en-gnote" });
-    const fill = h("div", { class: "en-fill" });
-    const leftN = h("b");
-    const invN = h("span", { class: "en-left" });
-    const el = h(
-      "section",
-      { class: "slide en" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
-      h(
-        "div",
-        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
-        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
-        h("h3", {}, "Asks, never reads"),
-        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
-        call,
-        log,
-        out
-      ),
-      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
-      vault,
-      h(
-        "div",
-        { class: "en-ledger" },
-        h("i", {}, "Information budget"),
-        h("div", { class: "en-bar" }, fill),
-        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
-        invN,
-        h(
-          "div",
-          { class: "en-sens" },
-          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
-        )
-      )
-    );
-    let ev = [],
-      evI = 0,
-      pks = [],
-      used = 0,
-      calls = 0,
-      t0 = 0,
-      now = 0,
-      fresh = true;
-    const fmt = n => (Math.round(n * 10) / 10).toString();
-    const ledger = () => {
-      const left = BUDGET - used;
-      fill.style.width = `${(left / BUDGET) * 100}%`;
-      fill.classList.toggle("low", left < 3);
-      leftN.textContent = fmt(left);
-      invN.textContent = `· ${calls} / 4 invocations`;
-    };
-    const say = (txt, ok) => {
-      gNote.textContent = txt;
-      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
-    };
-    const launch = (txt, cls, x0, x1, dur, blocked) => {
-      const p = h("div", { class: `en-pk ${cls}` }, txt);
-      el.append(p);
-      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
-    };
-    const script = () => {
-      ev = [];
-      evI = 0;
-      const at = (ms, fn) => ev.push([ms, fn]);
-      let T = 600;
-      ROUNDS.forEach((r, k) => {
-        const s = T;
-        at(s, () => {
-          qTask.textContent = r.q;
-          qSchema.textContent = r.schema;
-          call.classList.remove("flash");
-          void call.offsetWidth;
-          call.classList.add("flash");
-          lines.forEach(l => l.classList.remove("hot"));
-          gNote.classList.remove("show");
-          sfx.key();
-        });
-        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
-        if (r.over) {
-          at(s + 1400, () => {
-            say(`✗ over budget · needs ${r.bits} bits`, 0);
-            sfx.route(0);
-          });
-          T = s + 3200;
-          return;
-        }
-        at(s + 1350, () => say("✓ masked capability", 1));
-        at(s + 2000, () => {
-          calls++;
-          ledger();
-          vault.classList.add("busy");
-          vaultStatus.textContent = "sub-agent reading ";
-          gNote.classList.remove("show");
-        });
-        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
-        let u = s + 3600;
-        at(u, () => {
-          vault.classList.remove("busy");
-          vaultStatus.textContent = "answer ready";
-        });
-        if (r.leak) {
-          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
-          at(u + 800, () => {
-            say("✗ free-form string · denied", 0);
-            sfx.route(0);
-          });
-          u += 1800;
-        }
-        at(u, () => launch(r.a, "a", VX, PX, 1400));
-        at(u + 700, () => {
-          used += r.bits;
-          ledger();
-          say(`✓ schema · −${r.bits} bits`, 1);
-          sfx.route(2);
-        });
-        at(u + 1400, () => {
-          log.append(h("li", {}, r.log));
-          sfx.pop(k * 2);
-        });
-        T = u + 2200;
-      });
-      at(T, () => {
-        out.classList.add("show");
-        gNote.classList.remove("show");
-        sfx.review();
-      });
-      at(T + 4000, () => (fresh = true));
-    };
-    const reset = () => {
-      pks.forEach(p => p.el.remove());
-      pks = [];
-      used = calls = 0;
-      log.replaceChildren();
-      out.classList.remove("show");
-      vault.classList.remove("busy");
-      vaultStatus.textContent = "";
-      gNote.className = "en-gnote";
-      qTask.textContent = "";
-      qSchema.textContent = "";
-      lines.forEach(l => l.classList.remove("hot"));
-      ledger();
-      t0 = now;
-      script();
-    };
-    slides.push({
-      sound: "vault",
-      green: true,
-      palette: ["#238636", "#0e3a1f", "#8957e5", "#0b2f3a"],
-      notes:
-        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
-      enter() {
-        fresh = true;
-      },
-      tick(t) {
-        now = t;
-        if (fresh) {
-          fresh = false;
-          reset();
-        }
-        const e = t - t0;
-        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
-        for (const p of pks) {
-          if (p.dead) continue;
-          const u = Math.min(1, (t - p.start) / p.dur);
-          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
-          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
-          if (u >= 1) {
-            p.dead = t + 600;
-            if (p.blocked) p.el.classList.add("burst");
-            else p.dead = t;
-          }
-        }
-        pks = pks.filter(p => {
-          if (p.dead && t >= p.dead) p.el.remove();
-          return !p.dead || t < p.dead;
-        });
-      },
-      el,
-    });
-  }
-
   // The factory mindset: engineer processes, not code
   {
     resetIndex();
@@ -2643,6 +2368,7 @@
     }
     let last = 0;
     slides.push({
+      group: "factory",
       sound: "factory",
       palette: ["#bf3989", "#238636", "#9e6a03", "#8957e5"],
       notes:
@@ -3075,8 +2801,8 @@
       });
     };
     slides.push({
+      group: "factory",
       sound: "loop",
-      trans: "up",
       palette: ["#bf3989", "#8957e5", "#238636", "#9e6a03"],
       notes:
         "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. These are illustrative patterns with synthetic examples, not activity attributed to particular people or teams.",
@@ -3203,7 +2929,8 @@
         thr.textContent = n === null ? "" : n === 0 ? "✓ 0 open threads" : `${n} open thread${n > 1 ? "s" : ""}`;
       };
       slides.push({
-        sound: "loop",
+        group: "factory",
+        sound: "reviews",
         palette: ["#1f6feb", "#8957e5", "#d29922", "#238636"],
         notes:
           "Pull Request Review squared. This is an illustrative flow with synthetic reviewers and counts. The classic review goes straight from the author to a human reviewer. Here we insert one step: marking the pull request ready for review. That event starts several agentic reviewers, such as one applying Matt Pocock's engineering skills, a code quality reviewer and a test quality reviewer, which post review comments. PR Sous Chef watches for unresolved threads and nudges Copilot to push fixes, which triggers another round of review. The agents loop until the threads are resolved, so the developer only sees a clean pull request. A human still reviews and merges.",
@@ -3265,7 +2992,8 @@
     let bdT0 = 0,
       bdRun = -1;
     slides.push({
-      sound: "loop",
+      group: "factory",
+      sound: "assist",
       palette: ["#238636", "#8957e5", "#1f6feb", "#9e6a03"],
       notes:
         "Repo Assist. The loop: on a schedule the agent picks a couple of maintenance tasks, such as labelling and investigating issues, nudging stale pull requests or proposing performance and testing improvements, and a maintainer reviews every result. The data: an approximate, illustrative redraw of a figure of open issues in F# open-source repositories, as a percentage of the count on adoption day. Backlogs are flat before Repo Assist, then burn down after adoption. Not exact data and not activity attributed to particular people or teams.",
@@ -3297,7 +3025,167 @@
     });
   }
 
-  // Research → Assign → Refine: deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
+  // Issues as intent: how gh-aw itself is built; a community issue is triaged, assigned to Copilot, reviewed by agents and merged by a maintainer, with real repository counts
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 600;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const pill = (x, y, w, label, cls = "") => `<g class="fm-pill ${cls}"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}">${pill(x, y, w, label)}<circle cx="${x}" cy="${y}" r="34" fill="url(#ctAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const user = (id, x, y, w) => `<g class="fm-task" id="${id}">${pill(x, y, w, "Community", "g")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#3fb950" stroke-width="3"/>${ico("person", x, y, 36, "#3fb950")}</g>`;
+    const dev = (id, x, y, w, label) => `<g class="fm-task mra-dev" id="${id}">${pill(x, y, w, label, "b")}<circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#ctClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // [edge id, path, color, label, lx, ly, anchor]; g = community, b = maintainer, p = Copilot and agents
+    const EDGES = [
+      ["e1", "M298 170 H426", "g", ["files issue"], 362, 148, "middle"],
+      ["e2", "M470 206 V300 H185 V397", "b", ["triages & plans"], 327, 288, "middle"],
+      ["e3", "M298 430 H620 V170 H658", "b", ["assigns", "to Copilot"], 640, 300, "start"],
+      ["e4", "M800 196 V430 H956", "p", ["writes code,", "opens PR"], 822, 300, "start"],
+      ["e5", "M1000 394 V170 H1188", "p", ["ready for", "review"], 1022, 300, "start"],
+      ["e6", "M1375 145 V100 H800 V137", "p", ["comments → Copilot pushes fixes"], 1090, 90, "middle"],
+      ["e7", "M1230 206 V388", "p", ["threads", "resolved"], 1252, 300, "start"],
+      ["e8", "M1448 430 H1576", "b", ["merges"], 1512, 408, "middle"],
+      ["e9", "M1620 466 V570 H24 V170 H38", "g", ["issue closed as completed · intent shipped"], 860, 556, "middle"],
+    ];
+    const SEQ = [
+      ["e1", "nIssue"],
+      ["e2", "nMaint"],
+      ["e3", "nCopilot"],
+      ["e4", "nPR"],
+      ["e5", "nReview"],
+      ["e6", "nCopilot"],
+      ["e4", "nPR"],
+      ["e5", "nReview"],
+      ["e7", "nLead"],
+      ["e8", "nMerge"],
+      ["e9", "nUser", 1600],
+    ];
+    const LANE = { nUser: 0, nIssue: 0, nMaint: 0, nCopilot: 1, nPR: 1, nReview: 2, nLead: 2, nMerge: 2 };
+    const MK = { g: ["ctG", "#3fb950"], b: ["ctB", "#4493f8"], p: ["ctP", "#ab7df8"] };
+    let g = `<defs><clipPath id="ctClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ctAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>`;
+    for (const [id, col] of Object.values(MK)) g += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${col}"/></marker>`;
+    g += `</defs><rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 580, "INTENT"],
+      [580, 1140, "CODE"],
+      [1140, VW, "REVIEW"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="ctLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH - 60}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#${MK[c][0]})"/>`;
+      g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += user("nUser", 80, 170, 210) + box("nIssue", 470, 170, "issue") + dev("nMaint", 80, 430, 210, "Maintainer");
+    g += agent("nCopilot", 700, 170, 200, "Copilot") + box("nPR", 1000, 430, "pr");
+    g += agent("nReview", 1230, 170, 290, "Agentic reviewers") + dev("nLead", 1230, 430, 210, "Maintainer") + box("nMerge", 1620, 430, "merge");
+    g += `<text class="ct-round" id="ctRound" x="1000" y="500" text-anchor="middle"></text>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ct-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    // real counts for gh-aw issues labelled "community" and the merged pull requests that closed them, snapshot November 2026
+    const STATS = [
+      [450, "", "people filed community issues", "#3fb950", "#79c0ff"],
+      [1383, "", "community issues closed as completed", "#79c0ff", "#4493f8"],
+      [1039, "", "pull requests merged to close them", "#4493f8", "#ab7df8"],
+      [96, "%", "of those pull requests authored by Copilot", "#ab7df8", "#d2a8ff"],
+    ];
+    const nums = STATS.map(([, sfx]) => h("div", { class: "ct-num" }, "0" + sfx));
+    const stats = h(
+      "div",
+      { class: "ct-stats" },
+      ...STATS.map(([, , lab, a, b], i) => h("div", { class: "ct-stat", style: `--a:${a};--b:${b}` }, nums[i], h("div", { class: "ct-lab" }, lab)))
+    );
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1000,
+      START = 900,
+      HOLD = 1200,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("ctLane" + LANE[nid]).classList.add("on");
+    };
+    slides.push({
+      group: "factory",
+      sound: "contrib",
+      palette: ["#238636", "#8957e5", "#1f6feb", "#3fb950"],
+      notes:
+        "Issues as intent: how contributions to gh-aw itself are made. The flow is illustrative and uses a role icon for the community member. Anyone files an issue describing what they want, the intent, rather than a patch. A maintainer triages it, turns it into a plan and assigns it to Copilot. Copilot writes the code and opens a pull request. Once it is ready for review, agentic reviewers post comments and Copilot pushes fixes until the threads are resolved. A maintainer reviews and merges, and the issue is closed as completed. The figures are real counts for gh-aw issues labelled community, as of November 2026: 450 people filed 1,501 community issues, 1,383 were closed as completed, and 1,039 merged pull requests closed them, 96% of them authored by Copilot. Community members contribute intent; Copilot turns it into code and maintainers review.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+        nums.forEach((n, i) => (n.textContent = "0" + STATS[i][1]));
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          f = ease(Math.min(1, Math.max(0, (e - 600) / 2200)));
+        nums.forEach((n, i) => (n.textContent = Math.round(STATS[i][0] * f).toLocaleString("en-US") + STATS[i][1]));
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot").forEach(x => x.classList.remove("on", "hot"));
+          $("ctRound").textContent = "";
+          light("nUser");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          fr = (u - T[k]) / dur,
+          p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, fr / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", MK[p.classList[1]][1]);
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (k >= 4) $("ctRound").textContent = `review round ${k >= 7 ? 2 : 1}`;
+        if (fr >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "How gh-aw itself is built"), h("h2", {}, letters("Issues as "), letters("intent", "l-grad"))),
+        svg,
+        stats,
+        h("div", { class: "ct-src" }, "gh-aw issues labelled community · counts as of November 2026")
+      ),
+    });
+  }
+
+  // Daily Unsloppers (research → assign → refine): deep research files an issue, it is assigned to Copilot, and the pull request is refined with the developer
   {
     resetIndex();
     const VW = 1700,
@@ -3306,7 +3194,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#rpaAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/mnkiefer.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#rpaClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // Two synthetic source files as syntax-coloured bars; rows 3–6 of A repeat as rows 4–7 of B.
     const TOK = ["#ff7b72", "#d2a8ff", "#79c0ff", "#a5d6ff", "#8b949e"];
@@ -3382,7 +3270,7 @@
       ["e8", "nResearch", 1800],
     ];
     const LANE = { nResearch: 0, nCode: 0, nIssue: 1, nCopilot: 2, nPR: 2, nDev: 2, nMerge: 2 };
-    let g = `<defs><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="rpaClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="rpaAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="rpaP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <linearGradient id="rpaBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
       <marker id="rpaB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
@@ -3430,10 +3318,11 @@
       $("rpaLane" + LANE[nid]).classList.add("on");
     };
     slides.push({
-      sound: "loop",
+      group: "loops",
+      sound: "research",
       palette: ["#8957e5", "#1f6feb", "#238636", "#bf3989"],
       notes:
-        "Research, assign, refine: the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
+        "Daily unsloppers: research, assign, refine, the pattern behind workflows such as Daily Test Improver and Daily Perf Improver. This is an illustrative flow with synthetic files. Deep research agents scan the repository, here for duplicate code: two handlers share a near-identical block, and the finding is filed as an issue. The issue is assigned to Copilot, which works on it and opens a pull request. The pull request is assigned back to the developer, who refines it by iterating with Copilot, then reviews and merges. Humans stay in the loop at the merge. The workflow runs on a daily schedule, so the next morning research starts again on the improved code, and the loop repeats every day.",
       enter() {
         t0 = 0;
         cyc = -1;
@@ -3485,7 +3374,145 @@
           light(nid);
         }
       },
-      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Research · Assign · "), letters("Refine", "l-grad"))), svg),
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Daily Test Improver · Daily Perf Improver · …"), h("h2", {}, letters("Daily "), letters("Unsloppers", "l-grad"))), svg),
+    });
+  }
+
+  // Merge fast, unslop daily: three slow pull requests polished through many nit rounds (each still merging slop) vs many fast pull requests, agentic reviewers and background unsloppers that eat the slop
+  {
+    resetIndex();
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const CYC = 12800,
+      A_N = 3,
+      A_SPAN = 3800,
+      A_AT = k => 200 + k * A_SPAN,
+      A_X = k => 440 + k * 440,
+      NITS = ["nit: rename this", "nit: typo", "nit: extract helper", "nit: blank line", "nit: reword comment", "nit: early return", "nit: sort imports", "nit: one more test", "nit: naming again", "nit: inline this", "nit: fix wording", "nit: lgtm, but…"],
+      ROUND = (A_SPAN - 400) / (NITS.length / A_N),
+      B_N = 30,
+      B_AT = i => 300 + i * 290,
+      B_X = i => 50 + i * 48,
+      SWEEPS = [3600, 7200, 10200],
+      SWEEP_D = 1200,
+      LA = 230,
+      LB = 560;
+    // a couple of synthetic slop specks per fast commit
+    const SPECKS = Array.from({ length: B_N }, (_, i) => (i % 3 === 1 ? [[0, -24]] : [[-10, -22], [10, -26]]));
+    let g = `<line class="us-main" x1="0" y1="${LA}" x2="1500" y2="${LA}"/><text class="us-mainl" x="0" y="${LA + 38}">main</text>
+      <line class="us-main" x1="0" y1="${LB}" x2="1500" y2="${LB}"/><text class="us-mainl" x="0" y="${LB + 38}">main</text>
+      <line class="us-div" x1="0" y1="300" x2="1700" y2="300"/>
+      <text class="us-lane" x="0" y="34">Slow · polished · nit after nit</text>
+      <text class="us-lane good" x="0" y="356">Fast · good enough · unslopped in the background</text><text class="us-diff" x="1500" y="356" text-anchor="end">each <tspan class="add">+40</tspan> <tspan class="del">−8</tspan></text>
+      ${Array.from({ length: A_N }, (_, k) => `<circle class="us-commit" id="usA${k}" cx="${A_X(k)}" cy="${LA}" r="26"/><circle class="us-slop" id="usAS${k}" cx="${A_X(k) + 26}" cy="${LA - 34}" r="11"/>`).join("")}
+      <g id="usCard"><g class="us-nit" id="usNit"><rect x="0" y="-80" width="290" height="44" rx="10"/><text id="usNitT" x="16" y="-50"></text></g>
+        <g class="us-card"><rect class="c" x="0" y="-20" width="350" height="104" rx="14"/>${ico("pr", 36, 32, 34, "#9198a1")}<text id="usPrN" x="68" y="14">PR #1</text><text class="us-round" id="usRound" x="68" y="42">round 0</text><text class="us-diff" x="68" y="70"><tspan class="add">+1,240</tspan> <tspan class="del">−380</tspan> · 46 files</text><circle cx="334" cy="-6" r="8" fill="#d29922"/></g></g>`;
+    for (let i = 0; i < B_N; i++) {
+      const x = B_X(i);
+      g += `<g transform="translate(${x - 20},${LB - 112})"><g class="us-pr" id="usP${i}"><rect x="0" y="0" width="40" height="40" rx="8"/>${ico("pr", 20, 20, 22, "#e6edf3")}<circle cx="38" cy="2" r="9" fill="#8957e5"/>${ico("copilot", 38, 2, 13)}</g></g>`;
+      g += `<circle class="us-commit" id="usC${i}" cx="${x}" cy="${LB}" r="11"/>`;
+      SPECKS[i].forEach(([dx, dy], j) => (g += `<circle class="us-slop" id="usS${i}_${j}" cx="${x + dx}" cy="${LB + dy}" r="5"/>`));
+    }
+    g += `<g class="us-chomp" id="usChomp"><circle cx="0" cy="${LB}" r="30" fill="#8957e5"/>${ico("copilot", 0, LB + 1, 34)}<text x="0" y="${LB - 44}">daily unsloppers</text></g>
+      <text class="us-bots" x="0" y="${LB + 100}">code-simplifier · dead-code-remover · duplicate-code-detector · daily-file-diet · unbloat-docs</text>
+      <text class="us-num" id="usNA" x="1620" y="${LA - 50}">0%</text><text class="us-cap" x="1620" y="${LA - 16}">of feature</text><text class="us-cap" id="usMA" x="1620" y="${LA + 16}"></text><text class="us-cap bad" id="usCA" x="1620" y="${LA + 44}"></text>
+      <text class="us-num" id="usNB" x="1620" y="${LB - 50}">0%</text><text class="us-cap" x="1620" y="${LB - 16}">of feature</text><text class="us-cap" id="usMB" x="1620" y="${LB + 16}"></text><text class="us-cap ok" id="usCB" x="1620" y="${LB + 44}"></text>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "us-svg");
+    svg.setAttribute("viewBox", "0 0 1700 660");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id);
+    const card = $("usCard"),
+      nit = $("usNit"),
+      nitT = $("usNitT"),
+      round = $("usRound"),
+      prN = $("usPrN"),
+      chomp = $("usChomp");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    let t0 = 0,
+      cyc = -1,
+      fired = new Set();
+    const once = (k, fn) => fired.has(k) || (fired.add(k), fn());
+    slides.push({
+      group: "loops",
+      sound: "unslop",
+      palette: ["#238636", "#9e6a03", "#8957e5", "#1f6feb"],
+      notes:
+        "Merge fast, unslop daily. This is an illustrative, synthetic timeline. Two ways to reach code quality. On top, every pull request is polished until it is perfect: a reviewer asks for nit after nit and each big pull request, over a thousand lines, goes through many rounds. Only three merge in the same time, so the feature is only forty percent done, and each of them still lands some slop that nobody comes back for. At the bottom is the technique we use in gh-aw: thirty fast, short-lived, small pull requests that are good but not perfect. Agentic reviewers check each one and it merges quickly. The feature ships a slice at a time, so its percentage climbs with every merge and the feature is complete while the polished lane is still in review. The slop that gets through is eaten by many background unsloppers, daily workflows such as code simplifier, dead code remover, duplicate code detector and file diet, which open their own small clean-up pull requests. Throughput stays high and quality is maintained continuously instead of being gated on every pull request.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          fired = new Set();
+        }
+        // lane A: three big pull requests, each crawling through nit rounds before it merges, and each still merging some slop
+        const k = Math.min(A_N - 1, Math.max(0, Math.floor((u - 200) / A_SPAN))),
+          v = u - A_AT(k),
+          per = NITS.length / A_N,
+          r = Math.min(per, Math.floor(Math.max(0, v) / ROUND) + 1),
+          f = (Math.max(0, v) % ROUND) / ROUND,
+          review = v < A_SPAN - 400,
+          x0 = k ? A_X(k - 1) + 30 : 20;
+        let m = 0;
+        for (let j = 0; j < A_N; j++) {
+          const on = u >= A_AT(j) + A_SPAN - 200;
+          $("usA" + j).classList.toggle("on", on);
+          $("usAS" + j).classList.toggle("on", on);
+          if (on) (m++, once("am" + j, () => sfx.notify(false)));
+        }
+        card.setAttribute("transform", `translate(${x0 + (A_X(k) - 200 - x0) * ease(Math.min(1, Math.max(0, v) / (A_SPAN - 400)))},${LA - 140})`);
+        card.style.opacity = v < 0 || u >= A_AT(k) + A_SPAN - 200 ? 0 : 1;
+        prN.textContent = `PR #${k + 1}`;
+        round.textContent = `round ${r}`;
+        nitT.textContent = NITS[k * per + r - 1];
+        nit.style.opacity = !review || v < 0 ? 0 : f < 0.12 ? f / 0.12 : f > 0.85 ? (1 - f) / 0.15 : 1;
+        if (review && v >= 0) once(`n${k}_${r}`, () => sfx.key(0.5));
+        $("usNA").textContent = `${Math.round((m * 40) / A_N)}%`;
+        $("usMA").textContent = `${m} PR${m === 1 ? "" : "s"} merged`;
+        $("usCA").textContent = `${m} slop left`;
+        // lane B: a fast pull request every beat, reviewed by agents and merged; sweeps eat what slipped through
+        let n = 0,
+          eaten = 0,
+          cx = -1;
+        for (const s of SWEEPS) {
+          if (u < s) continue;
+          const last = SPECKS.reduce((m, _, i) => (B_AT(i) + 500 <= s ? i : m), -1),
+            end = B_X(last) + 40,
+            p = Math.min(1, (u - s) / SWEEP_D);
+          if (p < 1) cx = end * ease(p);
+          once("s" + s, () => sfx.review());
+        }
+        for (let i = 0; i < B_N; i++) {
+          const at = B_AT(i),
+            x = B_X(i),
+            on = u >= at + 500;
+          $("usP" + i).classList.toggle("on", u >= at && u < at + 520);
+          $("usC" + i).classList.toggle("on", on);
+          if (on) (n++, once("b" + i, () => sfx.pop(i)));
+          let clean = on;
+          SPECKS[i].forEach((_, j) => {
+            const sp = $(`usS${i}_${j}`),
+              gone = SWEEPS.some(s => u >= s && at + 500 <= s && (u >= s + SWEEP_D || x <= cx));
+            sp.classList.toggle("on", on);
+            sp.classList.toggle("eaten", gone);
+            if (gone) eaten++;
+            else clean = false;
+          });
+          $("usC" + i).classList.toggle("clean", clean);
+        }
+        chomp.classList.toggle("on", cx >= 0);
+        if (cx >= 0) chomp.setAttribute("transform", `translate(${cx},0)`);
+        $("usNB").textContent = `${Math.round((n / B_N) * 100)}%`;
+        $("usMB").textContent = `${n} PR${n === 1 ? "" : "s"} merged`;
+        $("usCB").textContent = `${eaten} slop eaten`;
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Fast PRs · agentic reviewers · background unsloppers"), h("h2", {}, letters("Merge fast, "), letters("unslop daily", "l-grad"))), svg),
     });
   }
 
@@ -3498,7 +3525,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#raoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/dsyme.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#raoClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
@@ -3546,7 +3573,7 @@
       ["#3fb950", 0.25],
       ["#d29922", 0.15],
     ];
-    let g = `<defs><radialGradient id="raoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="raoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="raoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="raoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="raoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
@@ -3722,7 +3749,8 @@
     };
     let prevT = 0;
     slides.push({
-      sound: "loop",
+      group: "loops",
+      sound: "telemetry",
       palette: ["#8957e5", "#238636", "#9e6a03", "#1f6feb"],
       notes:
         "Research, assign, observe: an agentic feedback loop. The production fleet, its numbers and the span stream are simulated in the browser. Servers export traces, metrics and logs over OTLP to an OpenTelemetry collector. A deep research agent queries that telemetry, notices the p95 latency on checkout breaching its SLO, researches the repository and files issues. Issue Monster assigns them to Copilot, the developer iterates, reviews and merges, and the deploy brings latency back under the SLO, which is observed again in the next round.",
@@ -3797,7 +3825,7 @@
     const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
       <circle cx="${x}" cy="${y}" r="34" fill="url(#mraAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
     const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
-      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/>${ico("person", x, y, 34, "#79c0ff")}</g>`;
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#mraClip)"/></g>`;
     const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
     // [edge id, path, color, label, lx, ly, anchor]
     const EDGES = [
@@ -3828,7 +3856,7 @@
       ["e9", "nMerge"],
     ];
     const LANE = { nComment: 0, nPR1: 0, nDev1: 1, nIssue: 1, nPR2: 1, nRefiner: 1, nMonster: 2, nPR3: 2, nDev2: 2, nMerge: 2 };
-    let g = `<defs><radialGradient id="mraAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+    let g = `<defs><clipPath id="mraClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="mraAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
       <marker id="mraP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
       <marker id="mraB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
     g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
@@ -3936,7 +3964,8 @@
       $("lane0").classList.add("on");
     };
     slides.push({
-      sound: "loop",
+      group: "loops",
+      sound: "mine",
       palette: ["#8957e5", "#1f6feb", "#bf3989", "#238636"],
       notes:
         "Mine, refine, apply: harvesting developer interventions into linters. All activity and review messages shown here are synthetic examples, not quotations or records of real people. Repeated corrections can become analyzer proposals, reviewed and refined by a developer, then applied across the repository through cleanup pull requests. Human corrections become deterministic checks.",
@@ -3997,6 +4026,477 @@
         }
       },
       el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Harvesting developer interventions into linters"), h("h2", {}, letters("Mine · Refine · "), letters("Apply", "l-grad"))), svg),
+    });
+  }
+
+  // Scan → Fix → Learn: the .NET runtime team's CI health loop; a scanner files Known Build Errors, a fixer attempts fixes, a feedback agent tunes both prompts
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#sflAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const maint = (id, x, y, avatar = "assets/avatars/ievangelist.jpg") => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Maintainer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="${avatar}" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#sflClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    // synthetic outer-loop pipelines; one fails per cycle, and the fixer's outcome rotates with it
+    const PIPES = ["stress · jit", "stress · gc", "pgo", "outer-loop", "arm64", "wasm"];
+    const FAIL = [1, 3, 4],
+      KIND = ["test hang", "assertion failure", "build break"];
+    const ROW0 = 284,
+      ROWH = 26;
+    let pipes = `<g class="sfl-box" id="sflPipes"><rect class="sfl-card" x="24" y="220" width="460" height="232" rx="12"/><text class="sfl-title" x="40" y="246">OUTER-LOOP PIPELINES</text>`;
+    PIPES.forEach((p, i) => (pipes += `<g class="sfl-row sfl-pipe" data-y="${ROW0 + i * ROWH}"><text x="40" y="${ROW0 + i * ROWH}">${p}</text><circle cx="462" cy="${ROW0 + i * ROWH - 6}" r="7"/></g>`));
+    pipes += `<text class="sfl-badge" id="sflBadge" x="40" y="440"></text>`;
+    pipes += `<g class="sfl-scan" id="sflBeam"><rect x="24" y="-28" width="460" height="28" fill="url(#sflBeamG)"/><line x1="24" y1="0" x2="484" y2="0"/></g></g>`;
+    const RUB = [
+      ["ok", "✓ signature is specific"],
+      ["ok", "✓ known-error data is valid"],
+      ["ok", "✓ fixed, never muted"],
+      ["ko", "✗ owner pinged wrongly"],
+      ["ed", "+ prompt edit proposed"],
+    ];
+    let rubric = `<g class="sfl-box" id="sflRubric"><rect class="sfl-card" x="1316" y="270" width="364" height="190" rx="12"/><text class="sfl-title" x="1332" y="296">KPI TRACKER · RUBRIC</text>`;
+    RUB.forEach(([c, t], i) => (rubric += `<g class="sfl-row sfl-rub"><text class="${c}" x="1332" y="${330 + i * 27}">${t}</text></g>`));
+    rubric += `</g>`;
+    const scanPipes = (f, c) => {
+      const s = $("sflBeam"),
+        y = 262 + Math.min(1, f / 0.75) * 166;
+      s.setAttribute("transform", `translate(0,${y})`);
+      s.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      svg.querySelectorAll(".sfl-pipe").forEach(r => r.classList.toggle("seen", +r.dataset.y <= y));
+      if (ROW0 + FAIL[c % 3] * ROWH <= y && !$("sflBadge").classList.contains("on")) {
+        $("sflBadge").classList.add("on");
+        sfx.pop(5);
+      }
+    };
+    const readRubric = f => svg.querySelectorAll(".sfl-rub").forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.5) / (RUB.length + 0.5)));
+    // [edge id, path, color, label, lx, ly, anchor, extra label class]
+    const EDGES = [
+      ["sflE0", "M110 174 V212", "p", ["scans failing runs"], 132, 200, "start"],
+      ["sflE1", "M492 340 H596", "p", ["files Known", "Build Error"], 640, 404, "middle"],
+      ["sflE2", "M640 304 V140 H818", "p", ["picks up", "open errors"], 662, 222, "start"],
+      ["sflO0", "M860 174 V274 H760 V320", "p", ["small and build-validated:", "draft fix PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO1", "M860 174 V274 H900 V320", "p", ["plausible, unverified:", "help-wanted PR"], 880, 222, "start", "sfl-ol"],
+      ["sflO2", "M860 174 V274 H1040 V320", "p", ["no code change possible:", "root-cause comment"], 880, 222, "start", "sfl-ol"],
+      ["sflR0", "M760 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR1", "M900 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflR2", "M1040 394 V470 H860 V542", "b", ["maintainer", "reviews"], 840, 500, "end", "sfl-ol"],
+      ["sflE3", "M1072 580 H1190 V140 H1214", "b", ["reactions & reviews"], 1140, 622, "middle"],
+      ["sflE4", "M1252 174 V292", "p", ["scores both", "against rubrics"], 1274, 222, "start"],
+      ["sflE5", "M1252 366 V542", "p", ["proposes", "prompt edits"], 1274, 494, "start"],
+      ["sflE6", "M1464 580 H1640 V655 H10 V140 H72", "b day", ["sharper prompts · the loop runs again"], 700, 642, "middle"],
+    ];
+    // the token's journey: [edge, node lit on arrival, duration]; SCAN and RUBRIC are in-place steps, {o} is this cycle's outcome
+    const SEQ = [
+      ["sflE0", "sflPipes"],
+      ["SCAN", "sflPipes", 2600],
+      ["sflE1", "sflKbe"],
+      ["sflE2", "sflFixer"],
+      ["sflO{o}", "sflOut{o}"],
+      ["sflR{o}", "sflDev"],
+      ["sflE3", "sflFeed"],
+      ["sflE4", "sflKpi"],
+      ["RUBRIC", "sflRubric", 2400],
+      ["sflE5", "sflDev2"],
+      ["sflE6", "sflScan", 1800],
+    ];
+    const LANE = { sflScan: 0, sflPipes: 0, sflKbe: 1, sflFixer: 1, sflOut0: 1, sflOut1: 1, sflOut2: 1, sflDev: 1, sflFeed: 2, sflKpi: 2, sflRubric: 2, sflDev2: 2 };
+    let g = `<defs><clipPath id="sflClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="sflAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="sflP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="sflBeamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
+      <marker id="sflB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 520, "SCAN · EVERY 12H"],
+      [520, 1160, "FIX · WEEKDAYS"],
+      [1160, VW, "LEARN · BI-WEEKLY"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="sflLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an, extra = ""] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#sfl${c.startsWith("p") ? "P" : "B"})"/>`;
+      g += `<text class="mra-l ${c} ${extra}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${l}</tspan>`).join("")}</text>`;
+    }
+    g += agent("sflScan", 110, 140, 230, "CI Scanner") + agent("sflFixer", 860, 140, 200, "CI Fixer") + agent("sflFeed", 1252, 140, 210, "Feedback");
+    g += pipes + box("sflKbe", 640, 340, "issue");
+    g += box("sflOut0", 760, 360, "pr") + box("sflOut1", 900, 360, "pr") + box("sflOut2", 1040, 360, "comment");
+    g += `<text class="sfl-rule" x="1150" y="520" text-anchor="end">✕ never disables a test</text>`;
+    g += maint("sflDev", 860, 580) + box("sflKpi", 1252, 330, "issue") + rubric + maint("sflDev2", 1252, 580, "assets/avatars/pelikhan.jpg");
+    g += `<g class="rpa-day">${ico("calendar", 30, 92, 26, "#ab7df8")}<text id="sflCycle" x="52" y="101">CYCLE 1</text></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg sfl-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 900,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1;
+    const at = (s, o) => s.replace("{o}", o);
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("sflLane" + LANE[nid]).classList.add("on");
+    };
+    slides.push({
+      group: "loops",
+      sound: "cihealth",
+      palette: ["#8957e5", "#1f6feb", "#2da44e", "#d29922"],
+      notes:
+        "Scan, fix, learn: a simplified rendering of the CI health process the .NET runtime team built from three agentic workflows. The pipelines, failures and rubric results shown are synthetic and illustrative. Every twelve hours a scanner reads failing outer-loop runs, such as stress, PGO or platform legs, and files a Known Build Error issue with a precise error signature, so the same failure is immediately ignorable in pull request CI. Detection only: it never touches the code. On weekdays a fixer picks up the open errors and always attempts a real fix. A small, build-validated change becomes a draft fix pull request; a plausible but unverified one becomes a help-wanted pull request that asks the likely author and area owners for help; when no code change is possible it posts one root-cause comment. It never disables or mutes a test. Maintainers review, close or comment. Every two weeks a feedback workflow reads those reactions, scores the scanner and the fixer against separate rubrics, and keeps a single KPI tracker issue with at most three proposed prompt edits. Humans apply the edits, the prompts get sharper, and the loop runs again.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC,
+          o = c % 3;
+        if (c !== cyc) {
+          cyc = c;
+          $("sflCycle").textContent = `CYCLE ${c + 1}`;
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          svg.querySelectorAll(".sfl-pipe").forEach((r, i) => r.classList.toggle("bad", i === FAIL[o]));
+          $("sflBadge").textContent = `✕ ${PIPES[FAIL[o]]}: ${KIND[o]}`;
+          $("sflBeam").style.opacity = 0;
+          light("sflScan");
+          popK = -1;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (eid === "SCAN" || eid === "RUBRIC") {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(at(SEQ[j][1], o));
+          if (eid === "SCAN") scanPipes(f, c);
+          else readRubric(f);
+          return;
+        }
+        const p = $(at(eid, o)),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(at(SEQ[j][1], o));
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(at(nid, o));
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Continuous CI health · as built by the .NET runtime team"), h("h2", {}, letters("Scan · Fix · "), letters("Learn", "l-grad"))), svg),
+    });
+  }
+
+  // Audit & Optimize: a health agent flags a failed run, which is audited through the agentic-workflows skill; the unified session is analyzed, the workflow is tuned and the next run is cheaper
+  {
+    resetIndex();
+    const VW = 1700,
+      VH = 680;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / (n === "merge" ? 16 : 24)})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    const agent = (id, x, y, w, label) => `<g class="fm-task" id="${id}"><g class="fm-pill"><rect x="${x}" y="${y - 25}" width="${w}" height="50" rx="25"/><text x="${x + 18 + w / 2}" y="${y + 8}">${label}</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 38)}</g>`;
+    const dev = (id, x, y) => `<g class="fm-task mra-dev" id="${id}"><g class="fm-pill b"><rect x="${x}" y="${y - 25}" width="200" height="50" rx="25"/><text x="${x + 18 + 100}" y="${y + 8}">Developer</text></g>
+      <circle cx="${x}" cy="${y}" r="34" fill="#0d1117" stroke="#4493f8" stroke-width="3"/><image href="assets/avatars/pelikhan.jpg" x="${x - 31}" y="${y - 31}" width="62" height="62" clip-path="url(#aoClip)"/></g>`;
+    const box = (id, x, y, icon) => `<g class="fm-out" id="${id}"><rect x="${x - 36}" y="${y - 34}" width="72" height="68" rx="14"/>${ico(icon, x, y, 34)}</g>`;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // synthetic run metrics: [label, before, after, format]
+    const MET = [
+      ["turns", 41, 17, v => `${Math.round(v)}`],
+      ["tokens", 412, 138, v => `${Math.round(v)}k`],
+      ["tool calls", 96, 22, v => `${Math.round(v)}`],
+      ["denied", 3, 0, v => `${Math.round(v)}`],
+    ];
+    // what the scheduled health agent sees across the repository's workflows: [name, score, ok]
+    const HEALTH = [
+      ["daily-report", 97, 1],
+      ["pr-review", 94, 1],
+      ["issue-triage", 58, 0],
+      ["docs-sync", 91, 1],
+    ];
+    let run = `<g class="sfl-box ao-run" id="aoRun"><rect class="sfl-card" x="24" y="90" width="332" height="298" rx="12"/><text class="sfl-title" x="40" y="116">HEALTH · ${HEALTH.length} WORKFLOWS</text>`;
+    HEALTH.forEach(([n, sc, ok], i) => {
+      const y = 146 + i * 26;
+      run += `<g class="ao-hrow${ok ? "" : " ao-pick"}"${ok ? "" : ' id="aoPick"'}><rect x="32" y="${y - 19}" width="316" height="26" rx="5"/><text class="ao-k" x="40" y="${y}">${n}</text><text class="ao-sc ${ok ? "ok" : "ko"}" x="338" y="${y}">${ok ? "✓" : "✕"} ${sc}</text></g>`;
+    });
+    run += `<line class="ao-axis" x1="40" y1="${146 + HEALTH.length * 26 - 10}" x2="338" y2="${146 + HEALTH.length * 26 - 10}"/><text class="ao-stat" id="aoStat" x="40" y="262"></text>`;
+    MET.forEach(([k], i) => (run += `<text class="ao-k" x="40" y="${292 + i * 26}">${k}</text><text class="ao-v" id="aoV${i}" x="338" y="${292 + i * 26}"></text>`));
+    run += `</g><text class="ao-delta" id="aoDelta" x="40" y="418">−66% tokens · −59% turns</text>`;
+    // what the audit downloads, typed into the terminal
+    const TERM = [
+      ["cmd", "$ gh aw audit 1842"],
+      ["dl", "↓ agent logs · firewall log"],
+      ["dl", "↓ token usage · tool calls"],
+      ["dl", "↓ aw_session.jsonl (unified)"],
+      ["ok", "✓ 214 events · 41 turns"],
+      ["ko", "✕ conclusion: failure"],
+    ];
+    let term = `<g class="sfl-box" id="aoTerm"><rect class="sfl-card" x="398" y="90" width="404" height="300" rx="12"/><text class="sfl-title" x="414" y="116">AUDIT · RUN 1842</text>`;
+    TERM.forEach(([c, t], i) => (term += `<g class="sfl-row ao-term"><text class="${c}" x="414" y="${158 + i * 36}">${esc(t)}</text></g>`));
+    term += `</g>`;
+    // the unified session: one bar per turn (height = tokens); r repeated search, x firewall denial, f oversized read, t tool, m model
+    const REP = [8, 11, 14, 17, 20, 23, 26, 29, 33],
+      DEN = [12, 27, 35],
+      BIG = [31, 36, 38],
+      NB = 41,
+      BX = 858,
+      BW = 380 / NB,
+      BASE = 256;
+    const KIND = [...Array(NB)].map((_, i) => (REP.includes(i) ? "r" : DEN.includes(i) ? "x" : BIG.includes(i) ? "f" : i % 2 ? "t" : "m"));
+    const HT = KIND.map((k, i) => (k === "f" ? 100 : k === "x" ? 22 : k === "r" ? 34 : 14 + ((i * 37) % 23) + (i >= 30 ? 36 : 0)));
+    const FIND = [
+      ["ed", "r", n => `⚠ ${n}× identical issue search`],
+      ["ko", "x", n => `✕ ${n} fetches denied by firewall`],
+      ["ed", "f", n => `⚠ ${n} files > 20 KB read whole`],
+      ["ed", "late", () => "⚠ 61% of tokens after turn 30"],
+    ];
+    let sess = `<g class="sfl-box" id="aoSess"><rect class="sfl-card" x="838" y="90" width="420" height="380" rx="12"/><text class="sfl-title" x="854" y="116">UNIFIED SESSION · aw_session.jsonl</text>`;
+    sess += `<rect class="rpa-dup" id="aoLate" x="${BX + 30 * BW - 3}" y="132" width="${11 * BW + 4}" height="${BASE - 128}" rx="6"/>`;
+    KIND.forEach((k, i) => (sess += `<rect class="ao-bar ${k}" x="${(BX + i * BW).toFixed(1)}" y="${BASE - HT[i]}" width="${(BW - 3).toFixed(1)}" height="${HT[i]}" rx="2"/>`));
+    sess += `<line class="ao-axis" x1="${BX - 4}" y1="${BASE + 2}" x2="${BX + 384}" y2="${BASE + 2}"/>`;
+    [
+      ["#8957e5", "model"],
+      ["#1f6feb", "tool"],
+      ["#f85149", "denied"],
+      ["#d29922", "waste"],
+    ].forEach(([c, t], i) => (sess += `<text class="ao-leg" x="${BX + i * 98}" y="${BASE + 28}" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
+    FIND.forEach(([c], i) => (sess += `<g class="sfl-row ao-find"><text class="${c}" id="aoF${i}" x="854" y="${330 + i * 34}"></text></g>`));
+    sess += `<g class="sfl-scan" id="aoBeam"><rect x="-28" y="128" width="28" height="${BASE - 124}" fill="url(#aoBeamG)"/><line x1="0" y1="128" x2="0" y2="${BASE + 4}"/></g></g>`;
+    // the fix, as a diff of the workflow markdown
+    const DIFF = [
+      ["ctx", "  tools:"],
+      ["ctx", "    github: { toolsets: [issues] }"],
+      ["add", "+   web-fetch:"],
+      ["add", "+ network:"],
+      ["add", "+   allowed: [docs.example.com]"],
+      ["add", "+ cache-memory: true"],
+      ["ctx", "  ---"],
+      ["add", "+ Search once, then reuse the results."],
+      ["ok", "✓ gh aw compile · lock refreshed"],
+    ];
+    let diff = `<g class="sfl-box ao-diff" id="aoDiff"><rect class="sfl-card" x="1288" y="90" width="404" height="330" rx="12"/><text class="sfl-title" x="1304" y="116">issue-triage.md</text>`;
+    DIFF.forEach(([c, t], i) => (diff += `<g class="sfl-row ao-dl ${c}"><rect x="1296" y="${134 + i * 30}" width="388" height="28" rx="4" fill="none"/><text x="1304" y="${154 + i * 30}">${esc(t)}</text></g>`));
+    diff += `</g>`;
+    // [edge id, path, color, label, lx, ly, anchor]
+    const EDGES = [
+      ["aoE0", "M90 400 V542", "p", ["on schedule · gh aw health", "picks issue-triage"], 112, 446, "start"],
+      ["aoE1", "M292 580 H410", "p", ["/agentic-workflows", "debug run 1842"], 340, 522, "middle"],
+      ["aoE2", "M450 544 V396", "p", ["audit"], 472, 478, "start"],
+      ["aoE3", "M804 240 H834", "p", [], 0, 0, "start"],
+      ["aoE4", "M1260 240 H1284", "p", [], 0, 0, "start"],
+      ["aoE5", "M1330 424 V542", "p", ["opens PR"], 1352, 490, "start"],
+      ["aoE7", "M1368 580 H1402", "b", ["✓ approves"], 1500, 534, "middle"],
+      ["aoE6", "M1440 616 V652 H8 V200 H20", "b day", ["merged · health keeps watching the next runs"], 760, 640, "middle"],
+    ];
+    // the token's journey: [edge, node lit on arrival, duration]; TYPE, SCAN, DIFF and RERUN are in-place steps
+    const SEQ = [
+      ["aoE0", "aoHealth"],
+      ["aoE1", "aoCop"],
+      ["aoE2", "aoTerm"],
+      ["TYPE", "aoTerm", 2200],
+      ["aoE3", "aoSess", 700],
+      ["SCAN", "aoSess", 3400],
+      ["aoE4", "aoDiff", 700],
+      ["DIFF", "aoDiff", 2600],
+      ["aoE5", "aoPR"],
+      ["aoE7", "aoDev", 900],
+      ["aoE6", "aoRun", 1800],
+      ["RERUN", "aoRun", 2200],
+    ];
+    const LANE = { aoRun: 0, aoHealth: 0, aoCop: 1, aoTerm: 1, aoSess: 2, aoDiff: 3, aoPR: 3, aoDev: 3 };
+    let g = `<defs><clipPath id="aoClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="aoAgent" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#c297ff"/><stop offset=".55" stop-color="#8957e5"/><stop offset="1" stop-color="#3b1d8f"/></radialGradient>
+      <marker id="aoP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker>
+      <linearGradient id="aoBeamG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ab7df8" stop-opacity="0"/><stop offset="1" stop-color="#ab7df8" stop-opacity=".35"/></linearGradient>
+      <marker id="aoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 380, "HEALTH"],
+      [380, 820, "AUDIT"],
+      [820, 1270, "AGENT · ANALYZE"],
+      [1270, VW, "AGENT · OPTIMIZE · FIX"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="aoLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    for (const [id, d, c, lab, lx, ly, an] of EDGES) {
+      g += `<path class="fm-wire ${c}" id="${id}" d="${d}" marker-end="url(#ao${c.startsWith("p") ? "P" : "B"})"/>`;
+      if (lab.length) g += `<text class="mra-l ${c}" x="${lx}" y="${ly}" text-anchor="${an}">${lab.map((l, k) => `<tspan x="${lx}" dy="${k ? 26 : 0}">${esc(l)}</tspan>`).join("")}</text>`;
+    }
+    g += run + term + sess + diff;
+    const badge = (x, y) => `<g class="ao-badge"><circle cx="${x}" cy="${y}" r="17" fill="url(#aoAgent)"/>${ico("copilot", x, y + 1, 20)}</g>`;
+    g += badge(1232, 444) + badge(1666, 394);
+
+    g += agent("aoHealth", 90, 580, 170, "health") + agent("aoCop", 450, 580, 290, "agentic-workflows") + box("aoPR", 1330, 580, "pr") + dev("aoDev", 1440, 580);
+    g += `<g class="ao-badge"><circle cx="62" cy="548" r="17" fill="#0d1117" stroke="#ab7df8" stroke-width="2"/>${ico("calendar", 62, 548, 18, "#ab7df8")}</g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.style.setProperty("--c", "#ab7df8");
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot"),
+      bars = [...svg.querySelectorAll(".ao-bar")],
+      finds = [...svg.querySelectorAll(".ao-find")];
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const STEP = 1050,
+      START = 900,
+      HOLD = 2400,
+      T = [];
+    let END = START;
+    for (const s of SEQ) {
+      T.push(END);
+      END += s[2] || STEP;
+    }
+    const CYC = END + HOLD;
+    let t0 = 0,
+      cyc = -1,
+      popK = -1,
+      typed = 0,
+      done = 0;
+    const light = nid => {
+      $(nid).classList.add("on");
+      $("aoLane" + LANE[nid]).classList.add("on");
+      if (nid === "aoHealth") $("aoPick").classList.add("on");
+    };
+    const setRun = (f, state) => {
+      const r = $("aoRun");
+      r.classList.toggle("bad", state === "bad");
+      r.classList.toggle("good", state === "good");
+      const st = $("aoStat");
+      st.textContent = state === "bad" ? "issue-triage #1842 · ✕" : state === "good" ? "issue-triage #1843 · ✓" : "issue-triage #1843 · ◌";
+      st.setAttribute("class", "ao-stat" + (state === "bad" ? " ko" : state === "good" ? " ok" : ""));
+      MET.forEach(([, a, b, fmt], i) => ($("aoV" + i).textContent = fmt(a + (b - a) * f)));
+    };
+    const reveal = (rows, f) => rows.forEach((r, i) => r.classList.toggle("seen", f >= (i + 0.4) / rows.length));
+    const scan = f => {
+      const b = $("aoBeam"),
+        x = BX + Math.min(1, f / 0.8) * (NB * BW + 4),
+        n = Math.floor((x - BX) / BW);
+      b.setAttribute("transform", `translate(${x},0)`);
+      b.style.opacity = f < 0.85 ? 1 : Math.max(0, 1 - (f - 0.85) / 0.15);
+      bars.forEach((r, i) => r.classList.toggle("seen", i < n));
+      FIND.forEach(([, k, txt], i) => {
+        const c = k === "late" ? +(n >= NB) : KIND.slice(0, n).filter(x => x === k).length;
+        if (!c) return;
+        const el = $("aoF" + i),
+          s = txt(c);
+        if (el.textContent !== s) el.textContent = s;
+        if (!finds[i].classList.contains("seen")) {
+          finds[i].classList.add("seen");
+          sfx.pop(4 + i);
+        }
+        if (k === "late") $("aoLate").classList.add("on");
+      });
+    };
+    slides.push({
+      group: "loops",
+      sound: "audit",
+      palette: ["#8957e5", "#1f6feb", "#d29922", "#2da44e"],
+      notes:
+        "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+          FIND.forEach((_, i) => ($("aoF" + i).textContent = ""));
+          $("aoBeam").style.opacity = 0;
+          setRun(0, "bad");
+          light("aoRun");
+          popK = -1;
+          typed = 0;
+          done = 0;
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        if (u < START || u >= END) {
+          dot.style.opacity = 0;
+          return;
+        }
+        let k = 0;
+        while (k + 1 < SEQ.length && T[k + 1] <= u) k++;
+        const [eid, nid, dur = STEP] = SEQ[k],
+          f = (u - T[k]) / dur;
+        if (["TYPE", "SCAN", "DIFF", "RERUN"].includes(eid)) {
+          dot.style.opacity = 0;
+          for (let j = 0; j <= k; j++) light(SEQ[j][1]);
+          if (eid === "TYPE") reveal([...svg.querySelectorAll(".ao-term")], f / 0.9);
+          else if (eid === "SCAN") scan(f);
+          else if (eid === "DIFF") reveal([...svg.querySelectorAll(".ao-dl")], f / 0.9);
+          else {
+            const g2 = Math.min(1, Math.max(0, (f - 0.15) / 0.6));
+            setRun(g2, f < 0.8 ? "run" : "good");
+            if (f >= 0.8 && !done) {
+              done = 1;
+              $("aoDelta").classList.add("on");
+              sfx.pop(9);
+            }
+          }
+          const rows = eid === "TYPE" ? ".ao-term.seen" : eid === "DIFF" ? ".ao-dl.seen" : null;
+          if (rows) {
+            const n = svg.querySelectorAll(rows).length;
+            if (n !== typed) {
+              typed = n;
+              if (n) sfx.key();
+            }
+          }
+          return;
+        }
+        const p = $(eid),
+          n = p.getTotalLength(),
+          q = p.getPointAtLength(n * ease(Math.min(1, f / 0.8)));
+        p.classList.add("hot");
+        if (dot.style.opacity !== "1") sfx.pop(0);
+        dot.style.opacity = 1;
+        dot.setAttribute("cx", q.x);
+        dot.setAttribute("cy", q.y);
+        dot.setAttribute("fill", p.classList.contains("b") ? "#4493f8" : "#ab7df8");
+        for (let j = 0; j < k; j++) light(SEQ[j][1]);
+        if (f >= 0.8) {
+          if (popK !== k) {
+            popK = k;
+            sfx.pop(k);
+          }
+          light(nid);
+        }
+      },
+      el: h("section", { class: "slide" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Health spots it · an agent fixes it · a developer approves"), h("h2", {}, letters("Audit & "), letters("Optimize", "l-grad"))), svg),
     });
   }
 
@@ -4303,6 +4803,7 @@
       pk = pk.filter(q => q.p < 1);
     };
     slides.push({
+      group: "cost",
       sound: "coins",
       palette: ["#9e6a03", "#238636", "#1f6feb", "#8957e5"],
       notes:
@@ -4722,6 +5223,7 @@
       if (b < 2) weekAt = 0;
     };
     slides.push({
+      group: "cost",
       sound: "router",
       palette: ["#8957e5", "#238636", "#1f6feb", "#6e40c9"],
       notes:
@@ -4822,6 +5324,271 @@
         }
         cx.globalAlpha = 1;
         bits = bits.filter(b => b.life > 0);
+      },
+      el: sec,
+    });
+  }
+
+  // Experiments, graders & evals: each run is assigned an A/B variant, graders measure it, evals judge it, and the analysis decides
+  {
+    resetIndex();
+    // stations: [kicker, title, sub, colour, frontmatter lines lit when a run passes]
+    const ST = [
+      ["experiments", "Assign", "A/B · least-used", "#e3b341", [0, 1, 2]],
+      ["agent", "Run", "same task, one variant", "#d1d7e0", [14]],
+      ["graders", "Measure", "deterministic · no LLM", "#39c5cf", [8, 9]],
+      ["evals", "Judge", "LLM asks: focused?", "#f778ba", [10, 11, 12]],
+      ["gh aw experiments", "Analyze", "per variant · stats", "#3fb950", [3, 4, 5, 6, 7]],
+    ];
+    const CODE = [
+      [["experiments", "k"], [":"]],
+      [["  "], ["style", "k"], [":"]],
+      [["    "], ["variants", "k"], [": [detailed, concise]"]],
+      [["    "], ["metric", "k"], [": "], ["eval:focused", "s"]],
+      [["    "], ["guardrail_metrics", "k"], [":"]],
+      [["      - "], ["name", "k"], [": "], ["grader:tool-success-rate", "s"]],
+      [["        "], ["threshold", "k"], [": "], ['">=0.95"', "s"]],
+      [["    "], ["min_samples", "k"], [": "], ["25", "n"]],
+      [["graders", "k"], [":"]],
+      [["  "], ["tool-success-rate", "k"], [": { "], ["threshold", "k"], [": "], ["0.95", "n"], [" }"]],
+      [["evals", "k"], [":"]],
+      [["  - "], ["id", "k"], [": "], ["focused", "s"]],
+      [["    "], ["question", "k"], [": Is the pull request focused?"]],
+      [["---"]],
+      [["Write a "], ["${{ experiments.style }}", "s"], [" fix."]],
+    ];
+    const N = 25,
+      COL = 360,
+      CW = 186,
+      Y = [138, 204],
+      MID = 171,
+      X0 = 130,
+      X1 = 4 * COL + 130,
+      V = 0.36,
+      DWELL = 1000;
+    const lineOf = new Map();
+    ST.forEach(([, , , c, ls]) => ls.forEach(l => lineOf.set(l, c)));
+    const lines = CODE.map((parts, i) => h("span", { "--c": lineOf.get(i) || "#9198a1" }, parts.map(([s, k]) => (k ? h("span", { class: `xp-${k}` }, s) : s))));
+    const code = h("div", { class: "xp-code" }, h("pre", {}, lines));
+    const stations = ST.map(([k, b, s, c], i) => h("div", { class: "xp-st", "--c": c, style: { left: `${i * COL}px` } }, h("i", {}, k), h("b", {}, b), h("small", {}, s)));
+    const flow = h(
+      "div",
+      { class: "xp-flow" },
+      Y.map((y, v) => h("div", { class: "xp-lane", "--c": v ? "var(--b)" : "var(--a)", style: { top: `${y}px` } })),
+      stations
+    );
+
+    const VAR = [
+      ["A", "detailed", "control", "var(--a)"],
+      ["B", "concise", "candidate", "var(--b)"],
+    ];
+    const rows = VAR.map(([v, name, role, c]) => {
+      const cells = Array.from({ length: N }, () => h("b"));
+      const rate = h("div", { class: "xp-rate" }, "—");
+      return { el: h("div", { class: "xp-row" }, h("i", { "data-v": v, "--c": c }, name, h("small", {}, role)), h("div", { class: "xp-cells" }, cells), rate), cells, rate };
+    });
+    const pill = h("span", { class: "xp-pill" }),
+      delta = h("b"),
+      pval = h("b"),
+      guard = h("span"),
+      dec = h("div", { class: "xp-dec" }),
+      why = h("div", { class: "xp-why" });
+    const an = h(
+      "div",
+      { class: "xp-an" },
+      h("div", { class: "xp-an-h" }, h("span", {}, "gh aw experiments analyze fix-bot"), pill),
+      rows.map(r => r.el),
+      h("div", { class: "xp-m" }, h("span", {}, "primary ", h("b", {}, "eval:focused"), " Δ ", delta), h("span", {}, pval)),
+      h("div", { class: "xp-m" }, h("span", {}, "guardrail ", h("b", {}, "grader:tool-success-rate ≥ 0.95")), guard),
+      why,
+      dec
+    );
+    const sec = h(
+      "section",
+      { class: "slide xp" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Is the agent getting better?"), h("h2", {}, letters("Experiments, "), letters("graders & evals", "l-grad"))),
+      flow,
+      code,
+      an
+    );
+
+    // two-sided two-proportion z-test, the analyzer's test for yes/no metrics
+    const erf = x => {
+      const s = Math.sign(x),
+        a = Math.abs(x),
+        k = 1 / (1 + 0.3275911 * a);
+      return s * (1 - ((((1.061405429 * k - 1.453152027) * k + 1.421413741) * k - 0.284496736) * k + 0.254829592) * k * Math.exp(-a * a));
+    };
+    const pTwo = (y1, n1, y2, n2) => {
+      const p = (y1 + y2) / (n1 + n2),
+        se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));
+      return se ? 1 - erf(Math.abs(y2 / n2 - y1 / n1) / se / Math.SQRT2) : 1;
+    };
+    // illustrative outcomes: the totals are fixed (A 14/25, B 22/25 focused); the order is shuffled every cycle
+    const deal = yes => {
+      const a = Array.from({ length: N }, (_, i) => i < yes);
+      for (let i = N - 1; i > 0; i--) {
+        const j = (Math.random() * (i + 1)) | 0;
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+
+    let t0 = 0,
+      cycle = 0,
+      runs = [],
+      spawned = 0,
+      nextAt = 0,
+      no = 0,
+      used = [0, 0],
+      got = [[], []],
+      ts = [[], []],
+      answers = [],
+      doneAt = 0,
+      ready = false,
+      promoted = false,
+      lit = [],
+      hot = [];
+    const flash = (i, t) => {
+      hot[i] = t;
+      stations[i].classList.add("hot");
+      for (const l of ST[i][4]) {
+        lit[l] = t;
+        lines[l].classList.add("on");
+      }
+    };
+    const fmt = v => `${Math.round(v * 100)}%`;
+    const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+    const refresh = () => {
+      const n = Math.min(got[0].length, got[1].length);
+      pill.textContent = ready ? "READY" : `COLLECTING ${n}/${N}`;
+      pill.classList.toggle("ready", ready);
+      const r = got.map(g => (g.length ? g.filter(Boolean).length / g.length : null));
+      rows.forEach((row, v) => (row.rate.textContent = r[v] == null ? "—" : fmt(r[v])));
+      delta.textContent = r[0] != null && r[1] != null ? `${r[1] >= r[0] ? "+" : "−"}${Math.round(Math.abs(r[1] - r[0]) * 100)} pts` : "…";
+      pval.textContent = ready ? `p = ${pTwo(got[0].filter(Boolean).length, N, got[1].filter(Boolean).length, N).toFixed(3)} · two-proportion` : "p = …";
+      guard.replaceChildren(
+        ...VAR.map(([v], i) => (ts[i].length ? h("span", {}, `${v} `, h("b", {}, mean(ts[i]).toFixed(2)), " ", h("span", { class: "ok" }, mean(ts[i]) >= 0.95 ? "✓  " : "✗  ")) : `${v} …  `))
+      );
+    };
+    const reset = () => {
+      runs.forEach(r => r.el.remove());
+      runs = [];
+      spawned = no = doneAt = 0;
+      used = [0, 0];
+      got = [[], []];
+      ts = [[], []];
+      answers = [deal(14), deal(22)];
+      ready = promoted = false;
+      nextAt = 0;
+      rows.forEach(r => r.cells.forEach(c => (c.className = "")));
+      dec.className = "xp-dec";
+      dec.textContent = "EXTEND";
+      why.textContent = `Collecting: each variant needs ${N} usable runs.`;
+      refresh();
+    };
+    const spawn = (t, gap) => {
+      // least-used variant first; a tie is broken at random
+      const v = used[0] === used[1] ? (Math.random() < 0.5 ? 0 : 1) : used[0] < used[1] ? 0 : 1;
+      const k = used[v]++;
+      no += 1 + ((Math.random() * 3) | 0);
+      const em = h("em"),
+        u = h("u"),
+        el = h("div", { class: "xp-run" }, h("b", {}, "?"), h("span", {}, `#${no}`), em, u);
+      flow.append(el);
+      runs.push({ el, em, u, v, k, t, st: 0, yes: answers[v][k], g: v ? 0.94 + Math.random() * 0.06 : 0.93 + Math.random() * 0.06 });
+      flash(0, t);
+      if (gap > 500) sfx.pop(v ? 5 : 1);
+    };
+    const step = (r, t) => {
+      // each run waits at Assign for a second before it starts moving
+      const e = t - r.t,
+        x = Math.min(X1, X0 + Math.max(0, e - DWELL) * V),
+        u = Math.min(1, e / 420),
+        y = MID + (Y[r.v] - MID) * (1 - (1 - u) ** 3);
+      r.el.style.transform = `translate(${(x - CW / 2).toFixed(1)}px, ${(y - 23).toFixed(1)}px)`;
+      if (r.st < 1 && e > 120) {
+        r.st = 1;
+        r.el.classList.add(r.v ? "b" : "a");
+        r.el.firstChild.textContent = VAR[r.v][0];
+      }
+      if (r.st < 2 && x >= COL + 130) {
+        r.st = 2;
+        flash(1, t);
+      }
+      if (r.st < 3 && x >= 2 * COL + 130) {
+        r.st = 3;
+        r.em.textContent = r.g.toFixed(2);
+        flash(2, t);
+      }
+      if (r.st < 4 && x >= 3 * COL + 130) {
+        r.st = 4;
+        r.u.textContent = r.yes ? "YES" : "NO";
+        r.u.className = r.yes ? "yes" : "no";
+        flash(3, t);
+        if (cycle === 0 && no < 40) sfx.notify(!r.yes);
+      }
+      if (r.st < 5 && x >= X1) {
+        r.st = 5;
+        r.at = t;
+        r.el.classList.add("gone");
+        flash(4, t);
+        got[r.v].push(r.yes);
+        ts[r.v].push(r.g);
+        rows[r.v].cells[got[r.v].length - 1].className = r.yes ? "yes" : "no";
+        refresh();
+      }
+      return r.st < 5 || t - r.at < 300;
+    };
+
+    slides.push({
+      group: "cost",
+      sound: "lab",
+      palette: ["#1f6feb", "#8957e5", "#238636", "#0d419d"],
+      notes:
+        "Experiments, graders and evals. How do you know a change to a workflow makes the agent better, not just different? Declare an experiment in the frontmatter: here the prompt style, detailed (the control) against concise (the candidate). On every run the activation job assigns one variant, least-used first so the two stay balanced, and the prompt reads it as experiments.style. After the run, graders measure it: ten deterministic built-ins such as tool-success-rate, loops and duration are computed from the unified session with no model call, and you can add your own JavaScript graders. Evals then judge it: an LLM answers a yes or no question such as 'is the pull request focused?'. The experiment names one of those as its primary metric (eval:focused) and others as guardrails (grader:tool-success-rate at 0.95 or better). gh aw experiments analyze joins each run's scores to its assigned variant, waits for min_samples per variant, runs the statistical test, checks every guardrail, and decides: extend, promote, reject or inconclusive. It never edits the workflow itself; promotion stays a reviewed change. The workflow, runs, scores and decision in the animation are illustrative and synthetic. Keys: → next slide.",
+      enter() {
+        t0 = cycle = 0;
+        lit = [];
+        hot = [];
+        lines.forEach(l => l.classList.remove("on"));
+        stations.forEach(s => s.classList.remove("hot"));
+        reset();
+      },
+      tick(t) {
+        if (!t0) {
+          t0 = t;
+          nextAt = t + 900;
+        }
+        // runs start slowly so each step can be followed, then speed up
+        if (spawned < 2 * N && t >= nextAt) {
+          const gap = Math.max(480, 1800 * 0.86 ** spawned);
+          spawn(t, gap);
+          spawned++;
+          nextAt = t + gap;
+        }
+        runs = runs.filter(r => step(r, t) || (r.el.remove(), false));
+        lit.forEach((at, l) => at && t - at > 140 && ((lit[l] = 0), lines[l].classList.remove("on")));
+        hot.forEach((at, i) => at && t - at > 260 && ((hot[i] = 0), stations[i].classList.remove("hot")));
+        if (!doneAt && got[0].length + got[1].length === 2 * N) doneAt = t;
+        if (doneAt && !ready && t - doneAt > 400) {
+          ready = true;
+          refresh();
+          if (cycle === 0) sfx.touch();
+          sfx.compile();
+        }
+        if (doneAt && !promoted && t - doneAt > 1300) {
+          promoted = true;
+          dec.textContent = "PROMOTE concise";
+          dec.className = "xp-dec promote";
+          why.textContent = "The candidate wins on the primary metric and passes every guardrail.";
+          sfx.review();
+        }
+        if (doneAt && t - doneAt > 7500) {
+          cycle++;
+          reset();
+          nextAt = t + 600;
+        }
       },
       el: sec,
     });
@@ -4980,6 +5747,7 @@
       tokN.textContent = "↓ " + Math.round(shown).toLocaleString("en-US") + " tokens";
     };
     slides.push({
+      group: "enterprise",
       sound: "engine",
       palette: ["#8957e5", "#9e6a03", "#1f6feb", "#238636"],
       notes:
@@ -5025,6 +5793,724 @@
           }
         }
         drawToks(t, dt);
+      },
+      el,
+    });
+  }
+
+  // Private enclaves: a public-repo agent asks an isolated sub-agent about a private repo; only finite, budgeted answers come back
+  {
+    resetIndex();
+    const BUDGET = 8;
+    const ROUNDS = [
+      { q: "Does it still call the v1 billing API?", schema: '{ uses_v1: boolean, callers: "0" | "1-5" | "6+" }', hot: [1, 4], a: '{ uses_v1: true, callers: "1-5" }', bits: 2.6, log: "uses v1 billing · 1-5 callers" },
+      { q: "Is the auth library on the patched release?", schema: "{ patched: boolean }", hot: [7], leak: '"no, see auth/session.ts: const key = …"', a: "{ patched: false }", bits: 1, log: "auth library not patched" },
+      { q: "Which test tier is flaky?", schema: '{ tier: "unit" | "integration" | "e2e" }', hot: [9], a: '{ tier: "integration" }', bits: 1.6, log: "flaky tier: integration" },
+      { q: "Which team owns the billing module?", schema: "{ team: one of 16 teams }", bits: 4, over: true },
+    ];
+    const CODE = [
+      "// billing/client.ts",
+      'import { charge } from "./v1/billing";',
+      "export async function renew(acct) {",
+      "  const plan = await lookup(acct);",
+      '  return charge(plan, { api: "v1" });',
+      "}",
+      "// auth/session.ts",
+      'import { sign } from "auth-lib@2.3.0";',
+      "// tests/integration/sync.test.ts",
+      'test.retry(3)("sync settles", run);',
+    ];
+    const PX = 560,
+      GX = 800,
+      VX = 1040;
+    const qTask = h("div", { class: "en-task" });
+    const qSchema = h("div", { class: "en-schema" });
+    const call = h("div", { class: "en-call" }, h("b", {}, "enclave_run_agent"), qTask, h("small", {}, "answer schema"), qSchema);
+    const log = h("ul", { class: "en-log" });
+    const out = h("div", { class: "en-out" }, h("code", {}, "create-issue"), "Plan the v1 billing migration");
+    const lines = CODE.map((l, i) => h("div", { class: "en-line" }, h("span", { class: "no" }, String(i + 1)), l));
+    const vaultStatus = h("div", { class: "en-status" });
+    const vault = h(
+      "div",
+      { class: "en-card en-vault", "--c": "#3fb950", "--i": 2 },
+      h("b", { class: "en-lock" }, "🔒 enclave"),
+      h("i", {}, "PRIVATE REPO · ISOLATED SUB-AGENT"),
+      h("h3", {}, "octo-org/private-service"),
+      h("div", { class: "en-facts" }, h("span", {}, "no egress"), h("span", {}, "read-only"), h("span", {}, "masked capability"), h("span", {}, "NVX microVM")),
+      h("div", { class: "en-code" }, lines),
+      vaultStatus
+    );
+    const gNote = h("div", { class: "en-gnote" });
+    const fill = h("div", { class: "en-fill" });
+    const leftN = h("b");
+    const invN = h("span", { class: "en-left" });
+    const el = h(
+      "section",
+      { class: "slide en" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Finite disclosure · private repos"), h("h2", {}, letters("Private "), letters("enclaves", "l-grad"))),
+      h(
+        "div",
+        { class: "en-card en-pub", "--c": "#4493f8", "--i": 0 },
+        h("i", {}, "PUBLIC REPO · PRIMARY AGENT"),
+        h("h3", {}, "Asks, never reads"),
+        h("div", { class: "en-facts" }, h("span", {}, h("b", {}, "0"), " private tokens"), h("span", {}, "no clone")),
+        call,
+        log,
+        out
+      ),
+      h("div", { class: "en-gate" }, h("i", {}, "MCP", h("br"), "gateway"), h("div", { class: "en-pillar" }), gNote, h("small", {}, "finite schema", h("br"), "budget ledger")),
+      vault,
+      h(
+        "div",
+        { class: "en-ledger" },
+        h("i", {}, "Information budget"),
+        h("div", { class: "en-bar" }, fill),
+        h("span", { class: "en-left" }, leftN, " / 8 bits left"),
+        invN,
+        h(
+          "div",
+          { class: "en-sens" },
+          ["public", "trusted", "internal", "confidential", "sealed"].map(s => h("span", { class: s === "confidential" ? "on" : "" }, s))
+        )
+      )
+    );
+    let ev = [],
+      evI = 0,
+      pks = [],
+      used = 0,
+      calls = 0,
+      t0 = 0,
+      now = 0,
+      fresh = true;
+    const fmt = n => (Math.round(n * 10) / 10).toString();
+    const ledger = () => {
+      const left = BUDGET - used;
+      fill.style.width = `${(left / BUDGET) * 100}%`;
+      fill.classList.toggle("low", left < 3);
+      leftN.textContent = fmt(left);
+      invN.textContent = `· ${calls} / 4 invocations`;
+    };
+    const say = (txt, ok) => {
+      gNote.textContent = txt;
+      gNote.className = `en-gnote show ${ok ? "ok" : "no"}`;
+    };
+    const launch = (txt, cls, x0, x1, dur, blocked) => {
+      const p = h("div", { class: `en-pk ${cls}` }, txt);
+      el.append(p);
+      pks.push({ el: p, x0, x1, start: now, dur, blocked, dead: 0 });
+    };
+    const script = () => {
+      ev = [];
+      evI = 0;
+      const at = (ms, fn) => ev.push([ms, fn]);
+      let T = 600;
+      ROUNDS.forEach((r, k) => {
+        const s = T;
+        at(s, () => {
+          qTask.textContent = r.q;
+          qSchema.textContent = r.schema;
+          call.classList.remove("flash");
+          void call.offsetWidth;
+          call.classList.add("flash");
+          lines.forEach(l => l.classList.remove("hot"));
+          gNote.classList.remove("show");
+          sfx.key();
+        });
+        at(s + 700, () => launch("task ▸", "q", PX, r.over ? GX : VX, r.over ? 700 : 1300, r.over));
+        if (r.over) {
+          at(s + 1400, () => {
+            say(`✗ over budget · needs ${r.bits} bits`, 0);
+            sfx.route(0);
+          });
+          T = s + 3200;
+          return;
+        }
+        at(s + 1350, () => say("✓ masked capability", 1));
+        at(s + 2000, () => {
+          calls++;
+          ledger();
+          vault.classList.add("busy");
+          vaultStatus.textContent = "sub-agent reading ";
+          gNote.classList.remove("show");
+        });
+        r.hot.forEach((n, j) => at(s + 2400 + j * 500, () => (lines[n].classList.add("hot"), sfx.key(0.6))));
+        let u = s + 3600;
+        at(u, () => {
+          vault.classList.remove("busy");
+          vaultStatus.textContent = "answer ready";
+        });
+        if (r.leak) {
+          at(u, () => launch(r.leak, "leak", VX, GX, 800, true));
+          at(u + 800, () => {
+            say("✗ free-form string · denied", 0);
+            sfx.route(0);
+          });
+          u += 1800;
+        }
+        at(u, () => launch(r.a, "a", VX, PX, 1400));
+        at(u + 700, () => {
+          used += r.bits;
+          ledger();
+          say(`✓ schema · −${r.bits} bits`, 1);
+          sfx.route(2);
+        });
+        at(u + 1400, () => {
+          log.append(h("li", {}, r.log));
+          sfx.pop(k * 2);
+        });
+        T = u + 2200;
+      });
+      at(T, () => {
+        out.classList.add("show");
+        gNote.classList.remove("show");
+        sfx.review();
+      });
+      at(T + 4000, () => (fresh = true));
+    };
+    const reset = () => {
+      pks.forEach(p => p.el.remove());
+      pks = [];
+      used = calls = 0;
+      log.replaceChildren();
+      out.classList.remove("show");
+      vault.classList.remove("busy");
+      vaultStatus.textContent = "";
+      gNote.className = "en-gnote";
+      qTask.textContent = "";
+      qSchema.textContent = "";
+      lines.forEach(l => l.classList.remove("hot"));
+      ledger();
+      t0 = now;
+      script();
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "vault",
+      palette: ["#8957e5", "#1f6feb", "#238636", "#1b7c83"],
+      notes:
+        "Private enclaves. An agent running in a public repository sometimes needs facts about a private repository, but it must never hold the private code or a token for it. With the enclaves frontmatter, the compiler registers an enclave_run_agent (or enclave_run_script) tool behind the MCP gateway. The primary agent sends a task plus a finite answer schema; AWF stages the private repo read-only into an isolated sub-agent (an NVX microVM, no egress) using a masked per-run capability the primary never sees. Only answers that fit the finite schema come back, and every answer is charged against an information budget set by the repo's sensitivity: public, trusted, internal, confidential or sealed. Free-form strings are denied, and once the budget or max-invocations is spent, further questions are refused. The repository, code, questions and bit counts on this slide are synthetic and illustrative.",
+      enter() {
+        fresh = true;
+      },
+      tick(t) {
+        now = t;
+        if (fresh) {
+          fresh = false;
+          reset();
+        }
+        const e = t - t0;
+        while (evI < ev.length && ev[evI][0] <= e) ev[evI++][1]();
+        for (const p of pks) {
+          if (p.dead) continue;
+          const u = Math.min(1, (t - p.start) / p.dur);
+          const k = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+          p.el.style.transform = `translate(calc(${p.x0 + (p.x1 - p.x0) * k}px - 50%), 0)`;
+          if (u >= 1) {
+            p.dead = t + 600;
+            if (p.blocked) p.el.classList.add("burst");
+            else p.dead = t;
+          }
+        }
+        pks = pks.filter(p => {
+          if (p.dead && t >= p.dead) p.el.remove();
+          return !p.dead || t < p.dead;
+        });
+      },
+      el,
+    });
+  }
+
+  // Connectors: a declaration lists everything a service offers; a workflow imports it and selects a few reads and one write; only that selection reaches the run
+  {
+    resetIndex();
+    // [label, kind] where kind 1 = selected by the workflow, "+" = collapsed remainder
+    const PV = [
+      {
+        id: "linear", name: "Linear", host: "api.linear.app", c: "#79c0ff",
+        trig: [["issue-created"], ["+6 more", "+"]],
+        tools: [["get-issue", 1], ["list-comments", 1], ["+27 more", "+"]],
+        safe: [["add-comment", 1], ["create-issue"], ["+6 more", "+"]],
+        sel: "[get-issue, list-comments]", reads: ["get-issue", "list-comments"], fx: "add-comment",
+      },
+      {
+        id: "jira", name: "Jira", host: "<site>.atlassian.net", c: "#4c9aff",
+        trig: [["issue-created"], ["+6 more", "+"]],
+        tools: [["getJiraIssue", 1], ["get-issue-remote-links"], ["+ MCP readers", "+"]],
+        safe: [["add-comment", 1], ["add-label"], ["+4 more", "+"]],
+        sel: "{personal: [getJiraIssue]}", reads: ["getJiraIssue"], fx: "add-comment",
+      },
+      {
+        id: "azure-devops", name: "Azure DevOps", host: "dev.azure.com", c: "#39c5cf",
+        trig: [["work-item-created"], ["+7 more", "+"]],
+        tools: [["get-work-item-description", 1], ["get-work-item"], ["+10 more", "+"]],
+        safe: [["comment-on-work-item", 1], ["create-work-item"], ["+21 more", "+"]],
+        sel: "[get-work-item-description]", reads: ["get-work-item-description"], fx: "comment-on-work-item",
+      },
+      {
+        id: "gitlab", name: "GitLab", host: "gitlab.com · self-managed", c: "#f0883e",
+        trig: [["merge-request-opened"], ["pipeline-updated"]],
+        tools: [["get-merge-request", 1], ["get-pipeline"]],
+        safe: [["add-merge-request-note", 1]],
+        sel: "[get-merge-request]", reads: ["get-merge-request"], fx: "add-merge-request-note",
+      },
+    ];
+    const CATALOG = ["Linear", "Jira", "Azure DevOps", "Slack", "Teams", "Confluence", "Sentry", "ServiceNow", "GitLab", "PagerDuty", "Datadog", "Zendesk", "Notion", "Asana"];
+    const K = "#ff7b72", D = "#656c76", T = "#f0f6fc", V = "#a5d6ff";
+    const R = "var(--r)", Wr = "var(--w)";
+
+    // declaration card
+    const cardFile = h("em");
+    const body = h("div", { class: "cn-body" });
+    const card = h("div", { class: "cn-card" }, h("div", { class: "cn-tab" }, "connectors/", cardFile, ".md"), body);
+    let pick = 0;
+    const chips = (list, k) => h("div", { class: "cn-chips" }, list.map(([l, s]) => h("span", { class: `cn-chip ${k}${s === 1 ? " pick" : ""}${s === "+" ? " more" : ""}`, "--i": s === 1 ? pick++ : 0 }, l)));
+    const sec = (label, ...kids) => h("div", { class: "cn-sec" }, h("small", {}, label), ...kids);
+    const buildCard = p => {
+      pick = 0;
+      cardFile.textContent = p.id;
+      body.replaceChildren(
+        sec("endpoint", h("div", { class: "cn-host" }, p.host)),
+        // reader secret serves the reads, writer secret only the safe-outputs job
+        sec("credentials", h("div", { class: "cn-chips" }, h("span", { class: "cn-chip r pick", "--i": 0 }, "reader"), h("span", { class: "cn-chip w pick", "--i": 3 }, "writer"))),
+        sec("triggers · not selected", chips(p.trig, "")),
+        sec("tools · read", chips(p.tools, "r")),
+        sec("safe-outputs · write", chips(p.safe, "w"))
+      );
+      body.classList.remove("swap");
+      void body.offsetWidth;
+      body.classList.add("swap");
+    };
+
+    // workflow editor: five slots retype per provider
+    const slot = k => h("span", { class: "cn-v", "--k": k });
+    const S = [slot("var(--pc)"), slot(R), slot(R), slot(Wr), slot(Wr)];
+    const LINES = [
+      [["---", D]],
+      [["on: ", K], ["workflow_dispatch", V]],
+      [["imports:", K]],
+      [["  - ", K], [".github/workflows/connectors/", V], S[0], [".md", V]],
+      [["tools:", K]],
+      [["  ", K], S[1], [": ", K], S[2]],
+      [["safe-outputs:", K]],
+      [["  staged: ", K], ["true", V]],
+      [["  ", K], S[3], ["-", K], S[4], [":", K]],
+      [["---", D]],
+      [["# Intake handoff", T]],
+      [["Read the approved item. Propose one update.", T]],
+    ];
+    const HOT = { 3: "var(--pc)", 5: R, 8: Wr };
+    const rows = LINES.map((parts, i) =>
+      h("div", { class: "cn-row" + (HOT[i] ? " hot" : ""), "--k": HOT[i] || "transparent" }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0])))))
+    );
+    const ed = h("div", { class: "cn-ed" }, h("div", { class: "cn-tab" }, "intake.md", h("span", {}, "SYNTHETIC")), h("div", { class: "cn-code" }, rows));
+    const target = p => [p.id, p.id, p.sel, p.id, p.fx];
+
+    // run time: provider ← reads ← agent → proposal → safe-outputs job → write → provider
+    const rt = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    rt.setAttribute("class", "cn-rt");
+    rt.setAttribute("viewBox", "0 0 450 520");
+    rt.innerHTML = `
+      <path class="e r" id="cnRead" d="M150 100 C150 190 98 210 98 300"/>
+      <path class="e p" id="cnProp" d="M195 410 H255"/>
+      <path class="e w" id="cnWrite" d="M352 300 C352 210 300 190 300 100"/>
+      <rect class="box pv" x="70" y="0" width="310" height="100" rx="18" style="--k:var(--pc)"/>
+      <text class="t pvt" x="225" y="46" text-anchor="middle"></text>
+      <text class="s" x="225" y="76" text-anchor="middle"></text>
+      <text class="m" x="20" y="196" style="fill:var(--r)">read</text>
+      <text class="m" x="430" y="196" text-anchor="end" style="fill:var(--w)">write</text>
+      <text class="m" x="225" y="438" text-anchor="middle" style="fill:#9198a1;font-size:12px">propose</text>
+      <rect class="box ag" x="0" y="300" width="195" height="220" rx="18" style="--k:var(--r)"/>
+      <text class="t" x="20" y="340">Agent</text>
+      <text class="s" x="20" y="366">sandbox</text>
+      <text class="m tl" x="20" y="404" style="fill:var(--r)"></text>
+      <text class="m tl" x="20" y="430" style="fill:var(--r)"></text>
+      <text class="s cnt" x="20" y="472"></text>
+      <text class="s" x="20" y="500" style="fill:#ff7b72">no writer secret</text>
+      <rect class="box so" x="255" y="300" width="195" height="220" rx="18" style="--k:var(--w)"/>
+      <text class="t" x="275" y="340">Safe outputs</text>
+      <text class="s" x="275" y="366">separate job</text>
+      <text class="m fx" x="275" y="404" style="fill:var(--w)"></text>
+      <text class="m fx" x="275" y="430" style="fill:var(--w)"></text>
+      <text class="s" x="275" y="472">writer secret</text>
+      <text class="s" x="275" y="500" style="fill:#d29922">staged · max 1</text>
+      <circle class="pk" r="9" style="fill:var(--r);filter:drop-shadow(0 0 8px var(--r))"/>
+      <circle class="pk" r="9" style="fill:#f0f6fc;filter:drop-shadow(0 0 8px #f0f6fc)"/>
+      <circle class="pk" r="9" style="fill:var(--w);filter:drop-shadow(0 0 8px var(--w))"/>`;
+    const [pvName, pvHost] = rt.querySelectorAll("text");
+    const toolEls = rt.querySelectorAll(".tl"),
+      fxEls = rt.querySelectorAll(".fx"),
+      cnt = rt.querySelector(".cnt"),
+      boxes = rt.querySelectorAll(".box"),
+      pks = rt.querySelectorAll(".pk"),
+      paths = ["cnRead", "cnProp", "cnWrite"].map(id => rt.querySelector("#" + id));
+    // fit a mono label into a box by shrinking its font (about 0.66em per glyph)
+    const fitText = (t, s, w = 160) => {
+      t.textContent = s;
+      t.style.fontSize = `${Math.min(16, Math.max(11, w / (s.length * 0.66)))}px`;
+    };
+    // a single long name wraps over both lines at its last hyphen that keeps the head short
+    const wrap = names => {
+      if (names.length > 1 || names[0].length <= 15) return names;
+      const n = names[0],
+        i = n.lastIndexOf("-", 14);
+      return [n.slice(0, i + 1), n.slice(i + 1)];
+    };
+    const buildRt = p => {
+      pvName.textContent = p.name;
+      pvHost.textContent = p.host;
+      const tl = wrap(p.reads);
+      toolEls.forEach((t, i) => fitText(t, tl[i] || ""));
+      cnt.textContent = `${p.reads.length} reader${p.reads.length > 1 ? "s" : ""} exposed`;
+      fitText(fxEls[0], p.id + "-");
+      fitText(fxEls[1], p.fx);
+    };
+
+    const cols = [
+      [110, "1", "Declare once", "endpoint · credentials · capabilities", ".2s"],
+      [600, "2", "Select per workflow", "importing alone grants nothing", ".3s"],
+      [1360, "3", "Expose only the selection", "reads in the sandbox · writes in a job", ".4s"],
+    ].map(([x, n, t, s, d]) => h("div", { class: "cn-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
+    const cat = CATALOG.map(n => h("span", { class: "cn-p" }, n));
+    const el = h(
+      "section",
+      { class: "slide cn" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Bring any service in · one reviewable YAML contract"), h("h2", {}, letters("Connectors", "l-grad"))),
+      cols,
+      card,
+      ed,
+      rt,
+      h("div", { class: "cn-cat" }, h("small", {}, "14 declarations"), cat)
+    );
+
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      holdAt = 0,
+      typed = [],
+      lens = null;
+    const setProvider = i => {
+      cur = i;
+      const p = PV[i];
+      el.style.setProperty("--pc", p.c);
+      buildCard(p);
+      buildRt(p);
+      cat.forEach(c => c.classList.toggle("on", c.textContent === p.name));
+    };
+    const paint = () => S.forEach((s, i) => (s.textContent = typed[i]));
+    const SEG = [
+      [300, 1300],
+      [1600, 2300],
+      [2600, 3700],
+    ];
+    const HOLD = 5200;
+    const packets = t => {
+      lens ??= paths.map(p => p.getTotalLength());
+      const e = phase === "hold" ? t - holdAt : -1;
+      SEG.forEach(([a, b], i) => {
+        const u = (e - a) / (b - a),
+          on = u >= 0 && u <= 1;
+        pks[i].style.opacity = on ? 1 : 0;
+        if (on) {
+          const pt = paths[i].getPointAtLength(u * lens[i]);
+          pks[i].setAttribute("cx", pt.x);
+          pks[i].setAttribute("cy", pt.y);
+        }
+      });
+      // light the box a packet just reached: agent after the read, job after the proposal, provider after the write
+      const near = at => e >= at && e < at + 700;
+      boxes[1].classList.toggle("hot", near(SEG[0][1]));
+      boxes[2].classList.toggle("hot", near(SEG[1][1]));
+      boxes[0].classList.toggle("hot", near(SEG[2][1]));
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "connectors",
+      palette: ["#1f6feb", "#238636", "#8957e5", "#1b7c83"],
+      notes:
+        "Connectors. A connector is an ordinary Markdown file under .github/workflows/connectors whose frontmatter declares one service: a fixed endpoint, separate reader and writer credential secret names, exact resource grants, and every capability the service offers, meaning triggers, read tools and safe-output writes. A workflow imports the declaration and then selects only what it needs: a reader or two under tools, and one write under safe-outputs, prefixed with the connector id. Importing alone grants nothing. At run time only the selection is exposed: the agent sees just the chosen readers inside the sandbox and holds no writer secret; it can only propose the write, which a separate safe-outputs job performs, staged here so it is only previewed. The same shape covers Linear, Jira, Azure DevOps, GitLab and ten more declarations. Connectors are experimental. The workflow is a synthetic example, capability names come from the declarations, and the request flow is illustrative.",
+      enter() {
+        phase = "hold";
+        since = 0;
+        holdAt = 0;
+        setProvider(0);
+        typed = target(PV[0]);
+        paint();
+        card.classList.add("lit");
+      },
+      tick(t) {
+        if (!since) since = holdAt = t;
+        const e = t - since;
+        if (phase === "hold" && e > HOLD) {
+          phase = "del";
+          since = t;
+          card.classList.remove("lit");
+        } else if (phase === "del" && e > 14) {
+          since = t;
+          const i = typed.findLastIndex(s => s.length);
+          if (i >= 0) typed[i] = typed[i].slice(0, -1);
+          else {
+            phase = "type";
+            setProvider((cur + 1) % PV.length);
+            sfx.pop(cur * 2);
+          }
+          paint();
+        } else if (phase === "type" && e > 40) {
+          since = t;
+          const goal = target(PV[cur]),
+            i = typed.findIndex((s, j) => s !== goal[j]);
+          if (i >= 0) {
+            typed[i] = goal[i].slice(0, typed[i].length + 1);
+            sfx.key(0.6);
+          } else {
+            phase = "hold";
+            holdAt = t;
+            card.classList.add("lit");
+          }
+          paint();
+        }
+        packets(t);
+      },
+      el,
+    });
+  }
+
+  // Enterprise ready: one Markdown workflow compiles to plain Actions YAML, so it runs on any runner (larger, self-hosted), keeps the agent behind the egress firewall (optionally in a microVM), reuses any action from the ecosystem, exports OpenTelemetry traces, and keeps Apps, OIDC and governance
+  {
+    resetIndex();
+    const RUN = [
+      { k: "[self-hosted, linux]", c: "#d29922" },
+      { k: "[self-hosted, arm64]", c: "#ab7df8" },
+      { k: "[self-hosted, gpu]", c: "#4493f8" },
+    ];
+    const OTEL = { c: "#f0883e", ic: '<path d="M8 14h22M16 26h30M24 38h24M12 50h16"/><circle cx="8" cy="14" r="3"/><circle cx="16" cy="26" r="3"/><circle cx="24" cy="38" r="3"/><circle cx="12" cy="50" r="3"/>' };
+    const SRV = '<rect x="10" y="10" width="44" height="13" rx="3"/><rect x="10" y="26" width="44" height="13" rx="3"/><rect x="10" y="42" width="44" height="13" rx="3"/><path d="M17 16.5h2M17 32.5h2M17 48.5h2M40 16.5h8M40 32.5h8M40 48.5h8"/>';
+    const FW = { c: "#ff7b72", ic: '<path d="M32 6 54 14v16c0 14-9 24-22 28C19 54 10 44 10 30V14Z"/><path d="M22 32l7 7 13-14"/>' };
+    const ECO = { c: "#3fb950", ic: '<rect x="8" y="8" width="20" height="20" rx="4"/><rect x="36" y="8" width="20" height="20" rx="4"/><rect x="8" y="36" width="20" height="20" rx="4"/><rect x="38" y="38" width="20" height="20" rx="4" transform="rotate(12 48 48)"/>' };
+    const STEPS = ["checkout", "setup-node", "cache"];
+    const CHIPS = [
+      ["GitHub Apps", [6, 7, 8]],
+      ["OIDC", [4, 5]],
+      ["Runner groups", [3]],
+      ["Environments", []],
+      ["Org secrets", [8]],
+      ["OpenTelemetry", [13, 14, 15]],
+      ["Rulesets", []],
+      ["Audit log", []],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff",
+      E = "#d2a8ff";
+    const vRun = h("span", { class: "ae-val" });
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [["runs-on: ", K], vRun],
+      [["permissions:", K]],
+      [
+        ["  id-token: ", K],
+        ["write", V],
+      ],
+      [["github-app:", K]],
+      [
+        ["  client-id: ", K],
+        ["${{ vars.APP_ID }}", E],
+      ],
+      [
+        ["  private-key: ", K],
+        ["${{ secrets.APP_KEY }}", E],
+      ],
+      [["network:", K]],
+      [
+        ["  allowed: ", K],
+        ["[defaults, node]", V],
+      ],
+      [["steps:", K]],
+      [
+        ["  - uses: ", K],
+        ["actions/setup-node@v4", V],
+      ],
+      [["observability:", K]],
+      [["  otlp:", K]],
+      [
+        ["    endpoint: ", K],
+        ["${{ secrets.OTLP_ENDPOINT }}", E],
+      ],
+      [["---", D]],
+      [["# Triage new issues for the platform team", T]],
+    ];
+    const rows = LINES.map((parts, i) => h("div", { class: "ae-row" + (i === 2 ? " hot" : "") }, h("span", { class: "no" }, String(i + 1)), h("span", {}, parts.map(p => (p instanceof Node ? p : h("span", { style: { color: p[1] } }, p[0]))))));
+    const ed = h("div", { class: "er-ed" }, h("div", { class: "ae-tab" }, "platform-triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "ae-code" }, rows));
+    const arrow = h("div", { class: "er-arrow" }, "gh aw compile");
+    arrow.innerHTML += '<svg viewBox="0 0 150 40"><path d="M4 20 H136 M120 6 L140 20 L120 34"/></svg><small>.lock.yml</small>';
+    const SB = 1,
+      RN = 2,
+      EC = 3;
+    const POS = [0, 1, 2, 3].map(i => [1010 + (i % 2) * 420, 330 + Math.floor(i / 2) * 260]);
+    const MID = i => [POS[i][0] + 195, POS[i][1] + 115];
+    const steps = STEPS.map((x, j) => h("b", { "--j": j }, x));
+    const card = (i, c, tag, title, code, ic, extra) => {
+      const el = h("div", { class: "er-card", "--rc": c, "--i": i, style: { left: `${POS[i][0]}px`, top: `${POS[i][1]}px` } }, h("i", {}, tag), h("h3", {}, title), h("code", {}, code), h("span", { class: "er-st" }), extra);
+      el.insertAdjacentHTML("afterbegin", `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true">${ic}</svg>`);
+      return el;
+    };
+    const spans = h(
+      "div",
+      { class: "er-spans" },
+      [
+        [0, 100],
+        [8, 46],
+        [30, 58],
+        [62, 30],
+      ].map(([x, w], j) => h("b", { "--x": `${x}%`, "--w": `${w}%`, "--j": j }))
+    );
+    const otel = card(0, OTEL.c, "Observability · OTLP", "OpenTelemetry", "observability.otlp", OTEL.ic, spans);
+    otel.classList.add("otel");
+    const cRun = h("span");
+    const runner = card(RN, RUN[0].c, "Your network", "Self Hosted", cRun, SRV);
+    const fw = card(SB, FW.c, "Egress firewall", "microVM", "network.allowed", FW.ic, h("div", { class: "er-fw" }, ["✓ defaults", "✓ node", "✕ other"].map(x => h("b", { class: x[0] === "✕" ? "no" : "" }, x))));
+    fw.classList.add("fw");
+    const eco = card(EC, ECO.c, "Actions · Marketplace", "Ecosystem", "uses: any action", ECO.ic, h("div", { class: "er-steps" }, steps));
+    eco.classList.add("eco");
+    const job = h("div", { class: "er-job" });
+    const trace = h("div", { class: "er-job er-trace" });
+    const chips = CHIPS.map(([x], i) => h("span", { class: "er-chip", "--i": i }, x));
+    const el = h(
+      "section",
+      { class: "slide er" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "All the goodness of GitHub Actions"), h("h2", {}, letters("Enterprise "), letters("ready", "l-grad"))),
+      h("div", { class: "er-tag" }, "It compiles to ", h("b", {}, "plain GitHub Actions"), ", so it runs wherever your Actions already run."),
+      ed,
+      arrow,
+      otel,
+      fw,
+      runner,
+      eco,
+      job,
+      trace,
+      h("div", { class: "er-chips" }, h("i", {}, "Identity · governance"), chips)
+    );
+    const fly = (dot, [x0, y0], [x1, y1]) => {
+      dot.style.transition = "none";
+      Object.assign(dot.style, { left: `${x0}px`, top: `${y0}px`, opacity: "1" });
+      void dot.offsetWidth;
+      dot.style.transition = "left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s .7s";
+      Object.assign(dot.style, { left: `${x1}px`, top: `${y1}px`, opacity: "0" });
+    };
+    let cur = 0,
+      phase = "hold",
+      since = 0,
+      typed = "",
+      arriveAt = 0,
+      otelAt = 0,
+      chipAt = 0,
+      sbAt = 0,
+      chip = -1;
+    const setRunner = (i, t) => {
+      cur = i;
+      el.style.setProperty("--ec", RUN[i].c);
+      runner.style.setProperty("--rc", RUN[i].c);
+      cRun.textContent = RUN[i].k;
+      runner.classList.add("on");
+      for (const c of [runner, eco, fw]) c.classList.remove("run");
+      eco.classList.remove("on");
+      fw.classList.remove("on");
+      steps.forEach(p => p.classList.remove("up"));
+      fly(job, [840, 460], MID(RN));
+      arriveAt = t + 700;
+      sbAt = otelAt = Infinity;
+    };
+    const setChip = i => {
+      chip = i;
+      chips.forEach((c, j) => c.classList.toggle("lit", j === i));
+      const lit = CHIPS[i][1];
+      rows.forEach((r, j) => r.classList.toggle("lit", lit.includes(j + 1) && j !== 2));
+    };
+    slides.push({
+      group: "enterprise",
+      sound: "enterprise",
+      palette: ["#1f6feb", "#0d419d", "#9e6a03", "#0a1a33"],
+      notes:
+        "Enterprise ready. An agentic workflow compiles to a plain GitHub Actions lock file, so you keep all the goodness of Actions: hosted, larger and Arm runners, or self-hosted runners and runner groups inside your own network, all selected with runs-on. Wherever it runs, the agent sits behind the egress firewall, which only allows the domains listed under network, and on eligible hosted KVM runners it can run inside a Cloud Hypervisor microVM. Custom steps reuse the whole Actions ecosystem, from setup and cache actions to your own internal actions, before the agent starts. Every run exports OpenTelemetry traces over OTLP to your own observability backend. Identity stays first class: GitHub App installation tokens instead of personal tokens, OIDC (id-token: write) to federate into clouds and MCP servers without long-lived keys, org and enterprise secrets, environments with required reviewers, rulesets and the audit log. The workflow, runner labels and job animation are synthetic and illustrative; see the self-hosted runners, OpenTelemetry and enterprise configuration reference for supported deployments.",
+      enter() {
+        typed = RUN[0].k;
+        vRun.textContent = typed;
+        phase = "hold";
+        since = chipAt = 0;
+        chip = -1;
+        chips.forEach(c => c.classList.remove("lit"));
+        rows.forEach(r => r.classList.remove("lit"));
+        otel.classList.remove("on", "run");
+        for (const c of [runner, eco, fw]) c.classList.remove("on", "run");
+        steps.forEach(p => p.classList.remove("up"));
+        cRun.textContent = RUN[0].k;
+        sbAt = Infinity;
+        for (const d of [job, trace]) {
+          d.style.transition = "none";
+          d.style.opacity = "0";
+        }
+        cur = 0;
+        arriveAt = otelAt = Infinity;
+      },
+      tick(t) {
+        if (!since) {
+          since = t;
+          chipAt = t + 1800;
+          setRunner(0, t + 900);
+        }
+        if (t > arriveAt && !runner.classList.contains("run")) {
+          runner.classList.add("run");
+          sbAt = t + 900;
+        }
+        if (t > sbAt) {
+          sbAt = Infinity;
+          fw.classList.remove("run");
+          void fw.offsetWidth;
+          fw.classList.add("on", "run");
+          fly(trace, MID(SB), MID(0));
+          otelAt = t + 700;
+        }
+        if (t > otelAt) {
+          otelAt = Infinity;
+          otel.classList.remove("run");
+          void otel.offsetWidth;
+          otel.classList.add("on", "run");
+        }
+        if (t > arriveAt) {
+          const n = Math.min(steps.length, Math.floor((t - arriveAt) / 260) + 1);
+          steps.forEach((p, j) => p.classList.toggle("up", j < n));
+          eco.classList.add("on");
+          eco.classList.toggle("run", n === steps.length);
+        }
+        if (t > chipAt) {
+          chipAt = t + 1500;
+          setChip((chip + 1) % CHIPS.length);
+        }
+        const el2 = t - since;
+        const next = RUN[(cur + 1) % RUN.length].k;
+        if (phase === "hold" && el2 > 3400) {
+          phase = "del";
+          since = t;
+        } else if (phase === "del" && el2 > 28) {
+          since = t;
+          typed = typed.slice(0, -1);
+          vRun.textContent = typed;
+          if (!typed) phase = "type";
+        } else if (phase === "type" && el2 > 70) {
+          since = t;
+          typed = next.slice(0, typed.length + 1);
+          vRun.textContent = typed;
+          sfx.key(0.7);
+          if (typed === next) {
+            setRunner((cur + 1) % RUN.length, t);
+            sfx.pop(cur * 2);
+            phase = "hold";
+          }
+        }
       },
       el,
     });
@@ -5163,6 +6649,7 @@
       ctx.fillText("WORKERS · ONE TARGET EACH", 470 + 2.5 * 110 + 27, CH - 6);
     };
     slides.push({
+      group: "scale",
       sound: "radar",
       palette: ["#8957e5", "#1f6feb", "#238636", "#9e6a03"],
       notes:
@@ -5293,8 +6780,7 @@
       if (!iDot.offsetWidth) return;
       const cs = getComputedStyle(iDot),
         fs = parseFloat(cs.fontSize);
-      mctx.font = `800 ${fs}px "Mona Sans"`;
-      if ("fontStretch" in mctx) mctx.fontStretch = "semi-expanded";
+      mctx.font = `700 ${fs}px "Mona Sans"`;
       const m = mctx.measureText("ı");
       // ink of the dotless i stem, relative to the span's origin and baseline
       const left = iDot.offsetLeft - m.actualBoundingBoxLeft,
@@ -5321,6 +6807,7 @@
       return [u * u * ax + 2 * u * f * mx + f * f * bx, u * u * ay + 2 * u * f * my + f * f * by];
     };
     slides.push({
+      group: "scale",
       sound: "finale",
       palette: ["#0fbf3e", "#1f6feb", "#8957e5", "#238636"],
       notes:
@@ -5500,7 +6987,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "fin-bg" }, h("h1", {}, "G", iDot, "tHub"), h("h1", {}, "Agentic Workflows")),
+        h("div", { class: "fin-bg" }, h("h1", {}, "G", iDot, "tHub Agentic Workflows"), h("h1", {}, "Build the factory that works for you")),
         cv,
         h("div", { class: "fin-cap" }, "Illustrative  ·  ", h("b", {}, "1"), " control repo  ·  ", h("b", {}, `${repos.length}`), " repos  ·  ", cRuns, " runs")
       ),
@@ -5526,6 +7013,21 @@
       })
     )
   );
+  const arrowBtn = (label, d, fn) => {
+    const b = h("button", {
+      "aria-label": label,
+      title: label,
+      onclick: e => {
+        e.stopPropagation();
+        fn();
+      },
+    });
+    b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+    return b;
+  };
+  const prevBtn = arrowBtn("Previous slide", "M15 5l-7 7 7 7", () => prev());
+  const nextBtn = arrowBtn("Next slide", "M9 5l7 7-7 7", () => next());
+  const arrows = h("div", { class: "arrows" }, prevBtn, nextBtn);
   const count = h("div", { class: "count" });
   const snd = h("button", {
     class: "snd",
@@ -5542,13 +7044,15 @@
     '<g class="x"><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></g></svg>';
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
-  const gwash = h("div", { class: "wash green" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, gwash, wash, gridc, stage, progress, dots, count, snd, notes);
+  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
 
+  // Dot row: left offset + 12px dots + 12px gaps + 28px for the wide active dot; sound/count need ~170px on the right.
+  const dotsWidth = 28 + slides.length * 24 - 12 + 28;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 170);
   };
   addEventListener("resize", fit);
   fit();
@@ -5608,6 +7112,7 @@
     };
     const cut = () => {
       if (!ac) return;
+      cueSince = ac.currentTime;
       const old = out,
         t = ac.currentTime;
       old.gain.cancelScheduledValues(t);
@@ -5672,7 +7177,7 @@
         pan.connect(out);
       } else g.connect(out);
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.18, t + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.115, t + 0.18);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
       src.start(t, Math.random() * 0.4);
       src.stop(t + 0.55);
@@ -5684,7 +7189,7 @@
       o.frequency.exponentialRampToValueAtTime(dir > 0 ? 42 : 80, t + 0.5);
       o.connect(og);
       og.connect(out);
-      env(og, t + 0.12, 0.02, 0.35, 0.4);
+      env(og, t + 0.12, 0.02, 0.224, 0.4);
       o.start(t + 0.1);
       o.stop(t + 0.6);
     };
@@ -5725,13 +7230,20 @@
       o.start(t);
       o.stop(t + a + dur + 0.05);
     };
-    const bell = (m, t, vol = 0.08, dur = 1.6) =>
+    const bell = (m, t, vol = 0.08, dur = 1.6, dest = out) =>
       [
         [1, 1],
         [2.76, 0.4],
         [5.4, 0.18],
         [8.93, 0.08],
-      ].forEach(([r, v]) => osc("sine", hz(m) * r, t, dur / r ** 0.4, vol * v));
+      ].forEach(([r, v]) => osc("sine", hz(m) * r, t, dur / r ** 0.4, vol * v, { dest }));
+    const panTo = p => {
+      const n = ac.createStereoPanner?.();
+      if (!n) return out;
+      n.pan.value = p;
+      n.connect(out);
+      return n;
+    };
     const click = (t, f = 3000, vol = 0.12, q = 4) => {
       const src = ac.createBufferSource(),
         bp = ac.createBiquadFilter(),
@@ -5776,16 +7288,130 @@
         pad([48, 55, 64, 71], t + 0.1, 3.2, 0.045);
         [72, 76, 79, 83, 86, 91].forEach((m, i) => bell(m, t + 0.5 + i * 0.11, 0.05, 1.4));
       },
-      ship: t => {
+      // built on Actions: build, test, deploy job ticks, then the agent step slots in with a shimmer and a green-check chime
+      actions: t => {
+        [60, 64, 67].forEach((m, i) => {
+          click(t + 0.2 + i * 0.16, 1800, 0.06, 6);
+          tone(m, t + 0.2 + i * 0.16, { type: "square", dur: 0.12, vol: 0.05, cutoff: 2400, detune: 3 });
+        });
+        tone(48, t + 0.2, { type: "triangle", dur: 0.9, vol: 0.14, cutoff: 800 });
+        [79, 83, 86].forEach((m, i) => bell(m, t + 0.62 + i * 0.06, 0.03, 0.9));
+        pad([60, 67, 71, 76], t + 0.6, 1.6, 0.02, "triangle", 2600);
+        bell(84, t + 1.05, 0.05, 1.4);
+        bell(91, t + 1.17, 0.04, 1.6);
+      },
+      // anatomy: a scanning glide down the file, one tick per section (front matter … prompt), settling on a chord
+      anatomy: t => {
+        osc("sine", 1800, t + 0.15, 1.1, 0.012, { f1: 300, a: 0.05 });
+        [84, 81, 79, 76, 74, 72].forEach((m, i) => {
+          click(t + 0.2 + i * 0.17, 2600, 0.04, 8);
+          bell(m, t + 0.2 + i * 0.17, 0.025, 0.6);
+        });
+        pad([48, 55, 62, 64], t + 1.2, 1.8, 0.025, "triangle", 1400);
+      },
+      // safe outputs: the direct write is refused (dull buzz), a proposal slides out, a detection sweep, then the separate job writes it
+      safe: t => {
+        osc("square", 110, t + 0.2, 0.14, 0.04, { f1: 98 });
+        osc("square", 104, t + 0.36, 0.18, 0.035, { f1: 92 });
+        osc("sine", hz(72), t + 0.65, 0.3, 0.03, { f1: hz(79) });
+        osc("sine", 2400, t + 0.95, 0.35, 0.01, { f1: 600 });
+        bell(79, t + 1.35, 0.045, 1.2);
+        bell(84, t + 1.47, 0.04, 1.4);
+      },
+      // review squared: "ready for review" fans out to agent reviewers (panned left, right, centre), then a human approves
+      reviews: t => {
+        tone(67, t + 0.2, { type: "triangle", dur: 0.2, vol: 0.06, cutoff: 2000, detune: 3 });
         [
-          [60, 0],
-          [64, 0.12],
-          [67, 0.24],
-          [72, 0.4],
-        ].forEach(([m, d]) => tone(m, t + 0.2 + d, { type: "sawtooth", dur: d > 0.3 ? 0.9 : 0.2, vol: 0.08, cutoff: 3600 }));
-        tone(48, t + 0.6, { type: "triangle", dur: 0.9, vol: 0.18, cutoff: 900 });
-        bell(84, t + 0.75, 0.07);
-        bell(91, t + 0.9, 0.05);
+          [-0.7, 76],
+          [0.7, 79],
+          [0, 83],
+        ].forEach(([p, m], i) => {
+          const d = panTo(p),
+            tt = t + 0.4 + i * 0.16;
+          bell(m, tt, 0.035, 0.7, d);
+          bell(m + 5, tt + 0.07, 0.025, 0.8, d);
+        });
+        osc("triangle", 110, t + 1.0, 0.18, 0.06, { f1: 55 });
+        click(t + 1.0, 600, 0.05, 4);
+        pad([55, 62, 67, 71], t + 1.0, 2, 0.03, "triangle", 2000);
+      },
+      // merge fast, unslop daily: a slow nit tick on the left, a quick run of merge pops on the right, then a downward gulp as the slop is eaten
+      unslop: t => {
+        [0, 0.3, 0.6].forEach(d => click(t + 0.15 + d, 1400, 0.04, 6));
+        [72, 74, 76, 79, 81, 84].forEach((m, i) => bell(m, t + 0.3 + i * 0.09, 0.03, 0.6));
+        osc("sine", hz(79), t + 1.0, 0.35, 0.04, { f1: hz(55) });
+        pad([53, 60, 64, 69], t + 1.2, 1.8, 0.025, "triangle", 1600);
+      },
+      // repo assist: a scheduled tick-tock, then a calm descending line as the open-issue count falls, resolving home
+      assist: t => {
+        [0, 0.25].forEach((d, i) => click(t + 0.2 + d, i ? 2400 : 3200, 0.05, 10));
+        [79, 76, 74, 72, 67].forEach((m, i) => tone(m, t + 0.7 + i * 0.15, { type: "triangle", dur: 0.3, vol: 0.06, cutoff: 2400, detune: 3 }));
+        bell(72, t + 1.45, 0.04, 1.6);
+        pad([48, 55, 64], t + 1.4, 1.8, 0.025, "triangle", 1400);
+      },
+      // issues as intent: a few typed keystrokes (the issue), a hand-off up to Copilot, review chirps, then a bright merge chord
+      contrib: t => {
+        [0, 0.09, 0.2, 0.27, 0.38].forEach((d, i) => click(t + 0.2 + d, 2600 + i * 180, 0.04, 12));
+        [67, 72, 79].forEach((m, i) => tone(m, t + 0.8 + i * 0.12, { type: "triangle", dur: 0.16, vol: 0.06, cutoff: 2600, detune: 3 }));
+        [84, 81, 84].forEach((m, i) => osc("sine", hz(m), t + 1.3 + i * 0.1, 0.12, 0.025));
+        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.75 + i * 0.05, 0.04, 1.5));
+        pad([48, 55, 64, 67], t + 1.75, 1.8, 0.025, "triangle", 2000);
+      },
+      // research → assign → refine: two sonar pings (the second finds something), a hand-off, then a refining back-and-forth
+      research: t => {
+        [74, 79].forEach((m, i) => {
+          osc("sine", hz(m), t + 0.2 + i * 0.45, 0.7, 0.05, { a: 0.003 });
+          osc("sine", hz(m) * 2, t + 0.2 + i * 0.45, 0.2, 0.01);
+        });
+        [67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.15, { type: "triangle", dur: 0.18, vol: 0.06, cutoff: 2400, detune: 3 }));
+        [76, 74, 76, 79].forEach((m, i) => tone(m, t + 1.45 + i * 0.12, { type: "triangle", dur: i === 3 ? 0.6 : 0.14, vol: 0.05, cutoff: 3000, detune: 3 }));
+      },
+      // research → assign → observe: a stream of span blips, a dissonant SLO-breach alert, then back under budget
+      telemetry: t => {
+        const P = [0, 2, 4, 7, 9];
+        for (let i = 0; i < 10; i++) osc("sine", hz(84 + P[(i * 3) % 5]), t + 0.2 + i * 0.07, 0.05, 0.015);
+        [78, 72].forEach((m, i) => tone(m, t + 1.0 + i * 0.16, { type: "square", dur: 0.16, vol: 0.04, cutoff: 1800, detune: 12 }));
+        [72, 76, 79].forEach((m, i) => bell(m, t + 1.5 + i * 0.07, 0.035, 1.2));
+      },
+      // mine → refine → apply: pickaxe strikes, a crystal forming (the rule), then stamped across the repo one PR at a time
+      mine: t => {
+        [0, 0.22, 0.44].forEach((d, i) => {
+          click(t + 0.2 + d, 1400 - i * 200, 0.1, 3);
+          osc("triangle", 160, t + 0.2 + d, 0.1, 0.08, { f1: 70 });
+        });
+        [88, 91, 95, 100].forEach((m, i) => bell(m, t + 0.8 + i * 0.05, 0.02, 1.1));
+        [67, 69, 71, 74].forEach((m, i) => {
+          click(t + 1.25 + i * 0.1, 3000, 0.04, 6);
+          tone(m, t + 1.25 + i * 0.1, { type: "triangle", dur: 0.12, vol: 0.04, cutoff: 2400, detune: 2 });
+        });
+      },
+      // scan → fix → learn: a scanner sweep, a failing leg's dissonant buzz, the fix resolving, then the prompts learn (rising chime)
+      cihealth: t => {
+        osc("sawtooth", 200, t + 0.2, 0.45, 0.02, { f1: 1600, a: 0.05 });
+        [52, 53].forEach(m => tone(m, t + 0.7, { type: "square", dur: 0.25, vol: 0.045, cutoff: 900, detune: 20 }));
+        [64, 67, 72].forEach((m, i) => tone(m, t + 1.05 + i * 0.11, { type: "triangle", dur: 0.22, vol: 0.06, cutoff: 2600, detune: 3 }));
+        bell(76, t + 1.45, 0.04, 1.2);
+        bell(79, t + 1.57, 0.035, 1.4);
+      },
+      // audit & optimize: artifacts trickling down, a scanner sweep, two warning taps, then the tuned run resolving upward
+      audit: t => {
+        for (let i = 0; i < 6; i++) osc("sine", hz(88 - i * 2), t + 0.2 + i * 0.06, 0.05, 0.015);
+        osc("sawtooth", 300, t + 0.65, 0.4, 0.015, { f1: 1400, a: 0.05 });
+        [70, 70].forEach((m, i) => tone(m, t + 1.1 + i * 0.12, { type: "square", dur: 0.08, vol: 0.035, cutoff: 1400, detune: 8 }));
+        [67, 71, 74, 79].forEach((m, i) => tone(m, t + 1.45 + i * 0.1, { type: "triangle", dur: i === 3 ? 0.5 : 0.14, vol: 0.05, cutoff: 2800, detune: 3 }));
+        bell(83, t + 1.85, 0.035, 1.3);
+      },
+      // enterprise: a solid low root, the same workflow fanning out across runners (left to right), on a broad chord
+      enterprise: t => {
+        tone(36, t + 0.15, { type: "triangle", dur: 1.2, vol: 0.16, cutoff: 600 });
+        [
+          [72, -0.8],
+          [76, -0.3],
+          [79, 0.3],
+          [84, 0.8],
+        ].forEach(([m, p], i) => bell(m, t + 0.3 + i * 0.1, 0.03, 1.2, panTo(p)));
+        pad([48, 55, 60, 64, 67], t + 0.3, 2.4, 0.025, "triangle", 1800);
+        bell(91, t + 0.9, 0.04, 1.6);
       },
       // prompt: keyboard typing then a compile whir and success chime
       typing: () => {}, // live keystrokes + compile chime are played by the slide itself
@@ -5885,6 +7511,16 @@
         bell(84, t + 0.75, 0.06);
         bell(91, t + 0.9, 0.05, 1.8);
       },
+      // connectors: two latch clicks as the service plugs in, then a read note (left) and a write note (right) over a soft chord
+      connectors: t => {
+        [0, 0.12].forEach((d, i) => {
+          click(t + 0.2 + d, 1800 + i * 900, 0.08, 6);
+          osc("sine", 140 - i * 30, t + 0.2 + d, 0.12, 0.12, { f1: 60 });
+        });
+        bell(76, t + 0.6, 0.04, 1.0, panTo(-0.6));
+        bell(83, t + 0.85, 0.04, 1.2, panTo(0.6));
+        pad([52, 59, 64, 68], t + 0.6, 2, 0.022, "triangle", 1800);
+      },
       // model routing: a filtered-noise riser into a rising A major arpeggio over a soft pad
       router: t => {
         const src = ac.createBufferSource(),
@@ -5908,6 +7544,12 @@
         bell(81, t + 0.9 + 5 * s, 0.04, 1.4);
         pad([45, 52, 57, 61], t + 0.9, 2.2, 0.022, "triangle", 1600);
       },
+      // experiments: control and candidate trade notes (A low, B high), then a resolving bell chord
+      lab: t => {
+        [60, 67, 60, 69, 60, 71].forEach((m, i) => tone(m, t + 0.2 + i * 0.13, { type: i % 2 ? "triangle" : "square", dur: 0.14, vol: 0.05, cutoff: 2400, detune: 4 }));
+        [72, 76, 79, 84].forEach((m, i) => bell(m, t + 1.05 + i * 0.07, 0.035, 1.3));
+        pad([48, 55, 60, 64], t + 1, 2.2, 0.022, "triangle", 1600);
+      },
       // enclaves: a heavy vault bolt sliding shut, then a low sealed hum
       vault: t => {
         [0, 0.18].forEach((d, i) => {
@@ -5926,6 +7568,14 @@
     const play = fn => {
       if (muted || !init()) return;
       fn(ac.currentTime + 0.01);
+    };
+    // In-slide event sounds (pops, keys, pings) only play while the slide is fresh, so looping
+    // animations don't repeat their melody forever. Entering a slide or stepping restarts the window.
+    const CUE_WINDOW = 15;
+    let cueSince = 0;
+    const cue = fn => {
+      if (ac && ac.currentTime - cueSince > CUE_WINDOW) return;
+      play(fn);
     };
     // Berlin techno bed for the post-preview acceleration: 4/4 kick, off-beat hats, acid line, claps, stabs.
     // k in (0..1] sets both tempo (128 → 146 BPM) and how many layers are in.
@@ -6049,12 +7699,14 @@
     return {
       unlock: init,
       cut,
+      // a presenter step inside a slide restarts the in-slide sound window
+      touch: () => ac && (cueSince = ac.currentTime),
       techno,
       // A soft rising blip for demo steps.
       pop: (() => {
         let lastPop = 0;
         return (n = 0) =>
-          play(t => {
+          cue(t => {
             if (t - lastPop < 0.07) return;
             lastPop = t;
             const f = hz(72 + SCALE[n % 8]);
@@ -6067,7 +7719,7 @@
       key: (() => {
         let last = 0;
         return (vol = 1) =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.025) return;
             last = t;
             click(t, 1800 + Math.random() * 2400, 0.07 * vol, 2);
@@ -6078,7 +7730,7 @@
       review: (() => {
         let last = 0;
         return () =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.3) return;
             last = t;
             osc("triangle", 110, t, 0.18, 0.06, { f1: 55 });
@@ -6090,7 +7742,7 @@
       })(),
       // compile: a short whir rising into a two-bell success chime
       compile: () =>
-        play(t => {
+        cue(t => {
           osc("sawtooth", 80, t, 0.4, 0.035, { f1: 640 });
           bell(79, t + 0.4, 0.05, 1);
           bell(84, t + 0.5, 0.04, 1.2);
@@ -6098,7 +7750,7 @@
       notify: (() => {
         let last = 0;
         return human =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.4) return;
             last = t;
             bell(human ? 88 : 91, t, 0.012, 0.6);
@@ -6110,7 +7762,7 @@
       route: (() => {
         let last = 0;
         return m =>
-          play(t => {
+          cue(t => {
             if (t - last < 0.09) return;
             last = t;
             const f = hz([36, 60, 84][m] + (Math.random() < 0.5 ? 0 : 7));
@@ -6133,13 +7785,13 @@
           },
           // one split-flap tick
           flap: () =>
-            play(t => {
+            cue(t => {
               if (t - lastFlap < 0.04) return;
               lastFlap = t;
               click(t, 2400 + Math.random() * 2000, 0.03, 5);
             }),
           pick: tier =>
-            play(t => {
+            cue(t => {
               const g = grid(t),
                 w = WALK[n++ % WALK.length];
               if (tier === 0) {
@@ -6156,7 +7808,7 @@
             }),
           // measured savings: bells cascading down into a soft A add9 chord and a two-note receipt
           saved: () =>
-            play(t => {
+            cue(t => {
               [93, 90, 88, 85, 81, 78, 76, 73].forEach((m, i) => bell(m, t + 0.05 + i * 0.07, 0.028, 0.9));
               pad([45, 52, 59, 61], t + 0.55, 2.6, 0.03, "triangle", 2000);
               bell(88, t + 0.9, 0.045, 1.4);
@@ -6164,7 +7816,7 @@
             }),
           // a week of runs: one soft mallet note per day, climbing, and a chord when the week is full
           day: i =>
-            play(t => {
+            cue(t => {
               tone([69, 71, 73, 76, 78, 81, 83][i], t, { type: "triangle", dur: 0.25, vol: 0.05, cutoff: 3000, detune: 3 });
               if (i === 6) [81, 85, 88].forEach((m, j) => bell(m, t + 0.12 + j * 0.05, 0.025, 1.6));
             }),
@@ -6240,7 +7892,7 @@
   // ---------- navigation ----------
   let cur = -1,
     redT = null;
-  // entering a "red" slide forward: the current slide first fades to red, then the red slide slides in from the right
+  // entering a "red" slide forward: the current slide first fades to red, then the red slide enters under the wash
   function go(n) {
     n = Math.max(0, Math.min(slides.length - 1, n));
     if (n === cur || redT) return;
@@ -6248,24 +7900,22 @@
       wash.classList.add("on", "cover");
       redT = setTimeout(() => {
         redT = null;
-        show(n, "left");
+        show(n, true);
       }, 1000);
       return;
     }
     show(n);
   }
-  function show(n, horiz) {
+  // siblings in a group push left (right going back); crossing into another group slides up (down going back)
+  function show(n, covered) {
     const dir = cur >= 0 && n < cur ? -1 : 1;
     wash.classList.toggle("on", !!slides[n].red);
-    gwash.classList.toggle("on", !!slides[n].green);
     sfx.cut();
     sfx.techno(slides[n].techno || 0);
     if (cur >= 0) sfx.slide(n, dir, slides[n].sound);
-    // "up"/"down" on a slide: it enters that way going forward, and reverses going back
-    const flip = { up: "down", down: "up" };
-    const vert = horiz || cur < 0 ? null : dir > 0 && flip[slides[n].trans] ? slides[n].trans : dir < 0 && flip[slides[cur].trans] ? flip[slides[cur].trans] : null;
-    const TR = ["up-in", "up-out", "down-in", "down-out", "left-in"];
-    if (cur >= 0 && horiz) {
+    const vert = cur >= 0 && slides[n].group !== slides[cur].group ? (dir > 0 ? "up" : "down") : null;
+    const TR = ["up-in", "up-out", "down-in", "down-out"];
+    if (cur >= 0 && covered) {
       // already hidden under the red wash: drop it instantly so it doesn't flash back when the wash moves behind the stage
       const old = slides[cur].el;
       clearTimeout(old._lt);
@@ -6277,13 +7927,12 @@
       old.classList.add("leaving");
       if (vert) old.classList.add(vert + "-out");
       clearTimeout(old._lt);
-      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), vert ? 1000 : 800);
+      old._lt = setTimeout(() => old.classList.remove("leaving", ...TR), 800);
     }
     const el = slides[n].el;
     clearTimeout(el._lt);
     el.classList.remove(...TR);
     if (vert) el.classList.add(vert + "-in");
-    if (horiz) el.classList.add(horiz + "-in");
     wash.classList.remove("cover");
     el.style.setProperty("--dx", cur < 0 ? "0%" : dir > 0 ? "100%" : "-100%");
     el.classList.remove("leaving");
@@ -6293,16 +7942,18 @@
     slides[n].enter?.(dir);
     progress.style.transform = `scaleX(${(n + 1) / slides.length})`;
     [...dots.children].forEach((d, i) => d.classList.toggle("on", i === n));
+    prevBtn.disabled = n === 0;
+    nextBtn.disabled = n === slides.length - 1;
     count.textContent = `${String(n + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
   }
   const next = () => {
-      if (slides[cur].onNext?.()) sfx.step(1);
+      if (slides[cur].onNext?.()) (sfx.touch(), sfx.step(1));
       else go(cur + 1);
     },
     prev = () => {
-      if (slides[cur].onPrev?.()) sfx.step(-1);
+      if (slides[cur].onPrev?.()) (sfx.touch(), sfx.step(-1));
       else go(cur - 1);
     };
 
@@ -6310,6 +7961,7 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if ((e.key === "Enter" || e.key === " ") && e.target.closest?.("a, button, input, textarea, select, [contenteditable]")) return;
     if (slides[cur].onKey?.(e)) {
+      sfx.touch();
       e.preventDefault();
       return;
     }
@@ -6384,8 +8036,7 @@
     });
 
     // Blueprint grid: 32px minor, 160px major lines, anchored centre-top.
-    // It turns to 45° (around the screen centre) while the red "Safety and control" wash is up,
-    // and to -45° while the green "Safe outputs" / "Private enclaves" wash is up.
+    // It turns to 45° (around the screen centre) while the red security wash is up.
     if (gridc.width !== bw || gridc.height !== bh) {
       gridc.width = bw;
       gridc.height = bh;
@@ -6393,7 +8044,7 @@
     const g = gridc.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cw, ch);
-    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : gwash.classList.contains("on") ? -Math.PI / 4 : 0;
+    const gTarget = wash.classList.contains("on") ? Math.PI / 4 : 0;
     gAng = REDUCED ? gTarget : gAng + (gTarget - gAng) * 0.035;
     if (Math.abs(gTarget - gAng) < 1e-4) gAng = gTarget;
     const k = Math.min(cw / W, ch / H),
