@@ -393,6 +393,10 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 			return nil, err
 		}
 		maps.Copy(explicitSafeOutputs, config)
+		// Imported require-agent-success values are OR-combined; only the main workflow can override them.
+		if _, defined := topRawSafeOutputs["require-agent-success"]; !defined {
+			delete(explicitSafeOutputs, "require-agent-success")
+		}
 	}
 
 	if len(importedCreatePullRequestDefaults) > 0 && result.CreatePullRequests != nil {
@@ -582,7 +586,7 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, explicitSafeOutput
 	}
 
 	// Merge meta-configuration fields (only set if empty/zero in result)
-	if _, defined := topRawSafeOutputs["require-agent-success"]; !defined {
+	if _, defined := explicitSafeOutputs["require-agent-success"]; !defined {
 		result.RequireAgentSuccess = result.RequireAgentSuccess || importedConfig.RequireAgentSuccess
 	}
 	if !result.Steer && importedConfig.Steer {
