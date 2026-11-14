@@ -36,13 +36,13 @@
   .slide.leaving.down-out { animation: down-out .8s cubic-bezier(.26,.86,.44,.985) both; }
   /* full-screen red wash for the security band (THEME.security.red): fades over the previous slide, then sits behind the stage */
   .wash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s ease-in-out;
-    background: radial-gradient(ellipse 80% 75% at 50% 55%, #6e0b12 0%, #3a0408 55%, #140103 100%); }
+    background: radial-gradient(ellipse 80% 75% at 50% 55%, #4a070c 0%, #270306 55%, #0c0102 100%); }
   /* blueprint grid on its own layer above the wash, so it stays visible (and turns with the band theme) over the red */
   canvas.gridc { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
   .wash.cover + canvas.gridc { z-index: 4; }
   .wash.on { opacity: 1; }
   .wash::after { content: ""; position: absolute; inset: 0;
-    background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
+    background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #1c0204b0 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
   .wash.cover { z-index: 4; }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
@@ -887,7 +887,7 @@
   .sec-box.sandbox { border-style: dashed; }
   .sec .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ff7b72, #f85149, #d29922); }
   .sec-omen { position: absolute; inset: -40px; pointer-events: none;
-    background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #2a0306aa 70%, #050000f0 100%); }
+    background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #1c0204b0 70%, #050000f0 100%); }
   .active .sec-omen { animation: omen 7s ease-in-out infinite; }
   .sec-omen { display: none; } /* the vignette lives on the full-screen .wash::after instead */
   @keyframes omen { 0%, 100% { opacity: .85; } 50% { opacity: 1; } 52% { opacity: .7; } 54% { opacity: 1; } }
@@ -12492,7 +12492,7 @@
     // Agentic Workflows: Actions teal, grid tilted 15°.
     platform: { base: [4, 17, 20], pal: ["#0b4f57", "#08363d", "#116329", "#03191c"], grid: [86, 212, 221, 0.03, 0.075], ang: Math.PI / 12, cell: 32, accent: ["#56d4dd", "#1b7c83", "#b3f0ff", "#7ee787"], music: "platform", prog: [0, 5, 7, 2, -3] },
     // Security: the red wash, grid turned 45°, a dark drone and alarm.
-    security: { base: [24, 3, 5], pal: ["#8e1519", "#4c0a0e", "#b62324", "#3d0a0d"], grid: [255, 225, 220, 0.03, 0.075], ang: Math.PI / 4, cell: 32, accent: ["#ff7b72", "#da3633", "#ffc1ba", "#ffa198"], red: true, music: "security", prog: [0, -2, 1, -1, 3] },
+    security: { base: [16, 2, 4], pal: ["#5e0e11", "#33070a", "#7a1718", "#290709"], grid: [255, 225, 220, 0.03, 0.075], ang: Math.PI / 4, cell: 32, accent: ["#ff7b72", "#da3633", "#ffc1ba", "#ffa198"], red: true, music: "security", prog: [0, -2, 1, -1, 3] },
     // Factory mindset: ember orange, grid tilted -15°, rhythmic machinery.
     mindset: { base: [20, 11, 5], pal: ["#9a3412", "#5c2008", "#bd561d", "#2a1204"], grid: [255, 166, 87, 0.03, 0.08], ang: -Math.PI / 12, cell: 32, accent: ["#ffa657", "#bd561d", "#ffdfb6", "#f0883e"], music: "factory", prog: [0] },
     // Human agent processes: dark blueprint blue, straight grid, a looping sequencer over a heartbeat.
@@ -12501,8 +12501,8 @@
     cost: { base: [13, 17, 23], pal: ["#7d5200", "#4a3000", "#9e6a03", "#2b1d00"], grid: [255, 196, 40, 0.08, 0.2], ang: -Math.PI / 4, cell: 32, accent: ["#e3b341", "#9e6a03", "#f8e3a1", "#d29922"], music: "cost", prog: [0, 2, 4, -3] },
     // Agentic Engineering: Copilot purple, grid tilted 30°, an engine rev.
     engineering: { base: [14, 8, 27], pal: ["#6e40c9", "#3c1e70", "#8957e5", "#1f0f3d"], grid: [210, 168, 255, 0.028, 0.07], ang: Math.PI / 6, cell: 32, accent: ["#d2a8ff", "#8957e5", "#eddeff", "#a371f7"], music: "engineering", prog: [0, 3, 5, -2, 7, -4] },
-    // Enterprise: slate steel, wide grid tilted -30°, a broad chord fanning across runners.
-    enterprise: { base: [9, 13, 19], pal: ["#0d419d", "#0a1a33", "#7d4e00", "#1c2128"], grid: [173, 186, 199, 0.03, 0.08], ang: -Math.PI / 6, cell: 48, accent: ["#79c0ff", "#1f6feb", "#e3b341", "#cae8ff"], music: "enterprise", prog: [0, 5, -5, 2, -3] },
+    // Enterprise: metallic grey with silver accents, wide grid tilted -30°, a broad chord fanning across runners.
+    enterprise: { base: [17, 19, 23], pal: ["#30363d", "#1b2638", "#3d444d", "#262c36"], grid: [209, 215, 224, 0.03, 0.075], ang: -Math.PI / 6, cell: 48, accent: ["#d1d7e0", "#4493f8", "#9198a1", "#f0f6fc"], music: "enterprise", prog: [0, 5, -5, 2, -3] },
     // AW factory (measured data): plum graph paper, a fine straight grid, a rising arpeggio.
     data: { base: [19, 7, 17], pal: ["#7d2457", "#3d1a5c", "#0f5323", "#0d2a5c"], grid: [255, 155, 206, 0.03, 0.08], ang: 0, cell: 20, accent: ["#ff9bce", "#db61a2", "#ffd3eb", "#ab7df8"], music: "data", prog: [0, 4, 7, 2] },
     finale: { base: [13, 17, 23], pal: ["#0a8a2e", "#0d419d", "#5a32a3", "#196c2e"], grid: [240, 246, 252, 0.028, 0.07], ang: 0, cell: 32, accent: ["#5fed83", "#0fbf3e", "#aff5b4", "#08872b"], music: "finale", prog: [0] },
