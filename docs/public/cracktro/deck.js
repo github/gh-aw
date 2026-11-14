@@ -4906,7 +4906,8 @@
       MID = 171,
       X0 = 130,
       X1 = 4 * COL + 130,
-      V = 0.6;
+      V = 0.6,
+      DWELL = 1000;
     const lineOf = new Map();
     ST.forEach(([, , , c, ls]) => ls.forEach(l => lineOf.set(l, c)));
     const lines = CODE.map((parts, i) => h("span", { "--c": lineOf.get(i) || "#9198a1" }, parts.map(([s, k]) => (k ? h("span", { class: `xp-${k}` }, s) : s))));
@@ -5042,9 +5043,10 @@
       if (gap > 500) sfx.pop(v ? 5 : 1);
     };
     const step = (r, t) => {
+      // each run waits at Assign for a second before it starts moving
       const e = t - r.t,
-        x = Math.min(X1, X0 + e * V),
-        u = Math.min(1, e / 260),
+        x = Math.min(X1, X0 + Math.max(0, e - DWELL) * V),
+        u = Math.min(1, e / 420),
         y = MID + (Y[r.v] - MID) * (1 - (1 - u) ** 3);
       r.el.style.transform = `translate(${(x - CW / 2).toFixed(1)}px, ${(y - 23).toFixed(1)}px)`;
       if (r.st < 1 && e > 120) {
