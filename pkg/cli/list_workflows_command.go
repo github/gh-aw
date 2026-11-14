@@ -207,8 +207,12 @@ func workflowFrontmatterFields(file string) (any, []string, string) {
 	if err != nil || result.Frontmatter == nil {
 		return nil, nil, ""
 	}
+	return frontmatterListFields(result.Frontmatter)
+}
+
+func frontmatterListFields(frontmatter map[string]any) (any, []string, string) {
 	var labels []string
-	if labelsField, ok := result.Frontmatter["labels"]; ok {
+	if labelsField, ok := frontmatter["labels"]; ok {
 		if labelsArray, ok := labelsField.([]any); ok {
 			for _, label := range labelsArray {
 				if labelStr, ok := label.(string); ok {
@@ -217,8 +221,8 @@ func workflowFrontmatterFields(file string) (any, []string, string) {
 			}
 		}
 	}
-	source, _ := result.Frontmatter["source"].(string)
-	return result.Frontmatter["on"], labels, source
+	source, _ := frontmatter["source"].(string)
+	return frontmatter["on"], labels, source
 }
 
 func outputWorkflowList(workflows []WorkflowListItem, jsonOutput bool) error {
