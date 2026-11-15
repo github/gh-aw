@@ -46,6 +46,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Cost Optimization |  |
 | Cost management | illustrative |
 | Model routing | illustrative |
+| DeterministicOps | illustrative |
 | Agents that debug agents | illustrative |
 | Agentic Engineering |  |
 | Any agent, any provider | illustrative |

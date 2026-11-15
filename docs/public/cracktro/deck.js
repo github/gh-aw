@@ -866,6 +866,25 @@
   .mc-tag.e0 { fill: #c297ff; } .mc-tag.e1 { fill: #f0883e; } .mc-tag.e2 { fill: #3fb950; }
   .mc-tok { fill: #e6edf3; font: 600 16px var(--mono); text-anchor: end; opacity: 0; transition: opacity .3s; } .mc-run.seen .mc-tok { opacity: 1; }
   .sfl-row.mc-find { opacity: 0; } .sfl-row.mc-find.seen { opacity: 1; } .mc-find .k { fill: #9198a1; }
+  /* --- deterministic ops --- */
+  .dto .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #4493f8, #3fb950, #d29922); }
+  .dto-band { fill: #d2992214; stroke: #d29922; stroke-width: 2; stroke-dasharray: 8 6; opacity: 0; transition: opacity .5s; } .dto-band.on { opacity: 1; }
+  .dto-sec rect { fill: transparent; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 6 6; transition: all .4s; }
+  .dto-sec text { fill: #9198a1; font: 600 15px var(--mono); letter-spacing: .08em; }
+  .dto-sec.det.on rect { fill: #1f6feb14; stroke: #4493f8; stroke-dasharray: none; filter: drop-shadow(0 0 10px #1f6feb66); } .dto-sec.det.on text { fill: #79c0ff; }
+  .dto-sec.ag.on rect { fill: #8957e514; stroke: #ab7df8; stroke-dasharray: none; } .dto-sec.ag.on text { fill: #c297ff; }
+  .dto-row { transition: transform 1s cubic-bezier(.5,0,.2,1); }
+  .dto-row rect { fill: #161b22; stroke: #3d444d; stroke-width: 2; transition: fill .3s, stroke .3s; }
+  .dto-row .c { fill: #e6edf3; font: 500 16px var(--mono); }
+  .dto-row .tg { font: 600 13px var(--mono); text-anchor: end; letter-spacing: .06em; fill: #c297ff; }
+  .dto-row.hot rect { stroke: #d29922; fill: #d2992218; } .dto-row.hot .tg { fill: #d29922; }
+  .dto-row.det rect { stroke: #4493f8; fill: #1f6feb22; } .dto-row.det .tg { fill: #79c0ff; }
+  .dto-tok { fill: #e6edf3; font: 600 16px var(--mono); text-anchor: end; }
+  .dto-mlab { fill: #9198a1; font: 500 16px var(--mono); }
+  .dto-mv { fill: #f0f6fc; font: 700 20px var(--mono); text-anchor: end; }
+  .dto-m { transition: width 1.4s cubic-bezier(.3,0,.2,1); }
+  .dto-big { fill: #3fb950; font: 700 64px "Mona Sans"; text-anchor: middle; opacity: 0; transition: opacity .5s; } .dto-big.on { opacity: 1; }
+  .dto-cap { fill: #9198a1; font: 500 16px var(--mono); text-anchor: middle; }
   #sflOut0.on rect { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb950); }
   #sflOut1.on rect { stroke: #d29922; filter: drop-shadow(0 0 14px #d29922); }
   .fm-dot { filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
@@ -8846,6 +8865,229 @@
         bits = bits.filter(b => b.life > 0);
       },
       el: sec,
+    });
+  }
+
+  // DeterministicOps: run history shows the same data-gathering calls in every run; audit flags them, they move from the agentic plan into deterministic steps:, and the next run spends fewer tokens
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 648;
+    const esc = x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const FETCH = 22;
+    // synthetic runs: [id, reasoning bars, tokens]
+    const RUNS = [
+      ["#1801", 12, "418k"],
+      ["#1802", 9, "396k"],
+      ["#1803", 11, "409k"],
+      ["#1828", 10, "401k"],
+      ["#1829", 12, "422k"],
+      ["#1830", 9, "412k"],
+    ];
+    // the agentic plan: [command, moves to steps:]
+    const PLAN = [
+      ["gh pr list --merged --since 1d", 1],
+      ["gh pr view #N --json files ×14", 1],
+      ["jq 'group_by(.labels[0])'", 1],
+      ["count changed lines per area", 1],
+      ["read diffs · pick highlights", 0],
+      ["write summary → create-discussion", 0],
+    ];
+    const FINDS = [
+      ["ed", "⚠ Partially Reducible To Deterministic"],
+      ["k", "same 4 calls · same order · 30/30 runs"],
+      ["k", "≈70% of turns only gather data"],
+      ["ok", "→ move them to steps:"],
+    ];
+    const rowY = r => 130 + r * 50,
+      detY = i => 178 + i * 38,
+      agY = i => 392 + i * 38,
+      BW = 448;
+    let g = `<defs><marker id="dtoG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d29922"/></marker>
+      <marker id="dtoB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4493f8"/></marker></defs>`;
+    g += `<rect class="fm-lane" x="0" y="0" width="${VW}" height="60"/>`;
+    [
+      [0, 540, "RUN HISTORY"],
+      [540, 1100, "AGENTIC → DETERMINISTIC"],
+      [1100, VW, "NEXT RUN"],
+    ].forEach(([x0, x1, t], i) => {
+      g += `<text class="fm-lane-t mra-lane" id="dtoLane${i}" x="${(x0 + x1) / 2}" y="40">${t}</text>`;
+      if (x0) g += `<line class="fm-div" x1="${x0}" y1="0" x2="${x0}" y2="${VH}"/>`;
+    });
+    g += `<path class="fm-wire" id="dtoW0" d="M524 560 C 560 560, 548 230, 586 230" stroke="#d29922" marker-end="url(#dtoG)"/>`;
+    g += `<path class="fm-wire b" id="dtoW1" d="M1070 470 C 1094 470, 1090 330, 1116 330" marker-end="url(#dtoB)"/>`;
+    // history: every run repeats the same data-gathering prefix before any reasoning
+    g += `<g class="sfl-box" id="dtoHist"><rect class="sfl-card" x="16" y="76" width="508" height="360" rx="12"/><text class="sfl-title" x="32" y="104">daily-pr-summary · last 30 runs</text>`;
+    g += `<rect class="dto-band" id="dtoBand" x="92" y="114" width="166" height="284" rx="8"/>`;
+    RUNS.forEach(([id, n, tok], r) => {
+      const y = rowY(r);
+      g += `<g class="mc-run" id="dtoRun${r}"><text class="mc-id" x="30" y="${y + 6}">${id}</text>`;
+      for (let j = 0; j < FETCH + n; j++) {
+        const f = j < FETCH,
+          ht = f ? 10 + ((j * 7) % 5) : 12 + ((j * 37 + r * 11) % 15);
+        g += `<rect class="ao-bar ${f ? "t fx" : "m"}" data-j="${j}" x="${100 + j * 7}" y="${y + 14 - ht}" width="5" height="${ht}" rx="1.5"/>`;
+      }
+      g += `<text class="mc-tok" x="508" y="${y + 6}">${tok}</text></g>`;
+    });
+    [
+      ["#1f6feb", "tool"],
+      ["#d29922", "repeated"],
+      ["#8957e5", "reasoning"],
+    ].forEach(([c, t], i) => (g += `<text class="ao-leg" x="${36 + i * 140}" y="420" fill="${c}">■ <tspan fill="#9198a1">${t}</tspan></text>`));
+    g += `</g>`;
+    // audit reads the history and names the pattern
+    g += `<g class="sfl-box" id="dtoAudit"><rect class="sfl-card" x="16" y="452" width="508" height="180" rx="12"/><text class="sfl-title" x="32" y="480">gh aw audit · 30 runs</text>`;
+    FINDS.forEach(([c, t], i) => (g += `<g class="sfl-row mc-find"><text class="${c}" x="32" y="${516 + i * 30}">${esc(t)}</text></g>`));
+    g += `</g>`;
+    // the workflow: deterministic steps: on top, the agent below
+    g += `<g class="sfl-box" id="dtoWf"><rect class="sfl-card" x="570" y="76" width="500" height="556" rx="12"/><text class="sfl-title" x="586" y="104">daily-pr-summary.md</text>`;
+    g += `<g class="dto-sec det" id="dtoDet"><rect x="586" y="120" width="468" height="200" rx="10"/><text x="602" y="144">steps: · deterministic · 0 tokens</text></g>`;
+    g += `<g class="dto-sec ag" id="dtoAg"><rect x="586" y="336" width="468" height="282" rx="10"/><text x="602" y="360">agent · reasoning only</text></g>`;
+    PLAN.forEach(([c], i) => {
+      g += `<g class="dto-row" id="dtoP${i}" style="transform: translate(0px, ${agY(i)}px)"><rect x="600" y="-20" width="440" height="32" rx="6"/><text class="c" x="614" y="2">${esc(c)}</text><text class="tg" x="1028" y="1">AGENT</text></g>`;
+    });
+    g += `</g>`;
+    // the next run: same summary, fewer tokens
+    g += `<g class="sfl-box" id="dtoRes"><rect class="sfl-card" x="1116" y="76" width="488" height="556" rx="12"/><text class="sfl-title" x="1132" y="104">tokens per run</text>`;
+    g += `<text class="dto-mlab" x="1136" y="150">before · all agentic</text><text class="dto-mv" x="1584" y="150">412k</text>`;
+    g += `<rect x="1136" y="164" width="${BW}" height="28" rx="6" fill="#ffffff0d"/><rect x="1136" y="164" width="${BW}" height="28" rx="6" fill="#8957e5"/>`;
+    g += `<text class="dto-mlab" x="1136" y="244">after · steps: + agent</text><text class="dto-mv" id="dtoAfterV" x="1584" y="244">412k</text>`;
+    g += `<rect x="1136" y="258" width="${BW}" height="28" rx="6" fill="#ffffff0d"/><rect class="dto-m" id="dtoAfter" x="1136" y="258" width="${BW}" height="28" rx="6" fill="#8957e5"/>`;
+    g += `<text class="dto-mlab" x="1136" y="338">turns</text><text class="dto-mv" id="dtoTurns" x="1584" y="338">34</text>`;
+    g += `<text class="dto-big" id="dtoBig" x="1360" y="460">−71%</text>`;
+    g += `<text class="dto-cap" x="1360" y="504">tokens per run · same summary</text>`;
+    g += `<text class="dto-cap" x="1360" y="560">data waits in /tmp/gh-aw/agent/</text>`;
+    g += `<text class="dto-cap" x="1360" y="590">before the agent starts</text></g>`;
+    g += `<circle class="fm-dot mra-dot" r="8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg ao-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mra-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // phases: [name, start ms, duration ms]
+    const P = { SCAN: [600, 2200], MINE: [2800, 1400], AUDIT: [4200, 1600], W0: [5800, 1000], MOVE: [6800, 1400], W1: [8200, 800], RES: [9000, 1600] };
+    const CYC = 13600;
+    let t0 = 0,
+      cyc = -1,
+      done = new Set();
+    const once = (k, fn) => {
+      if (!done.has(k)) {
+        done.add(k);
+        fn();
+      }
+    };
+    const place = moved => {
+      let a = 0,
+        d = 0;
+      PLAN.forEach(([, det], i) => {
+        const row = $("dtoP" + i),
+          y = moved && det ? detY(d++) : agY(moved ? a++ : i);
+        row.style.transform = `translate(0px, ${y}px)`;
+        row.classList.toggle("det", moved && !!det);
+        row.querySelector(".tg").textContent = moved && det ? "STEPS:" : "AGENT";
+      });
+    };
+    const reset = () => {
+      svg.querySelectorAll(".on, .hot, .seen").forEach(x => x.classList.remove("on", "hot", "seen"));
+      svg.querySelectorAll(".fx.f").forEach(b => b.classList.replace("f", "t"));
+      place(false);
+      $("dtoAfter").setAttribute("width", BW);
+      $("dtoAfterV").textContent = "412k";
+      $("dtoTurns").textContent = "34";
+      done = new Set();
+      $("dtoLane0").classList.add("on");
+      $("dtoHist").classList.add("on");
+    };
+    const wire = (id, f) => {
+      const path = $(id),
+        n = path.getTotalLength(),
+        q = path.getPointAtLength(n * ease(Math.min(1, f / 0.85)));
+      path.classList.add("hot");
+      dot.style.opacity = 1;
+      dot.setAttribute("cx", q.x);
+      dot.setAttribute("cy", q.y);
+      dot.setAttribute("fill", id === "dtoW0" ? "#d29922" : "#4493f8");
+    };
+    slides.push({
+      group: "cost",
+      notes:
+        "DeterministicOps: every run, workflow, command and number on this slide is illustrative and synthetic. Agentic workflows often spend most of their turns gathering data: listing pull requests, fetching files, grouping and counting. That work is the same on every run, and it does not need a model. Because every run is recorded as a unified session, we can look at the history: in the last 30 runs of this daily summary, the same four calls run in the same order before any reasoning starts. gh aw audit flags this as Partially Reducible To Deterministic, from the share of turns that only gather data. The fix is DeterministicOps: move those calls out of the agentic plan into the workflow's steps:, plain Actions steps that run before the agent and write their results to /tmp/gh-aw/agent/. They cost no tokens and give the same answer every time. The agent keeps only the reasoning, reading the diffs and writing the summary, so the next run makes the same summary with fewer turns and far fewer tokens. Agentic first, then mine the history and make the common parts deterministic.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        const ph = k => (u - P[k][0]) / P[k][1];
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        dot.style.opacity = 0;
+        // scan the history, column by column
+        const s = Math.min(1, Math.max(0, ph("SCAN")));
+        if (u >= P.SCAN[0]) {
+          const n = s * 34;
+          svg.querySelectorAll("#dtoHist .ao-bar:not(.seen)").forEach(b => +b.dataset.j < n && b.classList.add("seen"));
+          if (s >= 1) svg.querySelectorAll("#dtoHist .mc-run").forEach(r => r.classList.add("seen"));
+          const k = Math.floor(s * 6);
+          once("scan" + k, () => sfx.pop(k));
+        }
+        // the repeated prefix lights up in every run
+        if (u >= P.MINE[0])
+          once("mine", () => {
+            svg.querySelectorAll(".fx.t").forEach(b => b.classList.replace("t", "f"));
+            $("dtoBand").classList.add("on");
+            sfx.key();
+          });
+        // audit names it
+        if (u >= P.AUDIT[0]) {
+          $("dtoAudit").classList.add("on");
+          const f = ph("AUDIT"),
+            rows = [...svg.querySelectorAll("#dtoAudit .mc-find")];
+          rows.forEach((r, i) => {
+            if (f >= (i + 0.2) / rows.length && !r.classList.contains("seen")) {
+              r.classList.add("seen");
+              sfx.pop(3 + i);
+            }
+          });
+          once("plan", () => {
+            $("dtoWf").classList.add("on");
+            PLAN.forEach(([, det], i) => det && $("dtoP" + i).classList.add("hot"));
+          });
+        }
+        if (u >= P.W0[0] && u < P.MOVE[0]) wire("dtoW0", ph("W0"));
+        // the repeated calls leave the agentic plan for steps:
+        if (u >= P.MOVE[0])
+          once("move", () => {
+            $("dtoLane1").classList.add("on");
+            $("dtoDet").classList.add("on");
+            $("dtoAg").classList.add("on");
+            PLAN.forEach((_, i) => $("dtoP" + i).classList.remove("hot"));
+            place(true);
+            sfx.compile();
+          });
+        if (u >= P.W1[0] && u < P.RES[0]) wire("dtoW1", ph("W1"));
+        if (u >= P.RES[0]) {
+          once("res", () => {
+            $("dtoLane2").classList.add("on");
+            $("dtoRes").classList.add("on");
+            $("dtoAfter").setAttribute("width", Math.round((BW * 118) / 412));
+            sfx.pop(7);
+          });
+          const f = Math.min(1, ph("RES"));
+          $("dtoAfterV").textContent = `${Math.round(412 - (412 - 118) * ease(f))}k`;
+          $("dtoTurns").textContent = f >= 1 ? "34 → 10" : `${Math.round(34 - 24 * ease(f))}`;
+          if (f >= 1) once("big", () => $("dtoBig").classList.add("on"));
+        }
+      },
+      el: h("section", { class: "slide dto" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Agentic → deterministic · mined from run history"), h("h2", {}, letters("Deterministic"), letters("Ops", "l-grad"))), svg),
     });
   }
 
