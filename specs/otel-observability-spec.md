@@ -587,6 +587,30 @@ Span links SHOULD be used instead of parent-child relationships when outcome eva
 | `gh-aw.output.item_count` | int | RECOMMENDED at job completion. |
 | `gh-aw.engine.id` | string | RECOMMENDED for agent jobs. |
 
+### 10.2.1 Write gate attributes
+
+Safe-output spans for gated execution SHOULD include the compiler-recorded
+policy fields below. Unknown evidence MUST remain unknown; telemetry does not
+authorize writes or prove effects from job completion alone.
+
+| Attribute | Type | Requirement |
+|---|---|---|
+| `gh-aw.write_gate.verdict` | string | `allow`, `deny`, or `partial`, when recorded. |
+| `gh-aw.write_gate.reason` | string | Stable `[a-z0-9_.-]{1,64}` code, never free-form content. |
+| `gh-aw.write_gate.manifest_digest` | string | Canonical pending-manifest SHA-256; MUST NOT be a metric dimension. |
+| `gh-aw.write_gate.integrity` | string | `verified`, `failed`, or `unknown`. |
+| `gh-aw.write_gate.conclusion_check` | string | Conclusion-only enforcement check: `verified`, `failed`, or `unknown`. |
+| `gh-aw.write_gate.item_decision` | string | `apply`, `hold`, `review`, `stage`, or `drop`, for an individual item. |
+| `gh-aw.write_gate.count.<decision>` | int | Nonnegative bounded decision count; `<decision>` is one of the five item decisions. |
+
+Gate-blocked output outcome records use `skipped` and `gate_denied`,
+`gate_held`, `gate_staged`, or `gate_dropped`, separately from unknown outcomes
+and ungated staged configuration. Policy denial alone MUST NOT set span status
+`ERROR`. A proven unauthorized write or digest mismatch uses
+`error.type=write_gate_violation`; conclusion records the violation without
+changing the verdict. Item content and approval credentials MUST NOT be
+included. Ungated spans MUST NOT fabricate gate attributes.
+
 ### 10.3 Model Attributes
 
 | Attribute | Type | Requirement |

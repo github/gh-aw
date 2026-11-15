@@ -1,6 +1,7 @@
 // @ts-check
 
 const { classifySafeOutputResult, pickOutcomeField } = require("./safe_outputs_status.cjs");
+const { DECISIONS, SIGNALS, CODE, DIGEST } = require("./write_gate_observability.cjs");
 
 const OUTCOME_STATUSES = new Set(["success", "failed", "skipped", "warning", "cancelled", "deferred", "delegated", "staged", "failure"]);
 const RESULT_URL_FIELDS = [
@@ -71,6 +72,10 @@ function projectSafeOutputData(source) {
   if (source.identifier === null) data.identifier = null;
   if (OUTCOME_STATUSES.has(source.status)) data.status = source.status;
   if (typeof source.staged === "boolean") data.staged = source.staged;
+  if (DECISIONS.includes(source.gate_decision)) data.gate_decision = source.gate_decision;
+  if (SIGNALS.has(source.gate_signal)) data.gate_signal = source.gate_signal;
+  if (typeof source.decision_reason === "string" && CODE.test(source.decision_reason)) data.decision_reason = source.decision_reason;
+  if (typeof source.item_sha256 === "string" && DIGEST.test(source.item_sha256)) data.item_sha256 = source.item_sha256;
   if (source.operation_outcome === "indeterminate") data.operation_outcome = "indeterminate";
   const url = canonicalSafeOutputUrl(source.url);
   if (url) data.url = url;

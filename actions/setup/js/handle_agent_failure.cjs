@@ -316,6 +316,7 @@ function buildFailureMatchCategories(options) {
   const categories = [];
 
   if (options.transportWedge) categories.push("transport_wedge");
+  if (options.hasWriteGateViolation) categories.push("write_gate_violation");
   if (options.isTimedOut) categories.push("timed_out");
   if (options.hasAssignmentErrors) categories.push("assignment_errors");
   if (options.hasAssignCopilotFailures) categories.push("assign_copilot_failures");
@@ -450,6 +451,7 @@ function buildModelEndpointMismatchContext(mismatch, detectionJobResult = proces
  * @param {Object} options
  * @param {string} options.workflowName
  * @param {boolean} [options.transportWedge]
+ * @param {boolean} [options.hasWriteGateViolation]
  * @param {boolean} options.isTimedOut
  * @param {boolean} options.hasMissingSafeOutputs
  * @param {boolean} options.hasReportIncomplete
@@ -487,6 +489,7 @@ function buildFailureIssueTitle(options) {
 
 /** @param {Parameters<typeof buildFailureIssueTitle>[0]} options */
 function buildFailureIssueSummary(options) {
+  if (options.hasWriteGateViolation) return "violated the write gate";
   // Fatal runtime outcomes outrank historical request errors and timeout signals.
   if (typeof options.terminalOutputFailureCause === "string" && ["agent_startup_failure", "driver_crash", "secret_redaction_failure"].includes(options.terminalOutputFailureCause)) {
     return EMPTY_OUTPUT_FAILURE_CAUSES[options.terminalOutputFailureCause];
@@ -4273,6 +4276,23 @@ async function isInvalidatedPRMergeCheckout() {
 
 async function main() {
   try {
+    let hasWriteGateViolation = false;
+    if (process.env.GH_AW_WRITE_GATE !== undefined) {
+      try {
+        const rootDir = process.env.GH_AW_AGENT_OUTPUT ? path.dirname(process.env.GH_AW_AGENT_OUTPUT) : "/tmp/gh-aw";
+        const gate = collectUnifiedSession({ rootDir, warn: message => core.warning(message) }).events.find(event => event.type === "gate.decision" && event.provenance.component === "write_gate");
+        hasWriteGateViolation = gate?.data.failureCategory === "write_gate_violation";
+        if (hasWriteGateViolation) {
+          // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
+          core.setFailed("ERR_WRITE_GATE: Conclusion detected an unauthorized write or publication digest mismatch.");
+          fs.mkdirSync(path.dirname(FAILURE_CATEGORIES_PATH), { recursive: true });
+          fs.writeFileSync(FAILURE_CATEGORIES_PATH, JSON.stringify(["write_gate_violation"]));
+        }
+      } catch (error) {
+        core.setFailed(`ERR_WRITE_GATE: Unable to check write gate enforcement: ${getErrorMessage(error)}`);
+        return;
+      }
+    }
     // Get workflow context
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || "unknown";
     const workflowID = process.env.GH_AW_WORKFLOW_ID || "unknown";
@@ -4665,7 +4685,8 @@ async function main() {
       !hasMissingTool &&
       !hasMissingData &&
       !hasToolDenialsExceeded &&
-      !modelEndpointMismatchError
+      !modelEndpointMismatchError &&
+      !hasWriteGateViolation
     ) {
       core.info(
         `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/activation/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
@@ -4679,7 +4700,7 @@ async function main() {
       // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
       core.setFailed(buildReportIncompleteFailureMessage(reportIncompleteItems, { runId: context.runId, secretRedactionFailed: failureDiagnostics.secretRedactionFailed }));
     }
-    if (failureDiagnostics.hasNoJobs && !hasCheckoutFailure) {
+    if (failureDiagnostics.hasNoJobs && !hasCheckoutFailure && !hasWriteGateViolation) {
       core.info("Skipping failure reporting: no workflow jobs started; the run may not have been approved.");
       return;
     }
@@ -4694,7 +4715,8 @@ async function main() {
       !hasMissingTool &&
       !hasMissingData &&
       !hasToolDenialsExceeded &&
-      !modelEndpointMismatchError
+      !modelEndpointMismatchError &&
+      !hasWriteGateViolation
     ) {
       core.info("Agent completed with only noop outputs - skipping failure handling");
       return;
@@ -4705,7 +4727,7 @@ async function main() {
     // This prevents false-positive failure issues when a transient AI model error occurs
     // after the agent has already finished its task (e.g., create_discussion produced but
     // the server returned a spurious error on teardown).
-    if (hasCompletedDespiteJobFailure && !failureDiagnostics.secretRedactionFailed && !hasCheckoutFailure && !hasReportIncomplete && !hasCacheMissMisconfiguration && !modelEndpointMismatchError) {
+    if (hasCompletedDespiteJobFailure && !failureDiagnostics.secretRedactionFailed && !hasCheckoutFailure && !hasReportIncomplete && !hasCacheMissMisconfiguration && !modelEndpointMismatchError && !hasWriteGateViolation) {
       core.info("Agent completed with valid safe outputs despite job failure (terminal_reason: completed) — skipping failure handling");
       return;
     }
@@ -4812,6 +4834,7 @@ async function main() {
       }
     }
     const issueTitle = buildFailureIssueTitle({
+      hasWriteGateViolation,
       workflowName: normalizedWorkflowName,
       hasModelEndpointMismatch,
       modelNotSupportedError,
@@ -4845,6 +4868,7 @@ async function main() {
       copilotAgentNotFound: copilotAgentNotFound?.requestedAgent,
     });
     const failureCategories = buildFailureMatchCategories({
+      hasWriteGateViolation,
       agentConclusion,
       transportWedge,
       emptyOutputCause,
@@ -5054,6 +5078,7 @@ async function main() {
           checkoutError,
           items: agentOutputItems,
         });
+        if (hasWriteGateViolation) failureDiagnosticsContext.push(...buildWarningAlertLine("Write Gate Violation", "Conclusion detected an unauthorized write or publication digest mismatch. The recorded gate verdict is unchanged."));
         // Build timeout context
         const timeoutContext = buildTimeoutContext(isTimedOut, timeoutMinutes);
 
@@ -5291,6 +5316,7 @@ async function main() {
           checkoutError,
           items: agentOutputItems,
         });
+        if (hasWriteGateViolation) failureDiagnosticsContext.push(...buildWarningAlertLine("Write Gate Violation", "Conclusion detected an unauthorized write or publication digest mismatch. The recorded gate verdict is unchanged."));
 
         // Build timeout context
         const timeoutContext = buildTimeoutContext(isTimedOut, timeoutMinutes);

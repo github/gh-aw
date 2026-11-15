@@ -51,6 +51,35 @@ Every evaluation produces one of these outcomes:
 | `lifecycle_close` | Closed by lifecycle/noop bot policy and not reopened by a visible non-bot actor |
 | `unknown` | Missing execution evidence, unsupported evaluator, or no action-specific observable signal |
 | `error` | API or evaluation failure prevented verification |
+| `skipped` | Compiler-recorded policy prevented publication; gate signals distinguish the reason |
+
+### Write gate evidence
+
+Conclusion records one compiler-owned `gate.decision` event for a gated run.
+`verdict` is `allow`, `deny`, or `partial`; `reason` is a stable code of at most
+64 characters. `manifestDigest` identifies the canonical pending manifest.
+`integrity` and `conclusionCheck` are independently `verified`, `failed`, or
+`unknown`. Missing artifacts, unknown job results, and successful jobs without
+digest evidence MUST NOT become verified non-writes. A proven unauthorized
+write or digest mismatch yields `write_gate_violation`; the check never changes
+the recorded verdict.
+
+Gate-blocked rows MUST be evaluated before resource lookup as
+`skipped`/`strong` with `gate_denied`, `gate_held`, `gate_staged`, or
+`gate_dropped`. Strong evidence attests to the recorded suppression, not an
+applied effect or eventual approval. Missing target identity and unavailable
+GitHub APIs MUST NOT turn these rows into pending, unknown, deleted, or errors.
+This includes run-level denial, distinct from ordinary staged configuration.
+Review publication is evaluated as the actually created review issue. A held
+item applied by a later replay is evaluated normally from its successful
+execution record; its earlier held observation remains unchanged.
+
+Audit and logs JSON expose `write_gate` only when gate evidence exists.
+They include verdict, reason, manifest digest, integrity, conclusion check,
+decision counts, and item decisions when available. Outcome summaries MUST
+separately count `gate_denied`, `gate_held`, `gate_staged`, and `gate_dropped`;
+these counts are not acceptance, rejection, or unknown counts. Ungated runs
+retain their existing output shape.
 
 ### CLI conformance
 

@@ -55,6 +55,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 		observabilityInsights: observabilityInsights,
 	})
 	auditData.ModelRouting = applyAwInfoModelRouting(processedRun.ModelRouting, processedRun.Run.LogsPath)
+	auditData.WriteGate = readWriteGate(processedRun.Run.LogsPath)
 	auditData.SteeringNotices = tokenUsageSteeringNotices(processedRun.TokenUsage)
 	auditData.SteeringDeliveries = tokenUsageSteeringDeliveries(processedRun.TokenUsage)
 	auditData.SteeringNoticesUnavailable = tokenUsageSteeringNoticesUnavailable(processedRun.TokenUsage)

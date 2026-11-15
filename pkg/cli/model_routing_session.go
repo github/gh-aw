@@ -91,6 +91,7 @@ type sessionModelRoutingAttribution struct {
 	Mismatches                []ModelEndpointMismatch
 	UnavailableSubagentModels []sessionSubagentModelUnavailable
 	RetryEvents               []sessionModelRoutingEvent
+	WriteGate                 *WriteGateReport
 }
 
 // ModelEndpointMismatch describes a model/API incompatibility reported by the unified session.
@@ -197,6 +198,18 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
+	case event.Type == "gate.decision" && event.Provenance.Component == "write_gate" && event.Provenance.Phase == "conclusion" && event.Provenance.Path == "usage/aw_session.jsonl":
+		if attribution.WriteGate != nil {
+			attribution.WriteGate.ConclusionCheck = "unknown"
+			attribution.WriteGate.Error = "duplicate write gate conclusion evidence"
+			return nil
+		}
+		gate, err := parseWriteGate(event)
+		if err != nil {
+			attribution.WriteGate = &WriteGateReport{Integrity: "unknown", ConclusionCheck: "unknown", Error: err.Error()}
+			return nil
+		}
+		attribution.WriteGate = gate
 	case (event.Type == "harness.attempt" || event.Type == "harness.retry" || event.Type == "harness.decision") && event.Provenance.Component == "harness":
 		attribution.RetryEvents = append(attribution.RetryEvents, event)
 	case event.Type == "engine.retry" && event.Provenance.Component == "agent":
