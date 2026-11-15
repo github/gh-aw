@@ -2,79 +2,52 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="$SCRIPT_DIR/collect_usage_artifact_files.sh"
 TEST_DIR="$(mktemp -d)"
-RETRY_FILES=(
-  /tmp/gh-aw/agent/harness_retry.json
-  /tmp/gh-aw/threat-detection/detection_harness_retry.json
-  /tmp/gh-aw/usage/agent/harness_retry.json
-  /tmp/gh-aw/usage/detection/harness_retry.json
-)
-for file in /tmp/gh-aw/aw_info.json /tmp/gh-aw/agent/aw_info.json /tmp/gh-aw/usage/aw_info.json "${RETRY_FILES[@]}"; do
-  if [ -f "$file" ]; then
-    cp "$file" "$TEST_DIR/$(printf '%s' "$file" | tr '/' '_')"
-    touch "$TEST_DIR/$(printf '%s' "$file" | tr '/' '_').present"
-  fi
-done
-if [ -d /tmp/gh-aw/agent ]; then touch "$TEST_DIR/agent-dir.present"; fi
+trap 'rm -rf "$TEST_DIR"' EXIT
+ROOT="$TEST_DIR/gh-aw"
+SCRIPT="$TEST_DIR/collect_usage_artifact_files.sh"
+sed "s|/tmp/gh-aw|$ROOT|g" "$SCRIPT_DIR/collect_usage_artifact_files.sh" > "$SCRIPT"
 
-cleanup() {
-  for file in /tmp/gh-aw/aw_info.json /tmp/gh-aw/agent/aw_info.json /tmp/gh-aw/usage/aw_info.json "${RETRY_FILES[@]}"; do
-    backup="$TEST_DIR/$(printf '%s' "$file" | tr '/' '_')"
-    if [ -f "$backup.present" ]; then
-      mkdir -p "$(dirname "$file")"
-      cp "$backup" "$file"
-    else
-      rm -f "$file"
-    fi
-  done
-  if [ ! -f "$TEST_DIR/agent-dir.present" ]; then rmdir /tmp/gh-aw/agent 2>/dev/null || true; fi
-  rm -f /tmp/gh-aw/usage/activity/collector-test-marker
-  if [ -f "$TEST_DIR/previous-summary.json" ]; then
-    cp "$TEST_DIR/previous-summary.json" /tmp/gh-aw/usage/activity/summary.json
-  else
-    rm -f /tmp/gh-aw/usage/activity/summary.json
-  fi
-  rm -rf "$TEST_DIR"
-}
-trap cleanup EXIT
-
-mkdir -p "$TEST_DIR/bin-with-node" "$TEST_DIR/bin-without-node" /tmp/gh-aw/usage/activity
-mkdir -p /tmp/gh-aw/agent
-mkdir -p /tmp/gh-aw/threat-detection
-printf '{"attempts":1,"exit_code":0,"attempt_results":[{"attempt":1,"exit_code":0,"failure_classes":[]}]}\n' > /tmp/gh-aw/agent/harness_retry.json
-printf '{"attempts":2,"exit_code":1,"attempt_results":[{"attempt":1,"exit_code":1,"failure_classes":["rate_limit_error"]},{"attempt":2,"exit_code":1,"failure_classes":["rate_limit_error"]}]}\n' > /tmp/gh-aw/threat-detection/detection_harness_retry.json
-printf '{"model":"early"}\n' > /tmp/gh-aw/aw_info.json
-printf '{"model":"final","model_routing":{"status":"selected"}}\n' > /tmp/gh-aw/agent/aw_info.json
-if [ -f /tmp/gh-aw/usage/activity/summary.json ]; then
-  cp /tmp/gh-aw/usage/activity/summary.json "$TEST_DIR/previous-summary.json"
-  rm /tmp/gh-aw/usage/activity/summary.json
-fi
+mkdir -p "$TEST_DIR/bin-with-node" "$TEST_DIR/bin-without-node" "$ROOT/usage/activity"
+mkdir -p "$ROOT/agent" "$ROOT/runtime" "$ROOT/threat-detection"
+printf '{"attempts":1,"exit_code":0,"attempt_results":[{"attempt":1,"exit_code":0,"failure_classes":[]}]}\n' > "$ROOT/agent/harness_retry.json"
+printf '{"attempts":2,"exit_code":1,"attempt_results":[{"attempt":1,"exit_code":1,"failure_classes":["rate_limit_error"]},{"attempt":2,"exit_code":1,"failure_classes":["rate_limit_error"]}]}\n' > "$ROOT/threat-detection/detection_harness_retry.json"
+printf '{"model":"early"}\n' > "$ROOT/aw_info.json"
+printf '{"model":"final","model_routing":{"status":"selected"}}\n' > "$ROOT/runtime/aw_info.json"
+printf '{"model":"forged"}\n' > "$ROOT/agent/aw_info.json"
 for utility in mkdir cp find sort dirname mktemp mv rm; do
   ln -s "$(command -v "$utility")" "$TEST_DIR/bin-with-node/$utility"
   ln -s "$(command -v "$utility")" "$TEST_DIR/bin-without-node/$utility"
 done
 ln -s "$(command -v node)" "$TEST_DIR/bin-with-node/node"
-touch /tmp/gh-aw/usage/activity/collector-test-marker
+touch "$ROOT/usage/activity/collector-test-marker"
 
 output_without_node="$(RUNNER_TEMP="$TEST_DIR" PATH="$TEST_DIR/bin-without-node" /bin/bash "$SCRIPT" 2>&1)"
 grep -q 'Node was not found on PATH' <<<"$output_without_node"
-grep -q '/tmp/gh-aw/usage/activity/collector-test-marker' <<<"$output_without_node"
+grep -Fq "$ROOT/usage/activity/collector-test-marker" <<<"$output_without_node"
 
 output_with_node="$(RUNNER_TEMP="$TEST_DIR" PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" 2>&1)"
 ! grep -q 'Node was not found on PATH' <<<"$output_with_node"
-grep -q '/tmp/gh-aw/usage/activity/collector-test-marker' <<<"$output_with_node"
+grep -Fq "$ROOT/usage/activity/collector-test-marker" <<<"$output_with_node"
 
-test ! -f /tmp/gh-aw/usage/activity/summary.json
-cmp /tmp/gh-aw/agent/harness_retry.json /tmp/gh-aw/usage/agent/harness_retry.json
-cmp /tmp/gh-aw/threat-detection/detection_harness_retry.json /tmp/gh-aw/usage/detection/harness_retry.json
+test ! -f "$ROOT/usage/activity/summary.json"
+cmp "$ROOT/agent/harness_retry.json" "$ROOT/usage/agent/harness_retry.json"
+cmp "$ROOT/threat-detection/detection_harness_retry.json" "$ROOT/usage/detection/harness_retry.json"
+cmp "$ROOT/runtime/aw_info.json" "$ROOT/usage/aw_info.json"
 
-rm /tmp/gh-aw/agent/harness_retry.json /tmp/gh-aw/threat-detection/detection_harness_retry.json
-rm /tmp/gh-aw/usage/agent/harness_retry.json /tmp/gh-aw/usage/detection/harness_retry.json
+rm "$ROOT/agent/harness_retry.json" "$ROOT/threat-detection/detection_harness_retry.json"
+rm "$ROOT/usage/agent/harness_retry.json" "$ROOT/usage/detection/harness_retry.json"
 PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" >/dev/null
-test ! -f /tmp/gh-aw/usage/agent/harness_retry.json
-test ! -f /tmp/gh-aw/usage/detection/harness_retry.json
-grep -q '"model":"final"' /tmp/gh-aw/usage/aw_info.json
+test ! -f "$ROOT/usage/agent/harness_retry.json"
+test ! -f "$ROOT/usage/detection/harness_retry.json"
+
+rm "$ROOT/runtime/aw_info.json"
+PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" >/dev/null
+cmp "$ROOT/aw_info.json" "$ROOT/usage/aw_info.json"
+
+rm "$ROOT/aw_info.json" "$ROOT/usage/aw_info.json"
+PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" >/dev/null
+test ! -f "$ROOT/usage/aw_info.json"
 
 ISOLATED_ROOT="$TEST_DIR/isolated/gh-aw"
 ISOLATED_SCRIPT="$TEST_DIR/collect_usage_artifact_files.sh"
@@ -83,7 +56,7 @@ printf '{"model":"safe"}\n' > "$ISOLATED_ROOT/aw_info.json"
 printf 'external sentinel\n' > "$TEST_DIR/sentinel"
 ln -s "$TEST_DIR/sentinel" "$ISOLATED_ROOT/usage/aw_info.json"
 ln -s "$TEST_DIR/sentinel" "$ISOLATED_ROOT/agent_usage.json"
-sed "s|/tmp/gh-aw|$ISOLATED_ROOT|g" "$SCRIPT" > "$ISOLATED_SCRIPT"
+sed "s|/tmp/gh-aw|$ISOLATED_ROOT|g" "$SCRIPT_DIR/collect_usage_artifact_files.sh" > "$ISOLATED_SCRIPT"
 if /bin/bash "$ISOLATED_SCRIPT" >/dev/null 2>&1; then
   test "$(cat "$TEST_DIR/sentinel")" = "external sentinel"
   test -L "$ISOLATED_ROOT/usage/aw_info.json"

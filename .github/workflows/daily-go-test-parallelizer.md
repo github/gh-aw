@@ -105,7 +105,9 @@ Use only this workflow's disposable `GOCACHE` and `GOMODCACHE`; do not inspect p
 
 Stop after the first policy denial or unrecoverable tool failure; do not retry or probe around it. At turn 30 of 40 or 25 minutes of the 30-minute timeout, whichever comes first, checkpoint. Continue only if all remaining analysis and validation can finish with at least two turns and two minutes reserved for diff review and the terminal safe output. Otherwise restore candidate edits and report incomplete.
 
-After edits, run `go test -race` once per unique modified package, then run `go test ./...` once. Inspect the diff; it must contain only safe `t.Parallel()` additions in selected files. If validation fails or is blocked, or the diff is out of scope, restore your edits only (never pre-existing work) and report incomplete. Do not execute prohibited operations, grant exceptions, omit tests, or substitute static analysis. A possible policy incompatibility is not proof of a block or of no safe candidate.
+Print the candidate-only diff before validation; require only safe `t.Parallel()` additions in selected files. Run `go test -race -json` once per modified package, then `go test -json ./...` once. Use `set -o pipefail` and `tee` to save each complete output under `/tmp/gh-aw/agent/parallelizer-validation/` while retaining it in the agent transcript; preserve Go's exit status. Read saved JSON failure events and nearby output, not a truncated tool excerpt. Report failing test names and errors; a package-level FAIL alone is insufficient when test evidence exists.
+
+On failed, blocked, or out-of-scope validation, restore only your edits and report incomplete. Never omit tests, substitute static analysis, grant exceptions, or bypass denied operations. Suspected policy incompatibility is not proof of a block or no safe candidate.
 
 Before `report_incomplete`, self-check and report:
 

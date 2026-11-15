@@ -311,6 +311,9 @@ func TestRenderScheduleCalendarCell_NoANSIWhenNoColor(t *testing.T) {
 }
 
 func TestRenderScheduleCalendarCell_UsesANSIInColorTerminal(t *testing.T) {
+	t.Setenv("ACCESSIBLE", "")
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("TERM", "xterm-256color")
 	// This test intentionally avoids t.Parallel because it temporarily overrides
 	// a shared style token; running in parallel could race with other tests that
 	// read styles.ScheduleCalendarCritical.
