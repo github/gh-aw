@@ -49,6 +49,17 @@ Starting with [MCP gateway v0.5.1](https://github.com/github/gh-aw-mcpg/releases
 
 ## Configuration
 
+The default isolated proxy publishes its host port only on loopback. In the
+nonisolated host-network fallback, the pre-agent DIFC proxy binds loopback;
+the CLI proxy also accepts local Docker bridge callers (`docker0` and `br-*`)
+for AWF sidecar connectivity. That fallback requires noninteractive
+`sudo iptables` to block other ingress to TCP port 18443 before starting the CLI
+proxy, and fails startup if the filter cannot be installed. Cleanup removes
+only the proxy's filter after stopping its host-network container. If the
+container is already absent, any restrictive filter is retained until a
+subsequent successful legacy startup and cleanup. Local host processes and
+Docker bridge containers remain inside this trust boundary.
+
 Set `min-integrity` under `tools.github` in your workflow frontmatter:
 
 ```aw wrap

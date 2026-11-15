@@ -50,8 +50,10 @@ echo "Using DIFC proxy upstream host: ${GH_HOST} (API: ${GITHUB_API_URL})"
 docker rm -f awmg-proxy 2>/dev/null || true
 
 DOCKER_NETWORK_ARGS=(--network host)
+PROXY_LISTEN=127.0.0.1:18443
 if [ "${GH_AW_NETWORK_ISOLATION:-false}" = "true" ]; then
   DOCKER_NETWORK_ARGS=(--network bridge -p 127.0.0.1:18443:18443)
+  PROXY_LISTEN=0.0.0.0:18443
 fi
 
 docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
@@ -69,7 +71,7 @@ docker run -d --name awmg-proxy "${DOCKER_NETWORK_ARGS[@]}" \
   -v "$MCP_LOG_DIR:$MCP_LOG_DIR" \
   "$CONTAINER_IMAGE" proxy \
     --policy "$POLICY" \
-    --listen 0.0.0.0:18443 \
+    --listen "$PROXY_LISTEN" \
     --log-dir "$MCP_LOG_DIR" \
     --tls --tls-dir "$PROXY_LOG_DIR/proxy-tls" \
     --guards-mode filter \
