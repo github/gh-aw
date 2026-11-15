@@ -48,7 +48,8 @@ tools:
     - "jq *"
     - "node *"
     - "bash .github/skills/cracktro/refresh/*"
-    - "python3 -m http.server *"
+    - "python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public"
+    - 'mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review"'
     - "curl *"
     - "kill *"
 safe-outputs:
@@ -71,7 +72,7 @@ safe-outputs:
       - .github/skills/cracktro/data-refresh.md
       - .github/skills/cracktro/refresh/**
   upload-artifact:
-    allowed-paths: ["/tmp/gh-aw/agent/cracktro-review/"]
+    allowed-paths: ["cracktro-review/**"]
     max-uploads: 1
     retention-days: 7
   noop:
@@ -141,7 +142,14 @@ and the complete changed-file diff. Use the compiler-provisioned Playwright CLI
 against a local static server; no Astro build or package installation is needed
 for this standalone deck. Serve `docs/public` on loopback with
 `python3 -m http.server 4329 --bind 127.0.0.1 --directory docs/public`.
-Retain the server PID, check readiness with bounded `curl` retries, and open
+Run that exact command standalone from the repository root using the asynchronous
+shell tool; do not prepend `cd`, append arguments, or add shell background syntax.
+Retain the server handle/PID. Create the screenshot directory with the standalone
+command `mkdir -p "$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review"`.
+Check readiness with
+`curl --fail --silent --show-error --connect-timeout 2 --max-time 5 --retry 10 --retry-connrefused --retry-all-errors --retry-max-time 30 http://127.0.0.1:4329/cracktro/`.
+This bounds retry scheduling to 30 seconds and each transfer to 5 seconds.
+Do not use readiness loops requiring undeclared `seq` or `sleep`. Open
 `http://127.0.0.1:4329/cracktro/` with `playwright-cli open --browser=chromium`.
 
 Inspect changed slides and adjacent transitions at desktop and narrow widths.
@@ -149,8 +157,12 @@ Check keyboard navigation, slide links, notes, sound controls, content rules,
 and console/network errors, using `docs/tests/talk.spec.ts` as the existing
 regression contract. Run the relevant existing tests if dependencies are already
 available; never claim a suite passed when only browser checks ran. Save focused
-screenshots under `/tmp/gh-aw/agent/cracktro-review/` and publish them with
-`upload_artifact`. Close the browser and stop only the server PID you started.
+screenshots under `"$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/cracktro-review/"`
+and publish them with `upload_artifact` using `path: "cracktro-review"` relative
+to staging. Do not use an arbitrary `/tmp` source or upload the staging root.
+Close the browser and stop only the server handle/PID you
+started, including on validation failure. After a tool denial, do not retry
+command variants; report the precise blocker without opening a PR.
 
 Before publication, recheck for overlapping open PRs. Use only
 `create_pull_request` for GitHub changes; never push, merge, enable auto-merge,

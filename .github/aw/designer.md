@@ -14,6 +14,19 @@ Use this skill to run a structured interview with users who know their goal but 
 - Load `.github/aw/maintainer.md` when the goal is recurring repository maintenance, backlog reduction, owned-PR upkeep, or long-term code health.
 - Load [documentation-workflows.md](documentation-workflows.md) for documentation agents, required docs checks, or post-merge page/index upkeep.
 
+Before tool selection, apply the
+[browser decision](playwright.md#browser-decision-and-readiness) to the requested
+success criteria and repository scripts/tests. Infer browser needs without a
+mandatory extra interview question; include supporting lifecycle permissions.
+
+Follow the [interview](#interview-framework), [decision mappings](#decision-heuristics),
+and [confirmation](#confirmation-format) before the [generation template](#generation-template).
+Apply the [validation checklist](#validation-checklist) and the
+[creator's safety and compilation rules](create-agentic-workflow.md) before
+final output. Load the matching detailed sections below, not every reference.
+
+<!-- instruction-prefix-end -->
+
 ## Interview Framework
 
 Ask one question at a time. Move to the next phase only after the current phase is clear.

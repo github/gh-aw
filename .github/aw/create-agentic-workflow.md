@@ -5,9 +5,8 @@ disable-model-invocation: true
 
 # GitHub Agentic Workflow Designer & Creator
 
-Create one `.github/workflows/<workflow-id>.md` using `gh aw`. For evaluation,
-return recommendations only; do not create/edit files without an explicit
-implementation request.
+Create one `.github/workflows/<workflow-id>.md` using `gh aw`. Evaluation is
+recommendations only; do not create/edit without an explicit implementation request.
 
 ## Load These References First
 
@@ -75,7 +74,8 @@ compile it and include its generated `.lock.yml` in the PR.
    tools or `post-steps:`. Require `update-release` for release notes; restrict
    `create-pull-request.allowed-files`; require `noop` for duplicates,
    insufficient evidence or no action.
-4. Prefer `gh-proxy` and `toolsets:`; use `cli-proxy: true` only for needed
+4. Apply the [browser decision](playwright.md#browser-decision-and-readiness).
+   Prefer `gh-proxy` and `toolsets:`; use `cli-proxy: true` only for needed
    non-GitHub MCP CLIs. Codex cannot enforce nonempty per-command `tools.bash`
    allowlists; disable bash or choose a compatible engine. Declare `skills:`/
    `plugins:` at top level; never install them via generated steps, shell or
@@ -123,7 +123,6 @@ parameters. For examples and failure recovery, read
 
 ## Final Steps
 
-Apply the linked design and validation checklists. Create the source, run
-`gh aw compile <workflow-id>`, fix every compile error, and create a PR containing
-source and generated lock. Report the change and unavailable checks concisely.
+Apply the linked checklists. Run `gh aw compile <workflow-id>`, fix errors,
+and include source and lock in the PR. Report changes and unavailable checks.
 Compilation does not execute a workflow or authorize dispatch.

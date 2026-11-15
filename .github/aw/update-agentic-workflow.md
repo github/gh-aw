@@ -43,6 +43,10 @@ This prompt is for **updating existing workflows only**. For new workflows, use 
 
 Use [workflow-editing.md](workflow-editing.md) as the source of truth for the frontmatter-vs-body recompilation taxonomy and the `.lock.yml` review. Always compile after any edit, even for body-only changes.
 
+Apply the [browser decision](playwright.md#browser-decision-and-readiness) when
+the outcome or validation requirements change. Inspect existing tools, scripts,
+and tests; configure supporting lifecycle permissions, not just Playwright.
+
 ## Update Rules
 
 - make the smallest possible change
