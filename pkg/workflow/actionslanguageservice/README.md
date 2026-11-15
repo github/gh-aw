@@ -22,6 +22,13 @@ Expression length and nesting are bounded by `MaxExpressionLength` and `MaxExpre
 | `ActionsIdentifier` | Validates identifiers used by Actions syntax. |
 | `ValidateWorkflowWithCacheMode` | Validates workflow YAML against the compiler's cache-mode schema. |
 
+`Diagnostic` also implements `Error`; `Expression.Child` returns a child node by
+index. `Pattern` provides `FindAllString`, `FindAllStringSubmatch`,
+`FindAllStringSubmatchIndex`, `FindStringSubmatch`, and `MatchString` for
+searching expression references, plus `ReplaceAllString` and
+`ReplaceAllStringFunc` for source-preserving rewrites. The schema property's
+`UnmarshalJSON` method decodes schema declarations.
+
 ## Dependencies
 
 The parser follows the pinned Actions language grammar and is used by workflow AST and security-analysis packages.

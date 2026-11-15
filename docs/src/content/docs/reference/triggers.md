@@ -902,7 +902,9 @@ if: needs.pre_activation.outputs.has_issues == 'true'
 
 Supported permission scopes: `actions`, `checks`, `contents`, `deployments`, `discussions`, `issues`, `packages`, `pages`, `pull-requests`, `repository-projects`, `security-events`, `statuses`.
 
-`on.permissions` is merged on top of any permissions already required by the pre-activation job (e.g., `contents: read` for dev-mode checkout, `actions: read` for rate limiting).
+When either [`skip-if-match`](#skip-if-match-condition-skip-if-match) or [`skip-if-no-match`](#skip-if-no-match-condition-skip-if-no-match) is configured, the compiler automatically grants `issues: read` and `pull-requests: read` to the pre-activation job so search gates can query private and internal repositories. These permissions do not grant access to other repositories.
+
+`on.permissions` is merged on top of permissions already required by the pre-activation job, including search-gate read scopes, `contents: read` for dev-mode checkout, and `actions: read` for rate limiting. Explicit scopes such as `issues: write` are preserved.
 
 ## Trigger Shorthands
 

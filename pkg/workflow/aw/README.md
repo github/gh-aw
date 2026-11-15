@@ -29,6 +29,8 @@ Schema validation, import resolution, and typed workflow configuration remain th
 | `ValidateStatusOnlyJob` | Validates status-only job access to agent data and returns structured violations. |
 
 `workflow.Compiler.ParseWorkflowDocument` accepts this AST as input to compilation.
+`Document.FrontmatterResult` returns the parser's frontmatter result for callers
+that need its source locations and diagnostics.
 
 ## Dependencies
 

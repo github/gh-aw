@@ -19,3 +19,7 @@
 | `Frontmatter.RewriteText` | Applies a lexical transformation to frontmatter while keeping the Markdown body outside the edit. |
 
 When `Rename` finds that the destination already exists, that destination remains authoritative. Edits that fail validation leave the original content unchanged.
+
+`Frontmatter.MergeSequence` merges sequence values at a mapping path, while
+`Frontmatter.Move` moves a value between mapping paths. Both operations preserve
+unaffected source formatting.

@@ -28,3 +28,19 @@ Values are read when a resolver is called. The package also builds GitHub Action
 | `BuildModelOverrideExpression`, `BuildModelOverrideExpressionEmptyFallback` | Build phase model expressions with either a built-in fallback or an empty fallback for runtime selection. |
 
 The exported variable-name constants identify the corresponding enterprise overrides and policy variables. Configuration precedence and individual override behavior are documented in the parent [`workflow` package specification](../README.md).
+
+Additional package constants define admission defaults (`DefaultAdmissionAudience`,
+`DefaultAdmissionOnOutage`, `DefaultAdmissionURL`), job and artifact defaults
+(`DefaultAgentJobTimeoutMinutes`, `DefaultArtifactRetentionDays`,
+`DefaultDetectionJobTimeoutMinutes`), engine model defaults
+(`DefaultModelClaude`, `DefaultModelCodex`, `DefaultModelCopilot`), the OTLP
+protocol key (`OTLPProtocol`), and the creation policies
+(`PolicyAllowCreatePullRequest`, `PolicyStrict`).
+
+Other environment-variable identifiers are
+`DefaultDetectionMaxAICredits`, `DefaultDetectionModel`,
+`DefaultEvalsMaxAICredits`, `DefaultEvalsModel`, `DefaultMaxAICredits`,
+`DefaultMaxDailyAICredits`, `DefaultMaxTurnCacheMisses`, `DefaultMaxTurns`,
+`DefaultOTLPEndpoint`, `DefaultOTLPHeaders`, `DefaultTimeoutMinutes`,
+`DefaultUTC`, `PolicyModelsAllowed`, `PolicyModelsBlocked`, and
+`RequireSelfHostedRunners`.

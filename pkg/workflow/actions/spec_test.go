@@ -227,3 +227,54 @@ func TestSpec_PublicAPI_EditSource(t *testing.T) {
 	assert.True(t, strings.HasPrefix(edited, "# workflow comment\n"), "the unaffected leading comment must remain")
 	assert.True(t, strings.HasSuffix(edited, " # name comment\non: push\n"), "the unaffected inline comment and remaining fields must remain")
 }
+
+// TestSpec_PublicAPI_RenderExpression checks README.md / Public API: output
+// expressions use bindings derived by Resolve, including cross-job bindings.
+// SPEC_AMBIGUITY: The README does not define the wrap argument's exact syntax;
+// these assertions check the resolved output reference within the rendered text.
+func TestSpec_PublicAPI_RenderExpression(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		consumer actions.JobID
+	}{
+		{name: "same job output", consumer: "producer"},
+		{name: "cross job output", consumer: "consumer"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ref := actions.OutputRef{Job: "producer", Step: "generate", Name: "result"}
+			resolved, err := actions.Resolve(&actions.Workflow{
+				Jobs: []*actions.Job{
+					{
+						ID: "producer", RunsOn: "ubuntu-latest",
+						Steps: []actions.Step{
+							actions.RunStep{
+								StepOptions: actions.StepOptions{ID: "generate", Outputs: []actions.OutputDecl{{Name: "result"}}},
+								Run:         "echo result=ready",
+							},
+							actions.ActionStep{Uses: "example/action@v1", With: map[string]actions.Expression{"result": ref}},
+						},
+					},
+					{
+						ID: "consumer", RunsOn: "ubuntu-latest",
+						Steps: []actions.Step{actions.ActionStep{
+							Uses: "example/action@v1", With: map[string]actions.Expression{"result": ref},
+						}},
+					},
+				},
+			})
+			require.NoError(t, err, "declared producer output references must resolve before rendering")
+			rendered, err := actions.RenderExpression(ref, tc.consumer, resolved, true)
+			require.NoError(t, err, "a resolved output reference must render for %s", tc.name)
+			if tc.consumer == "producer" {
+				assert.Contains(t, rendered, "steps.generate.outputs.result", "same-job references must identify the earlier producer step")
+			} else {
+				require.NotEmpty(t, resolved.Jobs[0].Outputs, "cross-job references must have a producer job output binding")
+				for output := range resolved.Jobs[0].Outputs {
+					assert.Contains(t, rendered, "needs.producer.outputs."+string(output), "cross-job references must use the resolved producer output binding")
+				}
+			}
+		})
+	}
+}

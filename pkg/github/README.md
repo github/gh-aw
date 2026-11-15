@@ -54,6 +54,33 @@ For backward compatibility, deprecated exported `ObjectiveLabel*` and
 `ObjectiveValue*` constants are still available for external consumers. Runtime
 scoring behavior is not derived from those constants.
 
+The deprecated label constants name the historical issue labels; the paired
+value constants expose their legacy numeric values. They are aliases for
+compatibility only and do not configure `DefaultObjectiveMapping()`:
+
+`ObjectiveLabelAIGenerated`, `ObjectiveLabelAIInspected`, `ObjectiveLabelActions`,
+`ObjectiveLabelBug`, `ObjectiveLabelCLI`, `ObjectiveLabelCopilotOpt`,
+`ObjectiveLabelCritical`, `ObjectiveLabelDependencies`,
+`ObjectiveLabelDocumentation`, `ObjectiveLabelEngine`,
+`ObjectiveLabelEnhancement`, `ObjectiveLabelGoodFirstIssue`,
+`ObjectiveLabelHighPriority`, `ObjectiveLabelLintMonster`,
+`ObjectiveLabelLowPriority`, `ObjectiveLabelMCP`, `ObjectiveLabelMediumPriority`,
+`ObjectiveLabelP0`, `ObjectiveLabelP1`, `ObjectiveLabelP2`, `ObjectiveLabelP3`,
+`ObjectiveLabelPerformance`, `ObjectiveLabelQuestion`, `ObjectiveLabelReliability`,
+`ObjectiveLabelSecurityFix`, `ObjectiveLabelSmokeCopilot`, `ObjectiveLabelTesting`,
+and `ObjectiveLabelWorkflow`; and their corresponding value constants:
+`ObjectiveValueAIGenerated`, `ObjectiveValueAIInspected`, `ObjectiveValueActions`,
+`ObjectiveValueBug`, `ObjectiveValueCLI`, `ObjectiveValueCopilotOpt`,
+`ObjectiveValueCritical`, `ObjectiveValueDependencies`,
+`ObjectiveValueDocumentation`, `ObjectiveValueEngine`,
+`ObjectiveValueEnhancement`, `ObjectiveValueGoodFirstIssue`,
+`ObjectiveValueHighPriority`, `ObjectiveValueLintMonster`,
+`ObjectiveValueLowPriority`, `ObjectiveValueMCP`, `ObjectiveValueMediumPriority`,
+`ObjectiveValueP0`, `ObjectiveValueP1`, `ObjectiveValueP2`, `ObjectiveValueP3`,
+`ObjectiveValuePerformance`, `ObjectiveValueQuestion`, `ObjectiveValueReliability`,
+`ObjectiveValueSecurityFix`, `ObjectiveValueSmokeCopilot`, `ObjectiveValueTesting`,
+and `ObjectiveValueWorkflow`.
+
 Default label-to-value entries are provided by `DefaultObjectiveMapping()`:
 
 | Label | Value |

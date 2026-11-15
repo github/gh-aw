@@ -37,6 +37,19 @@ describe("resolve_model_alias", () => {
     expect(matches).toBe("copilot/claude-sonnet-4.6");
   });
 
+  it("selects the highest-version namespaced glob match", () => {
+    const matches = selectLatestGlobMatch("openrouter/anthropic/claude-sonnet-*", ["openrouter/anthropic/claude-sonnet-4.9", "openrouter/anthropic/claude-sonnet-4.10"]);
+    expect(matches).toBe("openrouter/anthropic/claude-sonnet-4.10");
+  });
+
+  it("preserves the full namespaced model token when matching", () => {
+    expect(globMatch("openrouter/anthropic/claude-sonnet-4", "openrouter/anthropic/claude-sonnet-4")).toBe(true);
+    expect(globMatch("openrouter/anthropic/claude-sonnet-4", "openrouter/anthropic/claude-opus-4")).toBe(false);
+    expect(globMatch("openrouter/*", "openrouter/anthropic/claude-sonnet-4")).toBe(false);
+    expect(globMatch("openrouter/anthropic/*sonnet*", "openrouter/anthropic/claude-sonnet-4")).toBe(true);
+    expect(resolveModelAlias("sonnet", { sonnet: ["openrouter/anthropic/claude-sonnet-4"] }, ["openrouter/anthropic/claude-opus-4", "openrouter/anthropic/claude-sonnet-4"])).toBe("openrouter/anthropic/claude-sonnet-4");
+  });
+
   it("resolves small -> mini -> haiku glob chain", () => {
     const resolved = resolveModelAlias("small", ALIAS_MAP, catalog);
     expect(resolved).toBe("copilot/claude-haiku-4.5");

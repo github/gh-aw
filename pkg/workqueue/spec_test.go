@@ -238,6 +238,8 @@ func TestSpec_Types_PublicContracts(t *testing.T) {
 		{name: "Branch", value: workqueue.Branch{}},
 		{name: "NativeDeliveryHost", value: workqueue.NativeDeliveryHost{}},
 		{name: "LedgerSession", value: workqueue.LedgerSession{}},
+		{name: "Trace", value: workqueue.Trace{}},
+		{name: "Observation", value: workqueue.Observation{}},
 		{name: "TraceOptions", value: workqueue.TraceOptions{}},
 		{name: "TraceEvent", value: workqueue.TraceEvent{}},
 		{name: "TraceEvidence", value: workqueue.TraceEvidence{}},
@@ -250,6 +252,7 @@ func TestSpec_Types_PublicContracts(t *testing.T) {
 		{name: "CheckpointParameters", value: workqueue.CheckpointParameters{}},
 		{name: "ClaimOperation", value: workqueue.ClaimOperation{}},
 		{name: "Dependency", value: workqueue.Dependency{}},
+		{name: "Resource", value: workqueue.Resource{}},
 		{name: "Replacement", value: workqueue.Replacement{}},
 		{name: "ResultReference", value: workqueue.ResultReference{}},
 		{name: "OperationsParameters", value: workqueue.OperationsParameters{}},
@@ -266,6 +269,7 @@ func TestSpec_Types_PublicContracts(t *testing.T) {
 		{name: "WorkerProfile", value: workqueue.WorkerProfile{}},
 		{name: "WorkerRevision", value: workqueue.WorkerRevision{}},
 		{name: "WorkerDeployment", value: workqueue.WorkerDeployment{}},
+		{name: "DeploymentOperation", value: workqueue.DeploymentOperation{}},
 		{name: "RetryPolicy", value: workqueue.RetryPolicy{}},
 		{name: "ReconciliationPolicy", value: workqueue.ReconciliationPolicy{}},
 		{name: "Limits", value: workqueue.Limits{}},
@@ -371,6 +375,59 @@ func TestSpec_PublicAPI_DispatchPrincipal(t *testing.T) {
 			}
 			assert.Equal(t, "spec-worker", workqueue.DispatchPrincipal(dispatch),
 				"the principal frozen at launch should remain independent of the request sender")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_NewRequestFingerprint checks README.md / Functions:
+// requests carry the canonical fingerprint of their actor, kind, and parameters.
+// SPEC_AMBIGUITY: The README does not specify the digest encoding or request-kind
+// admission rules; these tests check fingerprint relationships without replay.
+func TestSpec_PublicAPI_NewRequestFingerprint(t *testing.T) {
+	t.Parallel()
+	actor := workqueue.Actor{Role: "producer", Principal: "spec-principal", Repository: "owner/repo"}
+	const kind = "submit"
+	const parameters = `{"payload":{"task":"build","count":1}}`
+	fingerprint, err := workqueue.Fingerprint(actor, kind, json.RawMessage(parameters))
+	require.NoError(t, err, "integer-valued request parameters must support a canonical fingerprint")
+	require.NotEmpty(t, fingerprint, "a canonical request fingerprint must identify its input")
+	for _, tt := range []struct {
+		name       string
+		parameters string
+	}{
+		{name: "original parameters", parameters: parameters},
+		{name: "reordered and spaced parameters", parameters: "{ \"payload\": { \"count\": 1, \"task\": \"build\" } }\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			equivalent, err := workqueue.Fingerprint(actor, kind, json.RawMessage(tt.parameters))
+			require.NoError(t, err, "equivalent request parameters must support fingerprinting")
+			assert.Equal(t, fingerprint, equivalent, "canonical fingerprints must ignore insignificant object order and whitespace")
+			request, err := workqueue.NewRequest("spec-request", kind, actor, json.RawMessage(tt.parameters))
+			require.NoError(t, err, "a request envelope must be constructible from canonicalizable parameters")
+			assert.Equal(t, "spec-request", request.ID, "the envelope must retain its request ID")
+			assert.Equal(t, kind, request.Kind, "the envelope must retain its request kind")
+			assert.JSONEq(t, parameters, string(request.Parameters), "the envelope must retain parameter values")
+			assert.Equal(t, fingerprint, request.Fingerprint, "NewRequest must carry the canonical fingerprint of the same actor, kind, and parameters")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_ParseMalformedLedger checks README.md / Functions: parsing
+// a JSONL ledger must reject malformed JSON instead of producing usable commits.
+func TestSpec_PublicAPI_ParseMalformedLedger(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		data string
+	}{
+		{name: "truncated record", data: "{\"version\":"},
+		{name: "invalid JSON token", data: "not-json\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := workqueue.Parse([]byte(tt.data))
+			require.Error(t, err, "malformed JSONL must fail ledger parsing: %s", tt.name)
 		})
 	}
 }

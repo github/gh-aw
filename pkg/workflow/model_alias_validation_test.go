@@ -109,6 +109,26 @@ func TestParseModelIdentifier_ProviderScopedWithVersion(t *testing.T) {
 	assert.Equal(t, "claude-opus-4.5", p.ModelToken)
 }
 
+func TestParseModelIdentifier_NamespacedModel(t *testing.T) {
+	for _, model := range []string{"anthropic/claude-sonnet-4", "moonshotai/kimi-k3", "vendor/team/model.v2"} {
+		t.Run(model, func(t *testing.T) {
+			p, err := ParseModelIdentifier("openrouter/" + model + "?effort=high")
+			require.NoError(t, err)
+			assert.Equal(t, "openrouter", p.Provider)
+			assert.Equal(t, model, p.ModelToken)
+			assert.Equal(t, "high", p.Params["effort"])
+			assert.False(t, p.IsGlob)
+		})
+	}
+	for _, model := range []string{"/model", "vendor/", "vendor//model", "vendor/../model", "vendor/.model", "vendor/-model", "vendor/model.", "vendor/my model", "vendor/model:tag", "vendor/model%2Fname"} {
+		t.Run(model, func(t *testing.T) {
+			_, err := ParseModelIdentifier("openrouter/" + model)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "segment type: model")
+		})
+	}
+}
+
 func TestParseModelIdentifier_GlobPattern(t *testing.T) {
 	p, err := ParseModelIdentifier("copilot/*sonnet*")
 	require.NoError(t, err, "glob pattern should parse")

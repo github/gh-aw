@@ -52,6 +52,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Agents that debug agents | illustrative |
 | Any agent, any provider | illustrative |
 | Agent memory | illustrative |
+| Durable execution | illustrative |
 | Ephemerals | illustrative |
 | Index & search | illustrative |
 | Imports & reuse | illustrative |

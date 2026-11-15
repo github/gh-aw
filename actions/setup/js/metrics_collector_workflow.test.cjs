@@ -48,6 +48,14 @@ function writeSnapshot(root, content = snapshot()) {
   return content;
 }
 
+function snapshotWithMutation(mutate) {
+  const root = temporaryDirectory();
+  const data = JSON.parse(snapshot());
+  mutate(data);
+  writeSnapshot(root, JSON.stringify(data, null, 2) + "\n");
+  return root;
+}
+
 function runGate(root, script = gate, phase = "upload") {
   class FixtureDate extends Date {
     static now() {
@@ -122,6 +130,146 @@ describe("Metrics Collector serialized storage contract", () => {
     runGate(root);
     expect(fs.readFileSync(path.join(root, "latest.json"), "utf8")).toBe(content);
     expect(fs.readFileSync(path.join(root, "daily/2026-10-14.json"), "utf8")).toBe(content);
+  });
+
+  it("rejects workflow totals that do not match outcome counts", () => {
+    const root = snapshotWithMutation(data => data.workflows["workflow-0"].workflow_runs.total++);
+    expect(() => runGate(root)).toThrow("Workflow run total does not match outcome counts: workflow-0.");
+  });
+
+  it.each([
+    [
+      "negative counts",
+      runs => {
+        runs.failed = -1;
+      },
+    ],
+    [
+      "fractional counts",
+      runs => {
+        runs.skipped = 0.5;
+      },
+    ],
+    [
+      "null counts",
+      runs => {
+        runs.action_required = null;
+      },
+    ],
+  ])("rejects %s", (_, mutate) => {
+    const root = snapshotWithMutation(data => mutate(data.workflows["workflow-0"].workflow_runs));
+    expect(() => runGate(root)).toThrow("Workflow run counts must be non-negative integers: workflow-0.");
+  });
+
+  it.each([
+    [
+      "a null workflow",
+      data => {
+        data.workflows["workflow-0"] = null;
+      },
+    ],
+    [
+      "null workflow runs",
+      data => {
+        data.workflows["workflow-0"].workflow_runs = null;
+      },
+    ],
+    [
+      "missing workflow runs",
+      data => {
+        delete data.workflows["workflow-0"].workflow_runs;
+      },
+    ],
+  ])("rejects %s with a clear count validation error", (_, mutate) => {
+    const root = snapshotWithMutation(mutate);
+    expect(() => runGate(root)).toThrow("Workflow run counts must be non-negative integers: workflow-0.");
+  });
+
+  it.each([
+    [
+      "executed count",
+      runs => {
+        runs.executed++;
+      },
+    ],
+    [
+      "success rate offset by 0.0009",
+      runs => {
+        runs.success_rate += 0.0009;
+      },
+    ],
+    [
+      "success rate offset by 0.001",
+      runs => {
+        runs.success_rate += 0.001;
+      },
+    ],
+  ])("rejects an inconsistent %s", (_, mutate) => {
+    const root = snapshotWithMutation(data => mutate(data.workflows["workflow-0"].workflow_runs));
+    expect(() => runGate(root)).toThrow("Workflow executed count or success rate is inconsistent: workflow-0.");
+  });
+
+  it("accepts zero executions only with a null success rate", () => {
+    const root = snapshotWithMutation(data => {
+      Object.assign(data.workflows["workflow-0"].workflow_runs, {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        skipped: 0,
+        action_required: 0,
+        executed: 0,
+        success_rate: null,
+      });
+    });
+    expect(() => runGate(root)).not.toThrow();
+  });
+
+  it("rejects a numeric success rate when there were zero executions", () => {
+    const root = snapshotWithMutation(data => {
+      Object.assign(data.workflows["workflow-0"].workflow_runs, {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        skipped: 0,
+        action_required: 0,
+        executed: 0,
+        success_rate: 0,
+      });
+    });
+    expect(() => runGate(root)).toThrow("Workflow executed count or success rate is inconsistent: workflow-0.");
+  });
+
+  it("requires a partial status and note for unclassified conclusions", () => {
+    const validRoot = snapshotWithMutation(data => {
+      data.collection_status = "partial";
+      data.collection_note = "workflow-0 (neutral: 1)";
+      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+    });
+    expect(() => runGate(validRoot)).not.toThrow();
+
+    const invalidRoot = snapshotWithMutation(data => {
+      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+    });
+    expect(() => runGate(invalidRoot)).toThrow("Unclassified conclusions require partial collection status.");
+
+    const missingNoteRoot = snapshotWithMutation(data => {
+      data.collection_status = "partial";
+      data.collection_note = "";
+      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+    });
+    expect(() => runGate(missingNoteRoot)).toThrow("Partial metrics must include a collection note.");
+
+    const vagueNoteRoot = snapshotWithMutation(data => {
+      data.collection_status = "partial";
+      data.collection_note = "There was an unclassified conclusion.";
+      data.unclassified_conclusions = [{ workflow: "workflow-0", conclusion: "neutral", count: 1 }];
+    });
+    expect(() => runGate(vagueNoteRoot)).toThrow("Collection note must identify each unclassified conclusion and count.");
+  });
+
+  it("classifies startup_failure as a failed completed run", () => {
+    expect(source).toContain('Failed runs (conclusion: "failure", "cancelled", "timed_out", "startup_failure")');
+    expect(source).toContain("`startup_failure` as failed because it is a completed run that did not succeed.");
   });
 
   it.each(["bootstrap", "next-day", "both-replaced"])("measures the actual %s staged diff, including prefixes and headers", mode => {

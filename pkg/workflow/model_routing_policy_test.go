@@ -101,6 +101,17 @@ func TestBuildAWFConfigJSON_ModelRoutingPolicyMatrix(t *testing.T) {
 	}
 }
 
+func TestNarrowModelRoutingCandidate_NamespacedPolicy(t *testing.T) {
+	const candidate = "openrouter/anthropic/claude-opus-4"
+
+	t.Run("blocked exact namespaced model", func(t *testing.T) {
+		require.Empty(t, narrowModelRoutingCandidate(candidate, nil, []string{candidate}, false))
+	})
+	t.Run("allowed provider wildcard does not cross namespace segments", func(t *testing.T) {
+		require.Empty(t, narrowModelRoutingCandidate(candidate, []string{"openrouter/*"}, nil, false))
+	})
+}
+
 func TestBuildAWFConfigJSON_ModelRoutingPolicyErrors(t *testing.T) {
 	t.Run("policy excludes every candidate", func(t *testing.T) {
 		data := routedPolicyWorkflowData("copilot", "", []string{"gpt-5.6-sol"}, nil, []string{"gpt-5.4-mini"})

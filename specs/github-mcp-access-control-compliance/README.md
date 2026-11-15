@@ -180,7 +180,7 @@ Formal conformance tests are implemented in:
 The test suite includes:
 - **Predicate-mapped tests** (`TestFormal_*`) — each test maps to a specific guard predicate (P1–P6) or invariant documented in the Formal Model section above.
 - **Fixture runner** (`TestFormal_FixtureRunner`) — loads every YAML fixture file from this directory and drives each scenario through the formal evaluator. This ensures the fixture files, error codes, and expected decisions remain consistent with the formal model.
-- **Fixture inventory sync** (`TestFormal_FixtureCountConsistency`) — enforces that the documented fixture list and on-disk YAML set stay in exact sync (currently 11/11 fixtures).
+- **Fixture inventory sync** (`TestFormal_FixtureCountConsistency`) — enforces that the documented fixture list and on-disk YAML set stay in exact sync (currently 12/12 fixtures).
 
 The `combined-blocked-integrity.yaml` fixture verifies that the runner returns P5's `-32005`
 before P6's `-32006` when both guards fail.
