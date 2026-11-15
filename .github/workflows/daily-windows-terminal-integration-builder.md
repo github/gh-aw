@@ -29,11 +29,12 @@ evals:
   - id: failure_reported_or_noop
     question: Did the agent create an issue for an actionable integration failure, or use noop when no action was required?
 imports:
+  - shared/opencode.md
   - shared/reporting.md
 features:
   gh-aw-detection: true
 engine:
-  id: codex
+  id: opencode
   model-provider: openai
 model: openai/gpt-6-luna
 ---

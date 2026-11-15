@@ -32,12 +32,13 @@ safe-outputs:
     labels: [cookie]
     max: 1
 imports:
+  - shared/opencode.md
   - shared/aw-logs-24h-fetch.md
   - shared/reporting.md
 
   - shared/otlp.md
 engine:
-  id: codex
+  id: opencode
   model-provider: openai
 model: openai/gpt-5.6-luna
 ---
