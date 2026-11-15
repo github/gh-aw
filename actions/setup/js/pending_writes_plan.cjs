@@ -93,7 +93,11 @@ async function describeTarget(message, config, context, branches, options) {
   const target = { repository: safeTargetString(repoResult.repo) };
   const access = pendingReadAccess(options.handlerConfig?.[message.type] || {}, repoResult.repo, options);
   if (DELEGATED_TYPES.has(message.type)) {
-    target.job = DELEGATED_TYPES.get(message.type);
+    if (message.type === "call_workflow") {
+      const publication = options.publications.find(publication => publication.kind === "call" && publication.worker === message.workflow_name);
+      if (!publication || !config.workflows?.includes(message.workflow_name)) throw new Error("Unconfigured pending workflow call");
+      target.job = publication.job;
+    } else target.job = DELEGATED_TYPES.get(message.type);
     return { target, access };
   }
   if (message.type === "create_pull_request") {
@@ -271,7 +275,13 @@ async function buildPendingWritesUnchecked(options) {
   for (const publication of options.publications || []) {
     let supplied = publication.supplied;
     if (publication.kind === "ledger") supplied = describeLedgerTransaction(messages, config, run);
-    else if (publication.kind === "sarif") {
+    else if (publication.kind === "call") {
+      const calls = messages.filter(message => message.type === "call_workflow");
+      if (calls.length <= 1) {
+        const selected = calls.find(message => message.workflow_name === publication.worker);
+        supplied = { workflow_name: publication.worker, payload: selected ? parsePendingJSON(require("./call_workflow.cjs").buildCallWorkflowPayload(selected)) : null };
+      }
+    } else if (publication.kind === "sarif") {
       const { prepareCodeScanningFinding, buildCodeScanningSarif } = require("./code_scanning_helpers.cjs");
       const findings = messages.filter(message => message.type === "create_code_scanning_alert").map(prepareCodeScanningFinding);
       supplied = buildCodeScanningSarif(findings.slice(0, config.create_code_scanning_alert?.max || findings.length), config.create_code_scanning_alert);
@@ -284,9 +294,16 @@ async function buildPendingWritesUnchecked(options) {
         repository: publication.repository || run.repository,
         job: publication.job,
         ...(publication.branch ? { branch: publication.branch } : {}),
+        ...(publication.storage_key ? { storage_key: publication.storage_key } : {}),
+        ...(publication.drive_name ? { drive_name: publication.drive_name } : {}),
         ...(publication.kind === "ledger" ? { branches: (config.ledger_append?.ledgers || []).map(ledger => `ledgers/${ledger.name}`) } : {}),
       },
-      depends_on: publication.kind === "ledger" ? items.filter(item => item.type === "ledger_append").map(item => item.output_id) : [],
+      depends_on:
+        publication.kind === "ledger"
+          ? items.filter(item => item.type === "ledger_append").map(item => item.output_id)
+          : publication.kind === "call"
+            ? items.filter(item => item.type === "call_workflow" && item.target.job === publication.job).map(item => item.output_id)
+            : [],
       settings: { staged: options.staged === true, sha256: inputDigest(withoutCredentials(publication.settings || {})) },
       free_text: [],
       input_sha256: inputDigest(supplied ?? null),
