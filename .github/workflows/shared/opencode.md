@@ -89,7 +89,7 @@ engine:
         });
         writeSecureOutput("/tmp/gh-aw/opencode-mcp.json", JSON.stringify({ mcp: { servers } }, null, 2));
     harness-script: |
-      const { readFileSync } = require("fs");
+      const { readFileSync, existsSync } = require("fs");
       const { execFile } = require("child_process");
       const { runProcess } = require("./process_runner.cjs");
       const { isOpenCodeEvent, getOpenCodeMCPFailures, getOpenCodeSessionSteps } = require("./parse_opencode_log.cjs");
@@ -105,6 +105,12 @@ engine:
           throw new Error("OPENCODE_MODEL must use provider/model format");
         }
         const model = selectedModel.slice(separator + 1);
+        const rosterEnv = process.env.GH_AW_OPENCODE_MODELS || "";
+        const roster = rosterEnv
+          .split(",")
+          .map(entry => entry.trim())
+          .filter((entry, index, all) => entry && all.indexOf(entry) === index);
+        if (!roster.includes(model)) roster.unshift(model);
         const provider = process.env.GH_AW_LLM_PROVIDER;
         if (!["github", "anthropic", "openai"].includes(provider)) {
           throw new Error("GH_AW_LLM_PROVIDER must be github, anthropic, or openai");
@@ -171,7 +177,7 @@ engine:
               name: "GitHub Agentic Workflows",
               package: isAnthropic ? "@opencode/ai/providers/anthropic" : "@opencode/ai/providers/openai-compatible",
               settings: { baseURL, apiKey },
-              models: { [model]: { name: model } },
+              models: Object.fromEntries(roster.map(entry => [entry, { name: entry }])),
             },
           },
         };
@@ -201,41 +207,113 @@ engine:
         const observedMCPFailures = new Set();
         const runtimeEnv = { ...process.env, OPENCODE_CONFIG_CONTENT: JSON.stringify(config) };
         delete runtimeEnv.PWD;
-        const result = await runProcess({
+        const hasSafeOutputs = () => {
+          const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS;
+          return !safeOutputsPath || (existsSync(safeOutputsPath) && readFileSync(safeOutputsPath, "utf8").trim() !== "");
+        };
+        const handleEvent = line => {
+          let entry;
+          try { entry = JSON.parse(line); } catch { return; }
+          if (!isOpenCodeEvent(entry)) return;
+          if (entry.sessionID) sessionID = entry.sessionID;
+          if (entry?.type === "error" && entry.error) reportedError = true;
+          if (maxTurns !== undefined && entry.type === "tool_use" && entry.part?.state?.status === "error" && entry.part.state.error === "Tools are disabled after the maximum agent steps") {
+            maxTurnsHit = true;
+          }
+          if (entry?.type !== "step_finish") return;
+          const messageIdentity = typeof entry.part.messageID === "string" ? JSON.stringify([entry.sessionID, entry.part.messageID]) : undefined;
+          const identity = messageIdentity ?? (typeof entry.part.id === "string" ? JSON.stringify([entry.sessionID, "part", entry.part.id]) : undefined);
+          if (identity !== undefined && finishedSteps.has(identity)) return;
+          if (identity !== undefined) finishedSteps.add(identity);
+          if (messageIdentity !== undefined) finishedMessageParts.set(messageIdentity, { id: entry.part.id, messageID: entry.part.messageID });
+          turns++;
+          if (maxTurns !== undefined && turns >= maxTurns && entry.part?.reason === "tool-calls") {
+            maxTurnsHit = true;
+          }
+        };
+        const runOptions = {
           command,
-          args: [...commandArgs, "--model", `awf-proxy/${model}`],
-          logArgs: [...commandArgs, "--model", "(configured model)"],
-          attempt: 0,
           log,
-          stdin: prompt,
           env: runtimeEnv,
           maxCollectedOutputBytes: 1024 * 1024,
           onStderrLine: line => {
             for (const server of getOpenCodeMCPFailures(line)) observedMCPFailures.add(server);
           },
-          onStdoutLine: line => {
-            let entry;
-            try { entry = JSON.parse(line); } catch { return; }
-            if (!isOpenCodeEvent(entry)) return;
-            if (entry.sessionID) sessionID = entry.sessionID;
-            if (entry?.type === "error" && entry.error) reportedError = true;
-            if (maxTurns !== undefined && entry.type === "tool_use" && entry.part?.state?.status === "error" && entry.part.state.error === "Tools are disabled after the maximum agent steps") {
-              maxTurnsHit = true;
-            }
-            if (entry?.type !== "step_finish") return;
-            const messageIdentity = typeof entry.part.messageID === "string" ? JSON.stringify([entry.sessionID, entry.part.messageID]) : undefined;
-            const identity = messageIdentity ?? (typeof entry.part.id === "string" ? JSON.stringify([entry.sessionID, "part", entry.part.id]) : undefined);
-            if (identity !== undefined && finishedSteps.has(identity)) return;
-            if (identity !== undefined) finishedSteps.add(identity);
-            if (messageIdentity !== undefined) finishedMessageParts.set(messageIdentity, { id: entry.part.id, messageID: entry.part.messageID });
-            turns++;
-            if (maxTurns !== undefined && turns >= maxTurns && entry.part?.reason === "tool-calls") {
-              maxTurnsHit = true;
-            }
-          },
+          onStdoutLine: handleEvent,
           runtimeGuard: { shouldTerminate: () => ({ terminate: maxTurnsHit, reason: "OpenCode max-turns limit reached" }), pollIntervalMs: 100 },
+        };
+        const exportSessionRecords = async () => {
+          const exported = await new Promise((resolve, reject) => {
+            execFile(command, ["session", "export", "--standalone", sessionID], {
+              env: runtimeEnv,
+              cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || undefined,
+              timeout: 60000,
+              maxBuffer: 64 * 1024 * 1024,
+            }, (error, stdout) => {
+              if (error) {
+                const diagnostics = [];
+                if (Number.isSafeInteger(error.code) || (typeof error.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code))) diagnostics.push(`code=${error.code}`);
+                if (typeof error.signal === "string" && /^SIG[A-Z0-9]{1,16}$/.test(error.signal)) diagnostics.push(`signal=${error.signal}`);
+                if (error.killed === true) diagnostics.push("killed=true");
+                const detail = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
+                return reject(new Error(`Unable to export the OpenCode session for step reconciliation${detail}`, { cause: error }));
+              }
+              try { resolve(JSON.parse(stdout)); } catch {
+                reject(new Error("Failed to parse the OpenCode session export"));
+              }
+            });
+          });
+          return getOpenCodeSessionSteps(exported, sessionID);
+        };
+        const writeSessionRecords = records => {
+          for (const entry of records) {
+            if (entry.type === "step_finish") {
+              const observedPart = finishedMessageParts.get(JSON.stringify([entry.sessionID, entry.part.messageID]));
+              if (observedPart) entry.part = { ...entry.part, id: observedPart.id, messageID: observedPart.messageID };
+            }
+            process.stdout.write(JSON.stringify(entry) + "\n");
+          }
+        };
+        let result = await runProcess({
+          ...runOptions,
+          args: [...commandArgs, "--model", `awf-proxy/${model}`],
+          logArgs: [...commandArgs, "--model", "(configured model)"],
+          attempt: 0,
+          stdin: prompt,
         });
+        let reconciledRecords;
+        for (let nudge = 1; nudge <= 2; nudge++) {
+          if (result.exitCode !== 0 || maxTurnsHit || hasSafeOutputs() || !sessionID) break;
+          let remainingTurns;
+          if (maxTurns !== undefined) {
+            reconciledRecords = await exportSessionRecords();
+            const completedSteps = reconciledRecords.filter(entry => entry.type === "step_finish").length;
+            if (!completedSteps) throw new Error("OpenCode session export contains no completed model steps");
+            turns = Math.max(turns, completedSteps);
+            if (turns >= maxTurns) {
+              maxTurnsHit = true;
+              break;
+            }
+            remainingTurns = maxTurns - turns;
+          }
+          log(`No safe output yet, continuing the session (nudge ${nudge} of 2)`);
+          result = await runProcess({
+            ...runOptions,
+            env: remainingTurns === undefined ? runtimeEnv : {
+              ...runtimeEnv,
+              OPENCODE_CONFIG_CONTENT: JSON.stringify({
+                ...config,
+                agents: { ...config.agents, build: { ...config.agents.build, steps: remainingTurns } },
+              }),
+            },
+            args: [...commandArgs, "--session", sessionID],
+            logArgs: [...commandArgs, "--session", "(continued session)"],
+            attempt: nudge,
+            stdin: "Your last message ended without a tool call, so nothing has been delivered and this run is about to end with no output. Do not explain or plan: continue the task now and finish with the safe-output call the task names.",
+          });
+        }
         if (maxTurnsHit) {
+          if (reconciledRecords) writeSessionRecords(reconciledRecords);
           process.stdout.write(JSON.stringify({ type: "opencode.max_turns", timestamp: Date.now(), data: { maxTurns } }) + "\n");
           throw new Error("OpenCode max-turns limit reached");
         }
@@ -252,36 +330,10 @@ engine:
         }
         if (reportedError) throw new Error("OpenCode reported an error despite exiting with code 0");
         if (!sessionID) throw new Error("OpenCode produced no session events");
-        const exported = await new Promise((resolve, reject) => {
-          execFile(command, ["session", "export", "--standalone", sessionID], {
-            env: runtimeEnv,
-            cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || undefined,
-            timeout: 60000,
-            maxBuffer: 64 * 1024 * 1024,
-          }, (error, stdout) => {
-            if (error) {
-              const diagnostics = [];
-              if (Number.isSafeInteger(error.code) || (typeof error.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code))) diagnostics.push(`code=${error.code}`);
-              if (typeof error.signal === "string" && /^SIG[A-Z0-9]{1,16}$/.test(error.signal)) diagnostics.push(`signal=${error.signal}`);
-              if (error.killed === true) diagnostics.push("killed=true");
-              const detail = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
-              return reject(new Error(`Unable to export the OpenCode session for step reconciliation${detail}`, { cause: error }));
-            }
-            try { resolve(JSON.parse(stdout)); } catch {
-              reject(new Error("Failed to parse the OpenCode session export"));
-            }
-          });
-        });
-        const records = getOpenCodeSessionSteps(exported, sessionID);
+        const records = await exportSessionRecords();
         const steps = records.filter(entry => entry.type === "step_finish");
         if (!steps.length) throw new Error("OpenCode session export contains no completed model steps");
-        for (const entry of records) {
-          if (entry.type === "step_finish") {
-            const observedPart = finishedMessageParts.get(JSON.stringify([entry.sessionID, entry.part.messageID]));
-            if (observedPart) entry.part = { ...entry.part, id: observedPart.id, messageID: observedPart.messageID };
-          }
-          process.stdout.write(JSON.stringify(entry) + "\n");
-        }
+        writeSessionRecords(records);
         if (maxTurns !== undefined && steps.slice(maxTurns - 1).some(entry => entry.part.reason === "tool-calls")) {
           process.stdout.write(JSON.stringify({ type: "opencode.max_turns", timestamp: Date.now(), data: { maxTurns } }) + "\n");
           throw new Error("OpenCode max-turns limit reached");
@@ -322,11 +374,23 @@ prompt on stdin, and requests JSONL events. `run --standalone` starts a private,
 short-lived server so the run cannot reuse a background service with different
 configuration or credentials. Provider credentials remain in AWF;
 only a placeholder key reaches the agent. `engine.max-turns` limits completed
-model steps, and a tool-calling turn at the limit fails explicitly.
+model steps, and a tool-calling turn at the limit fails explicitly. Before each
+empty-run continuation, the harness reconciles completed steps and configures
+OpenCode with only the remaining cumulative step budget.
 MCP startup failures also fail the step, even when OpenCode exits successfully.
 Configured MCP startup/tool timeouts are converted from gh-aw seconds to
 OpenCode milliseconds: startup also bounds catalog loading, while tool timeout
 bounds execution.
+
+`GH_AW_OPENCODE_MODELS` optionally adds a comma-separated roster of model IDs;
+entries are trimmed and deduplicated, and the lead model is always included.
+All roster models use the same proxy, so the provider policy surface is unchanged.
+
+After a clean run with no safe output, the harness can continue the captured
+session up to two times to request the task's safe-output call. It does not
+continue nonzero runs, max-turns hits, runs with existing safe output, or runs
+without a captured session ID. If the cumulative turn budget is exhausted before
+a safe output is produced, the run fails without starting another model step.
 
 Repository `opencode.json`, `opencode.jsonc`, `.opencode/` agents, and `AGENTS.md`
 retain native discovery and JSONC parsing. Runtime configuration is supplied
