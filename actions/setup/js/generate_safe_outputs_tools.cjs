@@ -368,6 +368,11 @@ async function main() {
             if (generalLedgers.length === 1 && generalLedgers[0].schema && !containsSchemaRef(generalLedgers[0].schema)) {
               enhancedTool.inputSchema.properties.record = { ...enhancedTool.inputSchema.properties.record, ...generalLedgers[0].schema };
             }
+          } else if (generalLedgers.length === 1 && typeof generalLedgers[0].type === "string" && ["log", "set", "table"].includes(generalLedgers[0].type) && generalLedgers[0].schema && !containsSchemaRef(generalLedgers[0].schema)) {
+            enhancedTool.inputSchema.properties.value = {
+              ...enhancedTool.inputSchema.properties.value,
+              ...generalLedgers[0].schema,
+            };
           }
         }
       }

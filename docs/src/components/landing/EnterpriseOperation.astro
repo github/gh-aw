@@ -1,0 +1,139 @@
+---
+import LandingSection from './LandingSection.astro';
+// One static SVG source is shared with the cracktro deck (docs/public/cracktro/ops-visuals.js).
+// It is a dependency-free classic script, evaluated here at build time into a scoped object.
+import opsSource from '../../../public/cracktro/ops-visuals.js?raw';
+
+interface Props {
+  kind: 'observability' | 'governance' | 'infrastructure';
+}
+const { kind } = Astro.props;
+
+const scope: { AW_OPS_VISUALS?: Record<Props['kind'], string> } = {};
+new Function('window', 'globalThis', opsSource)(undefined, scope);
+const svg = scope.AW_OPS_VISUALS?.[kind];
+if (!svg) throw new Error(`ops-visuals.js did not provide the "${kind}" visual`);
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const sections = {
+  observability: {
+    title: 'OpenTelemetry',
+    lede: 'Traces and opt-in logs go to your OTLP backend.',
+    paragraphs: [
+      'Set <code>observability.otlp</code> endpoints with headers from secrets, or organization defaults through <code>GH_AW_DEFAULT_OTLP_ENDPOINT</code> and the secret <code>GH_AW_DEFAULT_OTLP_HEADERS</code>.',
+      'The hosted MCP gateway exports one trace span per tool call. Compact session logs are opt-in with <code>GH_AW_OTLP_LOGS_ENABLED=true</code>. Delivery failures never fail the workflow, but a default endpoint without headers fails the agent job. You own the collector and its retention.',
+    ],
+    link: { href: '/reference/open-telemetry/', text: 'Configure OpenTelemetry' },
+  },
+  governance: {
+    title: 'GitHub-native governance',
+    lede: 'The controls you already use in GitHub apply to every agentic job.',
+    paragraphs: [
+      'Organization and repository variables set cooperative defaults, not locked policy. Separately, protected environments enforce approvals, branch rulesets enforce merge requirements, and Actions policies restrict what can run.',
+    ],
+    link: { href: '/reference/governance/', text: 'Read the governance guide' },
+  },
+  infrastructure: {
+    title: 'Operator-owned infrastructure',
+    lede: 'Your runners, your mirrors, your registries.',
+    paragraphs: [
+      'Run on self-hosted Linux runners or ARC with Docker-in-Docker. Point action and container pins at internal mirrors and registries through <code>aw.json</code>, then recompile.',
+      'Pinned versions are the compatibility boundary: upgrading the CLI alone does not change existing lock files. Validate each version on your own runners.',
+    ],
+    link: { href: '/reference/enterprise-configuration/', text: 'Plan an enterprise deployment' },
+  },
+} as const;
+const section = sections[kind];
+---
+
+<LandingSection id={kind} title={section.title} lede={section.lede}>
+  <div slot="intro" class="aw-copy">
+    {section.paragraphs.map((p) => <p set:html={p} />)}
+    <a class="aw-link" href={`${base}${section.link.href}`}>{section.link.text} <span aria-hidden="true">→</span></a>
+  </div>
+  <figure slot="aside" class="aw-ops" set:html={svg} />
+</LandingSection>
+
+<style>
+  .aw-copy {
+    margin-top: 1.5rem;
+    max-width: 38.75rem;
+    font-size: var(--aw-step-0);
+    line-height: 1.65;
+    color: var(--aw-color-text-secondary);
+  }
+  .aw-copy p {
+    margin: 0 0 1rem;
+    text-wrap: pretty;
+  }
+  .aw-copy code {
+    font-size: 0.875em;
+    overflow-wrap: anywhere;
+  }
+  .aw-ops {
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-lg);
+    background: var(--aw-color-surface);
+  }
+  .aw-ops :global(svg) {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 26rem;
+    font-family: var(--aw-font-sans);
+  }
+  .aw-ops :global(text) {
+    fill: var(--aw-color-text-secondary);
+    font-size: 12px;
+  }
+  .aw-ops :global(.ov-t) {
+    fill: var(--aw-color-text);
+    font-size: 15px;
+  }
+  .aw-ops :global(.ov-b) {
+    fill: var(--aw-color-text);
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .aw-ops :global(.ov-m),
+  .aw-ops :global(.ov-c) {
+    font-family: var(--aw-font-mono);
+    font-size: 12px;
+  }
+  .aw-ops :global(.ov-c),
+  .aw-ops :global(.ov-k) {
+    fill: var(--aw-color-accent-text);
+  }
+  .aw-ops :global(.ov-k) {
+    font-family: var(--aw-font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .aw-ops :global(.ov-card),
+  .aw-ops :global(.ov-pill) {
+    fill: var(--aw-color-bg-raised);
+    stroke: var(--aw-color-border);
+    stroke-width: 1.5;
+  }
+  .aw-ops :global(.ov-key) {
+    stroke: var(--aw-color-accent);
+  }
+  .aw-ops :global(.ov-bar) {
+    fill: var(--aw-color-accent);
+    opacity: 0.75;
+  }
+  .aw-ops :global(.ov-line) {
+    fill: none;
+    stroke: var(--aw-color-text-secondary);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .aw-ops :global(.ov-dash) {
+    stroke-dasharray: 6 5;
+  }
+</style>

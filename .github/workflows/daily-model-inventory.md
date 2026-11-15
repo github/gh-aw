@@ -40,7 +40,7 @@ network:
 
 # Supply pricing for a private/enterprise model not yet in the models.dev catalog.
 # Cost values are per-token USD in scientific notation (e.g. 3e-06 = $3 per million tokens).
-# Entries are merged with the built-in models.json at runtime and fill gaps for unknown models.
+# Entries are passed to AWF as explicit pricing overrides for unknown models.
 models:
   providers:
     openai:
@@ -640,82 +640,21 @@ mkdir -p "$(dirname "$OUT")"
 If playwright extraction fails or returns an empty `models` array, note this in the issue report and
 continue — treat billing multiplier validation as skipped for this run (same behaviour as before).
 
-### Step 3: Validate models.json pricing data
+### Step 3: Cross-check AWF pricing evidence
 
-Read the current built-in pricing payloads from:
+AWF owns the model pricing catalog. Do not create, refresh, or modify a pricing catalog
+in this repository.
 
-- `pkg/cli/data/models.json`
-- `actions/setup/js/models.json`
-
-Treat these two files as a mirrored pair: proposed updates must keep them identical.
-
-The Copilot pricing table is now in:
-
-- `/tmp/gh-aw/agent/model-inventory/artifacts/copilot-billing-models/models.json`
-
-This file was populated in Step 2.5 from:
-`https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing`.
-
-The Copilot SDK models are available at:
-
-- `/tmp/gh-aw/agent/model-inventory/artifacts/copilot-sdk-models/models.json`
-
-Use the Copilot SDK (`billing` fields), reflect endpoint (`billing.multiplier`), and docs pricing table as validation sources for `models.json` pricing fields.
-Prefer Copilot SDK data when available; cross-check it against reflect data, and use docs table values as a secondary cross-check.
-
-Also validate Copilot SDK routing metadata in `models.json` for `github-copilot` models:
-- `provider_type` (for SDK provider selection)
-- `wire_api` when present (`responses` or `completions`, for OpenAI/Azure-compatible transport selection)
-
-When updating `models.json`, preserve or add `wire_api` for Copilot models where source data
-provides it. Keep `wire_api` absent for models/providers where it is not applicable.
+Cross-check the live Copilot SDK `billing` fields in
+`/tmp/gh-aw/agent/model-inventory/artifacts/copilot-sdk-models/models.json` against
+AWF reflect `billing.multiplier` fields in `/tmp/gh-aw/agent/model-inventory/reflect.json`.
+Use the documentation table in
+`/tmp/gh-aw/agent/model-inventory/artifacts/copilot-billing-models/models.json`
+as a secondary source. Report discrepancies with their source evidence as AWF follow-up
+items, not local pricing changes. Do not infer prices from model names or context limits.
 
 Treat `gpt-4o-mini`, `gpt-4.1`, `gpt-4o`, and `gpt-5.4-nano` as intentionally deprecated
-Copilot-facing model IDs. Keep ignoring them even if they appear in the reflect data,
-docs table, `models.dev`, or live provider inventories: do not propose adding or restoring them in
-`pkg/cli/data/models.json` (or `actions/setup/js/models.json`), and exclude them from
-missing/discrepancy tables.
-
-Use `models.dev/api.json` as the refresh source for the baseline `models.json` payload.
-When pricing updates are required, first run:
-
-```bash
-make refresh-models-json
-```
-
-Then validate/adjust pricing entries against Copilot SDK, reflect, and docs-derived data.
-
-For each provider's enriched data, validate pricing/model coverage for each model:
-
-1. **Copilot SDK data** — use the `models` list from
-   `/tmp/gh-aw/agent/model-inventory/artifacts/copilot-sdk-models/models.json`. For each model, use
-   its `billing` fields as the primary pricing source. Compare against the matching
-   `github/<model-id>` entry in `models.json`, and list discrepancies or missing models.
-
-2. **Copilot reflect data** — use the `copilot` endpoint's `models` list from
-   `/tmp/gh-aw/agent/model-inventory/reflect.json`. For each model, use
-   the `billing.multiplier` field to cross-check the SDK multiplier. Compare against the
-   matching `github/<model-id>` entry in `models.json`, and list discrepancies or missing models.
-   Cross-reference against the docs table as a secondary validation source.
-
-3. **Gemini API** — use `inputTokenLimit` / `outputTokenLimit` as an approximate proxy for model
-   complexity (this is an inference heuristic, not a definitive billing mapping).
-   Large-context, high-output-limit models typically correspond to higher-priced tiers; smaller
-   Flash models to lower-priced tiers. Flag any models whose limits suggest a pricing-tier change
-   versus what is currently in `models.json`.
-
-4. **OpenAI API** — use `owned_by` and model-ID naming conventions (e.g. `-mini`, `-nano`, `o1`,
-   `o3`) to cross-check current pricing tiers. Flag missing models or likely mismatches.
-
-5. **Anthropic API** — use `display_name` family grouping (haiku/sonnet/opus) to validate
-   current pricing tiers. Flag any new model IDs not yet in `models.json`.
-
-Produce a consolidated pricing gap table listing:
-- Models present in the live inventory but **missing** from `models.json` — include
-  the provider name for each model (e.g. "openai", "anthropic", "gemini", "copilot")
-- Models in `models.json` that are **not currently returned** by live APIs; keep these
-  in the payload as historical entries (do not propose automatic removals)
-- Models where the **inferred pricing tier or multiplier signal** differs from the stored pricing
+Copilot-facing model IDs and exclude them from missing/discrepancy tables.
 
 ### Step 4: Identify New or Updated Model Families
 
@@ -791,25 +730,10 @@ Brief description of what was found.
 For each provider, list noteworthy fields found in the raw response that are now captured
 in the enriched `models.json` artifact (context limits, capabilities, billing fields, etc.).
 
-### models.json Pricing Analysis
+### AWF Pricing Follow-up
 
-#### Missing from models.json
-
-| Model ID | Provider | Inferred Pricing | Basis |
-|----------|----------|-----------------:|-------|
-| ...      | ...      | ...              | ...   |
-
-#### Historical entries not currently returned
-
-List model IDs that appear in `models.json` but are absent from all live inventories.
-Treat these as historical records that should remain in the payload unless a human explicitly
-decides to delete them.
-
-#### Inferred vs stored pricing discrepancies
-
-| Model ID | Stored Pricing | Inferred Pricing | Inferred From |
-|----------|---------------:|-----------------:|---------------|
-| ...      | ...            | ...              | ...           |
+List discrepancies between AWF reflect, Copilot SDK billing, and documentation pricing
+with their source evidence. Pricing catalog changes belong in AWF, not this repository.
 
 ### Proposed Alias Updates
 
@@ -831,7 +755,7 @@ Any caveats, historical entries retained, or aliases that are already well-cover
 ```
 
 If no updates are needed (all live models are already covered by existing aliases, all
-`models.json` pricing entries are up to date, no new task-oriented aliases are warranted, and
+no new task-oriented aliases are warranted, and
 `audit_complete` is true with `counts.unresolvable` in `model-pins.json` equal to 0), call `noop` with a brief summary confirming coverage is up to date. Do not create a report-only pull request. Never report no changes needed when any workflow model pin is unresolvable.
 
 

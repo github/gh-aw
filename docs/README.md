@@ -58,9 +58,11 @@ The [interactive talk](https://github.github.com/gh-aw/cracktro/) is served from
 `public/cracktro/` and ships with the normal docs build and Pages deployment.
 It is a standalone slide deck, separate from the homepage slideshow, linked
 from the site footer. The deck is laid out as a table of horizontal bands: the
-title, the factory mindset and the finale are rows of their own, and every other band (Workflows,
-Security, Human agent processes, Cost & context, Agentic Engineering, Enterprise, AW factory) starts with a header
+title, the factory mindset, trust the process and the finale are rows of their own, and every other band (Workflows,
+Security, Human agent processes, Cost Optimization, Agentic Engineering, Enterprise, Central Agentic Ops, AW factory) starts with a header
 slide that lists the band's slides (click a tile to jump) and a map of all bands.
+The Central Agentic Ops (CAO, `gh cao`) band covers a research prototype, so each of its
+slides carries a "Research prototype" badge.
 Left/Right (or Space, Page Up/Page Down) step through the slides in reading
 order and wrap between bands, and Up/Down jump to the first slide of the band
 above or below. Home/End jump to the first/last slide, F for fullscreen, N for speaker notes,
@@ -83,7 +85,7 @@ issues labelled `community` and the merged pull requests that closed them
 counts of Linter Miner analyzer pull requests, LintMonster issues and the
 merged pull requests that closed them (May to November 2026), the Go Fan slide's counts of daily
 library review issues and the merged pull requests that closed them
-(February to November 2026, with shortened titles), the Continuous Security slide's
+(February to November 2026, with shortened titles), the Continuous Red Teaming slide's
 counts and dates, measured from that red-team workflow's repository memory and
 the firewall fix it led to (its attack diagram is a simplified illustration),
 the Semantic
@@ -102,6 +104,11 @@ Keep private repository
 references, source commit identifiers, and internal attributions out of the
 public assets. Speaker notes and source comments are public too.
 The workflow illustration, avatars, and fonts are local.
+The Enterprise band's OpenTelemetry, GitHub-native governance and
+operator-owned infrastructure diagrams come from `public/cracktro/ops-visuals.js`,
+a dependency-free script that sets `window.AW_OPS_VISUALS` for the deck. The
+homepage imports the same file at build time for its matching sections, so
+edit those diagrams in one place and keep them free of external references.
 Mona Sans reuses `public/fonts/`; Monaspace Neon and its SIL Open Font License
 are in `public/cracktro/fonts/`.
 
