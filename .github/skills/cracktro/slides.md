@@ -51,8 +51,8 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | If every PR needs deep human review, you don’t trust your process. | illustrative | Trust the process: if every pull request needs deep human review, improve checks, agent reviewers and tests until a skim is enough. |
 | Cost Optimization |  | Band header (Cost Optimization): debug, spend less and route smarter. |
 | Cost management | illustrative | Cut agent spend by scheduling less often, fetching data in deterministic steps, capping credits, using sub-agents and routing models. |
-| Cost guardrails | illustrative | Layered guardrails stop runaway agents: execution controls throttle events, the daily budget blocks runs before activation, per-run limits hard-stop a run, and optional central admission approves or denies each run before it starts. |
 | Model routing | illustrative | With model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
+| Cost guardrails | illustrative | Layered guardrails stop runaway agents: execution controls throttle events, the daily budget blocks runs before activation, per-run limits hard-stop a run, and optional central admission approves or denies each run before it starts. |
 | DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
 | Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |
 | Agentic Engineering |  | Band header (Agentic Engineering): give agents memory, expiry, search and measurement. |
