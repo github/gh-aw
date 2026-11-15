@@ -45,7 +45,7 @@
   .wash::after { content: ""; position: absolute; inset: 0;
     background: radial-gradient(ellipse 55% 60% at 50% 58%, transparent 30%, #1c0204b0 70%, #050000f0 100%); }
   .wash.on::after { animation: omen 7s ease-in-out infinite; }
-  .wash.cover { z-index: 4; transition-duration: .3s; }
+  .wash.cover { z-index: 4; }
   @keyframes up-in { from { transform: translateY(100%); } to { transform: none; } }
   @keyframes up-out { to { transform: translateY(-100%); } }
   @keyframes down-in { from { transform: translateY(-100%); } to { transform: none; } }
@@ -14373,7 +14373,7 @@
       redT = setTimeout(() => {
         redT = null;
         show(n, true);
-      }, 320);
+      }, 900);
       return;
     }
     // light <-> dark band: stage it so nothing overlaps; old slide fades out, then the background swaps, then the new slide enters
