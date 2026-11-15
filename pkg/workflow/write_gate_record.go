@@ -10,6 +10,11 @@ func (c *Compiler) addWriteGateRecordSteps(data *WorkflowData) error {
 	if !exists {
 		return fmt.Errorf("jobs.safe_outputs.gate-steps requires conclusion to record the verdict")
 	}
+	perms := NewPermissionsParser(job.Permissions).ToPermissions()
+	if level, exists := perms.Get(PermissionActions); !exists || level == PermissionNone {
+		perms.Set(PermissionActions, PermissionRead)
+	}
+	job.Permissions = perms.RenderToYAML()
 	job.Steps = append(job.Steps, `      - name: Record write gate verdict
         id: record_write_gate
         if: always()
@@ -22,12 +27,14 @@ func (c *Compiler) addWriteGateRecordSteps(data *WorkflowData) error {
           GH_AW_WRITE_GATE_RUN_ID: ${{ github.run_id }}
           GH_AW_WRITE_GATE_RUN_ATTEMPT: ${{ github.run_attempt }}
           GH_AW_WRITE_GATE_HEAD_SHA: ${{ github.sha }}
+          GH_AW_WRITE_GATE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          GH_AW_WRITE_GATE_WORKFLOW_REF: ${{ github.workflow_ref }}
         with:
           script: |
             const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require('${{ runner.temp }}/gh-aw/actions/record_write_gate.cjs');
-            main();
+            await main();
 `, `      - name: Upload write gate verdict
         id: upload_write_gate
         if: always() && steps.record_write_gate.outcome == 'success'

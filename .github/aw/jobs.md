@@ -104,8 +104,9 @@ Do not configure these jobs in agentic-workflow frontmatter.
 | `activity_report`, `forecast_report` | Produce reports. |
 
 For a gated source workflow, `apply_safe_outputs` and label-triggered replay
-require the original compiled policy and a matching recorded successful `allow`
-verdict. Missing, malformed, failed, denied, or partial verdicts refuse replay;
+require the original compiled policy bound to the recorded workflow-definition
+SHA/ref and a matching recorded successful `allow` verdict. Missing, malformed,
+failed, denied, or partial verdicts refuse replay;
 partial replay requires trustworthy per-item enforcement and is not enabled by
 the run-level replay path.
 | `close_agentic_workflows_issues`, `validate_workflows`, `compile-workflows`, `secret-validation` | Maintain workflow configuration. |

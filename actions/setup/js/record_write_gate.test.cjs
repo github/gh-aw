@@ -7,6 +7,8 @@ const identity = {
   GH_AW_WRITE_GATE_RUN_ID: "123",
   GH_AW_WRITE_GATE_RUN_ATTEMPT: "1",
   GH_AW_WRITE_GATE_HEAD_SHA: "a".repeat(40),
+  GH_AW_WRITE_GATE_WORKFLOW_SHA: "b".repeat(40),
+  GH_AW_WRITE_GATE_WORKFLOW_REF: "owner/repo/.github/workflows/test.lock.yml@refs/heads/main",
 };
 
 describe("compiler-owned write gate record", () => {
@@ -24,6 +26,8 @@ describe("compiler-owned write gate record", () => {
         run_id: "123",
         run_attempt: "1",
         head_sha: "a".repeat(40),
+        workflow_sha: "b".repeat(40),
+        workflow_ref: "owner/repo/.github/workflows/test.lock.yml@refs/heads/main",
         verdict,
         reason: "policy",
         safe_outputs_result: "success",
