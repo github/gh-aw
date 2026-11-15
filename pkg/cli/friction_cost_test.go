@@ -140,7 +140,7 @@ func TestApplyUsageActivitySummaryPrefersPrecomputedFriction(t *testing.T) {
 	}
 }
 
-func TestHistoricalRunsWithoutFrictionRemainCompatible(t *testing.T) {
+func TestHistoricalRunsWithoutPrecomputedFrictionDeriveFallback(t *testing.T) {
 	legacy := `{"schema":"usage-activity-summary/v1","session":{"total_events":3,"turns":2},"working_set":{"measurement_state":"measured","cumulative_input_tokens":10,"peak_input_tokens":10,"rebuild_excess_tokens":0,"invocations":1}}`
 	summary, err := loadUsageActivitySummary(writeUsageSummary(t, legacy))
 	if err != nil {
@@ -152,8 +152,8 @@ func TestHistoricalRunsWithoutFrictionRemainCompatible(t *testing.T) {
 	}
 	result := &DownloadResult{}
 	applyUsageActivitySummaryToResult(summary, result, true)
-	if result.Friction != nil {
-		t.Error("legacy runs must leave friction nil")
+	if result.Friction == nil || !result.Friction.Derived || result.Friction.CountedOccurrences != 0 {
+		t.Errorf("expected a derived zero-count friction fallback, got %+v", result.Friction)
 	}
 	// Every consumer helper must tolerate the nil section.
 	if got := frictionDisplayValue(nil); got != "" {

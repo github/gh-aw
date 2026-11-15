@@ -22,7 +22,7 @@ engine:
     mode: economy
 steps:
   - name: Provision disposable Go validation caches
-    run: mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache
+    run: mkdir -p /tmp/gh-aw/agent/go-build-cache /tmp/gh-aw/agent/go-mod-cache /tmp/gh-aw/agent/parallelizer-validation
 strict: true
 timeout-minutes: 30
 max-ai-credits: 15
