@@ -1,38 +1,48 @@
-# Agent Performance Analyzer - Latest Run (2026-11-14)
+# Agent Performance Analyzer - Latest Run (2026-11-15)
 
-Data basis: `metrics/latest.json` (collection_status complete, window 2026-11-13T02:31Z to 2026-11-14T02:31Z). 367 workflows, 164 active, 592 runs, 584 executed, 423 successful (72.4%). 406 safe outputs accepted, 0 rejected. 82.9M tokens.
-Quality scores, engagement, PR merge rate, and cost are null in every snapshot. Success rate over executed runs and safe-output acceptance are the proxies. Output sampling not performed.
+Data basis: `metrics/latest.json` (collection_status complete, window 2026-11-14T02:33Z to 2026-11-15T02:33Z). 367 workflows, 169 executed. 635 runs, 627 executed, 485 successful (77.4%). 358 safe outputs accepted, 0 rejected. 81.4M tokens.
+Quality, engagement, and PR merge rate are null in every snapshot. Success rate over executed runs is the only score. Output sampling not performed.
+Caveat: total != successful+failed+skipped+action_required on some rows. Verify exact counts before citing.
 
 ## Bottom tier (executed >= 3, by success rate)
-- daily-go-test-parallelizer (codex) 0/9, 6.06M tokens. Blocked batch retried daily since 11-13. Filed prompt-improvement issue (this run).
-- auditor (copilot) 2/21 (9.5%). Hourly "Collect failure evidence" failing. Logs HTTP 403, so the time_budget cause is unverified. Tracker #77641 is open; #77062 was closed not_planned.
-- pr-specification-reviewer (copilot) 20/67 (29.9%). Seven open "Failed jobs" issues all trace to the non-agent `push_ledger_changes` job (missing artifact `gh-aw-ledger-transactions`). Existing tracker #77383. Ranking is largely downstream. No self-check or rubric in prompt; 20-min timeout vs 2120s average.
-- ai-moderator (pi) 12/18 (66.7%). Timeout-vs-duration mismatch still unconfirmed.
-- auto-triage-issues 3/4, code-scanning-fixer 3/4, aw-failure-investigator 4/5, pr-code-quality-reviewer 25/31 (80.6%), contribution-check 5/6. Sample sizes too small for conclusions.
+- auditor 0/21 (0%). Hourly "Collect failure evidence" failing. Logs return HTTP 403, so the time_budget cause is unverified. P1 tracker #77641 closed not_planned 2026-11-15T04:40Z while still failing.
+- daily-go-test-parallelizer 0/9 (0%), 5.62M tokens. Seven open "reported incomplete result" issues dated 2026-11-15 (#78058, #78043, #78031, #78019, #77980, #77958, #77944). Parent #77069 closed not_planned 2026-11-14.
+- ai-moderator 2/10 (20%), command-gated. timeout-minutes 5 vs avg_duration 12140s. Timeout or queue cause unverified.
+- contribution-check 3/6 (50%). add-labels allowlist uses lgtm and needs-work. Label existence not verified (lookup inconclusive).
+- aw-failure-investigator 3/4, code-scanning-fixer 3/4. Sample too small.
+- pr-specification-reviewer 27/35 (77%), command-gated. Failures trace to the non-agent push_ledger_changes job. Tracker #77383 closed completed 2026-11-14.
+- pr-sous-chef 86/106 (81%), command-gated. mattpocock-skills-reviewer 43/52 (83%), 4.74M tokens. avenger 10/11 (91%).
 
-## Top performers (executed >= 3)
-- test-quality-sentinel 39/40 (97.5%), ponytail-reviewer 34/35 (97.1%), design-decision-gate 30/31 (96.8%), mattpocock-skills-reviewer 29/32 (90.6%), pr-sous-chef 105/116 (90.5%).
+## Top performers (executed >= 3, command-gated caveat)
+- test-quality-sentinel 63/63, design-decision-gate 25/25, ponytail-reviewer 48/51, pr-code-quality-reviewer 47/50.
 
 ## Named reviewer verdicts
-- Matt Pocock Skills Reviewer: REDESIGN (not deprecate). Cost and output volume swing (2.74M tokens and 59 outputs on 11-14; 1.5M and 48 on 11-13).
-- Design Decision Gate: KEEP. Success 30/31. Tokens fell from 2.25M (11-08) to 418K (11-14). Trim check only.
-- Impeccable Skills Reviewer: KEEP. Path-gated to docs/**, 1 run in window, 105K tokens. Insufficient data.
+- Matt Pocock Skills Reviewer: REDESIGN. 82.7% success, but 4.74M tokens and output volume swings.
+- Design Decision Gate: KEEP. 25/25. Trim token use only.
+- Impeccable Skills Reviewer: KEEP. Insufficient data in this window.
 
-## Engine mix (executed-weighted)
-- copilot 181/287 (63%), pi 157/179 (87.7%), codex 54/77 (70.1%, 65.6M tokens), claude 29/38 (76.3%).
-- Copilot excluding auditor and pr-spec: 159/199 (79.8%).
+## Engine mix (frontmatter-parsed, successful/executed)
+copilot 246/294 (83.7%), pi 135/166 (81.3%), codex 74/100 (74.0%), claude 25/36 (69.4%). Five workflows with no frontmatter engine: 1/25 (4.0%).
 
-## Corrections to prior record
-- #77094 is a Tidy timeout tracker, closed not_planned 2026-11-12. Not an ai-moderator tracker.
-- #77023 closed not_planned 2026-11-12. Metrics-collector model-provider gap is still present (metrics-collector.md:14-15).
-- #77069 (DGTP parent) closed not_planned 2026-11-14 while DGTP is still 0/9.
+## Failure attribution
+142 failures. auditor 21 + DGTP 9 + ai-moderator 8 = 38 (26.8%).
+
+## Trend
+Last 7 days (11-09 to 11-15, partial data): 69.4%. Prior 7 days (11-02 to 11-08): 78.3%. Directional only.
+
+## Corrections to prior record (verified 2026-11-15)
+- #77641 is closed not_planned (prior note said open).
+- #77383 closed completed 2026-11-14. #77939 closed completed 2026-11-15.
+- #77069 closed not_planned 2026-11-14. #63656 and #63657 closed not_planned 2026-09-28.
 
 ## Open items
-- metrics-collector.md still lacks `model-provider` under engine.
-- Command-gated workflows (pr-spec, DDG, Pocock, Ponytail, PCQ, TQS, ai-moderator): activated-run success not separated in metrics. Scored on executed runs as a proxy.
-- Auditor root cause unverified (logs 403).
+- metrics-collector.md engine block (lines 13-15) still lacks model-provider. No open tracker found (#77023 closed not_planned 2026-11-12). Route to Workflow Health Manager.
+- Conversation-job pattern tracker aw_cj01 (#77984) is open. Cite it, do not refile.
+- Auditor root cause unverified (logs HTTP 403).
+- DGTP prompt-improvement issue from the 2026-11-14 run could not be located by search. Verify before citing.
 
 ## Run log (condensed)
 - 2026-11-11: ranking from 11-08 snapshot.
 - 2026-11-12: full ranking, Pocock/Impeccable/DDG verdicts.
-- 2026-11-14: ranking from complete latest.json. Verified stale tracker claims. Filed DGTP prompt-improvement issue. pr-spec attributed to downstream ledger job (#77383).
+- 2026-11-14: ranking from complete latest.json. Verified stale tracker claims. pr-spec attributed to downstream ledger job (#77383).
+- 2026-11-15: full ranking from complete latest.json. Verified closed trackers. Bottom-10 audit with deficiency mapping. Proposed DGTP prompt-redesign, auditor root-cause, and metrics-collector model-provider issues (via safe outputs). Weekly discussion submitted via safe output. Issue numbers not yet known at write time.

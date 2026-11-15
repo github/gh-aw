@@ -282,7 +282,7 @@
 - AWF startup-failure cluster (Install AWF binary): no occurrences after 2026-11-12T23:30Z.
 
 ## Update — 2026-11-14 (Workflow Health Manager)
-- **Auditor tracker #77062 expired and auto-closed 2026-11-13T04:37Z while Auditor was still failing.** Re-filed as a new P1 tracker (temp id #77641). Do not cite #77062 as an open tracker. Recommend maintainers keep P1 trackers open until the failing step passes for 24h.
+- **Auditor tracker #77062 expired and auto-closed 2026-11-13T04:37Z while Auditor was still failing.** Re-filed as P1 tracker #77641, which was closed not_planned 2026-11-15T04:40Z while Auditor was still failing (verified 2026-11-15). Do not cite #77641 or #77062 as open. Recommend maintainers keep P1 trackers open until the failing step passes for 24h.
 - The 2026-11-12 "time_budget" attribution for Auditor is NOT re-verified (job logs HTTP 403). Treat as hypothesis.
 - "Handle agent failure" conclusion-job failures with green agent jobs now span several workflows (daily-doc-updater, daily-experiment-report, daily-byok-ollama-test), not only daily-go-test-parallelizer. No tracker found.
 - AWF "Install AWF binary" failure recurred 2026-11-13T09:36Z (daily-spending-forecast). The 2026-11-13 note that the cluster had no occurrences after 11-12 23:30Z is stale.
@@ -290,9 +290,9 @@
 ## Correction — 2026-11-14 (Agent Performance Analyzer)
 - #77094 is a Tidy timeout tracker, closed not_planned 2026-11-12. It is NOT an open ai-moderator tracker. Do not cite it as one.
 - #77023 closed not_planned 2026-11-12. Metrics-collector model-provider gap still present. No open tracker for it.
-- #77069 (DGTP parent) closed not_planned 2026-11-14 while DGTP is still 0/9 (9 runs, 6.06M tokens). Five open incomplete-result issues from today: #77638, #77686, #77715, #77726, #77743. Prompt-improvement issue filed this run (cursor retry loop, no stop rule).
-- pr-specification-reviewer failures (7 open "Failed jobs" issues: #77467, #77485, #77487, #77489, #77492, #77520, #77521) all trace to the non-agent `push_ledger_changes` job. Existing tracker #77383. Do not file a duplicate.
-- Auditor: #77062 closed not_planned 2026-11-13. Current tracker #77641 is open. Logs HTTP 403; time_budget cause is still unverified.
+- #77069 (DGTP parent) closed not_planned 2026-11-14 while DGTP is still 0/9 (9 runs, 6.06M tokens). Seven open incomplete-result issues dated 2026-11-15: #78058, #78043, #78031, #78019, #77980, #77958, #77944. The 2026-11-14 prompt-improvement issue could not be located by search; verify before citing.
+- pr-specification-reviewer failures (7 open "Failed jobs" issues: #77467, #77485, #77487, #77489, #77492, #77520, #77521) all trace to the non-agent `push_ledger_changes` job. Tracker #77383 closed completed 2026-11-14 (verified 2026-11-15). Check for a new tracker before filing.
+- Auditor: #77062 closed not_planned 2026-11-13. #77641 closed not_planned 2026-11-15 (see the Auditor entry above). Logs HTTP 403; time_budget cause is still unverified.
 
 ## Update — 2026-11-15T04:30Z (Workflow Health Manager)
 - **New tracker for the conclusion-job pattern.** Filed "Conclusion job fails while agent succeeds across several agentic workflows" (temp id aw_cj01, output so_kzALXOX1QwCY). In 40 sampled failed runs, 14 had agent=success and conclusion=failure, across 10 workflows. Do not file per-workflow duplicates; cite this tracker.
@@ -301,3 +301,4 @@
 - DGTP: #77069 closed not_planned while 0/9. Its conclusion-job failures are part of the aw_cj01 pattern.
 - Smoke: smoke-copilot-aoai-apikey (0/2) and smoke-codex-routed-openai (0/2) are tracked in #77939, #77767, #77926, #77928. Do not open duplicates.
 - Stale notes, do not cite as pending: avenger.md npm-symlink, gpclean.md retired model, #63656 and #63657 (closed not_planned, per the 2026-11-14 note). The model-provider gap on metrics-collector.md was not re-verified this run; treat it as unverified.
+- 2026-11-15 (agent-performance-analyzer): verified #77641 closed not_planned, #77383 closed completed, DGTP open incomplete-result issues rose to 7. Corrected stale open/pending claims above.
