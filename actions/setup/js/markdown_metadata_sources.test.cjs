@@ -258,7 +258,7 @@ describe("compiler metadata source acquisition", () => {
   it("reads the exact executing revision from the local git object store with zero Contents API requests", async () => {
     const file = ".github/workflows/main.lock.yml";
     const git = (...args) =>
-      execFileSync("git", ["-C", workspace, ...args], { stdio: ["ignore", "pipe", "ignore"] })
+      execFileSync("git", ["-C", workspace, "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...args], { stdio: ["ignore", "pipe", "ignore"] })
         .toString()
         .trim();
     git("init", "-q");
@@ -272,6 +272,45 @@ describe("compiler metadata source acquisition", () => {
     await metadata.loadMarkdownMetadata(`owner/repo/${file}@refs/heads/main`, workspace, { repository: "owner/repo", revision: executing, githubClient });
     expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
     expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small", tools: ["Read"] });
+  });
+
+  it("acquires the executing manifest in a blobless sparse checkout before an exhausted API fallback", async () => {
+    const sourceRepo = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-metadata-source-"));
+    additionalPaths.push(sourceRepo);
+    const checkout = path.join(workspace, "checkout");
+    const env = { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" };
+    const git = (directory, ...args) =>
+      execFileSync("git", ["-C", directory, "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...args], { env, stdio: ["ignore", "pipe", "ignore"] })
+        .toString()
+        .trim();
+    const file = ".github/workflows/main.lock.yml";
+    fs.mkdirSync(path.join(sourceRepo, "actions/setup"), { recursive: true });
+    fs.mkdirSync(path.join(sourceRepo, ".github/workflows"), { recursive: true });
+    fs.writeFileSync(path.join(sourceRepo, "actions/setup/action.yml"), "name: fixture\n");
+    fs.writeFileSync(path.join(sourceRepo, "go.mod"), "module fixture\n");
+    fs.writeFileSync(path.join(sourceRepo, file), headers([record({ model: "small" })]));
+    git(sourceRepo, "init", "-q");
+    git(sourceRepo, "config", "uploadpack.allowFilter", "true");
+    git(sourceRepo, "add", ".");
+    git(sourceRepo, "-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "fixture");
+    const executing = git(sourceRepo, "rev-parse", "HEAD");
+    git(workspace, "clone", "-q", "--filter=blob:none", "--no-checkout", "--depth=1", `file://${sourceRepo}`, checkout);
+    git(checkout, "sparse-checkout", "set", "actions");
+    git(checkout, "checkout", "-q", executing);
+    expect(() =>
+      execFileSync("git", ["-C", checkout, "cat-file", "blob", `${executing}:${file}`], {
+        env: { ...env, GIT_NO_LAZY_FETCH: "1" },
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+    ).toThrow();
+    git(checkout, "sparse-checkout", "set", "--no-cone", "/*", "!/*/", "/actions/", `/${file}`);
+    fs.writeFileSync(path.join(checkout, file), headers([record({ model: "forged" })]));
+    const githubClient = { rest: { repos: { getContent: vi.fn().mockRejectedValue(quotaError(0)) } } };
+    await metadata.loadMarkdownMetadata(`owner/repo/${file}@main`, checkout, { repository: "owner/repo", revision: executing, githubClient });
+    expect(githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+    expect(metadata.readMarkdownMetadata("agent", document).value).toEqual({ model: "small" });
+    expect(fs.existsSync(path.join(checkout, "go.mod"))).toBe(true);
+    expect(fs.existsSync(path.join(checkout, "actions/setup/action.yml"))).toBe(true);
   });
 
   it("merges matching caller checkout records for reusable workflows and preserves cache transport", async () => {

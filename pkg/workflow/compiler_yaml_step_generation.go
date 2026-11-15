@@ -19,6 +19,10 @@ var compilerYamlStepGenerationLog = logger.New("workflow:compiler_yaml_step_gene
 // - Not in dev or script mode
 // - action-tag feature is specified (uses remote actions instead)
 func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
+	return c.generateCheckoutActionsFolderWithManifest(data, "")
+}
+
+func (c *Compiler) generateCheckoutActionsFolderWithManifest(data *WorkflowData, lockFilename string) []string {
 	compilerYamlStepGenerationLog.Printf("Generating checkout actions folder step: actionMode=%s, version=%s", c.actionMode, c.version)
 	// Check if action-tag is specified - if so, we're using remote actions
 	if data != nil && data.Features != nil {
@@ -64,22 +68,42 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 	// Without repository: the runner defaults to the caller's repo, which has
 	// no actions/ directory, causing Setup Scripts to fail immediately.
 	if c.actionMode.IsDev() {
-		lines := []string{
-			"      - name: Checkout actions folder\n",
-			fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
-			"        with:\n",
-			"          repository: github/gh-aw\n",
-			"          sparse-checkout: |\n",
-			"            actions\n",
-			"          fetch-depth: 1\n",
-			"          clean: false\n",
-			"          persist-credentials: false\n",
-		}
-		return lines
+		return c.generateDevActionsCheckout(lockFilename)
 	}
 
 	// Release mode or other modes: no checkout needed
 	return nil
+}
+
+func (c *Compiler) generateDevActionsCheckout(lockFilename string) []string {
+	lines := []string{
+		"      - name: Checkout actions folder\n",
+		fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
+		"        with:\n",
+		"          repository: github/gh-aw\n",
+		"          sparse-checkout: |\n",
+	}
+	lines = append(lines, buildActionsSparseCheckout(lockFilename)...)
+	return append(lines,
+		"          fetch-depth: 1\n",
+		"          clean: false\n",
+		"          persist-credentials: false\n",
+	)
+}
+
+func buildActionsSparseCheckout(lockFilename string) []string {
+	if lockFilename == "" {
+		return []string{"            actions\n"}
+	}
+	// Fetch the executing manifest while checkout still has credentials, not via a later lazy fetch.
+	pattern := strings.NewReplacer("\\", "\\\\", "*", "\\*", "?", "\\?", "[", "\\[", "]", "\\]").Replace(lockFilename)
+	return []string{
+		"            /*\n",
+		"            !/*/\n",
+		"            /actions/\n",
+		fmt.Sprintf("            /.github/workflows/%s\n", pattern),
+		"          sparse-checkout-cone-mode: false\n",
+	}
 }
 
 // generateRestoreActionsSetupStep generates a single "Restore actions folder" step that
@@ -98,7 +122,7 @@ func (c *Compiler) generateRestoreActionsSetupStep() string {
 	var step strings.Builder
 	step.WriteString("      - name: Restore actions folder\n")
 	step.WriteString("        if: always()\n")
-	fmt.Fprintf(&step, "        uses: %s\n", getActionPin("actions/checkout"))
+	fmt.Fprintf(&step, "        uses: %s\n", getActionPin("actions/checkout")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	step.WriteString("        with:\n")
 	step.WriteString("          repository: github/gh-aw\n")
 	step.WriteString("          sparse-checkout: |\n")
@@ -382,7 +406,7 @@ func (c *Compiler) generateScriptModeCleanupStep() string {
 	step.WriteString("        run: |\n")
 	step.WriteString("          bash /tmp/gh-aw/actions-source/actions/setup/clean.sh\n")
 	step.WriteString("        env:\n")
-	fmt.Fprintf(&step, "          INPUT_DESTINATION: %s\n", SetupActionDestination)
+	fmt.Fprintf(&step, "          INPUT_DESTINATION: %s\n", SetupActionDestination) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
 	return step.String()
 }

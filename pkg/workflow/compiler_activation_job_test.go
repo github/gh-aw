@@ -35,6 +35,21 @@ const pullRequestActivationRef = "${{ (github.event_name == 'pull_request' || gi
 // callee repository in cross-repo scenarios.
 const sameRepoCondition = "steps.resolve-host-repo.outputs.target_repo == github.repository"
 
+func TestActivationCheckoutIncludesExecutingManifestBeforeRunInfo(t *testing.T) {
+	compiler := NewCompiler(WithVersion("dev"))
+	compiler.SetActionMode(ActionModeDev)
+	job, err := compiler.buildActivationJob(&WorkflowData{Name: "Auditor"}, false, "", "auditor.lock.yml")
+	require.NoError(t, err)
+	steps := strings.Join(job.Steps, "")
+	checkout := extractWorkflowStepByName(t, steps, "Checkout actions folder")
+	assert.Contains(t, checkout, "/actions/\n")
+	assert.Contains(t, checkout, "/.github/workflows/auditor.lock.yml\n")
+	assert.Contains(t, checkout, "sparse-checkout-cone-mode: false")
+	assert.Contains(t, checkout, "persist-credentials: false")
+	assert.Less(t, strings.Index(steps, "Checkout actions folder"), strings.Index(steps, "Generate agentic run info"))
+	assert.NotContains(t, strings.Join(compiler.generateCheckoutActionsFolder(nil), ""), ".lock.yml")
+}
+
 func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 	compiler := NewCompiler()
 	job, err := compiler.buildActivationJob(&WorkflowData{Name: "Test Workflow"}, false, "", "test.lock.yml")

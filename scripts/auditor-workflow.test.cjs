@@ -94,9 +94,20 @@ async function fixture(t, options = {}) {
     },
   };
   const mockRequire = name => {
+    if (name === "node:fs" && options.rollbackError) {
+      return {
+        ...fs,
+        writeFileSync: (file, value) => {
+          if (file === path.join(cache, "checkpoint.json") && Buffer.isBuffer(value)) {
+            throw Object.assign(new Error("Checkpoint restoration failed"), { code: "EACCES" });
+          }
+          return fs.writeFileSync(file, value);
+        },
+      };
+    }
     if (name !== "node:child_process") return require(name);
     return {
-      execFileSync: (command, args) => {
+      execFileSync: (command, args, execOptions) => {
         assert.equal(command, "gh");
         calls.push(args);
         if (args[1] === "version") return "gh aw test-version";
@@ -131,6 +142,11 @@ async function fixture(t, options = {}) {
           });
         }
         if (args[1] === "logs") {
+          assert.equal(args[args.indexOf("--count") + 1], "1");
+          assert.ok(execOptions.timeout > Number(args[args.indexOf("--timeout") + 1]) * 60000);
+          if (options.logErrorRun === Number(args[args.indexOf("--after-run-id") + 1]) + 1) {
+            throw Object.assign(new Error("Log collection timed out"), { code: "ETIMEDOUT" });
+          }
           clock.time = new Date(Date.parse(clock.time) + (options.logElapsedMs || 0)).toISOString();
           used += options.logCost || 0;
           const id = Number(args[args.indexOf("--after-run-id") + 1]) + 1;
@@ -181,7 +197,13 @@ async function fixture(t, options = {}) {
     setOutput: (key, value) => {
       outputs[key] = value;
     },
-    summary: { addRaw: () => ({ write: async () => {} }) },
+    summary: {
+      addRaw: () => ({
+        write: async () => {
+          if (options.summaryError) throw new Error("Summary unavailable");
+        },
+      }),
+    },
   };
   const execute = () => collect(mockRequire, { env: { CACHE_DIR: cache, DATA_DIR: data, GITHUB_RUN_ATTEMPT: String(options.runAttempt || 1) } }, { repo: { owner: "example", repo: "repo" }, runId: 99 }, github, core, FixtureDate);
   return { execute, calls, outputs, warnings, cache, data, runs, clock };
@@ -191,6 +213,7 @@ test("empty complete collection checkpoints but never audits or activates", asyn
   const f = await fixture(t);
   await f.execute();
   assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(f.outputs.cache_safe, "true");
   assert.ok(fs.existsSync(path.join(f.cache, "checkpoint.json")));
   assert.equal(f.calls.filter(call => call.includes("--audit")).length, 0);
   assert.deepEqual(
@@ -240,6 +263,46 @@ test("repeated observation is not new", async t => {
   assert.equal(f.outputs.has_new_failures, "false");
   assert.equal(f.calls.filter(call => call[1] === "logs").length, 2);
   assert.equal(f.calls.filter(call => call.includes("--audit")).length, 1);
+});
+
+test("failed evidence collection preserves query cache without advancing checkpoint", async t => {
+  const state = { version: 1, repository: "example/repo", checkpoint: now, seen: [], backlog: [], pending: [] };
+  const options = { state, runs: [run(42), run(43)], logErrorRun: 43 };
+  const f = await fixture(t, options);
+  await assert.rejects(f.execute(), { code: "ETIMEDOUT" });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json"))), state);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).complete, false);
+  assert.ok(fs.existsSync(path.join(f.cache, "queries", `42-1-${now.replaceAll(":", "-")}`, "report.json")));
+  options.logErrorRun = undefined;
+  f.calls.length = 0;
+  await f.execute();
+  assert.equal(f.calls.filter(call => call[1] === "logs" && !call.includes("--audit")).length, 1);
+  assert.equal(f.outputs.has_new_failures, "true");
+});
+
+test("late collection failure rolls back checkpoint and disables activation", async t => {
+  const state = { version: 1, repository: "example/repo", checkpoint: now, seen: [], backlog: [], pending: [] };
+  const f = await fixture(t, { state, runs: [run(42)], summaryError: true });
+  const retry = JSON.stringify({ version: 1, repository: "example/repo", checkpoint: now, timeout_seconds: 600 });
+  fs.writeFileSync(path.join(f.cache, "health-retry.json"), retry);
+  const original = fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8");
+  await assert.rejects(f.execute(), /Summary unavailable/);
+  assert.equal(fs.readFileSync(path.join(f.cache, "checkpoint.json"), "utf8"), original);
+  assert.equal(fs.readFileSync(path.join(f.cache, "health-retry.json"), "utf8"), retry);
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(f.outputs.cache_safe, "true");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).checkpoint_unchanged, true);
+});
+
+test("failed checkpoint restoration disables activation and cache persistence", async t => {
+  const state = { version: 1, repository: "example/repo", checkpoint: now, seen: [], backlog: [], pending: [] };
+  const f = await fixture(t, { state, runs: [run(42)], summaryError: true, rollbackError: true });
+  await assert.rejects(f.execute(), { code: "EACCES" });
+  assert.equal(f.outputs.has_new_failures, "false");
+  assert.equal(f.outputs.cache_safe, "false");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).complete, false);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.data, "manifest.json"))).checkpoint_unchanged, false);
 });
 
 test("old-run rerun attempt is independently collected", async t => {
@@ -381,7 +444,8 @@ for (const [name, age] of [
     assert.equal(f.outputs.has_new_failures, "false");
     assert.equal(f.calls.filter(call => call[0] === "tracked").length, 0);
     assert.equal(f.calls.filter(call => call[1] === "health").length, 1);
-    assert.deepEqual(f.warnings, []);
+    assert.equal(f.warnings.length, 1);
+    assert.match(f.warnings[0], /Collection failed; checkpoint and retry state restored/);
   });
 }
 

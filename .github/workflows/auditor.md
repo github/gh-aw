@@ -96,7 +96,8 @@ jobs:
           RECOVERY_CACHE_KEY: ${{ inputs.recovery_cache_key }}
           RESTORED_CACHE_KEY: ${{ steps.restore_checkpoint.outputs.cache-matched-key }}
         with:
-          retries: 0
+          retries: 2
+          retry-exempt-status-codes: 400,401,403,404,422,429
           script: |
             const fs = require('node:fs');
             const path = require('node:path');
@@ -109,16 +110,21 @@ jobs:
             const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value));
             const stateFile = path.join(cache, 'checkpoint.json');
             const retryFile = path.join(cache, 'health-retry.json');
+            const originalCheckpoint = fs.existsSync(stateFile) ? fs.readFileSync(stateFile) : undefined;
+            const originalRetry = fs.existsSync(retryFile) ? fs.readFileSync(retryFile) : undefined;
+            core.setOutput('has_new_failures', 'false');
+            core.setOutput('cache_safe', 'false');
+            try {
             const retry = fs.existsSync(retryFile) ? read(retryFile) : undefined;
             const end = new Date().toISOString();
             const evidenceDeadline = Date.parse(end) + 18 * 60000;
+            const queryTimeout = 150000;
             const bootstrap = !fs.existsSync(stateFile);
             const repository = context.repo.owner + '/' + context.repo.repo;
-            core.setOutput('has_new_failures', 'false');
             let requests = 0;
             const request = async (method, params) => {
               if (++requests > 1025) throw new Error('Metadata request budget exceeded');
-              return method({...context.repo, ...params});
+              return method({...context.repo, ...params, request: {retries: 0, retryCount: 0}});
             };
             if (bootstrap && !retry?.initial_state) {
               const attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
@@ -211,6 +217,7 @@ jobs:
               write(stateFile, {...state, checkpoint: end,
                 recoveries: [...(state.recoveries || []), recovery]});
               if (retry) fs.unlinkSync(retryFile);
+              core.setOutput('cache_safe', 'true');
               return;
             }
             // This checkpoint records a bounded health sample, not a census cursor.
@@ -262,6 +269,7 @@ jobs:
                   'The 900s maximum was reached; discovery remains unverified and needs investigation.');
               core.warning(message);
               await core.summary.addRaw(message + ' Partial diagnostics are in auditor-collection/health.json.').write();
+              core.setOutput('cache_safe', 'true');
               return;
             }
             if (!discovery || !Array.isArray(health.workflows) ||
@@ -355,7 +363,7 @@ jobs:
             const ceiling = rate.used + 150;
             const cli = args => {
               const stdout = execFileSync('gh', args, {
-                encoding: 'utf8', timeout: 120000, maxBuffer: 16 * 1024 * 1024
+                encoding: 'utf8', timeout: queryTimeout, maxBuffer: 16 * 1024 * 1024
               });
               const report = JSON.parse(stdout);
               if (report.partial === true || report.complete === false ||
@@ -366,7 +374,7 @@ jobs:
               return report;
             };
             for (const run of batch) {
-              if (Date.now() + 120000 > evidenceDeadline) break;
+              if (Date.now() + queryTimeout > evidenceDeadline) break;
               const currentRate = (await github.rest.rateLimit.get()).data.resources.core;
               if (currentRate.used >= ceiling - 25 || currentRate.reset !== rate.reset) {
                 if (currentRate.reset !== rate.reset) throw new Error('API rate window reset');
@@ -383,12 +391,11 @@ jobs:
               } else {
                 report = cli(['aw', 'logs', (run.path || '').split('@')[0],
                   '--repo', repository, '--after-run-id', String(run.id - 1),
-                  '--before-run-id', String(run.id + 1), '--count', '2',
+                  '--before-run-id', String(run.id + 1), '--count', '1',
                   '--artifacts', 'info,usage', '--json', '--verbose',
                   '--cached-jsonl', path.join(dir, `logs-${versionKey}.jsonl`),
                   '--output', path.join(dir, 'artifacts'), '--timeout', '2',
                   '--max-storage', '256', '--max-github-api-rate-limit', String(ceiling)]);
-                write(reportFile, {cli_version: cliVersion, report});
               }
               if (!Array.isArray(report.runs) || report.runs.length !== 1 ||
                   report.runs[0].run_id !== run.id || report.runs[0].status !== 'completed' ||
@@ -405,6 +412,7 @@ jobs:
                   backlog.push({key, run, report_file: path.relative(cache, reportFile)});
                 }
               }
+              write(reportFile, {cli_version: cliVersion, report});
               seen.add(key);
             }
             const pending = agentic.filter(r => r.status !== 'completed' ||
@@ -436,7 +444,7 @@ jobs:
             let auditCount = 0;
             for (const cluster of ranked) {
               if (newFailures === 0 || deferred > 0 || auditCount >= 3) break;
-              if (Date.now() + 120000 > evidenceDeadline) {
+              if (Date.now() + queryTimeout > evidenceDeadline) {
                 // Cached reports survive, but these failures must remain new until audits can finish.
                 for (const run of fresh) {
                   seen.delete(identity(run));
@@ -456,7 +464,7 @@ jobs:
               // Discovery/cache validation still shares the logs API ceiling.
               const audited = cli(['aw', 'logs', (member.run.path || '').split('@')[0],
                 '--repo', repository, '--after-run-id', String(member.run.id - 1),
-                '--before-run-id', String(member.run.id + 1), '--count', '2',
+                '--before-run-id', String(member.run.id + 1), '--count', '1',
                 '--artifacts', 'info,usage', '--audit', '--json', '--verbose',
                 '--cached-jsonl', path.join(dir, `logs-${versionKey}.jsonl`),
                 '--output', path.join(dir, 'artifacts'), '--timeout', '2',
@@ -541,7 +549,29 @@ jobs:
               `Discovery is a bounded sample (partial=${discovery.partial}). ` +
               `${samplingGaps.length} unresolved historical sampling gaps; prior states preserved in recovery/. ` +
               'No new failures means no agent, not proof that the backlog is healthy.').write();
+            core.setOutput('cache_safe', 'true');
+            } catch (error) {
+              core.setOutput('has_new_failures', 'false');
+              core.setOutput('cache_safe', 'false');
+              const failed = {
+                complete: false, evidence_complete: false, new_failures: 0,
+                repository: context.repo.owner + '/' + context.repo.repo,
+                checkpoint_unchanged: false
+              };
+              write(path.join(data, 'manifest.json'), failed);
+              for (const [file, original] of [[stateFile, originalCheckpoint], [retryFile, originalRetry]]) {
+                if (original !== undefined) fs.writeFileSync(file, original);
+                else if (fs.existsSync(file)) fs.unlinkSync(file);
+              }
+              failed.checkpoint_unchanged = true;
+              write(path.join(data, 'manifest.json'), failed);
+              core.warning('Collection failed; checkpoint and retry state restored. Verified query cache is retained; no agent activation.');
+              core.setOutput('cache_safe', 'true');
+              throw error;
+            }
       - name: Upload compact collection
+        id: upload_collection
+        if: ${{ !cancelled() && (steps.collect.outcome == 'success' || steps.collect.outcome == 'failure') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: auditor-collection
@@ -549,6 +579,7 @@ jobs:
           if-no-files-found: error
           retention-days: 2
       - name: Save collection checkpoint, retry state and query cache
+        if: ${{ !cancelled() && steps.collect.outputs.cache_safe == 'true' && (steps.collect.outcome == 'failure' || (steps.collect.outcome == 'success' && steps.upload_collection.outcome == 'success')) }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/auditor-cache
@@ -577,6 +608,11 @@ invalid, incomplete, has no **new** non-intentional failures, lacks a complete
 open-PR listing, or has `evidence_complete: false`. Collection failure is not an
 empty result; deferred failures remain checkpointed for later batches. Unfinished
 runs do not block ranking completed failures.
+
+Failed collection preserves verified query-cache evidence but restores the prior
+checkpoint and retry state. Its compact manifest remains explicitly incomplete,
+and cache persistence is refused if restoration fails. Neither collection failure
+nor cache persistence authorizes agent activation.
 
 Read `sampling_gaps` separately: a gap does not invalidate current evidence or
 prove historical coverage or recovery. Preserved `recovery/` snapshots retain

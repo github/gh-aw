@@ -143,7 +143,11 @@ jobs:
         with:
           repository: github/gh-aw
           sparse-checkout: |
-            actions
+            /*
+            !/*/
+            /actions/
+            /.github/workflows/daily-evals-report.lock.yml
+          sparse-checkout-cone-mode: false
           fetch-depth: 1
           clean: false
           persist-credentials: false

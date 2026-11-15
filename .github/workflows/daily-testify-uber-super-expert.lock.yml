@@ -144,7 +144,11 @@ jobs:
         with:
           repository: github/gh-aw
           sparse-checkout: |
-            actions
+            /*
+            !/*/
+            /actions/
+            /.github/workflows/daily-testify-uber-super-expert.lock.yml
+          sparse-checkout-cone-mode: false
           fetch-depth: 1
           clean: false
           persist-credentials: false

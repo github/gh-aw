@@ -139,7 +139,7 @@ func cacheActivationPreStepPermissions(ctx *activationJobBuildContext) error {
 }
 
 func (c *Compiler) addActivationSetupAndWorkflowCallSteps(ctx *activationJobBuildContext, setupActionRef string) {
-	ctx.steps = append(ctx.steps, c.generateCheckoutActionsFolder(ctx.data)...)
+	ctx.steps = append(ctx.steps, c.generateCheckoutActionsFolderWithManifest(ctx.data, ctx.lockFilename)...)
 	activationSetupTraceID, activationSetupParentSpanID := buildActivationSetupParentSpans(ctx.preActivationJob)
 	if ctx.data.AdmissionEnabled {
 		if activationSetupTraceID == "" {

@@ -120,7 +120,11 @@ jobs:
         with:
           repository: github/gh-aw
           sparse-checkout: |
-            actions
+            /*
+            !/*/
+            /actions/
+            /.github/workflows/daily-github-docs-seo-optimizer.lock.yml
+          sparse-checkout-cone-mode: false
           fetch-depth: 1
           clean: false
           persist-credentials: false

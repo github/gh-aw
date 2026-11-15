@@ -139,7 +139,11 @@ jobs:
         with:
           repository: github/gh-aw
           sparse-checkout: |
-            actions
+            /*
+            !/*/
+            /actions/
+            /.github/workflows/daily-go-test-stubs-aider.lock.yml
+          sparse-checkout-cone-mode: false
           fetch-depth: 1
           clean: false
           persist-credentials: false
