@@ -675,6 +675,7 @@ def main():
             "gate-bypass": "CompletedGateBeforeWrite",
             "partial-widen": "ItemNarrowing",
             "manifest-mutation": "ManifestBinding",
+            "tree-bypass": "PublicationContent",
             "stale-replay": "InvocationBinding",
             "conclusion-recovery": "NoConclusionRecovery",
         }.items():

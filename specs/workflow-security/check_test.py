@@ -487,7 +487,7 @@ class RuntimeCheckoutModelTest(unittest.TestCase):
                                  for case in report["cases"]),
                              2 + len(check.CONCLUSION_MUTATIONS) + len(check.CONCLUSION_WITNESSES))
             self.assertEqual(sum(case["model"] == "WriteGate"
-                                 for case in report["cases"]), 9)
+                                 for case in report["cases"]), 10)
 
     def test_write_gate_preserves_pinned_runtime_text_trace(self):
         text = (

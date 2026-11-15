@@ -3,18 +3,20 @@ EXTENDS Naturals, FiniteSets, Sequences
 
 CONSTANT Fault
 ASSUME Fault \in {"none", "gate-bypass", "partial-widen", "manifest-mutation",
-                  "stale-replay", "conclusion-recovery"}
+                  "stale-replay", "tree-bypass", "conclusion-recovery"}
 
 \* Symbolic digests represent identity equality, not a proof of SHA-256 or JSON.
 VARIABLE s
 vars == <<s>>
 Items == {1, 2}
+CodeItems == {1}
 Decisions == {"pending", "allow", "partial", "deny", "gate_error"}
 
 Init ==
     s = [stage |-> "prepare", valid |-> FALSE, completed |-> FALSE,
          decision |-> "pending", selected |-> {}, digest |-> 0, seen |-> 0,
          attempt |-> 1, gateAttempt |-> 1, changed |-> FALSE, replayed |-> FALSE,
+         plannedTree |-> 0, actualTree |-> 0, treeChanged |-> FALSE,
          writes |-> {}, reportedAllowed |-> FALSE, lastEvent |-> "Init"]
 
 Prepare(valid) ==
@@ -46,6 +48,11 @@ Replay ==
     /\ s' = [s EXCEPT !.attempt = 2, !.replayed = TRUE,
                       !.lastEvent = "ReplayPriorDecision"]
 
+MutateTree ==
+    /\ s.stage = "apply" /\ ~s.treeChanged
+    /\ s' = [s EXCEPT !.actualTree = 1, !.treeChanged = TRUE,
+                      !.lastEvent = "MutatePublicationTree"]
+
 Allowed ==
     /\ s.valid /\ s.completed /\ s.decision \in {"allow", "partial"}
     /\ (s.digest = s.seen \/ Fault = "manifest-mutation")
@@ -57,9 +64,11 @@ Publish(item) ==
     /\ (Allowed \/ (Fault = "gate-bypass" /\ ~s.completed))
     /\ (item \in s.selected \/ Fault = "partial-widen"
         \/ (Fault = "gate-bypass" /\ ~s.completed))
+    /\ (item \notin CodeItems \/ s.actualTree = s.plannedTree \/ Fault = "tree-bypass")
     /\ s' = [s EXCEPT !.writes = @ \cup {
            [item |-> item, completed |-> s.completed, decision |-> s.decision,
             selected |-> s.selected, digest |-> s.digest, seen |-> s.seen,
+            actualTree |-> s.actualTree, plannedTree |-> s.plannedTree,
             attempt |-> s.attempt, gateAttempt |-> s.gateAttempt,
             origin |-> "publisher"]},
                       !.lastEvent = IF item = 1 THEN "Publish:1" ELSE "Publish:2"]
@@ -79,6 +88,7 @@ Conclusion ==
                           [item |-> 1, completed |-> s.completed,
                            decision |-> s.decision, selected |-> s.selected,
                            digest |-> s.digest, seen |-> s.seen,
+                           actualTree |-> s.actualTree, plannedTree |-> s.plannedTree,
                            attempt |-> s.attempt, gateAttempt |-> s.gateAttempt,
                            origin |-> "conclusion"]}
                       ELSE @,
@@ -88,7 +98,7 @@ Next ==
     \/ \E valid \in BOOLEAN: Prepare(valid)
     \/ \E decision \in Decisions \ {"pending"}, selected \in SUBSET Items:
            Decide(decision, selected)
-    \/ Mutate \/ Replay
+    \/ Mutate \/ Replay \/ MutateTree
     \/ \E item \in Items: Publish(item)
     \/ Finish \/ Conclusion
 
@@ -101,15 +111,19 @@ TypeOK ==
     /\ s.digest \in 0..1 /\ s.seen \in 0..1
     /\ s.attempt \in 1..2 /\ s.gateAttempt \in 1..2
     /\ s.changed \in BOOLEAN /\ s.replayed \in BOOLEAN
+    /\ s.actualTree \in 0..1 /\ s.plannedTree \in 0..1 /\ s.treeChanged \in BOOLEAN
     /\ s.reportedAllowed \in BOOLEAN
     /\ s.writes \subseteq [item: Items, completed: BOOLEAN, decision: Decisions,
            selected: SUBSET Items, digest: 0..1, seen: 0..1,
+           actualTree: 0..1, plannedTree: 0..1,
            attempt: 1..2, gateAttempt: 1..2, origin: {"publisher", "conclusion"}]
 
 CompletedGateBeforeWrite ==
     \A w \in s.writes: w.completed /\ w.decision \in {"allow", "partial"}
 ItemNarrowing == \A w \in s.writes: w.item \in w.selected
 ManifestBinding == \A w \in s.writes: w.digest = w.seen
+PublicationContent ==
+    \A w \in s.writes: w.item \in CodeItems => w.actualTree = w.plannedTree
 InvocationBinding == \A w \in s.writes: w.attempt = w.gateAttempt
 NoConclusionRecovery == \A w \in s.writes: w.origin = "publisher"
 ConclusionChecksBoth ==
