@@ -25,7 +25,10 @@ func TestWriteGateAuditLogsJSON(t *testing.T) {
 			content, err := json.Marshal(gate)
 			require.NoError(t, err)
 			require.JSONEq(t, expected, string(content))
-			for _, value := range []any{RunData{WriteGate: gate}, AuditData{WriteGate: gate}} {
+			processed := ProcessedRun{Run: WorkflowRun{LogsPath: root}}
+			runData := buildRunData(processed, []ProcessedRun{processed}, "", &logsAggregate{engineCounts: make(map[string]int)}, false)
+			auditData, _ := buildLocalAuditData(processed, LogMetrics{}, nil)
+			for _, value := range []any{runData, auditData} {
 				content, err := json.Marshal(value)
 				require.NoError(t, err)
 				require.Contains(t, string(content), `"write_gate":`+stringMustMarshal(t, gate))

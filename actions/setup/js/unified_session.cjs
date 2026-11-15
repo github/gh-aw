@@ -914,11 +914,22 @@ function collectUnifiedSession({
     const decisionsFile = choose(["write-decisions.normalized.json", "write-decisions/write-decisions.normalized.json"]);
     const manifest = manifestFile ? records(manifestFile)[0] : undefined;
     const actualDigest = manifestFile ? require("node:crypto").createHash("sha256").update(read(manifestFile)).digest("hex") : undefined;
+    let manifestValid;
+    if (manifestFile && manifest?.complete === true && actualDigest === writeGate.GH_AW_PENDING_WRITES_SHA256) {
+      try {
+        require("./pending_writes.cjs").readAuthorizedManifest(manifestFile, writeGate.GH_AW_PENDING_WRITES_SHA256);
+        manifestValid = true;
+      } catch {
+        report(manifestFile, "invalid_pending_manifest", undefined);
+        manifestValid = false;
+      }
+    }
     const data = buildGateDecision({
       env: { ...writeGate, ...(jobResults === undefined ? {} : { GH_AW_JOB_RESULTS: jobResults }) },
       results: resultFile ? records(resultFile) : [],
       manifest,
       actualDigest,
+      manifestValid,
       decisions: decisionsFile ? records(decisionsFile)[0] : undefined,
       decisionsDigest: decisionsFile ? require("node:crypto").createHash("sha256").update(read(decisionsFile)).digest("hex") : undefined,
       resultsComplete: Boolean(resultFile && !incompleteSources.has(resultFile) && !malformedJsonSources.has(resultFile)),
