@@ -21,7 +21,7 @@ This mode requires the OpenAI inference provider, `permissions.id-token: write`,
 
 The proxy reaches `auth.openai.com` through its dedicated egress path. Neither that host nor the `codex-vendor` network opt-in is required in `network.allowed` for WIF. Startup refuses to launch Codex unless fresh AWF reflection confirms the configured OpenAI WIF endpoint.
 
-Codex threat detection inherits the main Codex engine's authentication when no detector-specific auth is set, including when a same-engine detector override is present. The generated detection job receives `id-token: write`. The separate [evals job](/gh-aw/experimental/experiments/#analyze-an-eval-backed-metric) does not inherit WIF and still requires `CODEX_API_KEY` or `OPENAI_API_KEY` for OpenAI models.
+Codex threat detection inherits the main Codex engine's authentication when no detector-specific auth is set, including when a same-engine detector override is present. The generated detection job receives `id-token: write`. The separate [evals job](/gh-aw/reference/experiments/#analyze-an-eval-backed-metric) does not inherit WIF and still requires `CODEX_API_KEY` or `OPENAI_API_KEY` for OpenAI models.
 
 See [Codex OpenAI Workload Identity Federation](/gh-aw/reference/auth/#codex-openai-workload-identity-federation) for provider setup, required fields, and a workflow example.
 

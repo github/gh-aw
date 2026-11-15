@@ -217,10 +217,12 @@ export default defineConfig({
     "/guides/memoryops/": "/gh-aw/patterns/memory-ops/",
     "/guides/memory-ops/": "/gh-aw/patterns/memory-ops/",
     "/guides/serena/": "/gh-aw/reference/serena/",
-    "/guides/experiments/": "/gh-aw/experimental/experiments/",
-    "/practices/experiments/": "/gh-aw/experimental/experiments/",
-    "/practices/experiments-specification/": "/gh-aw/experimental/experiments-specification/",
-    "/reference/experiments-specification/": "/gh-aw/experimental/experiments-specification/",
+    "/guides/experiments/": "/gh-aw/reference/experiments/",
+    "/practices/experiments/": "/gh-aw/reference/experiments/",
+    "/experimental/experiments/": "/gh-aw/reference/experiments/",
+    "/practices/experiments-specification/": "/gh-aw/specs/experiments-specification/",
+    "/reference/experiments-specification/": "/gh-aw/specs/experiments-specification/",
+    "/experimental/experiments-specification/": "/gh-aw/specs/experiments-specification/",
     "/reference/ai-credits-specification/": "/gh-aw/specs/ai-credits-specification/",
     "/reference/copilot-sdk-driver-specification/": "/gh-aw/specs/copilot-sdk-driver-specification/",
     "/reference/effective-tokens-specification/": "/gh-aw/specs/ai-credits-specification/",
@@ -502,6 +504,7 @@ export default defineConfig({
         {
           label: "Reference",
           items: [
+            { label: "A/B Experiments", link: "/reference/experiments/" },
             { label: "AI Engines", link: "/reference/engines/" },
             { label: "AI Engines (Copilot)", link: "/reference/engines/copilot/" },
             { label: "AI Engines (Claude)", link: "/reference/engines/claude/" },
@@ -597,8 +600,6 @@ export default defineConfig({
           collapsed: true,
           items: [
             { label: "Agy Engine (experimental)", link: "/engines/agy/" },
-            { label: "A/B Experiments", link: "/experimental/experiments/" },
-            { label: "A/B Experiments (Spec)", link: "/experimental/experiments-specification/" },
             { label: "CorrectionOps", link: "/experimental/correction-ops/" },
             { label: "Drive Memory (Private Preview)", link: "/experimental/drive-memory/" },
             { label: "Private Repository Enclaves", link: "/experimental/enclaves/" },

@@ -84,7 +84,6 @@ class PRSpecificationReviewerTests(unittest.TestCase):
         for path in (
             "specs/*.md",
             "docs/src/content/docs/specs/*.md",
-            "docs/src/content/docs/experimental/experiments-specification.md",
         ):
             self.assertIn(path, self.prompt)
         self.assertIn("safeoutputs create_pull_request_review_comment", self.text)

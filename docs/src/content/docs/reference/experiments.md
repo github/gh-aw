@@ -5,10 +5,6 @@ sidebar:
   order: 7
 ---
 
-:::caution[Experimental]
-A/B Experiments is an experimental feature.
-:::
-
 Use the `experiments` frontmatter section to compare workflow variants across
 repeated runs. Each experiment declares a name and a set of variants. On every
 run, the activation job picks one variant and exposes it to the prompt.
@@ -719,7 +715,7 @@ Tracking issue: [#1234](https://github.com/owner/repo/issues/1234)
 | `hypothesis` | `string` | | Null and alternative hypothesis (e.g. `"H0: no change. H1: concise reduces AIC by >=15%"`) |
 | `metric` | `string` | | Primary metric to observe (e.g. `aic`, `duration_ms`) |
 | `secondary_metrics` | `string[]` | | Additional metrics to track alongside the primary metric |
-| `guardrail_metrics` | `object[]` | | List of guardrail objects with `name` (string), `threshold` (comparison string like `>=0.95` or bare number like `0.0`), and optional `direction` (`"min"` or `"max"`). When `threshold` is a bare number, `direction` governs the pass condition (≤ for `min`, ≥ for `max`). See [experiments-specification §4.4](/gh-aw/experimental/experiments-specification/#44-guardrail-metrics) for full semantics. |
+| `guardrail_metrics` | `object[]` | | List of guardrail objects with `name` (string), `threshold` (comparison string like `>=0.95` or bare number like `0.0`), and optional `direction` (`"min"` or `"max"`). When `threshold` is a bare number, `direction` governs the pass condition (≤ for `min`, ≥ for `max`). See [experiments-specification §4.4](/gh-aw/specs/experiments-specification/#44-guardrail-metrics) for full semantics. |
 | `min_samples` | `integer` | | Minimum runs per variant required before statistical analysis is considered reliable. The step summary shows a progress bar toward this target. |
 | `analysis_type` | `string` | | Statistical method: `t_test`, `mann_whitney`, `proportion_test`, or `bayesian_ab`. |
 | `decision` | `object` | | Deterministic policy with optional non-negative `minimum_effect`, non-negative `regression_tolerance`, and `confidence` between 0 and 1. Effects use absolute primary-metric units. |
