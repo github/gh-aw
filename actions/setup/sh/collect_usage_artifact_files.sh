@@ -104,7 +104,6 @@ done
 
 if [ -f /tmp/gh-aw/aw_info.json ]; then safe_copy /tmp/gh-aw/aw_info.json /tmp/gh-aw/usage/aw_info.json || true; fi
 if [ -f /tmp/gh-aw/runtime/aw_info.json ]; then safe_copy /tmp/gh-aw/runtime/aw_info.json /tmp/gh-aw/usage/aw_info.json || true; fi
-if [ -f /tmp/gh-aw/agent/aw_info.json ]; then safe_copy /tmp/gh-aw/agent/aw_info.json /tmp/gh-aw/usage/aw_info.json || true; fi
 if [ -f /tmp/gh-aw/aw-info.jsonl ]; then safe_copy /tmp/gh-aw/aw-info.jsonl /tmp/gh-aw/usage/aw-info.jsonl || true; fi
 if [ -f /tmp/gh-aw/agent_usage.json ]; then safe_copy /tmp/gh-aw/agent_usage.json /tmp/gh-aw/usage/agent_usage.json || true; fi
 if [ -f /tmp/gh-aw/agent_usage.jsonl ]; then safe_copy /tmp/gh-aw/agent_usage.jsonl /tmp/gh-aw/usage/agent_usage.jsonl || true; fi

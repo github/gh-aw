@@ -249,7 +249,9 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 	gatewayFailures := 0
 
 	if mcpUsage != nil {
-		sources["mcp_gateway"] = true
+		if len(mcpUsage.ToolCalls) > 0 || mcpUsage.Integrity != nil {
+			sources["mcp_gateway"] = true
+		}
 		for _, call := range mcpUsage.ToolCalls {
 			if !isFrictionToolCallStatus(call.Status) && call.Error == "" {
 				continue
@@ -334,7 +336,7 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 		}
 	}
 
-	if len(events) == 0 {
+	if len(events) == 0 && session == nil && (mcpUsage == nil || (len(mcpUsage.ToolCalls) == 0 && mcpUsage.Integrity == nil)) {
 		return nil
 	}
 
@@ -376,14 +378,10 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 	return summary
 }
 
-// deriveFrictionFallback returns a historical summary only when it attributes
-// at least one counted friction occurrence.
+// deriveFrictionFallback returns a historical summary when source observations
+// are available, even if they contain no counted friction.
 func deriveFrictionFallback(mcpUsage *MCPToolUsageData, session *usageActivitySession) *FrictionCostSummary {
-	summary := deriveFrictionFromLogs(mcpUsage, session)
-	if summary == nil || summary.CountedOccurrences == 0 {
-		return nil
-	}
-	return summary
+	return deriveFrictionFromLogs(mcpUsage, session)
 }
 
 // isFrictionToolCallStatus reports whether an MCP tool call status indicates a
