@@ -451,6 +451,15 @@ async function pushSignedCommits({
   resolveRebaseConflict,
   assertTransportUnchanged,
 }) {
+  const { assertPendingCodePublication, pendingWritesEnabled } = require("./pending_writes.cjs");
+  if (pendingWritesEnabled()) {
+    const originalAssertion = assertTransportUnchanged;
+    assertTransportUnchanged = () => {
+      originalAssertion?.();
+      assertPendingCodePublication({ owner, repo, branch, baseRef, cwd });
+    };
+    assertTransportUnchanged();
+  }
   const effectiveCurrentRepo = currentRepo || `${owner}/${repo}`;
   const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds, {
     defaultRepo: effectiveCurrentRepo,

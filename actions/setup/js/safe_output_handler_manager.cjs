@@ -70,6 +70,7 @@ const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { collectDeliveryEvidence, publishDeliveryEvidence } = require("./work_queue_delivery_evidence.cjs");
 const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
+const { assertPendingWritesIntegrity, withPendingWrite } = require("./pending_writes.cjs");
 
 /**
  * Handler map configuration
@@ -1404,7 +1405,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
         return;
       }
-      const result = recordMergeDecision(messageType, await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
+      const result = recordMergeDecision(messageType, await withPendingWrite(message, () => messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i), i);
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
       // no-op warnings, or if_no_changes: warn/ignore). Subsequent messages are still
@@ -2192,6 +2193,8 @@ async function settleClaimDelivery(scope, messages, results, options = {}) {
 
 /** @param {{claimPartition?: boolean, messages?: object[], verifyOutput?: Function, finalizeResults?: Function, controlIntentPath?: string, queueClient?: object, authorize?: (request: Record<string, unknown>) => unknown, activationCommentLinks?: string[]}} [options] */
 async function main(options = {}) {
+  assertPendingWritesIntegrity();
+  require("./pending_writes_client.cjs").installPendingWriteClientGuards();
   const activationCommentLinks = options.activationCommentLinks ?? [];
   const scope = readClaimScopeContext();
   if (scope && !options.claimPartition) {
