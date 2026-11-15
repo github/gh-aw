@@ -118,7 +118,7 @@ Assess every selected file before calling analysis complete. Use `noop` only whe
 
 The restore-only cache makes `state.json` a completed-analysis cursor, not an attempted-batch cursor. Never write it or its directory; preserve the cursor unchanged on every outcome. Run-number rotation advances attempted batches only; it neither persists progress nor proves analysis succeeded.
 
-Call exactly one terminal safe-output tool. Include the selected batch, short reason, and that the cursor did not advance; include the self-check for incomplete outcomes. Use `###` or lower headings; show outcome and key results first, put long evidence in `<details>`, and format run IDs as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
+Before stopping, call exactly one terminal safe-output tool. Include the selected batch, short reason, and that the cursor did not advance; include the self-check for incomplete outcomes. Use `###` or lower headings; show outcome and key results first, put long evidence in `<details>`, and format run IDs as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
 
 Do not parallelize tests that use or may conflict through:
 
