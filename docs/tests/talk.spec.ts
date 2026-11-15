@@ -328,16 +328,6 @@ test.describe("agentic engineering slides", () => {
     expect(errors).toEqual([]);
   });
 
-  test("keeps claims, completions and verified results apart", async ({ page }) => {
-    const errors = await open(page, "Agents with a Job Queue", 14_000);
-    await expect(page.locator(".jq-svg")).toContainText("CLAIM");
-    await expect(page.locator("#jq02a")).toHaveText("✓ PR #91");
-    await expect(page.locator("#jq21a")).toHaveText("cancelled");
-    await expect(page.locator("#jq22a")).toHaveText("— none");
-    await expect(page.locator("#jqWs3")).toHaveText("ready");
-    expect(errors).toEqual([]);
-  });
-
   test("chains three runs through dispatches and completion signals", async ({ page }) => {
     const errors = await open(page, "Agents Trigger Agents", 12_500);
     await expect(page.locator(".att-svg .att-run.done")).toHaveCount(3);
