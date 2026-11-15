@@ -294,9 +294,8 @@
   body.light .dots button { background: #1f232833; }
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
-  body.light .count { color: #424a53; }
-  body.light .snd, body.light .fzb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .fzb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .smb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .smb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   .active .tp-copy > :nth-child(odd):not(.tp-vs), .active .tp-vs > :first-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
   .active .tp-copy > :nth-child(even):not(.tp-vs), .active .tp-vs > :last-child { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both; }
   .active .tp-copy > :nth-child(2) { animation-delay: .15s !important; }
@@ -2070,21 +2069,17 @@
   .arrows svg { width: 100%; height: 100%; display: block; }
   body.compact-nav .dots { display: none; }
   body.compact-nav .arrows { display: flex; }
-  body.compact-nav .snd { right: 112px; }
-  .snd, .fzb { position: fixed; right: 124px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  .snd, .fzb, .smb { position: fixed; right: 24px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover, .fzb:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg, .fzb svg { width: 100%; height: 100%; display: block; }
-  .fzb { right: 164px; }
-  body.compact-nav .fzb { right: 152px; }
-  /* too narrow for search between the arrows and sound: stack it above the sound toggle */
-  @media (max-width: 360px) { body.compact-nav .fzb { right: 112px; bottom: 50px; } }
+  .snd:hover, .fzb:hover, .smb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg, .smb svg { width: 100%; height: 100%; display: block; }
+  .fzb { right: 64px; }
+  .smb { right: 104px; }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
   .snd.off .x { opacity: 1; }
   .snd.flash { color: #f0f6fc; border-color: #f0f6fc; }
-  .count { position: fixed; right: 26px; bottom: 18px; font: 600 15px/1 var(--mono); color: #9198a1; z-index: 5; letter-spacing: .1em; }
   .notes { position: fixed; left: 24px; right: 24px; bottom: 50px; max-width: 900px; margin: 0 auto; padding: 18px 22px;
     background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
   .notes.on { display: block; }
@@ -2120,6 +2115,33 @@
   body.light .fz-s { color: #424a53; }
   body.light .fz-st, body.light .fz-b { color: #59636e; }
   body.light .fz mark { background: #8250df33; }
+
+  /* --- slide map (full-screen overview: one row per band, one tile per slide) --- */
+  .smp { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+    background: #0d1117f7; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #f0f6fc; font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; z-index: 20; }
+  .smp[open] { display: flex; flex-direction: column; }
+  .smp::backdrop { background: transparent; }
+  .smp-bar { display: flex; align-items: center; gap: 12px; padding: 16px 24px 8px; }
+  .smp-h { flex: 1; margin: 0; font: 600 14px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9198a1; }
+  .smp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .smp-row { display: grid; grid-template-columns: 170px 1fr; gap: 12px; align-items: start; }
+  .smp-l { font: 600 13px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); padding-top: 10px; }
+  .smp-tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .smp-t { width: 168px; min-height: 58px; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 10px; border: 1px solid #3d444d;
+    border-left: 3px solid var(--c); border-radius: 8px; background: #151b23; color: inherit; cursor: pointer; font: 500 13px/1.3 "Mona Sans", sans-serif; }
+  .smp-t b { font: 600 11px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
+  .smp-t span { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .smp-t.hd { background: transparent; border-style: dashed; border-left-style: solid; }
+  .smp-t:hover { background: #1f2630; border-color: #9198a1; border-left-color: var(--c); }
+  .smp-t.on { box-shadow: 0 0 0 2px var(--c); }
+  .smp-t:focus-visible { outline: 3px solid #ab7df8; outline-offset: 2px; }
+  @media (max-width: 640px) { .smp-row { grid-template-columns: 1fr; gap: 6px; } .smp-l { padding-top: 0; } .smp-t { width: calc(50% - 3px); } }
+  body.light .smp { background: #f6f8faf5; color: #1f2328; }
+  body.light .smp-t { background: #ffffff; border-color: #9ea7b3; border-left-color: var(--c); }
+  body.light .smp-t.hd { background: transparent; }
+  body.light .smp-t:hover { background: #eaeef2; }
+  body.light .smp-h, body.light .smp-t b { color: #59636e; }
+  body.light .smp-l { color: #1f2328; }
 
   /* --- any engine --- */
   .ae .slide-head .ae-agent .ch { background-image: linear-gradient(90deg, #ab7df8, #d2b8ff, #ab7df8); }
@@ -16245,12 +16267,13 @@
       .replace(/ ([,.])/g, "$1")
       .trim();
   };
+  // A short tile label: the heading, or the kicker when the heading is long; band headers and the slide map reuse it.
+  const label = s => {
+    const t = headingText(s);
+    const k = s.el.querySelector(".kicker")?.textContent.trim();
+    return t.length > 32 && k ? k : t;
+  };
   {
-    const label = s => {
-      const t = headingText(s);
-      const k = s.el.querySelector(".kicker")?.textContent.trim();
-      return t.length > 32 && k ? k : t;
-    };
     const parts = rows.filter(r => BANDS[r.group]);
     let num = 1;
     for (const r of rows) {
@@ -16338,10 +16361,10 @@
     { class: "dots" },
     rows.map(r => h("div", { class: "drow", title: BANDS[r.group]?.[0] || SOLO[r.group] || "" }, dotBtns.slice(r.start, r.start + (r.header ? 1 : 0) + r.items.length)))
   );
-  const arrowBtn = (label, d, fn) => {
+  const arrowBtn = (label, key, d, fn) => {
     const b = h("button", {
       "aria-label": label,
-      title: label,
+      title: `${label} (${key})`,
       onclick: e => {
         e.stopPropagation();
         fn();
@@ -16351,10 +16374,10 @@
     b._nav = fn;
     return b;
   };
-  const bandPrevBtn = arrowBtn("Previous band", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
-  const prevBtn = arrowBtn("Previous slide", "M15 5l-7 7 7 7", () => prev());
-  const nextBtn = arrowBtn("Next slide", "M9 5l7 7-7 7", () => next());
-  const bandNextBtn = arrowBtn("Next band", "M18 5v14M6 6l7 6-7 6", () => band(1));
+  const bandPrevBtn = arrowBtn("Previous band", "↑", "M6 5v14M18 6l-7 6 7 6", () => band(-1));
+  const prevBtn = arrowBtn("Previous slide", "←", "M15 5l-7 7 7 7", () => prev());
+  const nextBtn = arrowBtn("Next slide", "→", "M9 5l7 7-7 7", () => next());
+  const bandNextBtn = arrowBtn("Next band", "↓", "M18 5v14M6 6l7 6-7 6", () => band(1));
   const arrows = h("div", { class: "arrows" }, bandPrevBtn, prevBtn, nextBtn, bandNextBtn);
   // Taps on the arrows navigate on touchend and cancel the default action, so Safari neither
   // double-tap zooms nor synthesizes a second click, and the window swipe handlers never see them.
@@ -16378,7 +16401,6 @@
   );
   arrows.addEventListener("click", e => Date.now() - arrowTouchAt < 700 && e.detail > 0 && (e.stopPropagation(), e.preventDefault()), true);
   arrows.addEventListener("click", e => e.stopPropagation());
-  const count = h("div", { class: "count" });
   const snd = h("button", {
     class: "snd",
     "aria-label": "Toggle sound (M)",
@@ -16404,17 +16426,30 @@
     },
   });
   fzBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg>';
+  // the slide map sits left of search and opens the full-screen overview of every band (see ---------- slide map ----------)
+  const smBtn = h("button", {
+    class: "smb",
+    "aria-label": "Slide map (G)",
+    "aria-haspopup": "dialog",
+    title: "Slide map (G)",
+    onclick: e => {
+      e.stopPropagation();
+      openMap();
+    },
+  });
+  smBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="5" height="4" rx="1"/><rect x="10" y="4" width="5" height="4" rx="1"/><rect x="16.5" y="4" width="4" height="4" rx="1"/><rect x="3.5" y="10" width="5" height="4" rx="1"/><rect x="10" y="10" width="5" height="4" rx="1"/><rect x="3.5" y="16" width="5" height="4" rx="1"/><rect x="10" y="16" width="5" height="4" rx="1"/><rect x="16.5" y="16" width="4" height="4" rx="1"/></svg>';
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, count, fzBtn, snd, notes);
+  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, smBtn, fzBtn, snd, notes);
 
-  // Dot map: left offset + the longest band of 8px dots with 5px gaps + 16px for the wide active dot; search/sound/count need ~210px on the right.
+  // Dot map: left offset + the longest band of 8px dots with 5px gaps + 16px for the wide active dot; map/search/sound need ~150px on the right.
   const dotsWidth = 28 + Math.max(...rows.map(r => r.items.length + (r.header ? 1 : 0))) * 13 + 16 + 400;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 210);
+    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 150);
   };
   addEventListener("resize", fit);
   fit();
@@ -17147,7 +17182,6 @@
     nextBtn.disabled = n === slides.length - 1;
     bandPrevBtn.disabled = slides[n].band === 0;
     bandNextBtn.disabled = slides[n].band === rows.length - 1;
-    count.textContent = `${String(n + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
     notes.textContent = slides[n].notes || "";
     history.replaceState(null, "", `#${n + 1}`);
   }
@@ -17166,7 +17200,7 @@
     };
 
   addEventListener("keydown", e => {
-    if (fz.open) return; // the search dialog handles its own keys
+    if (fz.open || smp.open) return; // the search and map dialogs handle their own keys
     if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
       e.preventDefault();
       openSearch();
@@ -17198,18 +17232,19 @@
     else if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
     else if (e.key === "n" || e.key === "N") notes.classList.toggle("on");
     else if (e.key === "m" || e.key === "M") toggleSound();
+    else if (e.key === "g" || e.key === "G") openMap();
   });
   addEventListener("click", e => {
-    if (fz.open || e.target.closest(".fz, a, button")) return;
+    if (fz.open || smp.open || e.target.closest(".fz, .smp, a, button")) return;
     const tile = e.target.closest("[data-go]");
     if (tile) return go(+tile.dataset.go);
     e.clientX < innerWidth / 3 ? prev() : next();
   });
   let tx = null,
     ty = null;
-  addEventListener("touchstart", e => (fz.open ? (tx = ty = null) : ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY))), { passive: true });
+  addEventListener("touchstart", e => (fz.open || smp.open ? (tx = ty = null) : ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY))), { passive: true });
   addEventListener("touchend", e => {
-    if (tx == null || fz.open) return;
+    if (tx == null || fz.open || smp.open) return;
     const dx = e.changedTouches[0].clientX - tx,
       dy = e.changedTouches[0].clientY - ty;
     tx = ty = null;
@@ -17414,6 +17449,87 @@
   // closing returns focus to the opener; drop it so Space and Enter go back to driving the deck
   fz.addEventListener("close", () => document.activeElement?.blur?.());
   for (const t of ["touchstart", "touchend"]) fz.addEventListener(t, e => e.stopPropagation(), { passive: true });
+
+  // ---------- slide map ----------
+  // G (or the dock's map button) opens a full-screen overview: one row per band, one tile per slide, the current one ringed.
+  // Click or Enter opens a slide; Left/Right step in slide order, Up/Down move to the nearest tile on the line above/below.
+  const smpBody = h("div", { class: "smp-body" });
+  const smp = h(
+    "dialog",
+    { class: "smp", "aria-label": "Slide map" },
+    h("div", { class: "smp-bar" }, h("h2", { class: "smp-h" }, "Slide map"), h("button", { class: "fz-x", type: "button", "aria-label": "Close slide map (Esc)", onclick: () => smp.close() }, "Esc")),
+    smpBody
+  );
+  document.body.append(smp);
+  let smpTiles = null;
+  const smpBuild = () => {
+    smpTiles = [];
+    smpBody.replaceChildren(
+      ...rows.map(r => {
+        const c = THEME[r.group].accent[0],
+          tiles = slides.filter(s => s.band === slides[r.start].band).map(s => {
+            const n = slides.indexOf(s),
+              t = h(
+                "button",
+                { class: `smp-t${s.header ? " hd" : ""}`, type: "button", "aria-label": `Go to slide ${n + 1}: ${label(s) || BANDS[r.group]?.[0] || SOLO[r.group]}`, onclick: () => (smp.close(), go(n)) },
+                h("b", {}, String(n + 1).padStart(2, "0")),
+                h("span", {}, label(s) || BANDS[r.group]?.[0] || SOLO[r.group])
+              );
+            smpTiles[n] = t;
+            return t;
+          });
+        return h("section", { class: "smp-row", "--c": c }, h("div", { class: "smp-l" }, BANDS[r.group]?.[0] || SOLO[r.group]), h("div", { class: "smp-tiles" }, tiles));
+      })
+    );
+  };
+  // nearest tile on the next visual line above or below (tiles wrap, so bands can span several lines)
+  const smpVert = (from, down) => {
+    const a = from.getBoundingClientRect(),
+      cx = a.left + a.width / 2,
+      cy = a.top + a.height / 2;
+    let best = null,
+      bd = Infinity;
+    for (const t of smpTiles) {
+      const b = t.getBoundingClientRect(),
+        dy = b.top + b.height / 2 - cy;
+      if (down ? dy <= 4 : dy >= -4) continue;
+      const d = Math.abs(dy) * 100 + Math.abs(b.left + b.width / 2 - cx);
+      if (d < bd) ((bd = d), (best = t));
+    }
+    return best;
+  };
+  function openMap() {
+    if (smp.open) return;
+    if (fz.open) fz.close();
+    if (!smpTiles) smpBuild();
+    smpTiles.forEach((t, i) => {
+      t.classList.toggle("on", i === cur);
+      if (i === cur) t.setAttribute("aria-current", "true");
+      else t.removeAttribute("aria-current");
+    });
+    smp.showModal();
+    const t = smpTiles[cur];
+    t?.focus({ preventScroll: true });
+    t?.scrollIntoView({ block: "center" });
+  }
+  smp.addEventListener("keydown", e => {
+    const i = smpTiles.indexOf(document.activeElement);
+    let to = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") to = smpTiles[Math.min(slides.length - 1, Math.max(0, (i < 0 ? cur : i) + (e.key === "ArrowRight" ? 1 : -1)))];
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") to = smpVert(smpTiles[i < 0 ? cur : i], e.key === "ArrowDown");
+    else if (e.key === "Home") to = smpTiles[0];
+    else if (e.key === "End") to = smpTiles[slides.length - 1];
+    else if (e.key === "Escape" || e.key === "g" || e.key === "G") {
+      e.preventDefault();
+      smp.close();
+      return;
+    } else return;
+    e.preventDefault();
+    if (to) (to.focus({ preventScroll: true }), to.scrollIntoView({ block: "nearest" }));
+  });
+  smp.addEventListener("click", e => e.target === smp && smp.close());
+  smp.addEventListener("close", () => document.activeElement?.blur?.());
+  for (const t of ["touchstart", "touchend"]) smp.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
   // ---------- animated background ----------
   const ctx = canvas.getContext("2d");
