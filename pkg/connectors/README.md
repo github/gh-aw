@@ -29,7 +29,7 @@ that contract as the source of truth when adding or changing connector behavior.
 
 | Area | Exported symbols | Description |
 |------|------------------|-------------|
-| Requests | `Credential`, `Input`, `Value`, `BinaryRequest`, `Patch`, `Operation`, `RetryPolicy` | Describe phase-bound credentials, bounded inputs, typed request values, request bodies, and explicitly bounded retries. |
+| Requests | `Credential`, `Input`, `Request`, `Value`, `BinaryRequest`, `Patch`, `Operation`, `RetryPolicy` | Describe phase-bound credentials, bounded inputs, typed request values, request bodies, and explicitly bounded retries. |
 | Trusted writes | `TrustedInput`, `TrustedPreflight`, `InputLookup`, `CreatedResource`, `CreatedResourceHost` | Model authored safe-output inputs, preflight checks, canonical identity lookups, and invocation-local temporary resources. |
 | Read and MCP capabilities | `ReadTool`, `HTTPMCP`, `MCPTool`, `Result`, `ToolCapability` | Describe REST-backed reads, remote streamable-HTTP MCP tools, and untrusted execution results. |
 | Events | `Trigger`, `EventPredicate`, `EventFilter`, `EventVariant`, `EventProjection`, `EventEvaluationVersion` | Represent bounded matching and projection rules over authenticated evidence; variants cannot grant resource authority. |
@@ -53,6 +53,10 @@ lowering. Execution bounds responses, refuses redirects, validates inputs and
 resources, and labels remote results untrusted. Safe outputs require an explicit
 write-enabled runtime and are validated again outside the agent credential
 boundary.
+
+`ConnectorSpec.Validate` validates one connector declaration. The MCP HTTP
+adapter also defines the `Error` method on its typed response error and the
+`RoundTrip` transport method used to perform one bounded HTTP exchange.
 
 ## Tests
 

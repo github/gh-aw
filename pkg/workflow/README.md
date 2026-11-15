@@ -1664,7 +1664,7 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | Durable and engine helpers | `DurableExecutionProvider`, `GetDurableExecutionPlan`, `GetInternalLogsDir`, `GetPluginInstallationSteps`, `GetLogParserScriptSource`, `GetPostConfigPluginInstallationSteps`, `EngineDurableDefinition`, `DurableConfig`, `DurableExecutionPlan`, `DurableRestoreStepName`, `PiSessionDirectory`, `DynamicWorkflowsEnabled`, `ResolveEffectiveEngineConfig` | Engine capabilities and helpers for durable execution, plugin setup, log capture, session restoration, and resolving effective engine configuration. |
 | Compiler controls | `SetSkipDefaultCheckout`, `SetDefaultPushToken`, `SetDynamicPushToken`, `SetRequireSelfHostedRunners`, `SetLockFileLogo`, `DefaultModelRoutingWorkflowCount`, `IsNoEmit`, `SetReadOnly`, `SetDryRun`, `SetEnvironmentOverride`, `IncrementExperimentalWarningCount`, `GetExperimentalWarningCount`, `SetConfiguredModelValidator` | Compiler mutators and accessors for checkout credentials, runner requirements, output mode, environment overrides, dry-run state, and optional model validation. |
 | Grader and security configuration | `BuiltinGraderRegistry`, `BuiltinGraderIDs`, `HasGraders`, `EnabledGraderIDs`, `CustomGraderIDs`, `DefaultGraderIDs`, `PrepareShellScript`, `AddSecurityAdvisoryCommentConfig`, `CreateSecurityAdvisoryConfig`, `ContentsIsNone`, `RepoProtectedFilesConfig`, `TokenBrokerConfig`, `IsReportAsIssueEnabled`, `IsLockFileLogoEnabled` | Grader registry and selection helpers, security safe-output configuration, protected-file settings, token-broker selection, and permission or reporting checks. |
-| Workflow metadata and webhooks | `GHAWManifestWorkQueue`, `GHAWMarkdownMetadata`, `GHAWMarkdownMetadataRecord`, `WebhookFilter`, `WebhookCondition`, `WebhookContext`, `WebhookBatch`, `WebhookPayloadProjection`, `WebhookPayloadProjectionPolicy`, `WebhookCommandFilter`, `WebhookActivityNormalization` | Manifest and authored-metadata records plus bounded webhook matching, projection, batching, and activity-normalization declarations. |
+| Workflow metadata and webhooks | `GHAWManifestWorkQueue`, `GHAWMarkdownMetadata`, `GHAWMarkdownMetadataRecord`, `WebhookDispatch`, `WebhookFilter`, `WebhookCondition`, `WebhookContext`, `WebhookBatch`, `WebhookPayloadProjection`, `WebhookPayloadProjectionPolicy`, `WebhookCommandFilter`, `WebhookActivityNormalization` | Manifest and authored-metadata records plus bounded webhook matching, projection, batching, and activity-normalization declarations. |
 | Work-queue and MCP integration | `WorkQueueAssignmentInputName`, `WorkQueueClaimInputName`, `RenderWorkQueueMCP`, `RenderLedgerMCP`, `MCPScriptParamItems` | Agent input names and MCP rendering helpers for immutable queue snapshots and participant-scoped intent. |
 | Other package helpers | `AgyDefaultDomains`, `FindNewestEntryForRepo`, `ToFinding`, `ShellScriptResources`, `SafeOutputsUploadCodeCoverageStagingArtifactName`, `ParseError`, `MarshalYAML` | Engine defaults, scanner conversion, embedded-script discovery, cache lookup, and parsing/serialization helpers. |
 
@@ -1676,6 +1676,137 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `ParseStaleCheckMode` | `func ParseStaleCheckMode(frontmatter map[string]any) (disabled, full bool)` | Reads the `on` stale-check mode from frontmatter |
 | `ScanResourceSecurity` | `func ScanResourceSecurity(content []byte) []SecurityFinding` | Scans non-Markdown resources for Unicode obfuscation; returns nil for invalid UTF-8 |
 | `ValidateEnvironmentOverride` | `func ValidateEnvironmentOverride(name string) error` | Validates a literal Actions environment name; empty means no override |
+
+### Additional exported identifiers
+
+The package also exports helper methods for templating JSON slices and matching
+conditional-template patterns: `AddTemplatableJSONSlice`, `FindAllString`,
+`FindAllStringIndex`, `FindAllStringSubmatch`, and `FindStringSubmatch`.
+`AgentRuntimeCloudHypervisor`, `AgentRuntimeDocker`,
+`AgentRuntimeDockerSudoIptables`, and `AgentRuntimeNVX` identify supported
+runtime modes; `LedgerMutationDefaultMax` is the default mutation limit.
+`MCPParamTypeArray`, `MCPParamTypeBoolean`, `MCPParamTypeNumber`,
+`MCPParamTypeObject`, and `MCPParamTypeString` name MCP JSON parameter kinds.
+
+The `OTelAttr*` constants are stable attribute keys used to describe workflow
+and engine telemetry. They cover standard GenAI and GitHub identity, gh-aw
+workflow and session state, model routing, graders and evaluations, network and
+MCP activity, work-queue accounting, and token working-set measurements:
+
+`OTelAttrDeploymentEnvironment`, `OTelAttrEngineID`,
+`OTelAttrExceptionMessage`, `OTelAttrExceptionType`,
+`OTelAttrGenAiOperationName`, `OTelAttrGenAiRequestModel`,
+`OTelAttrGenAiResponseFinishReasons`, `OTelAttrGenAiResponseModel`,
+`OTelAttrGenAiSystem`, `OTelAttrGenAiUsageCacheCreationInputTokens`,
+`OTelAttrGenAiUsageCacheReadInputTokens`, `OTelAttrGenAiUsageInputTokens`,
+`OTelAttrGenAiUsageOutputTokens`, `OTelAttrGenAiUsageTotalTokens`,
+`OTelAttrGenAiWorkflowName`, `OTelAttrGhAwActionMinutes`,
+`OTelAttrGhAwAgentConclusion`, `OTelAttrGhAwAgentExecutionExitCode`,
+`OTelAttrGhAwAiCreditsRateLimitError`, `OTelAttrGhAwAic`,
+`OTelAttrGhAwAwfVersion`, `OTelAttrGhAwAwmgVersion`, `OTelAttrGhAwCliVersion`,
+`OTelAttrGhAwDeploymentState`, `OTelAttrGhAwDetectionConclusion`,
+`OTelAttrGhAwDetectionReason`, `OTelAttrGhAwDurableParentRunID`,
+`OTelAttrGhAwEpisodeID`, `OTelAttrGhAwEpisodeKind`, `OTelAttrGhAwErrorCount`,
+`OTelAttrGhAwErrorMessages`, `OTelAttrGhAwErrorNestedCount`,
+`OTelAttrGhAwEvalAnswer`, `OTelAttrGhAwEvalID`, `OTelAttrGhAwEvalModel`,
+`OTelAttrGhAwEvalsCount`, `OTelAttrGhAwEvalsNo`,
+`OTelAttrGhAwEvalsReasonCode`, `OTelAttrGhAwEvalsStatus`,
+`OTelAttrGhAwEvalsUnknown`, `OTelAttrGhAwEvalsYes`, `OTelAttrGhAwEventName`,
+`OTelAttrGhAwExperiments`, `OTelAttrGhAwFailureCategories`,
+`OTelAttrGhAwFirewallAllowedRequests`, `OTelAttrGhAwFirewallBlockedRequests`,
+`OTelAttrGhAwFirewallRequests`, `OTelAttrGhAwFrontmatterBodyModified`,
+`OTelAttrGhAwFrontmatterEmoji`, `OTelAttrGhAwFrontmatterSource`,
+`OTelAttrGhAwGitHubRateLimitLimit`, `OTelAttrGhAwGitHubRateLimitRemaining`,
+`OTelAttrGhAwGitHubRateLimitReset`, `OTelAttrGhAwGitHubRateLimitResource`,
+`OTelAttrGhAwGitHubRateLimitUsed`, `OTelAttrGhAwGraderID`,
+`OTelAttrGhAwGraderName`, `OTelAttrGhAwGraderPassed`,
+`OTelAttrGhAwGraderSeverity`, `OTelAttrGhAwGraderSource`,
+`OTelAttrGhAwGraderStatus`, `OTelAttrGhAwGraderUnit`,
+`OTelAttrGhAwGraderValue`, `OTelAttrGhAwGradersCount`,
+`OTelAttrGhAwGradersErrors`, `OTelAttrGhAwGradersFailed`,
+`OTelAttrGhAwGradersOther`, `OTelAttrGhAwGradersPassed`,
+`OTelAttrGhAwGradersUnavailable`, `OTelAttrGhAwHarnessAttempts`,
+`OTelAttrGhAwHarnessRetryReasons`, `OTelAttrGhAwHopID`,
+`OTelAttrGhAwHopParentID`, `OTelAttrGhAwIntegrityFilteredEvents`,
+`OTelAttrGhAwJobName`, `OTelAttrGhAwMaxAiCredits`,
+`OTelAttrGhAwMaxAiCreditsExceeded`, `OTelAttrGhAwMcpFailedToolCalls`,
+`OTelAttrGhAwMcpInputBytes`, `OTelAttrGhAwMcpMaxInputBytes`,
+`OTelAttrGhAwMcpMaxOutputBytes`, `OTelAttrGhAwMcpOutputBytes`,
+`OTelAttrGhAwMcpToolCalls`, `OTelAttrGhAwModelEffort`,
+`OTelAttrGhAwModelRequested`, `OTelAttrGhAwModelRoutingClassifierAic`,
+`OTelAttrGhAwModelRoutingComplexity`, `OTelAttrGhAwModelRoutingDegraded`,
+`OTelAttrGhAwModelRoutingDeviatedRequests`,
+`OTelAttrGhAwModelRoutingFailureCode`, `OTelAttrGhAwModelRoutingMode`,
+`OTelAttrGhAwModelRoutingObjective`, `OTelAttrGhAwModelRoutingRouterVersion`,
+`OTelAttrGhAwModelRoutingScope`, `OTelAttrGhAwModelRoutingStatus`,
+`OTelAttrGhAwModelRoutingTaskType`, `OTelAttrGhAwOriginEvent`,
+`OTelAttrGhAwOtlpExportErrorDetails`, `OTelAttrGhAwOtlpExportErrors`,
+`OTelAttrGhAwOutputItemCount`, `OTelAttrGhAwOutputItemTypes`,
+`OTelAttrGhAwPermissionDeniedCount`, `OTelAttrGhAwRootRepo`,
+`OTelAttrGhAwRootWorkflowID`, `OTelAttrGhAwRunActor`,
+`OTelAttrGhAwRunAttempt`, `OTelAttrGhAwRunStatus`,
+`OTelAttrGhAwSessionCompactVersion`, `OTelAttrGhAwSessionEventType`,
+`OTelAttrGhAwSessionIncludedEvents`, `OTelAttrGhAwSessionOmittedEvents`,
+`OTelAttrGhAwSessionOversizedLines`, `OTelAttrGhAwSessionScanTruncated`,
+`OTelAttrGhAwSessionTruncated`, `OTelAttrGhAwSessionUntimedEvents`,
+`OTelAttrGhAwStaged`, `OTelAttrGhAwSteeringEventCount`,
+`OTelAttrGhAwTrackerID`, `OTelAttrGhAwTriggerCommentID`,
+`OTelAttrGhAwTriggerItemNumber`, `OTelAttrGhAwTriggerItemType`,
+`OTelAttrGhAwTriggerLabel`, `OTelAttrGhAwTurns`, `OTelAttrGhAwWarningCount`,
+`OTelAttrGhAwWorkQueueAdmissionPaused`,
+`OTelAttrGhAwWorkQueueCapacityLogicalLimit`,
+`OTelAttrGhAwWorkQueueCapacityLogicalSaturatedPools`,
+`OTelAttrGhAwWorkQueueCapacityNativeLimit`,
+`OTelAttrGhAwWorkQueueCapacityNativeSaturatedPools`,
+`OTelAttrGhAwWorkQueueClaimsOpen`, `OTelAttrGhAwWorkQueueCommittedClaim`,
+`OTelAttrGhAwWorkQueueCommittedClaimCancellation`,
+`OTelAttrGhAwWorkQueueCommittedCompletion`,
+`OTelAttrGhAwWorkQueueCommittedDeliveryFailure`,
+`OTelAttrGhAwWorkQueueCommittedDispatch`,
+`OTelAttrGhAwWorkQueueCommittedRelease`,
+`OTelAttrGhAwWorkQueueCommittedResult`, `OTelAttrGhAwWorkQueueCommittedWork`,
+`OTelAttrGhAwWorkQueueCommittedWorkCancellation`,
+`OTelAttrGhAwWorkQueueDeliveryFailed`, `OTelAttrGhAwWorkQueueDeliveryPending`,
+`OTelAttrGhAwWorkQueueErrorType`, `OTelAttrGhAwWorkQueueGrantsPaused`,
+`OTelAttrGhAwWorkQueueInitialized`, `OTelAttrGhAwWorkQueueObservedAtUnixMs`,
+`OTelAttrGhAwWorkQueueOperation`, `OTelAttrGhAwWorkQueueOutcome`,
+`OTelAttrGhAwWorkQueuePublicationAmbiguous`,
+`OTelAttrGhAwWorkQueuePublicationAttempts`,
+`OTelAttrGhAwWorkQueuePublicationCommits`,
+`OTelAttrGhAwWorkQueuePublicationConflict`,
+`OTelAttrGhAwWorkQueuePublicationRecovered`, `OTelAttrGhAwWorkQueueQueueID`,
+`OTelAttrGhAwWorkQueueReason`, `OTelAttrGhAwWorkQueueReconciliationChecked`,
+`OTelAttrGhAwWorkQueueReconciliationUnresolved`,
+`OTelAttrGhAwWorkQueueRequestKind`, `OTelAttrGhAwWorkQueueReservationsActive`,
+`OTelAttrGhAwWorkQueueReservationsUnbound`,
+`OTelAttrGhAwWorkQueueReservationsUncertain`,
+`OTelAttrGhAwWorkQueueReservationsUnresolved`,
+`OTelAttrGhAwWorkQueueSnapshotPresent`, `OTelAttrGhAwWorkQueueWorkAvailable`,
+`OTelAttrGhAwWorkQueueWorkCancelled`, `OTelAttrGhAwWorkQueueWorkClaimed`,
+`OTelAttrGhAwWorkQueueWorkCompleted`, `OTelAttrGhAwWorkQueueWorkExpired`,
+`OTelAttrGhAwWorkQueueWorkOldestAvailableAgeMs`,
+`OTelAttrGhAwWorkQueueWorkRetryDelayed`, `OTelAttrGhAwWorkQueueWorkTotal`,
+`OTelAttrGhAwWorkflowCallID`, `OTelAttrGhAwWorkflowCallParentID`,
+`OTelAttrGhAwWorkflowRunConclusion`,
+`OTelAttrGhAwWorkingSetCumulativeInputTokens`,
+`OTelAttrGhAwWorkingSetInvocations`, `OTelAttrGhAwWorkingSetMeasurementState`,
+`OTelAttrGhAwWorkingSetPeakInputTokens`,
+`OTelAttrGhAwWorkingSetRebuildExcessTokens`,
+`OTelAttrGhAwWorkingSetRebuildFactor`, `OTelAttrGitHubActionsRunUrl`,
+`OTelAttrGitHubActorID`, `OTelAttrGitHubEventName`, `OTelAttrGitHubHeadRef`,
+`OTelAttrGitHubJob`, `OTelAttrGitHubRef`, `OTelAttrGitHubRefName`,
+`OTelAttrGitHubRepository`, `OTelAttrGitHubRunAttempt`, `OTelAttrGitHubRunID`,
+`OTelAttrGitHubSha`, `OTelAttrGitHubWorkflowRef`, `OTelAttrRepository`,
+`OTelAttrRunID`, `OTelAttrRunnerArch`, `OTelAttrRunnerEnvironment`,
+`OTelAttrRunnerName`, `OTelAttrRunnerOs`, `OTelAttrServiceName`,
+`OTelAttrServiceVersion`, and `OTelAttrWorkflowName`.
+
+`PermissionCodeQuality`, `PermissionDrives`,
+`PermissionRepositoryAdvisories`, and `PermissionSecretScanningAlerts` name
+permission levels. `ReactionTypeConfused`, `ReactionTypeEyes`,
+`ReactionTypeHeart`, `ReactionTypeHooray`, `ReactionTypeLaugh`,
+`ReactionTypeMinusOne`, `ReactionTypeNone`, `ReactionTypePlusOne`, and
+`ReactionTypeRocket` identify supported GitHub reaction values.
 
 ## Workflow Subpackages
 

@@ -946,6 +946,58 @@ Methods on unexported types (e.g. `cachedLogsJSONLWriter.Append*`, `githubGrader
 | Model routing and usage | `AwInfoModelConfig`, `AwInfoModelConfigRouting`, `AwInfoModelSelection`, `AwInfoModelRouting`, `ModelEndpointMismatch`, `ModelRoutingLogsSummary`, `ModelRoutingRouteSummary`, `ModelRoutingLabels`, `ModelRoutingChoice`, `ModelRoutingFailure`, `ModelRoutingCost`, `ModelRoutingDeviation`, `ModelRoutingAgentCost`, `ModelRoutingSummary`, `AgentUsageBreakdown`, `AgentModelUsage`, `TokenUsageSteering`, `SteeringNotice` | Configured and observed model routes, endpoint compatibility, costs, failures, agent attribution, and steering notices. Detection traffic remains separate from agent usage. |
 | Work-queue and cached-log reports | `WorkQueueCurrentSnapshot`, `WorkQueueAssignmentReceipt`, `WorkQueueClaimReceipt`, `WorkQueueFinishReceipt`, `WorkQueueDiagnostics`, `WorkQueueAssignedClaimDiagnostics` | Snapshot-based queue diagnostics; receipts describe validated facts. |
 
+### Additional exported status and event identifiers
+
+The audit append methods add normalized evidence to the corresponding report
+collections: `AppendAudit`, `AppendRateLimit`, and `AppendWorkflowRuns`.
+`ArtifactSetGraders`, `ArtifactSetInfo`, `ArtifactSetOutcomes`, and
+`ArtifactSetWorkQueue` name supported artifact groups.
+
+`AuditFindingAgenticDelegatedContext`, `AuditFindingAgenticModelDowngrade`,
+`AuditFindingAgenticOverkill`, `AuditFindingAgenticPartiallyReducible`,
+`AuditFindingAgenticPoorControl`, `AuditFindingAgenticResourceHeavy`,
+`AuditFindingBlockedNetworkRequests`, `AuditFindingDetectionJobFailed`,
+`AuditFindingEngineStepFailed`, `AuditFindingHighTokenUsage`,
+`AuditFindingMCPServerFailures`, `AuditFindingManyIterations`,
+`AuditFindingModelAvailabilityUnknown`, `AuditFindingModelEndpointUnsupported`,
+`AuditFindingModelResolutionFailed`, `AuditFindingModelUnavailable`,
+`AuditFindingMultipleErrors`, `AuditFindingSafeOutputsBlocked`,
+`AuditFindingSubagentFailed`, `AuditFindingSubagentModelNotObserved`,
+`AuditFindingSubagentModelUnavailable`, `AuditFindingThreatDetected`,
+`AuditFindingToolsNotAvailable`, `AuditFindingWorkflowFailed`,
+`AuditFindingWorkflowSucceeded`, and `AuditFindingWorkflowTimeout` are
+machine-readable audit finding categories.
+
+Experiment evaluation exposes `ExperimentDecisionExtend`,
+`ExperimentDecisionInconclusive`, `ExperimentDecisionPromote`,
+`ExperimentDecisionReject`, and the reason codes
+`ExperimentDecisionReasonAnalysisUnavailable`,
+`ExperimentDecisionReasonCandidateImproved`,
+`ExperimentDecisionReasonCandidateRegressed`,
+`ExperimentDecisionReasonEffectBelowThreshold`,
+`ExperimentDecisionReasonEvidenceInsufficient`,
+`ExperimentDecisionReasonGuardrailFailed`,
+`ExperimentDecisionReasonGuardrailUnsupported`,
+`ExperimentDecisionReasonInsufficientObservations`,
+`ExperimentDecisionReasonInsufficientSamples`, and
+`ExperimentDecisionReasonUnsupportedMultiVariant`. The
+`ExperimentReadinessCollecting` and `ExperimentReadinessReady` values mark
+whether normal analysis requirements have enough usable data.
+
+`FrictionStateCausal`, `FrictionStateMeasured`, `FrictionStateStatistical`,
+`FrictionStateUnavailable`, and `FrictionStateUnsupported` describe the evidence
+state for execution-friction estimates.
+`GuardrailStatusFail`, `GuardrailStatusInsufficientObservations`,
+`GuardrailStatusMissing`, `GuardrailStatusPass`, and
+`GuardrailStatusUnsupported` are stable guardrail outcomes.
+`RateLimitWarningThresholdPercent` configures the warning boundary for rate
+limit reports. `SteeringDelivery` and `TokenUsageSteeringDelivery` identify
+token-usage steering delivery records.
+
+`EpisodeRetrieval` records the bounded inputs, coverage, and result of gathering
+related workflow runs. The TUI hooks `Init` and `View` and the report writer's
+`Write` method implement Bubble Tea lifecycle and output behavior.
+
 ## Source Synchronization
 
 Re-verified on 2026-10-06: the exported symbols listed above were previously undocumented and are now covered.

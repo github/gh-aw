@@ -26,3 +26,13 @@
 | `PrimeAuthoredJavaScript` | Primes JavaScript analysis for a set of authored documents. |
 
 Findings identify source paths and sink sites, not values. A `CoverageGap` must be treated as incomplete evidence, not as proof that no flow exists.
+
+The source and sink constants are `ActionInput`, `Artifact`, `Display`, `Log`,
+`Network`, `OTLPAttribute`, `Output`, `Prompt`, `Summary`, and `WorkflowInput`.
+`ExpressionError` exposes a value-safe `Error` method, and `TextExpression`
+represents one parsed expression with source information. `AnalyzeText` analyzes
+expressions in authored text using the supplied rule and source bindings;
+`VisitInterpolations` visits each interpolation without evaluating it.
+`ParseBatch` parses a batch of JavaScript sources and returns per-script results
+alongside the batch-level error.
+`TypeScriptParser.Parse` parses one source through the installed compiler bridge.
