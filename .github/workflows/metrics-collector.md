@@ -44,8 +44,29 @@ tools:
             typeof snapshot.workflows !== "object" || Object.keys(snapshot.workflows).length === 0) {
           throw new Error("Latest metrics must contain workflow records.");
         }
+        if (!["complete", "partial"].includes(snapshot.collection_status) ||
+            !Array.isArray(snapshot.unclassified_conclusions)) {
+          throw new Error("Metrics must declare collection status and unclassified conclusions.");
+        }
+        if (snapshot.collection_status === "partial" &&
+            (typeof snapshot.collection_note !== "string" || snapshot.collection_note.trim() === "")) {
+          throw new Error("Partial metrics must include a collection note.");
+        }
+        if (snapshot.unclassified_conclusions.length > 0 && snapshot.collection_status !== "partial") {
+          throw new Error("Unclassified conclusions require partial collection status.");
+        }
+        for (const item of snapshot.unclassified_conclusions) {
+          if (!item || typeof item.workflow !== "string" || !snapshot.workflows[item.workflow] ||
+              typeof item.conclusion !== "string" || item.conclusion.trim() === "" ||
+              !Number.isSafeInteger(item.count) || item.count <= 0) {
+            throw new Error("Unclassified conclusions must identify a workflow, conclusion, and positive count.");
+          }
+          if (!snapshot.collection_note.includes(`${item.workflow} (${item.conclusion}: ${item.count})`)) {
+            throw new Error("Collection note must identify each unclassified conclusion and count.");
+          }
+        }
         for (const [name, workflow] of Object.entries(snapshot.workflows)) {
-          const runs = workflow.workflow_runs;
+          const runs = workflow?.workflow_runs;
           const counts = ["total", "successful", "failed", "skipped", "action_required"];
           if (!runs || counts.some(field => !Number.isSafeInteger(runs[field]) || runs[field] < 0)) {
             throw new Error(`Workflow run counts must be non-negative integers: ${name}.`);
@@ -58,7 +79,7 @@ tools:
               (runs.executed === 0
                 ? runs.success_rate !== null
                 : !Number.isFinite(runs.success_rate) ||
-                  Math.abs(runs.success_rate - runs.successful / runs.executed) >= 0.001)) {
+                  runs.success_rate !== runs.successful / runs.executed)) {
             throw new Error(`Workflow executed count or success rate is inconsistent: ${name}.`);
           }
         }
@@ -257,13 +278,16 @@ If you see any `.md` files at the root (e.g. `agent-performance-latest.md`, `sha
     `successful + failed + skipped + action_required`. Do not count a run twice or include queued
     or in-progress runs in `total`.
   - Successful runs (conclusion: "success")
-  - Failed runs (conclusion: "failure", "cancelled", "timed_out", "startup_failure")
+  - Failed runs (conclusion: "failure", "cancelled", "timed_out", "startup_failure"). Treat
+    `startup_failure` as failed because it is a completed run that did not succeed.
   - Skipped runs (conclusion: "skipped")
   - Approval-gated runs (conclusion: "action_required")
   - Executed runs: `successful + failed`
   - Calculate success rate: `successful / executed`; use `null` when `executed` is 0
-  - If any completed run has a conclusion not covered above, set `collection_status` to `partial`
-    and explain its conclusion and count in `collection_note`; do not silently include it in `total`.
+  - For every completed run with an unclassified conclusion, add its workflow, conclusion, and
+    count to the top-level `unclassified_conclusions` array. Set `collection_status` to `partial`
+    and include `<workflow> (<conclusion>: <count>)` in `collection_note`; do not silently include it
+    in `total`.
   - Token usage and costs (if available in logs)
   - Execution duration statistics
 
@@ -306,12 +330,14 @@ cannot determine outcome status, set those items to `"pending"` rather than omit
 **Workflow Runs Fallback (GitHub API)**:
 
 When the logs-based path is truncated or unavailable, paginate `list_workflow_runs` across the full
-collection window and classify each completed run by its `conclusion`. Apply the same outcome
-mapping, `total` invariant, and unknown-conclusion handling as the logs path. Set `executed` to
-`successful + failed` and calculate `success_rate` as `successful / executed`; when `executed` is 0,
-set `success_rate` to `null`. Never treat skipped or approval-gated runs as failures. Include all
-counts in every workflow's `workflow_runs` object, including zero values, and set
-`"data_source": "github_api_fallback"` plus a `collection_note` describing why fallback was used.
+collection window and apply the same conclusion mapping and unknown-conclusion handling as the
+logs path. Count completed `success` as `successful`; `failure`, `cancelled`, `timed_out`, and
+`startup_failure` as `failed`; and count `skipped` and `action_required` separately. Set `total` to
+`successful + failed + skipped + action_required`, excluding queued and in-progress runs. Set
+`executed` to `successful + failed` and calculate `success_rate` as `successful / executed`; when
+`executed` is 0, set `success_rate` to `null`. Never treat skipped or approval-gated runs as
+failures. Include all counts in every workflow's `workflow_runs` object, including zero values, and
+set `"data_source": "github_api_fallback"` plus a `collection_note` describing why fallback was used.
 
 **Additional Metrics via GitHub API**:
 - Use GitHub MCP server (default toolset) to supplement with:
@@ -333,6 +359,8 @@ Create a JSON object following this schema:
   "timestamp": "2024-12-24T00:00:00Z",
   "period": "daily",
   "collection_status": "complete",
+  "collection_note": "",
+  "unclassified_conclusions": [],
   "collection_window": {
     "start": "2024-12-23T00:00:00Z",
     "end": "2024-12-24T00:00:00Z",
@@ -369,7 +397,7 @@ Create a JSON object following this schema:
         "skipped": 0,
         "action_required": 0,
         "executed": 7,
-        "success_rate": 0.857,
+        "success_rate": 0.8571428571428571,
         "avg_duration_seconds": 180,
         "total_tokens": 45000,
         "total_cost_usd": 0.45
@@ -547,9 +575,11 @@ separate aggregate file in place of the dated snapshots.
 - Always include workflows in the metrics even if they have no activity (helps detect stalled workflows)
 - **If the agentic-workflows `logs` tool is unavailable**, collect what you can from the GitHub API directly using the Workflow Runs Fallback rules above and set `"data_source": "github_api_fallback"` in the JSON
 - Set `"collection_status": "complete"` only when workflow run counts and safe-output breakdowns
-  cover the full 24h window through logs data and/or the GitHub API fallback. Set
-  `"collection_status": "partial"` only when both logs pagination and fallback collection fail to
-  cover the window, and include a precise `collection_note` plus `collection_window.coverage_hours`.
+  cover the full 24h window through logs data and/or the GitHub API fallback and
+  `unclassified_conclusions` is empty. Set `"collection_status": "partial"` when either coverage is
+  incomplete or any completed run has an unclassified conclusion, even if time coverage is complete.
+  Include a precise `collection_note` and list each unclassified workflow, conclusion, and count in
+  `unclassified_conclusions`.
 - **NEVER write a partial stub file like `{"date": "...", "status": "no-data"}`** — if you can't collect data, write a minimal valid metrics JSON with zeros instead:
   ```json
   {
@@ -557,6 +587,7 @@ separate aggregate file in place of the dated snapshots.
     "period": "daily",
     "collection_status": "partial",
     "collection_note": "Description of what could not be collected",
+    "unclassified_conclusions": [],
     "workflows": {},
     "ecosystem": {
       "total_workflows": 0,
@@ -704,20 +735,23 @@ echo "Stored date: $STORED_DATE | Today: $TODAY"
 # Step 5: Validate workflow-run classification and success-rate semantics
 jq -e '
   all(.workflows[]?.workflow_runs;
-    has("total") and
-    has("successful") and
-    has("failed") and
-    has("skipped") and
-    has("action_required") and
-    has("executed") and
-    .total == (.successful + .failed + .skipped + .action_required) and
-    .executed == ((.successful // 0) + (.failed // 0)) and
-    (if .executed == 0 then
-       .success_rate == null
+    . as $runs |
+    ["total", "successful", "failed", "skipped", "action_required", "executed"] as $fields |
+    all($fields[]; . as $field |
+      ($runs[$field] | if type == "number" then . >= 0 and floor == . else false end)
+    ) and
+    $runs.total == ($runs.successful + $runs.failed + $runs.skipped + $runs.action_required) and
+    $runs.executed == ($runs.successful + $runs.failed) and
+    (if $runs.executed == 0 then
+       $runs.success_rate == null
      else
-       ((.success_rate - (.successful / .executed)) | fabs) < 0.001
+       $runs.success_rate == ($runs.successful / $runs.executed)
      end)
-  )
+  ) and
+  (.collection_status == "complete" or .collection_status == "partial") and
+  (.unclassified_conclusions | type == "array") and
+  ((.unclassified_conclusions | length) == 0 or .collection_status == "partial") and
+  (.collection_status != "partial" or (.collection_note | type == "string" and length > 0))
 ' /tmp/gh-aw/repo-memory/default/metrics/latest.json >/dev/null || {
   echo "ERROR: workflow run classifications or success rates are inconsistent"
   exit 1

@@ -277,6 +277,17 @@ describe("DefaultArtifactClient.uploadArtifact", () => {
     await expect(client.uploadArtifact("art", ["/a", "/b"], tmpDir, { skipArchive: true })).rejects.toThrow("single file");
   });
 
+  it("rejects leading-dash staged filenames before invoking zip", async () => {
+    const filePath = path.join(tmpDir, "-T");
+    fs.writeFileSync(filePath, "test content");
+    const spawnSyncSpy = vi.spyOn(childProcess, "spawnSync");
+
+    const client = new DefaultArtifactClient();
+    await expect(client.uploadArtifact("artifact", [filePath], tmpDir)).rejects.toThrow("leading-dash filenames");
+
+    expect(spawnSyncSpy).not.toHaveBeenCalled();
+  });
+
   it("sends camelCase field names and mimeType as a plain string in CreateArtifact request", async () => {
     const filePath = path.join(tmpDir, "test.bin");
     fs.writeFileSync(filePath, "test content");
@@ -440,7 +451,7 @@ describe("DefaultArtifactClient.uploadArtifact", () => {
 
     expect(capturedName).toBe("archive-name");
     expect(spawnSyncSpy).toHaveBeenNthCalledWith(1, "zip", ["-v"], expect.objectContaining({ timeout: 12_345 }));
-    expect(spawnSyncSpy).toHaveBeenNthCalledWith(2, "zip", expect.any(Array), expect.objectContaining({ timeout: 67_890 }));
+    expect(spawnSyncSpy).toHaveBeenNthCalledWith(2, "zip", ["-q", "-r", expect.any(String), "./data.txt"], expect.objectContaining({ timeout: 67_890 }));
     spawnSyncSpy.mockRestore();
     delete req.cache[artifactClientPath];
   });

@@ -17,9 +17,14 @@ func TestParseInt64KMSuffix(t *testing.T) {
 		{name: "uppercase K suffix", input: "100000K", expected: 100_000_000, ok: true},
 		{name: "lowercase m suffix", input: "100m", expected: 100_000_000, ok: true},
 		{name: "whitespace trimmed", input: " 42M ", expected: 42_000_000, ok: true},
+		{name: "maximum K multiplier", input: "9223372036854775K", expected: 9223372036854775000, ok: true},
+		{name: "maximum M multiplier", input: "9223372036854M", expected: 9223372036854000000, ok: true},
 		{name: "zero invalid", input: "0", expected: 0, ok: false},
 		{name: "invalid suffix", input: "10G", expected: 0, ok: false},
 		{name: "invalid string", input: "abc", expected: 0, ok: false},
+		{name: "K multiplier overflow", input: "9223372036854776K", expected: 0, ok: false},
+		{name: "M multiplier overflow", input: "9223372036855M", expected: 0, ok: false},
+		{name: "integer overflow", input: "9999999999999999999K", expected: 0, ok: false},
 	}
 
 	for _, tt := range tests {

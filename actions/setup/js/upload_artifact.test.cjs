@@ -205,6 +205,15 @@ describe("upload_artifact.cjs", () => {
       expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
     });
 
+    it("rejects a staged file with a leading-dash filename", async () => {
+      writeStaging("-T");
+
+      await runHandler(buildConfig(), [{ type: "upload_artifact", path: "-T" }]);
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('filenames beginning with "-" are not allowed'));
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
+    });
+
     it("fails when max-uploads is exceeded", async () => {
       writeStaging("a.json");
       writeStaging("b.json");
@@ -663,6 +672,18 @@ describe("upload_artifact.cjs", () => {
       // The file should have been copied into the staging directory.
       expect(fs.existsSync(path.join(STAGING_DIR, "report.json"))).toBe(true);
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Auto-copied file"));
+    });
+
+    it("rejects leading-dash filenames before copying them into staging", async () => {
+      const absFile = path.join(WORKSPACE_DIR, "-T");
+      writeWorkspace("-T");
+
+      const results = await runHandler(buildConfig(), [{ type: "upload_artifact", path: absFile }]);
+
+      expect(results[0].success).toBe(false);
+      expect(results[0].error).toContain('filenames beginning with "-" are not allowed');
+      expect(fs.existsSync(path.join(STAGING_DIR, "-T"))).toBe(false);
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
     });
 
     it("auto-copies a directory from an absolute path", async () => {

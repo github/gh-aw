@@ -15,7 +15,7 @@ A [study of 15 open-source repositories](https://github.com/githubnext/repo-assi
 
 ## How Repo Assist Works
 
-On each scheduled run, Repo Assist reads live repository data and selects three tasks using weights that change with the backlog. A repository with many unlabelled issues receives more labelling and investigation work. As the backlog clears, the workflow spends more time on engineering investments, testing, performance, documentation, and forward-looking improvements.
+On each scheduled run, Repo Assist reads live repository data and selects three tasks using weights that change with the backlog. A repository with many unlabeled issues receives more labeling and investigation work. As the backlog clears, the workflow spends more time on engineering investments, testing, performance, documentation, and forward-looking improvements.
 
 Across runs, Repo Assist can label and investigate issues and pull requests, implement focused fixes as draft pull requests, improve dependencies, CI, code, performance, tests, and documentation, maintain its own pull requests by addressing CI failures and merge conflicts, nudge authors of stale pull requests, and continue work that advances the repository's goals.
 

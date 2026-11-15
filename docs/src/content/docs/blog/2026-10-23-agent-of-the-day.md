@@ -25,7 +25,7 @@ The most recent completed run, [run 39965349799](https://github.com/github/gh-aw
 - **Footprint:** roughly 108k tokens across five model invocations, with a peak input of about 27k tokens. The audit flagged this as "high token usage", which is fair for a full diff read, and it makes a good optimization target.
 - **Posture:** read-only. The audit observed no GitHub write actions from the agent itself.
 - **Network:** the firewall saw 11 requests and blocked none.
-- **Stability:** compared with an earlier successful run ([run 39880437110](https://github.com/github/gh-aw/actions/runs/39880437110)), the audit labelled it "stable": same turns, same posture, same blocked-request count.
+- **Stability:** compared with an earlier successful run ([run 39880437110](https://github.com/github/gh-aw/actions/runs/39880437110)), the audit labeled it "stable": same turns, same posture, same blocked-request count.
 
 The audit also raised anomaly flags on a few log events. Those were rare-template matches, meaning patterns not seen before in this workflow's history, rather than failures.
 
