@@ -133,6 +133,7 @@ post-steps:
       if-no-files-found: error
 imports:
   - shared/pr-safe-output-defaults.md
+  - shared/reporting.md
 safe-outputs:
   create-issue:
     title-prefix: "[git-sim] "

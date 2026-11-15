@@ -19,6 +19,7 @@ engine:
 
 imports:
   - shared/otlp.md
+  - shared/reporting.md
 tools:
   cli-proxy: true
   cache-memory: true

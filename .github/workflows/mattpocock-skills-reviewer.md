@@ -25,6 +25,7 @@ imports:
     min-integrity: approved
 - shared/otlp.md
 - shared/pr-diff-data-fetch.md
+- shared/reporting.md
 max-daily-ai-credits: 10000
 "on":
   pull_request:
