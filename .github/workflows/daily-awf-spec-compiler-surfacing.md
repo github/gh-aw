@@ -61,6 +61,7 @@ timeout-minutes: 30
 strict: true
 imports:
   - shared/otlp.md
+  - shared/reporting.md
 features:
   gh-aw-detection: true
 evals:

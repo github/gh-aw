@@ -80,6 +80,7 @@ imports:
   - shared/community-attribution.md
   - shared/otlp.md
   - shared/issue-dedup.md
+  - shared/reporting.md
 
 steps:
   - name: Re-fetch full community issue history with pagination

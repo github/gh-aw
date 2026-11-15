@@ -48,6 +48,7 @@ imports:
   - shared/daily-report-worker.md
   - shared/aw-logs-24h-fetch.md
   - shared/otlp.md
+  - shared/reporting.md
 evals:
   - id: firewall_data_collected
     question: Did the agent collect firewall log events for the reporting period?

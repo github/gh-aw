@@ -43,6 +43,8 @@ evals:
 sandbox:
   agent:
     id: awf
+imports:
+  - shared/reporting.md
 ---
 
 # Daily GitHub Docs SEO Optimizer

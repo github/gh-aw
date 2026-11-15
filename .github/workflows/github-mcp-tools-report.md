@@ -41,6 +41,7 @@ imports:
       title-prefix: "[mcp-tools-report] "
 
   - shared/otlp.md
+  - shared/reporting.md
 ---
 
 # GitHub MCP Remote Server Tools Report Generator
