@@ -122,6 +122,7 @@ function buildSafeOutputDependencyPlan(messages) {
  * @param {any} record
  */
 function isConfirmedDependencySuccess(record) {
+  if (record?.gate_decision !== undefined && record.gate_decision !== "apply") return false;
   if (isDependencyDelegatedType(record?.type)) return false;
   // @safe-outputs-exempt USE-003: reads the staged flag only to reject unconfirmed success; renders no staged preview
   if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true") return false;
