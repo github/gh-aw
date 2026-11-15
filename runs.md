@@ -45,3 +45,4 @@
 2026-11-12: discovery (repo search, 3 queries; 7 gh-aw hits + 5 agentics-linked queued); reviewed UnclesLibrary/agentic-workflows-library (5), tomsiwik/laboratory (4), jcampb/mm-bmad (6); no blog (none >=8 unblogged); backlog 17.
 2026-11-13: discovery skipped (backlog 17); reviewed notglossy/agentic-workflows (7), mohith-e/gh-aw-trial (7), pulumi-labs/gh-aw-internal (5; shared/ subtree withheld by access policy), githubnext/gh-aw-dashboard (2); no blog (none >=8 unblogged); backlog 13.
 2026-11-14: discovery skipped (backlog 13); reviewed ymd65536/GitHubAgenticWorkflows (2), svennijhuis/agentic-workflows (8, blogged: ecosystem spotlight PR), githubnext/repo-mind-light-aw (5; shared file policy-filtered); backlog 10.
+2026-11-15: discovery skipped (backlog 10); reviewed OttilieWilliams playground (2), githubnext/evergreen (8, blogged: ecosystem spotlight PR), elbruno/weekly-ai-news-digest (4; workflow sources filtered by policy); backlog 7.

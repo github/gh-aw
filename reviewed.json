@@ -822,5 +822,40 @@
    "CHANGELOG up to v1.1.5 (2026-05-19); last push 2026-06-10"
   ],
   "blogged": false
+ },
+ "OttilieWilliams/agentic-workflows-playground": {
+  "kind": "other",
+  "reviewed": "2026-11-15",
+  "score": 2,
+  "summary": "Throwaway sandbox for trying gh-aw; quick-start only, no original workflow content; 0 stars.",
+  "highlights": [
+   "README.md: self-described throwaway sandbox; quick start uses gh aw add/compile",
+   ".github/workflows holds compiled *.lock.yml copies (e.g. repo-status) rather than original source"
+  ],
+  "blogged": false
+ },
+ "githubnext/evergreen": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-15",
+  "score": 8,
+  "summary": "Opt-in PR gardener with deterministic preflight, lease label, per-PR quota and verified safe outputs; young (13 stars, last commit 2026-07-25).",
+  "highlights": [
+   "workflows/evergreen.md: schedule + workflow_dispatch only; comment explains why pull_request is avoided (confused-deputy guards)",
+   "preflight job and pre-agent step verify opt-in and evergreen_active labels plus head SHA (refs/pull/N/head) before checkout; stale checkouts refused",
+   "shared/evergreen/safe-output-policy.md and quota-policy.md: verified safe outputs, no direct merge or base-branch writes, quota with exhausted state; in-workflow git wrapper exits 64 on merge/rebase",
+   "REQUIRED_CHECKS_JSON defaults to '[]' (fail-closed); five named stop states; engine copilot, network defaults, skills pinned by SHA"
+  ],
+  "blogged": true
+ },
+ "elbruno/weekly-ai-news-digest": {
+  "kind": "other",
+  "reviewed": "2026-11-15",
+  "score": 4,
+  "summary": "Daily AI news digest run as a paired control vs GPT-5 Mini model experiment with frozen RSS snapshot and AI-credit accounting; workflow sources were not readable.",
+  "highlights": [
+   "README: paired-model experiment design (same snapshot and prompt to two models) with published telemetry pages",
+   "daily-digest-*.md sources returned 'filtered by secrecy policy'; only the README and docs/paired-model-experiment.md were readable, so guardrails are unassessed"
+  ],
+  "blogged": false
  }
 }
