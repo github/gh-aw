@@ -45,6 +45,15 @@ test.describe("Homepage Links", () => {
     await expect(page).toHaveURL(/\/gh-aw\/setup\/creating-workflows\//);
   });
 
+  test("should navigate to slides when the Slides CTA is clicked", async ({ page }) => {
+    const slides = page.locator(".aw-hero").getByRole("link", { name: "Slides", exact: true }).filter({ visible: true });
+    await expect(slides).toBeVisible();
+    await expect(slides).toHaveAttribute("href", "https://gh.io/gh-aw-slides");
+    await page.route("https://gh.io/gh-aw-slides", route => route.fulfill({ body: "Slides" }));
+    await slides.click();
+    await expect(page).toHaveURL("https://gh.io/gh-aw-slides");
+  });
+
   test("should offer skill help above the legal footer on landing and docs pages", async ({ page }) => {
     for (const path of ["/gh-aw/", "/gh-aw/setup/creating-workflows/"]) {
       await page.goto(path);
