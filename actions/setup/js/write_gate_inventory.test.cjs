@@ -59,6 +59,28 @@ describe("independent normalized write decision inventory", () => {
     expect(() => readDecisionInventory(path.join(directory, "missing.json"), sha256, digest)).toThrow();
   });
 
+  it("narrows global allow to partial or deny when item plans are incomplete", () => {
+    const pending = items.map((item, index) => ({ ...item, complete: index !== 0 }));
+    const inventory = buildWriteDecisionInventory({ items: pending }, digest, { decision: "allow", reason: "clear" }, vi.fn());
+    expect(inventory.decision).toBe("partial");
+    expect(inventory.items[0]).toMatchObject({ gate_decision: "drop", decision_reason: "gate_item_incomplete" });
+    expect(inventory.items.slice(1).every(item => item.gate_decision === "apply")).toBe(true);
+    expect(buildWriteDecisionInventory({ items: items.map(item => ({ ...item, complete: false })) }, digest, { decision: "allow", reason: "clear" }, vi.fn()).decision).toBe("deny");
+  });
+
+  it("gates downstream job_ publication IDs in the same inventory as so_ items", () => {
+    const publication = { ...items[0], output_id: "job_0123456789abcdef" };
+    const inventory = buildWriteDecisionInventory(
+      { items: [...items, publication] },
+      digest,
+      { decision: "partial", reason: "items_checked", items: [{ output_id: publication.output_id, decision: "hold", reason: "approval_required" }] },
+      vi.fn()
+    );
+    expect(inventory.items.at(-1)).toMatchObject({ output_id: publication.output_id, gate_decision: "hold" });
+    const pin = writeDecisionInventory(filename, inventory);
+    expect(readDecisionInventory(filename, pin, digest).items.at(-1)).toMatchObject({ output_id: publication.output_id, gate_decision: "hold" });
+  });
+
   it("rejects malformed normalized records even with a matching file digest", () => {
     const inventory = buildWriteDecisionInventory({ items }, digest, { decision: "allow", reason: "clear" }, vi.fn());
     inventory.items[0].gate_decision = "invalid";

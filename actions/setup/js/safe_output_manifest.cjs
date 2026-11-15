@@ -253,7 +253,14 @@ const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing
 /**
  * @typedef {Object} ManifestEntry
  * @property {string} type - The safe output type (e.g., "create_issue")
- * @property {"success"} [status] - Execution outcome, present only for explicit successful handler results
+ * @property {"success"|"skipped"} [status] - Explicit execution outcome or gated suppression
+ * @property {boolean} [skipped]
+ * @property {string} [reason]
+ * @property {string} [output_id]
+ * @property {string} [item_sha256]
+ * @property {number} [messageIndex]
+ * @property {string} [gate_decision]
+ * @property {string} [decision_reason]
  * @property {string} [url] - Canonical resource URI returned by the handler (not inferred from the request)
  * @property {number} [number] - Issue/PR/discussion number if applicable
  * @property {string} [repo] - Repository slug (owner/repo) if applicable
@@ -268,6 +275,7 @@ const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing
  * @property {Object} [after_state] - Execution-time state snapshot captured after mutation
  * @property {string[]} [labelsAdded] - Labels added by add_labels handler
  * @property {string[]} [labelsSuggested] - Labels suggested but not applied by add_labels handler
+ * @property {string[]} [labelsBefore]
  * @property {string} timestamp - ISO 8601 timestamp of creation
  */
 
@@ -305,7 +313,7 @@ function redactManifestValue(value, secretValues) {
  * It is designed to be easily testable by accepting the file path as a parameter.
  *
  * @param {string} [manifestFile] - Path to the manifest file (defaults to MANIFEST_FILE_PATH)
- * @returns {(item: {type: string, status?: "success", url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}) => void} Logger function
+ * @returns {(item: Omit<ManifestEntry, "timestamp">) => void} Logger function
  */
 function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
   const identity = currentClaimHandle() ? claimIdentity(currentClaimHandle()) : null;
@@ -317,7 +325,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
   /**
    * Log an executed safe output item to the manifest file.
    *
-   * @param {{type: string, status?: "success", url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}} item - Executed item details
+   * @param {Omit<ManifestEntry, "timestamp">} item - Executed item details
    */
   return function logCreatedItem(item) {
     if (identity) assertClaimIdentity(identity);
@@ -327,7 +335,18 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
     /** @type {ManifestEntry} */
     const entry = {
       type: item.type,
-      ...(item.status === "success" ? { status: item.status } : {}),
+      ...(item.status === "success" || (item.status === "skipped" && item.gate_decision !== undefined) ? { status: item.status } : {}),
+      ...(item.gate_decision !== undefined
+        ? {
+            output_id: item.output_id,
+            item_sha256: item.item_sha256,
+            messageIndex: item.messageIndex,
+            gate_decision: item.gate_decision,
+            decision_reason: item.decision_reason,
+            ...(item.skipped ? { skipped: true } : {}),
+            ...(item.reason ? { reason: item.reason } : {}),
+          }
+        : {}),
       ...(identity || {}),
       ...(item.url ? { url: item.url } : {}),
       ...(item.number != null ? { number: item.number } : {}),

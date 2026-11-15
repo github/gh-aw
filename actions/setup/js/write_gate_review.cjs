@@ -15,6 +15,7 @@ const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { getErrorStatus } = require("./error_helpers.cjs");
+const { OUTPUT_ID_PATTERN } = require("./write_gate_inventory.cjs");
 
 /**
  * No implicit target: an absent or unusable review repository always stages.
@@ -78,7 +79,7 @@ async function createGateReviewIssue({ message, reviewRepo, defaultRepo, allowed
   if (isStagedMode()) return stage("gate_staged");
   const target = resolveGateReviewRepo(reviewRepo, defaultRepo, allowedRepos);
   if (!target) return stage("gate_review_repo_unusable");
-  if (typeof message.type !== "string" || typeof message.output_id !== "string" || !/^so_[A-Za-z0-9_-]{12}$/.test(message.output_id)) {
+  if (typeof message.type !== "string" || typeof message.output_id !== "string" || !OUTPUT_ID_PATTERN.test(message.output_id)) {
     throw new Error(`${ERR_VALIDATION}: Write gate review requires a valid output_id and type`);
   }
   assertUnchanged();
@@ -105,7 +106,7 @@ async function createGateReviewIssue({ message, reviewRepo, defaultRepo, allowed
       RATE_LIMIT_RETRY_CONFIG,
       `create write gate review issue in ${target.owner}/${target.repo}`
     );
-    return { success: true, reviewed: true, gate_decision: "review", fallback_used: true, issue_number: issue.number, issue_url: issue.html_url, repo: `${target.owner}/${target.repo}` };
+    return { success: true, reviewed: true, gate_decision: "review", fallback_used: true, issue_number: issue.number, issue_url: issue.html_url, repo: `${target.owner}/${target.repo}`, issue };
   } catch (error) {
     const original = error && typeof error === "object" && "originalError" in error ? error.originalError : error;
     const status = getErrorStatus(original);
