@@ -2076,6 +2076,52 @@
   .cn-p { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .4s; }
   .cn-p.on { color: #0d1117; background: var(--pc); border-color: var(--pc); box-shadow: 0 0 26px -4px var(--pc); }
 
+  /* --- Imports & reuse: shared components imported by a workflow, merged and hashed into its lock --- */
+  .imp .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #e3b341, #ab7df8, #79c0ff); }
+  .imp-col { position: absolute; top: 290px; opacity: 0; }
+  .active .imp-col { animation: rise .8s cubic-bezier(.2,.9,.2,1) both var(--d); }
+  .imp-col b { display: flex; align-items: center; gap: 14px; font: 700 30px/1 "Mona Sans"; color: #f0f6fc; }
+  .imp-col b i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 99px; background: #f0f6fc; color: #0d1117; font: normal 800 20px/1 "Mona Sans"; }
+  .imp-col span { display: block; margin: 10px 0 0 50px; font: 500 17px/1 var(--mono); color: #9198a1; letter-spacing: .04em; white-space: nowrap; }
+  .imp-pane { position: absolute; top: 380px; height: 520px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; transition: border-color .4s, box-shadow .4s; }
+  .imp-lib { left: 110px; width: 460px; }
+  .imp-ed { left: 600px; width: 730px; }
+  .imp-lock { left: 1360px; width: 450px; }
+  .active .imp-lib { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .4s; }
+  .active .imp-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .6s; }
+  .active .imp-lock { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .8s; }
+  .imp-lock.hot { border-color: #f0f6fc; box-shadow: 0 0 40px -12px #f0f6fc; }
+  .imp-tab { display: flex; align-items: center; height: 50px; padding: 0 22px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 19px/1 var(--mono); color: #f0f6fc; white-space: nowrap; }
+  .imp-tab > span { margin-left: auto; color: #656c76; font-size: 15px; letter-spacing: .1em; transition: color .3s; }
+  .imp-tab > span.ok { color: #3fb950; }
+  .imp-fs { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .imp-f { padding: 10px 14px; border-radius: 12px; border: 1.5px solid #21262d; transition: all .35s; }
+  .imp-f > div { display: flex; align-items: baseline; gap: 10px; }
+  .imp-f b { font: 500 17px/1 var(--mono); color: #e6edf3; white-space: nowrap; }
+  .imp-f em { margin-left: auto; font: 600 12px/1 var(--mono); font-style: normal; letter-spacing: .1em; text-transform: uppercase; color: #9198a1; white-space: nowrap; }
+  .imp-f small { display: block; margin-bottom: 6px; font: 500 13px/1 var(--mono); color: #9198a1; }
+  .imp-f p { display: flex; gap: 6px; margin: 8px 0 0; }
+  .imp-f p span { padding: 4px 9px; border-radius: 99px; border: 1px solid #3d444d; font: 500 13px/1 var(--mono); color: #9198a1; white-space: nowrap; transition: all .35s; }
+  .imp-f.seen { border-color: color-mix(in srgb, var(--k) 45%, transparent); }
+  .imp-f.seen b, .imp-f.on b { color: var(--k); }
+  .imp-f.on { border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, transparent); box-shadow: 0 0 24px -8px var(--k); }
+  .imp-f.on p span { color: var(--k); border-color: var(--k); }
+  .imp-code { padding: 12px 0; font: 500 18px/28px var(--mono); }
+  .imp-row { display: flex; white-space: pre; transition: background .35s; }
+  .imp-row .no { width: 58px; padding-right: 20px; text-align: right; color: #656c76; flex: none; }
+  .imp-row.seen { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 10%, transparent), transparent 70%); }
+  .imp-row.hot { background: linear-gradient(90deg, color-mix(in srgb, var(--k) 26%, transparent), transparent 85%); }
+  .imp-rs { padding: 6px 0; }
+  .imp-r { display: flex; flex-direction: column; gap: 7px; padding: 8px 22px 8px 19px; border-left: 3px solid transparent; opacity: .32; transition: all .35s; }
+  .imp-r b { font: 600 16px/1 var(--mono); color: #e6edf3; white-space: nowrap; }
+  .imp-r span { font: 500 14px/1 var(--mono); color: #9198a1; white-space: nowrap; }
+  .imp-r.on { opacity: 1; border-color: var(--k); background: linear-gradient(90deg, color-mix(in srgb, var(--k) 16%, transparent), transparent 80%); }
+  .imp-r.on b { color: var(--k); }
+  .imp-rules { position: absolute; left: 110px; top: 940px; display: flex; align-items: center; gap: 10px; opacity: 0; }
+  .active .imp-rules { animation: rise .8s cubic-bezier(.2,.9,.2,1) both 1s; }
+  .imp-rules small { margin-right: 6px; font: 600 15px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
+  .imp-rules span { padding: 7px 13px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font: 500 15px/1 var(--mono); color: #c9d1d9; white-space: nowrap; }
+
   /* --- enterprise operations: OpenTelemetry, governance, infrastructure (shared static visuals from ops-visuals.js) --- */
   .ops .slide-head .l-grad .ch { background-image: linear-gradient(90deg, var(--oc), #a5d6ff, var(--oc)); }
   .ops-tag { position: absolute; left: 110px; right: 110px; top: 252px; font: 500 28px/1.3 "Mona Sans"; color: #9198a1; opacity: 0; }
@@ -9988,6 +10034,210 @@
         idx.classList.toggle("hot", u >= IDX_AT[0] && u < IDX_AT[3] + 600);
         cache.classList.toggle("hot", u >= IDX_AT[3] && u < AGT_AT[0] + 700);
         agt.classList.toggle("hot", u >= AGT_AT[0] && u < CYC - 1500);
+      },
+      el,
+    });
+  }
+
+  // Imports & reuse: shared components (no on:) are written once; a workflow imports them by path, with typed inputs or from another repo at a ref; the compiler merges each field by its own rule and hashes every import into the lock
+  {
+    resetIndex();
+    // [colour, owner prefix, file, tag, frontmatter fields, editor lines]
+    const SRC = [
+      ["#79c0ff", "", "shared/mcp/serena.md", "uses · with", ["import-schema", "mcp-servers"], [4, 5]],
+      ["#3fb950", "", "shared/otlp.md", "local", ["network", "observability"], [6]],
+      ["#e3b341", "", "shared/rotate-token.md", "local", ["steps"], [7]],
+      ["#ab7df8", "acme-org/shared-workflows/", "shared/tools.md@v2.1.0", "remote · @ref", ["tools", "safe-outputs"], [8]],
+      ["#f778ba", "", ".github/shared/editorial.md", "runtime", ["prompt snippet"], [13]],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff";
+    const files = SRC.map(([c, owner, name, tag, fields]) =>
+      h(
+        "div",
+        { class: "imp-f", "--k": c },
+        owner ? h("small", {}, owner) : null,
+        h("div", {}, h("b", {}, name), h("em", {}, tag)),
+        h(
+          "p",
+          {},
+          fields.map(f => h("span", {}, f))
+        )
+      )
+    );
+    const lib = h("div", { class: "imp-pane imp-lib" }, h("div", { class: "imp-tab" }, "shared components", h("span", {}, "NO TRIGGER")), h("div", { class: "imp-fs" }, files));
+
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [
+        ["engine: ", K],
+        ["copilot", V],
+      ],
+      [["imports:", K]],
+      [
+        ["  - uses: ", K],
+        ["shared/mcp/serena.md", V],
+      ],
+      [
+        ["    with: ", K],
+        ["{ languages: [go, typescript] }", V],
+      ],
+      [
+        ["  - ", K],
+        ["shared/otlp.md", V],
+      ],
+      [
+        ["  - ", K],
+        ["shared/rotate-token.md", V],
+      ],
+      [
+        ["  - ", K],
+        ["acme-org/shared-workflows/shared/tools.md@v2.1.0", V],
+      ],
+      [["permissions:", K]],
+      [
+        ["  contents: ", K],
+        ["read", V],
+      ],
+      [["---", D]],
+      [["# Triage", T]],
+      [["{{#runtime-import .github/shared/editorial.md}}", "#f778ba"]],
+      [["Label the issue. Propose one comment.", T]],
+    ];
+    const rows = LINES.map((parts, i) =>
+      h(
+        "div",
+        { class: "imp-row" },
+        h("span", { class: "no" }, String(i + 1)),
+        h(
+          "span",
+          {},
+          parts.map(([s, c]) => h("span", { style: { color: c } }, s))
+        )
+      )
+    );
+    const ed = h("div", { class: "imp-pane imp-ed" }, h("div", { class: "imp-tab" }, "triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "imp-code" }, rows));
+
+    // [source index (-1 = the importing workflow), merged field, merge rule]
+    const MERGE = [
+      [0, "mcp-servers.serena", "with → languages: go, typescript"],
+      [1, "network.allowed", "domains unioned, deduped, sorted"],
+      [2, "steps", "imported steps run first"],
+      [3, "tools", "deep merge · allowed lists deduped"],
+      [3, "safe-outputs", "each type defined once"],
+      [-1, "permissions", "validated against main, never merged"],
+      [4, "prompt", "runtime-import read at run time"],
+      [-1, "frontmatter hash", "covers every import, nested too"],
+    ];
+    const merged = MERGE.map(([s, k, d]) => h("div", { class: "imp-r", "--k": s < 0 ? "#f0f6fc" : SRC[s][0] }, h("b", {}, k), h("span", {}, d)));
+    const status = h("span", {}, "");
+    const lock = h("div", { class: "imp-pane imp-lock" }, h("div", { class: "imp-tab" }, "triage.lock.yml", status), h("div", { class: "imp-rs" }, merged));
+
+    const cols = [
+      [110, "1", "Write once", "shared/ · no on: · not compiled alone", ".2s"],
+      [600, "2", "Import anywhere", "path · uses/with · owner/repo@ref", ".3s"],
+      [1360, "3", "Compile & merge", "one lock · one rule per field", ".4s"],
+    ].map(([x, n, t, s, d]) => h("div", { class: "imp-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
+    const RULES = ["same file, different with → compile error", "missing import fails · path? skips it", "runtime imports stay local, never the network"];
+    const el = h(
+      "section",
+      { class: "slide imp" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Shared components · reviewed once, reused by every workflow"), h("h2", {}, letters("Imports "), letters("& reuse", "l-grad"))),
+      cols,
+      lib,
+      ed,
+      lock,
+      h(
+        "div",
+        { class: "imp-rules" },
+        h("small", {}, "Guardrails"),
+        RULES.map(r => h("span", {}, r))
+      )
+    );
+
+    // ms into the cycle when each source is imported, compilation starts, each merged field lands and the lock is written
+    const SRC_AT = [700, 1700, 2700, 3700, 4700],
+      COMPILE_AT = 5900,
+      MERGE_AT = MERGE.map((_, i) => 6400 + i * 420),
+      DONE_AT = 10000,
+      CYC = 13500;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      [...files, ...merged].forEach(x => x.classList.remove("on", "seen"));
+      rows.forEach(r => r.classList.remove("hot", "seen"));
+      lock.classList.remove("hot");
+      status.textContent = "";
+      status.classList.remove("ok");
+    };
+    const focus = i => {
+      files.forEach((f, j) => {
+        f.classList.toggle("on", j === i);
+        if (j === i) f.classList.add("seen");
+      });
+      rows.forEach(r => r.classList.remove("hot"));
+      if (i < 0) return;
+      for (const n of SRC[i][5]) {
+        rows[n].style.setProperty("--k", SRC[i][0]);
+        rows[n].classList.add("hot", "seen");
+      }
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Imports and reuse, an illustrative example with a synthetic workflow, file names and organisation. A Markdown file without an on: trigger is a shared component: it is validated, never compiled on its own, and any workflow can import it. Write a tool set, an MCP server, network rules, steps or safe outputs once, review it once, and reuse it. A workflow lists its imports in frontmatter by path. A component that declares an import-schema takes typed inputs through uses and with, so one Serena file serves Go and TypeScript repositories. A path of the form owner/repo/path@ref is fetched from another repository at a tag, branch or commit and cached by commit SHA under .github/aw/imports, so compilation also works offline. Compiling merges each field by its own rule: tools deep-merge with their allowed lists deduplicated, network domains are unioned, imported steps run first, each safe-output type is defined once, and permissions are never merged, only validated: the main workflow must already grant what an import needs. The lock records a hash over every import, nested ones too, so editing a shared file makes the lock stale until you recompile. Guardrails: a file may appear once per import graph and importing it twice with different with values is a compile error, a missing import fails compilation unless the path ends in a question mark, and runtime-import in the prompt body injects a local file under .github at run time and never fetches from the network. The index and search pattern on the previous slide ships exactly this way: one shared import adds the indexing job and the search server to any workflow.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        SRC_AT.forEach((ms, i) => u >= ms && fire("s" + i, () => (focus(i), sfx.key(0.7), sfx.pop(i))));
+        if (u >= COMPILE_AT)
+          fire("c", () => {
+            focus(-1);
+            lock.classList.add("hot");
+            status.textContent = "COMPILING";
+            sfx.compile();
+          });
+        MERGE_AT.forEach(
+          (ms, i) =>
+            u >= ms &&
+            fire("m" + i, () => {
+              const s = MERGE[i][0];
+              merged[i].classList.add("on");
+              files.forEach((f, j) => f.classList.toggle("on", j === s));
+              sfx.key(0.5);
+            })
+        );
+        if (u >= DONE_AT)
+          fire("d", () => {
+            files.forEach(f => f.classList.remove("on"));
+            lock.classList.remove("hot");
+            status.textContent = "✓ COMPILED";
+            status.classList.add("ok");
+            sfx.notify(false);
+          });
       },
       el,
     });
