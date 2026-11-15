@@ -96,6 +96,7 @@
       { "if": { "properties": { "type": { "const": "firewall.token_usage" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.upstream_error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallUpstreamErrorData" } } } },
       { "if": { "properties": { "type": { "const": "gate.decision" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GateDecisionData" } } } },
+      { "if": { "properties": { "type": { "const": "gate.item_decision" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GateItemDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "github_api.rate_limit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GitHubApiRateLimitData" } } } },
       { "if": { "properties": { "type": { "const": "grader.manifest" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderManifestData" } } } },
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
@@ -713,9 +714,28 @@
           "required": ["apply", "hold", "review", "stage", "drop"],
           "additionalProperties": false
         },
-        "items": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
+        "items": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" }, "description": "Legacy inline detail. New collectors publish separate gate.item_decision records." }
       },
       "required": ["verdict", "reason", "integrity", "conclusionCheck"],
+      "additionalProperties": false
+    },
+    "GateItemDecisionData": {
+      "type": "object",
+      "properties": {
+        "output_id": { "type": "string", "pattern": "^(so_[A-Za-z0-9_-]{12}|job_[a-f0-9]{16})$" },
+        "gate_decision": {
+          "anyOf": [
+            { "type": "object", "properties": {} },
+            { "type": "object", "properties": {} },
+            { "type": "object", "properties": {} },
+            { "type": "object", "properties": {} },
+            { "type": "object", "properties": {} }
+          ]
+        },
+        "decision_reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
+        "item_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "required": ["output_id"],
       "additionalProperties": false
     },
     "GitHubApiRateLimitData": {
@@ -1285,6 +1305,7 @@
         "gate_signal": { "type": "string", "enum": ["gate_denied", "gate_held", "gate_staged", "gate_dropped"] },
         "decision_reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
         "item_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "review_publication": { "type": "boolean", "const": true, "description": "Compiler-managed successful gate-review publication, never an agent claim." },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." }
       },
       "additionalProperties": false
@@ -1307,6 +1328,7 @@
         "gate_signal": { "type": "string", "enum": ["gate_denied", "gate_held", "gate_staged", "gate_dropped"] },
         "decision_reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
         "item_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "review_publication": { "type": "boolean", "const": true, "description": "Compiler-managed successful gate-review publication, never an agent claim." },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },

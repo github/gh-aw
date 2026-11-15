@@ -43,6 +43,7 @@ const RUNTIME_TYPES = new Set([
   "safe_output.outcome",
   "safe_output.error",
   "gate.decision",
+  "gate.item_decision",
   "experiment.state",
   "experiment.assignment",
   "grader.manifest",
@@ -252,6 +253,8 @@ function eventDetail(event) {
         fields(data, ["verdict", "reason", "manifestDigest", "integrity", "conclusionCheck", "counts"]) +
         (Array.isArray(data.items) ? ` items=[${data.items.map(item => fields(item, ["output_id", "gate_decision", "decision_reason", "item_sha256"])).join("; ")}]` : "")
       );
+    case "gate.item_decision":
+      return fields(data, ["output_id", "gate_decision", "decision_reason", "item_sha256"]);
     case "safe_output.error":
       return `${fields(data, ["type", "status", "errorCode", "message", "error"])}${Array.isArray(data.errors) ? ` errors=${data.errors.length} [${data.errors.map(error => fields(error, ["type", "errorCode"])).join("; ")}]` : ""}`;
     case "experiment.assignment":

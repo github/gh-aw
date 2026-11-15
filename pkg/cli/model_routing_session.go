@@ -92,6 +92,7 @@ type sessionModelRoutingAttribution struct {
 	UnavailableSubagentModels []sessionSubagentModelUnavailable
 	RetryEvents               []sessionModelRoutingEvent
 	WriteGate                 *WriteGateReport
+	WriteGateItemIDs          map[string]struct{}
 	GateSkipped               []CreatedItemReport
 }
 
@@ -199,6 +200,21 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
+	case event.Type == "gate.item_decision" && event.Provenance.Component == "write_gate" && event.Provenance.Phase == "conclusion" && event.Provenance.Path == "usage/aw_session.jsonl":
+		if attribution.WriteGate == nil || attribution.WriteGate.Error != "" {
+			return fmt.Errorf("write gate item decision has no run verdict")
+		}
+		var item WriteGateItem
+		if json.Unmarshal(event.Data, &item) != nil || item.OutputID == "" || !validGateItemDecision(item.Decision) ||
+			(item.ItemSHA256 != "" && !writeGateDigestPattern.MatchString(item.ItemSHA256)) ||
+			(item.DecisionReason != "" && !writeGateReasonPattern.MatchString(item.DecisionReason)) {
+			return fmt.Errorf("invalid write gate item decision")
+		}
+		if _, duplicate := attribution.WriteGateItemIDs[item.OutputID]; duplicate {
+			return fmt.Errorf("duplicate write gate item decision")
+		}
+		attribution.WriteGateItemIDs[item.OutputID] = struct{}{}
+		attribution.WriteGate.Items = append(attribution.WriteGate.Items, item)
 	case event.Type == "safe_output.result" && event.Provenance.Component == "write_gate" && event.Provenance.Phase == "conclusion" && event.Provenance.Path == "usage/aw_session.jsonl":
 		var item CreatedItemReport
 		if json.Unmarshal(event.Data, &item) != nil || item.Type == "" || item.Status != "skipped" || item.OutputID == "" || !writeGateDigestPattern.MatchString(item.ItemSHA256) {
@@ -220,6 +236,10 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 			return nil
 		}
 		attribution.WriteGate = gate
+		attribution.WriteGateItemIDs = make(map[string]struct{}, len(gate.Items))
+		for _, item := range gate.Items {
+			attribution.WriteGateItemIDs[item.OutputID] = struct{}{}
+		}
 	case (event.Type == "harness.attempt" || event.Type == "harness.retry" || event.Type == "harness.decision") && event.Provenance.Component == "harness":
 		attribution.RetryEvents = append(attribution.RetryEvents, event)
 	case event.Type == "engine.retry" && event.Provenance.Component == "agent":

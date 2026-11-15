@@ -161,6 +161,17 @@ function createTransportIntegrity() {
           return result;
         }
         const usesTransport = command === "git" && args.some(arg => inputs.has(arg));
+        if (command === "git" && args[0] === "push" && require("./pending_writes.cjs").pendingWritesEnabled()) {
+          const target = args[args.length - 1];
+          const branch = target
+            .split(":")
+            .pop()
+            .replace(/^refs\/heads\//, "");
+          await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: args[args.length - 2], branch, cwd });
+        }
+        if (command === "gh" && require("./pending_writes.cjs").pendingWritesEnabled() && !["view", "list", "status", "diff"].includes(args[1])) {
+          throw require("./pending_writes.cjs").integrityError("unsupported_cli_write");
+        }
         const verifyContents = usesTransport || (command === "git" && args[0] === "push");
         // Full byte checks remain mandatory at reads, application, publication,
         // and handler completion. Unrelated local commands only check identity.

@@ -115,6 +115,9 @@ func TestWriteGateDeniedCollectorCLIWithoutHandlerManifest(t *testing.T) {
 			require.ErrorIs(t, err, os.ErrNotExist)
 			gate := readWriteGate(root)
 			require.Equal(t, "deny", gate.Verdict)
+			require.Len(t, gate.Items, 1)
+			require.Equal(t, "so_abcdefghijkl", gate.Items[0].OutputID)
+			require.Equal(t, "drop", gate.Items[0].Decision)
 			if verdict == "" {
 				require.Equal(t, "gate_error", gate.Reason)
 			}

@@ -148,12 +148,14 @@ type FileInfo struct {
 // URL is present for creation types (e.g. create_issue, add_comment) but may be empty
 // for modification types (e.g. add_labels, close_issue) that do not return a URL.
 type CreatedItemReport struct {
-	Status          string         `json:"status,omitempty" console:"-"`
-	GateDecision    string         `json:"gate_decision,omitempty" console:"-"`
-	DecisionReason  string         `json:"decision_reason,omitempty" console:"-"`
-	GateSignal      string         `json:"gate_signal,omitempty" console:"-"`
-	OutputID        string         `json:"output_id,omitempty" console:"-"`
-	ItemSHA256      string         `json:"item_sha256,omitempty" console:"-"`
+	Status            string `json:"status,omitempty" console:"-"`
+	GateDecision      string `json:"gate_decision,omitempty" console:"-"`
+	DecisionReason    string `json:"decision_reason,omitempty" console:"-"`
+	GateSignal        string `json:"gate_signal,omitempty" console:"-"`
+	OutputID          string `json:"output_id,omitempty" console:"-"`
+	ItemSHA256        string `json:"item_sha256,omitempty" console:"-"`
+	ReviewPublication bool   `json:"review_publication,omitempty" console:"-"`
+
 	Type            string         `json:"type" console:"header:Type"`
 	URL             string         `json:"url,omitempty" console:"header:URL,omitempty"`
 	Number          int            `json:"number,omitempty" console:"header:Number,omitempty"`

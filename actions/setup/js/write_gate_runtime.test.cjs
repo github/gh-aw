@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
-import { canonicalPendingJSON, inputDigest, itemDigest } from "./pending_writes.cjs";
+import { canonicalPendingJSON, inputDigest, itemDigest, gateConfigFromEnv, pendingContext, pendingEnvironment } from "./pending_writes.cjs";
 import { readInput, sha256 } from "./pending_writes_files.cjs";
 import { publishWriteDecisionInventory } from "./write_gate_runtime.cjs";
 import { processMessages } from "./safe_output_handler_manager.cjs";
@@ -12,6 +12,7 @@ import { createManifestLogger } from "./safe_output_manifest.cjs";
 import { DECISIONS } from "./write_gate_decisions.cjs";
 import { createIssue } from "./create_issue.cjs";
 import { guardPendingWriteClient } from "./pending_writes_client.cjs";
+import { collectUnifiedSession } from "./unified_session.cjs";
 import { useExecutionProvenanceFixture } from "./test_execution_provenance.js";
 
 useExecutionProvenanceFixture();
@@ -77,6 +78,9 @@ describe("pinned per-item manager enforcement", () => {
       inputs: [
         { id: "agent_output", kind: "file", length: file.length, sha256: file.sha256, mode: file.mode },
         { id: "handler_config", kind: "value", sha256: inputDigest(config) },
+        { id: "gate_config", kind: "value", sha256: inputDigest(gateConfigFromEnv()) },
+        { id: "context", kind: "value", sha256: inputDigest(pendingContext()) },
+        { id: "environment", kind: "value", sha256: inputDigest(pendingEnvironment()) },
       ],
       items,
     };
@@ -91,6 +95,9 @@ describe("pinned per-item manager enforcement", () => {
       JSON.stringify([
         { id: "agent_output", kind: "file", path: agentOutput },
         { id: "handler_config", kind: "value", value: config },
+        { id: "gate_config", kind: "value" },
+        { id: "context", kind: "value" },
+        { id: "environment", kind: "value" },
       ])
     );
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify(config));
@@ -128,6 +135,36 @@ describe("pinned per-item manager enforcement", () => {
     expect(rows.filter(row => row.skipped).map(row => row.reason)).toEqual(["gate_held", "gate_staged", "gate_dropped"]);
     expect(rows.every(row => row.output_id && row.item_sha256 && row.decision_reason)).toBe(true);
     expect(rows.find(row => row.gate_decision === "review").url).toBe("https://github.com/review-owner/review-repo/issues/90");
+  });
+
+  it("records and verifies an actual review issue when native policy narrows a held item", async () => {
+    const messages = [{ type: "push_to_pull_request_branch", output_id: "so_aaaaaaaaaaaa", body: "Held branch change" }];
+    authorize(messages, [{ output_id: messages[0].output_id, decision: "hold", reason: "approval_required" }], { detection: { enabled: true, mode: "warn", conclusion: "warning" } });
+    const resultFile = path.join(directory, "safe-output-items.jsonl");
+    await processMessages(new Map([["push_to_pull_request_branch", handler]]), messages, createManifestLogger(resultFile));
+    expect(handler).not.toHaveBeenCalled();
+    expect(global.github.rest.issues.create).toHaveBeenCalledOnce();
+    const row = JSON.parse(fs.readFileSync(resultFile, "utf8").trim());
+    expect(row).toMatchObject({ status: "success", gate_decision: "review", decision_reason: "gate_existing_restriction", url: "https://github.com/review-owner/review-repo/issues/90" });
+    if (row.review_publication === true) expect(row.type).toBe("create_issue");
+    const events = collectUnifiedSession({
+      rootDir: directory,
+      warn: vi.fn(),
+      dailyAIC: {},
+      admission: {},
+      writeGate: {
+        GH_AW_WRITE_GATE: "partial",
+        GH_AW_WRITE_GATE_REASON: "items_checked",
+        GH_AW_PENDING_WRITES_SHA256: process.env.GH_AW_PENDING_WRITES_SHA256,
+        GH_AW_WRITE_GATE_DECISIONS_SHA256: process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256,
+        GH_AW_JOB_RESULTS: "{}",
+        GH_AW_WRITE_GATE_WRITE_JOB_NAMES: "[]",
+      },
+    }).events;
+    const gate = events.find(event => event.type === "gate.decision").data;
+    // Historical review artifacts lack the trusted publication marker.
+    expect(gate).toMatchObject({ verdict: "partial", conclusionCheck: row.review_publication === true ? "verified" : "unknown", counts: { hold: 1, review: 0 } });
+    expect(gate).not.toHaveProperty("failureCategory");
   });
 
   it("drops missing entries and rejects altered/missing normalized files before invocation", async () => {

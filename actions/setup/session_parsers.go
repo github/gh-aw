@@ -86,6 +86,8 @@ import "embed"
 //go:embed js/parse_pydantic_log.cjs
 //go:embed js/write_gate_observability.cjs js/write_gate_decisions.cjs js/write_gate_inventory.cjs
 //go:embed js/pending_writes.cjs js/pending_writes_files.cjs js/pending_writes_client.cjs js/pending_writes_plan.cjs js/pending_writes_code.cjs
+//go:embed js/pending_writes_read.cjs js/pending_write_inputs.cjs
+//go:embed js/call_workflow.cjs js/resolve_mentions.cjs js/resolve_mentions_from_payload.cjs
 //go:embed js/safe_output_dependencies.cjs js/safe_output_execution_metadata.cjs js/safe_output_submission.cjs
 //go:embed js/git_helpers.cjs js/git_auth_helpers.cjs js/git_patch_utils.cjs js/commit_sha_helpers.cjs
 //go:embed js/generate_git_bundle.cjs js/generate_git_patch.cjs js/extra_empty_commit.cjs

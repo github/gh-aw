@@ -14,6 +14,13 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
+function buildCallWorkflowPayload(message) {
+  const inputs = message.inputs && typeof message.inputs === "object" ? { ...message.inputs } : {};
+  if (!("aw_context" in inputs)) inputs.aw_context = JSON.stringify(buildAwContext());
+  else if (typeof inputs.aw_context !== "string" || inputs.aw_context === "") inputs.aw_context = JSON.stringify(inputs.aw_context);
+  return JSON.stringify(inputs);
+}
+
 /**
  * Main handler factory for call_workflow.
  * Unlike dispatch_workflow, this handler makes no GitHub API calls.
@@ -86,14 +93,9 @@ async function main(config = {}) {
 
       // Serialise inputs as a JSON payload string so they can be forwarded
       // through a single `payload` input to the called workflow.
+      const payloadJson = buildCallWorkflowPayload(message);
       /** @type {Record<string, unknown>} */
-      const inputs = message.inputs && typeof message.inputs === "object" ? { ...message.inputs } : {};
-      if (!("aw_context" in inputs)) {
-        inputs.aw_context = JSON.stringify(buildAwContext());
-      } else if (typeof inputs.aw_context !== "string" || inputs.aw_context === "") {
-        inputs.aw_context = JSON.stringify(inputs.aw_context);
-      }
-      const payloadJson = JSON.stringify(inputs);
+      const inputs = JSON.parse(payloadJson);
       const logPayloadJson = JSON.stringify({ ...inputs, aw_context: redactWebhookPayloads(inputs.aw_context) });
 
       // If in staged mode, preview the workflow call without executing it
@@ -132,4 +134,4 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { main };
+module.exports = { main, buildCallWorkflowPayload };

@@ -44,8 +44,77 @@ function pendingWritesEnabled() {
   return process.env.GH_AW_PENDING_WRITES_REQUIRED === "true";
 }
 
+function resolvedGateConfig() {
+  return {
+    review_repo: process.env.GH_AW_WRITE_GATE_REVIEW_REPO || "",
+    allowed_repos: process.env.GH_AW_WRITE_GATE_ALLOWED_REPOS || "",
+    approval_environment: process.env.GH_AW_WRITE_GATE_APPROVAL_ENVIRONMENT || "",
+  };
+}
+
+function pendingContext(value = globalThis.context) {
+  if (!value?.repo || !value.eventName || !value.payload) throw integrityError("context_missing");
+  return parsePendingJSON(JSON.stringify({ ...value, repo: value.repo, ...(value.issue ? { issue: value.issue } : {}) }));
+}
+
+function pendingEnvironment() {
+  return Object.fromEntries(
+    [
+      "GH_AW_TARGET_REPO_SLUG",
+      "GH_AW_WORKFLOW_ID",
+      "GH_AW_WORKFLOW_NAME",
+      "GH_AW_WORKFLOW_SOURCE",
+      "GH_AW_WORKFLOW_SOURCE_URL",
+      "GH_AW_SAFE_OUTPUTS_STAGED",
+      "GH_AW_CUSTOM_BASE_BRANCH",
+      "DEFAULT_BRANCH",
+      "GITHUB_BASE_REF",
+      "GH_AW_DETECTION_CONCLUSION",
+      "GH_AW_DETECTION_REASON",
+      "GH_AW_DETECTION_THREAT_KINDS",
+    ].map(name => [name, process.env[name] || ""])
+  );
+}
+
 function integrityError(reason = "inputs_changed") {
   return Object.assign(new Error(`Pending writes refused: ${reason}`), { code: "ERR_PENDING_WRITES", reason });
+}
+
+function pendingAuthorization(manifest, item) {
+  const { readDecisionInventory } = require("./write_gate_inventory.cjs");
+  const file = process.env.GH_AW_WRITE_GATE_DECISIONS;
+  const sha = process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256;
+  if (!file || !sha) throw integrityError("decisions_missing");
+  const inventory = readDecisionInventory(file, sha, process.env.GH_AW_PENDING_WRITES_SHA256 || "");
+  if (inventory.items.length !== manifest.items.length) throw integrityError("decisions_invalid");
+  const selection = inventory.items.find(selection => selection.output_id === item.output_id);
+  if (!selection || selection.item_sha256 !== item.item_sha256 || selection.input_sha256 !== item.input_sha256) throw integrityError("decisions_invalid");
+  return { inventory, selection };
+}
+
+function pendingHoldApproved(item) {
+  const modulePath = path.join(__dirname, "write_gate_replay_approval.cjs");
+  if (!fs.existsSync(modulePath)) return false;
+  const capability = require(modulePath).currentHeldReplayAuthorization();
+  return Boolean(
+    capability &&
+    capability.manifest_sha256 === process.env.GH_AW_PENDING_WRITES_SHA256 &&
+    capability.write_decisions_sha256 === process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256 &&
+    Array.isArray(capability.held_ids) &&
+    capability.held_ids.includes(item.output_id)
+  );
+}
+
+function assertPendingEffectAllowed() {
+  if (!pendingWritesEnabled()) return;
+  const active = activeWrite.getStore();
+  if (!active || active.planning) throw integrityError("item_missing");
+  const manifest = readAuthorizedManifest();
+  const item = manifest.items.find(item => item.output_id === active.output_id && item.item_sha256 === active.item_sha256);
+  if (!item || item.complete !== true) throw integrityError("item_missing");
+  const { selection } = pendingAuthorization(manifest, item);
+  const mayApply = selection.gate_decision === "apply" || (selection.gate_decision === "hold" && pendingHoldApproved(item));
+  if (item.settings.staged === true || process.env.GH_AW_REPLAY_FORCE_STAGED === "true" || (active.review ? !["apply", "review", "hold"].includes(selection.gate_decision) : !mayApply)) throw integrityError("item_not_authorized");
 }
 
 /**
@@ -99,6 +168,15 @@ function assertPendingWritesIntegrity() {
   const configBinding = bindings.find(binding => binding.id === "handler_config");
   if (!configBinding) throw integrityError("manifest_invalid");
   configBinding.value = withoutCredentials(handlerConfig);
+  const gateBinding = bindings.find(binding => binding.id === "gate_config");
+  if (!gateBinding) throw integrityError("manifest_invalid");
+  gateBinding.value = resolvedGateConfig();
+  const contextBinding = bindings.find(binding => binding.id === "context");
+  if (!contextBinding) throw integrityError("manifest_invalid");
+  contextBinding.value = pendingContext();
+  const environmentBinding = bindings.find(binding => binding.id === "environment");
+  if (!environmentBinding) throw integrityError("manifest_invalid");
+  environmentBinding.value = pendingEnvironment();
   try {
     assertManifestInputs(manifest, bindings);
   } catch (cause) {
@@ -165,9 +243,20 @@ function assertPendingCodeFiles(actualFiles) {
   if (inputDigest([...new Set(actualFiles)].sort()) !== inputDigest(expected)) throw integrityError("files_changed");
 }
 
+function assertPendingGitDestination(repository, branch) {
+  if (!pendingWritesEnabled()) return;
+  const item = activeWrite.getStore();
+  if (!item || item.planning || item.complete !== true) throw integrityError("item_missing");
+  assertPendingEffectAllowed();
+  const expected = item.target.head_repository || item.target.repository;
+  if (repository.toLowerCase() !== expected.toLowerCase() || (item.target.branch && branch !== item.target.branch) || (item.target.branches && !item.target.branches.includes(branch))) throw integrityError("target_changed");
+  if (item.publication) item.recheck();
+}
+
 /** Signed-push API and git-push transports share this last publication check. */
 function assertPendingCodePublication({ owner, repo, branch, baseRef, cwd }) {
   if (!pendingWritesEnabled()) return;
+  assertPendingEffectAllowed();
   const item = activeWrite.getStore();
   const { execLocalGitSync } = require("./git_helpers.cjs");
   if (item?.publication) {
@@ -198,6 +287,10 @@ function assertPendingPublication(job, id, supplied) {
   const manifest = readAuthorizedManifest();
   const matches = manifest.items.filter(item => item.target.job === job && item.publication?.id === id);
   if (matches.length !== 1 || matches[0].complete !== true || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
+  const { inventory, selection } = pendingAuthorization(manifest, matches[0]);
+  const mayApply = selection.gate_decision === "apply" || (selection.gate_decision === "hold" && pendingHoldApproved(matches[0]));
+  if (!mayApply || process.env.GH_AW_REPLAY_FORCE_STAGED === "true" || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
+  if (matches[0].settings?.staged === true || (manifest.detection.enabled && ["warning", "failure"].includes(manifest.detection.conclusion))) throw integrityError("native_policy_veto");
 }
 
 async function withPendingPublication(job, id, readSupplied, operation) {
@@ -207,7 +300,40 @@ async function withPendingPublication(job, id, readSupplied, operation) {
   if (!item) throw integrityError("item_missing");
   const recheck = () => assertPendingPublication(job, id, readSupplied());
   recheck();
-  return activeWrite.run({ ...item, recheck }, operation);
+  return activeWrite.run({ ...item, recheck }, async () => {
+    const previousGithub = globalThis.github;
+    const previousFactory = globalThis.getOctokit;
+    require("./pending_writes_client.cjs").installPendingWriteClientGuards();
+    try {
+      return await operation();
+    } finally {
+      globalThis.github = previousGithub;
+      globalThis.getOctokit = previousFactory;
+    }
+  });
+}
+
+async function withPendingDirectoryPublication(job, id, bindingId, directory, operation) {
+  if (!pendingWritesEnabled()) return operation();
+  const { captureDirectory } = require("./pending_writes_files.cjs");
+  const captured = captureDirectory(directory, bindingId);
+  assertPendingPublication(job, id, captured.supplied);
+  return withPendingPublication(
+    job,
+    id,
+    () => ({ id: bindingId, kind: "directory", files: describeDirectory(directory) }),
+    () => {
+      activeWrite.getStore().captured_files = captured.captured;
+      return operation();
+    }
+  );
+}
+
+function capturedPublicationFile(file) {
+  if (!pendingWritesEnabled()) return null;
+  const input = activeWrite.getStore()?.captured_files?.get(path.resolve(file));
+  if (!input) throw integrityError("inputs_changed");
+  return { bytes: Buffer.from(input.bytes), mode: input.mode };
 }
 
 /** Compiler-owned check after authored gate steps. */
@@ -239,6 +365,10 @@ module.exports = {
   inputDigest,
   itemDigest,
   pendingWritesEnabled,
+  resolvedGateConfig,
+  gateConfigFromEnv: resolvedGateConfig,
+  pendingContext,
+  pendingEnvironment,
   readAuthorizedManifest,
   assertManifestInputs,
   assertPendingWritesIntegrity,
@@ -250,10 +380,15 @@ module.exports = {
   currentPendingWrite,
   assertPendingTarget,
   assertPendingCodeFiles,
+  assertPendingGitDestination,
   assertPendingCodePublication,
   assertPendingPublication,
   withPendingPublication,
+  withPendingDirectoryPublication,
+  capturedPublicationFile,
   integrityError,
+  pendingAuthorization,
+  assertPendingEffectAllowed,
   verify,
   prepare,
 };

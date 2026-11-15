@@ -460,6 +460,8 @@ export interface SafeOutputData {
   decision_reason?: string;
   /** @pattern ^[a-f0-9]{64}$ */
   item_sha256?: string;
+  /** Compiler-managed successful gate-review publication, never an agent claim. */
+  review_publication?: true;
   /** The operation may have applied even though processing failed to confirm it. */
   operation_outcome?: "indeterminate";
 }
@@ -474,7 +476,18 @@ export interface GateDecisionData {
   conclusionCheck: "verified" | "failed" | "unknown";
   failureCategory?: "write_gate_violation";
   counts?: { apply: number; hold: number; review: number; stage: number; drop: number };
+  /** Legacy inline detail. New collectors publish separate gate.item_decision records. */
   items?: SafeOutputData[];
+}
+
+export interface GateItemDecisionData {
+  /** @pattern ^(so_[A-Za-z0-9_-]{12}|job_[a-f0-9]{16})$ */
+  output_id: string;
+  gate_decision: NonNullable<SafeOutputData["gate_decision"]>;
+  /** @pattern ^[a-z0-9_.-]{1,64}$ */
+  decision_reason?: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  item_sha256?: string;
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {
@@ -967,6 +980,7 @@ export interface UnifiedSessionEventDataMap {
   "safe_output.outcome": SafeOutputData;
   "safe_output.error": SafeOutputErrorData;
   "gate.decision": GateDecisionData;
+  "gate.item_decision": GateItemDecisionData;
   "experiment.state": ExperimentStateData;
   "experiment.assignment": ExperimentAssignmentData;
   "grader.manifest": GraderManifestData;
