@@ -162,6 +162,25 @@ func readLogsOutcomeItems(run ProcessedRun) ([]CreatedItemReport, bool, error) {
 		}
 		combined = append(combined, items...)
 	}
+	session, _, err := readSessionModelRouting(run.Run.LogsPath)
+	if err != nil {
+		writeGateLog.Debug("Unable to read optional gate outcome evidence", "error", err)
+	}
+	if session != nil && len(session.GateSkipped) > 0 {
+		found = true
+		observed := make(map[string]bool)
+		for _, item := range combined {
+			if item.OutputID != "" {
+				observed[item.OutputID] = true
+			}
+		}
+		for _, item := range session.GateSkipped {
+			if !observed[item.OutputID] {
+				combined = append(combined, item)
+				observed[item.OutputID] = true
+			}
+		}
+	}
 	return combined, found, nil
 }
 

@@ -92,6 +92,7 @@ type sessionModelRoutingAttribution struct {
 	UnavailableSubagentModels []sessionSubagentModelUnavailable
 	RetryEvents               []sessionModelRoutingEvent
 	WriteGate                 *WriteGateReport
+	GateSkipped               []CreatedItemReport
 }
 
 // ModelEndpointMismatch describes a model/API incompatibility reported by the unified session.
@@ -198,6 +199,15 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
+	case event.Type == "safe_output.result" && event.Provenance.Component == "write_gate" && event.Provenance.Phase == "conclusion" && event.Provenance.Path == "usage/aw_session.jsonl":
+		var item CreatedItemReport
+		if json.Unmarshal(event.Data, &item) != nil || item.Type == "" || item.Status != "skipped" || item.OutputID == "" || !writeGateDigestPattern.MatchString(item.ItemSHA256) {
+			return fmt.Errorf("invalid write gate skipped result")
+		}
+		if _, blocked := gateBlockedOutcome(item); !blocked {
+			return fmt.Errorf("invalid write gate suppression signal")
+		}
+		attribution.GateSkipped = append(attribution.GateSkipped, item)
 	case event.Type == "gate.decision" && event.Provenance.Component == "write_gate" && event.Provenance.Phase == "conclusion" && event.Provenance.Path == "usage/aw_session.jsonl":
 		if attribution.WriteGate != nil {
 			attribution.WriteGate.ConclusionCheck = "unknown"
