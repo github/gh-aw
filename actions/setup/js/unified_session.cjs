@@ -19,7 +19,7 @@ const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
-const { buildGateDecision } = require("./write_gate_observability.cjs");
+const { buildGateDecision, buildGateBlockedResults } = require("./write_gate_observability.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -912,6 +912,22 @@ function collectUnifiedSession({
     const manifestFile = choose(["pending-writes/pending-writes.json", "pending-writes.json"]);
     const resultFile = choose(["safe-output-items.jsonl"]);
     const decisionsFile = choose(["write-decisions.normalized.json", "write-decisions/write-decisions.normalized.json"]);
+    let decisions;
+    let decisionsDigest;
+    let decisionsValid;
+    if (decisionsFile) {
+      decisions = records(decisionsFile)[0];
+      decisionsDigest = require("node:crypto").createHash("sha256").update(read(decisionsFile)).digest("hex");
+      if (writeGate.GH_AW_WRITE_GATE_DECISIONS_SHA256 && writeGate.GH_AW_PENDING_WRITES_SHA256) {
+        try {
+          decisions = require("./write_gate_inventory.cjs").readDecisionInventory(decisionsFile, writeGate.GH_AW_WRITE_GATE_DECISIONS_SHA256, writeGate.GH_AW_PENDING_WRITES_SHA256);
+          decisionsValid = true;
+        } catch {
+          report(decisionsFile, "invalid_write_decision_inventory", undefined);
+          decisionsValid = false;
+        }
+      }
+    }
     const manifest = manifestFile ? records(manifestFile)[0] : undefined;
     const actualDigest = manifestFile ? require("node:crypto").createHash("sha256").update(read(manifestFile)).digest("hex") : undefined;
     let manifestValid;
@@ -930,11 +946,25 @@ function collectUnifiedSession({
       manifest,
       actualDigest,
       manifestValid,
-      decisions: decisionsFile ? records(decisionsFile)[0] : undefined,
-      decisionsDigest: decisionsFile ? require("node:crypto").createHash("sha256").update(read(decisionsFile)).digest("hex") : undefined,
+      decisions,
+      decisionsDigest,
+      decisionsValid,
       resultsComplete: Boolean(resultFile && !incompleteSources.has(resultFile) && !malformedJsonSources.has(resultFile)),
     });
-    if (data) sources.push({ component: "write_gate", phase: "conclusion", path: "usage/aw_session.jsonl", events: [{ type: "gate.decision", data }] });
+    if (data) {
+      const skipped = buildGateBlockedResults({
+        gate: data,
+        manifest,
+        decisions,
+        decisionsValid,
+        results: resultFile ? records(resultFile) : [],
+        resultsReadable: !resultFile || (!incompleteSources.has(resultFile) && !malformedJsonSources.has(resultFile)),
+      });
+      /** @type {SessionEvent[]} */
+      const gateEvents = [{ type: "gate.decision", data }];
+      for (const data of skipped) gateEvents.push({ type: "safe_output.result", data });
+      sources.push({ component: "write_gate", phase: "conclusion", path: "usage/aw_session.jsonl", events: gateEvents });
+    }
   }
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
   const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
