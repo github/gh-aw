@@ -25,6 +25,8 @@ const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION, ERR_PARSE } = require("./error_codes.cjs");
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
+const { parseLockFileHeaders } = require("./lock_file_headers.cjs");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
 
 /**
  * Parse a run ID from a run URL or plain run ID string.
@@ -51,12 +53,114 @@ function parseRunUrl(runUrl) {
 
   // Parse a full GitHub Actions URL
   // Pattern: https://github.com/{owner}/{repo}/actions/runs/{runId}[/job/{jobId}]
-  const match = trimmed.match(/github\.com\/([^/]+)\/([^/]+)\/actions\/runs\/(\d+)/);
+  const match = trimmed.match(/^https:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/actions\/runs\/(\d+)(?:\/job\/\d+)?(?:[?#].*)?$/);
   if (match) {
     return { runId: match[3], owner: match[1], repo: match[2] };
   }
 
   throw new Error(`${ERR_VALIDATION}: Cannot parse run ID from: ${trimmed}. Expected a plain run ID (digits only) or a GitHub Actions run URL (https://github.com/{owner}/{repo}/actions/runs/{runId}).`);
+}
+
+/**
+ * Resolve the policy from the run's immutable compiled workflow, never its
+ * agent artifact or today's workflow configuration.
+ * @param {string} runId
+ * @param {string} owner
+ * @param {string} repo
+ */
+async function getReplayPolicy(runId, owner, repo) {
+  const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(runId) });
+  const workflowPath = run.path?.split("@")[0];
+  if (
+    run.status !== "completed" ||
+    typeof run.run_attempt !== "number" ||
+    !Number.isSafeInteger(run.run_attempt) ||
+    run.run_attempt < 1 ||
+    !/^[a-f0-9]{40}$/.test(run.head_sha || "") ||
+    !workflowPath ||
+    !/^\.github\/workflows\/[^/]+\.ya?ml$/.test(workflowPath)
+  ) {
+    throw new Error(`${ERR_VALIDATION}: Replay requires a completed run with an immutable workflow identity`);
+  }
+  const { data: source } = await github.rest.repos.getContent({ owner, repo, path: workflowPath, ref: run.head_sha });
+  if (Array.isArray(source) || source.type !== "file" || source.encoding !== "base64" || typeof source.content !== "string") {
+    throw new Error(`${ERR_VALIDATION}: Original compiled workflow is unavailable; refusing replay`);
+  }
+  const headers = parseLockFileHeaders(Buffer.from(source.content, "base64").toString("utf8").split(/\r?\n/, 3));
+  if (!headers.manifest || headers.manifest.version !== 1) {
+    throw new Error(`${ERR_VALIDATION}: Original compiled workflow has no valid compiler manifest; refusing replay`);
+  }
+  if (headers.metadata?.dry_run === true) {
+    throw new Error(`${ERR_VALIDATION}: Dry-run outputs cannot be replayed as writes`);
+  }
+  const gate = headers.manifest.write_gate;
+  if (gate === undefined) return { run, gate: null };
+  if (!gate || typeof gate !== "object" || !("version" in gate) || gate.version !== 1 || !("record_job" in gate) || typeof gate.record_job !== "string" || !gate.record_job) {
+    throw new Error(`${ERR_VALIDATION}: Original write gate policy is malformed; refusing replay`);
+  }
+  return { run, gate };
+}
+
+/**
+ * @param {unknown} record
+ * @param {{runId: string, repository: string, attempt: number, headSha: string}} identity
+ */
+function validateReplayWriteGateRecord(record, identity) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) throw new Error(`${ERR_VALIDATION}: Missing recorded write gate verdict; refusing replay`);
+  const fields = ["version", "repository", "run_id", "run_attempt", "head_sha", "safe_outputs_result", "verdict", "reason"];
+  if (Object.keys(record).length !== fields.length || fields.some(key => !Object.hasOwn(record, key))) throw new Error(`${ERR_VALIDATION}: Malformed recorded write gate verdict; refusing replay`);
+  const value = Object.fromEntries(Object.entries(record));
+  if (
+    value.version !== 1 ||
+    value.repository !== identity.repository ||
+    value.run_id !== identity.runId ||
+    value.run_attempt !== String(identity.attempt) ||
+    value.head_sha !== identity.headSha ||
+    typeof value.reason !== "string" ||
+    !value.reason
+  ) {
+    throw new Error(`${ERR_VALIDATION}: Recorded write gate identity does not match the original run; refusing replay`);
+  }
+  if (value.safe_outputs_result !== "success" || value.verdict !== "allow") {
+    throw new Error(`${ERR_VALIDATION}: Replay requires a successful recorded allow verdict; partial, denied, and unavailable gates cannot be replayed`);
+  }
+}
+
+/**
+ * Verify the trusted recording steps succeeded, then validate their record.
+ * A conflicting upload from another job makes the compiler-owned upload fail,
+ * so an artifact with the same name cannot stand in for a trusted verdict.
+ * @param {{run: any, gate: any}} policy
+ * @param {string} runId
+ * @param {string} owner
+ * @param {string} repo
+ */
+async function enforceReplayWriteGate(policy, runId, owner, repo) {
+  if (!policy.gate) return;
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+    owner,
+    repo,
+    run_id: Number(runId),
+    attempt_number: policy.run.run_attempt,
+    per_page: 100,
+  });
+  const matches = jobs.filter(job => job.name === policy.gate.record_job);
+  if (matches.length !== 1 || matches[0].status !== "completed") throw new Error(`${ERR_VALIDATION}: No unique completed write gate recorder; refusing replay`);
+  for (const name of ["Record write gate verdict", "Upload write gate verdict"]) {
+    const steps = (matches[0].steps || []).filter(step => step.name === name);
+    if (steps.length !== 1 || steps[0].conclusion !== "success" || steps[0].status !== "completed") {
+      throw new Error(`${ERR_VALIDATION}: Write gate recording did not complete successfully; refusing replay`);
+    }
+  }
+  const directory = fs.mkdtempSync(path.join(TMP_GH_AW_PATH, "replay-write-gate-"));
+  try {
+    const exitCode = await exec.exec("gh", ["run", "download", runId, "--repo", `${owner}/${repo}`, "--name", "write-gate", "--dir", directory]);
+    if (exitCode !== 0) throw new Error(`${ERR_SYSTEM}: Recorded write gate artifact is unavailable; refusing replay`);
+    const record = parseStrictJSON(fs.readFileSync(path.join(directory, "write_gate.json"), "utf8"));
+    validateReplayWriteGateRecord(record, { runId, repository: `${owner}/${repo}`, attempt: policy.run.run_attempt, headSha: policy.run.head_sha });
+  } finally {
+    fs.rmSync(directory, { recursive: true });
+  }
 }
 
 /**
@@ -159,6 +263,19 @@ async function main() {
   const displayRepoSlug = repoFromUrl ?? `${context.repo.owner}/${context.repo.repo}`;
   core.info(`Target repository: ${displayRepoSlug}`);
 
+  try {
+    const policy = await getReplayPolicy(runId, owner || context.repo.owner, repo || context.repo.repo);
+    if (policy.gate && displayRepoSlug.toLowerCase() !== `${context.repo.owner}/${context.repo.repo}`.toLowerCase()) {
+      throw new Error(`${ERR_VALIDATION}: Gated outputs can only be replayed in their original repository`);
+    }
+    fs.mkdirSync(TMP_GH_AW_PATH, { recursive: true });
+    await enforceReplayWriteGate(policy, runId, owner || context.repo.owner, repo || context.repo.repo);
+  } catch (error) {
+    core.setFailed(`Cannot authorize safe-output replay: ${getErrorMessage(error)}`);
+    // The label replay wrapper must not publish success after a gate refusal.
+    throw error;
+  }
+
   // Download the agent artifact into /tmp/gh-aw/
   const destDir = TMP_GH_AW_PATH;
   let agentOutputFile;
@@ -191,4 +308,4 @@ async function main() {
   await runHandlerManager();
 }
 
-module.exports = { main, parseRunUrl, buildHandlerConfigFromOutput };
+module.exports = { main, parseRunUrl, buildHandlerConfigFromOutput, getReplayPolicy, enforceReplayWriteGate, validateReplayWriteGateRecord };
