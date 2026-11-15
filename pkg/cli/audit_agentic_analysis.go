@@ -327,12 +327,19 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 
 	assessments := make([]AgenticAssessment, 0, 4)
 	toolTypes := len(toolUsage)
-	frictionEvents := len(processedRun.MissingTools) + len(processedRun.MCPFailures) + len(processedRun.MissingData)
+	reportedControlSignals := len(processedRun.MissingTools) + len(processedRun.MCPFailures) + len(processedRun.MissingData)
+	frictionEvents := reportedControlSignals
+	frictionEvidence := fmt.Sprintf("control_events=%d reported_control_signals=%d friction_counted_occurrences=unavailable", frictionEvents, reportedControlSignals)
+	if processedRun.Friction != nil {
+		frictionOccurrences := processedRun.Friction.CountedOccurrences
+		frictionEvents = max(frictionEvents, frictionOccurrences)
+		frictionEvidence = fmt.Sprintf("control_events=max(reported_control_signals=%d, friction_counted_occurrences=%d)=%d", reportedControlSignals, frictionOccurrences, frictionEvents)
+	}
 	writeCount := len(createdItems) + processedRun.Run.SafeItemsCount
 
 	assessments = appendResourceHeavyAssessment(assessments, processedRun, metrics, domain, fingerprint, toolTypes, writeCount)
 	assessments = appendOverkillAssessment(assessments, metrics, domain, fingerprint, toolTypes)
-	assessments = appendPoorControlAssessment(assessments, domain, fingerprint, frictionEvents, writeCount)
+	assessments = appendPoorControlAssessment(assessments, domain, fingerprint, frictionEvents, frictionEvidence, writeCount)
 	assessments = appendPartiallyReducibleAssessment(assessments, metrics, fingerprint)
 	assessments = appendModelDowngradeAssessment(assessments, domain, fingerprint, processedRun.ModelRouting)
 	assessments = appendDelegatedContextAssessment(assessments, awContext)
@@ -371,7 +378,7 @@ func appendOverkillAssessment(assessments []AgenticAssessment, metrics MetricsDa
 	return assessments
 }
 
-func appendPoorControlAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, frictionEvents, writeCount int) []AgenticAssessment {
+func appendPoorControlAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, frictionEvents int, frictionEvidence string, writeCount int) []AgenticAssessment {
 	if frictionEvents >= 3 || (frictionEvents > 0 && writeCount >= 3) || ((domain.Name == "triage" || domain.Name == "repo_maintenance" || domain.Name == "issue_response") && fingerprint.ExecutionStyle == "exploratory") {
 		severity := "medium"
 		if frictionEvents >= 4 || (frictionEvents > 0 && fingerprint.ActuationStyle == "write_heavy") {
@@ -381,7 +388,7 @@ func appendPoorControlAssessment(assessments []AgenticAssessment, domain *TaskDo
 			Kind:           "poor_agentic_control",
 			Severity:       severity,
 			Summary:        "The run showed signs of broad or weakly controlled agentic behavior.",
-			Evidence:       fmt.Sprintf("friction=%d execution=%s actuation=%s", frictionEvents, fingerprint.ExecutionStyle, fingerprint.ActuationStyle),
+			Evidence:       fmt.Sprintf("%s execution=%s actuation=%s", frictionEvidence, fingerprint.ExecutionStyle, fingerprint.ActuationStyle),
 			Recommendation: "Tighten instructions, reduce unnecessary tools, or delay write actions until the workflow has stronger evidence.",
 		})
 	}

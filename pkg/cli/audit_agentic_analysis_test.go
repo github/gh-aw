@@ -92,6 +92,54 @@ func TestBuildAgenticAssessmentsFlagsResourceHeavyRun(t *testing.T) {
 	assert.True(t, found, "resource heavy assessment should be present")
 }
 
+func TestBuildAgenticAssessmentsIncludesSessionToolFailuresInControlAssessment(t *testing.T) {
+	t.Parallel()
+	processedRun := ProcessedRun{
+		Run: WorkflowRun{DatabaseID: 1, SafeItemsCount: 6},
+		Friction: &FrictionCostSummary{
+			TotalOccurrences:   1,
+			CountedOccurrences: 1,
+			Drivers: []FrictionDriverSummary{{
+				Driver:                "session_tool_failure",
+				Occurrences:           1,
+				CountedOccurrences:    1,
+				SuppressedOccurrences: 0,
+			}},
+		},
+	}
+	domain := &TaskDomainInfo{Name: "code_fix", Label: "Code Fix"}
+	fingerprint := &BehaviorFingerprint{
+		ExecutionStyle: "directed",
+		ActuationStyle: "write_heavy",
+	}
+
+	assessments := buildAgenticAssessments(processedRun, MetricsData{}, nil, nil, domain, fingerprint, nil)
+
+	require.Len(t, assessments, 1)
+	assert.Equal(t, "poor_agentic_control", assessments[0].Kind)
+	assert.Equal(t, "high", assessments[0].Severity)
+	assert.Contains(t, assessments[0].Evidence, "control_events=max(reported_control_signals=0, friction_counted_occurrences=1)=1")
+}
+
+func TestBuildAgenticAssessmentsLabelsReportedSignalsWhenFrictionIsUnavailable(t *testing.T) {
+	t.Parallel()
+	processedRun := ProcessedRun{
+		Run:          WorkflowRun{DatabaseID: 1, SafeItemsCount: 6},
+		MissingTools: []MissingToolReport{{Tool: "example_tool"}},
+	}
+	domain := &TaskDomainInfo{Name: "code_fix", Label: "Code Fix"}
+	fingerprint := &BehaviorFingerprint{
+		ExecutionStyle: "directed",
+		ActuationStyle: "selective_write",
+	}
+
+	assessments := buildAgenticAssessments(processedRun, MetricsData{}, nil, nil, domain, fingerprint, nil)
+
+	require.Len(t, assessments, 1)
+	assert.Equal(t, "poor_agentic_control", assessments[0].Kind)
+	assert.Contains(t, assessments[0].Evidence, "control_events=1 reported_control_signals=1 friction_counted_occurrences=unavailable")
+}
+
 func TestBuildAuditDataIncludesAgenticAnalysis(t *testing.T) {
 	t.Parallel()
 	processedRun := ProcessedRun{
