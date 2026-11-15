@@ -310,12 +310,14 @@ function appendLedgerRecords(ledger, appends, config) {
 }
 
 async function main(options = {}) {
-  const { withPendingPublication } = require("./pending_writes.cjs");
+  const { withPendingPublication, pendingWritesEnabled } = require("./pending_writes.cjs");
+  if (!pendingWritesEnabled()) return mainUnchecked(options);
+  const artifact = structuredClone(options.artifact || readTransactions(options.file));
   return withPendingPublication(
     "push_ledger_changes",
     "transactions",
     () => options.artifact || readTransactions(options.file),
-    () => mainUnchecked(options)
+    () => mainUnchecked({ ...options, artifact })
   );
 }
 

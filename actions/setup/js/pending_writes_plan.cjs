@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { SCHEMA, canonicalPendingJSON, inputDigest, itemDigest, parsePendingJSON, withPendingPlanning } = require("./pending_writes.cjs");
+const { SCHEMA, canonicalPendingJSON, inputDigest, itemDigest, parsePendingJSON, withPendingPlanning, resolvedGateConfig, pendingContext, pendingEnvironment } = require("./pending_writes.cjs");
 const { readInput, describeDirectory, sha256, MAX_INPUT_BYTES } = require("./pending_writes_files.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo, isExactRepoSlug } = require("./repo_helpers.cjs");
@@ -14,6 +14,7 @@ const { getBaseBranch } = require("./get_base_branch.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { normalizeThreatKinds } = require("./threat_detection_warning.cjs");
 const { normalizeLedgerAppends } = require("./ledger_transactions.cjs");
+const { pendingReadAccess, pendingRead } = require("./pending_writes_read.cjs");
 
 const NO_WRITE_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "report_incomplete", "ledger_mutation"]);
 const CREATION_TYPES = new Set(["create_issue", "create_discussion", "create_security_advisory", "create_project", "create_check_run", "create_agent_session"]);
@@ -47,7 +48,7 @@ function withoutCredentials(value) {
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key]) => !["github-token", "head-github-token", "github_token", "head_github_token", "_prReviewBufferRegistry", "_activationCommentLinks", "allowedMentionAliases"].includes(key))
-      .map(([key, child]) => [key, withoutCredentials(child)])
+      .map(([key, child]) => [key, ["schema", "data_schema", "input_schema", "inputSchema", "output_schema"].includes(key) ? structuredClone(child) : withoutCredentials(child)])
   );
 }
 
@@ -84,18 +85,19 @@ function safeTargetString(value) {
  * Reuse the same repo/number resolvers as the handlers. Unsupported selectors
  * are explicit incomplete plans; they never silently become triggering.
  */
-async function describeTarget(message, config, context, branches) {
+async function describeTarget(message, config, context, branches, options) {
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, message.type);
   if (!repoResult.success || !isExactRepoSlug(repoResult.repoParts)) throw new Error("Pending-write repository cannot be resolved");
   /** @type {Record<string, any>} */
   const target = { repository: safeTargetString(repoResult.repo) };
+  const access = pendingReadAccess(options.handlerConfig?.[message.type] || {}, repoResult.repo, options);
   if (DELEGATED_TYPES.has(message.type)) {
     target.job = DELEGATED_TYPES.get(message.type);
-    return target;
+    return { target, access };
   }
   if (message.type === "create_pull_request") {
-    const base = config.base_branch || (await getBaseBranch(repoResult.repoParts));
+    const base = config.base_branch || (await pendingRead(() => getBaseBranch(repoResult.repoParts, { githubClient: access.client, failClosed: true })));
     target.base = safeTargetString(message.base || base);
     target.branch = branches.get(message);
     if (config["head-repo"]) {
@@ -103,14 +105,14 @@ async function describeTarget(message, config, context, branches) {
       if (!head.success) throw new Error("Pending-write head repository cannot be resolved");
       target.head_repository = safeTargetString(head.repo);
     }
-    return target;
+    return { target, access };
   }
-  if (CREATION_TYPES.has(message.type) || NO_WRITE_TYPES.has(message.type) || message.type === "ledger_append") return target;
+  if (CREATION_TYPES.has(message.type) || NO_WRITE_TYPES.has(message.type) || message.type === "ledger_append") return { target, access };
   if (message.type === "add_comment" && ["discussion", "discussion_comment"].includes(context.eventName) && (config.target || "triggering") === "triggering") {
     target.number = context.payload?.discussion?.number;
     target.kind = "discussion";
     if (!Number.isSafeInteger(target.number)) throw new Error("Pending-write discussion cannot be resolved");
-    return target;
+    return { target, access };
   }
   if (ISSUE_TYPES.has(message.type) || BOTH_TYPES.has(message.type) || PR_TYPES.has(message.type)) {
     const result = resolveTarget({
@@ -125,14 +127,14 @@ async function describeTarget(message, config, context, branches) {
     target.number = result.number;
     target.kind = result.contextType === "issue" ? "issue" : "pull_request";
     if (message.type === "push_to_pull_request_branch") {
-      const { data: pr } = await github.rest.pulls.get({ ...repoResult.repoParts, pull_number: result.number });
+      const { data: pr } = await pendingRead(() => access.client.rest.pulls.get({ ...repoResult.repoParts, pull_number: result.number }));
       if (pr?.number !== result.number || !pr.head?.sha || !pr.head?.ref || !pr.base?.ref) throw new Error("Pending-write PR head cannot be resolved");
       target.branch = safeTargetString(pr.head.ref);
       target.base = safeTargetString(pr.base.ref);
       target.head_repository = safeTargetString(pr.head.repo?.full_name || repoResult.repo);
       target.head_commit = pr.head.sha;
     }
-    return target;
+    return { target, access };
   }
   throw new Error("Pending-write handler target is unsupported");
 }
@@ -183,11 +185,19 @@ async function buildPendingWritesUnchecked(options) {
   const config = withoutCredentials(options.handlerConfig || {});
   const run = options.run;
   if (!run || !run.repository || !run.workflow_ref || !run.workflow_sha || !run.run_id || !run.run_attempt || !run.event) throw new Error("Pending writes require complete run provenance");
-  const context = options.context || globalThis.context;
+  const context = pendingContext(options.context || globalThis.context);
   const bindings = [{ id: "agent_output", kind: "file", path: options.agentOutputPath }, ...(options.bindings || [])];
   const inputs = bindings.map(describeInput);
   bindings.push({ id: "handler_config", kind: "value", value: config });
   inputs.push({ id: "handler_config", kind: "value", sha256: inputDigest(config) });
+  const gateConfig = options.gateConfig || resolvedGateConfig();
+  bindings.push({ id: "gate_config", kind: "value", value: gateConfig });
+  inputs.push({ id: "gate_config", kind: "value", sha256: inputDigest(gateConfig) });
+  bindings.push({ id: "context", kind: "value", value: context });
+  inputs.push({ id: "context", kind: "value", sha256: inputDigest(context) });
+  const environment = pendingEnvironment();
+  bindings.push({ id: "environment", kind: "value", value: environment });
+  inputs.push({ id: "environment", kind: "value", sha256: inputDigest(environment) });
   const graph = buildSafeOutputDependencyPlan(messages);
   const ids = messages.map((message, index) => message.output_id || `so_${inputDigest([index, message]).slice(0, 12)}`);
   const branches = new Map();
@@ -222,7 +232,7 @@ async function buildPendingWritesUnchecked(options) {
         protected_files_policy: handlerConfig.protected_files_policy || (message.type === "create_pull_request" ? "request_review" : "blocked"),
         sha256: inputDigest(handlerConfig),
       },
-      free_text: describeText(message),
+      free_text: [...describeText(message), ...describeText(handlerConfig, "/settings")],
       input_sha256: inputDigest(message),
       complete: true,
       reason_category: "ready",
@@ -231,10 +241,18 @@ async function buildPendingWritesUnchecked(options) {
       const custom = (options.customTypes || []).includes(message.type);
       if (!config[message.type] && !NO_WRITE_TYPES.has(message.type) && !custom) throw new Error("Unconfigured pending-write handler");
       if (graph.invalid.has(index) || graph.cyclic) throw new Error("Invalid pending-write dependency graph");
-      item.target = custom ? { repository: run.repository, job: message.type } : await describeTarget(message, handlerConfig, context, branches);
+      const describedTarget = custom
+        ? { target: { repository: run.repository, job: message.type }, access: { token: options.readToken, client: options.readClient || globalThis.github } }
+        : await describeTarget(message, handlerConfig, context, branches, options);
+      item.target = describedTarget.target;
+      if (["add_comment", "create_issue", "create_pull_request", "create_discussion", "close_discussion", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"].includes(message.type)) {
+        const { resolveAllowedMentionsFromPayload, getMentionsGithubClient } = require("./resolve_mentions_from_payload.cjs");
+        const [owner, repo] = item.target.repository.split("/");
+        item.settings.mention_allowances = await resolveAllowedMentionsFromPayload(context, getMentionsGithubClient(describedTarget.access.client), core, handlerConfig.mentions ?? config.mentions ?? {}, undefined, { owner, repo });
+      }
       if (dynamicSettings(handlerConfig, message)) throw new Error("Pending-write plan requires dynamic auxiliary targets");
       if (["create_pull_request", "push_to_pull_request_branch"].includes(message.type)) {
-        const described = await describeCodeWrite(message, item.target, handlerConfig, salts.get(message), options.readToken, options.localRepository);
+        const described = await describeCodeWrite(message, item.target, handlerConfig, salts.get(message), describedTarget.access.token, options.localRepository, describedTarget.access.client);
         item.code = described.code;
         for (const binding of described.bindings) {
           bindings.push({ id: `${binding.suffix}:${ids[index]}`, kind: binding.kind, path: binding.path });
@@ -242,9 +260,10 @@ async function buildPendingWritesUnchecked(options) {
         }
         if (!item.code.complete) throw new Error("Pending-write code inventory is incomplete");
       }
-    } catch {
+    } catch (error) {
       item.complete = false;
-      item.reason_category = "unsupported_plan";
+      item.reason_category = error?.code === "ERR_PENDING_READ_UNAVAILABLE" ? "read_unavailable" : "unsupported_plan";
+      if (item.reason_category === "read_unavailable") globalThis.core?.warning?.("Pending-write code cannot be read before the gate with the existing scoped credential; no future write-App token or alternate credential will be used");
     }
     item.item_sha256 = itemDigest(item);
     items.push(item);
