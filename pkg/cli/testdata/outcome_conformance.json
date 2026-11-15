@@ -1,5 +1,67 @@
 [
   {
+    "name": "gate denied Class A without a target",
+    "item": { "type": "create_issue", "status": "skipped", "gate_signal": "gate_denied" },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_denied" }
+  },
+  {
+    "name": "gate held Class A",
+    "item": { "type": "create_pull_request", "status": "skipped", "gate_decision": "hold" },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_held" }
+  },
+  {
+    "name": "gate staged Class A",
+    "item": { "type": "add_comment", "status": "staged", "gate_decision": "stage" },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_staged" }
+  },
+  {
+    "name": "gate dropped Class A",
+    "item": { "type": "create_issue", "status": "skipped", "gate_decision": "drop" },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_dropped" }
+  },
+  {
+    "name": "gate denied Class C ignores unavailable primary API",
+    "item": { "type": "create_issue", "number": 1, "status": "skipped", "gate_signal": "gate_denied" },
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_denied" }
+  },
+  {
+    "name": "gate held Class C ignores primary 404",
+    "item": { "type": "create_pull_request", "number": 1, "status": "skipped", "gate_decision": "hold" },
+    "errors": { "pulls/1": 404 },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_held" }
+  },
+  {
+    "name": "gate staged Class C ignores rate limit",
+    "item": { "type": "add_comment", "number": 1, "status": "staged", "gate_decision": "stage" },
+    "errors": { "issues/1": 429 },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_staged" }
+  },
+  {
+    "name": "gate dropped Class C ignores unavailable primary API",
+    "item": { "type": "create_issue", "number": 1, "status": "skipped", "gate_decision": "drop" },
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "skipped", "evidence_strength": "strong", "signal": "gate_dropped" }
+  },
+  {
+    "name": "held item applied by replay evaluated normally",
+    "item": { "type": "create_issue", "number": 1, "status": "success", "gate_decision": "hold", "gate_signal": "gate_held" },
+    "responses": { "issues/1": { "state": "closed", "state_reason": "completed" } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "completed" }
+  },
+  {
+    "name": "review evaluated as created issue",
+    "item": { "type": "create_issue", "number": 1, "status": "success", "gate_decision": "review" },
+    "responses": { "issues/1": { "state": "closed", "state_reason": "completed" } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "completed" }
+  },
+  {
+    "name": "review issue Class C primary API failure",
+    "item": { "type": "create_issue", "number": 1, "status": "success", "gate_decision": "review" },
+    "errors": { "issues/1": 503 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
     "name": "commit at action boundary is not follow up",
     "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
     "responses": {

@@ -255,6 +255,7 @@ type RunData struct {
 	SteeringDeliveries         []SteeringDelivery     `json:"steering_deliveries,omitempty" console:"-"`                                            // Every AWF steering notice delivery, one per conversation per notice
 	SteeringNoticesUnavailable bool                   `json:"steering_notices_unavailable,omitempty" console:"-"`                                   // True when the unified session could not be read
 	ModelRouting               *ModelRoutingSummary   `json:"model_routing,omitempty" console:"-"`                                                  // AWF model routing and per-run cost attribution
+	WriteGate                  *WriteGateReport       `json:"write_gate,omitempty" console:"-"`                                                     // AWF model routing and per-run cost attribution
 	GitHubAPICalls             int                    `json:"github_api_calls,omitempty" console:"header:GitHub API Calls,format:number,omitempty"` // GitHub API calls made during the run
 	AvgTimeBetweenTurns        string                 `json:"avg_time_between_turns,omitempty" console:"-"`                                         // Average time between consecutive LLM API calls (TBT)
 	Experiments                *ExperimentData        `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
@@ -574,6 +575,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	runData := newRunData(pr, engineInfo, chainMetrics, comparison, failureKind, gitHubAPICalls)
 	runData.EpisodeHops = collectRunEpisodeHops(pr, engineInfo.awContext)
 	runData.ModelRouting = pr.ModelRouting
+	runData.WriteGate = readWriteGate(run.LogsPath)
 	applyRunDataSteering(&runData, pr.TokenUsage)
 	runData.Ledger = pr.Ledger
 	runData.awInfo = engineInfo.awInfo

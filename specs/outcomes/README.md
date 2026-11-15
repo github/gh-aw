@@ -17,7 +17,8 @@ stuttering before publication; it is an assumption, not a guarantee about the
 scheduling of later CLI evaluations. These model identities do not imply two
 production evaluators; `gh aw logs --outcomes` is the live evaluation entry point.
 
-The finite universe has **2,712 distinct evidence records**. Each action family
+The finite universe has **2,736 distinct evidence records**, including 24 gate
+suppression records varying reason, target availability, and API degradation. Each action family
 varies relevant state, missing/available execution evidence, API success/failure,
 reference availability, actor provenance, time eligibility, or retention.
 PR effort additionally varies completeness, human activity, and timestamp
@@ -34,6 +35,7 @@ invariants also constrain the evidence that can justify acceptance.
 |---|---|
 | `TypeOK` | Valid phase, status, strength, and zero-touch flag |
 | `PrimaryFailureCannotAccept` | Primary API failure cannot justify acceptance |
+| `GateBlocksRemainSkipped` | Gate suppression preserves skipped/strong and its exact signal even without targets or APIs |
 | `AcceptanceEvidence` | Accepted results require normative action-specific evidence |
 | `ExecutionAttributionRequired` | Identity-sensitive actions require recorded, matched execution evidence |
 | `ReviewRequiresPostActionHuman` | Ready-for-review acceptance requires a strictly post-action visible non-bot review |
@@ -78,10 +80,15 @@ run-level evidence; generated artifacts are not source files.
 
 ## Last recorded bounds and controls
 
-The following are the last recorded TLC 2.19 results (official v1.7.4
-distribution), not verification from this update. TLC was not rerun because
-`TLA2TOOLS_JAR` was not configured. The shared corpus now contains 95 cases,
-all projected by `check.mjs`; verification of the current corpus is pending.
+The gate update was checked with TLC 2.19 (official v1.7.4 distribution):
+the full bounded baseline completed with 19,152 generated states, 16,416
+distinct states, depth 5, and an empty queue. The 24-record gate-only slice
+completed with 168 generated states, 144 distinct states, and an empty queue.
+The seeded `gate` defect failed `GateBlocksRemainSkipped` as required.
+Full current fixture verification remains blocked by a pre-existing dispatch
+projection mismatch: a captured run ID in the execution URL is not projected
+as present execution evidence. The historical bounds below are retained for
+comparison, not represented as current fixture verification.
 The controls column identifies what each positive run is paired with; mutation
 controls must fail with the exact invariant named below.
 
@@ -98,6 +105,7 @@ against the current 95-case corpus and controls is pending.
 
 | Deliberate defect | Required invariant violation |
 |---|---|
+| Gate suppression reclassified as unknown | `GateBlocksRemainSkipped` |
 | Target existence accepted | `AcceptanceEvidence` |
 | Open issue bot activity accepted | `OpenCreationsPending` |
 | Merged push without execution identity accepted | `AcceptanceEvidence` |
