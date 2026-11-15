@@ -222,7 +222,9 @@ install_linux_binary() {
 
   local binary_url="${BASE_URL}/${binary_name}"
   echo "Downloading binary from \"${binary_url}\"..."
-  curl --proto '=https' --proto-redir '=https' -fsSL --retry 5 --retry-delay 10 --retry-max-time 180 --retry-all-errors -o "${TEMP_DIR}/${binary_name}" "${binary_url}"
+  # Exponential backoff spans longer gateway outages than six fixed-delay attempts.
+  # Bound connection setup without imposing a total timeout on large binaries.
+  curl --proto '=https' --proto-redir '=https' -fsSL --retry 8 --retry-max-time 180 --connect-timeout 15 --retry-all-errors -o "${TEMP_DIR}/${binary_name}" "${binary_url}"
 
   # Verify checksum
   verify_checksum "${TEMP_DIR}/${binary_name}" "${binary_name}" "${expected_checksum}"
