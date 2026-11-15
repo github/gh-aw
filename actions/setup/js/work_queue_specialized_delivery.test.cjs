@@ -120,9 +120,11 @@ describe("multiple asset deliveries in one Claim", () => {
     const verify = index => execute(() => assets.verifyAssetDelivery({ claim, github, authorize, durable: true, result: { entry: { index, type: "upload_asset", verifier: "asset", receipt: JSON.parse(JSON.stringify(receipts[index])) } } }));
     expect((await verify(0)).verified).toBe(true);
     expect((await verify(1)).verified).toBe(true);
-    state.refs.set(`heads/${results[0].branch}`, "e".repeat(40));
-    expect((await verify(0)).verified).toBe(false);
-    expect((await verify(1)).verified).toBe(true);
+    expect(results[0].branch).toBe(results[1].branch);
+    expect(state.refs.size).toBe(1);
+    state.refs.set(`heads/${results[0].branch}`, results[0].commit);
+    expect((await verify(0)).verified).toBe(true);
+    expect((await verify(1)).verified).toBe(secondPath === "first.png");
   });
 });
 

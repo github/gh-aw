@@ -63,7 +63,7 @@ async function main(config = {}, suppliedClient) {
     const content = readGuardedFile(staged, maximum);
     const sha256 = crypto.createHash("sha256").update(content).digest("hex");
     if (message.sha !== undefined && message.sha !== sha256) throw new Error("Queue asset staged content differs from its declared digest");
-    const branch = `${branchPrefix}-asset-${count}`;
+    const branch = branchPrefix;
     const assetPath = `claims/${namespace}/${sha256}${extension}`;
     const authorityResource = await resolveRepositoryTarget(client, { repository, ref: `refs/heads/${branch}`, path: assetPath });
     const git = client.rest?.git;
@@ -133,13 +133,26 @@ async function verifyAssetReceipt(options, receipt) {
   if (!validAssetReceipt(receipt, claim)) return { verified: false, diagnostics: { event: "asset.receipt_missing" } };
   const [owner, repo] = receipt.repository.split("/");
   const ref = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
-  if (ref.data.object.sha !== receipt.commit) return { verified: false, diagnostics: { event: "asset.ref_mismatch" } };
+  const branchHead = ref.data.object.sha;
+  if (typeof branchHead !== "string" || !branchHead) return { verified: false, diagnostics: { event: "asset.ref_mismatch" } };
   const commit = await github.rest.git.getCommit({ owner, repo, commit_sha: receipt.commit });
   if (commit.data.sha !== receipt.commit || commit.data.tree.sha !== receipt.tree) return { verified: false, diagnostics: { event: "asset.commit_mismatch" } };
   if (receipt.parent ? commit.data.parents?.length !== 1 || commit.data.parents[0].sha !== receipt.parent : commit.data.parents?.length !== 0) return { verified: false, diagnostics: { event: "asset.parent_mismatch" } };
   const tree = await github.rest.git.getTree({ owner, repo, tree_sha: receipt.tree, recursive: "true" });
   if (tree.data.truncated || tree.data.sha !== receipt.tree || !tree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob))
     return { verified: false, diagnostics: { event: "asset.tree_mismatch" } };
+  if (branchHead !== receipt.commit) {
+    const headCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: branchHead });
+    if (headCommit.data?.sha !== branchHead || typeof headCommit.data.tree?.sha !== "string") return { verified: false, diagnostics: { event: "asset.ref_mismatch" } };
+    const headTree = await github.rest.git.getTree({ owner, repo, tree_sha: headCommit.data.tree.sha, recursive: "true" });
+    if (
+      !headTree.data ||
+      headTree.data.truncated ||
+      headTree.data.sha !== headCommit.data.tree.sha ||
+      !headTree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob)
+    )
+      return { verified: false, diagnostics: { event: "asset.path_missing_from_ref" } };
+  }
   const blob = await github.rest.git.getBlob({ owner, repo, file_sha: receipt.blob });
   if (blob.data.sha !== receipt.blob || blob.data.encoding !== "base64" || crypto.createHash("sha256").update(Buffer.from(blob.data.content, "base64")).digest("hex") !== receipt.sha256)
     return { verified: false, diagnostics: { event: "asset.blob_mismatch" } };
@@ -152,9 +165,9 @@ async function verifyAssetReceipt(options, receipt) {
       { kind: "git_blob", repository: receipt.repository, id: receipt.blob },
       { kind: "git_tree", repository: receipt.repository, id: receipt.tree },
       { kind: "git_commit", repository: receipt.repository, id: receipt.commit },
-      { kind: "git_ref", repository: receipt.repository, id: receipt.commit },
+      { kind: "git_ref", repository: receipt.repository, id: branchHead },
     ],
-    evidence: { source: "github_git_api", commit: receipt.commit, tree: receipt.tree, blob: receipt.blob, sha256: receipt.sha256 },
+    evidence: { source: "github_git_api", commit: receipt.commit, tree: receipt.tree, blob: receipt.blob, branch_head: branchHead, sha256: receipt.sha256 },
   });
   return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
