@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
 
+var writeGateLog = logger.NewSlogLoggerWithHandler(logger.New("cli:write_gate"))
 var writeGateReasonPattern = regexp.MustCompile(`^[a-z0-9_.-]{1,64}$`)
 var writeGateDigestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
@@ -33,7 +36,7 @@ type WriteGateItem struct {
 func readWriteGate(runDir string) *WriteGateReport {
 	session, _, err := readSessionModelRouting(runDir)
 	if err != nil {
-		auditReportLog.Printf("Failed to read write gate evidence: %v", err)
+		writeGateLog.Debug("Failed to read write gate evidence", "error", err)
 		return nil
 	}
 	if session == nil {
