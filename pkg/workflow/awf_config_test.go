@@ -1982,6 +1982,42 @@ func TestBuildAWFConfigJSON_DomainDeduplication(t *testing.T) {
 // validateAWFConfigJSON path, which is triggered at compile time when --validate is used
 // (WorkflowData.ValidateAWFConfig == true). Running it unconditionally here ensures schema
 // compliance is verified in CI without the per-compile performance cost.
+func TestAWFConfigSchemaMaxAiCredits(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		value string
+		valid bool
+	}{
+		{`1000`, true},
+		{`0.5`, true},
+		{`0`, true},
+		{`-1`, true},
+		{`"20K"`, true},
+		{`"20k"`, true},
+		{`"100M"`, true},
+		{`"100m"`, true},
+		{`" 001K "`, true},
+		{`"0K"`, false},
+		{`"000m"`, false},
+		{`"-1K"`, false},
+		{`"1.5M"`, false},
+		{`"1000"`, false},
+		{`"1G"`, false},
+		{`-2`, false},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			t.Parallel()
+			err := validateAWFConfigJSON(`{"apiProxy":{"maxAiCredits":` + tc.value + `}}`)
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
 func TestBuildAWFConfigJSON_SchemaCompliance(t *testing.T) {
 	cases := []struct {
 		name   string
