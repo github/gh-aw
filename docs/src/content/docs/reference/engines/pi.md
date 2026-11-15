@@ -209,6 +209,10 @@ network:
 
 Compatible provider catalogs, including classifier and image models, retain their native identities but route through the same credential-isolated gateway. Requests must be supported by that gateway and upstream endpoint. Providers requiring different protocols or ambient cloud authentication can run natively only when the agent sandbox is explicitly disabled; this removes credential isolation and is not the recommended deployment mode. Unsupported sandboxed provider routes fail compilation instead of silently switching to Copilot.
 
+For OpenRouter, the first slash separates the provider; the remaining `anthropic/claude-sonnet-4` is the exact upstream model ID. Use the full catalog ID (for example `openrouter/moonshotai/kimi-k3`), not a bare `openrouter/kimi-k3` shorthand. Pi does not infer a vendor namespace: when AWF model discovery completes, the ID must exactly match the configured endpoint's `/reflect` catalog.
+
+Sandboxed OpenRouter requires the explicit `model-provider: openai`, endpoint, and `OPENAI_API_KEY` mapping shown above. The native `openrouter` provider's `OPENROUTER_API_KEY` mapping applies only when the agent sandbox is explicitly disabled; it does not supply a credential-isolated AWF route.
+
 ## Pi runtime configuration
 
 `engine.config` accepts JSON with four optional objects:

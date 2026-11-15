@@ -13,6 +13,42 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+func TestCompilePiOpenRouterModel(t *testing.T) {
+	for _, model := range []string{"anthropic/claude-sonnet-4", "moonshotai/kimi-k3"} {
+		t.Run(model, func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "pi-openrouter.md")
+			markdown := fmt.Sprintf(`---
+on: workflow_dispatch
+engine:
+  id: pi
+  model: openrouter/%s
+  model-provider: openai
+  env:
+    OPENAI_BASE_URL: https://openrouter.ai/api/v1
+    OPENAI_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+network:
+  allowed: [defaults, openrouter.ai]
+---
+Report status.
+`, model)
+			require.NoError(t, os.WriteFile(source, []byte(markdown), 0o600))
+			require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+			lock, err := os.ReadFile(filepath.Join(dir, "pi-openrouter.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(lock), "GH_AW_PI_MODEL: openrouter/"+model)
+			require.Contains(t, string(lock), "GH_AW_PI_NATIVE_PROVIDER: openrouter")
+			require.Contains(t, string(lock), "GH_AW_LLM_PROVIDER=openai")
+			require.Contains(t, string(lock), "https://openrouter.ai/api/v1")
+			require.Equal(t, model, extractPiModelID("openrouter/"+model))
+
+			withoutRoute := strings.Replace(markdown, "  model-provider: openai\n", "", 1)
+			require.NoError(t, os.WriteFile(source, []byte(withoutRoute), 0o600))
+			require.ErrorContains(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source), "credential-isolated AWF route")
+		})
+	}
+}
+
 func TestCompilePiDispatchModel(t *testing.T) {
 	for _, expression := range []string{"${{ inputs.model }}", "${{ github.event.inputs.model }}"} {
 		for _, firewall := range []bool{true, false} {
