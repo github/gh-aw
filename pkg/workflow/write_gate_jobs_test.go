@@ -318,7 +318,9 @@ Publish only after the gate.
 			require.Contains(t, string(steps), "GH_AW_WRITE_GATE_WORKFLOW_SHA")
 			require.Contains(t, string(steps), "github.workflow_sha")
 			require.Contains(t, string(steps), "Upload write gate verdict")
-			require.Contains(t, output, `"write_gate":{"version":1,"record_job":"conclusion","artifact_immutable":true`)
+			var header strings.Builder
+			require.NoError(t, compiler.generateManifestHeader(&header, data, nil, nil))
+			require.Contains(t, header.String(), `"write_gate":{"version":1,"record_job":"conclusion","artifact_immutable":true`)
 		})
 	}
 }

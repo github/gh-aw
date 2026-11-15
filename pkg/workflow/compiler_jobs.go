@@ -296,6 +296,12 @@ func (c *Compiler) getActivationRenderedEngineEnvValues(data *WorkflowData) []st
 // This function orchestrates the building of all job types by delegating to focused helper functions.
 func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 	compilerJobsLog.Printf("Building jobs for workflow: %s", markdownPath)
+	if err := c.validateWriteGateConfiguration(data); err != nil {
+		return err
+	}
+	if hasWriteGateSteps(data) && data.SafeOutputs == nil {
+		data.SafeOutputs = &SafeOutputsConfig{}
+	}
 
 	// Use the already-parsed frontmatter from WorkflowData; consumers below only
 	// inspect the processed "on" field for activation decisions.
@@ -662,7 +668,7 @@ func (c *Compiler) buildUpdateCacheMemoryJobWrapper(data *WorkflowData, threatDe
 		return "", nil
 	}
 
-	if !threatDetectionEnabled {
+	if !threatDetectionEnabled && !hasWriteGateSteps(data) {
 		return "", nil
 	}
 
@@ -685,7 +691,7 @@ func (c *Compiler) buildUpdateCacheMemoryJobWrapper(data *WorkflowData, threatDe
 }
 
 func (c *Compiler) buildUpdateDriveMemoryJobWrapper(data *WorkflowData, threatDetectionEnabled bool) (string, error) {
-	if data.DriveMemoryConfig == nil || len(data.DriveMemoryConfig.Drives) == 0 || !threatDetectionEnabled {
+	if data.DriveMemoryConfig == nil || len(data.DriveMemoryConfig.Drives) == 0 || (!threatDetectionEnabled && !hasWriteGateSteps(data)) {
 		return "", nil
 	}
 	job, err := c.buildUpdateDriveMemoryJob(data, threatDetectionEnabled)

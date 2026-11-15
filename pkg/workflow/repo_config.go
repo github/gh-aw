@@ -180,6 +180,9 @@ type RepoConfig struct {
 	// self-hosted runner.
 	RequireSelfHostedRunners bool
 
+	// RequireWriteGate requires an imported or authored gate for write outputs.
+	RequireWriteGate bool
+
 	// LockFileLogo controls the ASCII logo in generated workflow headers.
 	// When nil or true, the logo is enabled.
 	LockFileLogo *bool
@@ -293,6 +296,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 		Strict                   bool                          `json:"strict,omitempty"`
 		GHES                     bool                          `json:"ghes,omitempty"`
 		RequireSelfHostedRunners bool                          `json:"require_self_hosted_runners,omitempty"`
+		RequireWriteGate         bool                          `json:"require_write_gate,omitempty"`
 		LockFileLogo             *bool                         `json:"lock_file_logo,omitempty"`
 		ArtifactRetentionDays    *TemplatableInt32             `json:"artifact_retention_days,omitempty"`
 		HelpCommand              *bool                         `json:"help_command,omitempty"` // nil = use default (enabled)
@@ -317,6 +321,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	r.Strict = raw.Strict
 	r.GHES = raw.GHES
 	r.RequireSelfHostedRunners = raw.RequireSelfHostedRunners
+	r.RequireWriteGate = raw.RequireWriteGate
 	r.LockFileLogo = raw.LockFileLogo
 	r.ArtifactRetentionDays = raw.ArtifactRetentionDays
 	r.HelpCommand = raw.HelpCommand

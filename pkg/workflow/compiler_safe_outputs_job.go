@@ -144,7 +144,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	}
 
 	// Early return when no safe output handler steps were emitted
-	if len(safeOutputStepNames) == 0 && !isWorkQueueParticipant(data) {
+	if len(safeOutputStepNames) == 0 && !isWorkQueueParticipant(data) && !hasWriteGateSteps(data) {
 		consolidatedSafeOutputsJobLog.Print("No safe output steps were added")
 		return nil, nil, nil
 	}
@@ -819,7 +819,13 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 
 	// Build and insert preamble token minting steps (GitHub App tokens) before checkout/safe-output steps.
 	preambleTokenSteps := c.buildPreambleTokenSteps(data, outputs)
-	if len(preambleTokenSteps) > 0 {
+	if hasWriteGateSteps(data) {
+		var err error
+		steps, err = c.insertWriteGatePhase(data, steps, preambleTokenSteps, agentArtifactPrefix, outputs)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else if len(preambleTokenSteps) > 0 {
 		steps = c.insertPreambleTokenStepsIntoSteps(steps, preambleTokenSteps, data, agentArtifactPrefix)
 	}
 
