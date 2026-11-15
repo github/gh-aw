@@ -1,0 +1,120 @@
+{
+ "date": "2026-11-15",
+ "window": "2026-10-16..2026-11-15",
+ "total_prs": 621,
+ "merged": 535,
+ "closed": 84,
+ "open": 2,
+ "merge_rate": 0.864,
+ "merge_rate_basis": "completed (merged/(merged+closed))",
+ "categories": {
+  "feature": [
+   118,
+   103,
+   14,
+   1
+  ],
+  "bug_fix": [
+   86,
+   73,
+   12,
+   1
+  ],
+  "security": [
+   72,
+   64,
+   8,
+   0
+  ],
+  "testing": [
+   35,
+   34,
+   1,
+   0
+  ],
+  "documentation": [
+   35,
+   33,
+   2,
+   0
+  ],
+  "refactor": [
+   40,
+   29,
+   11,
+   0
+  ],
+  "dependency": [
+   16,
+   14,
+   2,
+   0
+  ],
+  "other": [
+   219,
+   185,
+   34,
+   0
+  ]
+ },
+ "category_format": "[total,merged,closed,open]",
+ "length_buckets_completed": {
+  "0-100": [
+   334,
+   280
+  ],
+  "100-150": [
+   169,
+   146
+  ],
+  "150-250": [
+   26,
+   22
+  ],
+  "250+": [
+   90,
+   87
+  ]
+ },
+ "signals_completed": {
+  "code_block": [
+   353,
+   321
+  ],
+  "file_path": [
+   150,
+   140
+  ],
+  "acceptance": [
+   103,
+   94
+  ],
+  "test_cmd": [
+   19,
+   19
+  ],
+  "no_code_file_accept_test": [
+   199,
+   156
+  ]
+ },
+ "negative_titles": {
+  "wip_draft": [
+   11,
+   3
+  ],
+  "triage_verify_investigate": [
+   14,
+   3
+  ]
+ },
+ "last_7_days": {
+  "total": 185,
+  "merged": 155,
+  "closed": 28,
+  "open": 2,
+  "merge_rate": 0.847
+ },
+ "category_rules": "v5 (conventional-commit prefix, else title keyword regex; re-implemented this run, not strictly comparable to v4)",
+ "caveat": "PR body used as prompt proxy; bodies may include agent-written summaries"
+}
