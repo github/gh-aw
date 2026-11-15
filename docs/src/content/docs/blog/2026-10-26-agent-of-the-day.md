@@ -13,7 +13,7 @@ Every codebase has a file that started small and kept saying yes. Today's spotli
 
 ## Agent of the Day: Daily File Diet
 
-[Daily File Diet](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-file-diet.md) runs on a weekday schedule (around 13:00 UTC) and can also be started manually. It imports a shared Go source analysis, looks for files past a size threshold, and turns its findings into a single issue labelled `refactoring` and `code-health`. Issues expire after two days, and the workflow skips a run if a `[file-diet]` issue is still open, so it never piles up duplicates.
+[Daily File Diet](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-file-diet.md) runs on a weekday schedule (around 13:00 UTC) and can also be started manually. It imports a shared Go source analysis, looks for files past a size threshold, and turns its findings into a single issue labeled `refactoring` and `code-health`. Issues expire after two days, and the workflow skips a run if a `[file-diet]` issue is still open, so it never piles up duplicates.
 
 Its permissions are read-only for contents, issues and pull requests. The only write path is the issue it files through safe outputs.
 

@@ -33,7 +33,7 @@ The summary reports 49.3 minutes of total duration, about 103,000 tokens, roughl
 
 ## The audit view
 
-We ran `audit` on [run 40871500692](https://github.com/github/gh-aw/actions/runs/40871500692). It compared the run against an earlier baseline, [40869752898](https://github.com/github/gh-aw/actions/runs/40869752898), matched on event, task domain and resource profile, and labelled the pair "stable": same turn count, same write-capable posture, zero blocked requests.
+We ran `audit` on [run 40871500692](https://github.com/github/gh-aw/actions/runs/40871500692). It compared the run against an earlier baseline, [40869752898](https://github.com/github/gh-aw/actions/runs/40869752898), matched on event, task domain and resource profile, and labeled the pair "stable": same turn count, same write-capable posture, zero blocked requests.
 
 The audit also raised one flag worth being honest about. It classified the run as a heavy profile for a code-fix task: two turns, nine tool types and six write actions over about ten and a half minutes. Its recommendation is to compare against similar runs and trim unneeded tools or writes. The spread in token use above (3,738 to 33,268) suggests review depth tracks the size of the pull request, which is plausible but is our reading, not something the logs state.
 
