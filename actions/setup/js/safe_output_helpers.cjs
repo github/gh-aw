@@ -266,6 +266,7 @@ function resolveTarget(params) {
     return authorizationInvariant;
   }
 
+  require("./pending_writes.cjs").assertPendingTarget({ number: itemNumber });
   return {
     success: true,
     number: itemNumber,
