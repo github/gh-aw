@@ -120,7 +120,9 @@ function projectEvent(event) {
   /** @type {Record<string, unknown>} */
   const data = projectScalars(event.data, EVENT_FIELDS[event.type]);
   if (event.type === "gate.decision") {
-    const gate = require("./write_gate_observability.cjs").projectGateDecision(event.data);
+    const { isCompilerGateDecision, projectGateDecision } = require("./write_gate_observability.cjs");
+    if (!isCompilerGateDecision(event)) return undefined;
+    const gate = projectGateDecision(event.data);
     if (!gate.verdict) return undefined;
     Object.assign(data, gate);
     delete data.items;

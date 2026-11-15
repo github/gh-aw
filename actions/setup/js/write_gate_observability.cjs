@@ -27,6 +27,17 @@ function isCompilerGateDecision(event) {
   );
 }
 
+/** @param {any} item @returns {Record<string, any>|undefined} */
+function projectGateItemDecision(item) {
+  if (!item || typeof item.output_id !== "string" || !/^(so_[A-Za-z0-9_-]{12}|job_[a-f0-9]{16})$/.test(item.output_id) || !DECISIONS.includes(item.gate_decision)) return undefined;
+  return {
+    output_id: item.output_id,
+    gate_decision: item.gate_decision,
+    ...(typeof item.decision_reason === "string" && CODE.test(item.decision_reason) ? { decision_reason: item.decision_reason } : {}),
+    ...(DIGEST.test(item.item_sha256) ? { item_sha256: item.item_sha256 } : {}),
+  };
+}
+
 /** @param {any} source @returns {Record<string, any>} */
 function projectGateDecision(source) {
   if (!source || !VERDICTS.has(source.verdict) || typeof source.reason !== "string" || !CODE.test(source.reason) || !CHECKS.has(source.integrity) || !CHECKS.has(source.conclusionCheck)) return {};
@@ -38,15 +49,8 @@ function projectGateDecision(source) {
   }
   if (Array.isArray(source.items)) {
     data.items = source.items.flatMap(item => {
-      if (!item || typeof item.output_id !== "string" || !/^(so_[A-Za-z0-9_-]{12}|job_[a-f0-9]{16})$/.test(item.output_id) || !DECISIONS.includes(item.gate_decision)) return [];
-      return [
-        {
-          output_id: item.output_id,
-          gate_decision: item.gate_decision,
-          ...(typeof item.decision_reason === "string" && CODE.test(item.decision_reason) ? { decision_reason: item.decision_reason } : {}),
-          ...(DIGEST.test(item.item_sha256) ? { item_sha256: item.item_sha256 } : {}),
-        },
-      ];
+      const data = projectGateItemDecision(item);
+      return data ? [data] : [];
     });
   }
   return data;
@@ -270,4 +274,4 @@ function checkConclusion({ core = global.core, rootDir = "/tmp/gh-aw", env = pro
   }
 }
 
-module.exports = { buildGateDecision, buildGateBlockedResults, projectGateDecision, isCompilerGateDecision, checkConclusion, DECISIONS, SIGNALS, CODE, DIGEST };
+module.exports = { buildGateDecision, buildGateBlockedResults, projectGateDecision, projectGateItemDecision, isCompilerGateDecision, checkConclusion, DECISIONS, SIGNALS, CODE, DIGEST };
