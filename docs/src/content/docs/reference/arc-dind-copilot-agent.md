@@ -164,7 +164,7 @@ gh aw compile
 | DinD container mode | **Yes** | This gh-aw ARC path needs a Docker daemon in the runner pod. |
 | `NET_ADMIN` capability | **No** | Not required. AWF enforces egress via Docker network topology (network isolation mode), not host `iptables`. The DinD sidecar daemon manages all network enforcement internally. |
 | `ghcr.io/actions/actions-runner:latest` | Recommended | Use the official runner image, or a compatible custom image with equivalent runner requirements. |
-| Runner user | **Yes** | Non-root runner users are supported. By default, `sudo` must be available on the runner container for the Copilot CLI install script. If your cluster enforces `allowPrivilegeEscalation: false`, use the `--rootless` flag — see [Pod security and rootless install](#pod-security-and-rootless-install) below. |
+| Runner user | **Yes** | Non-root runner users are supported. ARC/DinD installs the Copilot CLI in rootless mode by default, so `sudo` is not required. For clusters that enforce `allowPrivilegeEscalation: false`, see [Pod security and rootless install](#pod-security-and-rootless-install) below. |
 | DinD sidecar privilege | **Yes** | ARC DinD mode configures a privileged sidecar for Docker daemon operation. |
 | Shared work volume (`/home/runner/_work`) | **Yes** | Runner and Docker daemon share this volume in ARC DinD mode, so workspace mounts work without host path translation. |
 | Specific Kubernetes distribution | Not established | No distribution/chart validation matrix is declared; validate cluster networking, volumes, and privilege policies. |
@@ -214,9 +214,9 @@ To migrate:
 
 ## Pod security and rootless install
 
-Clusters that enforce `allowPrivilegeEscalation: false` (via PodSecurity Admission or OPA policies) prevent the default Copilot CLI install script from using `sudo`.
+ARC DinD installs the Copilot CLI in rootless mode by default. If your `copilot-setup-steps` install the CLI manually, pass `--rootless` to avoid `sudo` in clusters that enforce `allowPrivilegeEscalation: false` (via PodSecurity Admission or OPA policies).
 
-Pass `--rootless` to `install_copilot_cli.sh` in your `copilot-setup-steps` to install to `$RUNNER_TEMP/gh-aw/bin` without any `sudo` calls. AWF mounts this job-scoped directory read-only; the script adds it to `$GITHUB_PATH` so subsequent steps find the binary:
+The `--rootless` flag installs to `$RUNNER_TEMP/gh-aw/bin` without any `sudo` calls. AWF mounts this job-scoped directory read-only; the script adds it to `$GITHUB_PATH` so subsequent steps find the binary:
 
 ```yaml
 copilot-setup-steps:
