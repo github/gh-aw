@@ -117,7 +117,7 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 		if recordJobName == "" {
 			recordJobName = recordJob.Name
 		}
-		manifest.WriteGate = &GHAWManifestWriteGate{Version: 1, RecordJob: recordJobName}
+		manifest.WriteGate = &GHAWManifestWriteGate{Version: 1, RecordJob: recordJobName, ArtifactImmutable: !data.GHES}
 	}
 	manifest.WebhookSubscriptions = data.WebhookSubscriptions
 	if err := deduplicateMarkdownMetadata(yaml.String(), manifest); err != nil {

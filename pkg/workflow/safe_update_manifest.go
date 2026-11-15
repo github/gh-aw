@@ -78,8 +78,9 @@ type GHAWManifestWorkQueue struct {
 }
 
 type GHAWManifestWriteGate struct {
-	Version   int    `json:"version"`
-	RecordJob string `json:"record_job"`
+	Version           int    `json:"version"`
+	RecordJob         string `json:"record_job"`
+	ArtifactImmutable bool   `json:"artifact_immutable"`
 }
 
 // GHAWManifest is the single-line JSON payload embedded as a "# gh-aw-manifest: ..."
