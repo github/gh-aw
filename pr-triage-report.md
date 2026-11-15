@@ -1,39 +1,30 @@
-### Executive totals
-- Open Copilot PRs: 0
-- Eligible after 1h cooldown: 0
-- Skipped by cooldown: 0
-- Distribution by category: none
-- Distribution by risk: none
-- Distribution by priority: none
-- Distribution by action: none
+### PR Triage Report
 
-### Top-priority PRs
-- None. There are no open PRs authored by `app/github-copilot` in this repository queue.
+#### Executive totals
+- Eligible Copilot PRs: 1
+- Open Copilot PRs reviewed: 1
+- Cooldown-skipped PRs: 0
+- Category mix: bug 1
+- Risk mix: medium 1
+- Priority mix: medium 1
+- Recommended actions: batch_review 1
 
-### Auto-merge candidates
-- None.
+#### Top-priority PRs
+- #77573 — Capture startup failure log details — score 47 — batch_review
 
-### Fast-track items
-- None.
+#### Auto-merge candidates
+- None
 
-### Batch opportunities
-- None.
+#### Fast-track items
+- None
 
-### Close candidates
-- None in the eligible set.
+#### Batch opportunities
+- pr-batch:runtime-ops — #77573
 
-### Key trends and next actions
-- The live queue does not currently contain any PRs authored by `app/github-copilot`.
-- No labels or review comments were required for this run.
-- Re-run triage after new app/github-copilot PRs appear or after the cooldown window clears on newer agent PRs.
+#### Close candidates
+- None
 
-<details>
-<summary>Current author snapshot</summary>
-
-- `dependabot[bot]`: 15 open PRs
-- `pelikhan`: 7 open PRs
-- `github-actions[bot]`: 7 open PRs
-- `gh-aw-bot`: 7 open PRs
-- `Copilot`: 3 open PRs
-
-</details>
+#### Key trends and next actions
+- Only one eligible Copilot PR remained after the 1-hour cooldown.
+- The eligible PR is a medium-risk runtime diagnostics fix with green CI and a standard batch-review recommendation.
+- Continue to monitor for additional Copilot PRs as they pass the cooldown window.
