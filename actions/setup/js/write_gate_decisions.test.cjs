@@ -59,4 +59,9 @@ describe("write gate item decisions", () => {
     expect(evaluateItemDecision({ ...input, replay: "approved", approverRecorded: true, detection: "warn-veto" }).decision).toBe("drop");
     expect(evaluateItemDecision({ ...input, replay: "approved", approverRecorded: true, dependenciesApplied: false }).decision).toBe("drop");
   });
+
+  it.each(["", "unknown", "success", undefined, null])("drops unrecognized detection state %s instead of applying", detection => {
+    const input = { gate: "allow", entry: "apply", outcome: "apply", detection, manifestMatches: true, staged: false, reviewRepoUsable: true, dependenciesApplied: true, replay: "run", approverRecorded: false };
+    expect(evaluateItemDecision(input)).toEqual({ decision: "drop", reason: "gate_detection_failed" });
+  });
 });
