@@ -316,7 +316,9 @@ test.describe("slides.md metadata", () => {
       [table("| A |  |  |"), /:5: empty Summary for "A"/],
       [table("| A | synthetic | First. |"), /:5: unknown Notes value "synthetic"/],
       [table("| A |  | First. |", "| A |  | Second. |"), /:6: duplicate Heading "A" \(first on line 5\)/],
+      [table("| Human agent processes |  | First. |", "| Human Agent Processes |  | Second. |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
       [table("| A |  | Same. |", "| B |  | Same. |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
+      [table("| A |  | First. |", "B | illustrative | Last slide. |"), /:6: malformed row, expected "\| Heading \| Notes \| Summary \|": B \| illustrative \| Last slide\. \|/],
       [table("| A |  | First. |", "", "| B |  | Second. |"), /:7: table row outside the slide table/],
       [table(), /:3: slide table has no rows/],
       ["| Heading | Notes |\n|---|---|\n| A |  |\n", /:1: expected table header/],
@@ -363,7 +365,8 @@ test("serves the slide list in the talk page head without running the deck", asy
   const docs = jsonLd(head);
   expect(docs).toHaveLength(1);
   expect(docs[0].url).toBe(PAGE_URL);
-  expect(docs[0].hasPart).toEqual(SLIDES.map((slide, i) => ({ "@type": "CreativeWork", position: i + 1, name: slide.heading, description: slide.summary, url: `${PAGE_URL}#${i + 1}` })));
+  expect(docs[0].hasPart).toEqual(slideParts(SLIDES, PAGE_URL));
+  expect(docs[0].hasPart.every((part: { description: string }) => !part.description.startsWith("Band header ("))).toBe(true);
   expect(head.match(/https:\/\/[^"\s]+/g)!.every(url => url.startsWith("https://schema.org") || url.startsWith("https://github.github.com/gh-aw/"))).toBe(true);
 });
 

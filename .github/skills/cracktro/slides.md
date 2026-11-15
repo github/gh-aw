@@ -30,7 +30,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Continuous Red Teaming | illustrative | A daily red-team agent keeps trying new ways to escape the agent firewall, and each escape it finds is turned into a firewall fix. |
 | Stop manually translating intent into code. |  | The factory mindset: engineer processes that create trusted features instead of hand-translating intent into code. |
 | Human agent processes |  | Band header (Human agent processes): engineer processes, not code, with patterns that pair people and agents. |
-| Human Agent Processes | illustrative | Event-driven hand-off patterns such as IssueOps, DailyOps, ReviewOps and LabelOps let agents do the work while people make the decisions. |
+| Event-driven Hand-offs | illustrative | Event-driven hand-off patterns such as IssueOps, DailyOps, ReviewOps and LabelOps let agents do the work while people make the decisions. |
 | Pull Request Review² | illustrative | Marking a pull request ready starts agentic reviewers, and Copilot is nudged to fix their findings so the human reviewer sees a clean pull request. |
 | Issues as intent | illustrative | Contributors run a debug agent on their own failures and file anonymized issues that state intent, which maintainers plan and assign to Copilot. |
 | Repo Assist | illustrative | A scheduled assistant picks maintenance tasks such as triage and stale pull requests, a maintainer reviews every result, and backlogs shrink. |

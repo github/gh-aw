@@ -50,15 +50,18 @@ export function parseSlides(text, source = "slides.md") {
     if (!heading) fail(index, "empty Heading");
     if (!NOTES.has(notes)) fail(index, `unknown Notes value "${notes}" (expected empty or "illustrative")`);
     if (!summary) fail(index, `empty Summary for "${heading}"`);
-    if (headings.has(heading)) fail(index, `duplicate Heading "${heading}" (first on line ${headings.get(heading)})`);
+    const headingKey = heading.toLowerCase();
+    if (headings.has(headingKey)) fail(index, `duplicate Heading "${heading}" (first on line ${headings.get(headingKey)})`);
     if (summaries.has(summary)) fail(index, `duplicate Summary for "${heading}" (first on line ${summaries.get(summary)})`);
-    headings.set(heading, index + 1);
+    headings.set(headingKey, index + 1);
     summaries.set(summary, index + 1);
     slides.push({ heading, illustrative: notes === "illustrative", summary, line: index + 1 });
   }
   if (!slides.length) fail(headerIndex, "slide table has no rows");
   for (; index < lines.length; index++) {
+    if (!lines[index].trim()) continue;
     if (isRow(lines[index])) fail(index, "table row outside the slide table (one table only, no blank lines inside it)");
+    fail(index, `malformed row, expected "| Heading | Notes | Summary |": ${lines[index]}`);
   }
   return slides;
 }
@@ -81,7 +84,7 @@ export function slideParts(slides, pageUrl) {
     "@type": "CreativeWork",
     position: i + 1,
     name: slide.heading,
-    description: slide.summary,
+    description: slide.summary.replace(/^Band header \([^)]*\):\s*/, ""),
     url: `${pageUrl}#${i + 1}`,
   }));
 }
