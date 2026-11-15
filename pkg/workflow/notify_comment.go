@@ -21,7 +21,7 @@ var notifyCommentLog = logger.New("workflow:notify_comment")
 // - Recording missing tools
 // This job runs when:
 // 1. always() - runs even if agent fails
-// 2. Agent job was not skipped
+// 2. Agent job was not skipped, activation failed, or a custom prerequisite failed
 // 3. NO add_comment output was produced, or detection produced no verdict
 // This job depends on all safe output jobs to ensure it runs last
 func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, safeOutputJobNames []string) (*Job, error) {

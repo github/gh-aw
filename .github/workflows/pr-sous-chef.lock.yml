@@ -3643,7 +3643,8 @@ jobs:
       - safe_outputs
     if: >
       always() && (needs.agent.result != 'skipped' || needs.activation.result == 'failure' || needs.activation.outputs.lockdown_check_failed == 'true' ||
-      needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true')
+      needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' ||
+      (!cancelled()) && needs.activation.result == 'success' && needs.prefilter.result == 'failure')
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:

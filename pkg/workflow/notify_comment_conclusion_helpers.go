@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
@@ -632,9 +633,8 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	if workQueueRequiresAssignment(data) || workQueueIssuesConfig(data) != nil && isWorkQueueParticipant(data) {
 		return BuildFunctionCall("always")
 	}
-	// Build the condition for this job:
 	// 1. always() - run even if agent fails
-	// 2. agent was activated (not skipped) OR activation failed
+	// 2. agent was activated (not skipped), activation failed, or a custom prerequisite failed
 	// 3. IF comment_id exists: add_comment job either doesn't exist OR hasn't created a comment yet
 	alwaysFunc := BuildFunctionCall("always")
 	agentNotSkipped := BuildNotEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.result", mainJobName)), BuildStringLiteral("skipped"))
@@ -677,8 +677,11 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 		steeringIssueExists := BuildNotEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.steering_issue_number", constants.ActivationJobName)), BuildStringLiteral(""))
 		activationGuardrailsFailed = BuildOr(activationGuardrailsFailed, steeringIssueExists)
 	}
-	condition := BuildAnd(alwaysFunc, BuildOr(agentNotSkipped, activationGuardrailsFailed))
-
+	runnable := BuildOr(agentNotSkipped, activationGuardrailsFailed)
+	if prerequisitesFailed := c.buildConclusionCustomPrerequisitesFailedCondition(data, mainJobName); prerequisitesFailed != nil {
+		runnable = BuildOr(runnable, prerequisitesFailed)
+	}
+	condition := BuildAnd(alwaysFunc, runnable)
 	if slices.Contains(safeOutputJobNames, "add_comment") {
 		noComment := ConditionNode(&NotNode{Child: BuildPropertyAccess("needs.add_comment.outputs.comment_id")})
 		if IsDetectionJobEnabled(data.SafeOutputs) {
@@ -687,6 +690,45 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 		condition = BuildAnd(condition, noComment)
 	}
 	return withReactionCleanupCondition(data, condition)
+}
+
+func (c *Compiler) buildConclusionCustomPrerequisitesFailedCondition(data *WorkflowData, mainJobName string) ConditionNode {
+	if !conclusionReportFailedJobsEnabled(data) || isWorkQueueParticipant(data) {
+		return nil
+	}
+	// Conclusion is built before custom jobs and built-in needs augmentations.
+	// Combine authored edges with the already-built agent/activation dependencies.
+	graph := aw.AuthoredJobDependencies(data.Jobs)
+	for id, job := range c.jobManager.GetAllJobs() {
+		graph[id] = mergeJobNeeds(graph[id], job.Needs)
+	}
+	var names []string
+	for id := range data.Jobs {
+		if !isBuiltinJobName(normalizeBuiltinJobAlias(id)) && graph.DependsOn(mainJobName, id) && !graph.DependsOn(id, mainJobName) {
+			names = append(names, id)
+		}
+	}
+	slices.Sort(names)
+	var failed ConditionNode
+	for _, id := range names {
+		jobFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.result", id)), BuildStringLiteral("failure"))
+		if failed == nil {
+			failed = jobFailed
+		} else {
+			failed = BuildOr(failed, jobFailed)
+		}
+	}
+	if failed == nil {
+		return nil
+	}
+	gate := BuildAnd(
+		&NotNode{Child: BuildFunctionCall("cancelled")},
+		BuildEquals(BuildPropertyAccess("needs.activation.result"), BuildStringLiteral("success")),
+	)
+	if hasMaxDailyAICGuardrail(data) && !data.MaxDailyAICContinueOnError {
+		gate = BuildAnd(gate, BuildNotEquals(BuildPropertyAccess("needs.activation.outputs.daily_ai_credits_guardrail_status"), BuildStringLiteral("quota_blocked")))
+	}
+	return BuildAnd(gate, failed)
 }
 
 // buildConclusionJobNeeds builds dependencies for the conclusion job.

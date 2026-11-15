@@ -126,6 +126,79 @@ func TestConclusionJobResultsEnvironmentExcludesOutputs(t *testing.T) {
 	}
 }
 
+func TestConclusionCustomPrerequisiteFailureReportingPath(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		Name: "Snapshot research",
+		SafeOutputs: &SafeOutputsConfig{
+			ReportFailureAsIssue: templatableBoolPtr("false"),
+		},
+		Jobs: map[string]any{
+			"agent": map[string]any{"needs": "snapshot"},
+			"snapshot": map[string]any{
+				"name":    "Publish snapshot",
+				"runs-on": "ubuntu-latest",
+				"steps":   []any{map[string]any{"run": "exit 1"}},
+			},
+			"follow_up": map[string]any{
+				"needs":   "agent",
+				"runs-on": "ubuntu-latest",
+				"steps":   []any{map[string]any{"run": "echo complete"}},
+			},
+		},
+	}
+	needs, _ := compiler.buildMainJobDependencies(data, true)
+	agent := &Job{Name: "agent", Needs: needs, If: compiler.buildMainJobCondition(data, true)}
+	require.NoError(t, compiler.jobManager.AddJob(agent))
+	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "activation"}))
+	conclusion, err := compiler.buildConclusionJob(data, "agent", nil)
+	require.NoError(t, err)
+	require.NoError(t, compiler.jobManager.AddJob(conclusion))
+	require.NoError(t, compiler.buildFrontmatterCustomJobs(data, true))
+	require.NoError(t, compiler.finalizeBuiltJobs(data))
+
+	require.Contains(t, agent.Needs, "snapshot")
+	require.NotContains(t, agent.Needs, "follow_up")
+	require.False(t, ifExpressionContainsStatusFunc(agent.If), "failed snapshot must still block agent startup through Actions' implicit success gate")
+	require.Contains(t, conclusion.If, "needs.snapshot.result == 'failure'")
+	require.NotContains(t, conclusion.If, "needs.follow_up.result")
+	require.Contains(t, conclusion.Needs, "snapshot")
+	require.Contains(t, conclusion.Permissions, "actions: read")
+	require.Contains(t, conclusion.Permissions, "issues: write")
+
+	env := buildRenderedJobEnv(conclusion)
+	var resultsJSON string
+	require.NoError(t, json.Unmarshal([]byte(env["GH_AW_JOB_RESULTS"]), &resultsJSON))
+	require.Contains(t, resultsJSON, `"snapshot":{"result":"${{ needs.snapshot.result }}"}`)
+	var namesJSON string
+	require.NoError(t, json.Unmarshal([]byte(env["GH_AW_JOB_DISPLAY_NAMES"]), &namesJSON))
+	var names map[string]string
+	require.NoError(t, json.Unmarshal([]byte(namesJSON), &names))
+	require.Equal(t, "Publish snapshot", names["snapshot"])
+
+	var steps struct {
+		Steps []struct {
+			ID   string            `yaml:"id"`
+			If   string            `yaml:"if"`
+			Env  map[string]string `yaml:"env"`
+			With map[string]string `yaml:"with"`
+		} `yaml:"steps"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("steps:\n"+strings.Join(conclusion.Steps, "")), &steps))
+	found := false
+	for _, step := range steps.Steps {
+		if step.ID != "report_failed_jobs" {
+			continue
+		}
+		found = true
+		require.Equal(t, "always()", step.If, "missing agent artifacts or earlier conclusion step failures must not suppress custom failure reporting")
+		require.Equal(t, "true", step.Env["GH_AW_REPORT_FAILED_JOBS"])
+		require.Contains(t, step.With["script"], "report_failed_jobs.cjs")
+		require.Contains(t, step.With["github-token"], "secrets.GITHUB_TOKEN")
+	}
+	require.True(t, found, "custom failures must use report-failed-jobs independently of agent failure reporting")
+}
+
 func TestFailedJobsDisplayNames(t *testing.T) {
 	names := buildFailedJobsDisplayNames(map[string]*Job{
 		"agent":            {DisplayName: "Renamed agent"},

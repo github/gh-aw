@@ -1952,7 +1952,11 @@ jobs:
       always() && (needs.agent.result != 'skipped' || needs.activation.result == 'failure' || needs.activation.outputs.lockdown_check_failed == 'true' ||
       needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' ||
       needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' ||
-      needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
+      needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error' || (!cancelled()) &&
+      needs.activation.result == 'success' &&
+      needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked' && (needs.collect_anthropic_models.result == 'failure' ||
+      needs.collect_copilot_billing_models.result == 'failure' || needs.collect_copilot_sdk_models.result == 'failure' ||
+      needs.collect_gemini_models.result == 'failure' || needs.collect_openai_models.result == 'failure'))
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:

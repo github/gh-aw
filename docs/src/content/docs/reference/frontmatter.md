@@ -447,6 +447,8 @@ safe-outputs:
 
 `report-failed-jobs` also accepts a GitHub Actions expression that resolves to a boolean. When omitted, it defaults to `true`.
 
+Failed custom prerequisites can be reported even when their failure skips the agent, provided activation succeeded and the run was not cancelled or stopped by the AI Credits API quota guardrail. The failed prerequisite still blocks agent execution; intentionally skipped or cancelled prerequisites do not trigger this reporting path.
+
 Custom safe-output jobs are defined under `safe-outputs.jobs:`. They run after the agent completes and can expose a custom safe-output tool to the agent. The optional `output` field is the success message returned to the agent:
 
 ```yaml wrap
