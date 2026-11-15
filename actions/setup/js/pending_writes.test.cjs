@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { buildPendingWrites } from "./pending_writes_plan.cjs";
-import { canonicalPendingJSON, inputDigest, itemDigest, prepare, verify, assertPendingWritesIntegrity, assertPendingPublication, withPendingWrite, assertPendingCodeFiles, assertPendingTarget } from "./pending_writes.cjs";
 import { describeDirectory, sha256 } from "./pending_writes_files.cjs";
 import { describePatchFiles, extractPathsFromPatch, checkFileProtectionPostApply } from "./manifest_file_helpers.cjs";
+const require = createRequire(import.meta.url);
+const { canonicalPendingJSON, inputDigest, itemDigest, prepare, verify, assertPendingWritesIntegrity, assertPendingPublication, withPendingWrite, assertPendingCodeFiles, assertPendingTarget } = require("./pending_writes.cjs");
 
 describe("handler-derived pending writes", () => {
   let directory;
@@ -55,6 +58,9 @@ describe("handler-derived pending writes", () => {
     expect(first.manifest.items[0].free_text).toContainEqual({ field: "/title", length: 12, sha256: sha256("Secret title") });
     expect(first.manifest.items[0].item_sha256).toBe(itemDigest(first.manifest.items[0]));
     expect(first.manifest.complete).toBe(true);
+    const Ajv2020 = require("ajv/dist/2020");
+    const validate = new Ajv2020().compile(require("./pending_writes.schema.json"));
+    expect(validate(first.manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(canonicalPendingJSON({ z: 1.5, a: { b: true, a: null } })).toBe('{"a":{"a":null,"b":true},"z":1.5}');
   });
 
@@ -152,7 +158,13 @@ describe("handler-derived pending writes", () => {
     const result = await prepare(options);
     expect(result.manifest.complete).toBe(false);
     expect(result.manifest.items.every(item => !item.complete)).toBe(true);
-    expect(await verify(result.sha256, options)).toEqual({ allow: false, reason: "manifest_incomplete" });
+    expect(await verify(result.sha256, options)).toMatchObject({ allow: true, reason: "manifest_incomplete" });
+    vi.stubEnv("GH_AW_PENDING_WRITES_REQUIRED", "true");
+    vi.stubEnv("GH_AW_PENDING_WRITES", options.manifestPath);
+    vi.stubEnv("GH_AW_PENDING_WRITES_SHA256", result.sha256);
+    vi.stubEnv("GH_AW_PENDING_WRITES_BINDINGS", JSON.stringify(result.bindings));
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify(options.handlerConfig));
+    await expect(withPendingWrite(JSON.parse(fs.readFileSync(options.agentOutputPath, "utf8")).items[0], () => "not allowed", 0)).rejects.toThrow("item_incomplete");
   });
 
   it("keeps ungated runtimes unchanged", async () => {
@@ -160,6 +172,65 @@ describe("handler-derived pending writes", () => {
     expect(assertPendingWritesIntegrity()).toBeNull();
     expect(() => assertPendingPublication("anything", "anything", null)).not.toThrow();
     expect(await withPendingWrite({}, () => "unchanged")).toBe("unchanged");
+  });
+
+  it("binds the published tree and refuses same-path different-content before any push", async () => {
+    const repo = path.join(directory, "repo");
+    fs.mkdirSync(repo);
+    const git = args => execFileSync("git", ["-c", "commit.gpgsign=false", ...args], { cwd: repo, encoding: "utf8" });
+    git(["init", "--quiet"]);
+    git(["config", "user.name", "test"]);
+    git(["config", "user.email", "test@example.com"]);
+    fs.writeFileSync(path.join(repo, "file.txt"), "base\n");
+    git(["add", "file.txt"]);
+    git(["commit", "--quiet", "-m", "base"]);
+    const base = git(["rev-parse", "HEAD"]).trim();
+    const branch = `pending-test-${path.basename(directory)}`;
+    git(["checkout", "--quiet", "-b", branch]);
+    fs.writeFileSync(path.join(repo, "file.txt"), "approved\n");
+    git(["add", "file.txt"]);
+    git(["commit", "--quiet", "-m", "approved"]);
+    const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
+    const patchPath = getPatchPathForBranchInRepo(branch, "owner/repo");
+    fs.mkdirSync(path.dirname(patchPath), { recursive: true });
+    try {
+      fs.writeFileSync(patchPath, git(["format-patch", "--stdout", `${base}..HEAD`]));
+      const message = { type: "create_pull_request", branch, title: "a", body: "b" };
+      fs.writeFileSync(options.agentOutputPath, JSON.stringify({ items: [message] }));
+      options.handlerConfig = { create_pull_request: { base_branch: "main", preserve_branch_name: true, protected_files_policy: "allowed" } };
+      options.localRepository = repo;
+      vi.stubGlobal("github", { rest: { repos: { getBranch: async () => ({ data: { commit: { sha: base } } }) } } });
+      const result = await authorize();
+      expect(result.manifest.complete).toBe(true);
+      expect(result.manifest.items[0].code.tree_sha256).toMatch(/^[0-9a-f]{64}$/);
+      const { assertPendingCodePublication } = require("./pending_writes.cjs");
+      await withPendingWrite(message, () => assertPendingCodePublication({ owner: "owner", repo: "repo", branch, baseRef: base, cwd: repo }), 0);
+      fs.writeFileSync(path.join(repo, "file.txt"), "not approved\n");
+      git(["add", "file.txt"]);
+      git(["commit", "--quiet", "-m", "unreviewed edit"]);
+      const push = vi.fn();
+      vi.stubGlobal("exec", { getExecOutput: push, exec: push });
+      const { pushSignedCommits } = require("./push_signed_commits.cjs");
+      await expect(withPendingWrite(message, () => pushSignedCommits({ githubClient: global.github, owner: "owner", repo: "repo", branch, baseRef: base, cwd: repo, signedCommits: false }), 0)).rejects.toThrow("content_changed");
+      expect(push).not.toHaveBeenCalled();
+    } finally {
+      fs.unlinkSync(patchPath);
+    }
+  });
+
+  it("refuses publication without an active item and constrains trusted review writes", async () => {
+    const result = await authorize();
+    expect(() => assertPendingTarget({ repository: "owner/repo" })).toThrow("item_missing");
+    const { guardPendingWriteClient } = require("./pending_writes_client.cjs");
+    const create = vi.fn(async () => ({ data: { number: 1 } }));
+    const guarded = guardPendingWriteClient({ rest: { issues: { create } } });
+    await expect(guarded.rest.issues.create({ owner: "owner", repo: "repo", title: "a" })).rejects.toThrow("item_missing");
+    const { withPendingReview } = require("./pending_writes.cjs");
+    vi.stubEnv("GH_AW_WRITE_GATE_REVIEW_REPO", "policy/reviews");
+    await withPendingReview(result.manifest.items[0], "policy/reviews", () => guarded.rest.issues.create({ owner: "policy", repo: "reviews", title: "a" }));
+    await expect(withPendingReview(result.manifest.items[0], "policy/reviews", () => guarded.rest.issues.create({ owner: "policy", repo: "reviews", title: "a", assignees: ["copilot"] }))).rejects.toThrow("review_scope_invalid");
+    await expect(withPendingReview(result.manifest.items[0], "wrong/repository", () => guarded.rest.issues.create({ owner: "wrong", repo: "repository", title: "a" }))).rejects.toThrow("review_scope_invalid");
+    expect(create).toHaveBeenCalledOnce();
   });
 });
 
