@@ -3893,6 +3893,58 @@ authoritative credential, resource, typed-input, staging, and migration contract
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "update_pull_request",
+  "description": "Update an existing GitHub pull request's title or body, or update its branch. At least one of title, body, or update_branch=true is required.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "title": {"type": "string", "description": "New pull request title (always replaced)"},
+      "body": {"type": "string", "maxLength": 65536, "description": "Pull request body in Markdown"},
+      "operation": {"type": "string", "enum": ["replace", "append", "prepend", "replace-island"], "description": "How to apply body (default: replace)"},
+      "update_branch": {"type": "boolean", "description": "Update the PR branch with the latest base branch changes; only true is meaningful"},
+      "draft": {"type": "boolean", "description": "Draft state of the pull request"},
+      "pull_request_number": {"type": ["number", "string"], "description": "Canonical target pull request number"},
+      "pr_number": {"type": ["number", "string"], "description": "Alias for pull_request_number"},
+      "pr": {"type": ["number", "string"], "description": "Alias for pull_request_number"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+**Operational Semantics**:
+
+1. **Required Change**: The MCP server MUST reject (error code -32602) an operation that provides none of a non-empty `title`, a `body`, or `update_branch: true`. `update_branch: false` is equivalent to omission.
+2. **Target Resolution**: The target pull request is resolved from `target` configuration (`"triggering"` by default, `"*"`, or a fixed number). With `target: "*"`, requests MUST include one of `pull_request_number`, `pr_number`, or `pr`.
+3. **Body Operations**: `replace` (default) overwrites the body; `append` and `prepend` add content with a separator; `replace-island` replaces only the run-specific section. The processor reads the current body before applying any operation other than `replace`. `title` is always replaced.
+4. **Branch Update**: When `update_branch` is true (agent-supplied or configured), the processor updates the pull request branch with the latest base branch changes before applying other updates. If the endpoint reports that updating a stacked pull request branch is unsupported, the processor falls back to a stack sync unless `sync-stack: false`.
+5. **Field Gating**: `title: false` or `body: false` configuration disables updating that field.
+6. **Staged Mode**: In staged mode, the processor previews the update without calling the GitHub API.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `title`: Allow title updates (default: `true`)
+- `body`: Allow body updates (default: `true`)
+- `operation`: Default body operation (default: `replace`)
+- `update-branch`: Update the PR branch before other updates (default: `false`)
+- `sync-stack`: Allow the stacked-PR stack-sync fallback (default: `true`)
+- `required-labels`, `required-title-prefix`: Only update pull requests matching all required labels and the title prefix
+
+**Security Requirements**:
+
+- `title` and `body` undergo full sanitization and length limits (title 256 characters, body 65536 characters)
+- Target authorization is enforced at runtime; agent-supplied pull request numbers are ignored unless `target` is `"*"`
+- Required-label and title-prefix filters are evaluated against the live pull request before any mutation
+- Cross-repo validation against `allowed-repos`
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -3920,12 +3972,41 @@ authoritative credential, resource, typed-input, staging, and migration contract
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "close_pull_request",
+  "description": "Close a pull request WITHOUT merging, adding a closing comment.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["body"],
+    "properties": {
+      "body": {"type": "string", "maxLength": 65536, "description": "Closing comment explaining why the PR is closed"},
+      "pull_request_number": {"type": ["number", "string"], "description": "Pull request to close; required when target is \"*\""}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+**Operational Semantics**:
+
+1. **Target Resolution**: The target pull request is resolved from `target` configuration (see Target Authorization).
+2. **Filters**: The processor fetches the pull request and skips it when `required-labels` or `required-title-prefix` do not match.
+3. **Comment**: The processor posts the sanitized closing comment, using the agent `body` or the configured `comment` default. When `allow-body: false`, any agent `body` is discarded with a warning and the pull request is closed without a comment.
+4. **Close**: The processor sets the pull request state to `closed` without merging. An already-closed pull request still receives the comment and is reported as `alreadyClosed`.
+5. **Staged Mode**: In staged mode, the processor previews the close without mutating GitHub state.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 10)
 - `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+- `required-labels`, `required-title-prefix`: Only close pull requests matching all required labels and the title prefix
+- `comment`: Default closing comment when the agent supplies no `body`
+- `allow-body`: When `false`, discard agent-supplied `body` and close without a comment
 
 **Target Authorization**:
 
@@ -3938,6 +4019,14 @@ authoritative credential, resource, typed-input, staging, and migration contract
 **CPR-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
 
 **CPR-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Security Requirements**:
+
+- The closing comment undergoes full sanitization before posting
+- Target authorization (CPR-001 through CPR-005) is enforced at runtime before any mutation
+- Label and title-prefix filters are evaluated against the live pull request
+- Cross-repo validation against `allowed-repos`
+- The operation MUST NOT merge the pull request
 
 **Required Permissions**:
 
@@ -4175,12 +4264,41 @@ or review bodies to returned or persisted decision evidence.
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "mark_pull_request_as_ready_for_review",
+  "description": "Mark a draft pull request as ready for review and add an explanatory comment.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["reason"],
+    "properties": {
+      "reason": {"type": "string", "maxLength": 65536, "description": "Comment explaining why the PR is ready for review"},
+      "pull_request_number": {"type": ["number", "string"], "description": "Pull request to mark ready; defaults to the triggering pull request"}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+**Operational Semantics**:
+
+1. **Target Resolution**: The target pull request is resolved from `target` configuration (see Target Authorization).
+2. **Filters**: The processor skips the pull request when `required-labels` or `required-title-prefix` do not match.
+3. **Validation**: `reason` MUST be a non-empty string; otherwise the operation fails.
+4. **Idempotence**: If the pull request is not a draft, the processor MUST succeed without mutation and report `alreadyReady`.
+5. **Transition**: The processor marks the pull request ready with the GraphQL `markPullRequestReadyForReview` mutation (the REST API ignores `draft: false`) and fails if the pull request is still a draft afterwards.
+6. **Comment**: After the transition, the processor posts the sanitized `reason` as a comment with the workflow footer.
+7. **Staged Mode**: In staged mode, the processor previews the transition without mutating GitHub state.
+
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
 - `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+- `required-labels`, `required-title-prefix`: Only mark pull requests matching all required labels and the title prefix
 
 **Target Authorization**:
 
@@ -4193,6 +4311,13 @@ or review bodies to returned or persisted decision evidence.
 **MRR-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
 
 **MRR-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Security Requirements**:
+
+- The `reason` comment undergoes full sanitization before posting
+- Target authorization (MRR-001 through MRR-005) is enforced at runtime before any mutation
+- Label and title-prefix filters are evaluated against the live pull request
+- Cross-repo validation against `allowed-repos`
 
 **Required Permissions**:
 
