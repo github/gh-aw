@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -129,6 +130,12 @@ func addJobLevelCommandMetadata(envVars map[string]string, data *WorkflowData) {
 }
 
 func (c *Compiler) addJobLevelSafeOutputConfig(envVars map[string]string, data *WorkflowData) {
+	if data.SafeOutputs != nil && data.SafeOutputs.Gate != nil {
+		gate := data.SafeOutputs.Gate
+		envVars["GH_AW_WRITE_GATE_REVIEW_REPO"] = fmt.Sprintf("%q", gate.ReviewRepo)
+		envVars["GH_AW_WRITE_GATE_ALLOWED_REPOS"] = fmt.Sprintf("%q", strings.Join(gate.AllowedRepos, ","))
+		envVars["GH_AW_WRITE_GATE_APPROVAL_ENVIRONMENT"] = fmt.Sprintf("%q", gate.ApprovalEnvironment)
+	}
 	// Add safe output job environment variables (staged/target repo)
 	if data.SafeOutputs != nil {
 		if value := resolveSafeOutputsStagedValue(c.trialMode, data.SafeOutputs.Staged); value != nil {

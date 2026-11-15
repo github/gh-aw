@@ -3,6 +3,7 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { resolveGateReviewRepo, buildGateReviewBlocks, createGateReviewIssue } from "./write_gate_review.cjs";
 import { useExecutionProvenanceFixture, expectExecutionProvenance } from "./test_execution_provenance.js";
+import { renderSizedReport } from "./report_size.cjs";
 
 useExecutionProvenanceFixture();
 
@@ -25,6 +26,7 @@ describe("write gate review issues", () => {
     delete global.core;
     delete global.context;
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
   const options = () => ({ message, reviewRepo: "review-owner/review-repo", defaultRepo: "test-owner/test-repo", allowedRepos: new Set(["review-owner/review-repo"]), client, assertUnchanged });
 
@@ -86,5 +88,26 @@ describe("write gate review issues", () => {
     const blocks = buildGateReviewBlocks({ ...message, body: "token=known-sensitive-value" }, "+known-sensitive-value", ["known-sensitive-value"]);
     expect(JSON.stringify(blocks)).not.toContain("known-sensitive-value");
     expect(blocks.at(-1)).toMatchObject({ type: "details", children: [{ type: "code_block", language: "diff" }] });
+  });
+
+  it.each([
+    { type: "add_labels", labels: ["review-required", "known-sensitive-value"] },
+    { type: "dispatch_workflow", workflow: "deploy.yml", ref: "main", inputs: { environment: "production", token: "known-sensitive-value" } },
+  ])("describes body-less $type proposals using the verified target and redacted operation", request => {
+    const target = { repository: "verified-owner/verified-repo", kind: "issue", number: 42 };
+    const blocks = buildGateReviewBlocks({ ...request, output_id: "so_aaaaaaaaaaaa", repo: "untrusted/repo", issue_number: 999 }, "", ["known-sensitive-value"], target);
+    const rendered = renderSizedReport({ type: "report", title: "Review proposal", children: blocks }).body;
+    expect(rendered).toContain("verified-owner/verified-repo");
+    expect(rendered).toContain("42");
+    expect(rendered).not.toContain("untrusted/repo");
+    expect(rendered).not.toContain("known-sensitive-value");
+    expect(rendered).toContain(request.type === "add_labels" ? "review-required" : "deploy.yml");
+  });
+
+  it("does not fall back to another credential when the selected review App token is unavailable", async () => {
+    vi.stubEnv("GH_AW_WRITE_GATE_REVIEW_USE_APP", "true");
+    const result = await createGateReviewIssue(options());
+    expect(result).toMatchObject({ staged: true, reason: "gate_review_auth_unavailable" });
+    expect(client.rest.issues.create).not.toHaveBeenCalled();
   });
 });

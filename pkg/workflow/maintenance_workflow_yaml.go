@@ -32,6 +32,7 @@ type buildMaintenanceWorkflowYAMLOptions struct {
 	hasWorkQueue        bool
 	hasCacheMemory      bool
 	hasSteering         bool
+	hasWriteGate        bool
 	noLogo              bool
 }
 
@@ -65,6 +66,9 @@ func buildMaintenanceWorkflowYAML(
 	}
 	yaml.WriteString(buildMaintenanceRunOperationJob(ctx, opts, setupActionRef))
 	yaml.WriteString(buildMaintenanceUpdatePRBranchesJob(opts, setupActionRef))
+	if opts.hasWriteGate {
+		yaml.WriteString(buildMaintenanceHeldReplayJobs(opts, setupActionRef))
+	}
 	yaml.WriteString(buildMaintenanceApplySafeOutputsJob(opts, setupActionRef))
 	yaml.WriteString(buildMaintenanceCreateLabelsJob(ctx, opts, setupActionRef))
 	yaml.WriteString(buildMaintenanceActivityReportJob(ctx, opts, setupActionRef))

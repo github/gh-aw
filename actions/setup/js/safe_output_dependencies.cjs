@@ -144,10 +144,11 @@ function isConfirmedDependencySuccess(record) {
  * @param {Set<number>} [reviewComments] Buffered comments included in this review
  * @returns {{state: "ready"|"waiting"|"failed", errorCode?: string, error?: string}}
  */
-function checkSafeOutputDependencies(plan, index, results, allowWaiting, reviewComments = new Set()) {
+function checkSafeOutputDependencies(plan, index, results, allowWaiting, reviewComments = new Set(), confirmedPrerequisites = new Set()) {
   if (plan.invalid.has(index)) return { state: "failed", errorCode: "safe_output_dependency_invalid", error: plan.invalid.get(index) };
   let waiting = false;
   for (const prerequisite of plan.prerequisites[index]) {
+    if (confirmedPrerequisites.has(prerequisite)) continue;
     const records = results.filter(result => result.messageIndex === prerequisite);
     if (records.length > 1) return { state: "failed", errorCode: "safe_output_dependency_failed", error: "Ambiguous safe-output prerequisite result" };
     const record = records[0];

@@ -124,6 +124,7 @@ async function createIssue(parameters) {
         defaultRepo: getDefaultTargetRepo(),
         allowedRepos: parseAllowedRepos(process.env.GH_AW_WRITE_GATE_ALLOWED_REPOS),
         client: github,
+        pendingItem: item,
         assertUnchanged: () => {
           assertPendingWritesIntegrity();
         },

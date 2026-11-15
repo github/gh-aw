@@ -324,6 +324,16 @@ function checkFileProtection(patchContent, config) {
  */
 function checkFileProtectionPostApply(actualFiles, config) {
   require("./pending_writes.cjs").assertPendingCodeFiles(actualFiles);
+  return classifyFileProtectionPaths(actualFiles, config);
+}
+
+/**
+ * Read-only policy classification; publication callers still verify the actual tree.
+ * @param {string[]} actualFiles
+ * @param {HandlerConfig} config
+ * @returns {ReturnType<typeof checkFileProtectionPostApply>}
+ */
+function classifyFileProtectionPaths(actualFiles, config) {
   if (!actualFiles || actualFiles.length === 0) {
     return { action: "allow" };
   }
@@ -397,6 +407,7 @@ function checkFileProtectionPostApply(actualFiles, config) {
 }
 
 module.exports = {
+  classifyFileProtectionPaths,
   extractFilenamesFromPatch,
   extractPathsFromPatch,
   describePatchFiles,

@@ -130,6 +130,13 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 	}
 
 	permissions := NewPermissions()
+	if safeOutputs.Gate != nil && safeOutputs.Gate.ReviewRepo != "" {
+		level := PermissionWrite
+		if templatableBoolIsTrue(safeOutputs.Staged) {
+			level = PermissionRead
+		}
+		permissions.Set(PermissionIssues, level)
+	}
 	if len(safeOutputs.ClaimAdapters) > 0 && !templatableBoolIsTrue(safeOutputs.Staged) {
 		for _, adapter := range safeOutputs.ClaimAdapters {
 			if adapter != nil && adapter.EffectType == "github_rest" && adapter.Request != nil {

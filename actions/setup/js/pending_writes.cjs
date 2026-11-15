@@ -100,7 +100,12 @@ function assertPendingEffectAllowed() {
   const item = manifest.items.find(item => item.output_id === active.output_id && item.item_sha256 === active.item_sha256);
   if (!item || item.complete !== true) throw integrityError("item_missing");
   const { selection } = pendingAuthorization(manifest, item);
-  if (item.settings.staged === true || (active.review ? !["apply", "review", "hold"].includes(selection.gate_decision) : selection.gate_decision !== "apply")) throw integrityError("item_not_authorized");
+  const replay = require("./write_gate_replay_approval.cjs").currentHeldReplayAuthorization();
+  const approvedHold =
+    selection.gate_decision === "hold" && replay?.held_ids.includes(item.output_id) && replay.manifest_sha256 === process.env.GH_AW_PENDING_WRITES_SHA256 && replay.write_decisions_sha256 === process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256;
+  if (item.settings.staged === true || process.env.GH_AW_REPLAY_FORCE_STAGED === "true" || (active.review ? !["apply", "review", "hold"].includes(selection.gate_decision) : selection.gate_decision !== "apply" && !approvedHold))
+    throw integrityError("item_not_authorized");
+  require("./write_gate_runtime.cjs").assertWriteGateItemMutation(active);
 }
 
 /**
@@ -244,6 +249,7 @@ function assertPendingCodePublication({ owner, repo, branch, baseRef, cwd }) {
   if (!pendingWritesEnabled()) return;
   assertPendingEffectAllowed();
   const item = activeWrite.getStore();
+  require("./write_gate_runtime.cjs").assertWriteGateItemMutation(item);
   const { execLocalGitSync } = require("./git_helpers.cjs");
   if (item?.publication) {
     item.recheck();
@@ -274,8 +280,15 @@ function assertPendingPublication(job, id, supplied) {
   const matches = manifest.items.filter(item => item.target.job === job && item.publication?.id === id);
   if (matches.length !== 1 || matches[0].complete !== true || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
   const { inventory, selection } = pendingAuthorization(manifest, matches[0]);
-  if (selection.gate_decision !== "apply" || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
+  const replay = require("./write_gate_replay_approval.cjs").currentHeldReplayAuthorization();
+  const approvedHold =
+    selection.gate_decision === "hold" &&
+    replay?.held_ids.includes(matches[0].output_id) &&
+    replay.manifest_sha256 === process.env.GH_AW_PENDING_WRITES_SHA256 &&
+    replay.write_decisions_sha256 === process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256;
+  if ((selection.gate_decision !== "apply" && !approvedHold) || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
   if (matches[0].settings?.staged === true || (manifest.detection.enabled && ["warning", "failure"].includes(manifest.detection.conclusion))) throw integrityError("native_policy_veto");
+  require("./write_gate_runtime.cjs").assertWriteGateItemMutation(matches[0]);
 }
 
 async function withPendingPublication(job, id, readSupplied, operation) {

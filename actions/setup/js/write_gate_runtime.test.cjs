@@ -21,6 +21,7 @@ describe("pinned per-item manager enforcement", () => {
   let agentOutput;
   let config;
   let handler;
+  let issueApi;
   beforeEach(() => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), "write-gate-runtime-"));
     agentOutput = path.join(directory, "agent_output.json");
@@ -37,6 +38,7 @@ describe("pinned per-item manager enforcement", () => {
     vi.stubGlobal("github", {
       rest: { repos: { get: vi.fn().mockResolvedValue({ data: { has_issues: true } }) }, issues: { create: vi.fn().mockResolvedValue({ data: { number: 90, html_url: "https://github.com/review-owner/review-repo/issues/90" } }) } },
     });
+    issueApi = global.github.rest.issues.create;
     handler = vi.fn().mockResolvedValue({ success: true, number: 10, repo: "test-owner/test-repo", url: "https://github.com/test-owner/test-repo/issues/10" });
     vi.stubEnv("GH_AW_WRITE_GATE_REVIEW_REPO", "review-owner/review-repo");
     vi.stubEnv("GH_AW_WRITE_GATE_ALLOWED_REPOS", "review-owner/review-repo");
@@ -103,6 +105,8 @@ describe("pinned per-item manager enforcement", () => {
     const verdictFile = path.join(directory, "write-decisions.json");
     fs.writeFileSync(verdictFile, JSON.stringify({ decision: "partial", reason: "items_checked", items: entries || items.map(item => ({ output_id: item.output_id, decision: "apply", reason: "clear" })) }));
     vi.stubEnv("GH_AW_WRITE_DECISIONS", verdictFile);
+    vi.stubEnv("GH_AW_VALIDATED_WRITE_GATE", "partial");
+    vi.stubEnv("GH_AW_VALIDATED_WRITE_DECISIONS_SHA256", readInput(verdictFile).sha256);
     publishWriteDecisionInventory();
     return manifest;
   }
@@ -113,9 +117,10 @@ describe("pinned per-item manager enforcement", () => {
       messages,
       messages.map((message, index) => ({ output_id: message.output_id, decision: DECISIONS[index], reason: `gate_${DECISIONS[index]}` }))
     );
+    vi.stubGlobal("github", guardPendingWriteClient(global.github));
     const result = await processMessages(new Map([[type, handler]]), messages);
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(global.github.rest.issues.create).toHaveBeenCalledTimes(1);
+    expect(issueApi).toHaveBeenCalledTimes(1);
     expect(result.results.map(item => item.gate_decision)).toEqual(DECISIONS);
     expect(result.results.filter(item => item.skipped)).toHaveLength(3);
     expect(result.results.every(item => item.output_id && /^[a-f0-9]{64}$/.test(item.item_sha256))).toBe(true);
@@ -207,5 +212,48 @@ describe("pinned per-item manager enforcement", () => {
     await expect(createIssue({ title: "item", body: "item" })).rejects.toThrow("requires output_id");
     await expect(createIssue({ title: "item", body: "item", output_id: messages[0].output_id, owner: "other", repo: "repo" })).rejects.toThrow("target");
     expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing", "malformed"])("publishes a pinned all-drop inventory for validated deny with %s authored data", state => {
+    authorize([{ type: "create_issue", title: "item", body: "item" }]);
+    fs.unlinkSync(process.env.GH_AW_WRITE_GATE_DECISIONS);
+    if (state === "missing") fs.unlinkSync(process.env.GH_AW_WRITE_DECISIONS);
+    else fs.writeFileSync(process.env.GH_AW_WRITE_DECISIONS, "{not json");
+    vi.stubEnv("GH_AW_VALIDATED_WRITE_GATE", "deny");
+    vi.stubEnv("GH_AW_VALIDATED_WRITE_GATE_REASON", "gate_error");
+    const normalized = publishWriteDecisionInventory();
+    expect(normalized.inventory.decision).toBe("deny");
+    expect(normalized.inventory.items).toHaveLength(1);
+    expect(normalized.inventory.items[0].gate_decision).toBe("drop");
+    const rows = fs.readFileSync(path.join(directory, "safe-output-items.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    expect(rows[0]).toMatchObject({ status: "skipped", skipped: true, reason: "gate_denied", gate_decision: "drop", decision_reason: "gate_error" });
+    expect(issueApi).not.toHaveBeenCalled();
+  });
+
+  it("guards direct custom API mutations even when custom code ignores item decisions", async () => {
+    const messages = [{ type: "create_issue", output_id: "so_aaaaaaaaaaaa", title: "item", body: "item" }];
+    authorize(messages, [{ output_id: messages[0].output_id, decision: "hold", reason: "approval_required" }]);
+    const client = guardPendingWriteClient(global.github);
+    const { withPendingWrite } = require("./pending_writes.cjs");
+    await expect(withPendingWrite(messages[0], () => client.rest.issues.create({ owner: "test-owner", repo: "test-repo", title: "ignore hold", body: "ignore hold" }), 0)).rejects.toThrow("item_not_authorized");
+    expect(issueApi).not.toHaveBeenCalled();
+  });
+
+  it.each(["GH_AW_WRITE_GATE_REVIEW_REPO", "GH_AW_WRITE_GATE_ALLOWED_REPOS"])("refuses review when bound %s changes after preparation", async field => {
+    const messages = [{ type: "add_labels", output_id: "so_aaaaaaaaaaaa", labels: ["review"] }];
+    authorize(messages, [{ output_id: messages[0].output_id, decision: "review", reason: "review_required" }]);
+    vi.stubEnv(field, field.endsWith("REPO") ? "unreviewed/target" : "*");
+    await expect(processMessages(new Map([["add_labels", handler]]), messages)).rejects.toThrow("inputs_changed");
+    expect(issueApi).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("rejects per-item edits after the authoritative raw verdict document was validated", () => {
+    const messages = [{ type: "create_issue", output_id: "so_aaaaaaaaaaaa", title: "item", body: "item" }];
+    authorize(messages);
+    fs.unlinkSync(process.env.GH_AW_WRITE_GATE_DECISIONS);
+    fs.writeFileSync(process.env.GH_AW_WRITE_DECISIONS, JSON.stringify({ decision: "partial", reason: "items_checked", items: [{ output_id: messages[0].output_id, decision: "apply", reason: "edited" }] }));
+    expect(() => publishWriteDecisionInventory()).toThrow("changed after verdict validation");
+    expect(issueApi).not.toHaveBeenCalled();
   });
 });

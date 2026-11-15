@@ -261,6 +261,10 @@ const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing
  * @property {number} [messageIndex]
  * @property {string} [gate_decision]
  * @property {string} [decision_reason]
+ * @property {string} [approval_environment]
+ * @property {string[]} [approvers]
+ * @property {string} [replay_source_run_id]
+ * @property {boolean} [review_publication]
  * @property {string} [url] - Canonical resource URI returned by the handler (not inferred from the request)
  * @property {number} [number] - Issue/PR/discussion number if applicable
  * @property {string} [repo] - Repository slug (owner/repo) if applicable
@@ -343,6 +347,8 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
             messageIndex: item.messageIndex,
             gate_decision: item.gate_decision,
             decision_reason: item.decision_reason,
+            ...(item.approval_environment ? { approval_environment: item.approval_environment, approvers: item.approvers, replay_source_run_id: item.replay_source_run_id } : {}),
+            ...(item.review_publication === true ? { review_publication: true } : {}),
             ...(item.skipped ? { skipped: true } : {}),
             ...(item.reason ? { reason: item.reason } : {}),
           }

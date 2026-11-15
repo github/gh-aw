@@ -61,8 +61,9 @@ Read the issue.
 	for _, id := range []string{"safe-outputs-app-token", "process_safe_outputs"} {
 		condition := steps[indices[id]].(map[string]any)["if"].(string)
 		require.Contains(t, condition, "steps.write_gate.outcome == 'success'")
-		require.Contains(t, condition, "steps.write_gate.outputs.write_gate == 'allow'")
-		require.Contains(t, condition, "steps.write_gate.outputs.write_gate == 'partial'")
+		require.Contains(t, condition, "steps.normalize_write_decisions.outcome == 'success'")
+		require.Contains(t, condition, "steps.normalize_write_decisions.outputs.decision == 'allow'")
+		require.Contains(t, condition, "steps.normalize_write_decisions.outputs.decision == 'partial'")
 	}
 	require.Equal(t, "always()", steps[indices["write_gate"]].(map[string]any)["if"])
 	require.Contains(t, job["outputs"].(map[string]any)["write_gate"], "|| 'deny'")

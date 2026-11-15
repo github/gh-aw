@@ -29,6 +29,23 @@ const { parseLockFileHeaders } = require("./lock_file_headers.cjs");
 const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { normalizeSafeOutputConfig, normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { isDeepStrictEqual } = require("node:util");
+const sourceBoundPolicies = new WeakSet();
+
+/** @param {any} value */
+function freezeReplayPolicy(value) {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) freezeReplayPolicy(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/** @param {any} policy */
+function sourceBoundPolicy(policy) {
+  freezeReplayPolicy(policy);
+  sourceBoundPolicies.add(policy);
+  return policy;
+}
 
 /**
  * Parse a run ID from a run URL or plain run ID string.
@@ -70,9 +87,12 @@ function parseRunUrl(runUrl) {
  * @param {string} owner
  * @param {string} repo
  */
-async function getReplayPolicy(runId, owner, repo) {
-  if (!Number.isSafeInteger(Number(runId)) || Number(runId) < 1) throw new Error(`${ERR_VALIDATION}: Replay run ID must be a positive safe integer`);
+async function getReplayPolicy(runId, owner, repo, inspectPartial = false) {
+  if (!/^[1-9]\d*$/.test(runId) || !Number.isSafeInteger(Number(runId))) {
+    throw new Error(`${ERR_VALIDATION}: Replay run ID must be a positive safe integer; use the exact Actions run ID`);
+  }
   const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(runId) });
+  if (run.id !== undefined && String(run.id) !== runId) throw new Error(`${ERR_VALIDATION}: Replay run identity does not match the requested artifact run`);
   const workflowPath = run.path?.split("@")[0];
   if (
     run.status !== "completed" ||
@@ -92,7 +112,7 @@ async function getReplayPolicy(runId, owner, repo) {
     attempt_number: run.run_attempt,
     per_page: 100,
   });
-  const recorded = await loadRecordedWriteGate(jobs, runId, owner, repo, run.run_attempt, run.head_sha, workflowPath);
+  const recorded = await loadRecordedWriteGate(jobs, runId, owner, repo, run.run_attempt, run.head_sha, workflowPath, inspectPartial);
   // Push uses the pushed commit; schedule uses the last default-branch commit;
   // workflow_dispatch uses the selected branch/tag revision. PR and reusable
   // contexts do not establish this equivalence and need the actual record.
@@ -117,13 +137,13 @@ async function getReplayPolicy(runId, owner, repo) {
     if (recorded || !legacyHeader || /^# gh-aw-manifest:/m.test(compiledSource) || /\bwrite_gate\b|gate-steps|Record write gate verdict/.test(compiledSource)) {
       throw new Error(`${ERR_VALIDATION}: Original compiled workflow has no valid compiler manifest; refusing replay`);
     }
-    return { run, gate: null, recorded: null };
+    return sourceBoundPolicy({ run, gate: null, recorded: null });
   }
   if (headers.manifest.version !== 1) throw new Error(`${ERR_VALIDATION}: Unsupported original compiler manifest; refusing replay`);
   const gate = headers.manifest.write_gate;
   if (gate === undefined) {
     if (recorded || /\bwrite_gate\b|gate-steps|Record write gate verdict/.test(compiledSource)) throw new Error(`${ERR_VALIDATION}: Original write gate policy is missing; refusing replay`);
-    return { run, gate: null, recorded: null };
+    return sourceBoundPolicy({ run, gate: null, recorded: null });
   }
   if (
     !gate ||
@@ -139,17 +159,18 @@ async function getReplayPolicy(runId, owner, repo) {
     throw new Error(`${ERR_VALIDATION}: Original write gate policy is malformed; refusing replay`);
   }
   if (!recorded || recorded.recorderName !== gate.record_job) throw new Error(`${ERR_VALIDATION}: Missing or mismatched compiler-owned write gate recorder; refusing replay`);
-  return { run, gate, recorded };
+  return sourceBoundPolicy({ run, gate, recorded });
 }
 
 /**
  * @param {unknown} record
  * @param {{runId: string, repository: string, attempt: number, headSha: string, workflowPath?: string, workflowSha?: string}} identity
  */
-function validateReplayWriteGateRecord(record, identity) {
+function validateReplayWriteGateRecord(record, identity, inspectPartial = false) {
   if (!record || typeof record !== "object" || Array.isArray(record)) throw new Error(`${ERR_VALIDATION}: Missing recorded write gate verdict; refusing replay`);
   const fields = ["version", "repository", "run_id", "run_attempt", "head_sha", "workflow_sha", "workflow_ref", "safe_outputs_result", "verdict", "reason"];
-  if (Object.keys(record).length !== fields.length || fields.some(key => !Object.hasOwn(record, key))) throw new Error(`${ERR_VALIDATION}: Malformed recorded write gate verdict; refusing replay`);
+  const pins = ["pending_writes_sha256", "write_decisions_sha256", "pending_write_inputs_sha256", "safe_output_items_sha256"];
+  if (Object.keys(record).some(key => !fields.includes(key) && !pins.includes(key)) || fields.some(key => !Object.hasOwn(record, key))) throw new Error(`${ERR_VALIDATION}: Malformed recorded write gate verdict; refusing replay`);
   const value = Object.fromEntries(Object.entries(record));
   if (
     value.version !== 1 ||
@@ -167,7 +188,8 @@ function validateReplayWriteGateRecord(record, identity) {
   ) {
     throw new Error(`${ERR_VALIDATION}: Recorded write gate identity does not match the original run; refusing replay`);
   }
-  if (value.safe_outputs_result !== "success" || value.verdict !== "allow") {
+  if (pins.some(key => value[key] !== undefined && (typeof value[key] !== "string" || !/^[a-f0-9]{64}$/.test(value[key])))) throw new Error(`${ERR_VALIDATION}: Invalid recorded replay integrity pins`);
+  if (value.safe_outputs_result !== "success" || !(value.verdict === "allow" || (inspectPartial && value.verdict === "partial"))) {
     throw new Error(`${ERR_VALIDATION}: Replay requires a successful recorded allow verdict; partial, denied, and unavailable gates cannot be replayed`);
   }
 }
@@ -184,7 +206,7 @@ function validateReplayWriteGateRecord(record, identity) {
  * @param {string} headSha
  * @param {string} [workflowPath]
  */
-async function loadRecordedWriteGate(jobs, runId, owner, repo, attempt, headSha, workflowPath) {
+async function loadRecordedWriteGate(jobs, runId, owner, repo, attempt, headSha, workflowPath, inspectPartial = false) {
   const names = ["Record write gate verdict", "Upload write gate verdict"];
   const matches = jobs.filter(job => job.steps?.some(step => names.includes(step.name)));
   if (matches.length === 0) return null;
@@ -206,7 +228,7 @@ async function loadRecordedWriteGate(jobs, runId, owner, repo, attempt, headSha,
     const exitCode = await exec.exec("gh", ["run", "download", runId, "--repo", `${owner}/${repo}`, "--name", "write-gate", "--dir", directory]);
     if (exitCode !== 0) throw new Error(`${ERR_SYSTEM}: Recorded write gate artifact is unavailable; refusing replay`);
     const record = parseStrictJSON(fs.readFileSync(path.join(directory, "write_gate.json"), "utf8"));
-    validateReplayWriteGateRecord(record, { runId, repository: `${owner}/${repo}`, attempt, headSha, workflowPath });
+    validateReplayWriteGateRecord(record, { runId, repository: `${owner}/${repo}`, attempt, headSha, workflowPath }, inspectPartial);
     return { record: Object.fromEntries(Object.entries(record)), recorderName: matches[0].name };
   } catch (error) {
     throw new Error(`${ERR_VALIDATION}: Cannot verify recorded write gate verdict; refusing replay`, { cause: error });
@@ -437,4 +459,14 @@ async function main() {
   }
 }
 
-module.exports = { main, parseRunUrl, buildHandlerConfigFromOutput, getReplayPolicy, enforceReplayWriteGate, validateReplayWriteGateRecord, loadRecordedWriteGate, prepareGatedReplayConfig };
+module.exports = {
+  main,
+  parseRunUrl,
+  buildHandlerConfigFromOutput,
+  getReplayPolicy,
+  enforceReplayWriteGate,
+  validateReplayWriteGateRecord,
+  loadRecordedWriteGate,
+  prepareGatedReplayConfig,
+  isSourceBoundReplayPolicy: policy => sourceBoundPolicies.has(policy),
+};

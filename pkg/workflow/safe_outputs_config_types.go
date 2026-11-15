@@ -39,6 +39,7 @@ type BaseSafeOutputConfig struct {
 
 // SafeOutputsConfig holds configuration for automatic output routes
 type SafeOutputsConfig struct {
+	Gate                                   *SafeOutputsGateConfig                 `yaml:"gate,omitempty"`
 	Steer                                  bool                                   `yaml:"steer,omitempty"` // Experimental. Create an issue and steer the agent from issue comments.
 	CreateIssues                           *CreateIssuesConfig                    `yaml:"create-issue,omitempty"`
 	CreateSecurityAdvisory                 *CreateSecurityAdvisoryConfig          `yaml:"create-security-advisory,omitempty"`
@@ -132,6 +133,12 @@ type SafeOutputsConfig struct {
 	TimeoutMinutes                         int                                `yaml:"timeout-minutes,omitempty"`           // Timeout for the safe_outputs job in minutes. Defaults to 45.
 	AutoInjectedCreateIssue                bool                               `yaml:"-"`                                   // Internal: true when create-issues was automatically injected by the compiler (not user-configured)
 	CreateIssuesDisabled                   bool                               `yaml:"-"`                                   // Internal: true when create-issue is explicitly disabled, preventing auto-injection
+}
+
+type SafeOutputsGateConfig struct {
+	ReviewRepo          string   `yaml:"review-repo,omitempty"`
+	AllowedRepos        []string `yaml:"allowed-repos,omitempty"`
+	ApprovalEnvironment string   `yaml:"approval-environment,omitempty"`
 }
 
 // SafeOutputMessagesConfig holds custom message templates for safe-output footer and notification messages

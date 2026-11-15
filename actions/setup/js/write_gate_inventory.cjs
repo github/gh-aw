@@ -41,7 +41,7 @@ function buildWriteDecisionInventory(manifest, manifestSha256, verdict, warn) {
   const parsed = gateAllowed && verdict.decision === "partial" ? parseItemDecisions(verdict.items, known, warn) : new Map();
   const items = manifest.items.map(item => {
     const selection = !gateAllowed
-      ? { decision: "drop", reason: "gate_denied" }
+      ? { decision: "drop", reason: verdict.decision === "deny" && /^[a-z0-9_.-]{1,64}$/.test(verdict.reason) ? verdict.reason : "gate_denied" }
       : item.complete !== true
         ? { decision: "drop", reason: "gate_item_incomplete" }
         : verdict.decision === "allow"

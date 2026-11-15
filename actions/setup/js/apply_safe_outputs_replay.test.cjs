@@ -153,6 +153,13 @@ describe("apply_safe_outputs_replay", () => {
       });
     }
 
+    it("rejects unsafe numeric IDs before policy/artifact lookup can refer to different runs", async () => {
+      const { getReplayPolicy } = await import("./apply_safe_outputs_replay.cjs");
+      await expect(getReplayPolicy("9007199254740993", "testowner", "testrepo")).rejects.toThrow("positive safe integer");
+      expect(global.github.rest.actions.getWorkflowRun).not.toHaveBeenCalled();
+      expect(global.exec.exec).not.toHaveBeenCalled();
+    });
+
     it("accepts only a matching successful recorded allow", async () => {
       const { validateReplayWriteGateRecord } = await import("./apply_safe_outputs_replay.cjs");
       expect(() => validateReplayWriteGateRecord(record(), identity)).not.toThrow();

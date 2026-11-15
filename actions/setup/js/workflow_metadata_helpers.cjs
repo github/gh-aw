@@ -33,6 +33,7 @@ function getWorkflowMetadata(owner, repo, ctx = context) {
  * @returns {string} The full workflow run URL
  */
 function buildWorkflowRunUrl(ctx, workflowRepo) {
+  const replay = require("./write_gate_replay_approval.cjs").currentHeldReplayAuthorization();
   const server = ctx.serverUrl || process.env.GITHUB_SERVER_URL || "https://github.com";
   let { owner = "", repo = "" } = workflowRepo ?? {};
   if (!owner || !repo) {
@@ -44,7 +45,7 @@ function buildWorkflowRunUrl(ctx, workflowRepo) {
       repo = repo || envRepo;
     }
   }
-  return `${server}/${owner}/${repo}/actions/runs/${ctx.runId}`;
+  return `${server}/${owner}/${repo}/actions/runs/${replay?.approval_run_id ?? ctx.runId}`;
 }
 
 /**

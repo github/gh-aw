@@ -6734,6 +6734,28 @@
         }
       ],
       "properties": {
+        "gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-item write gate review destinations and held-item replay approval. Requires jobs.safe_outputs.gate-steps.",
+          "properties": {
+            "review-repo": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Exact repository for review issues. Supports GitHub Actions expressions. Must match the default repository or gate.allowed-repos; unusable destinations stage the item."
+            },
+            "allowed-repos": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Additional repositories or existing repository glob patterns allowed for gate review issues. Does not authorize ordinary handler writes."
+            },
+            "approval-environment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "GitHub environment whose actual reviewers must approve held-item replay. Supports GitHub Actions expressions; absence or unusable review evidence never authorizes held writes."
+            }
+          }
+        },
         "steer": {
           "type": "boolean",
           "description": "⚠️ Experimental. Create a run-scoped issue and let the agent read user-authored issue comments containing the keyword 'steer'. The issue is reused for agent failure reporting. Requires top-level issues: read permission.",

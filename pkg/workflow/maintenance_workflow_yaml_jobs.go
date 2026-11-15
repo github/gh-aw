@@ -321,6 +321,13 @@ func buildMaintenanceApplySafeOutputsJob(opts buildMaintenanceWorkflowYAMLOption
       run_url: ${{ steps.record.outputs.run_url }}
     steps:
 `)
+	if opts.hasWriteGate {
+		text := b.String()
+		text = strings.Replace(text, "    runs-on:", "    needs: [prepare_safe_output_replay]\n    runs-on:", 1)
+		text = strings.Replace(text, "    if: ${{ ", "    if: ${{ needs.prepare_safe_output_replay.result == 'success' && needs.prepare_safe_output_replay.outputs.mode == 'legacy' && ", 1)
+		b.Reset()
+		b.WriteString(text)
+	}
 	writeMaintenanceActionsFolderCheckoutStep(&b)
 	writeMaintenanceSetupScriptsStep(&b, setupActionRef)
 	writeMaintenanceAdminPermissionsStep(&b, opts, "")

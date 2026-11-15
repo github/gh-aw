@@ -13,6 +13,13 @@ import (
 //
 //nolint:largefunc // Legacy global configuration extraction is intentionally centralized.
 func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *SafeOutputsConfig) {
+	if gateMap, ok := outputMap["gate"].(map[string]any); ok {
+		config.Gate = &SafeOutputsGateConfig{
+			ReviewRepo:          extractStringFromMap(gateMap, "review-repo", safeOutputsConfigLog),
+			ApprovalEnvironment: extractStringFromMap(gateMap, "approval-environment", safeOutputsConfigLog),
+			AllowedRepos:        ParseStringArrayFromConfig(gateMap, "allowed-repos", safeOutputsConfigLog),
+		}
+	}
 	// Handle steering issue mode.
 	if steer, exists := outputMap["steer"]; exists {
 		if steerBool, ok := steer.(bool); ok {

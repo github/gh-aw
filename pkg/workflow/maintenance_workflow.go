@@ -210,8 +210,9 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	compactionLedgers := collectMaintenanceCompactionLedgers(workflowDataList)
 	hasWorkQueue := slices.ContainsFunc(workflowDataList, isWorkQueueEnabled)
 	hasSteering := slices.ContainsFunc(workflowDataList, isSteeringIssueEnabled)
+	hasWriteGate := slices.ContainsFunc(workflowDataList, hasWriteGateSteps)
 
-	if !hasExpires && len(compactionLedgers) == 0 && !hasWorkQueue && !hasSteering {
+	if !hasExpires && len(compactionLedgers) == 0 && !hasWorkQueue && !hasSteering && !hasWriteGate {
 		maintenanceLog.Print("No workflows require scheduled maintenance, skipping maintenance workflow generation")
 
 		// No maintenance workflow means no scheduled close-expired-issues consumer.
@@ -336,6 +337,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		hasWorkQueue:        hasWorkQueue,
 		hasCacheMemory:      hasCacheMemory,
 		hasSteering:         hasSteering,
+		hasWriteGate:        hasWriteGate,
 		noLogo:              !shouldIncludeLockFileLogo(repoConfig, opts.NoLogo),
 	})
 	if err != nil {
