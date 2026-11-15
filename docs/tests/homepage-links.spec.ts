@@ -45,10 +45,13 @@ test.describe("Homepage Links", () => {
     await expect(page).toHaveURL(/\/gh-aw\/setup\/creating-workflows\//);
   });
 
-  test("should navigate to slides when the Slides CTA is clicked", async ({ page }) => {
-    const slides = page.locator(".aw-hero").getByRole("link", { name: "Slides", exact: true }).filter({ visible: true });
+  test("should link the header slideshow control to external slides without an extra CTA", async ({ page }) => {
+    const slides = page.locator(".site-header").getByRole("link", { name: "Slides", exact: true });
     await expect(slides).toBeVisible();
     await expect(slides).toHaveAttribute("href", "https://gh.io/gh-aw-slides");
+    await expect(page.locator(".aw-cta").getByRole("link", { name: "Slides", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Start slideshow" })).toHaveCount(0);
+    await expect(page.locator("#landing-slideshow, .aw-title-slide")).toHaveCount(0);
     await page.route("https://gh.io/gh-aw-slides", route => route.fulfill({ body: "Slides" }));
     await slides.click();
     await expect(page).toHaveURL("https://gh.io/gh-aw-slides");
