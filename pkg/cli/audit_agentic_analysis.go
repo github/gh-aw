@@ -359,6 +359,10 @@ func appendResourceHeavyAssessment(assessments []AgenticAssessment, processedRun
 }
 
 func appendOverkillAssessment(assessments []AgenticAssessment, metrics MetricsData, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, toolTypes int) []AgenticAssessment {
+	if metrics.Turns == 0 {
+		auditAgenticLog.Print("Skipping overkill assessment: no agent turns recorded")
+		return assessments
+	}
 	if (domain.Name == "triage" || domain.Name == "repo_maintenance" || domain.Name == "issue_response") && fingerprint.ResourceProfile == "lean" && fingerprint.ExecutionStyle == "directed" && fingerprint.ToolBreadth == "narrow" {
 		assessments = append(assessments, AgenticAssessment{
 			Kind:           "overkill_for_agentic",
