@@ -4288,7 +4288,7 @@
       "M3 3a2 2 0 0 1 2-2h9.982a2 2 0 0 1 1.414.586l4.018 4.018A2 2 0 0 1 21 7.018V21a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Zm2-.5a.5.5 0 0 0-.5.5v18a.5.5 0 0 0 .5.5h14a.5.5 0 0 0 .5-.5V8.5h-4a2 2 0 0 1-2-2v-4Zm10 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0-.146-.336l-4.018-4.018A.5.5 0 0 0 15 2.5Z",
     ],
   };
-  // Human Agent Processes: trigger → agent → output → human patterns, then the Repo Assist loop
+  // Event-driven Hand-offs: trigger → agent → output → human patterns, then the Repo Assist loop
   {
     resetIndex();
     const ICON = OCTI;
@@ -4685,7 +4685,7 @@
     slides.push({
       group: "process",
       notes:
-        "Human Agent Processes: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself over a 30-day window, 15 October to 14 November 2026 (snapshot taken 14 November 2026): auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed 935 runs on 906 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals are a snapshot of the triggers in gh-aw's own workflow files on 14 November 2026, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
+        "Event-driven Hand-offs: build the factory that works for you. Each pattern is a hand-off between people and agents, wired to a GitHub event. IssueOps: an issue is opened, an agent triages it and comments, and a maintainer picks it up. DailyOps: a scheduled agent scans the repository and files an issue. ReviewOps: a pull request is marked ready for review, an agent reviews it and leaves comments, and a maintainer takes it from there. LabelOps: adding a label starts an agent that investigates, comments, and hands back to a maintainer. The flows are illustrative patterns with synthetic labels, not activity attributed to particular people or teams. The right-hand column is measured on gh-aw itself over a 30-day window, 15 October to 14 November 2026 (snapshot taken 14 November 2026): auto-triage-issues completed 366 runs on issue events; daily-cli-tools-tester filed 30 issues, 16 closed as completed; pr-code-quality-reviewer, which runs when a pull request is marked ready for review, completed 935 runs on 906 pull requests; and the changeset workflow ran on 9 pull requests after its label was added. Pattern totals are a snapshot of the triggers in gh-aw's own workflow files on 14 November 2026, smoke tests excluded: 3 workflows start on issues opened, 194 on a schedule, 8 on ready for review and 6 on a label.",
       enter() {
         hT0 = 0;
         hCyc = -1;
@@ -4696,7 +4696,7 @@
       el: h(
         "section",
         { class: "slide" },
-        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Patterns · measured on gh-aw"), h("h2", {}, letters("Human Agent "), letters("Processes", "l-grad"))),
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Patterns · measured on gh-aw"), h("h2", {}, letters("Event-driven "), letters("Hand-offs", "l-grad"))),
         h("div", { class: "fm-quote hap-quote" }, "Build the ", h("em", {}, "factory"), " that works for you."),
         hapSvg
       ),

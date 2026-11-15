@@ -12,6 +12,7 @@ on:
     paths:
       - 'docs/**'
       - '!docs/adr/**'
+      - '.github/skills/cracktro/slides.md'
       - '.github/workflows/docs.yml'
   push:
     branches:
@@ -21,6 +22,7 @@ on:
       - '!docs/adr/**'
       - 'cmd/gh-aw-wasm/**'
       - 'scripts/bundle-wasm-docs.sh'
+      - '.github/skills/cracktro/slides.md'
       - '.github/workflows/docs.yml'
       - 'Makefile'
 

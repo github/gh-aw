@@ -1,12 +1,14 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync, readdirSync } from "node:fs";
+import { injectSlideMetadata, loadSlides, parseSlides, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
 
 // The ordered slide list lives in .github/skills/cracktro/slides.md; a slide's number is its row position.
-const SLIDES = readFileSync(new URL("../../.github/skills/cracktro/slides.md", import.meta.url), "utf8")
-  .split("\n")
-  .map(line => line.match(/^\| (.+?) \| (illustrative)? *\|$/))
-  .filter((m): m is RegExpMatchArray => !!m && m[1] !== "Heading")
-  .map(m => ({ heading: m[1], illustrative: !!m[2] }));
+const SLIDES = loadSlides();
+const PAGE_URL = "https://github.github.com/gh-aw/cracktro/";
+const SOURCE_HTML = readFileSync(new URL("../public/cracktro/index.html", import.meta.url), "utf8");
+// Same check as the deck.js privacy test: no handles, private repository references or full commit SHAs.
+const PRIVATE_REFS = /\bwho:\s|(?<![.\w])github(?:next)?\/(?!squad\b)[\w.-]+|\b[a-f0-9]{40}\b/i;
+const jsonLd = (html: string) => [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(m => JSON.parse(m[1])).filter(d => d["@type"] === "PresentationDigitalDocument");
 const TOTAL = SLIDES.length;
 const slideNo = (heading: string) => {
   const n = SLIDES.findIndex(s => s.heading === heading) + 1;
@@ -288,4 +290,93 @@ test("keeps every key on the host side of the zero-secret agents diagram", async
   await expect(page.locator(".zs-vm-g .zs-key")).toHaveCount(0);
   await expect(page.locator(".zs-svg .zs-key")).toHaveCount(2);
   expect(errors).toEqual([]);
+});
+
+test.describe("slides.md metadata", () => {
+  const table = (...rows: string[]) => ["# Slides", "", "| Heading | Notes | Summary |", "|---|---|---|", ...rows, ""].join("\n");
+
+  test("parses every row with a unique, public summary", () => {
+    expect(SLIDES.length).toBeGreaterThan(0);
+    expect(parseSlides(table("| A |  | First. |", "| B | illustrative | Second. |"))).toEqual([
+      { heading: "A", illustrative: false, summary: "First.", line: 5 },
+      { heading: "B", illustrative: true, summary: "Second.", line: 6 },
+    ]);
+    for (const slide of SLIDES) {
+      expect(`${slide.heading} ${slide.summary}`, slide.heading).not.toMatch(PRIVATE_REFS);
+      expect(slide.summary, slide.heading).not.toMatch(/https?:|@[\w-]|#\d/);
+    }
+  });
+
+  test("rejects malformed slide lists with the offending line", () => {
+    const cases: [string, RegExp][] = [
+      [table("| A | First. |"), /:5: expected 3 cells, found 2/],
+      [table("| A |  | First. | extra |"), /:5: expected 3 cells, found 4/],
+      [table("| A |  | First."), /:5: malformed row/],
+      [table("|  |  | First. |"), /:5: empty Heading/],
+      [table("| A |  |  |"), /:5: empty Summary for "A"/],
+      [table("| A | synthetic | First. |"), /:5: unknown Notes value "synthetic"/],
+      [table("| A |  | First. |", "| A |  | Second. |"), /:6: duplicate Heading "A" \(first on line 5\)/],
+      [table("| Human agent processes |  | First. |", "| Human Agent Processes |  | Second. |"), /:6: duplicate Heading "Human Agent Processes" \(first on line 5\)/],
+      [table("| A |  | Same. |", "| B |  | Same. |"), /:6: duplicate Summary for "B" \(first on line 5\)/],
+      [table("| A |  | First. |", "B | illustrative | Last slide. |"), /:6: malformed row, expected "\| Heading \| Notes \| Summary \|": B \| illustrative \| Last slide\. \|/],
+      [table("| A |  | First. |", "", "| B |  | Second. |"), /:7: table row outside the slide table/],
+      [table(), /:3: slide table has no rows/],
+      ["| Heading | Notes |\n|---|---|\n| A |  |\n", /:1: expected table header/],
+      ["| Heading | Notes | Summary |\n|---|---|\n", /:2: expected separator/],
+      ["no table", /missing slide table/],
+    ];
+    for (const [text, error] of cases) expect(() => parseSlides(text, "slides.md"), String(error)).toThrow(error);
+  });
+
+  test("injects escaped, idempotent JSON-LD and leaves the rest of the page untouched", () => {
+    const hostile = parseSlides(table("| A </script><script>alert(1)</script> |  | Uses $& and $1 & <b>tags</b>\u2028. |"));
+    const html = injectSlideMetadata(SOURCE_HTML, hostile, PAGE_URL);
+    expect(html.match(/<\/script>/gi)).toHaveLength(SOURCE_HTML.match(/<\/script>/gi)!.length);
+    expect(html).not.toContain("<b>");
+    const [doc] = jsonLd(html);
+    expect(doc.hasPart).toEqual(slideParts(hostile, PAGE_URL));
+    expect(doc.hasPart[0].description).toBe("Uses $& and $1 & <b>tags</b>\u2028.");
+    expect(serializeJsonLd({ s: "</script>&\u2029" })).toBe('{"s":"\\u003c/script\\u003e\\u0026\\u2029"}');
+
+    const real = injectSlideMetadata(SOURCE_HTML, SLIDES, PAGE_URL);
+    expect(injectSlideMetadata(real, SLIDES, PAGE_URL)).toBe(real);
+    const [start, end] = [SOURCE_HTML.indexOf('<script type="application/ld+json">'), SOURCE_HTML.indexOf("</script>")];
+    expect(real.slice(0, start)).toBe(SOURCE_HTML.slice(0, start));
+    expect(real.slice(real.length - (SOURCE_HTML.length - end))).toBe(SOURCE_HTML.slice(end));
+    const { hasPart, ...rest } = jsonLd(real)[0];
+    expect(rest).toEqual(jsonLd(SOURCE_HTML)[0]);
+    expect(hasPart).toHaveLength(SLIDES.length);
+    // The hand-written source stays free of generated metadata; the build adds it.
+    expect(jsonLd(SOURCE_HTML)[0].hasPart).toBeUndefined();
+
+    expect(() => injectSlideMetadata(SOURCE_HTML, SLIDES, "https://example.com/talk/")).toThrow(/does not match/);
+    expect(() => injectSlideMetadata("<head></head>", SLIDES, PAGE_URL)).toThrow(/found 0/);
+    const block = SOURCE_HTML.slice(start, end + "</script>".length);
+    expect(() => injectSlideMetadata(SOURCE_HTML.replace(block, block + block), SLIDES, PAGE_URL)).toThrow(/found 2/);
+  });
+});
+
+test("serves the slide list in the talk page head without running the deck", async ({ request }) => {
+  const response = await request.get("/gh-aw/cracktro/");
+  expect(response.ok()).toBe(true);
+  const html = await response.text();
+  expect(html).toBe(injectSlideMetadata(SOURCE_HTML, SLIDES, PAGE_URL));
+  const head = html.slice(0, html.indexOf("</head>"));
+  const docs = jsonLd(head);
+  expect(docs).toHaveLength(1);
+  expect(docs[0].url).toBe(PAGE_URL);
+  expect(docs[0].hasPart).toEqual(slideParts(SLIDES, PAGE_URL));
+  expect(docs[0].hasPart.every((part: { description: string }) => !part.description.startsWith("Band header ("))).toBe(true);
+  expect(head.match(/https:\/\/[^"\s]+/g)!.every(url => url.startsWith("https://schema.org") || url.startsWith("https://github.github.com/gh-aw/"))).toBe(true);
+});
+
+test("opens every slide from its metadata #N link", async ({ page, request }) => {
+  const [doc] = jsonLd(await (await request.get("/gh-aw/cracktro/")).text());
+  await page.goto("/gh-aw/cracktro/");
+  for (const part of doc.hasPart) {
+    const hash = new URL(part.url).hash;
+    await page.evaluate(h => (location.hash = h), hash);
+    await expect(page.locator(".count")).toHaveText(at(part.position));
+    await expect(page.locator(".slide.active").getByRole("heading").first()).toHaveText(part.name);
+  }
 });
