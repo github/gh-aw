@@ -258,6 +258,22 @@ Based on your analysis:
      - Use the `add-labels` safe output to add appropriate labels (`spam`, `link-spam`, `ai-generated`)
    - **If no warnings or issues are found** and the PR appears legitimate, use the `add-labels` safe output to add the `ai-inspected` label
 
+## Success Rubric and Final Self-Check
+
+A successful review uses the supplied context, takes only high-confidence actions supported by that context, and emits at least one valid safe output. Before the final safe output, verify the target, allowed action and labels, rationale and confidence fields, spam-only hide reason, and that spam-log entries are added only when spam labels were applied.
+
+## Important Guidelines
+
+- Be conservative with detections to avoid false positives
+- Consider the repository context when evaluating relevance
+- Technical discussions may naturally contain links to resources, documentation, or related issues
+- New contributors may have less polished writing - this doesn't necessarily indicate AI generation
+- Provide clear reasoning for each detection in your analysis
+- Only take action if you have high confidence in the detection
+- **You MUST always emit at least one safe output.** After completing your analysis, if no spam was detected and no labels were applied, call the `noop` safe output to confirm that the content was reviewed and no action was required. Never exit without calling a safe output.
+
+<!-- instruction-prefix-end -->
+
 ## Spam Tracking (Cache Memory)
 
 Use the cache memory at `/tmp/gh-aw/cache-memory/` to track spam activity across runs and detect bursts of suspicious behavior from the same user.
@@ -298,17 +314,3 @@ After completing your analysis, if any spam labels were applied:
 4. Write the updated array back to `/tmp/gh-aw/cache-memory/spam-log.json`
 
 If no spam was detected, you may still update the log to remove stale entries, but do not add a new entry.
-
-## Success Rubric and Final Self-Check
-
-A successful review uses the supplied context, takes only high-confidence actions supported by that context, and emits at least one valid safe output. Before the final safe output, verify the target, allowed action and labels, rationale and confidence fields, spam-only hide reason, and that spam-log entries are added only when spam labels were applied.
-
-## Important Guidelines
-
-- Be conservative with detections to avoid false positives
-- Consider the repository context when evaluating relevance
-- Technical discussions may naturally contain links to resources, documentation, or related issues
-- New contributors may have less polished writing - this doesn't necessarily indicate AI generation
-- Provide clear reasoning for each detection in your analysis
-- Only take action if you have high confidence in the detection
-- **You MUST always emit at least one safe output.** After completing your analysis, if no spam was detected and no labels were applied, call the `noop` safe output to confirm that the content was reviewed and no action was required. Never exit without calling a safe output.

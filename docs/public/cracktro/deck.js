@@ -295,8 +295,8 @@
   body.light .dots button.hd { background: transparent; box-shadow: inset 0 0 0 2px #1f232859; }
   body.light .dots button.on { background: #1f2328; box-shadow: none; }
   body.light .count { color: #424a53; }
-  body.light .snd, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
-  body.light .snd:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
+  body.light .snd, body.light .fzb, body.light .arrows button { border-color: #9ea7b3; background: #e6eaefcc; color: #424a53; }
+  body.light .snd:hover, body.light .fzb:hover, body.light .arrows button:hover { color: #1f2328; border-color: #818b98; }
   .active .tp-copy > :nth-child(odd):not(.tp-vs), .active .tp-vs > :first-child { animation: tp-l .9s cubic-bezier(.2,.9,.25,1) both; }
   .active .tp-copy > :nth-child(even):not(.tp-vs), .active .tp-vs > :last-child { animation: tp-r .9s cubic-bezier(.2,.9,.25,1) both; }
   .active .tp-copy > :nth-child(2) { animation-delay: .15s !important; }
@@ -1978,10 +1978,14 @@
   body.compact-nav .dots { display: none; }
   body.compact-nav .arrows { display: flex; }
   body.compact-nav .snd { right: 112px; }
-  .snd { position: fixed; right: 124px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
+  .snd, .fzb { position: fixed; right: 124px; bottom: 10px; width: 34px; height: 34px; padding: 6px; border: 1px solid #3d444d; border-radius: 8px;
     background: #151b23cc; color: #9198a1; cursor: pointer; z-index: 5; transition: color .2s, border-color .2s, background .2s; }
-  .snd:hover { color: #f0f6fc; border-color: #9198a1; }
-  .snd svg { width: 100%; height: 100%; display: block; }
+  .snd:hover, .fzb:hover { color: #f0f6fc; border-color: #9198a1; }
+  .snd svg, .fzb svg { width: 100%; height: 100%; display: block; }
+  .fzb { right: 164px; }
+  body.compact-nav .fzb { right: 152px; }
+  /* too narrow for search between the arrows and sound: stack it above the sound toggle */
+  @media (max-width: 360px) { body.compact-nav .fzb { right: 112px; bottom: 50px; } }
   .snd .waves { transition: opacity .2s; }
   .snd .x { opacity: 0; transition: opacity .2s; }
   .snd.off .waves { opacity: 0; }
@@ -1992,6 +1996,37 @@
     background: #151b23f0; border: 1px solid #3d444d; border-radius: 12px; color: #f0f6fc; font: 400 18px/1.45 "Mona Sans"; z-index: 6; display: none; }
   .notes.on { display: block; }
   body:not(.compact-nav) .notes { left: 330px; }
+
+  /* --- slide search (full-screen dialog) --- */
+  .fz { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+    background: #0d1117f7; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #f0f6fc; font-family: "Mona Sans", -apple-system, "Segoe UI", sans-serif; z-index: 20; }
+  .fz[open] { display: flex; justify-content: center; }
+  .fz::backdrop { background: transparent; }
+  .fz-box { width: min(980px, calc(100% - 32px)); margin-top: max(16px, 7vh); max-height: calc(100% - max(32px, 14vh)); display: flex; flex-direction: column; gap: 12px; }
+  .fz-bar { display: flex; gap: 10px; align-items: center; }
+  .fz-in { flex: 1; min-width: 0; font: 500 clamp(20px, 3vw, 30px)/1.2 "Mona Sans", sans-serif; color: inherit; background: #151b23; border: 1px solid #3d444d;
+    border-radius: 12px; padding: 14px 18px; outline: none; }
+  .fz-in:focus { border-color: #ab7df8; box-shadow: 0 0 0 3px #ab7df840; }
+  .fz-x { font: 600 14px/1 var(--mono); color: #9198a1; background: #151b23; border: 1px solid #3d444d; border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+  .fz-x:hover { color: #f0f6fc; border-color: #9198a1; }
+  .fz-st { font: 500 14px/1 var(--mono); color: #9198a1; letter-spacing: .06em; }
+  .fz-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .fz-list li { display: grid; grid-template-columns: 3.2em 1fr; gap: 4px 12px; padding: 12px 16px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; }
+  .fz-list li:hover { background: #151b23; }
+  .fz-list li[aria-selected="true"] { background: #1f2630; border-color: #ab7df8; }
+  .fz-n { grid-row: span 2; font: 600 18px/1.4 var(--mono); color: #ab7df8; letter-spacing: .06em; }
+  .fz-t { font-size: 20px; font-weight: 600; line-height: 1.3; }
+  .fz-b { font: 500 13px/1 var(--mono); color: #9198a1; margin-left: 10px; letter-spacing: .04em; }
+  .fz-s { font-size: 15px; line-height: 1.4; color: #c9d1d9; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .fz mark { background: #ab7df859; color: inherit; border-radius: 3px; }
+  body.light .fz { background: #f6f8faf5; color: #1f2328; }
+  body.light .fz-in, body.light .fz-x { background: #ffffff; border-color: #9ea7b3; color: #1f2328; }
+  body.light .fz-list li:hover { background: #eaeef2; }
+  body.light .fz-list li[aria-selected="true"] { background: #ffffff; border-color: #8250df; }
+  body.light .fz-n { color: #8250df; }
+  body.light .fz-s { color: #424a53; }
+  body.light .fz-st, body.light .fz-b { color: #59636e; }
+  body.light .fz mark { background: #8250df33; }
 
   /* --- any engine --- */
   .ae .slide-head .ae-agent .ch { background-image: linear-gradient(90deg, #ab7df8, #d2b8ff, #ab7df8); }
@@ -15129,14 +15164,18 @@
       1
     )
   );
+  // A slide's heading as one readable line (per-letter lines joined by spaces); the search index reuses it.
+  const headingText = s => {
+    const hd = s.el.querySelector("h1, h2, h3");
+    const ls = hd ? [...hd.querySelectorAll(".line")] : [];
+    return (ls.length ? ls.map(l => l.textContent).join(" ") : hd?.textContent || "")
+      .replace(/\s+/g, " ")
+      .replace(/ ([,.])/g, "$1")
+      .trim();
+  };
   {
     const label = s => {
-      const hd = s.el.querySelector("h1, h2, h3");
-      const ls = hd ? [...hd.querySelectorAll(".line")] : [];
-      const t = (ls.length ? ls.map(l => l.textContent).join(" ") : hd?.textContent || "")
-        .replace(/\s+/g, " ")
-        .replace(/ ([,.])/g, "$1")
-        .trim();
+      const t = headingText(s);
       const k = s.el.querySelector(".kicker")?.textContent.trim();
       return t.length > 32 && k ? k : t;
     };
@@ -15281,17 +15320,29 @@
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><g class="waves"><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a7.5 7.5 0 0 1 0 11"/></g>' +
     '<g class="x"><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></g></svg>';
+  // search sits left of the sound toggle and opens the full-screen slide search (see ---------- search ----------)
+  const fzBtn = h("button", {
+    class: "fzb",
+    "aria-label": "Search slides (/)",
+    "aria-haspopup": "dialog",
+    title: "Search slides (/)",
+    onclick: e => {
+      e.stopPropagation();
+      openSearch();
+    },
+  });
+  fzBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg>';
   const notes = h("div", { class: "notes" });
   const wash = h("div", { class: "wash" });
   const gridc = h("canvas", { class: "gridc" });
-  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, count, snd, notes);
+  document.body.append(canvas, wash, gridc, stage, progress, dots, arrows, count, fzBtn, snd, notes);
 
-  // Dot map: left offset + the longest band of 8px dots with 5px gaps + 16px for the wide active dot; sound/count need ~170px on the right.
+  // Dot map: left offset + the longest band of 8px dots with 5px gaps + 16px for the wide active dot; search/sound/count need ~210px on the right.
   const dotsWidth = 28 + Math.max(...rows.map(r => r.items.length + (r.header ? 1 : 0))) * 13 + 16 + 400;
   const fit = () => {
     const s = Math.min(innerWidth / W, innerHeight / H);
     stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
-    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 170);
+    document.body.classList.toggle("compact-nav", dotsWidth > innerWidth - 210);
   };
   addEventListener("resize", fit);
   fit();
@@ -16043,7 +16094,18 @@
     };
 
   addEventListener("keydown", e => {
+    if (fz.open) return; // the search dialog handles its own keys
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      openSearch();
+      return;
+    }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "/" && !e.target.closest?.("input, textarea, select, [contenteditable]")) {
+      e.preventDefault();
+      openSearch();
+      return;
+    }
     if ((e.key === "Enter" || e.key === " ") && e.target.closest?.("a, button, input, textarea, select, [contenteditable]")) return;
     if (slides[cur].onKey?.(e)) {
       sfx.touch();
@@ -16066,16 +16128,16 @@
     else if (e.key === "m" || e.key === "M") toggleSound();
   });
   addEventListener("click", e => {
-    if (e.target.closest("a, button")) return;
+    if (fz.open || e.target.closest(".fz, a, button")) return;
     const tile = e.target.closest("[data-go]");
     if (tile) return go(+tile.dataset.go);
     e.clientX < innerWidth / 3 ? prev() : next();
   });
   let tx = null,
     ty = null;
-  addEventListener("touchstart", e => ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY)), { passive: true });
+  addEventListener("touchstart", e => (fz.open ? (tx = ty = null) : ((tx = e.touches[0].clientX), (ty = e.touches[0].clientY))), { passive: true });
   addEventListener("touchend", e => {
-    if (tx == null) return;
+    if (tx == null || fz.open) return;
     const dx = e.changedTouches[0].clientX - tx,
       dy = e.changedTouches[0].clientY - ty;
     tx = ty = null;
@@ -16083,6 +16145,203 @@
     else if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
   });
   addEventListener("hashchange", () => go((parseInt(location.hash.slice(1), 10) || 1) - 1));
+
+  // ---------- search ----------
+  // "/" (or Ctrl/Cmd+K, or the dock's search button) opens a full-screen dialog that fuzzy-searches every slide.
+  // The index is precomputed once: each slide's title, its slides.md summary (the JSON-LD hasPart description the
+  // docs build injects; absent on a plain static preview) and its body text plus speaker notes.
+  // Matching is bounds-based: each query term must occur, letters in order, inside one window of a field, and the
+  // window is bounded (at most one and a half times the term), so letters scattered through long notes never match.
+  // The tightest window wins: forward from each occurrence of the first letter to the earliest end, then backward to
+  // the latest start. Its bounds score the match (term length / window width, word-start and field bonuses) and mark it.
+  const FZ_FIELDS = [
+    ["title", 3],
+    ["summary", 2],
+    ["body", 1],
+  ];
+  let fzIndex = null,
+    fzHits = [],
+    fzSel = 0;
+  const fzNorm = t => t.replace(/\s+/g, " ").trim();
+  // visible slide text, one space between text nodes; per-letter headings (the title) and decorative aria-hidden parts are skipped
+  const fzText = el => {
+    const out = [],
+      walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode: n => (n.parentElement?.closest('.line, style, script, [aria-hidden="true"]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+      });
+    while (walk.nextNode()) out.push(walk.currentNode.nodeValue);
+    return out.join(" ");
+  };
+  const fzBuild = () => {
+    let parts = [];
+    for (const el of document.querySelectorAll('script[type="application/ld+json"]')) {
+      try {
+        const d = JSON.parse(el.textContent);
+        if (d?.["@type"] === "PresentationDigitalDocument" && Array.isArray(d.hasPart)) parts = d.hasPart;
+      } catch {}
+    }
+    return slides.map((s, i) => {
+      const part = parts.find(p => p.position === i + 1),
+        title = headingText(s) || part?.name || `Slide ${i + 1}`,
+        summary = fzNorm(part?.description || ""),
+        body = fzNorm(`${fzText(s.el)} ${s.notes || ""}`);
+      return { n: i, band: BANDS[s.group]?.[0] || "", title, summary, body, notes: fzNorm(s.notes || ""), lc: { title: title.toLowerCase(), summary: summary.toLowerCase(), body: body.toLowerCase() } };
+    });
+  };
+  // Tightest bounded window [start, end) of `text` holding the characters of `term` in order, or null.
+  const fzBounds = (text, term) => {
+    const n = term.length,
+      max = n + Math.ceil(n / 2);
+    let best = null;
+    for (let i = text.indexOf(term[0]); i >= 0; i = text.indexOf(term[0], i + 1)) {
+      let j = i,
+        k = 0;
+      for (; j < text.length && k < n && j - i < max; j++) if (text[j] === term[k]) k++;
+      if (k < n) continue;
+      let b = j - 1;
+      for (k = n - 1; k >= 0; b--) if (text[b] === term[k]) k--;
+      b++;
+      if (!best || j - b < best[1] - best[0] || (j - b === best[1] - best[0] && /\W/.test(text[b - 1] || " ") && !/\W/.test(text[best[0] - 1] || " "))) best = [b, j];
+      if (j - b === n && (b === 0 || /\W/.test(text[b - 1]))) break; // contiguous at a word start: cannot do better
+      i = Math.max(i, b);
+    }
+    return best;
+  };
+  const fzScore = (text, [b, e], n) => n / (e - b) + (b === 0 || /\W/.test(text[b - 1]) ? 0.5 : 0) + 0.25 * (1 - Math.min(b, 400) / 400);
+  const fzSearch = q => {
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
+    if (!terms.length) return fzIndex.map(r => ({ r, score: 0, marks: {} }));
+    // "#12" jumps straight to slide 12; a bare "12" also matches text and ranks slide 12 first
+    const num = /^(#?)(\d+)$/.exec(q.trim());
+    if (num?.[1]) return fzIndex.filter(r => r.n + 1 === +num[2]).map(r => ({ r, score: 1, marks: {} }));
+    const hits = [];
+    for (const r of fzIndex) {
+      let score = 0;
+      const marks = { title: [], summary: [], body: [] };
+      for (const term of terms) {
+        let best = 0;
+        for (const [f, w] of FZ_FIELDS) {
+          const bd = r.lc[f] && fzBounds(r.lc[f], term);
+          if (!bd) continue;
+          marks[f].push(bd);
+          best = Math.max(best, w * fzScore(r.lc[f], bd, term.length));
+        }
+        if (!best) {
+          score = 0;
+          break;
+        }
+        score += best;
+      }
+      if (num && +num[2] === r.n + 1) score += 100;
+      if (score) hits.push({ r, score, marks });
+    }
+    return hits.sort((a, b) => b.score - a.score || a.r.n - b.r.n).slice(0, 60);
+  };
+  // text with <mark>s over the (merged) bounds, built as DOM nodes, never as HTML
+  const fzMark = (text, bounds) => {
+    const out = [];
+    let at = 0;
+    for (const [b, e] of [...bounds].sort((x, y) => x[0] - y[0])) {
+      const s = Math.max(b, at);
+      if (e <= s) continue;
+      if (s > at) out.push(text.slice(at, s));
+      out.push(h("mark", {}, text.slice(s, e)));
+      at = e;
+    }
+    if (at < text.length) out.push(text.slice(at));
+    return out;
+  };
+  // the line under the title: the summary when it matched (or nothing else did), else a body excerpt around the first match
+  const fzLine = ({ r, marks }) => {
+    if (r.summary && (marks.summary?.length || !marks.body?.length)) return fzMark(r.summary, marks.summary || []);
+    if (!marks.body?.length) return r.notes.slice(0, 220);
+    const first = Math.min(...marks.body.map(m => m[0])),
+      from = Math.max(0, first - 60),
+      to = Math.min(r.body.length, first + 160);
+    const inner = marks.body.filter(([b, e]) => b >= from && e <= to).map(([b, e]) => [b - from, e - from]);
+    return [from ? "…" : "", ...fzMark(r.body.slice(from, to), inner), to < r.body.length ? "…" : ""];
+  };
+  const fzIn = h("input", {
+    type: "search",
+    class: "fz-in",
+    placeholder: "Search slides",
+    autocomplete: "off",
+    spellcheck: false,
+    "aria-label": "Search slides",
+    role: "combobox",
+    "aria-expanded": "true",
+    "aria-controls": "fz-list",
+    "aria-autocomplete": "list",
+  });
+  const fzList = h("ul", { class: "fz-list", id: "fz-list", role: "listbox", "aria-label": "Matching slides" });
+  const fzSt = h("div", { class: "fz-st", "aria-live": "polite" });
+  const fz = h(
+    "dialog",
+    { class: "fz", "aria-label": "Search slides" },
+    h("div", { class: "fz-box" }, h("div", { class: "fz-bar" }, fzIn, h("button", { class: "fz-x", type: "button", "aria-label": "Close search (Esc)", onclick: () => fz.close() }, "Esc")), fzSt, fzList)
+  );
+  document.body.append(fz);
+  const fzPaint = () => {
+    [...fzList.children].forEach((li, i) => li.setAttribute("aria-selected", i === fzSel ? "true" : "false"));
+    const li = fzList.children[fzSel];
+    if (li) {
+      fzIn.setAttribute("aria-activedescendant", li.id);
+      li.scrollIntoView({ block: "nearest" });
+    } else fzIn.removeAttribute("aria-activedescendant");
+  };
+  const fzRender = () => {
+    fzHits = fzSearch(fzIn.value);
+    fzSel = 0;
+    fzList.replaceChildren(
+      ...fzHits.map((hit, i) =>
+        h(
+          "li",
+          { id: `fz-o-${i}`, role: "option", onclick: () => fzPick(i), onmousemove: () => fzSel !== i && ((fzSel = i), fzPaint()) },
+          h("span", { class: "fz-n" }, String(hit.r.n + 1).padStart(2, "0")),
+          h("div", { class: "fz-t" }, ...fzMark(hit.r.title, hit.marks.title || []), hit.r.band && hit.r.band !== hit.r.title ? h("span", { class: "fz-b" }, hit.r.band) : null),
+          h("div", { class: "fz-s" }, fzLine(hit))
+        )
+      )
+    );
+    fzSt.textContent = fzIn.value.trim()
+      ? fzHits.length
+        ? `${fzHits.length} matching slide${fzHits.length === 1 ? "" : "s"} · ↑↓ to choose, Enter to open`
+        : "No slides match"
+      : `${fzHits.length} slides · type to search titles, summaries and slide text`;
+    fzPaint();
+  };
+  function fzPick(i) {
+    const hit = fzHits[i];
+    if (!hit) return;
+    fz.close();
+    go(hit.r.n);
+  }
+  function openSearch() {
+    if (fz.open) return;
+    fzIndex ??= fzBuild();
+    fz.showModal();
+    fzIn.select();
+    fzRender();
+  }
+  fzIn.addEventListener("input", fzRender);
+  fz.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (fzHits.length) ((fzSel = (fzSel + (e.key === "ArrowDown" ? 1 : -1) + fzHits.length) % fzHits.length), fzPaint());
+    } else if (e.key === "Enter" && e.target === fzIn) {
+      e.preventDefault();
+      fzPick(fzSel);
+    } else if (e.key === "Escape") {
+      // close explicitly: browsers may ignore a repeated Escape without fresh user activation
+      e.preventDefault();
+      fz.close();
+    }
+  });
+  // a click on the dialog's own surface (outside the search box) closes it
+  fz.addEventListener("click", e => e.target === fz && fz.close());
+  // closing returns focus to the opener; drop it so Space and Enter go back to driving the deck
+  fz.addEventListener("close", () => document.activeElement?.blur?.());
+  for (const t of ["touchstart", "touchend"]) fz.addEventListener(t, e => e.stopPropagation(), { passive: true });
 
   // ---------- animated background ----------
   const ctx = canvas.getContext("2d");
