@@ -72,7 +72,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	}
 
 	cacheMode := ""
-	if !data.GHES && (data.DryRun || (IsDetectionJobEnabled(data.SafeOutputs) && !hasDependencyCaches)) {
+	if !data.GHES && (data.DryRun || ((IsDetectionJobEnabled(data.SafeOutputs) || hasWriteGateSteps(data)) && !hasDependencyCaches)) {
 		// Restore-only actions alone do not restrict the job's scoped cache token.
 		// Dependency caches use the runner's trigger-scoped default instead:
 		// trusted events can save, while low-trust events retain read-only access.
