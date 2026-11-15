@@ -349,7 +349,7 @@ Restricted publication.
 	require.NoError(t, err)
 	require.NotNil(t, config)
 	issue := config["create_issue"].(map[string]any)
-	require.Equal(t, float64(1), issue["max"])
+	require.InDelta(t, 1, issue["max"], 0)
 	require.Equal(t, "owner/restricted", issue["target-repo"])
 	require.Equal(t, []any{"owner/restricted"}, issue["allowed_repos"])
 	require.Equal(t, true, issue["staged"])

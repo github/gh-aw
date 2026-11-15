@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -81,7 +82,7 @@ func (c *Compiler) buildWriteGatePhaseSteps(data *WorkflowData) ([]string, error
 	}
 	outcomes := make([]string, len(ids))
 	for index, id := range ids {
-		outcomes[index] = "${{ steps." + id + ".outcome }}"
+		outcomes[index] = "${{ steps." + id + ".outcome }}" //nolint:uncheckedsliceindex // outcomes has the same length as ids.
 	}
 	encoded, err := json.Marshal(outcomes)
 	if err != nil {
@@ -90,7 +91,7 @@ func (c *Compiler) buildWriteGatePhaseSteps(data *WorkflowData) ([]string, error
 	env := map[string]any{
 		"GH_AW_WRITE_DECISIONS":          "${{ steps.initialize_write_gate.outputs.path }}",
 		"GH_AW_WRITE_GATE_STEP_OUTCOMES": string(encoded),
-		"GH_AW_WRITE_GATE_DRY_RUN":       fmt.Sprint(data.DryRun),
+		"GH_AW_WRITE_GATE_DRY_RUN":       strconv.FormatBool(data.DryRun),
 	}
 	verdict, err := c.writeGateRuntimeStep("Validate write gate verdict", writeGateStepID, "main", env, "always()")
 	if err != nil {
@@ -105,7 +106,7 @@ func (c *Compiler) prepareWriteGateSteps(raw []any, data *WorkflowData) ([]strin
 	}
 	steps := make([]any, len(raw))
 	ids := make([]string, len(raw))
-	seen := map[string]bool{writeGateStepID: true, writeGateInitializeStepID: true}
+	seen := map[string]struct{}{writeGateStepID: {}, writeGateInitializeStepID: {}}
 	for index, value := range raw {
 		step, ok := value.(map[string]any)
 		if !ok {
@@ -116,8 +117,15 @@ func (c *Compiler) prepareWriteGateSteps(raw []any, data *WorkflowData) ([]strin
 		if err != nil {
 			return nil, nil, err
 		}
-		ids[index], copy["id"] = id, id
-		env, _ := copy["env"].(map[string]any)
+		ids[index], copy["id"] = id, id //nolint:uncheckedsliceindex // ids has the same length as raw.
+		var env map[string]any
+		if value, exists := copy["env"]; exists {
+			var ok bool
+			env, ok = value.(map[string]any)
+			if !ok {
+				return nil, nil, fmt.Errorf("gate-steps[%d].env expects an object of environment variables", index)
+			}
+		}
 		env = maps.Clone(env)
 		if env == nil {
 			env = make(map[string]any)
@@ -125,13 +133,13 @@ func (c *Compiler) prepareWriteGateSteps(raw []any, data *WorkflowData) ([]strin
 		env["GH_AW_WRITE_DECISIONS"] = "${{ steps.initialize_write_gate.outputs.path }}"
 		copy["env"] = env
 		c.warnWriteGateCredentials(step)
-		steps[index] = copy
+		steps[index] = copy //nolint:uncheckedsliceindex // steps has the same length as raw.
 	}
 	pinned, err := c.extractPinnedJobSteps("gate-steps", "safe_outputs", map[string]any{"gate-steps": steps}, data)
 	return pinned, ids, err
 }
 
-func writeGateConfiguredStepID(step map[string]any, index int, seen map[string]bool) (string, error) {
+func writeGateConfiguredStepID(step map[string]any, index int, seen map[string]struct{}) (string, error) {
 	id := fmt.Sprintf("aw_write_gate_%d", index+1)
 	if value, exists := step["id"]; exists {
 		var ok bool
@@ -141,10 +149,10 @@ func writeGateConfiguredStepID(step map[string]any, index int, seen map[string]b
 		}
 	}
 	key := strings.ToLower(id)
-	if seen[key] {
+	if _, exists := seen[key]; exists {
 		return "", fmt.Errorf("gate-steps[%d].id %q conflicts with another gate or compiler-owned step. Use a unique identifier, for example: id: check_policy", index, id)
 	}
-	seen[key] = true
+	seen[key] = struct{}{}
 	return id, nil
 }
 
@@ -200,7 +208,7 @@ func (c *Compiler) guardWriteGateSteps(lines []string) ([]string, error) {
 		if previous, exists := step["if"]; exists {
 			switch value := previous.(type) {
 			case string:
-				condition = BuildAnd(condition, &ExpressionNode{Expression: c.extractExpressionFromIfString(value)})
+				condition = BuildAnd(condition, &ExpressionNode{Expression: stripExpressionWrapper(c.extractExpressionFromIfString(value))})
 			case bool, int, int64, uint64, float64:
 				condition = BuildAnd(condition, &ExpressionNode{Expression: fmt.Sprint(value)})
 			default:
@@ -223,7 +231,7 @@ func (c *Compiler) insertWriteGatePhase(data *WorkflowData, steps, tokens []stri
 		return nil, err
 	}
 	index := c.calculatePreambleInsertIndex(steps, data, prefix)
-	for index < len(steps) && !strings.HasPrefix(steps[index], stepNameLinePrefix) {
+	for index < len(steps) && !strings.HasPrefix(steps[index], stepNameLinePrefix) { //nolint:uncheckedsliceindex // The preamble index is nonnegative and the condition bounds it.
 		index++
 	}
 	guarded, err := c.guardWriteGateSteps(append(append([]string{}, tokens...), steps[index:]...))

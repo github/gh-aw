@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -75,7 +76,7 @@ func (c *Compiler) addWriteGateRecordSteps(data *WorkflowData) error {
 	}
 	job, exists := c.jobManager.GetJob("conclusion")
 	if !exists {
-		return fmt.Errorf("jobs.safe_outputs.gate-steps requires conclusion to record the verdict")
+		return errors.New("jobs.safe_outputs.gate-steps requires conclusion to record the verdict")
 	}
 	perms := NewPermissionsParser(job.Permissions).ToPermissions()
 	if level, exists := perms.Get(PermissionActions); !exists || level == PermissionNone {

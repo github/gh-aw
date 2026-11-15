@@ -2,7 +2,9 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"strings"
 
@@ -26,12 +28,23 @@ func jobsContainWriteGateField(jobs map[string]any) bool {
 func normalizeWriteGateImportJobs(main map[string]any, imports string) (map[string]any, string, error) {
 	parsed := make([]map[string]any, 0)
 	gated := jobsContainWriteGateField(main)
-	for _, line := range strings.Split(imports, "\n") {
+	for line := range strings.SplitSeq(imports, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 		var jobs map[string]any
-		if err := json.Unmarshal([]byte(line), &jobs); err != nil {
+		decoder := json.NewDecoder(strings.NewReader(line))
+		err := decoder.Decode(&jobs)
+		if err == nil {
+			var extra any
+			if trailing := decoder.Decode(&extra); trailing != io.EOF {
+				err = trailing
+				if err == nil {
+					err = errors.New("expected one imported job object")
+				}
+			}
+		}
+		if err != nil {
 			if gated {
 				return nil, "", fmt.Errorf("imported write-gate jobs could not be parsed: %w. Use valid job objects in shared workflows", err)
 			}
@@ -79,11 +92,11 @@ func normalizeWriteGateJobAliases(jobs map[string]any) (map[string]any, error) {
 	if raw, exists := result[canonical]; exists {
 		config, ok := raw.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("jobs.safe_outputs expects an object; imported write gates cannot be replaced with a scalar. Example: safe_outputs: {}")
+			return nil, errors.New("jobs.safe_outputs expects an object; imported write gates cannot be replaced with a scalar. Example: safe_outputs: {}")
 		}
 		if value, exists := config["gate-steps"]; exists {
 			if _, ok := value.([]any); !ok {
-				return nil, fmt.Errorf("jobs.safe_outputs.gate-steps expects an additive array; imported gate steps cannot be removed with null or false. Example: gate-steps: []")
+				return nil, errors.New("jobs.safe_outputs.gate-steps expects an additive array; imported gate steps cannot be removed with null or false. Example: gate-steps: []")
 			}
 		}
 	}

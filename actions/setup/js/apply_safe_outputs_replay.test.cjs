@@ -369,6 +369,20 @@ describe("apply_safe_outputs_replay", () => {
       }
     });
 
+    it("refuses failed or ambiguous enforcement checks before downloading an allow record", async () => {
+      const { loadRecordedWriteGate } = await import("./apply_safe_outputs_replay.cjs");
+      const checked = { name: "Check write gate enforcement", status: "completed", conclusion: "success" };
+      for (const checks of [[{ ...checked, conclusion: "failure" }], [{ ...checked, conclusion: "cancelled" }], [{ ...checked, conclusion: "skipped" }], [{ ...checked, status: "in_progress" }], [checked, checked]]) {
+        await expect(loadRecordedWriteGate([{ ...trustedJob(), steps: [...trustedJob().steps, ...checks] }], "123", "testowner", "testrepo", 1, "a".repeat(40))).rejects.toThrow(/enforcement check/);
+        expect(global.exec.exec).not.toHaveBeenCalled();
+      }
+      configureRecorder();
+      for (const checks of [[], [checked]]) {
+        const recorded = await loadRecordedWriteGate([{ ...trustedJob(), steps: [...trustedJob().steps, ...checks] }], "123", "testowner", "testrepo", 1, "a".repeat(40));
+        expect(recorded.record.verdict).toBe("allow");
+      }
+    });
+
     it("checks the downloaded verdict without falling back to the agent artifact", async () => {
       const fs = require("node:fs");
       const { loadRecordedWriteGate } = await import("./apply_safe_outputs_replay.cjs");

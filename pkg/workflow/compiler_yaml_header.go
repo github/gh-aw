@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -111,7 +112,7 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	if hasWriteGateSteps(data) {
 		recordJob, exists := c.jobManager.GetJob("conclusion")
 		if !exists {
-			return fmt.Errorf("jobs.safe_outputs.gate-steps requires conclusion to record the verdict")
+			return errors.New("jobs.safe_outputs.gate-steps requires conclusion to record the verdict")
 		}
 		recordJobName := recordJob.DisplayName
 		if recordJobName == "" {

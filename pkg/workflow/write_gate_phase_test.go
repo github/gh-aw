@@ -68,6 +68,26 @@ Read the issue.
 	require.Contains(t, job["outputs"].(map[string]any)["write_gate"], "|| 'deny'")
 }
 
+func TestWriteGatePublicationStepUnwrapsOriginalCondition(t *testing.T) {
+	steps, err := NewCompiler().guardWriteGateSteps([]string{
+		"      - name: Publish\n        if: ${{ always() }}\n        run: echo publish\n",
+	})
+	require.NoError(t, err)
+	var parsed []map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(strings.Join(steps, "")), &parsed))
+	condition := parsed[0]["if"].(string)
+	require.NotContains(t, condition, "${{", "the verdict guard must remain one expression")
+	condition = strings.ReplaceAll(condition, "always()", "('true' == 'true')")
+	for _, outcome := range []string{"success", "failure", "cancelled", "skipped"} {
+		for _, verdict := range []string{"allow", "partial", "deny", ""} {
+			require.Equal(t, outcome == "success" && (verdict == "allow" || verdict == "partial"),
+				evaluateTestCondition(t, condition, map[string]string{
+					"steps.write_gate.outcome": outcome, "steps.write_gate.outputs.write_gate": verdict,
+				}), "outcome=%s verdict=%s", outcome, verdict)
+		}
+	}
+}
+
 func TestWriteGateImportsCannotBeRemoved(t *testing.T) {
 	imported := `{"safe_outputs":{"gate-steps":[{"id":"imported_gate","run":"echo imported"}]}}`
 	for _, name := range []string{"safe_outputs", "safe-outputs"} {
@@ -101,6 +121,13 @@ func TestWriteGateRepositoryRequirement(t *testing.T) {
 	require.NoError(t, compiler.validateWriteGateConfiguration(data))
 	data.Jobs = map[string]any{"agent": map[string]any{"gate-steps": []any{map[string]any{"run": "echo deny"}}}}
 	require.ErrorContains(t, compiler.validateWriteGateConfiguration(data), "only in safe_outputs")
+}
+
+func TestWriteGateRejectsInvalidStepEnvironment(t *testing.T) {
+	_, _, err := NewCompiler().prepareWriteGateSteps([]any{
+		map[string]any{"run": "echo gate", "env": "not-an-object"},
+	}, &WorkflowData{})
+	require.ErrorContains(t, err, ".env expects an object")
 }
 
 func TestWriteGateDryRunDoesNotExecuteAuthoredGate(t *testing.T) {

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -99,7 +100,7 @@ func (c *Compiler) guardPublicationWriteGate(data *WorkflowData) error {
 		return nil
 	}
 	if _, exists := c.jobManager.GetJob(string(constants.SafeOutputsJobName)); !exists {
-		return fmt.Errorf("jobs.safe_outputs.gate-steps requires a generated safe_outputs job")
+		return errors.New("jobs.safe_outputs.gate-steps requires a generated safe_outputs job")
 	}
 	for name := range publicationJobNames(data.SafeOutputs) {
 		if name == string(constants.SafeOutputsJobName) {

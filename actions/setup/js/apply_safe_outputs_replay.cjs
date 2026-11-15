@@ -195,6 +195,10 @@ async function loadRecordedWriteGate(jobs, runId, owner, repo, attempt, headSha,
       throw new Error(`${ERR_VALIDATION}: Write gate recording did not complete successfully; refusing replay`);
     }
   }
+  const checks = (matches[0].steps || []).filter(step => step.name === "Check write gate enforcement");
+  if (checks.length > 0 && (checks.length !== 1 || checks[0].status !== "completed" || checks[0].conclusion !== "success")) {
+    throw new Error(`${ERR_VALIDATION}: Write gate enforcement check did not complete successfully; refusing replay`);
+  }
   let directory;
   try {
     fs.mkdirSync(TMP_GH_AW_PATH, { recursive: true });
