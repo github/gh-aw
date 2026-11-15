@@ -1041,7 +1041,7 @@ func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool, 
 		// Without a detection job, only cancellation prevents this cleanup job from running.
 		jobCondition = BuildAnd(BuildFunctionCall("always"), notCancelled)
 	}
-	return RenderCondition(requireSafeOutputsAgentSuccess(jobCondition, safeOutputs)), jobNeeds
+	return RenderCondition(requirePublicationAgentSuccess(jobCondition, safeOutputs, pushRepoMemoryJobName)), jobNeeds
 }
 
 // buildPushRepoMemoryOutputs builds the persistence and validation outputs from all memory steps.

@@ -202,6 +202,8 @@ Set `jobs.<job-id>.restore-memory: true` to restore any configured `cache-memory
 
 Custom jobs can depend on generated post-agent maintenance jobs when the corresponding feature is enabled. For example, with `tools.repo-memory` configured, `needs: [push_repo_memory]` runs a custom job after the agent and the repo-memory push, without listing `agent` explicitly. Other post-agent maintenance job IDs are `update_cache_memory`, `update_drive_memory`, `push_ledger_changes`, and `push_evals_state`. Experiment persistence (`push_experiments_state`) runs after activation rather than after the agent.
 
+When [`jobs.safe_outputs.gate-steps`](/gh-aw/reference/safe-outputs/#write-gate-job-dependencies) is configured, custom safe-output jobs, these post-agent persistence jobs, upload jobs, and `call-*` workers all wait directly for `safe_outputs`. They run only after that job succeeds and publishes `write_gate: allow` or `partial`; an authored `if: always()` cannot override the verdict. With threat detection disabled, cache and drive memory still publish through separate gated jobs rather than writing from `agent`. Activation-owned experiment persistence remains independent of this gate.
+
 ### Built-in jobs
 
 | Job | Step order |

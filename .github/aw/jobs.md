@@ -71,9 +71,24 @@ Keep `agent` and `detection` read-only; use safe outputs for writes.
 | `conclusion` | Compiler-generated conclusion | All generated and custom jobs | No custom credential; aggregates results and usage. |
 | `push_repo_memory` | Repository-backed memory | After threat detection | Framework-managed repository credential. |
 | `update_cache_memory` | Cache memory | After threat detection | Framework-managed repository credential. |
-| `push_experiments_state` | Repository-backed experiments | After threat detection | Framework-managed repository credential. |
+| `update_drive_memory` | Writable drive memory | After threat detection | Framework-managed drive credential. |
+| `push_ledger_changes` | Ledger persistence | `safe_outputs`, `agent`, `activation`, `detection` if present | Persists validated ledger transactions. |
+| `push_experiments_state` | Repository-backed experiments | `activation` | Independent pre-agent state, not agent-derived publication. |
 | `push_evals_state` | Persisted eval state | After threat detection | Framework-managed repository credential. |
 | `call-<sanitized-worker-name>` | `safe-outputs.call-workflow` worker | — | Configure the called workflow input through the worker's `github-token` or `github-app`. |
+
+With `jobs.safe_outputs.gate-steps`, custom safe-output jobs, agent-derived
+persistence (`push_repo_memory`, `update_cache_memory`, `update_drive_memory`,
+`push_ledger_changes`, `push_evals_state`), uploads (including code coverage),
+and `call-*` jobs receive a direct `safe_outputs` dependency. They require a
+successful `safe_outputs` job and `write_gate` equal to `allow` or `partial`.
+Authored `if` conditions cannot bypass this guard. Cache and drive writes move
+out of `agent` even when threat detection is disabled.
+
+`push_experiments_state` stays on the activation side. Conclusion's failure
+issues/comments, detection tracking issue, and status comments stay ungated.
+Conclusion records the verdict in the `write-gate` artifact for maintenance
+replay; the record does not assert per-item enforcement or artifact integrity.
 
 ## Maintenance workflow jobs
 
@@ -87,6 +102,12 @@ Do not configure these jobs in agentic-workflow frontmatter.
 | `run_operation`, `update_pull_request_branches`, `apply_safe_outputs` | Run selected maintenance operations. |
 | `create_labels`, `label_disable_agentic_workflow`, `label_apply_safe_outputs` | Manage labels. |
 | `activity_report`, `forecast_report` | Produce reports. |
+
+For a gated source workflow, `apply_safe_outputs` and label-triggered replay
+require the original compiled policy and a matching recorded successful `allow`
+verdict. Missing, malformed, failed, denied, or partial verdicts refuse replay;
+partial replay requires trustworthy per-item enforcement and is not enabled by
+the run-level replay path.
 | `close_agentic_workflows_issues`, `validate_workflows`, `compile-workflows`, `secret-validation` | Maintain workflow configuration. |
 
 ## Compatibility aliases

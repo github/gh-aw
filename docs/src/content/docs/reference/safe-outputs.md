@@ -1862,6 +1862,14 @@ When omitted or `false`, safe outputs can still run after an agent failure for f
 
 An explicit value in the main workflow overrides imports. Otherwise, any imported `require-agent-success: true` enables the requirement.
 
+### Write Gate Job Dependencies
+
+When `jobs.safe_outputs.gate-steps` is configured, every custom safe-output job, agent-derived persistence job (`push_repo_memory`, `update_cache_memory`, `update_drive_memory`, `push_ledger_changes`, `push_evals_state`), upload job (assets, code scanning, and code coverage), and `call-*` worker gets a direct `needs: safe_outputs` dependency. Publication requires both `needs.safe_outputs.result == 'success'` and `write_gate` equal to `allow` or `partial`. Missing or unknown verdicts and failed, cancelled, or timed-out gates block these jobs, including jobs with an authored `if: always()`.
+
+The gate does not replace existing output selection, staging, cache event policies, or `require-agent-success` checks. Warning-mode detection reaches the trusted gate; failed or strict-mode detection still blocks publication. Cache and drive memory publish through separate jobs even when threat detection is disabled. Workflows without gate steps retain their compiled job graph.
+
+Conclusion's failure issues and comments, detection tracking issue, and status comments remain ungated. Activation-owned experiment persistence (`push_experiments_state`) is independent of agent-derived publication and does not wait for the gate.
+
 ### Workflow Call Outputs (`workflow_call`)
 
 When a workflow uses `on: workflow_call` (or includes `workflow_call` in its triggers) and configures safe outputs, the compiler automatically injects `on.workflow_call.outputs` exposing the results of each configured safe output type. This makes gh-aw workflows composable building blocks in larger automation pipelines.
@@ -2443,7 +2451,7 @@ See [Staged Mode](/gh-aw/reference/staged-mode/) for the full guide, including t
 
 ## Replaying Safe Outputs
 
-If the `safe_outputs` job fails or is skipped — for example, due to a transient API error, threat detection blocking the output, or a cancelled run — you can replay safe outputs from a previous run using the **Agentic Maintenance** workflow.
+The **Agentic Maintenance** workflow can replay safe outputs from a completed previous run. Gated workflows require a recorded successful `allow` verdict; replay does not bypass a failed, skipped, or denied gate.
 
 > [!NOTE]
 > The Agentic Maintenance workflow (`agentics-maintenance.yml`) is generated automatically when any workflow uses the `expires` field in `create-issue`, `create-discussion`, or `create-pull-request` safe outputs.
@@ -2459,7 +2467,9 @@ To replay safe outputs:
    - Run ID only: `12345`
 6. Click **Run workflow**.
 
-The `apply_safe_outputs` job downloads the `agent_output.json` artifact from the specified run and applies all safe outputs as if the original run had completed successfully. Authorization requires exact `admin` or `maintain` repository access. For custom organization repository roles, gh-aw authorizes against the inherited standard role metadata reported by GitHub rather than the custom role name. If that inherited standard role cannot be resolved, the replay request is rejected.
+The `apply_safe_outputs` job resolves the original compiled workflow at the run's commit before downloading `agent_output.json`. Workflows without gate steps retain run-level replay. For gated workflows, replay requires a matching recorded successful `allow` verdict in the compiler-owned `write-gate` artifact and successful conclusion recording/upload steps from that run attempt. Missing or malformed evidence, denied or unavailable gates, and dry-run sources refuse replay. `partial` is also refused until replay can enforce trustworthy per-item decisions; run-level replay never grants approval to held items. Gated outputs can only be replayed in their original repository. Label-triggered replay uses the same checks.
+
+Authorization requires exact `admin` or `maintain` repository access. For custom organization repository roles, gh-aw authorizes against the inherited standard role metadata reported by GitHub rather than the custom role name. If that inherited standard role cannot be resolved, the replay request is rejected.
 
 > [!TIP]
 > Find the run URL by opening the failed or cancelled run in the **Actions** tab — the URL in your browser's address bar is the run URL.

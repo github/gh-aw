@@ -1,0 +1,41 @@
+package workflow
+
+import "fmt"
+
+func (c *Compiler) addWriteGateRecordSteps(data *WorkflowData) error {
+	if !hasWriteGateSteps(data) {
+		return nil
+	}
+	job, exists := c.jobManager.GetJob("conclusion")
+	if !exists {
+		return fmt.Errorf("jobs.safe_outputs.gate-steps requires conclusion to record the verdict")
+	}
+	job.Steps = append(job.Steps, `      - name: Record write gate verdict
+        id: record_write_gate
+        if: always()
+        uses: `+c.getActionPin("actions/github-script")+`
+        env:
+          GH_AW_WRITE_GATE: ${{ needs.safe_outputs.outputs.write_gate }}
+          GH_AW_WRITE_GATE_REASON: ${{ needs.safe_outputs.outputs.write_gate_reason }}
+          GH_AW_WRITE_GATE_JOB_RESULT: ${{ needs.safe_outputs.result }}
+          GH_AW_WRITE_GATE_REPOSITORY: ${{ github.repository }}
+          GH_AW_WRITE_GATE_RUN_ID: ${{ github.run_id }}
+          GH_AW_WRITE_GATE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_AW_WRITE_GATE_HEAD_SHA: ${{ github.sha }}
+        with:
+          script: |
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require('${{ runner.temp }}/gh-aw/actions/record_write_gate.cjs');
+            main();
+`, `      - name: Upload write gate verdict
+        id: upload_write_gate
+        if: always() && steps.record_write_gate.outcome == 'success'
+        uses: `+c.getActionPin("actions/upload-artifact")+`
+        with:
+          name: `+artifactPrefixExprForDownstreamJob(data)+`write-gate
+          path: /tmp/gh-aw/write-gate/write_gate.json
+          if-no-files-found: error
+`)
+	return nil
+}

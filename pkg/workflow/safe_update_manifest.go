@@ -77,6 +77,11 @@ type GHAWManifestWorkQueue struct {
 	LogicalContract string `json:"logical_contract,omitempty"`
 }
 
+type GHAWManifestWriteGate struct {
+	Version   int    `json:"version"`
+	RecordJob string `json:"record_job"`
+}
+
 // GHAWManifest is the single-line JSON payload embedded as a "# gh-aw-manifest: ..."
 // comment in generated lock files. It records the secrets, external actions, and
 // container images that were detected at the time the lock file was last compiled
@@ -100,6 +105,7 @@ type GHAWManifest struct {
 	Admission                   bool                                 `json:"admission"`
 	WebhookSubscriptions        []WebhookSubscription                `json:"webhook_subscriptions,omitempty"`
 	WorkQueue                   *GHAWManifestWorkQueue               `json:"work_queue,omitempty"`
+	WriteGate                   *GHAWManifestWriteGate               `json:"write_gate,omitempty"`
 	MarkdownMetadata            *GHAWMarkdownMetadata                `json:"-"`
 	AgentMetadata               map[string]json.RawMessage           `json:"agent_metadata"`
 	MetadataRefs                map[string]map[string]string         `json:"metadata_refs,omitempty"`
