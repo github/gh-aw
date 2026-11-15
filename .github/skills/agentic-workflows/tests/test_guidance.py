@@ -95,9 +95,17 @@ class GuidanceTests(unittest.TestCase):
 
         creator = normalized((ROOT / ".github/aw/create-agentic-workflow.md").read_text())
         sentences = re.split(r"(?<=[.!?])\s+", creator)
+        self.assertIn(
+            "description: Design, evaluate, create and compile gh-aw workflows",
+            creator,
+        )
         owner_rule = next(sentence for sentence in sentences if "CODEOWNERS" in sentence)
         self.assertIn("responsible owner", owner_rule)
         self.assertIn("maintainer metadata", owner_rule)
+        recommendation_rule = next(sentence for sentence in sentences if "assumptions and alternatives" in sentence)
+        self.assertIn("state assumptions and alternatives", recommendation_rule)
+        concise_rule = next(sentence for sentence in sentences if "Keep it short" in sentence)
+        self.assertIn("without option dumps", concise_rule)
         edit_rule = next(sentence for sentence in sentences if "later edits" in sentence)
         self.assertIn("update changed content", edit_rule)
         self.assertIn("noop only when no change is needed", edit_rule)
@@ -123,6 +131,14 @@ class GuidanceTests(unittest.TestCase):
         ):
             with self.subTest(route=route):
                 self.assertIn(route, prefix)
+        self.assertIn(
+            "| Diagnose / patch / debug | `.github/aw/debug-agentic-workflow.md` |",
+            prefix,
+        )
+        self.assertIn(
+            "| Debug with CLI setup / run-URL scoping | `.github/aw/debug-bootstrap.md` first |",
+            prefix,
+        )
         self.assertIn("CLI setup or run-URL scoping", prefix)
         for rule in (
             "Non-dry-run dispatch is prohibited",
