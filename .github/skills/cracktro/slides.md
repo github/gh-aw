@@ -61,6 +61,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | GitHub-native governance | illustrative |
 | Operator-owned infrastructure | illustrative |
 | Push SDLC | illustrative |
+| Imports & reuse | illustrative |
 | Connectors | illustrative |
 | Central Agentic Ops |  |
 | Hyperscale Agentics | illustrative |
