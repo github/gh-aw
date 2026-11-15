@@ -29,14 +29,14 @@ describe("apply_safe_outputs_replay", () => {
     global.github = {
       rest: {
         actions: {
-          getWorkflowRun: vi.fn().mockResolvedValue({ data: { status: "completed", run_attempt: 1, head_sha: "a".repeat(40), path: ".github/workflows/test.lock.yml" } }),
+          getWorkflowRun: vi.fn().mockResolvedValue({ data: { status: "completed", event: "workflow_dispatch", run_attempt: 1, head_sha: "a".repeat(40), path: ".github/workflows/test.lock.yml" } }),
           listJobsForWorkflowRunAttempt: vi.fn(),
         },
         repos: {
           getContent: vi.fn().mockResolvedValue({ data: { type: "file", encoding: "base64", content: Buffer.from('# gh-aw-manifest: {"version":1}\n').toString("base64") } }),
         },
       },
-      paginate: vi.fn(),
+      paginate: vi.fn().mockResolvedValue([]),
     };
 
     global.context = {
@@ -133,11 +133,25 @@ describe("apply_safe_outputs_replay", () => {
       run_id: "123",
       run_attempt: "1",
       head_sha: "a".repeat(40),
+      workflow_sha: "b".repeat(40),
+      workflow_ref: "testowner/testrepo/.github/workflows/test.lock.yml@refs/heads/main",
       safe_outputs_result: "success",
       verdict: "allow",
       reason: "approved",
     });
-    const identity = { runId: "123", repository: "testowner/testrepo", attempt: 1, headSha: "a".repeat(40) };
+    const identity = { runId: "123", repository: "testowner/testrepo", attempt: 1, headSha: "a".repeat(40), workflowSha: "b".repeat(40), workflowPath: ".github/workflows/test.lock.yml" };
+    const trustedJob = () => ({
+      name: "conclusion",
+      status: "completed",
+      steps: ["Record write gate verdict", "Upload write gate verdict"].map(name => ({ name, status: "completed", conclusion: "success" })),
+    });
+    function configureRecorder(value = record()) {
+      global.github.paginate.mockResolvedValue([trustedJob()]);
+      global.exec.exec.mockImplementation(async (_command, args) => {
+        require("node:fs").writeFileSync(require("node:path").join(args[args.indexOf("--dir") + 1], "write_gate.json"), JSON.stringify(value));
+        return 0;
+      });
+    }
 
     it("accepts only a matching successful recorded allow", async () => {
       const { validateReplayWriteGateRecord } = await import("./apply_safe_outputs_replay.cjs");
@@ -160,6 +174,8 @@ describe("apply_safe_outputs_replay", () => {
         { ...record(), run_id: "124" },
         { ...record(), run_attempt: "2" },
         { ...record(), head_sha: "b".repeat(40) },
+        { ...record(), workflow_sha: "c".repeat(40) },
+        { ...record(), workflow_ref: "testowner/testrepo/.github/workflows/other.lock.yml@refs/heads/main" },
         { ...record(), reason: null },
         { ...record(), items: [] },
       ]) {
@@ -169,11 +185,70 @@ describe("apply_safe_outputs_replay", () => {
 
     it("loads policy from the original immutable compiled workflow", async () => {
       const { getReplayPolicy } = await import("./apply_safe_outputs_replay.cjs");
+      configureRecorder();
       global.github.rest.repos.getContent.mockResolvedValue({
-        data: { type: "file", encoding: "base64", content: Buffer.from('# gh-aw-manifest: {"version":1,"write_gate":{"version":1,"record_job":"conclusion"}}\n').toString("base64") },
+        data: { type: "file", encoding: "base64", content: Buffer.from('# gh-aw-manifest: {"version":1,"write_gate":{"version":1,"record_job":"conclusion","artifact_immutable":true}}\n').toString("base64") },
       });
-      expect((await getReplayPolicy("123", "testowner", "testrepo")).gate).toEqual({ version: 1, record_job: "conclusion" });
-      expect(global.github.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ ref: "a".repeat(40), path: ".github/workflows/test.lock.yml" }));
+      expect((await getReplayPolicy("123", "testowner", "testrepo")).gate).toEqual({ version: 1, record_job: "conclusion", artifact_immutable: true });
+      expect(global.github.rest.repos.getContent).toHaveBeenCalledWith(expect.objectContaining({ ref: "b".repeat(40), path: ".github/workflows/test.lock.yml" }));
+      expect(global.github.rest.repos.getContent).not.toHaveBeenCalledWith(expect.objectContaining({ ref: "a".repeat(40) }));
+    });
+
+    it("does not reinterpret a divergent PR head without a recorded gate as ungated", async () => {
+      const { main } = await import("./apply_safe_outputs_replay.cjs");
+      global.github.rest.actions.getWorkflowRun.mockResolvedValue({
+        data: { status: "completed", event: "pull_request", run_attempt: 1, head_sha: "a".repeat(40), path: ".github/workflows/test.lock.yml" },
+      });
+      // The head revision is ungated, but the actual workflow definition at b
+      // is gated. No recorded workflow SHA/verdict exists to authorize replay.
+      global.github.rest.repos.getContent.mockImplementation(async ({ ref }) => ({
+        data: {
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from(ref === "a".repeat(40) ? '# gh-aw-manifest: {"version":1}\n' : '# gh-aw-manifest: {"version":1,"write_gate":{"version":1,"record_job":"conclusion","artifact_immutable":true}}\n').toString("base64"),
+        },
+      }));
+      process.env.GH_AW_RUN_URL = "123";
+      await expect(main()).rejects.toThrow(/workflow-definition identity/);
+      expect(global.github.rest.repos.getContent).not.toHaveBeenCalled();
+      expect(global.exec.exec).not.toHaveBeenCalled();
+      expect(process.env.GH_AW_AGENT_OUTPUT).toBeUndefined();
+    });
+
+    it("preserves justified historical ungated trigger classes and rejects ambiguous ones", async () => {
+      const { getReplayPolicy } = await import("./apply_safe_outputs_replay.cjs");
+      for (const event of ["push", "schedule", "workflow_dispatch", "pull_request", "issues", "workflow_run", "workflow_call"]) {
+        global.github.rest.actions.getWorkflowRun.mockResolvedValue({
+          data: { status: "completed", event, run_attempt: 1, head_sha: "a".repeat(40), path: ".github/workflows/test.lock.yml" },
+        });
+        for (const header of ['# gh-aw-manifest: {"version":1}\n', "# frontmatter-hash: abc123\n"]) {
+          global.github.rest.repos.getContent.mockResolvedValue({ data: { type: "file", encoding: "base64", content: Buffer.from(header).toString("base64") } });
+          if (["push", "schedule", "workflow_dispatch"].includes(event)) {
+            expect((await getReplayPolicy("123", "testowner", "testrepo")).gate).toBeNull();
+          } else {
+            await expect(getReplayPolicy("123", "testowner", "testrepo")).rejects.toThrow(/refusing legacy replay/);
+          }
+        }
+      }
+      expect(global.exec.exec).not.toHaveBeenCalled();
+    });
+
+    it("rejects lookalike artifacts, source/recorder mismatches, and mutable artifact transports", async () => {
+      const { getReplayPolicy } = await import("./apply_safe_outputs_replay.cjs");
+      const source = '# gh-aw-manifest: {"version":1,"write_gate":{"version":1,"record_job":"conclusion","artifact_immutable":true}}\n';
+      global.github.rest.repos.getContent.mockResolvedValue({ data: { type: "file", encoding: "base64", content: Buffer.from(source).toString("base64") } });
+      // An agent-uploaded record without successful compiler recording steps
+      // is not even downloaded.
+      await expect(getReplayPolicy("123", "testowner", "testrepo")).rejects.toThrow(/compiler-owned write gate recorder/);
+      expect(global.exec.exec).not.toHaveBeenCalled();
+      configureRecorder();
+      global.github.paginate.mockResolvedValue([{ ...trustedJob(), name: "agent" }]);
+      await expect(getReplayPolicy("123", "testowner", "testrepo")).rejects.toThrow(/mismatched/);
+      global.github.paginate.mockResolvedValue([trustedJob()]);
+      for (const header of ['# gh-aw-manifest: {"version":1}\n', source.replace('"artifact_immutable":true', '"artifact_immutable":false')]) {
+        global.github.rest.repos.getContent.mockResolvedValue({ data: { type: "file", encoding: "base64", content: Buffer.from(header).toString("base64") } });
+        await expect(getReplayPolicy("123", "testowner", "testrepo")).rejects.toThrow();
+      }
     });
 
     it("refuses absent/malformed source policy and dry-run replay", async () => {
@@ -190,8 +265,10 @@ describe("apply_safe_outputs_replay", () => {
     });
 
     it("requires successful trusted recorder and upload steps before artifact download", async () => {
-      const { enforceReplayWriteGate } = await import("./apply_safe_outputs_replay.cjs");
-      const policy = { run: { run_attempt: 1, head_sha: "a".repeat(40) }, gate: { version: 1, record_job: "conclusion" } };
+      const { getReplayPolicy } = await import("./apply_safe_outputs_replay.cjs");
+      global.github.rest.repos.getContent.mockResolvedValue({
+        data: { type: "file", encoding: "base64", content: Buffer.from('# gh-aw-manifest: {"version":1,"write_gate":{"version":1,"record_job":"conclusion","artifact_immutable":true}}\n').toString("base64") },
+      });
       const trustedJob = {
         name: "conclusion",
         status: "completed",
@@ -205,14 +282,14 @@ describe("apply_safe_outputs_replay", () => {
         [{ ...trustedJob, steps: [trustedJob.steps[0], { ...trustedJob.steps[1], conclusion: "failure" }] }],
       ]) {
         global.github.paginate.mockResolvedValue(jobs);
-        await expect(enforceReplayWriteGate(policy, "123", "testowner", "testrepo")).rejects.toThrow();
+        await expect(getReplayPolicy("123", "testowner", "testrepo")).rejects.toThrow();
         expect(global.exec.exec).not.toHaveBeenCalled();
       }
     });
 
     it("checks the downloaded verdict without falling back to the agent artifact", async () => {
       const fs = require("node:fs");
-      const { enforceReplayWriteGate } = await import("./apply_safe_outputs_replay.cjs");
+      const { loadRecordedWriteGate } = await import("./apply_safe_outputs_replay.cjs");
       const { TMP_GH_AW_PATH } = require("./constants.cjs");
       fs.mkdirSync(TMP_GH_AW_PATH, { recursive: true });
       global.github.paginate.mockResolvedValue([
@@ -222,7 +299,6 @@ describe("apply_safe_outputs_replay", () => {
           steps: ["Record write gate verdict", "Upload write gate verdict"].map(name => ({ name, status: "completed", conclusion: "success" })),
         },
       ]);
-      const policy = { run: { run_attempt: 1, head_sha: "a".repeat(40) }, gate: { version: 1, record_job: "conclusion" } };
       for (const value of [record(), { ...record(), verdict: "partial" }, null]) {
         global.exec.exec.mockImplementation(async (_command, args) => {
           const destination = args[args.indexOf("--dir") + 1];
@@ -230,9 +306,9 @@ describe("apply_safe_outputs_replay", () => {
           return 0;
         });
         if (value?.verdict === "allow") {
-          await expect(enforceReplayWriteGate(policy, "123", "testowner", "testrepo")).resolves.toBeUndefined();
+          expect((await loadRecordedWriteGate([trustedJob()], "123", "testowner", "testrepo", 1, "a".repeat(40))).record).toEqual(record());
         } else {
-          await expect(enforceReplayWriteGate(policy, "123", "testowner", "testrepo")).rejects.toThrow();
+          await expect(loadRecordedWriteGate([trustedJob()], "123", "testowner", "testrepo", 1, "a".repeat(40))).rejects.toThrow();
         }
       }
       expect(global.exec.exec.mock.calls.every(([, args]) => args[args.indexOf("--name") + 1] === "write-gate")).toBe(true);
