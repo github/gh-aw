@@ -55,10 +55,10 @@ function projectGateDecision(source) {
 /**
  * Check recorded enforcement without changing the verdict or equating missing
  * evidence with an absence of writes.
- * @param {{env: NodeJS.ProcessEnv, results: any[], manifest?: any, actualDigest?: string, resultsComplete?: boolean, decisions?: any, decisionsDigest?: string}} options
+ * @param {{env: NodeJS.ProcessEnv, results: any[], manifest?: any, actualDigest?: string, manifestValid?: boolean, resultsComplete?: boolean, decisions?: any, decisionsDigest?: string}} options
  * @returns {Record<string, any>|undefined}
  */
-function buildGateDecision({ env, results, manifest, actualDigest, resultsComplete = false, decisions, decisionsDigest }) {
+function buildGateDecision({ env, results, manifest, actualDigest, manifestValid, resultsComplete = false, decisions, decisionsDigest }) {
   if (env.GH_AW_WRITE_GATE === undefined) return undefined;
   const valid = VERDICTS.has(env.GH_AW_WRITE_GATE) && CODE.test(env.GH_AW_WRITE_GATE_REASON ?? "");
   const verdict = valid ? env.GH_AW_WRITE_GATE : "deny";
@@ -67,6 +67,7 @@ function buildGateDecision({ env, results, manifest, actualDigest, resultsComple
   let integrity = "unknown";
   if (expected && actualDigest) {
     integrity = DIGEST.test(expected) && expected === actualDigest ? (manifest?.complete === true ? "verified" : "unknown") : "failed";
+    if (manifestValid === false) integrity = "failed";
   }
   let failed = integrity === "failed";
   let complete = resultsComplete && integrity === "verified";
@@ -74,11 +75,13 @@ function buildGateDecision({ env, results, manifest, actualDigest, resultsComple
   const items = [];
   const pending = new Map((Array.isArray(manifest?.items) ? manifest.items : []).map(item => [item.output_id, item]));
   const authorized = new Map();
+  let decisionsVerified = false;
   if (decisions || env.GH_AW_WRITE_GATE_DECISIONS_SHA256) {
     const expectedDecisions = env.GH_AW_WRITE_GATE_DECISIONS_SHA256;
     if (!decisions || !decisionsDigest || !expectedDecisions) complete = false;
     else if (!DIGEST.test(expectedDecisions) || decisionsDigest !== expectedDecisions || decisions.manifest_sha256 !== expected || decisions.schema !== "gh-aw/write-decisions/v1" || !Array.isArray(decisions.items)) failed = true;
     else {
+      decisionsVerified = true;
       for (const decision of decisions.items) {
         const item = pending.get(decision.output_id);
         if (!item || item.item_sha256 !== decision.item_sha256 || !DECISIONS.includes(decision.gate_decision) || authorized.has(decision.output_id)) {
@@ -134,7 +137,11 @@ function buildGateDecision({ env, results, manifest, actualDigest, resultsComple
       const result = needs[job]?.result;
       if (!["success", "failure", "cancelled", "skipped"].includes(result)) complete = false;
       if (result === "success") {
-        if (verdict !== "allow") failed = true;
+        if (verdict === "deny") failed = true;
+        if (verdict === "partial" && decisionsVerified) {
+          const jobItems = [...pending.values()].filter(item => item.target?.job === job);
+          if (!jobItems.length || jobItems.some(item => !["apply", "review"].includes(authorized.get(item.output_id)?.gate_decision))) failed = true;
+        }
         // Job completion alone cannot attest to its published content digest.
         complete = false;
       }
@@ -153,4 +160,29 @@ function buildGateDecision({ env, results, manifest, actualDigest, resultsComple
   });
 }
 
-module.exports = { buildGateDecision, projectGateDecision, isCompilerGateDecision, DECISIONS, SIGNALS, CODE, DIGEST };
+/**
+ * Compiler-owned conclusion check. It runs before best-effort usage generation
+ * so a proven violation cannot be hidden by that step's continue-on-error.
+ * @param {{core?: typeof import("@actions/core"), rootDir?: string, env?: NodeJS.ProcessEnv}} [options]
+ */
+function checkConclusion({ core = global.core, rootDir = "/tmp/gh-aw", env = process.env } = {}) {
+  try {
+    const { collectUnifiedSession } = require("./unified_session.cjs");
+    const gate = collectUnifiedSession({ rootDir, writeGate: env, jobResults: env.GH_AW_JOB_RESULTS, warn: message => core.warning(message) }).events.find(isCompilerGateDecision)?.data;
+    if (!gate) throw new Error("Gate conclusion evidence is unavailable");
+    core.setOutput("integrity", gate.integrity);
+    core.setOutput("conclusion_check", gate.conclusionCheck);
+    if (gate.failureCategory === "write_gate_violation") {
+      const fs = require("node:fs");
+      const path = require("node:path");
+      fs.writeFileSync(path.join(rootDir, "failure_categories.json"), JSON.stringify(["write_gate_violation"]));
+      core.setFailed("ERR_WRITE_GATE: Conclusion detected an unauthorized write or publication digest mismatch.");
+      return;
+    }
+  } catch (error) {
+    core.setFailed(`ERR_WRITE_GATE: Unable to check write gate enforcement: ${require("./error_helpers.cjs").getErrorMessage(error)}`);
+    return;
+  }
+}
+
+module.exports = { buildGateDecision, projectGateDecision, isCompilerGateDecision, checkConclusion, DECISIONS, SIGNALS, CODE, DIGEST };

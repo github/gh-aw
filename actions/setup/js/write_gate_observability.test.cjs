@@ -1,13 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildGateDecision } from "./write_gate_observability.cjs";
+import { buildGateDecision, checkConclusion } from "./write_gate_observability.cjs";
 import { collectUnifiedSession } from "./unified_session.cjs";
 import { renderUnifiedSession } from "./unified_session_render.cjs";
 import { compactUnifiedSession } from "./compact_unified_session.cjs";
 import { buildFailureMatchCategories } from "./handle_agent_failure.cjs";
+import { canonicalPendingJSON, itemDigest, SCHEMA } from "./pending_writes.cjs";
 
 const digest = "a".repeat(64);
 const item = { output_id: "so_abcdefghijkl", item_sha256: digest, type: "create_issue" };
@@ -255,12 +256,25 @@ describe("compiler-owned gate conclusion evidence", () => {
     expect(build(env, [{ ...result, type: "create_pull_request" }], extra).conclusionCheck).toBe("failed");
   });
 
+  it("does not confuse an authorized partial secondary job with a policy violation", () => {
+    const jobItem = { output_id: "job_aaaaaaaaaaaaaaaa", item_sha256: digest, target: { job: "upload_assets" } };
+    const decisions = { schema: "gh-aw/write-decisions/v1", manifest_sha256: digest, items: [{ ...jobItem, gate_decision: "apply" }] };
+    const env = { GH_AW_WRITE_GATE: "partial", GH_AW_WRITE_GATE_DECISIONS_SHA256: digest, GH_AW_WRITE_GATE_WRITE_JOB_NAMES: '["upload_assets"]', GH_AW_JOB_RESULTS: '{"upload_assets":{"result":"success"}}' };
+    const extra = { manifest: { complete: true, items: [jobItem] }, decisions, decisionsDigest: digest };
+    expect(build(env, [], extra)).toMatchObject({ verdict: "partial", conclusionCheck: "unknown" });
+    decisions.items[0].gate_decision = "hold";
+    expect(build(env, [], extra)).toMatchObject({ verdict: "partial", conclusionCheck: "failed", failureCategory: "write_gate_violation" });
+    expect(build({ ...env, GH_AW_WRITE_GATE_DECISIONS_SHA256: undefined }, [], { ...extra, decisions: undefined, decisionsDigest: undefined }).conclusionCheck).toBe("unknown");
+  });
+
   it("collects trusted events with bounded summary/compact metadata and leaves ungated collection unchanged", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "gate-observability-"));
     try {
-      const encoded = JSON.stringify(manifest);
+      const collectorItem = { ...item, complete: true };
+      collectorItem.item_sha256 = itemDigest(collectorItem);
+      const encoded = canonicalPendingJSON({ schema: SCHEMA, ...manifest, inputs: [], items: [collectorItem] });
       fs.writeFileSync(path.join(root, "pending-writes.json"), encoded);
-      fs.writeFileSync(path.join(root, "safe-output-items.jsonl"), JSON.stringify({ ...item, status: "success", gate_decision: "apply", title: "PRIVATE_TITLE" }) + "\n");
+      fs.writeFileSync(path.join(root, "safe-output-items.jsonl"), JSON.stringify({ ...collectorItem, status: "success", gate_decision: "apply", title: "PRIVATE_TITLE" }) + "\n");
       const options = { rootDir: root, warn: () => {}, dailyAIC: {}, admission: {} };
       const ungated = collectUnifiedSession({ ...options, writeGate: {} }).events;
       expect(ungated.some(event => event.type === "gate.decision")).toBe(false);
@@ -274,6 +288,11 @@ describe("compiler-owned gate conclusion evidence", () => {
       const compact = compactUnifiedSession(events).session;
       expect(compact).toContain('"counts":{"apply":1,"hold":0,"review":0,"stage":0,"drop":0}');
       expect(compact).not.toContain("so_abcdefghijkl");
+      fs.writeFileSync(path.join(root, "safe-output-items.jsonl"), JSON.stringify({ ...collectorItem, status: "success", gate_signal: "gate_denied" }) + "\n");
+      const core = { warning: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() };
+      checkConclusion({ rootDir: root, env: { ...base, GH_AW_WRITE_GATE: "deny" }, core });
+      expect(core.setFailed).toHaveBeenCalledWith("ERR_WRITE_GATE: Conclusion detected an unauthorized write or publication digest mismatch.");
+      expect(JSON.parse(fs.readFileSync(path.join(root, "failure_categories.json"), "utf8"))).toEqual(["write_gate_violation"]);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
