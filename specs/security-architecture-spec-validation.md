@@ -49,6 +49,15 @@ The statuses below distinguish implementation/runtime evidence from a targeted f
 | v1.1.6 | Body-only bot PR edits | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), body-only and malformed/mixed edit cases; formal model status in §7b. |
 | v1.1.7 | Immutable revision binding and explicit dispatch-context failures | Runtime verified; targeted formal proof unverified. | [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs), SHA binding, stale-head, malformed-context, and checked-out-HEAD cases; formal model status in §7b. |
 | v1.1.8 | Explicit floating-head checkout | Compiler and runtime tests verified; targeted formal proof unverified. | [`pr_floating_head_test.go`](../pkg/workflow/pr_floating_head_test.go), [`pr_checkout_test.go`](../pkg/workflow/pr_checkout_test.go), and [`checkout_pr_branch.test.cjs`](../actions/setup/js/checkout_pr_branch.test.cjs). |
+| v1.1.9 | Appendix G test mapping | **UNVERIFIED** as a version-specific update; the 2026-11-08 pass mapped through v1.1.8. | Security Architecture maintainers to review the v1.1.9 Appendix G mapping; no separate validation result is recorded. |
+| v1.1.10 | Go toolchain security baseline | **UNVERIFIED** pending release-build evidence. | See the TT-03 evidence row below; Security Architecture maintainers own follow-up. |
+| TT-03 (v1.1.10) | Go 1.27.4 minimum and embedded release-toolchain evidence | **UNVERIFIED**; current-checkout baseline check passed, but release artifacts were not built or inspected. | [`check-go-toolchain.sh`](../scripts/check-go-toolchain.sh) returned `go1.27.4` on 2026-11-15. [`build-release.sh`](../scripts/build-release.sh) was not run, so `dist/build-toolchain.txt` and embedded toolchains remain unverified. **Owner:** Security Architecture maintainers. |
+
+---
+
+### Targeted §9/§11 Revalidation
+
+**Status (2026-11-15): RESCHEDULED, NOT COMPLETED.** The 2026-09-01 deadline was missed. Security Architecture maintainers have formally rescheduled the targeted §9/§11 revalidation to **2026-11-30**. No revalidation result is claimed; its outcome must be recorded here.
 
 ---
 
@@ -602,6 +611,8 @@ A conforming CI pipeline SHOULD implement at least Approach 1 and SHOULD run the
 
 This section audits the compliance test matrix defined in `security-architecture-spec.md §12` against the evidence documented in this validation report. Each test category is classified as **EVIDENCED**, **PARTIALLY EVIDENCED**, or **GAP** based on whether this document provides concrete implementation evidence.
 
+The categories and test-ID ranges below were checked against `security-architecture-spec.md §12.3`. TT-03 is not a §12.3 test category; its separate status is recorded in the versioned table above and remains **UNVERIFIED**. This mapping does not treat the toolchain check as evidence for unrelated §12.3 categories.
+
 | Test Category | Test IDs | Status | Notes |
 |---------------|----------|--------|-------|
 | Input Sanitization | T-IS-001 to T-IS-008 | ✅ EVIDENCED | Covered in §1a (IS-04 to IS-09); all sanitization functions verified in `sanitize_content_core.cjs` |
@@ -691,6 +702,11 @@ The specification provides an accurate formalization of the security architectur
 **Current full revalidation**: **Completed 2026-11-08; no overall grade assigned** because the v1.1.4 TT-01–04 requirement-level mapping remains unverified. The bounded RS-05a authorization model passed targeted formal revalidation on 2026-11-09.
 
 ## Change Log
+
+### 2026-11-15
+
+- Added explicit v1.1.9 and v1.1.10 validation rows and a TT-03 evidence row; release-build evidence remains unverified and is owned by Security Architecture maintainers.
+- Formally rescheduled the incomplete targeted §9/§11 revalidation to 2026-11-30; no completion is claimed.
 
 ### 2026-11-09
 

@@ -101,74 +101,27 @@ Do not change assertions, test behavior, production code, dependencies, generate
 
 ## Validate
 
-Use the disposable Go build and module caches provisioned by this workflow through `GOCACHE` and `GOMODCACHE`; do not read pre-existing caches or inspect the process environment.
+Use only this workflow's disposable `GOCACHE` and `GOMODCACHE`; do not inspect pre-existing caches or the process environment.
 
-After editing the selected batch:
+Stop after the first policy denial or unrecoverable tool failure; do not retry or probe around it. At turn 30 of 40 or 25 minutes of the 30-minute timeout, whichever comes first, checkpoint. Continue only if all remaining analysis and validation can finish with at least two turns and two minutes reserved for diff review and the terminal safe output. Otherwise restore candidate edits and report incomplete.
 
-1. Run `go test -race` once per unique modified package (deduplicate package paths across edited files).
-2. Run `go test ./...` once after all candidate edits.
-3. Inspect the diff and confirm it contains only safe `t.Parallel()` additions in selected files.
-4. If any test command fails, restore only your candidate edits and call `report_incomplete`. If the diff contains any other change, remove your out-of-scope edits and call `report_incomplete`; never revert pre-existing work.
-
-Security-policy limitations are not test failures or evidence that no safe
-candidate exists. The full suite includes environment-enumeration and
-credential-fixture tests that may be incompatible with the run's immutable
-policy. Do not execute prohibited operations, grant fixture exceptions, omit
-tests, or replace the required full-suite/race evidence with static analysis.
-If required validation is blocked, leave test files unchanged, preserve the
-previous cursor, and call `report_incomplete`.
-Do not create a pull request or use `noop` to imply validation succeeded.
+After edits, run `go test -race` once per unique modified package, then run `go test ./...` once. Inspect the diff; it must contain only safe `t.Parallel()` additions in selected files. If validation fails or is blocked, or the diff is out of scope, restore your edits only (never pre-existing work) and report incomplete. Do not execute prohibited operations, grant exceptions, omit tests, or substitute static analysis. A possible policy incompatibility is not proof of a block or of no safe candidate.
 
 Before `report_incomplete`, self-check and report:
 
-- The blocked batch, the exact required command and its concrete error. If a
-  command was prohibited before execution, say it was not run and name the
-  policy limitation instead of inventing an error. Classify the outcome as
-  environment/policy blocked, test failure, or agent failure; state uncertainty.
-- Confirm candidate edits were restored by inspecting the diff without reverting
-  pre-existing work; if restoration cannot be confirmed, say so.
-- Confirm the completed-analysis cursor remains unchanged and identify the next
-  attempted batch using the rotation above, or state why it cannot be determined.
+- State the batch and exact command, denial, or test error. Classify as environment/policy blocked only for an observed denial or a specific rule that forbids an unrun command; classify a permitted nonzero test as test failure. For a budget stop without command failure, report budget-limited work, not a policy block. Otherwise report agent failure or unknown and state uncertainty; never infer a block from suspected incompatibility.
+- Confirm candidate edits were restored without reverting pre-existing work, and the cursor is unchanged; identify the next attempted batch or say why it is unknown.
 
 ## Persist and report
 
-Treat `state.json` as a completed-analysis cursor, not an attempted-batch cursor.
-A completed analysis requires all selected files to have a completed safety
-assessment and either:
+Assess every selected file before calling analysis complete. Use `noop` only when no safe edit is available (no tests claimed); create a draft PR only when edits pass all validation and diff checks. For any partial, blocked, failed, or uncertain result, use `report_incomplete`, never `noop`.
 
-- No safe edit is available, so the completed analysis ends with `noop`; no test execution is claimed.
-- Candidate edits pass every required validation command and the diff check.
+The restore-only cache makes `state.json` a completed-analysis cursor, not an attempted-batch cursor. Never write it or its directory; preserve the cursor unchanged on every outcome. Run-number rotation advances attempted batches only; it neither persists progress nor proves analysis succeeded.
 
-Cursor persistence is temporarily disabled: the compiler-enforced
-`restore-only: true` cache configuration restores existing state but never
-uploads or saves cache-memory changes. Do not write `state.json` or create its
-directory. Preserve the previous cursor byte-for-byte (or leave it absent) on
-every outcome, including successful validation and completed no-candidate
-analysis. Never advance the cursor immediately after selection.
-
-The run-number rotation advances attempted batches independently of completion;
-it does not persist progress or prove analysis succeeded. A retry of the same
-workflow run keeps the same run number, and changes to the file list can alter
-batch boundaries. A trusted persistence gate is still required to advance the
-completed-analysis cursor; an agent-written success flag is not validation evidence.
-
-Use `###` or lower headings in any PR description or final report. Present a
-concise overview, selected files and results, collapsible detailed test evidence,
-then next actions or limitations. Keep the outcome visible and put long logs or
-per-file breakdowns in
-`<details><summary><b>...</b></summary>...</details>`. Format applicable run
-references as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
-
-Before stopping, call exactly one terminal safe-output tool: create one draft
-pull request when validation succeeds with a change; use `noop` only for a
-completed analysis with no safe edit; use `report_incomplete` when analysis or
-required validation is blocked or fails. Include the selected batch and a short
-reason, and state that the completed-analysis cursor did not advance
-(restore-only mode). For incomplete outcomes include the self-check above.
+Call exactly one terminal safe-output tool. Include the selected batch, short reason, and that the cursor did not advance; include the self-check for incomplete outcomes. Use `###` or lower headings; show outcome and key results first, put long evidence in `<details>`, and format run IDs as `[§12345](https://github.com/${{ github.repository }}/actions/runs/12345)`.
 
 Do not parallelize tests that use or may conflict through:
 
-- `t.Setenv`, `os.Setenv`, `os.Chdir`, or other process-wide state
-- shared mutable globals, singleton state, ordering assumptions, or package-level mocks
-- fixed ports, fixed filesystem paths, shared databases, or shared external services
-- unsafe loop-variable capture, timing dependencies, or explicit synchronization between tests
+- `t.Setenv`, `os.Setenv`, `os.Chdir`, or other process-wide state;
+- shared mutable globals, singleton state, ordering assumptions, or package mocks;
+- fixed ports/paths, shared databases/services, unsafe loop capture, timing dependencies, or explicit synchronization.
