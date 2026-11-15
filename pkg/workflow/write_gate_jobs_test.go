@@ -171,6 +171,12 @@ func TestWriteGatePublicationPathIncludesMemoryOnly(t *testing.T) {
 	}
 	require.False(t, hasWritePublicationPath(&WorkflowData{ExperimentsStorage: ExperimentsStorageRepo, Experiments: map[string][]string{"model": {"a", "b"}}}))
 	require.False(t, hasWritePublicationPath(&WorkflowData{CacheMemoryConfig: &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default", RestoreOnly: true}}}}))
+	require.False(t, hasWritePublicationPath(&WorkflowData{SafeOutputs: &SafeOutputsConfig{
+		NoOp: &NoOpConfig{}, MissingTool: &MissingToolConfig{}, MissingData: &MissingDataConfig{}, ReportIncomplete: &ReportIncompleteConfig{},
+	}}), "conclusion-owned diagnostics do not create a gated publication path")
+	require.True(t, hasWritePublicationPath(&WorkflowData{SafeOutputs: &SafeOutputsConfig{
+		Steps: []any{map[string]any{"run": "echo publish"}},
+	}}), "authored safe-output publication steps require the gate")
 }
 
 func TestWriteGateCompiledPublicationGraph(t *testing.T) {
@@ -318,4 +324,8 @@ func TestWriteGateStaticReplayRefusesImplicitContext(t *testing.T) {
 	data.SafeOutputs.CreateIssues.Group = strPtr("true")
 	require.False(t, isStaticWriteGateReplayType("create_issue", data), "grouping needs the original resolved target")
 	require.False(t, isStaticWriteGateReplayType("call_workflow", data))
+	worker := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}, SafeOutputs: data.SafeOutputs}
+	config, err := NewCompiler().buildWriteGateReplayConfig(worker)
+	require.NoError(t, err)
+	require.Nil(t, config, "claim-constrained writes require the original runtime scope snapshot")
 }

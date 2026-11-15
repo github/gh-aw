@@ -106,6 +106,9 @@ async function getReplayPolicy(runId, owner, repo) {
   }
   const compiledSource = Buffer.from(source.content, "base64").toString("utf8");
   const headers = parseLockFileHeaders(compiledSource.split(/\r?\n/, 3));
+  if ((/^# gh-aw-metadata:/m.test(compiledSource) && !headers.metadata) || (headers.metadata?.dry_run !== undefined && typeof headers.metadata.dry_run !== "boolean")) {
+    throw new Error(`${ERR_VALIDATION}: Original workflow metadata is malformed; refusing replay`);
+  }
   if (headers.metadata?.dry_run === true) {
     throw new Error(`${ERR_VALIDATION}: Dry-run outputs cannot be replayed as writes`);
   }
@@ -249,7 +252,10 @@ function prepareGatedReplayConfig(gate, agentOutputFile, override = process.env.
   ) {
     throw new Error(`${ERR_VALIDATION}: Original resolved replay restrictions are unavailable; refusing replay`);
   }
-  const serialized = JSON.stringify(gate.replay_config);
+  const serialized = JSON.stringify(gate.replay_config, (_key, value) => {
+    if (typeof value === "number" && !Number.isFinite(value)) throw new Error(`${ERR_VALIDATION}: Original replay restrictions require finite numbers`);
+    return value;
+  });
   if (serialized.includes("${{") || serialized.includes("${GH_AW_INPUT_") || /"(?:github-token|head-github-token)"\s*:/.test(serialized)) {
     throw new Error(`${ERR_VALIDATION}: Original replay config requires unavailable runtime restrictions or credentials`);
   }
@@ -349,8 +355,9 @@ function buildHandlerConfigFromOutput(agentOutputFile) {
 async function main() {
   const runUrl = process.env.GH_AW_RUN_URL;
   if (!runUrl) {
-    core.setFailed(`${ERR_CONFIG}: GH_AW_RUN_URL environment variable is required but not set`);
-    return;
+    const error = new Error(`${ERR_CONFIG}: GH_AW_RUN_URL environment variable is required but not set`);
+    core.setFailed(error.message);
+    throw error;
   }
 
   core.info(`Applying safe outputs from run: ${runUrl}`);
@@ -361,7 +368,7 @@ async function main() {
     ({ runId, owner, repo } = parseRunUrl(runUrl));
   } catch (error) {
     core.setFailed(getErrorMessage(error));
-    return;
+    throw error;
   }
 
   core.info(`Parsed run ID: ${runId}`);
@@ -393,7 +400,7 @@ async function main() {
     agentOutputFile = await downloadAgentArtifact(runId, destDir, repoFromUrl);
   } catch (error) {
     core.setFailed(getErrorMessage(error));
-    return;
+    throw error;
   }
 
   // Set GH_AW_AGENT_OUTPUT so the handler manager can find the output file
@@ -417,7 +424,7 @@ async function main() {
       core.info("Auto-configured GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG from agent output");
     } catch (error) {
       core.setFailed(`Failed to build handler config: ${getErrorMessage(error)}`);
-      return;
+      throw error;
     }
   }
 
@@ -425,6 +432,9 @@ async function main() {
   core.info("Applying safe outputs...");
   const { main: runHandlerManager } = require("./safe_output_handler_manager.cjs");
   await runHandlerManager();
+  if (process.exitCode && process.exitCode !== 0) {
+    throw new Error(`${ERR_SYSTEM}: Safe-output replay handler processing failed; see the reported handler errors`);
+  }
 }
 
 module.exports = { main, parseRunUrl, buildHandlerConfigFromOutput, getReplayPolicy, enforceReplayWriteGate, validateReplayWriteGateRecord, loadRecordedWriteGate, prepareGatedReplayConfig };
