@@ -12,7 +12,7 @@ function optionsFromEnv() {
     manifestPath: process.env.GH_AW_PENDING_WRITES,
     handlerConfig: parsePendingJSON(process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG || "{}"),
     context,
-    readToken: process.env.GITHUB_TOKEN,
+    readToken: process.env.GH_AW_PENDING_DEFAULT_READ_TOKEN || process.env.GITHUB_TOKEN,
     readTokens: parsePendingJSON(process.env.GH_AW_PENDING_READ_TOKENS || "{}"),
     staged: process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true",
     workflowId: process.env.GH_AW_WORKFLOW_ID,
@@ -93,16 +93,34 @@ function checkPublication(spec) {
   if (!item || (spec.repository && spec.repository !== item.target.repository) || (spec.branch && spec.branch !== item.target.branch)) throw integrityError("target_changed");
   const supplied = publicationSupplied(spec);
   assertPendingPublication(spec.job, spec.id, supplied);
-  return supplied;
+  return { item, supplied };
 }
 
 function checkPublicationFromEnv() {
   try {
-    checkPublication(parsePendingJSON(process.env.GH_AW_PENDING_PUBLICATION || "{}"));
+    const { item } = checkPublication(parsePendingJSON(process.env.GH_AW_PENDING_PUBLICATION || "{}"));
+    core.setOutput("pending_writes_verified", "true");
+    core.setOutput("pending_writes_item_sha256", JSON.stringify({ [item.output_id]: item.item_sha256 }));
   } catch (cause) {
     core.setFailed("Pending-write publication inputs changed or are incomplete; no writes are authorized");
     return;
   }
 }
 
-module.exports = { main, optionsFromEnv, verifyFromEnv, publicationSupplied, checkPublication, checkPublicationFromEnv };
+function collectPublicationChecks() {
+  const manifest = readAuthorizedManifest();
+  const verified = {};
+  const names = parsePendingJSON(process.env.GH_AW_PENDING_CHECK_NAMES || "[]");
+  for (const name of names) {
+    const raw = process.env[`GH_AW_PENDING_CHECK_${name}`];
+    if (!raw) continue;
+    for (const [id, digest] of Object.entries(parsePendingJSON(raw))) {
+      if (!manifest.items.some(item => item.output_id === id && item.item_sha256 === digest && item.target.job === process.env.GH_AW_PENDING_JOB)) throw integrityError("publication_proof_invalid");
+      verified[id] = digest;
+    }
+  }
+  core.setOutput("pending_writes_verified", String(Object.keys(verified).length > 0));
+  core.setOutput("pending_writes_item_sha256", JSON.stringify(verified));
+}
+
+module.exports = { main, optionsFromEnv, verifyFromEnv, publicationSupplied, checkPublication, checkPublicationFromEnv, collectPublicationChecks };
