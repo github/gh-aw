@@ -220,13 +220,17 @@ function ensureUnzipAvailable() {
 }
 
 function createZipFromFiles(files, rootDirectory, outputPath) {
-  ensureZipAvailable();
   const relativeFiles = files.map(file => path.relative(rootDirectory, file));
   const invalid = relativeFiles.find(rel => !rel || rel.startsWith("..") || path.isAbsolute(rel));
   if (invalid) {
     throw new Error(`all upload artifact files must be under rootDirectory (invalid path: ${invalid})`);
   }
-  const result = spawnSync("zip", ["-q", "-r", outputPath, ...relativeFiles], {
+  const leadingDashFilename = relativeFiles.find(rel => path.basename(rel).startsWith("-"));
+  if (leadingDashFilename) {
+    throw new Error(`upload artifact files must not have leading-dash filenames (invalid path: ${leadingDashFilename})`);
+  }
+  ensureZipAvailable();
+  const result = spawnSync("zip", ["-q", "-r", outputPath, ...relativeFiles.map(file => `./${file}`)], {
     cwd: rootDirectory,
     encoding: "utf8",
     timeout: ARCHIVE_COMMAND_TIMEOUT_MS,
@@ -480,10 +484,12 @@ class DefaultArtifactClient {
     } else {
       tmpDir = makeTempDir("gh-aw-artifact-upload-");
       uploadPath = path.join(tmpDir, `${artifactName || "artifact"}.zip`);
-      createZipFromFiles(files, rootDirectory, uploadPath);
     }
 
     try {
+      if (!options.skipArchive) {
+        createZipFromFiles(files, rootDirectory, uploadPath);
+      }
       const { workflowRunBackendId, workflowJobRunBackendId } = getBackendIdsFromRuntimeToken();
       const createRequest = {
         workflowRunBackendId,

@@ -664,7 +664,11 @@ the remote workflows directory (default: `$GH_AW_WORKFLOWS_DIR` or `.github/work
 The `--stale` filter is local-only. For enabled/disabled state and run information, use
 `status` instead.
 
-For local workflows, `compiled` is `Yes` when the source frontmatter matches the generated `.lock.yml`, `No` when the hashes differ, and `N/A` when the lock file is missing. JSON output is a top-level array with one object per workflow and the same values in each object's `compiled` field. Use `--stale` to inspect only stale or missing lock files:
+For local workflows, `compiled` is `Yes` when the source frontmatter matches the generated `.lock.yml`, `No` when the hashes differ, and `N/A` when the lock file is missing. JSON output is a top-level array with one object per workflow and the same values in each object's `compiled` field.
+
+Local JSON entries also include `source` when the workflow declares a nonempty string [`source:` field](/gh-aw/reference/frontmatter/#source-tracking-source). The value preserves the declared upstream path and ref. Missing, empty, or non-string values omit the key. Remote listings do not include source metadata.
+
+Use `--stale` to inspect only stale or missing lock files:
 
 ```bash
 gh aw list --stale

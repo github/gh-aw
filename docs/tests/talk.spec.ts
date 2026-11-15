@@ -226,7 +226,7 @@ test("publishes a social card for link previews", async ({ page, request }) => {
 });
 
 test("publishes synthetic examples without profile assets or private source references", async ({ page, request }) => {
-  const allowedAvatar = /^assets\/avatars\/(?:mona|ducky)\.jpg$/;
+  const allowedAvatar = /^assets\/avatars\/(?:mona\.jpg|ducky\.jpg|mona-full\.png)$/;
   for (const asset of readdirSync(new URL("../public/cracktro/assets/", import.meta.url), { recursive: true }) as string[]) {
     expect(asset === "avatars" || allowedAvatar.test(`assets/${asset}`), asset).toBe(true);
   }
@@ -260,6 +260,24 @@ test("publishes synthetic examples without profile assets or private source refe
   }
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
+});
+
+test("keeps role and avatar circles flat", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/");
+  for (const index of SLIDES.keys()) {
+    await page.getByRole("button", { name: `Slide ${index + 1}`, exact: true }).click();
+    const shaded = await page.locator(".slide.active").evaluate(slide => [
+      ...[...slide.querySelectorAll("circle")].flatMap(circle => {
+        const id = getComputedStyle(circle).fill.match(/url\("?#([^")]+)/)?.[1];
+        return id && slide.ownerDocument.getElementById(id)?.tagName === "radialGradient" ? [`circle → #${id}`] : [];
+      }),
+      ...[...slide.querySelectorAll<HTMLElement>("*")].flatMap(el => {
+        const style = getComputedStyle(el);
+        return style.borderRadius === "50%" && style.backgroundImage.includes("radial-gradient") ? [el.className.toString()] : [];
+      }),
+    ]);
+    expect(shaded, SLIDES[index].heading).toEqual([]);
+  }
 });
 
 test("keeps every key on the host side of the zero-secret agents diagram", async ({ page }) => {

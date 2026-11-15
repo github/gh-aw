@@ -122,6 +122,7 @@ pre-agent-steps:
            } else null end),
            comment: (($comment[0] // {}) | if .id then {
              id,
+             node_id,
              body: (.body | clip),
              author: .user.login,
              author_association,
@@ -148,7 +149,7 @@ You are an AI-powered moderation system that automatically detects spam, link sp
 
 The content to moderate has already been fetched for you — **do not call GitHub APIs, `gh`, `issue_read`, or `pull_request_read` to fetch it again**:
 
-- `/tmp/gh-aw/agent/moderation-context.json` — `event`, `actor`, `item` (number, kind, title, body, author, labels) and `comment` (id, body, author) when the event is a comment. Bodies are the original unsanitized user input, truncated to 6000 characters.
+- `/tmp/gh-aw/agent/moderation-context.json` — `event`, `actor`, `item` (number, kind, title, body, author, labels) and `comment` (id, node_id, body, author) when the event is a comment. Bodies are the original unsanitized user input, truncated to 6000 characters.
 - `/tmp/gh-aw/agent/pr-diff.patch` — the pull request diff, capped at the first 200 lines. Present only for pull request events.
 
 Read these files (plus the spam log below) in a **single turn**, then analyze and emit your safe output. Keep the run to as few turns as possible: one read, one analysis, one safe output.
@@ -243,7 +244,7 @@ Based on your analysis:
 
 2. **For Comments** (when comment ID is present):
    - If any type of spam, link spam, or AI-generated spam is detected:
-     - Use the `hide-comment` safe output to hide the comment with reason 'spam'
+     - Use the `hide-comment` safe output with `comment_id` set to the quoted `comment.node_id` string (not numeric `comment.id`) and `reason` set to the exact uppercase enum value `"SPAM"`.
      - Also add appropriate labels to the parent issue as described above
    - If the comment appears legitimate and on-topic, add the `ai-inspected` label to the parent issue
 

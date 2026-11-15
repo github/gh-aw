@@ -26,7 +26,7 @@ Most agentic workflow examples stop at one trigger and one comment. [svennijhuis
 ## How it works
 
 1. [aw.yml](https://github.com/svennijhuis/agentic-workflows/blob/main/aw.yml) is the package manifest. It lists the eleven workflows under `includes:` and sets `min-version: v0.93.4`, so `gh aw add` knows what to install.
-2. An issue-builder run implements an issue and opens a `builder/*` pull request labelled `builder`.
+2. An issue-builder run implements an issue and opens a `builder/*` pull request labeled `builder`.
 3. The builder then dispatches `pr-reviewer` for round 1. The reviewer posts a `COMMENT` review that starts with `Reviewer: ready to merge.` when clean. Otherwise it posts inline comments and dispatches the builder for a fix round.
 4. If round 3 still has findings, the reviewer adds `needs-help` and posts one summary of open points for a maintainer. It starts nothing further.
 

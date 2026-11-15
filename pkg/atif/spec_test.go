@@ -84,7 +84,7 @@ func TestSpec_PublicAPI_ConvertEnforcesInputLimit(t *testing.T) {
 
 	trajectory, err := atif.Convert(context.Background(), input)
 
-	require.Error(t, err, "Convert should reject input larger than MaxSessionBytes")
+	require.ErrorContains(t, err, "exceeds the 64 MiB ATIF input limit")
 	assert.Nil(t, trajectory, "Convert should not return a trajectory for oversized input")
 }
 
@@ -125,17 +125,4 @@ func TestSpec_PublicAPI_EncodeValidatesBeforeWriting(t *testing.T) {
 			assert.Empty(t, output.Bytes(), "Encode should not emit an invalid trajectory for %s", tt.name)
 		})
 	}
-}
-
-type repeatingReader struct {
-	pattern []byte
-	offset  int
-}
-
-func (r *repeatingReader) Read(p []byte) (int, error) {
-	for i := range p {
-		p[i] = r.pattern[r.offset]
-		r.offset = (r.offset + 1) % len(r.pattern)
-	}
-	return len(p), nil
 }

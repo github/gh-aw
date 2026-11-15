@@ -1,10 +1,33 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
 const { buildCopilotSDKPermissionHandler } = require("../actions/setup/js/copilot_sdk_permissions.cjs");
+
+function workflowLock(name) {
+  const lockPath = path.join(__dirname, "..", ".github", "workflows", `${name}.lock.yml`);
+  return JSON.parse(execFileSync("yq", ["-o=json", lockPath], { encoding: "utf8" }));
+}
+
+function compiledMCPServer(lock, serverName) {
+  const gatewayStep = lock.jobs.agent.steps.find(step => step.name === "Start MCP Gateway");
+  assert.ok(gatewayStep, "Missing MCP gateway step");
+
+  const heredoc = gatewayStep.run.match(/cat << (GH_AW_MCP_CONFIG_[a-f0-9]{16}_EOF) \|[^\n]*\n/);
+  assert.ok(heredoc, "Missing compiled MCP configuration heredoc");
+  const bodyStart = heredoc.index + heredoc[0].length;
+  const bodyEnd = gatewayStep.run.indexOf(`\n${heredoc[1]}`, bodyStart);
+  assert.notEqual(bodyEnd, -1, "Missing compiled MCP configuration heredoc terminator");
+
+  const configText = gatewayStep.run.slice(bodyStart, bodyEnd).replace(/\\\$/g, "$");
+  const gatewayStart = configText.indexOf('\n  "gateway":');
+  assert.notEqual(gatewayStart, -1, "Missing compiled gateway configuration");
+  const mcpServersText = configText.slice(0, gatewayStart).replace(/,\s*$/, "") + "\n}";
+  return JSON.parse(mcpServersText).mcpServers[serverName];
+}
 
 function workflowPermissions(name) {
   const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", `${name}.lock.yml`), "utf8");
@@ -50,4 +73,25 @@ test("Tidy separates permitted formatting from exact permitted status inspection
   for (const command of ["make fmt | tail -5; git status --porcelain | head", "git status --porcelain"]) {
     checkCommand(handler, command, "reject");
   }
+});
+
+test("Daily Graft uses full history and fails closed on unusable graph analysis", () => {
+  const workflows = path.join(__dirname, "..", ".github", "workflows");
+  const source = fs.readFileSync(path.join(workflows, "daily-graft-intelligence.md"), "utf8");
+  const graft = fs.readFileSync(path.join(workflows, "shared", "mcp", "graft.md"), "utf8");
+
+  assert.match(source, /checkout:\s*\n\s+fetch-depth: 0/);
+  assert.doesNotMatch(source, /graft-(?:recent-activity|changed-files)\.txt \|\| true/);
+  assert.match(graft, /check "\$GITHUB_WORKSPACE" --json/);
+  assert.match(graft, /report\.graph\?\.ok === true/);
+  assert.match(graft, /Graft wiring graph is missing or stale/);
+  assert.match(source, /optional deep layer may report `NO GRAPH`/);
+  assert.match(source, /safeoutputs report_incomplete/);
+});
+
+test("Daily Graft compiled MCP config resolves read-only workspace mounts structurally", () => {
+  const graft = compiledMCPServer(workflowLock("daily-graft-intelligence"), "graft");
+
+  assert.deepEqual(graft.entrypointArgs, ["-y", "@nanonets/graft@0.8.0", "--dir=/tmp/gh-aw/graft", "mcp", "${GH_AW_MCP_ENV_GITHUB_WORKSPACE}"]);
+  assert.deepEqual(graft.mounts, ["${GH_AW_MCP_ENV_GITHUB_WORKSPACE}:${GH_AW_MCP_ENV_GITHUB_WORKSPACE}:ro", "/tmp/gh-aw/graft-empty-git:${GH_AW_MCP_ENV_GITHUB_WORKSPACE}/.git:ro", "/tmp/gh-aw/graft:/tmp/gh-aw/graft:ro"]);
 });

@@ -2414,7 +2414,7 @@ The `footer-install` template renders the install instructions that follow the f
 
 ## Staged Mode
 
-Staged mode lets you preview what safe outputs a workflow would create without actually creating anything. Every write operation is skipped; instead, a 🎭-labelled preview appears in the GitHub Actions step summary.
+Staged mode lets you preview what safe outputs a workflow would create without actually creating anything. Every write operation is skipped; instead, a 🎭-labeled preview appears in the GitHub Actions step summary.
 
 Staged handlers can still read target data to validate filters such as `required-labels` and `required-title-prefix`. The compiler grants the read permissions these lookups require, including for GitHub App tokens, without granting write permissions for staged handlers.
 

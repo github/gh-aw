@@ -27,7 +27,6 @@ for (const viewport of [
       const slides = sections(page);
       await expect(slides.first()).toHaveClass(/aw-hero/);
       await expect(slides.nth(1)).toHaveCSS("scroll-snap-align", "start");
-      await expect(page.locator(".aw-title-slide")).toBeHidden();
       await page.mouse.move(viewport.width - 20, viewport.height / 2);
 
       for (const index of [1, 2, 1]) {
@@ -78,19 +77,4 @@ test("disables snapping for reduced motion and on documentation pages", async ({
   await expect(page.locator("html")).toHaveCSS("scroll-snap-type", /^y(?: proximity)?$/);
   await page.goto("/gh-aw/setup/creating-workflows/");
   await expect(page.locator("html")).toHaveCSS("scroll-snap-type", "none");
-});
-
-test("leaves presentation navigation independent and restores landing snapping", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/gh-aw/");
-  await page.getByRole("button", { name: "Start slideshow" }).click();
-  const dialog = page.getByRole("dialog", { name: "GitHub Agentic Workflows presentation" });
-  await expect(dialog).toBeVisible();
-  await expect(page.locator("html")).toHaveCSS("scroll-snap-type", "none");
-  await page.keyboard.press("ArrowRight");
-  await expect(dialog.locator("[data-slideshow-status]")).toContainText("2 /");
-  await page.keyboard.press("Escape");
-  await expect(dialog).not.toBeVisible();
-  await expect(page.locator("html")).toHaveCSS("scroll-snap-type", /^y(?: proximity)?$/);
 });

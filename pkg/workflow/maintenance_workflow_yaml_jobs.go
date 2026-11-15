@@ -440,13 +440,7 @@ func buildMaintenanceActivityReportCacheAndDownloadSteps(opts buildMaintenanceWo
             --format markdown \
             --report-file ./.cache/gh-aw/activity-report-logs/report.md
 
-      - name: Save activity report logs cache
-        if: ${{ always() }}
-        uses: ` + getActionPin("actions/cache/save") + `
-        with:
-          path: ./.cache/gh-aw/activity-report-logs
-          key: ${{ steps.activity_report_logs_cache.outputs.cache-primary-key }}
-
+` + activityReportSaveCacheStep() + `
 `
 }
 
@@ -457,33 +451,8 @@ func buildMaintenanceActivityReportIssueStep(resolver SHAResolver) string {
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('node:fs');
-            const reportPath = './.cache/gh-aw/activity-report-logs/report.md';
-            if (!fs.existsSync(reportPath)) {
-              core.warning('Activity report markdown not found at ' + reportPath + '; skipping issue creation.');
-              return;
-            }
-            let reportBody = '';
-            try {
-              reportBody = fs.readFileSync(reportPath, 'utf8').trim();
-            } catch (error) {
-              core.warning('Failed to read activity report markdown at ' + reportPath + ': ' + error.message);
-              return;
-            }
-            if (!reportBody) {
-              core.warning('Activity report markdown is empty at ' + reportPath + '; skipping issue creation.');
-              return;
-            }
-            const repoSlug = context.repo.owner + '/' + context.repo.repo;
-            const body = [
-              '### Agentic workflow activity report',
-              '',
-              'Repository: ' + repoSlug,
-              'Generated at: ' + new Date().toISOString(),
-              '',
-              reportBody,
-            ].join('\n');
-            const createdIssue = await github.rest.issues.create({
+` + activityReportReadScript + `            const repoSlug = context.repo.owner + '/' + context.repo.repo;
+` + activityReportBodyScript + `            const createdIssue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: '[aw] agentic status report',

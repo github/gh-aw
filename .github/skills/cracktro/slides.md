@@ -10,7 +10,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 |---|---|
 | GitHubAgenticWorkflows |  |
 | Agentic Workflows |  |
-| CI/CD toContinuousAI | illustrative |
+| CI/CD meetsContinuous AI | illustrative |
 | Anatomy of a workflow | illustrative |
 | Turn Intent to Automation |  |
 | Turn Automation into Value | illustrative |
@@ -20,8 +20,8 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Zero-secret agents | illustrative |
 | Supply chain hardening | illustrative |
 | Safe outputs | illustrative |
-| Continuous Security | illustrative |
 | Need-to-know enclaves | illustrative |
+| Continuous Red Teaming | illustrative |
 | Stop manually translating intent into code. |  |
 | Human agent processes |  |
 | Human Agent Processes | illustrative |
@@ -42,25 +42,33 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Speak · Map · Grep | illustrative |
 | Scan · Fix · Learn | illustrative |
 | For PMs | illustrative |
-| Cost & context |  |
+| If every PR needs deep human review, you don’t trust your process. | illustrative |
+| Cost Optimization |  |
 | Cost management | illustrative |
 | Model routing | illustrative |
-| Agents that debug agents | illustrative |
+| DeterministicOps | illustrative |
+| Audit & Optimize | illustrative |
 | Agentic Engineering |  |
+| Agents that debug agents | illustrative |
 | Any agent, any provider | illustrative |
 | Agent memory | illustrative |
 | Ephemerals | illustrative |
 | Index & search | illustrative |
+| Imports & reuse | illustrative |
 | Experiments, graders & evals | illustrative |
-| Audit & Optimize | illustrative |
 | Enterprise |  |
-| Enterprise infrastructure as code | illustrative |
+| Infrastructure as code | illustrative |
 | OpenTelemetry | illustrative |
 | GitHub-native governance | illustrative |
 | Operator-owned infrastructure | illustrative |
-| Centralized campaigns | illustrative |
 | Push SDLC | illustrative |
 | Connectors | illustrative |
+| Central Agentic Ops |  |
+| Hyperscale Agentics | illustrative |
+| Centralized campaigns | illustrative |
+| AW maintenance | illustrative |
+| Session data lake | illustrative |
+| Ops data for Agents | illustrative |
 | AW factory |  |
 | First commit to GA |  |
 | How PRs land |  |

@@ -548,7 +548,7 @@ permissions:
 
 # Auto-File Issues for Critical Findings
 
-Use the `agentic-workflows` MCP tool `audit` with run ID ${{ github.event.workflow_run.id }}. Filter `key_findings` for severity `high` or `critical`. For each finding without a matching open issue, create one with the finding title, description, impact, and recommendations, labelled `audit-finding`. If no critical findings, call the `noop` safe output tool.
+Use the `agentic-workflows` MCP tool `audit` with run ID ${{ github.event.workflow_run.id }}. Filter `key_findings` for severity `high` or `critical`. For each finding without a matching open issue, create one with the finding title, description, impact, and recommendations, labeled `audit-finding`. If no critical findings, call the `noop` safe output tool.
 ```
 
 ### Weekly audit monitoring agent

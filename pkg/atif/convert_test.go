@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,6 +48,12 @@ func TestReconcileMetricsMapGrowth(t *testing.T) {
 			incoming: map[string]json.RawMessage{"turns": json.RawMessage("2")},
 			want:     map[string]json.RawMessage{"turns": json.RawMessage("2")},
 		},
+		{
+			name:     "non-object usage",
+			previous: map[string]json.RawMessage{"usage": json.RawMessage(`{"input_tokens":1}`)},
+			incoming: map[string]json.RawMessage{"usage": json.RawMessage(`[]`)},
+			want:     map[string]json.RawMessage{"usage": json.RawMessage(`[]`)},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			previous, err := json.Marshal(tc.previous)
@@ -84,26 +90,27 @@ func TestConvertConversation(t *testing.T) {
 {"type":"assistant.refusal","data":{"reason":"refusal","content":"No"}}
 {"type":"vendor.extension","data":{"opaque":[false,0,null],"secret":"retained locally"},"timestamp":123}
 `)
-	require.Equal(t, "s1", trajectory.SessionID)
-	require.Equal(t, Agent{Name: "copilot", Version: "unknown", ModelName: "test-model"}, trajectory.Agent)
+	assert.Equal(t, "s1", trajectory.SessionID)
+	assert.Equal(t, Agent{Name: "copilot", Version: "unknown", ModelName: "test-model"}, trajectory.Agent)
 	require.Len(t, trajectory.Steps, 7)
-	require.Equal(t, "Be helpful.\n", trajectory.Steps[1].Message)
-	require.Equal(t, "user", trajectory.Steps[2].Source)
-	require.Equal(t, "2026-10-01T10:00:00Z", trajectory.Steps[2].Timestamp)
-	require.Equal(t, "Reasoning\n", trajectory.Steps[3].ReasoningContent)
-	require.Equal(t, "Hi\n", trajectory.Steps[4].Message)
-	require.Equal(t, "agent", trajectory.Steps[5].Source)
-	require.Equal(t, "system", trajectory.Steps[6].Source)
-	require.Empty(t, trajectory.Steps[6].Timestamp)
-	raw := trajectory.Steps[6].Extra["unified_event"].(json.RawMessage)
-	require.Contains(t, string(raw), `"opaque":[false,0,null]`)
+	assert.Equal(t, "Be helpful.\n", trajectory.Steps[1].Message)
+	assert.Equal(t, "user", trajectory.Steps[2].Source)
+	assert.Equal(t, "2026-10-01T10:00:00Z", trajectory.Steps[2].Timestamp)
+	assert.Equal(t, "Reasoning\n", trajectory.Steps[3].ReasoningContent)
+	assert.Equal(t, "Hi\n", trajectory.Steps[4].Message)
+	assert.Equal(t, "agent", trajectory.Steps[5].Source)
+	assert.Equal(t, "system", trajectory.Steps[6].Source)
+	assert.Empty(t, trajectory.Steps[6].Timestamp)
+	raw, ok := trajectory.Steps[6].Extra["unified_event"].(json.RawMessage)
+	require.True(t, ok, "unified_event should retain its raw JSON value")
+	assert.Contains(t, string(raw), `"opaque":[false,0,null]`)
 	var first, second bytes.Buffer
 	require.NoError(t, Encode(&first, trajectory))
 	require.NoError(t, Encode(&second, convert(t, `{"type":"assistant.message","data":{"content":"Hi"}}`)))
-	require.True(t, strings.HasSuffix(first.String(), "\n"))
+	assert.True(t, strings.HasSuffix(first.String(), "\n"))
 	first.Reset()
 	require.NoError(t, Encode(&first, convert(t, `{"type":"assistant.message","data":{"content":"Hi"}}`)))
-	require.Equal(t, first.String(), second.String())
+	assert.Equal(t, first.String(), second.String())
 }
 
 func TestConvertTools(t *testing.T) {
@@ -120,16 +127,23 @@ func TestConvertTools(t *testing.T) {
 {"type":"tool.execution_complete","data":{"toolCallId":"duplicate","output":"ambiguous"}}
 `)
 	require.Len(t, trajectory.Steps, 9)
-	require.Equal(t, "0", trajectory.Steps[0].Observation.Results[0].Content)
-	require.Equal(t, "a", trajectory.Steps[0].Observation.Results[0].SourceCallID)
-	require.Contains(t, string(trajectory.Steps[0].Observation.Results[0].Extra["unified_event"].(json.RawMessage)), `"success":false`)
-	require.Equal(t, "false", trajectory.Steps[1].Observation.Results[0].Content)
+	require.NotNil(t, trajectory.Steps[0].Observation)
+	require.Len(t, trajectory.Steps[0].Observation.Results, 1)
+	assert.Equal(t, "0", trajectory.Steps[0].Observation.Results[0].Content)
+	assert.Equal(t, "a", trajectory.Steps[0].Observation.Results[0].SourceCallID)
+	raw, ok := trajectory.Steps[0].Observation.Results[0].Extra["unified_event"].(json.RawMessage)
+	require.True(t, ok, "unified_event should retain its raw JSON value")
+	assert.Contains(t, string(raw), `"success":false`)
+	require.NotNil(t, trajectory.Steps[1].Observation)
+	require.Len(t, trajectory.Steps[1].Observation.Results, 1)
+	assert.Equal(t, "false", trajectory.Steps[1].Observation.Results[0].Content)
 	for _, index := range []int{2, 3, 4, 8} {
-		require.Equal(t, "system", trajectory.Steps[index].Source)
-		require.Empty(t, trajectory.Steps[index].ToolCalls)
+		assert.Equal(t, "system", trajectory.Steps[index].Source)
+		assert.Empty(t, trajectory.Steps[index].ToolCalls)
 	}
-	require.Nil(t, trajectory.Steps[5].Observation)
-	require.NotNil(t, trajectory.Steps[5].ToolCalls[0].Arguments)
+	assert.Nil(t, trajectory.Steps[5].Observation)
+	require.Len(t, trajectory.Steps[5].ToolCalls, 1)
+	assert.NotNil(t, trajectory.Steps[5].ToolCalls[0].Arguments)
 }
 
 func TestConvertEngineVersion(t *testing.T) {
@@ -165,34 +179,81 @@ func TestConvertSubagentsAndStructuredContent(t *testing.T) {
 }
 
 func TestConvertToolProvenanceScope(t *testing.T) {
-	trajectory := convert(t, `{"type":"tool.execution_start","data":{"toolCallId":"a","toolName":"read","input":{}},"provenance":{"component":"agent","path":"parent.jsonl"}}
-{"type":"tool.execution_complete","data":{"toolCallId":"a","output":"wrong path"},"provenance":{"component":"agent","path":"child.jsonl"}}
-{"type":"tool.execution_complete","data":{"toolCallId":"a","output":"correct path"},"provenance":{"component":"agent","path":"parent.jsonl"}}
-{"type":"session.result","data":{"usage":{"output_tokens":999}},"provenance":{"component":"detection"}}
-{"type":"assistant.message","data":{"content":"not the primary agent"},"provenance":{"component":"evals"}}
+	for _, tc := range []struct {
+		name, start, mismatch, match, metrics, excluded string
+	}{
+		{
+			name:     "path",
+			start:    `"path":"parent.jsonl"`,
+			mismatch: `"path":"child.jsonl"`,
+			match:    `"path":"parent.jsonl"`,
+			metrics:  `"component":"detection"`,
+			excluded: `"component":"evals"`,
+		},
+		{
+			name:     "phase",
+			start:    `"path":"parent.jsonl","phase":"first"`,
+			mismatch: `"path":"parent.jsonl","phase":"second"`,
+			match:    `"path":"parent.jsonl","phase":"first"`,
+			metrics:  `"path":"parent.jsonl","phase":"detection","component":"detection"`,
+			excluded: `"path":"parent.jsonl","phase":"evals","component":"evals"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			trajectory := convert(t, `{"type":"tool.execution_start","data":{"toolCallId":"a","toolName":"read","input":{}},"provenance":{"component":"agent",`+tc.start+`}}
+{"type":"tool.execution_complete","data":{"toolCallId":"a","output":"wrong scope"},"provenance":{"component":"agent",`+tc.mismatch+`}}
+{"type":"tool.execution_complete","data":{"toolCallId":"a","output":"correct scope"},"provenance":{"component":"agent",`+tc.match+`}}
+{"type":"session.result","data":{"usage":{"output_tokens":999}},"provenance":{`+tc.metrics+`}}
+{"type":"assistant.message","data":{"content":"not the primary agent"},"provenance":{`+tc.excluded+`}}
 `)
-	require.Equal(t, "correct path", trajectory.Steps[0].Observation.Results[0].Content)
-	require.Equal(t, "system", trajectory.Steps[1].Source)
-	require.Nil(t, trajectory.FinalMetrics.CompletionTokens)
-	require.Empty(t, trajectory.Steps[3].Message)
+			require.Len(t, trajectory.Steps, 4)
+			require.NotNil(t, trajectory.Steps[0].Observation)
+			require.Len(t, trajectory.Steps[0].Observation.Results, 1)
+			assert.Equal(t, "correct scope", trajectory.Steps[0].Observation.Results[0].Content)
+			assert.Equal(t, "system", trajectory.Steps[1].Source)
+			assert.Nil(t, trajectory.FinalMetrics.CompletionTokens)
+			assert.Empty(t, trajectory.Steps[3].Message)
+		})
+	}
 }
 
 func TestConvertNestedCallerContext(t *testing.T) {
-	trajectory := convert(t, `{"type":"session.init","data":{"sourceEngine":"copilot","model":"primary"}}
+	for _, tc := range []struct {
+		name   string
+		events string
+	}{
+		{
+			name: "nested session initialization",
+			events: `{"type":"session.init","data":{"sourceEngine":"copilot","model":"primary"}}
 {"type":"session.init","data":{"sourceEngine":"claude","model":"nested","parentToolUseId":"launch"}}
 {"type":"assistant.message","data":{"agentId":"child","content":"nested caller"}}
 {"type":"tool.execution_start","data":{"toolCallId":"a","toolName":"read","parentToolUseId":"launch","input":{}}}
 {"type":"tool.execution_complete","data":{"toolCallId":"a","output":"not a parent call"}}
 {"type":"session.result","data":{"parentToolUseId":"launch","usage":{"output_tokens":999}}}
-`)
-	require.Equal(t, "copilot", trajectory.Agent.Name)
-	require.Equal(t, "primary", trajectory.Agent.ModelName)
-	for _, step := range trajectory.Steps {
-		require.Equal(t, "system", step.Source)
-		require.Empty(t, step.Message)
-		require.Empty(t, step.ToolCalls)
+`,
+		},
+		{
+			name: "nested caller events",
+			events: `{"type":"session.init","data":{"sourceEngine":"copilot","model":"primary"}}
+{"type":"assistant.message","data":{"parentToolCallId":"launch","content":"nested caller"}}
+{"type":"tool.execution_start","data":{"parentToolCallId":"launch","toolCallId":"a","toolName":"read","input":{}}}
+{"type":"tool.execution_complete","data":{"parentToolCallId":"launch","toolCallId":"a","output":"not a parent call"}}
+{"type":"session.result","data":{"parentToolCallId":"launch","usage":{"output_tokens":999}}}
+`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			trajectory := convert(t, tc.events)
+			assert.Equal(t, "copilot", trajectory.Agent.Name)
+			assert.Equal(t, "primary", trajectory.Agent.ModelName)
+			for _, step := range trajectory.Steps {
+				assert.Equal(t, "system", step.Source)
+				assert.Empty(t, step.Message)
+				assert.Empty(t, step.ToolCalls)
+			}
+			assert.Nil(t, trajectory.FinalMetrics.CompletionTokens)
+		})
 	}
-	require.Nil(t, trajectory.FinalMetrics.CompletionTokens)
 }
 
 func TestConvertCopilotParentCallContext(t *testing.T) {
@@ -387,52 +448,231 @@ func TestConvertRejectsInvalidInput(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	_, err = Convert(t.Context(), errorReader{})
 	require.ErrorContains(t, err, "source failed")
-	_, err = Convert(t.Context(), io.MultiReader(strings.NewReader(header), io.LimitReader(repeatingReader{}, MaxSessionBytes)))
-	require.Error(t, err)
 }
 
 type errorReader struct{}
 
 func (errorReader) Read([]byte) (int, error) { return 0, errors.New("source failed") }
 
-type repeatingReader struct{}
-
-func (repeatingReader) Read(p []byte) (int, error) {
-	for i := range p {
-		p[i] = ' '
-	}
-	return len(p), nil
-}
-
 func TestEncodeRejectsInvalidTrajectory(t *testing.T) {
-	trajectory := convert(t, `{"type":"assistant.message","data":{"content":"Hi"}}`)
-	trajectory.Steps[0].Observation = &Observation{Results: []ObservationResult{{SourceCallID: "missing"}}}
-	var output bytes.Buffer
-	require.ErrorContains(t, Encode(&output, trajectory), "unmatched")
-	require.Empty(t, output.String())
+	for _, tc := range []struct {
+		name   string
+		nil    bool
+		mutate func(*Trajectory)
+		want   string
+	}{
+		{
+			name: "nil trajectory",
+			nil:  true,
+			want: "supported schema",
+		},
+		{
+			name: "unmatched observation",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].Observation = &Observation{Results: []ObservationResult{{SourceCallID: "missing"}}}
+			},
+			want: "unmatched",
+		},
+		{
+			name: "unsupported schema",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.SchemaVersion = "unsupported"
+			},
+			want: "supported schema",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var trajectory *Trajectory
+			if !tc.nil {
+				trajectory = convert(t, `{"type":"assistant.message","data":{"content":"Hi"}}`)
+				tc.mutate(trajectory)
+			}
+			var output bytes.Buffer
+			require.ErrorContains(t, Encode(&output, trajectory), tc.want)
+			assert.Empty(t, output.String())
+		})
+	}
 }
 
-// Fixtures are also checked with Harbor's official TrajectoryValidator. Set
-// ATIF_VALIDATION_DIR to capture generated documents for that external check.
 func TestCompatibilityFixtures(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.jsonl")
 	require.NoError(t, err)
 	require.NotEmpty(t, files)
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			input, err := os.ReadFile(file)
-			require.NoError(t, err)
-			trajectory, err := Convert(t.Context(), bytes.NewReader(input))
-			require.NoError(t, err)
-			var output bytes.Buffer
-			require.NoError(t, Encode(&output, trajectory))
+			output := compatibilityFixtureOutput(t, file)
 			golden := strings.TrimSuffix(file, ".jsonl") + ".atif"
 			expected, err := os.ReadFile(golden)
 			require.NoError(t, err)
-			require.JSONEq(t, string(expected), output.String())
-			if dir := os.Getenv("ATIF_VALIDATION_DIR"); dir != "" {
-				require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(golden)), output.Bytes(), 0o600))
-			}
+			require.JSONEq(t, string(expected), string(output))
 		})
 	}
+}
+
+// TestCompatibilityFixturesWritesValidationOutput writes generated documents
+// for Harbor's official TrajectoryValidator when ATIF_VALIDATION_DIR is set.
+func TestCompatibilityFixturesWritesValidationOutput(t *testing.T) {
+	dir := os.Getenv("ATIF_VALIDATION_DIR")
+	if dir == "" {
+		t.Skip("ATIF_VALIDATION_DIR is not set")
+	}
+	files, err := filepath.Glob("testdata/*.jsonl")
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+	for _, file := range files {
+		t.Run(filepath.Base(file), func(t *testing.T) {
+			output := compatibilityFixtureOutput(t, file)
+			golden := strings.TrimSuffix(file, ".jsonl") + ".atif"
+			require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(golden)), output, 0o600))
+		})
+	}
+}
+
+func compatibilityFixtureOutput(t *testing.T, file string) []byte {
+	t.Helper()
+	input, err := os.ReadFile(file)
+	require.NoError(t, err)
+	trajectory, err := Convert(t.Context(), bytes.NewReader(input))
+	require.NoError(t, err)
+	var output bytes.Buffer
+	require.NoError(t, Encode(&output, trajectory))
+	return output.Bytes()
+}
+
+func TestTrajectoryValidateRejectsInvalidInput(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		nil    bool
+		mutate func(*Trajectory)
+		want   string
+	}{
+		{
+			name: "nil trajectory",
+			nil:  true,
+			want: "supported schema",
+		},
+		{
+			name: "unsupported schema",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.SchemaVersion = "unsupported"
+			},
+			want: "supported schema",
+		},
+		{
+			name: "missing agent name",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Agent.Name = ""
+			},
+			want: "supported schema",
+		},
+		{
+			name: "missing agent version",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Agent.Version = ""
+			},
+			want: "supported schema",
+		},
+		{
+			name: "no steps",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps = nil
+			},
+			want: "supported schema",
+		},
+		{
+			name: "non-sequential step ID",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].StepID = 2
+			},
+			want: "not sequential",
+		},
+		{
+			name: "invalid source",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].Source = "tool"
+			},
+			want: "invalid ATIF source",
+		},
+		{
+			name: "agent-only fields on non-agent step",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].Source = "user"
+				trajectory.Steps[0].ReasoningContent = "not allowed"
+			},
+			want: "agent-only fields",
+		},
+		{
+			name: "invalid timestamp",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].Timestamp = "not-a-time"
+			},
+			want: "invalid ATIF timestamp",
+		},
+		{
+			name: "empty tool call ID",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].ToolCalls = []ToolCall{{FunctionName: "read", Arguments: map[string]json.RawMessage{}}}
+			},
+			want: "invalid ATIF tool call",
+		},
+		{
+			name: "empty tool function name",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].ToolCalls = []ToolCall{{ToolCallID: "call", Arguments: map[string]json.RawMessage{}}}
+			},
+			want: "invalid ATIF tool call",
+		},
+		{
+			name: "nil tool arguments",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].ToolCalls = []ToolCall{{ToolCallID: "call", FunctionName: "read"}}
+			},
+			want: "invalid ATIF tool call",
+		},
+		{
+			name: "duplicate tool call ID",
+			mutate: func(trajectory *Trajectory) {
+				call := ToolCall{ToolCallID: "call", FunctionName: "read", Arguments: map[string]json.RawMessage{}}
+				trajectory.Steps[0].ToolCalls = []ToolCall{call, call}
+			},
+			want: "invalid ATIF tool call",
+		},
+		{
+			name: "unmatched observation",
+			mutate: func(trajectory *Trajectory) {
+				trajectory.Steps[0].Observation = &Observation{Results: []ObservationResult{{SourceCallID: "missing"}}}
+			},
+			want: "unmatched ATIF observation",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var trajectory *Trajectory
+			if !tc.nil {
+				trajectory = &Trajectory{
+					SchemaVersion: SchemaVersion,
+					Agent:         Agent{Name: "agent", Version: "1"},
+					Steps:         []Step{{StepID: 1, Source: "agent", Message: "message"}},
+				}
+				tc.mutate(trajectory)
+			}
+			require.ErrorContains(t, trajectory.Validate(), tc.want)
+		})
+	}
+}
+
+type failingWriter struct {
+	err error
+}
+
+func (w failingWriter) Write([]byte) (int, error) {
+	return 0, w.err
+}
+
+func TestEncodeReturnsWriterError(t *testing.T) {
+	want := errors.New("writer failed")
+	trajectory := convert(t, `{"type":"assistant.message","data":{"content":"Hi"}}`)
+
+	err := Encode(failingWriter{err: want}, trajectory)
+
+	require.ErrorIs(t, err, want)
 }

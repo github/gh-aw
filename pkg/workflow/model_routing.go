@@ -322,7 +322,7 @@ func modelRoutingDefaultCandidatesPolicyError(engineName, namespace string, allo
 }
 
 func splitModelPolicyRule(rule string) (string, string) {
-	if i := strings.LastIndex(rule, "/"); i >= 0 {
+	if i := strings.Index(rule, "/"); i >= 0 {
 		return rule[:i], rule[i+1:]
 	}
 	return "", rule

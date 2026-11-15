@@ -10,7 +10,7 @@ Use the smallest trigger that matches the request.
 
 | User intent | Trigger | Typical read tools | Typical safe output |
 |---|---|---|---|
-| Review PR changes, comment on quality, suggest fixes | `pull_request` | `github` (`gh-proxy`), optional `playwright` for UI diffs | `add-comment` |
+| Review PR changes, comment on quality, suggest fixes | `pull_request` with `types: [ready_for_review]` (see [pr-reviewer.md](pr-reviewer.md)) | `github` (`gh-proxy`), optional `playwright` for UI diffs | `add-comment` or PR review outputs |
 | Investigate failed CI/Actions runs and summarize incident | `workflow_run` | `github` (`gh-proxy`) with `actions: read` | `create-issue` |
 | Monitor external service deployment failures (Heroku, Vercel, Fly.io) | `deployment_status` | `github` (`gh-proxy`) with `deployments: read` | `create-issue` |
 | Run visual regression checks on PR UI changes | `pull_request` | `playwright` + `cache-memory` | `add-comment` |
@@ -27,6 +27,16 @@ Use the smallest trigger that matches the request.
 ### Scenario Examples
 
 The matrix above gives trigger, tools, and output. These add the `paths:` scoping and definitions the matrix cannot express.
+
+### Reviewer Workflows: Prefer `ready_for_review`
+
+For reviewer workflows, trigger on `pull_request` with `types: [ready_for_review]` so review starts when a draft becomes reviewable instead of on every push. Add `opened`, `synchronize`, and `reopened` only when the workflow is a required check or must review every new commit. Pair with a `slash_command` for manual re-review. See [pr-reviewer.md](pr-reviewer.md).
+
+```yaml
+on:
+  pull_request:
+    types: [ready_for_review]
+```
 
 ### Pull Request Path Filters and Diffs
 
@@ -50,7 +60,7 @@ Non-engineering personas:
 
 ### Pattern-specific `noop` examples
 
-- **PR reviewer (`pull_request`)**: `noop` when only docs/metadata changed outside scoped `paths:`.
+- **PR reviewer (`pull_request` `ready_for_review`)**: `noop` when only docs/metadata changed outside scoped `paths:`.
 - **Failure triage (`workflow_run`)**: `noop` when rerun succeeds, signal is flake-only, or an open incident already exists for the same failure key.
 - **Scheduled digest (`schedule`)**: `noop` when the exact reporting window (for example `since previous successful run`) has zero qualifying updates.
 - **Deployment monitor (`deployment_status`)**: `noop` when non-terminal statuses (`queued`, `in_progress`) arrive without a terminal failure.
