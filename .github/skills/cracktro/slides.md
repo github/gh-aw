@@ -51,6 +51,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | If every PR needs deep human review, you don’t trust your process. | illustrative | Trust the process: if every pull request needs deep human review, improve checks, agent reviewers and tests until a skim is enough. |
 | Cost Optimization |  | Band header (Cost Optimization): debug, spend less and route smarter. |
 | Cost management | illustrative | Cut agent spend by scheduling less often, fetching data in deterministic steps, capping credits, using sub-agents and routing models. |
+| Cost guardrails | illustrative | Layered guardrails stop runaway agents: execution controls throttle events, the daily budget blocks runs before activation, per-run limits hard-stop a run, and optional central admission approves or denies each run before it starts. |
 | Model routing | illustrative | With model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
 | DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
 | Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |
@@ -66,10 +67,14 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Enterprise |  | Band header (Enterprise): any agent, any provider, any scale. |
 | Infrastructure as code | illustrative | Workflows compile to plain Actions YAML, so they run on any runner, reuse the Actions ecosystem and keep enterprise controls, with the agent behind the firewall. |
 | OpenTelemetry | illustrative | Agentic workflows export OpenTelemetry traces to collectors you run, configured per workflow or as an organization default. |
+| Distributed tracing | illustrative | One shared trace follows a task from its workflow runs and jobs through agent sessions, tool calls, retries and dispatched runs in other repositories, with outcomes and cost on every span. |
 | GitHub-native governance | illustrative | Defaults and policy variables are set at enterprise, organization or repository scope and enforced with GitHub controls such as protected environments. |
 | Operator-owned infrastructure | illustrative | Operators run agentic jobs on their own Linux runners, on Kubernetes, or in air-gapped networks with mirrored actions and container images. |
+| GitHub App permissions | illustrative | A GitHub App installed on selected repositories mints short-lived scoped tokens, keeping the agent read-only and leaving writes to trusted safe-output jobs in each repository. |
+| OIDC token broker | illustrative | Experimental: a deployment-owned broker verifies a job's OIDC identity and returns a short-lived credential, so no long-lived secret is stored in the repository. |
 | Push SDLC | illustrative | A task arrives with its own squad of human-led AI agents that join the developer's repository, pair with them, then step back and leave their decisions behind. |
 | Connectors | illustrative | A connector declares everything a third-party service offers; a workflow imports it and selects only the reads and writes it needs. |
+| Webhook gateway | illustrative | Experimental: a hosted receiver authenticates external and GitHub events, matches declared subscriptions and dispatches verified batches to a workflow as untrusted input. |
 | Central Agentic Ops |  | Band header (Central Agentic Ops): gh cao, a research prototype for operating agentic workflows across many repositories. |
 | Hyperscale Agentics | illustrative | Research prototype: at enterprise scale every agent run reports into telemetry, an operations database and a session data lake, so fleets are managed from aggregates. |
 | Centralized campaigns | illustrative | Research prototype: a control repository installs and tracks campaigns that roll agentic processes out across an enterprise's repositories. |

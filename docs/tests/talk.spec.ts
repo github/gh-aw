@@ -350,6 +350,70 @@ test("keeps every key on the host side of the zero-secret agents diagram", async
   expect(errors).toEqual([]);
 });
 
+test("places the enterprise tracing, access and event slides beside their neighbours", async ({ page }) => {
+  expect(slideNo("Distributed tracing")).toBe(slideNo("OpenTelemetry") + 1);
+  expect(slideNo("GitHub App permissions")).toBe(slideNo("Operator-owned infrastructure") + 1);
+  expect(slideNo("OIDC token broker")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("Webhook gateway")).toBe(slideNo("Connectors") + 1);
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  const NEW: [string, string | null][] = [
+    ["Distributed tracing", null],
+    ["GitHub App permissions", null],
+    ["OIDC token broker", "Experimental"],
+    ["Webhook gateway", "Experimental"],
+  ];
+  for (const [heading, badge] of NEW) {
+    const n = slideNo(heading);
+    await page.goto(`/gh-aw/cracktro/#${n}`);
+    await expect(page.locator(".count")).toHaveText(at(n));
+    const slide = page.locator(".slide.active");
+    await expect(slide.locator("h2")).toHaveText(heading);
+    await expect(slide.locator(".xsv")).toBeVisible();
+    await expect(slide.locator(".xsv [data-s]").first()).toBeAttached();
+    if (badge) await expect(slide.locator(".xbadge")).toContainText(badge);
+    else await expect(slide.locator(".xbadge")).toHaveCount(0);
+  }
+  // Arrow navigation reaches the slide after each new one.
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Distributed tracing")}`);
+  await expect(page.locator(".count")).toHaveText(at(slideNo("Distributed tracing")));
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".slide.active h2")).toHaveText("GitHub-native governance");
+  expect(errors).toEqual([]);
+});
+
+test("keeps the frame loop running through the routed steps of the enterprise diagrams", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  for (const heading of ["Distributed tracing", "Webhook gateway"]) {
+    await page.goto(`/gh-aw/cracktro/#${slideNo(heading)}`);
+    await expect(page.locator(".slide.active h2")).toHaveText(heading);
+    await expect(page.locator(".slide.active .xsv [data-s='7'].on").first()).toBeAttached({ timeout: 12_000 });
+  }
+  expect(errors).toEqual([]);
+});
+
+test("steps the cost guardrails slide from execution controls to admission", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Cost guardrails")}`);
+  const slide = page.locator(".slide.active");
+  await expect(slide.locator("h2")).toHaveText("Cost guardrails");
+  await expect(slide.locator(".cg-node")).toHaveCount(5);
+  await expect(slide.locator(".cg-status b")).toHaveText(/EVENTS|THROTTLE/);
+  const expected = ["CHECKED|RUNNING", "NOTICE", "HARD STOP", "BLOCKED", "APPROVED", "DENIED"];
+  for (const label of expected) {
+    await page.keyboard.press("ArrowRight");
+    await expect(slide.locator(".cg-status b")).toHaveText(new RegExp(label), { timeout: 6000 });
+  }
+  await expect(slide.locator(".cg-run em")).toHaveText("ALLOWANCE 250");
+  await expect(slide.locator(".cg-mode.on b")).toHaveText("ADMIT");
+  await page.keyboard.press("ArrowLeft");
+  await expect(slide.locator(".cg-status b")).toHaveText("ADMISSION");
+  await expect(page.locator(".slide.active h2")).toHaveText("Cost guardrails");
+  expect(errors).toEqual([]);
+});
+
 test.describe("slides.md metadata", () => {
   const table = (...rows: string[]) => ["# Slides", "", "| Heading | Notes | Summary |", "|---|---|---|", ...rows, ""].join("\n");
 
