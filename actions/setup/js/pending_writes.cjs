@@ -1,0 +1,224 @@
+// @ts-check
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+const { AsyncLocalStorage } = require("node:async_hooks");
+const { validString, parseStrictJSON } = require("./work_queue_codec.cjs");
+const { readInput, describeDirectory, sha256, MAX_INPUT_BYTES } = require("./pending_writes_files.cjs");
+
+const SCHEMA = "gh-aw/pending-writes/v1";
+const activeWrite = new AsyncLocalStorage();
+
+/**
+ * Canonical JSON: UTF-16 lexicographic keys, ECMAScript finite-number spelling,
+ * array order retained, UTF-8, no whitespace or trailing newline.
+ * @param {unknown} value
+ * @param {number} [depth]
+ * @returns {string}
+ */
+function canonicalPendingJSON(value, depth = 0) {
+  if (depth > 64) throw new Error("Pending-write JSON exceeds the nesting limit");
+  if (value === null) return "null";
+  if (typeof value === "string") return JSON.stringify(validString(value));
+  if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(child => canonicalPendingJSON(child, depth + 1)).join(",")}]`;
+  if (!value || typeof value !== "object" || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new Error("Pending-write value must be JSON");
+  return `{${Object.keys(value)
+    .sort()
+    .map(key => `${JSON.stringify(validString(key))}:${canonicalPendingJSON(value[key], depth + 1)}`)
+    .join(",")}}`;
+}
+
+const inputDigest = value => sha256(canonicalPendingJSON(value));
+function parsePendingJSON(text) {
+  const parsed = JSON.parse(text);
+  return parseStrictJSON(text, { maxBytes: MAX_INPUT_BYTES, finiteNumbersIn: parsed && typeof parsed === "object" ? Object.keys(parsed) : [] });
+}
+function itemDigest(item) {
+  const { item_sha256, ...body } = item;
+  return inputDigest(body);
+}
+
+function pendingWritesEnabled() {
+  return process.env.GH_AW_PENDING_WRITES_REQUIRED === "true";
+}
+
+function integrityError(reason = "inputs_changed") {
+  return Object.assign(new Error(`Pending writes refused: ${reason}`), { code: "ERR_PENDING_WRITES", reason });
+}
+
+/**
+ * Load only the compiler-bound digest. Gate steps may edit the manifest but
+ * cannot bless it by rewriting a digest stored alongside the downloaded file.
+ */
+function readAuthorizedManifest(file = process.env.GH_AW_PENDING_WRITES, expected = process.env.GH_AW_PENDING_WRITES_SHA256) {
+  if (!file || !/^[0-9a-f]{64}$/.test(expected || "")) throw integrityError("manifest_missing");
+  let bytes;
+  try {
+    ({ bytes } = readInput(file));
+  } catch (cause) {
+    throw Object.assign(integrityError("manifest_missing"), { cause });
+  }
+  if (sha256(bytes) !== expected) throw integrityError();
+  const manifest = parsePendingJSON(bytes.toString("utf8"));
+  if (manifest.schema !== SCHEMA || manifest.complete !== true || !Array.isArray(manifest.items) || !Array.isArray(manifest.inputs) || canonicalPendingJSON(manifest) !== bytes.toString("utf8")) {
+    throw integrityError("manifest_incomplete");
+  }
+  const ids = new Set();
+  for (const item of manifest.items) {
+    if (item.complete !== true || typeof item.output_id !== "string" || ids.has(item.output_id) || item.item_sha256 !== itemDigest(item)) throw integrityError("manifest_invalid");
+    ids.add(item.output_id);
+  }
+  return manifest;
+}
+
+/** Recompute downloaded bytes, including missing/added files in inventories. */
+function assertManifestInputs(manifest, bindings) {
+  if (!Array.isArray(bindings) || bindings.length !== manifest.inputs.length) throw integrityError();
+  const described = bindings.map(binding => {
+    if (binding.kind === "directory") return { id: binding.id, kind: binding.kind, files: describeDirectory(binding.path) };
+    if (binding.kind === "value") return { id: binding.id, kind: binding.kind, sha256: inputDigest(binding.value) };
+    if (binding.kind !== "file") throw integrityError("manifest_invalid");
+    const { length, sha256: digest, mode } = readInput(binding.path);
+    return { id: binding.id, kind: binding.kind, length, sha256: digest, mode };
+  });
+  if (inputDigest(described) !== inputDigest(manifest.inputs)) throw integrityError();
+}
+
+/**
+ * Check all inputs immediately before handler creation and again at each
+ * handler invocation; raw content never becomes a verdict reason.
+ */
+function assertPendingWritesIntegrity() {
+  if (!pendingWritesEnabled()) return null;
+  const manifest = readAuthorizedManifest();
+  const bindings = parseStrictJSON(process.env.GH_AW_PENDING_WRITES_BINDINGS || "[]");
+  const { withoutCredentials } = require("./pending_writes_plan.cjs");
+  const handlerConfig = parsePendingJSON(process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG || "{}");
+  const configBinding = bindings.find(binding => binding.id === "handler_config");
+  if (!configBinding) throw integrityError("manifest_invalid");
+  configBinding.value = withoutCredentials(handlerConfig);
+  try {
+    assertManifestInputs(manifest, bindings);
+  } catch (cause) {
+    throw Object.assign(integrityError(), { cause });
+  }
+  return manifest;
+}
+
+/** @param {any} manifest @param {any} message @param {number} [index] */
+function findPendingItem(manifest, message, index = undefined) {
+  const digest = inputDigest(message);
+  const id = message.output_id || (index === undefined ? undefined : `so_${inputDigest([index, message]).slice(0, 12)}`);
+  const matches = manifest.items.filter(item => item.input_sha256 === digest && (id === undefined || item.output_id === id));
+  if (matches.length !== 1) throw integrityError("item_missing");
+  return matches[0];
+}
+
+/** @param {any} message @param {() => any} operation @param {number} [index] */
+async function withPendingWrite(message, operation, index = undefined) {
+  if (!pendingWritesEnabled()) return operation();
+  const manifest = assertPendingWritesIntegrity();
+  const item = findPendingItem(manifest, message, index);
+  return activeWrite.run(item, operation);
+}
+
+function pendingBranchSalt() {
+  return activeWrite.getStore()?.code?.branch_salt;
+}
+
+function currentPendingWrite() {
+  return activeWrite.getStore();
+}
+
+/** Validate the exact handler-resolved destination, not the agent's proposal. */
+function assertPendingTarget(target) {
+  if (!pendingWritesEnabled()) return;
+  const item = activeWrite.getStore();
+  if (!item) return;
+  for (const [key, value] of Object.entries(target)) {
+    if (value !== undefined && item.target[key] !== value) throw integrityError("target_changed");
+  }
+}
+
+/** Compare the list evaluated by the authoritative post-apply check. */
+function assertPendingCodeFiles(actualFiles) {
+  if (!pendingWritesEnabled()) return;
+  const item = activeWrite.getStore();
+  if (!item?.code?.complete) throw integrityError("code_plan_incomplete");
+  const expected = [...new Set(item.code.evaluated_paths)].sort();
+  if (inputDigest([...new Set(actualFiles)].sort()) !== inputDigest(expected)) throw integrityError("files_changed");
+}
+
+/** Signed-push API and git-push transports share this last publication check. */
+function assertPendingCodePublication({ owner, repo, branch, baseRef, cwd }) {
+  if (!pendingWritesEnabled()) return;
+  const item = activeWrite.getStore();
+  if (!item?.code?.complete) throw integrityError("code_plan_incomplete");
+  if (`${owner}/${repo}` !== (item.target.head_repository || item.target.repository) || branch !== item.target.branch) throw integrityError("target_changed");
+  const { execLocalGitSync } = require("./git_helpers.cjs");
+  const options = { cwd, timeout: 10000, maxBuffer: MAX_INPUT_BYTES };
+  const base = execLocalGitSync(["rev-parse", "--verify", `${baseRef}^{commit}`], options).trim();
+  if (item.code.base_commit && !base.startsWith(item.code.base_commit)) throw integrityError("base_changed");
+  const files = execLocalGitSync(["diff", "--name-only", "--no-renames", "-z", `${base}..HEAD`], options)
+    .split("\0")
+    .filter(Boolean);
+  assertPendingCodeFiles(files);
+}
+
+/**
+ * Downstream jobs compare their exact supplied artifact, record batch or
+ * directory against the entry bound to the safe_outputs job digest.
+ */
+function assertPendingPublication(job, id, supplied) {
+  if (!pendingWritesEnabled()) return;
+  const manifest = readAuthorizedManifest();
+  const matches = manifest.items.filter(item => item.target.job === job && item.publication?.id === id);
+  if (matches.length !== 1 || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
+}
+
+/** Compiler-owned check after authored gate steps. */
+async function verify(expected, options) {
+  try {
+    const { buildPendingWrites } = require("./pending_writes_plan.cjs");
+    const current = await buildPendingWrites(options);
+    const bytes = readInput(options.manifestPath).bytes;
+    if (current.sha256 !== expected || sha256(bytes) !== expected) return { allow: false, reason: "inputs_changed" };
+    return current.manifest.complete ? { allow: true, reason: "allowed", manifest: current.manifest } : { allow: false, reason: "manifest_incomplete" };
+  } catch {
+    return { allow: false, reason: "inputs_changed" };
+  }
+}
+
+/** @param {Record<string, any>} options */
+async function prepare(options) {
+  const { buildPendingWrites } = require("./pending_writes_plan.cjs");
+  const result = await buildPendingWrites(options);
+  fs.mkdirSync(path.dirname(options.manifestPath), { recursive: true });
+  fs.writeFileSync(options.manifestPath, result.bytes, { flag: "wx", mode: 0o600 });
+  return result;
+}
+
+module.exports = {
+  SCHEMA,
+  canonicalPendingJSON,
+  parsePendingJSON,
+  inputDigest,
+  itemDigest,
+  pendingWritesEnabled,
+  readAuthorizedManifest,
+  assertManifestInputs,
+  assertPendingWritesIntegrity,
+  findPendingItem,
+  withPendingWrite,
+  pendingBranchSalt,
+  currentPendingWrite,
+  assertPendingTarget,
+  assertPendingCodeFiles,
+  assertPendingCodePublication,
+  assertPendingPublication,
+  integrityError,
+  verify,
+  prepare,
+};

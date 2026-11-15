@@ -94,6 +94,44 @@ function extractPathsFromPatch(patchContent) {
 }
 
 /**
+ * Describe the same paths used by pre-apply protection, including both ends of
+ * renames/copies. Metadata comes from the transport's diff, not its prose.
+ * @param {string} patchContent
+ */
+function describePatchFiles(patchContent) {
+  const evaluatedPaths = extractPathsFromPatch(patchContent);
+  const entries = extractDiffGitHeaderEntries(patchContent);
+  const files = entries.map((entry, index) => {
+    const section = patchContent.slice(entry.headerIndex, entries[index + 1]?.headerIndex ?? patchContent.length);
+    const oldMode = section.match(/^(?:old mode|deleted file mode) ([0-7]{6})$/m)?.[1] || section.match(/^index [0-9a-f]+\.\.[0-9a-f]+ ([0-7]{6})$/m)?.[1] || null;
+    const newMode = section.match(/^(?:new mode|new file mode) ([0-7]{6})$/m)?.[1] || section.match(/^index [0-9a-f]+\.\.[0-9a-f]+ ([0-7]{6})$/m)?.[1] || null;
+    const status = /^rename from /m.test(section) ? "renamed" : /^copy from /m.test(section) ? "copied" : /^new file mode /m.test(section) ? "added" : /^deleted file mode /m.test(section) ? "deleted" : "modified";
+    let additions = 0;
+    let deletions = 0;
+    let inHunk = false;
+    for (const line of section.split("\n")) {
+      if (line.startsWith("@@")) inHunk = true;
+      else if (line === "-- ") inHunk = false;
+      else if (inHunk && line.startsWith("+")) additions++;
+      else if (inHunk && line.startsWith("-")) deletions++;
+    }
+    return {
+      path: status === "deleted" ? entry.oldPath : entry.newPath,
+      previous_path: status === "renamed" || status === "copied" ? entry.oldPath : null,
+      status,
+      old_mode: oldMode,
+      new_mode: newMode,
+      mode_changed: oldMode !== newMode,
+      binary: /^(?:GIT binary patch|Binary files .* differ)$/m.test(section),
+      submodule: oldMode === "160000" || newMode === "160000",
+      additions,
+      deletions,
+    };
+  });
+  return { files, evaluated_paths: evaluatedPaths };
+}
+
+/**
  * Checks whether any files modified in the patch match the given list of manifest file names.
  * Matching is done by file basename only (no path comparison).
  *
@@ -285,6 +323,7 @@ function checkFileProtection(patchContent, config) {
  * @returns {{ action: 'allow' } | { action: 'deny', source: 'allowlist'|'protected'|'post-apply', files: string[] } | { action: 'fallback', files: string[] } | { action: 'request_review', files: string[] }}
  */
 function checkFileProtectionPostApply(actualFiles, config) {
+  require("./pending_writes.cjs").assertPendingCodeFiles(actualFiles);
   if (!actualFiles || actualFiles.length === 0) {
     return { action: "allow" };
   }
@@ -360,6 +399,7 @@ function checkFileProtectionPostApply(actualFiles, config) {
 module.exports = {
   extractFilenamesFromPatch,
   extractPathsFromPatch,
+  describePatchFiles,
   checkForManifestFiles,
   checkForProtectedPaths,
   checkForTopLevelDotFolders,
