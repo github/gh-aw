@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 )
 
 func (c *Compiler) addPendingCallVerificationJob(data *WorkflowData, call *Job, publication pendingWritePublication) error {
@@ -14,7 +15,7 @@ func (c *Compiler) addPendingCallVerificationJob(data *WorkflowData, call *Job, 
 		"      - name: Download authorized write decisions\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
 		"        with:\n",
-		"          name: write-decisions\n",
+		"          name: "+artifactPrefixExprForDownstreamJob(data)+"write-decisions\n",
 		"          path: /tmp/gh-aw/\n")
 	encoded, err := json.Marshal(publication)
 	if err != nil {
@@ -42,9 +43,7 @@ func (c *Compiler) addPendingCallVerificationJob(data *WorkflowData, call *Job, 
 			"pending_writes_item_sha256": "${{ steps.verify_pending_call.outputs.pending_writes_item_sha256 }}",
 		},
 	}
-	for key, value := range call.Env {
-		verification.Env[key] = value
-	}
+	maps.Copy(verification.Env, call.Env)
 	call.Env = nil
 	if err := c.jobManager.AddJob(verification); err != nil {
 		return fmt.Errorf("adding workflow call verification: %w", err)

@@ -119,6 +119,7 @@ func TestPendingWriteCallHasVerifiedImmutableInputs(t *testing.T) {
 		If:   "needs.safe_outputs.outputs.call_workflow_name == 'worker'",
 		With: map[string]any{"payload": "${{ needs.safe_outputs.outputs.call_workflow_payload }}"},
 	}
+
 	require.NoError(t, compiler.jobManager.AddJob(call))
 	require.NoError(t, compiler.guardPendingWritePublications(data, true, map[string]struct{}{"call-worker": {}}))
 	verification, exists := compiler.jobManager.GetJob("verify-pending-call-worker")
@@ -130,4 +131,50 @@ func TestPendingWriteCallHasVerifiedImmutableInputs(t *testing.T) {
 	require.Contains(t, call.If, "outputs.pending_writes_verified == 'true'")
 	require.Nil(t, call.Env)
 	require.Equal(t, "${{ needs.safe_outputs.outputs.call_workflow_payload }}", call.With["payload"])
+}
+
+func TestPendingWriteInvocationReusesNativeWriterLimits(t *testing.T) {
+	compiler := NewCompiler()
+	data := pendingWriteTestData(t, compiler)
+	memory := data.RepoMemoryConfig.Memories[0]
+	memory.MaxFileCount = 17
+	memory.FileGlob = []string{"*.json"}
+	memory.AllowedExtensions = []string{".json"}
+	data.RepoMemoryConfig.Memories[0] = memory
+	native := compiler.buildSinglePushRepoMemoryStep(data, memory, true, true)
+	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: pushRepoMemoryJobName, Steps: []string{native}}))
+	spec := buildPendingWriteSpec(data)
+	require.NoError(t, compiler.freezePendingInvocations(&spec))
+	var invocation *pendingWriteInvocation
+	for _, publication := range spec.Publications {
+		if publication.Job == pushRepoMemoryJobName {
+			invocation = publication.Invocation
+		}
+	}
+	require.NotNil(t, invocation)
+	require.Equal(t, "push_repo_memory.cjs", invocation.Module)
+	require.Equal(t, "17", invocation.Env["MAX_FILE_COUNT"])
+	require.Equal(t, "*.json", invocation.Env["FILE_GLOB_FILTER"])
+	require.Equal(t, memory.ID, invocation.Env["MEMORY_ID"])
+	require.Equal(t, "repo_memory:"+memory.ID, invocation.PathEnv["ARTIFACT_DIR"])
+	require.NotContains(t, invocation.Env, "GH_TOKEN")
+}
+
+func TestPendingWriteArtifactsIsolateReusableInvocations(t *testing.T) {
+	compiler := NewCompiler()
+	data := pendingWriteTestData(t, compiler)
+	data.On = "on:\n  workflow_call:\n"
+	uploads := strings.Join(compiler.buildPendingWritesUploadSteps(data), "")
+	for _, name := range []string{pendingWritesArtifactName, "pending-write-inputs", "write-decisions"} {
+		require.Contains(t, uploads, "name: ${{ needs.agent.outputs.artifact_prefix }}"+name)
+	}
+	require.Contains(t, strings.Join(compiler.pendingWritesDownloadSteps(data), ""), "name: ${{ needs.activation.outputs.artifact_prefix }}"+pendingWritesArtifactName)
+	for _, name := range []string{"agent", "activation", "safe_outputs"} {
+		require.NoError(t, compiler.jobManager.AddJob(&Job{Name: name, Steps: []string{"      - run: echo ready\n"}}))
+	}
+	writer := &Job{Name: "publish", Needs: []string{"safe_outputs"}, Steps: []string{"      - name: Publish\n        env:\n          GH_AW_AGENT_OUTPUT: /tmp/input.json\n        run: echo publish\n"}}
+	require.NoError(t, compiler.jobManager.AddJob(writer))
+	require.NoError(t, compiler.guardPendingWritePublications(data, true, map[string]struct{}{"publish": {}}))
+	require.Contains(t, writer.Needs, "activation")
+	require.Contains(t, strings.Join(writer.Steps, ""), "name: ${{ needs.activation.outputs.artifact_prefix }}write-decisions")
 }

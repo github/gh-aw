@@ -51,10 +51,13 @@ Read the issue.
 			indices[id] = index
 		}
 	}
-	for _, id := range []string{"initialize_write_gate", "check_policy", "write_gate", "safe-outputs-app-token", "process_safe_outputs"} {
+	for _, id := range []string{"initialize_write_gate", "pending_writes", "check_policy", "verify_pending_writes", "write_gate", "safe-outputs-app-token", "process_safe_outputs"} {
 		require.Contains(t, indices, id)
 	}
 	require.Less(t, indices["initialize_write_gate"], indices["check_policy"])
+	require.Less(t, indices["pending_writes"], indices["check_policy"])
+	require.Less(t, indices["check_policy"], indices["verify_pending_writes"])
+	require.Less(t, indices["verify_pending_writes"], indices["write_gate"])
 	require.Less(t, indices["check_policy"], indices["write_gate"])
 	require.Less(t, indices["write_gate"], indices["safe-outputs-app-token"])
 	require.Less(t, indices["safe-outputs-app-token"], indices["process_safe_outputs"])
@@ -65,6 +68,14 @@ Read the issue.
 		require.Contains(t, condition, "steps.write_gate.outputs.write_gate == 'partial'")
 	}
 	require.Equal(t, "always()", steps[indices["write_gate"]].(map[string]any)["if"])
+	require.Equal(t, "always()", steps[indices["verify_pending_writes"]].(map[string]any)["if"])
+	prepared := steps[indices["pending_writes"]].(map[string]any)["env"].(map[string]any)
+	require.Equal(t, pendingWritesPath, prepared["GH_AW_PENDING_WRITES"])
+	verified := steps[indices["verify_pending_writes"]].(map[string]any)["env"].(map[string]any)
+	require.Equal(t, "${{ steps.pending_writes.outputs.sha256 }}", verified["GH_AW_PENDING_WRITES_SHA256"])
+	handled := steps[indices["process_safe_outputs"]].(map[string]any)["env"].(map[string]any)
+	require.Equal(t, "${{ steps.pending_writes.outputs.sha256 }}", handled["GH_AW_PENDING_WRITES_SHA256"])
+	require.Equal(t, "${{ steps.write_gate.outputs.write_gate_decisions_sha256 }}", handled["GH_AW_WRITE_GATE_DECISIONS_SHA256"])
 	require.Contains(t, job["outputs"].(map[string]any)["write_gate"], "|| 'deny'")
 }
 

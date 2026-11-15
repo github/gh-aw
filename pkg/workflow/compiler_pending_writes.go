@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/goccy/go-yaml"
 )
 
 const pendingWritesPath = "/tmp/gh-aw/pending-writes.json"
 const pendingWritesArtifactName = "pending-writes"
+const pendingLaterDecisionsPath = "/tmp/gh-aw/write-decisions.normalized.json"
 
 type pendingWriteTransport struct {
 	ID         string `json:"id"`
@@ -25,17 +25,18 @@ type pendingWriteTransport struct {
 }
 
 type pendingWritePublication struct {
-	ID         string `json:"id"`
-	Job        string `json:"job"`
-	Type       string `json:"type"`
-	Kind       string `json:"kind"`
-	BindingID  string `json:"binding_id,omitempty"`
-	Path       string `json:"path,omitempty"`
-	Branch     string `json:"branch,omitempty"`
-	Repository string `json:"repository,omitempty"`
-	Worker     string `json:"worker,omitempty"`
-	StorageKey string `json:"storage_key,omitempty"`
-	DriveName  string `json:"drive_name,omitempty"`
+	ID         string                  `json:"id"`
+	Job        string                  `json:"job"`
+	Type       string                  `json:"type"`
+	Kind       string                  `json:"kind"`
+	BindingID  string                  `json:"binding_id,omitempty"`
+	Path       string                  `json:"path,omitempty"`
+	Branch     string                  `json:"branch,omitempty"`
+	Repository string                  `json:"repository,omitempty"`
+	Worker     string                  `json:"worker,omitempty"`
+	StorageKey string                  `json:"storage_key,omitempty"`
+	DriveName  string                  `json:"drive_name,omitempty"`
+	Invocation *pendingWriteInvocation `json:"invocation,omitempty"`
 }
 
 type pendingWriteSpec struct {
@@ -49,90 +50,16 @@ type pendingWriteSpec struct {
 func buildPendingWriteSpec(data *WorkflowData) pendingWriteSpec {
 	spec := pendingWriteSpec{Bindings: []pendingWriteTransport{}, Publications: []pendingWritePublication{}, CustomTypes: []string{}, DetectionEnabled: IsDetectionJobEnabled(data.SafeOutputs), DetectionMode: "block"}
 	prefix := artifactPrefixExprForAgentDownstreamJob(data)
-	addDirectory := func(id, job, kind, artifact, directory, repository, branch string) {
-		spec.Bindings = append(spec.Bindings, pendingWriteTransport{ID: id, Kind: "directory", Path: directory, Artifact: artifact, Job: job, Branch: branch, Repository: repository})
-		spec.Publications = append(spec.Publications, pendingWritePublication{ID: id, Job: job, Type: kind, Kind: "directory", BindingID: id, Path: directory, Repository: repository, Branch: branch})
-	}
-	if data.RepoMemoryConfig != nil {
-		for _, memory := range data.RepoMemoryConfig.Memories {
-			repository := memory.TargetRepo
-			if repository == "" {
-				repository = "${{ github.repository }}"
-			}
-			if memory.Wiki {
-				repository += ".wiki"
-			}
-			addDirectory("repo_memory:"+memory.ID, pushRepoMemoryJobName, "repo_memory", prefix+"repo-memory-"+SanitizeWorkflowIDForCacheKey(memory.ID), constants.TmpRepoMemoryDir+memory.ID, repository, memory.BranchName)
-			spec.Publications[len(spec.Publications)-1].ID = memory.ID
-		}
-	}
-	if data.CacheMemoryConfig != nil {
-		for _, cache := range data.CacheMemoryConfig.Caches {
-			if cache.RestoreOnly {
-				continue
-			}
-			artifact := prefix + "cache-memory"
-			if cache.ID != "default" {
-				artifact += "-" + cache.ID
-			}
-			addDirectory("cache_memory:"+cache.ID, updateCacheMemoryJobName, "cache_memory", artifact, cacheMemoryDirFor(cache.ID), "", "")
-			var githubConfig *GitHubToolConfig
-			if data.ParsedTools != nil {
-				githubConfig = data.ParsedTools.GitHub
-			}
-			key := computeIntegrityCacheKey(cache, githubConfig)
-			if !strings.HasSuffix(key, "-${{ github.run_id }}") {
-				key += "-${{ github.run_id }}"
-			}
-			spec.Publications[len(spec.Publications)-1].StorageKey = key
-		}
-	}
-	if data.DriveMemoryConfig != nil {
-		for _, drive := range data.DriveMemoryConfig.Drives {
-			if drive.RestoreOnly {
-				continue
-			}
-			addDirectory("drive_memory:"+drive.ID, updateDriveMemoryJobName, "drive_memory", generateDriveMemoryArtifactName(data, drive.ID), "/tmp/gh-aw/pending-drive/"+drive.ID, "", "")
-			spec.Publications[len(spec.Publications)-1].DriveName = drive.DriveName
-		}
-	}
+	spec.addPendingMemorySpec(data, prefix)
+	spec.addPendingCacheSpec(data, prefix)
+	spec.addPendingDriveSpec(data)
 	if data.Evals != nil && data.Evals.HasEvals() {
-		addDirectory("evals", pushEvalsStateJobName, "evals_state", prefix+constants.EvalsArtifactName.String(), evalsStateDir, "", evalsBranchName(data.WorkflowID))
+		spec.addPendingDirectory(pendingWritePublication{ID: "evals", Job: pushEvalsStateJobName, Type: "evals_state", Kind: "directory", BindingID: "evals", Path: evalsStateDir, Branch: evalsBranchName(data.WorkflowID)}, prefix+constants.EvalsArtifactName.String())
 	}
 	if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
 		spec.Publications = append(spec.Publications, pendingWritePublication{ID: "transactions", Job: pushLedgerChangesJobName, Type: "ledger", Kind: "ledger", Path: ledgerTransactionsArtifactPath})
 	}
-	if data.SafeOutputs == nil {
-		return spec
-	}
-	if data.SafeOutputs.UploadAssets != nil {
-		addDirectory("assets", "upload_assets", "upload_asset", prefix+"safe-outputs-assets", constants.TmpGhAwAssetsDir, "", data.SafeOutputs.UploadAssets.BranchName)
-	}
-	if data.SafeOutputs.UploadArtifact != nil {
-		spec.Bindings = append(spec.Bindings, pendingWriteTransport{ID: "upload_artifacts", Kind: "directory", Path: artifactStagingDirExpr, Artifact: prefix + SafeOutputsUploadArtifactStagingArtifactName})
-	}
-	if data.SafeOutputs.UploadCodeCoverage != nil {
-		addDirectory("coverage", "upload_code_coverage", "upload_code_coverage", prefix+SafeOutputsUploadCodeCoverageStagingArtifactName, codeCoverageDownloadPath, "", "")
-	}
-	if data.SafeOutputs.CreateCodeScanningAlerts != nil {
-		spec.Publications = append(spec.Publications, pendingWritePublication{ID: "sarif", Job: "upload_code_scanning_sarif", Type: "create_code_scanning_alert", Kind: "sarif", Path: constants.SarifArtifactDownloadPath.String() + "/" + constants.SarifFileName.String()})
-	}
-	if data.SafeOutputs.CallWorkflow != nil {
-		for _, worker := range data.SafeOutputs.CallWorkflow.Workflows {
-			spec.Publications = append(spec.Publications, pendingWritePublication{ID: worker, Job: "call-" + sanitizeJobName(worker), Type: "call_workflow", Kind: "call", Worker: worker})
-		}
-	}
-	for name := range data.SafeOutputs.Jobs {
-		normalized := stringutil.NormalizeSafeOutputIdentifier(name)
-		spec.CustomTypes = append(spec.CustomTypes, normalized)
-		spec.Publications = append(spec.Publications, pendingWritePublication{ID: normalized, Job: normalized, Type: "custom_job", Kind: "file", BindingID: "agent_output", Path: SafeJobsDownloadDirExpr + constants.AgentOutputFilename.String()})
-	}
-	for name := range data.SafeOutputs.Scripts {
-		spec.CustomTypes = append(spec.CustomTypes, stringutil.NormalizeSafeOutputIdentifier(name))
-	}
-	for name := range data.SafeOutputs.Actions {
-		spec.CustomTypes = append(spec.CustomTypes, stringutil.NormalizeSafeOutputIdentifier(name))
-	}
+	spec.addPendingSafeOutputSpec(data, prefix)
 	slices.Sort(spec.CustomTypes)
 	slices.SortFunc(spec.Publications, func(a, b pendingWritePublication) int { return strings.Compare(a.Job+"\x00"+a.ID, b.Job+"\x00"+b.ID) })
 	return spec
@@ -146,6 +73,7 @@ func (c *Compiler) pendingWritesRuntimeEnv(data *WorkflowData) ([]string, error)
 	steps := []string{
 		"          GH_AW_AGENT_OUTPUT: /tmp/gh-aw/agent_output.json\n",
 		"          GH_AW_PENDING_WRITES: " + pendingWritesPath + "\n",
+		"          GH_AW_PENDING_WRITE_INPUTS: /tmp/gh-aw/pending-write-inputs\n",
 		fmt.Sprintf("          GH_AW_PENDING_WRITES_SPEC: %q\n", specJSON),
 		"          GITHUB_REPOSITORY: ${{ github.repository }}\n",
 		"          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}\n",
@@ -222,22 +150,31 @@ func (c *Compiler) buildPendingWritesPreparationSteps(data *WorkflowData, enable
 	return steps, nil
 }
 
-func (c *Compiler) buildPendingWritesUploadSteps() []string {
+func (c *Compiler) buildPendingWritesUploadSteps(data *WorkflowData) []string {
+	prefix := artifactPrefixExprForAgentDownstreamJob(data)
 	return []string{
 		"      - name: Upload pending-write manifest\n",
-		"        if: always() && steps.pending_writes.outputs.sha256 != ''\n",
+		"        if: always() && steps.verify_pending_writes.outputs.allowed == 'true'\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
-		"          name: " + pendingWritesArtifactName + "\n",
-		"          path: " + pendingWritesPath + "\n",
+		"          name: " + prefix + pendingWritesArtifactName + "\n",
+		"          path: /tmp/gh-aw/pending-write-inputs/pending-writes.json\n",
 		"          retention-days: 7\n",
 		"          if-no-files-found: error\n",
 		"      - name: Upload frozen pending-write inputs\n",
-		"        if: always() && steps.pending_writes.outputs.pending_write_inputs_sha256 != ''\n",
+		"        if: always() && steps.verify_pending_writes.outputs.allowed == 'true'\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
-		"          name: pending-write-inputs\n",
+		"          name: " + prefix + "pending-write-inputs\n",
 		"          path: /tmp/gh-aw/pending-write-inputs/\n",
+		"          retention-days: 7\n",
+		"          if-no-files-found: error\n",
+		"      - name: Upload normalized write decisions\n",
+		"        if: always() && steps.write_gate.outputs.write_gate_decisions_sha256 != ''\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		"        with:\n",
+		"          name: " + prefix + "write-decisions\n",
+		"          path: " + pendingNormalizedDecisionsPath + "\n",
 		"          retention-days: 7\n",
 		"          if-no-files-found: error\n",
 	}
@@ -248,14 +185,14 @@ func (c *Compiler) pendingWritesDownloadSteps(data *WorkflowData) []string {
 		"      - name: Download authorized pending writes\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
 		"        with:\n",
-		"          name: " + pendingWritesArtifactName + "\n",
+		"          name: " + artifactPrefixExprForDownstreamJob(data) + pendingWritesArtifactName + "\n",
 		"          path: /tmp/gh-aw/\n",
 	}
 }
 
 func pendingPublicationForStep(publications []pendingWritePublication, step map[string]any, job string) (pendingWritePublication, bool) {
-	name, _ := step["name"].(string)
-	uses, _ := step["uses"].(string)
+	name := pendingStepString(step, "name")
+	uses := pendingStepString(step, "uses")
 	for _, publication := range publications {
 		if publication.Job != job {
 			continue
@@ -275,8 +212,8 @@ func pendingPublicationForStep(publications []pendingWritePublication, step map[
 				return publication, true
 			}
 		default:
-			env, _ := step["env"].(map[string]any)
-			if strings.Contains(name, "Upload") || strings.Contains(name, "Push evals") || strings.Contains(name, "Reconcile and push ledger") || (job == publication.ID && env["GH_AW_AGENT_OUTPUT"] != nil) {
+			env := pendingStepEnv(step)
+			if step["id"] == job || strings.Contains(name, "Upload") || strings.Contains(name, "Push evals") || strings.Contains(name, "Reconcile and push ledger") || (job == publication.ID && env["GH_AW_AGENT_OUTPUT"] != nil) {
 				return publication, true
 			}
 		}
@@ -285,7 +222,7 @@ func pendingPublicationForStep(publications []pendingWritePublication, step map[
 }
 
 // Resolve Actions first, then bind every emitted publication step to its input.
-func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled bool, publications map[string]struct{}) error {
+func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled bool, publications map[string]struct{}) error { //nolint:largefunc // Publication lowering preserves step order and performs one coherent guarded rewrite per job.
 	if !enabled {
 		return nil
 	}
@@ -294,6 +231,9 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 		safeJob.Needs = append(safeJob.Needs, "evals")
 	}
 	spec := buildPendingWriteSpec(data)
+	if err := c.freezePendingInvocations(&spec); err != nil {
+		return err
+	}
 	names := make([]string, 0, len(publications))
 	for name := range publications {
 		names = append(names, name)
@@ -307,13 +247,16 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 		if !exists {
 			continue
 		}
+		if hasWorkflowCallTrigger(data.On) && !slices.Contains(job.Needs, "activation") {
+			job.Needs = append(job.Needs, "activation")
+		}
 		if job.Env == nil {
 			job.Env = map[string]string{}
 		}
 		job.Env["GH_AW_PENDING_WRITES_REQUIRED"] = "true"
 		job.Env["GH_AW_PENDING_WRITES"] = pendingWritesPath
 		job.Env["GH_AW_PENDING_WRITES_SHA256"] = "${{ needs.safe_outputs.outputs.pending_writes_sha256 }}"
-		job.Env["GH_AW_WRITE_GATE_DECISIONS"] = "/tmp/gh-aw/write-decisions.normalized.json"
+		job.Env["GH_AW_WRITE_GATE_DECISIONS"] = pendingLaterDecisionsPath
 		job.Env["GH_AW_WRITE_GATE_DECISIONS_SHA256"] = "${{ needs.safe_outputs.outputs.write_gate_decisions_sha256 }}"
 		if job.Uses != "" {
 			var publication *pendingWritePublication
@@ -341,8 +284,8 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 		var steps []string
 		hasSetup := false
 		for _, step := range parsed.Steps {
-			uses, _ := step["uses"].(string)
-			run, _ := step["run"].(string)
+			uses := pendingStepString(step, "uses")
+			run := pendingStepString(step, "run")
 			if step["id"] == "setup" && (uses == c.resolveActionReference("./actions/setup", data) || strings.Contains(run, "actions/setup/setup.sh")) {
 				hasSetup = true
 			}
@@ -355,7 +298,7 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 			}
 		}
 		steps = append(steps, c.pendingWritesDownloadSteps(data)...)
-		steps = append(steps, "      - name: Download authorized write decisions\n", fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")), "        with:\n", "          name: write-decisions\n", "          path: /tmp/gh-aw/\n")
+		steps = append(steps, "      - name: Download authorized write decisions\n", fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")), "        with:\n", "          name: "+artifactPrefixExprForDownstreamJob(data)+"write-decisions\n", "          path: /tmp/gh-aw/\n")
 		checked := false
 		var checkIDs []string
 		for index, step := range parsed.Steps {
@@ -368,6 +311,16 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 					return fmt.Errorf("encoding pending publication %s: %w", publication.ID, err)
 				}
 				steps = append(steps, "      - name: Verify pending-write publication inputs\n", "        id: "+id+"\n", fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)), "        env:\n", fmt.Sprintf("          GH_AW_PENDING_PUBLICATION: %q\n", publicationJSON))
+				if publication.Invocation != nil {
+					envNames := make([]string, 0, len(publication.Invocation.Env))
+					for name := range publication.Invocation.Env {
+						envNames = append(envNames, name)
+					}
+					slices.Sort(envNames)
+					for _, name := range envNames {
+						steps = append(steps, fmt.Sprintf("          %s: %q\n", name, publication.Invocation.Env[name]))
+					}
+				}
 				if inputs, ok := step["with"].(map[string]any); ok {
 					if key, exists := inputs["key"]; exists {
 						steps = append(steps, fmt.Sprintf("          GH_AW_PENDING_STORAGE_KEY: %q\n", fmt.Sprint(key)))
@@ -389,7 +342,7 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 				}
 				step["if"] = condition
 				if name == publication.ID {
-					env, _ := step["env"].(map[string]any)
+					env := pendingStepEnv(step)
 					env["GH_AW_AGENT_OUTPUT"] = publication.Path
 				}
 				if job.Outputs == nil {

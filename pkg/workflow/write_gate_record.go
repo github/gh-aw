@@ -96,6 +96,9 @@ func (c *Compiler) addWriteGateRecordSteps(data *WorkflowData) error {
           GH_AW_WRITE_GATE_HEAD_SHA: ${{ github.sha }}
           GH_AW_WRITE_GATE_WORKFLOW_SHA: ${{ github.workflow_sha }}
           GH_AW_WRITE_GATE_WORKFLOW_REF: ${{ github.workflow_ref }}
+          GH_AW_PENDING_WRITES_SHA256: ${{ needs.safe_outputs.outputs.pending_writes_sha256 }}
+          GH_AW_WRITE_GATE_DECISIONS_SHA256: ${{ needs.safe_outputs.outputs.write_gate_decisions_sha256 }}
+          GH_AW_PENDING_WRITE_INPUTS_SHA256: ${{ needs.safe_outputs.outputs.pending_write_inputs_sha256 }}
         with:
           script: |
             const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');

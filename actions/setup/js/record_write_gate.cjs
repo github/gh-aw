@@ -39,7 +39,7 @@ function buildWriteGateRecord(env = process.env) {
   const result = env.GH_AW_WRITE_GATE_JOB_RESULT || "unknown";
   const verdict = env.GH_AW_WRITE_GATE;
   const validVerdict = ["allow", "deny", "partial"].includes(verdict || "");
-  return {
+  const record = {
     version: 1,
     repository,
     run_id: runId,
@@ -51,6 +51,18 @@ function buildWriteGateRecord(env = process.env) {
     verdict: validVerdict ? verdict : "deny",
     reason: validVerdict ? env.GH_AW_WRITE_GATE_REASON || "unspecified" : "gate_unavailable",
   };
+  for (const [field, name] of [
+    ["pending_writes_sha256", "GH_AW_PENDING_WRITES_SHA256"],
+    ["write_decisions_sha256", "GH_AW_WRITE_GATE_DECISIONS_SHA256"],
+    ["pending_write_inputs_sha256", "GH_AW_PENDING_WRITE_INPUTS_SHA256"],
+  ]) {
+    const digest = env[name];
+    if (digest) {
+      if (!/^[a-f0-9]{64}$/.test(digest)) throw new Error(`${ERR_VALIDATION}: Invalid write-gate input integrity pin`);
+      record[field] = digest;
+    }
+  }
+  return record;
 }
 
 async function main() {

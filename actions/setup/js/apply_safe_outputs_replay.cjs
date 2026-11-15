@@ -149,8 +149,10 @@ async function getReplayPolicy(runId, owner, repo) {
 function validateReplayWriteGateRecord(record, identity) {
   if (!record || typeof record !== "object" || Array.isArray(record)) throw new Error(`${ERR_VALIDATION}: Missing recorded write gate verdict; refusing replay`);
   const fields = ["version", "repository", "run_id", "run_attempt", "head_sha", "workflow_sha", "workflow_ref", "safe_outputs_result", "verdict", "reason"];
-  if (Object.keys(record).length !== fields.length || fields.some(key => !Object.hasOwn(record, key))) throw new Error(`${ERR_VALIDATION}: Malformed recorded write gate verdict; refusing replay`);
+  const pins = ["pending_writes_sha256", "write_decisions_sha256", "pending_write_inputs_sha256", "safe_output_items_sha256"];
+  if (Object.keys(record).some(key => ![...fields, ...pins].includes(key)) || fields.some(key => !Object.hasOwn(record, key))) throw new Error(`${ERR_VALIDATION}: Malformed recorded write gate verdict; refusing replay`);
   const value = Object.fromEntries(Object.entries(record));
+  if (pins.some(key => Object.hasOwn(value, key) && (typeof value[key] !== "string" || !/^[a-f0-9]{64}$/.test(value[key])))) throw new Error(`${ERR_VALIDATION}: Malformed recorded write gate integrity pin; refusing replay`);
   if (
     value.version !== 1 ||
     value.repository !== identity.repository ||
