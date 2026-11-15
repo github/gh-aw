@@ -77,6 +77,11 @@ open the full prompt in a phone-style dialog (Escape or Done closes it).
 Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
 1200x630 render of the title slide; regenerate it if the title slide changes.
 
+The [daily Cracktro maintainer](../.github/workflows/daily-cracktro-maintainer.md)
+uses `copilot/claude-opus-5.5` to check for missing shipped features and outdated
+content. It proposes one focused draft PR after local browser checks, waits
+while its previous PR is open, and leaves historical data snapshots intact.
+
 Examples, review activity, repository counts, and cost figures are synthetic,
 except the model routing slide's results, which are measured on this
 repository's own workflows, the Issues as intent slide's counts of
