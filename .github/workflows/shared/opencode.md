@@ -242,6 +242,38 @@ engine:
           onStdoutLine: handleEvent,
           runtimeGuard: { shouldTerminate: () => ({ terminate: maxTurnsHit, reason: "OpenCode max-turns limit reached" }), pollIntervalMs: 100 },
         };
+        const exportSessionRecords = async () => {
+          const exported = await new Promise((resolve, reject) => {
+            execFile(command, ["session", "export", "--standalone", sessionID], {
+              env: runtimeEnv,
+              cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || undefined,
+              timeout: 60000,
+              maxBuffer: 64 * 1024 * 1024,
+            }, (error, stdout) => {
+              if (error) {
+                const diagnostics = [];
+                if (Number.isSafeInteger(error.code) || (typeof error.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code))) diagnostics.push(`code=${error.code}`);
+                if (typeof error.signal === "string" && /^SIG[A-Z0-9]{1,16}$/.test(error.signal)) diagnostics.push(`signal=${error.signal}`);
+                if (error.killed === true) diagnostics.push("killed=true");
+                const detail = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
+                return reject(new Error(`Unable to export the OpenCode session for step reconciliation${detail}`, { cause: error }));
+              }
+              try { resolve(JSON.parse(stdout)); } catch {
+                reject(new Error("Failed to parse the OpenCode session export"));
+              }
+            });
+          });
+          return getOpenCodeSessionSteps(exported, sessionID);
+        };
+        const writeSessionRecords = records => {
+          for (const entry of records) {
+            if (entry.type === "step_finish") {
+              const observedPart = finishedMessageParts.get(JSON.stringify([entry.sessionID, entry.part.messageID]));
+              if (observedPart) entry.part = { ...entry.part, id: observedPart.id, messageID: observedPart.messageID };
+            }
+            process.stdout.write(JSON.stringify(entry) + "\n");
+          }
+        };
         let result = await runProcess({
           ...runOptions,
           args: [...commandArgs, "--model", `awf-proxy/${model}`],
@@ -249,11 +281,31 @@ engine:
           attempt: 0,
           stdin: prompt,
         });
+        let reconciledRecords;
         for (let nudge = 1; nudge <= 2; nudge++) {
           if (result.exitCode !== 0 || maxTurnsHit || hasSafeOutputs() || !sessionID) break;
+          let remainingTurns;
+          if (maxTurns !== undefined) {
+            reconciledRecords = await exportSessionRecords();
+            const completedSteps = reconciledRecords.filter(entry => entry.type === "step_finish").length;
+            if (!completedSteps) throw new Error("OpenCode session export contains no completed model steps");
+            turns = Math.max(turns, completedSteps);
+            if (turns >= maxTurns) {
+              maxTurnsHit = true;
+              break;
+            }
+            remainingTurns = maxTurns - turns;
+          }
           log(`No safe output yet, continuing the session (nudge ${nudge} of 2)`);
           result = await runProcess({
             ...runOptions,
+            env: remainingTurns === undefined ? runtimeEnv : {
+              ...runtimeEnv,
+              OPENCODE_CONFIG_CONTENT: JSON.stringify({
+                ...config,
+                agents: { ...config.agents, build: { ...config.agents.build, steps: remainingTurns } },
+              }),
+            },
             args: [...commandArgs, "--session", sessionID],
             logArgs: [...commandArgs, "--session", "(continued session)"],
             attempt: nudge,
@@ -261,6 +313,7 @@ engine:
           });
         }
         if (maxTurnsHit) {
+          if (reconciledRecords) writeSessionRecords(reconciledRecords);
           process.stdout.write(JSON.stringify({ type: "opencode.max_turns", timestamp: Date.now(), data: { maxTurns } }) + "\n");
           throw new Error("OpenCode max-turns limit reached");
         }
@@ -277,36 +330,10 @@ engine:
         }
         if (reportedError) throw new Error("OpenCode reported an error despite exiting with code 0");
         if (!sessionID) throw new Error("OpenCode produced no session events");
-        const exported = await new Promise((resolve, reject) => {
-          execFile(command, ["session", "export", "--standalone", sessionID], {
-            env: runtimeEnv,
-            cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || undefined,
-            timeout: 60000,
-            maxBuffer: 64 * 1024 * 1024,
-          }, (error, stdout) => {
-            if (error) {
-              const diagnostics = [];
-              if (Number.isSafeInteger(error.code) || (typeof error.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code))) diagnostics.push(`code=${error.code}`);
-              if (typeof error.signal === "string" && /^SIG[A-Z0-9]{1,16}$/.test(error.signal)) diagnostics.push(`signal=${error.signal}`);
-              if (error.killed === true) diagnostics.push("killed=true");
-              const detail = diagnostics.length ? ` (${diagnostics.join(", ")})` : "";
-              return reject(new Error(`Unable to export the OpenCode session for step reconciliation${detail}`, { cause: error }));
-            }
-            try { resolve(JSON.parse(stdout)); } catch {
-              reject(new Error("Failed to parse the OpenCode session export"));
-            }
-          });
-        });
-        const records = getOpenCodeSessionSteps(exported, sessionID);
+        const records = await exportSessionRecords();
         const steps = records.filter(entry => entry.type === "step_finish");
         if (!steps.length) throw new Error("OpenCode session export contains no completed model steps");
-        for (const entry of records) {
-          if (entry.type === "step_finish") {
-            const observedPart = finishedMessageParts.get(JSON.stringify([entry.sessionID, entry.part.messageID]));
-            if (observedPart) entry.part = { ...entry.part, id: observedPart.id, messageID: observedPart.messageID };
-          }
-          process.stdout.write(JSON.stringify(entry) + "\n");
-        }
+        writeSessionRecords(records);
         if (maxTurns !== undefined && steps.slice(maxTurns - 1).some(entry => entry.part.reason === "tool-calls")) {
           process.stdout.write(JSON.stringify({ type: "opencode.max_turns", timestamp: Date.now(), data: { maxTurns } }) + "\n");
           throw new Error("OpenCode max-turns limit reached");
@@ -347,7 +374,9 @@ prompt on stdin, and requests JSONL events. `run --standalone` starts a private,
 short-lived server so the run cannot reuse a background service with different
 configuration or credentials. Provider credentials remain in AWF;
 only a placeholder key reaches the agent. `engine.max-turns` limits completed
-model steps, and a tool-calling turn at the limit fails explicitly.
+model steps, and a tool-calling turn at the limit fails explicitly. Before each
+empty-run continuation, the harness reconciles completed steps and configures
+OpenCode with only the remaining cumulative step budget.
 MCP startup failures also fail the step, even when OpenCode exits successfully.
 Configured MCP startup/tool timeouts are converted from gh-aw seconds to
 OpenCode milliseconds: startup also bounds catalog loading, while tool timeout
@@ -360,7 +389,8 @@ All roster models use the same proxy, so the provider policy surface is unchange
 After a clean run with no safe output, the harness can continue the captured
 session up to two times to request the task's safe-output call. It does not
 continue nonzero runs, max-turns hits, runs with existing safe output, or runs
-without a captured session ID.
+without a captured session ID. If the cumulative turn budget is exhausted before
+a safe output is produced, the run fails without starting another model step.
 
 Repository `opencode.json`, `opencode.jsonc`, `.opencode/` agents, and `AGENTS.md`
 retain native discovery and JSONC parsing. Runtime configuration is supplied

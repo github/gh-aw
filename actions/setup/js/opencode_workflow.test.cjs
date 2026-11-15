@@ -165,6 +165,53 @@ describe("OpenCode shared workflow harness", () => {
   });
 
   it.each([
+    ["live completion", [{ type: "step_finish", sessionID: "ses", part: { id: "finish", reason: "stop" } }]],
+    ["completion missing from live events", [{ type: "text", sessionID: "ses", part: { text: "Finished." } }]],
+  ])("does not continue when the reconciled session has exhausted max-turns (%s)", async (_case, events) => {
+    const result = await harness({
+      env: { GH_AW_SAFE_OUTPUTS: "/outputs.jsonl", GH_AW_MAX_TURNS: "1" },
+      events,
+      sessionExport: { info: { id: "ses" }, messages: [{ type: "assistant", id: "first", finish: "stop", time: { completed: 1000 } }] },
+    });
+    expect(result.runProcess).toHaveBeenCalledOnce();
+    expect(result.process.exitCode).toBe(1);
+    expect(
+      result.stdout
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line).type)
+    ).toEqual(["step_finish", "opencode.max_turns"]);
+  });
+
+  it("limits a continuation to the remaining cumulative max-turns budget", async () => {
+    let outputWritten = false;
+    const result = await harness({
+      env: { GH_AW_SAFE_OUTPUTS: "/outputs.jsonl", GH_AW_MAX_TURNS: "3" },
+      safeOutputsContents: () => (outputWritten ? '{"type":"noop"}\n' : ""),
+      events: [{ type: "text", sessionID: "ses", part: { text: "Continuing." } }],
+      runs: [
+        { events: [{ type: "text", sessionID: "ses", part: { text: "Working." } }] },
+        {
+          events: [{ type: "text", sessionID: "ses", part: { text: "Done." } }],
+          afterRun: () => {
+            outputWritten = true;
+          },
+        },
+      ],
+      sessionExport: {
+        info: { id: "ses" },
+        messages: [
+          { type: "assistant", id: "first", finish: "stop", time: { completed: 1000 } },
+          { type: "assistant", id: "second", finish: "stop", time: { completed: 2000 } },
+        ],
+      },
+    });
+    const [initial, continuation] = result.runProcess.mock.calls.map(([options]) => options);
+    expect(JSON.parse(initial.env.OPENCODE_CONFIG_CONTENT).agents.build.steps).toBe(3);
+    expect(JSON.parse(continuation.env.OPENCODE_CONFIG_CONTENT).agents.build.steps).toBe(1);
+  });
+
+  it.each([
     ["a nonzero exit", { events: [{ type: "text", sessionID: "ses", part: { text: "Finished." } }], processResult: { exitCode: 3 } }, {}],
     ["a max-turns hit", { events: [{ type: "step_finish", sessionID: "ses", part: { id: "finish", reason: "tool-calls" } }] }, { GH_AW_MAX_TURNS: "1" }],
     ["existing safe output", { events: [{ type: "text", sessionID: "ses", part: { text: "Finished." } }] }, {}],
