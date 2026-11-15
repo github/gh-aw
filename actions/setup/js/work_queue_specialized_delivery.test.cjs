@@ -44,6 +44,11 @@ afterEach(() => {
 function client() {
   const state = { bad: false, report: null, blobs: new Map(), trees: new Map(), commits: new Map(), refs: new Map() };
   const objectId = value => crypto.createHash("sha1").update(JSON.stringify(value)).digest("hex");
+  const queueTree = "e".repeat(40);
+  const queueCommit = "f".repeat(40);
+  state.trees.set(queueTree, []);
+  state.commits.set(queueCommit, { sha: queueCommit, tree: { sha: queueTree }, parents: [] });
+  state.refs.set("heads/work-queue", queueCommit);
   const github = {
     rest: {
       repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }), getCommit: async () => ({ data: { sha: process.env.GITHUB_SHA } }) },
@@ -111,7 +116,7 @@ describe("multiple asset deliveries in one Claim", () => {
     fs.writeFileSync(path.join(directory, sha("first.png") + ".png"), "first asset");
     if (secondPath !== "first.png") fs.writeFileSync(path.join(directory, sha(secondPath) + ".png"), "second asset");
     const results = await execute(async () => {
-      const handler = await assets.main({ "target-repo": "owner/repo", "assets-dir": root, max: 2 }, github);
+      const handler = await assets.main({ "target-repo": "owner/repo", "assets-dir": root, branch: "assets/test", max: 2 }, github);
       return [await handler({ type: "upload_asset", path: "first.png" }), await handler({ type: "upload_asset", path: secondPath })];
     });
     const receipts = await execute(() => results.map(result => assets.durableAssetReceipt(result, claim)));
@@ -121,6 +126,7 @@ describe("multiple asset deliveries in one Claim", () => {
     expect((await verify(0)).verified).toBe(true);
     expect((await verify(1)).verified).toBe(true);
     expect(results[0].branch).toBe(results[1].branch);
+    expect(results[0].branch).toBe("work-queue");
     expect(state.refs.size).toBe(1);
     state.refs.set(`heads/${results[0].branch}`, results[0].commit);
     expect((await verify(0)).verified).toBe(true);

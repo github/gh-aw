@@ -21,7 +21,6 @@ const {
 } = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
-const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { readGuardedFile } = require("./symlink_guard.cjs");
 
@@ -39,7 +38,7 @@ async function main(config = {}, suppliedClient) {
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue asset requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
   const namespace = path.basename(claimArtifactPath("", factoryClaim));
-  const branchPrefix = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`) + `-claims/${namespace}`;
+  const branch = "work-queue";
   const allowed = config["allowed-exts"] || [".png", ".jpg", ".jpeg"];
   const maximum = Number(config["max-size"] || 10240) * 1024;
   const limit = Number(config.max || 10);
@@ -63,7 +62,6 @@ async function main(config = {}, suppliedClient) {
     const content = readGuardedFile(staged, maximum);
     const sha256 = crypto.createHash("sha256").update(content).digest("hex");
     if (message.sha !== undefined && message.sha !== sha256) throw new Error("Queue asset staged content differs from its declared digest");
-    const branch = branchPrefix;
     const assetPath = `claims/${namespace}/${sha256}${extension}`;
     const authorityResource = await resolveRepositoryTarget(client, { repository, ref: `refs/heads/${branch}`, path: assetPath });
     const git = client.rest?.git;
@@ -71,30 +69,28 @@ async function main(config = {}, suppliedClient) {
     const createBlob = git?.createBlob;
     const createTree = git?.createTree;
     const createCommit = git?.createCommit;
-    if (typeof getRef !== "function" || typeof createBlob !== "function" || typeof createTree !== "function" || typeof createCommit !== "function") throw new Error("Queue asset requires its native read and write endpoints");
-    /** @type {string | null} */
-    let head = null;
+    const updateRef = git?.updateRef;
+    if (typeof getRef !== "function" || typeof createBlob !== "function" || typeof createTree !== "function" || typeof createCommit !== "function" || typeof updateRef !== "function")
+      throw new Error("Queue asset requires its native read and write endpoints");
+    /** @type {string} */
+    let head;
     let baseTree;
     try {
       const { data } = await getRef({ owner, repo, ref: `heads/${branch}` });
       head = data.object.sha;
     } catch (error) {
       if (error.status !== 404) throw error;
-      if (!branch.startsWith("assets/")) throw new Error("Only the approved assets/ namespace can create a new asset branch");
+      throw new Error("Queue asset requires the existing work-queue branch");
     }
-    if (head) {
-      const getCommit = git?.getCommit;
-      if (typeof getCommit !== "function") throw new Error("Queue asset requires its native parent commit endpoint");
-      const commit = await getCommit({ owner, repo, commit_sha: head });
-      baseTree = commit.data.tree.sha;
-    }
-    const mutateRef = head ? git?.updateRef : git?.createRef;
-    if (typeof mutateRef !== "function") throw new Error("Queue asset requires its native branch write endpoint");
-    const { blob, tree, commit } = await withClaimResourceEffects([authorityResource], ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.updateRef", "rest.git.createRef"], async () => {
+    const getCommit = git?.getCommit;
+    if (typeof getCommit !== "function") throw new Error("Queue asset requires its native parent commit endpoint");
+    const parent = await getCommit({ owner, repo, commit_sha: head });
+    baseTree = parent.data.tree.sha;
+    const { blob, tree, commit } = await withClaimResourceEffects([authorityResource], ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.updateRef"], async () => {
       const blob = await createBlob({ owner, repo, content: content.toString("base64"), encoding: "base64" });
-      const tree = await createTree({ owner, repo, ...(baseTree ? { base_tree: baseTree } : {}), tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });
-      const commit = await createCommit({ owner, repo, message: `Publish Claim ${factoryClaim} asset ${sha256}`, tree: tree.data.sha, parents: head ? [head] : [] });
-      await mutateRef({ owner, repo, ref: head ? `heads/${branch}` : `refs/heads/${branch}`, sha: commit.data.sha, ...(head ? { force: false } : {}) });
+      const tree = await createTree({ owner, repo, base_tree: baseTree, tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });
+      const commit = await createCommit({ owner, repo, message: `Publish Claim ${factoryClaim} asset ${sha256}`, tree: tree.data.sha, parents: [head] });
+      await updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.data.sha, force: false });
       return { blob, tree, commit };
     });
     const server = process.env.GITHUB_SERVER_URL || "https://github.com";

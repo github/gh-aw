@@ -1388,7 +1388,7 @@ git checkout --orphan my-custom-branch && git rm -rf . && git commit --allow-emp
 
 **Security**: Files must be isolated regular files within the workspace or `/tmp`; symlinks (including parent-directory links), hard links, and special files are rejected. Staging and publication use the same bounded, verified file snapshot for hashing and writing, with no-follow opens and exclusive destination creation. Extension allowlists, size limits, SHA-256 verification, orphaned branch isolation, and minimal permissions also apply.
 
-Work-queue workers publish each Claim's uploads to one Claim-scoped branch beneath the configured `assets/` prefix, using separate content-addressed files. Delivery verification checks the original commit, tree, blob, and digest, and confirms the file is still present at the current branch head.
+Work-queue workers publish each Claim's uploads as separate content-addressed files on the existing `work-queue` branch; they do not create an asset branch. Delivery verification checks the original commit, tree, blob, and digest, and confirms the file is still present at the current branch head.
 
 **Platform support**: Asset staging and publication require Linux with `/proc/self/fd` available for descriptor-relative access. macOS and Windows fail closed with `ERR_VALIDATION` before guarded file access; absolute-path checks cannot prevent concurrent ancestor replacement, and POSIX no-follow flags do not protect against Windows junctions. Policy and size-limit failures use `ERR_VALIDATION`; upload-handler I/O failures use `ERR_SYSTEM`.
 
