@@ -356,6 +356,13 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
  */
 
 async function main() {
+  const { withPendingPublication } = require("./pending_writes.cjs");
+  const { describeDirectory } = require("./pending_writes_files.cjs");
+  const id = process.env.MEMORY_ID;
+  return withPendingPublication("push_repo_memory", id, () => ({ id: `repo_memory:${id}`, kind: "directory", files: describeDirectory(process.env.ARTIFACT_DIR || "") }), mainUnchecked);
+}
+
+async function mainUnchecked() {
   setOutput("save_status", "skipped");
   const artifactDir = process.env.ARTIFACT_DIR;
   const memoryId = process.env.MEMORY_ID;

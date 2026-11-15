@@ -26,7 +26,19 @@ function guardPendingWriteClient(client) {
         if (namespace === "" && key === "graphql" && typeof value === "function") {
           return (...args) => {
             const query = typeof args[0] === "string" ? args[0] : args[0]?.query;
-            if (typeof query !== "string" || /\bmutation\b/.test(query.replace(/#[^\n]*/g, ""))) throw integrityError("unsupported_graphql_write");
+            if (typeof query !== "string") throw integrityError("unsupported_graphql_write");
+            if (/\bmutation\b/.test(query.replace(/#[^\n]*/g, ""))) {
+              const item = currentPendingWrite();
+              // The signed-commit publisher uses this exact variable-bound
+              // mutation. Unknown GraphQL mutation shapes remain unsupported.
+              const normalized = query.replace(/\s+/g, " ").trim();
+              if (!/^mutation \(\$input: CreateCommitOnBranchInput!\) \{ createCommitOnBranch\(input: \$input\) \{ commit \{ oid \} \} \}$/.test(normalized) || !item) throw integrityError("unsupported_graphql_write");
+              const branch = args[1]?.input?.branch;
+              const repository = item.target.head_repository || item.target.repository;
+              if (branch?.repositoryNameWithOwner !== repository || (item.target.branch && branch?.branchName !== item.target.branch)) throw integrityError("target_changed");
+              if (item.publication) item.recheck();
+              else assertPendingWritesIntegrity();
+            }
             return value.apply(target, args);
           };
         }
@@ -43,11 +55,13 @@ function guardPendingWriteClient(client) {
           const readonly = method ? ["GET", "HEAD", "OPTIONS"].includes(method) : READ_METHOD.test(String(key));
           if (readonly) return value.bind(target);
           return async (...args) => {
-            assertPendingWritesIntegrity();
             const item = currentPendingWrite();
-            if (!item) throw integrityError("item_missing");
+            if (!item || item.planning) throw integrityError("item_missing");
+            if (item.publication) item.recheck();
+            else assertPendingWritesIntegrity();
             const request = args[0];
             if (!request || typeof request !== "object") throw integrityError("target_changed");
+            if (item.review && (namespace !== "issues" || key !== "create" || request.assignees?.length)) throw integrityError("review_scope_invalid");
             const repository = `${request.owner}/${request.repo}`;
             if (![item.target.repository, item.target.head_repository].includes(repository)) throw integrityError("target_changed");
             if (item.code) {
