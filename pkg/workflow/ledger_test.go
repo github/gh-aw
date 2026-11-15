@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -164,6 +165,32 @@ func TestCommentBackedLedgerConfiguration(t *testing.T) {
 			require.Contains(t, err.Error(), "Example:\ntools:\n  comment-memory:\n    "+tc.example)
 		}
 	}
+}
+
+func TestLedgerAuthoringGuideCommentBackedExampleCompiles(t *testing.T) {
+	guide, err := os.ReadFile("../../.github/aw/ledger.md")
+	require.NoError(t, err)
+	guideText := string(guide)
+
+	universalBranchClaim := regexp.MustCompile(`(?i)\b(?:all|every|each)\s+(?:standalone\s+)?ledgers?\b[^.\n]{0,100}\bbranch\b`)
+	require.NotRegexp(t, universalBranchClaim, guideText)
+
+	const exampleHeading = "### Example: comment-backed ledger"
+	exampleStart := strings.Index(guideText, exampleHeading)
+	require.NotEqual(t, -1, exampleStart, "guide must include the comment-backed ledger example")
+	exampleSection := guideText[exampleStart+len(exampleHeading):]
+	fenceStart := strings.Index(exampleSection, "```yaml\n")
+	require.NotEqual(t, -1, fenceStart, "comment-backed ledger example must be YAML")
+	exampleSection = exampleSection[fenceStart+len("```yaml\n"):]
+	fenceEnd := strings.Index(exampleSection, "```")
+	require.NotEqual(t, -1, fenceEnd, "comment-backed ledger example must be fenced")
+
+	source := "---\non: workflow_dispatch\nengine: copilot\n" + exampleSection[:fenceEnd] + "---\nRecord audit outcomes.\n"
+	filename := filepath.Join(t.TempDir(), "comment-ledger-guide.md")
+	require.NoError(t, os.WriteFile(filename, []byte(source), 0o600))
+	require.NoError(t, NewCompiler().CompileWorkflow(filename))
+
+	require.FileExists(t, filepath.Join(filepath.Dir(filename), "comment-ledger-guide.lock.yml"))
 }
 
 func TestLedgerPersistenceConcurrencyQueue(t *testing.T) {
