@@ -959,6 +959,11 @@
   .proto span { color: #56d4dd; letter-spacing: .04em; text-transform: none; padding-left: 14px; border-left: 1px solid #3d444d; }
   @keyframes proto-blink { 50% { opacity: .25; } }
   .bh .proto { top: 96px; right: 140px; }
+  /* experimental badge on every slide that sets experimental (same spot as .proto) */
+  .xbadge { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 12px; padding: 12px 22px; border: 2px dashed #f0883e; border-radius: 999px; background: #0d1117cc; font: 600 18px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #f0883e; z-index: 5; }
+  .xbadge span { color: #9198a1; letter-spacing: .04em; text-transform: none; padding-left: 12px; border-left: 1px solid #3d444d; }
+  .cg > .xbadge, .xp > .xbadge { top: 24px; }
+  .ek > .xbadge { right: 560px; }
   /* --- gh cao: hyperscale agentics --- */
   .hyp-scale, .hyp-cv, .hyp-sinks, .hyp-outs { position: absolute; opacity: 0; }
   .active .hyp-scale, .active .hyp-cv, .active .hyp-sinks, .active .hyp-outs { animation: rise .8s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 160ms + 300ms); }
@@ -2394,8 +2399,6 @@
   .xcap b { color: #d29922; font-weight: 600; margin-right: 4px; }
   .xcap span { padding: 6px 12px; border-radius: 99px; border: 1.5px solid #3d444d; background: #161b22; font-size: 16px; color: #c9d1d9; white-space: nowrap; }
   .active .xcap { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.2s; }
-  .xbadge { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 12px; padding: 12px 22px; border: 2px dashed #f0883e; border-radius: 999px; background: #0d1117cc; font: 600 18px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #f0883e; z-index: 5; }
-  .xbadge span { color: #9198a1; letter-spacing: .04em; text-transform: none; padding-left: 12px; border-left: 1px solid #3d444d; }
   .dtr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #f0883e, #ab7df8, #79c0ff, #f0883e); }
   .gap .slide-head h2 { font-size: 100px; }
   .gap .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #d29922, #ff7b72, #3fb950); }
@@ -3807,8 +3810,9 @@
     const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     slides.push({
       group: "security",
+      experimental: "microVM runtime",
       notes:
-        "Zero-secret agents. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; a sealed boundary traces around it and locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
+        "Zero-secret agents. The micro-VM runtime shown here is experimental. The first principle of gh-aw's security architecture: the agent holds nothing worth stealing. The coding agent runtime, whether Copilot, Claude or Codex, runs inside a micro-VM on its own guest kernel with no auth at all; a sealed boundary traces around it and locks to show it is walled off from everything else. The workspace and tool cache are shared over a virtiofs mount, files only. Everything that needs a credential lives on the host: MCP calls go through the MCP gateway, either to safe outputs, which only record proposals as action artifacts whose GitHub updates are later allowed or denied, or to the GitHub MCP server, which holds the GitHub token. Model calls go to an API proxy that injects the LLM key. All outbound traffic, from those services and from the agent itself, leaves through the Squid firewall, which allows or denies hosts and ports. Both kernels run inside the GitHub Actions runner VM. A prompt-injected agent can try to exfiltrate secrets, but there are none inside the sandbox. The request flows animated here are illustrative.",
       enter() {
         if (!built) {
           built = true;
@@ -8887,8 +8891,9 @@
     };
     slides.push({
       group: "cost",
+      experimental: "model: router",
       notes:
-        "Cost management: guard, measure, optimize. Start from a daily PR summary. 1) Scheduling: does it really need to run daily? Weekly cuts runs 7x. 2) Deterministic compute: fetch the PRs with a plain gh step instead of letting the agent explore with tools. 3) Guard: max-ai-credits per run and max-daily-ai-credits cap spend; an optional central admission service, enabled with on.admission, can also deny activation before any agent runs. 4) Sub-agents: fan per-PR summaries out to a pr-summary sub-agent on a smaller model. 5) Model routing: use the documented model: router modes to balance cost and quality for eligible main-agent runs. Numbers are illustrative, not internal usage or billing data: roughly 2,800 to 110 AIC a week. Keys: → next optimization.",
+        "Cost management: guard, measure, optimize. Model routing is experimental. Start from a daily PR summary. 1) Scheduling: does it really need to run daily? Weekly cuts runs 7x. 2) Deterministic compute: fetch the PRs with a plain gh step instead of letting the agent explore with tools. 3) Guard: max-ai-credits per run and max-daily-ai-credits cap spend; an optional central admission service, enabled with on.admission, can also deny activation before any agent runs. 4) Sub-agents: fan per-PR summaries out to a pr-summary sub-agent on a smaller model. 5) Model routing: use the documented model: router modes to balance cost and quality for eligible main-agent runs. Numbers are illustrative, not internal usage or billing data: roughly 2,800 to 110 AIC a week. Keys: → next optimization.",
       enter() {
         t0 = last = spawn = 0;
         pk = [];
@@ -9434,8 +9439,9 @@
     };
     slides.push({
       group: "cost",
+      experimental: "user-rate-limit",
       notes:
-        "Cost guardrails: stop runaway agents. Illustrative: synthetic runs and numbers. Optimization (previous slide) makes each run cheaper; guardrails cap what runs may spend; admission decides centrally whether a run may start. Execution controls come first: user-rate-limit cancels a user's excess runs, concurrency serializes runs, and items created by safe outputs do not trigger further workflows. The daily budget, max-daily-ai-credits, is checked at activation before the agent starts: it sums this workflow's runs over the rolling 24 hours and, when the total exceeds the limit, skips the agent job; it does not apply to workflow_dispatch, repository_dispatch or workflow_call runs. Per-run limits are hard stops during the run: max-ai-credits (budget notices first, then the firewall stops the run), max-turns and timeout-minutes. Defaults: 1,000 AIC per run, 5,000 AIC per workflow per day, 20 minutes for the agent step; negative values disable an AIC guardrail. Admission is optional (on.admission: true plus an org-provided URL): before activation the authority verifies the run's OIDC identity and either approves with an AIC allowance that replaces max-ai-credits and supersedes the daily check, or denies. Denial and invalid approval always block; on an outage the default, ignore, keeps the local guardrails, and block stops. Admission is cooperative, not a hard spending cap. Keys: → next step.",
+        "Cost guardrails: stop runaway agents. The user rate limit is experimental. Illustrative: synthetic runs and numbers. Optimization (previous slide) makes each run cheaper; guardrails cap what runs may spend; admission decides centrally whether a run may start. Execution controls come first: user-rate-limit cancels a user's excess runs, concurrency serializes runs, and items created by safe outputs do not trigger further workflows. The daily budget, max-daily-ai-credits, is checked at activation before the agent starts: it sums this workflow's runs over the rolling 24 hours and, when the total exceeds the limit, skips the agent job; it does not apply to workflow_dispatch, repository_dispatch or workflow_call runs. Per-run limits are hard stops during the run: max-ai-credits (budget notices first, then the firewall stops the run), max-turns and timeout-minutes. Defaults: 1,000 AIC per run, 5,000 AIC per workflow per day, 20 minutes for the agent step; negative values disable an AIC guardrail. Admission is optional (on.admission: true plus an org-provided URL): before activation the authority verifies the run's OIDC identity and either approves with an AIC allowance that replaces max-ai-credits and supersedes the daily check, or denies. Denial and invalid approval always block; on an outage the default, ignore, keeps the local guardrails, and block stops. Admission is cooperative, not a hard spending cap. Keys: → next step.",
       enter() {
         last = 0;
         jump(0);
@@ -9847,8 +9853,9 @@
     };
     slides.push({
       group: "cost",
+      experimental: "model: router",
       notes:
-        "Model routing. Every workflow run pays for a model, and the usual habit is to pin one strong model for every run. With one line, model: router, the router reads each run's task before the agent starts, labels the kind of work, its scope and its difficulty, weighs what a mistake would cost (low, medium or high stakes, which gh-aw calls economy, balanced and robust), then picks the cheapest model and reasoning effort that is good enough, using benchmark results that ship with the AWF firewall. It runs inside the firewall, respects the workflow's model policy, and gh aw audit shows what it picked and why. The tasks, labels and picks in the animation are illustrative. The results are measured on gh-aw's own workflows: across 127 routed workflows and 3,097 routed runs through 12 Nov 2026, each compared with its own two weeks before routing, cost per run fell 75% (65 to 16 AI credits) while run success (87.6% to 88.5%) and judged quality (83.9 to 83.6 out of 100) held steady. Most routers pick a model for one prompt in a chat, with a person watching. This one is built for workflows that repeat: the same job runs on every schedule, issue and pull request with no one watching, so the router weighs the stakes of each run itself, and the saving repeats on every run. The week of runs is illustrative. Keys: → next step.",
+        "Model routing. This is experimental. Every workflow run pays for a model, and the usual habit is to pin one strong model for every run. With one line, model: router, the router reads each run's task before the agent starts, labels the kind of work, its scope and its difficulty, weighs what a mistake would cost (low, medium or high stakes, which gh-aw calls economy, balanced and robust), then picks the cheapest model and reasoning effort that is good enough, using benchmark results that ship with the AWF firewall. It runs inside the firewall, respects the workflow's model policy, and gh aw audit shows what it picked and why. The tasks, labels and picks in the animation are illustrative. The results are measured on gh-aw's own workflows: across 127 routed workflows and 3,097 routed runs through 12 Nov 2026, each compared with its own two weeks before routing, cost per run fell 75% (65 to 16 AI credits) while run success (87.6% to 88.5%) and judged quality (83.9 to 83.6 out of 100) held steady. Most routers pick a model for one prompt in a chat, with a person watching. This one is built for workflows that repeat: the same job runs on every schedule, issue and pull request with no one watching, so the router weighs the stakes of each run itself, and the saving repeats on every run. The week of runs is illustrative. Keys: → next step.",
       enter() {
         t0 = last = build = si = 0;
         run = null;
@@ -10773,6 +10780,7 @@
     };
     slides.push({
       group: "engineering",
+      experimental: "skip-if-decision",
       notes:
         "Don’t Run the Agent, an illustrative pipeline with synthetic events, not measured runs. The cheapest, fastest agent invocation is the one you never make, so put cheap deterministic gates first and model-based decisions last. 1) Triggers: GitHub Actions event types, branches, paths and label names stop a workflow from being scheduled at all; actor restrictions (on.roles, on.bots, skip-roles, skip-bots, skip-author-associations) are checked by the compiled pre-activation job and stop the run there. 2) Conditions: a top-level if: on Actions context, such as skipping draft pull requests, skips jobs without a runner; jobs.agent.if and jobs.agent.needs are combined with the compiler's own conditions to gate just the agent job. 3) Search: on.skip-if-match and on.skip-if-no-match run GitHub search queries in pre-activation, alongside cooldown and stop-after; a match skips the agent job, skipped not failed, at the cost of API calls. 4) on.steps: deterministic steps inside the same pre-activation job expose <id>_result outputs for an if: to read, without an extra job. 5) Custom jobs: a jobs: filter job computes an eligibility output such as should-run before activation; it costs a runner job. 6) Noop short-circuit: steps: or pre-agent-steps: write a noop record to $GH_AW_SAFE_OUTPUTS, and the harness exits at startup without inference and without AI Credits, but the agent job has already started and used runner minutes. 7) skip-if-decision, experimental: up to 64 top-level questions evaluated before each otherwise eligible invocation, including retries and continuations. Each answers deny, allow or unknown. Any deny skips that invocation and records a noop; otherwise allow, or all unknown, keeps the path the deterministic harness chose. Model errors and timeouts abstain as unknown, so the gate proceeds rather than failing closed. The decision itself is a model call with its own cost, which is why it comes last. An optional central admission service, on.admission, can also deny activation; it is covered with cost guards on the Cost management slide. Different gates save different things: no run, no runner, no agent job, or no inference. A skipped agent is not necessarily a skipped Actions run.",
       enter() {
@@ -11300,6 +11308,7 @@
     };
     slides.push({
       group: "engineering",
+      experimental: "engine.durable",
       notes:
         "Durable execution, an illustrative run with a synthetic run number, turn counts and session ID. Long agent runs get interrupted: a step hits its timeout, a model call fails, someone re-runs the job. The experimental engine.durable setting makes the agent's session survive that. It persists the engine's native session files, not a live process. After the agent step, even when that step failed, an always() step redacts secrets, validates the checkpoint and uploads it as a GitHub Actions artifact, kept for retention-days, seven by default. Re-running the run restores the checkpoint from the earlier attempt; a new run restores the last successful run of the same workflow on the same branch, or an explicit parent. Copilot, Claude, Codex and Pi then resume the exact recorded session, here copilot --session-id, with the current prompt, credentials, models and tool policy, so the agent continues at turn 15 instead of redoing the first 14. With no history the first run starts fresh; a missing or corrupt parent checkpoint is an error, never a silent unrelated conversation. Cancellation or hard runner loss can prevent publication. Only session files come back: not workspace edits, credentials, pending task phases or exactly-once tool execution, and restored history is data, never instructions. The unified session records durable.restore and durable.session, so gh aw audit shows whether a run really resumed. The design lesson: resume the session, not the side effects. Keep every write retry-safe and idempotent, so repeating a step after a resume is harmless.",
       enter() {
@@ -11771,6 +11780,7 @@
     };
     slides.push({
       group: "engineering",
+      experimental: "QMD search",
       notes:
         "Index and search, an illustrative run with synthetic file names and token counts. Many workflows spend most of their budget reading: the agent greps a checkout and pulls whole files into context to answer one question. The index/search pattern splits the work across a job boundary. Job one is not agentic: plain deterministic steps, the only job with contents: read, check out the docs, run qmd update and qmd embed so only changed documents are re-embedded, and save the index to the GitHub Actions cache under a stable key. The Actions cache is the link between the two jobs, and between runs: the next indexing run restores it and only re-embeds what changed. Job two is the agent: it has contents: none and no checkout, and restores the cached index restore-only, as a disposable copy it can never save back, and talks to QMD as an MCP server with only query and get allowed, so it can search and read passages but can never rebuild or poison the index. It runs a hybrid keyword and vector query, reads only the hits, and spends a fraction of the tokens. Both jobs come from one shared agentic workflow, imported with imports: shared/qmd.md, and cache-memory publishes the index only after threat detection. When indexing and search share a run, the shared workflow also hands the fresh index over as an artifact so the agent never searches an older cache. Any indexing library that builds a file-based index and serves it over MCP fits the same slots. See the experimental QMD page in the docs.",
       enter() {
@@ -12231,8 +12241,9 @@
 
     slides.push({
       group: "engineering",
+      experimental: "experiments · graders",
       notes:
-        "Experiments, graders and evals. How do you know a change to a workflow makes the agent better, not just different? Declare an experiment in the frontmatter: here the prompt style, detailed (the control) against concise (the candidate). On every run the activation job assigns one variant, least-used first so the two stay balanced, and the prompt reads it as experiments.style. After the run, graders measure it: ten deterministic built-ins such as tool-success-rate, loops and duration are computed from the unified session with no model call, and you can add your own JavaScript graders. Evals then judge it: an LLM answers a yes or no question such as 'is the pull request focused?'. The experiment names one of those as its primary metric (eval:focused) and others as guardrails (grader:tool-success-rate at 0.95 or better). gh aw experiments analyze joins each run's scores to its assigned variant, waits for min_samples per variant, runs the statistical test, checks every guardrail, and decides: extend, promote, reject or inconclusive. It never edits the workflow itself; promotion stays a reviewed change. The workflow, runs, scores and decision in the animation are illustrative and synthetic. Keys: → next slide.",
+        "Experiments, graders and evals. Experiments and graders are experimental. How do you know a change to a workflow makes the agent better, not just different? Declare an experiment in the frontmatter: here the prompt style, detailed (the control) against concise (the candidate). On every run the activation job assigns one variant, least-used first so the two stay balanced, and the prompt reads it as experiments.style. After the run, graders measure it: ten deterministic built-ins such as tool-success-rate, loops and duration are computed from the unified session with no model call, and you can add your own JavaScript graders. Evals then judge it: an LLM answers a yes or no question such as 'is the pull request focused?'. The experiment names one of those as its primary metric (eval:focused) and others as guardrails (grader:tool-success-rate at 0.95 or better). gh aw experiments analyze joins each run's scores to its assigned variant, waits for min_samples per variant, runs the statistical test, checks every guardrail, and decides: extend, promote, reject or inconclusive. It never edits the workflow itself; promotion stays a reviewed change. The workflow, runs, scores and decision in the animation are illustrative and synthetic. Keys: → next slide.",
       enter() {
         t0 = cycle = 0;
         lit = [];
@@ -12717,8 +12728,9 @@
     };
     slides.push({
       group: "security",
+      experimental: "enclaves",
       notes:
-        "Need-to-know enclaves. GitLost was a real attack: a public issue prompted an agent with access to a private repository, and the agent's public reply leaked private contents. Enclaves stop private-to-public leaks in cross-repo flows. Here a public issue asks whether version 2 is compatible with an internal integration. The primary agent in the public repo never reads the private repo; it hands the repo, the task and a response schema to a trusted broker, which launches a single-use, isolated enclave agent with read-only access to the private repository. The enclave finds the answer, and also a confidential launch date. If it tries to return free text, the output gate drops it: only schema values leave. Compatibility is compatible, incompatible or unknown, and migrationRequired is true or false, so there are six possible answers, three bits, which together with timing and error bits fit an eight-bit confidential budget. The public comment says compatible, no migration required, and nothing else. Then the enclave is destroyed. The issue, repository, project name and date are synthetic, and the flow is illustrative.",
+        "Need-to-know enclaves. Enclaves are experimental. GitLost was a real attack: a public issue prompted an agent with access to a private repository, and the agent's public reply leaked private contents. Enclaves stop private-to-public leaks in cross-repo flows. Here a public issue asks whether version 2 is compatible with an internal integration. The primary agent in the public repo never reads the private repo; it hands the repo, the task and a response schema to a trusted broker, which launches a single-use, isolated enclave agent with read-only access to the private repository. The enclave finds the answer, and also a confidential launch date. If it tries to return free text, the output gate drops it: only schema values leave. Compatibility is compatible, incompatible or unknown, and migrationRequired is true or false, so there are six possible answers, three bits, which together with timing and error bits fit an eight-bit confidential budget. The public comment says compatible, no migration required, and nothing else. Then the enclave is destroyed. The issue, repository, project name and date are synthetic, and the flow is illustrative.",
       enter() {
         if (!built) {
           built = true;
@@ -13643,12 +13655,12 @@
       "section",
       { class: "slide otb" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Brokered credentials · no stored secret"), h("h2", {}, letters("OIDC "), letters("token broker", "l-grad"))),
-      h("div", { class: "xbadge" }, "Experimental", h("span", {}, "deployment-owned broker")),
       svg,
       h("div", { class: "xcap" }, h("b", {}, "You run the broker:"), h("span", {}, "org or repo variable"), h("span", {}, "explicit opt-in per workflow"), h("span", {}, "id-token: write"))
     );
     slides.push({
       group: "enterprise",
+      experimental: "deployment-owned broker",
       notes:
         "OIDC token broker. This is experimental, and the broker itself is deployment-owned: gh-aw ships the client side and the contract, not the server. An administrator publishes the broker endpoint as the GH_AW_TOKEN_BROKER_URL organization or repository variable, and each workflow opts in explicitly with token-broker, choosing copilot-request for inference, copilot-task for coding-agent tasks, or both. Broker-enabled jobs need id-token write. The job asks GitHub for an OIDC token whose audience is the broker URL and presents it; the broker verifies GitHub's signature, the issuer, expiry, audience, and the repository, workflow and run claims against its enrollment policy, and only then returns a short-lived credential. An unconditional post-step asks the broker to invalidate it, scoped to the verified job. If anything fails, the job fails: there is no fallback to a personal token, an App token or GITHUB_TOKEN. Today brokered inference works in the threat-detection and evals jobs; main-agent inference stays blocked until the firewall gains a renewable credential provider. The repository, workflow and claim values are synthetic and the exchange timing is illustrative.",
       enter() {
@@ -15397,6 +15409,7 @@
     };
     slides.push({
       group: "enterprise",
+      experimental: "connectors",
       notes:
         "Connectors. A connector is an ordinary Markdown file under .github/workflows/connectors whose frontmatter declares one service: a fixed endpoint, separate reader and writer credential secret names, exact resource grants, and every capability the service offers, meaning triggers, read tools and safe-output writes. A workflow imports the declaration and then selects only what it needs: a reader or two under tools, and one write under safe-outputs, prefixed with the connector id. Importing alone grants nothing. At run time only the selection is exposed: the agent sees just the chosen readers inside the sandbox and holds no writer secret; it can only propose the write, which a separate safe-outputs job performs, staged here so it is only previewed. The same shape covers Linear, Jira, Azure DevOps, GitLab and ten more declarations. Connectors are experimental. The workflow is a synthetic example, capability names come from the declarations, and the request flow is illustrative.",
       enter() {
@@ -15500,12 +15513,12 @@
       "section",
       { class: "slide whg" },
       h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "External events in · through a hosted receiver"), h("h2", {}, letters("Webhook "), letters("gateway", "l-grad"))),
-      h("div", { class: "xbadge" }, "Experimental", h("span", {}, "hosted receiver required")),
       svg,
       h("div", { class: "xcap" }, h("b", {}, "gh-aw ships:"), h("span", {}, "the declaration"), h("span", {}, "the compiled route"), h("span", {}, "batch validation"), h("b", {}, "You deploy:"), h("span", {}, "the receiver and its App"))
     );
     slides.push({
       group: "enterprise",
+      experimental: "hosted receiver required",
       notes:
         "Webhook gateway. This is experimental and needs a hosted receiver that gh-aw does not ship. A workflow declares server-filtered subscriptions under on.gateway-dispatch: GitHub events such as Projects v2 items, code scanning or Dependabot alerts and comments, or external issues from Jira and Linear. The repository opts in through gateway-dispatch in aw.json, every value must be a literal, roles must be write or higher, and no other trigger may coexist. The hosted CAO receiver authenticates each delivery, matches it against the compiled subscriptions and batches matching events of one kind into a restricted repository dispatch. A compiler-generated gateway_provenance job then verifies that the dispatch really came from the approved CAO App, alongside an OIDC admission check, before the agent reads the batch from github.aw.context.items as untrusted input. gh-aw supplies the declaration, the compiled route and batch validation; the receiver, its App identity and dispatch authority are deployment-owned, and the docs ask deployments to keep it nonactivating until that contract is enforced. This is not the MCP gateway. Events and the subscription are synthetic and the flow is illustrative.",
       enter: () => stage.enter(),
@@ -16837,6 +16850,7 @@
         s.step = i;
         s.red = !!THEME[s.group].red;
         if (PROTO[s.group]) s.el.append(h("div", { class: "proto", "aria-label": `Research prototype: ${PROTO[s.group]}` }, h("i"), h("b", {}, "Research prototype"), h("span", {}, PROTO[s.group])));
+        else if (s.experimental) s.el.append(h("div", { class: "xbadge", "aria-label": `Experimental: ${s.experimental}` }, "Experimental", h("span", {}, s.experimental)));
         slides.push(s);
       });
     });
