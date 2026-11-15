@@ -199,7 +199,7 @@ accepted gap below has a rationale.
 
 | Requirement | Test ID(s) or documented gap | Implementation evidence |
 |---|---|---|
-| §5 ordered processing pipeline | **Partial:** handler test verifies read → read → write order and one gate-skip cutoff; schema, count, target, label, staged, computation, and REST failure cutoffs remain untested. | “executes the label pipeline in order and stops before writes on a gate skip” does not establish early-stop behavior for all eight stages. |
+| §5 ordered processing pipeline | **Partial:** handler test verifies read → read → write order and one gate-skip cutoff; schema, count, target, label, staged, computation, and REST failure cutoffs remain untested. | “executes the label pipeline in order and stops before writes on a gate skip” does not establish early-stop behavior for all eight stages. **Owner:** replace-label maintainers. **Close when:** handler tests cover each stage's early-stop/no-write behavior and show the computed set is based on the live stage-5 REST response. |
 | RL-008 | T-RL-001–006 | `TestFormalSchemaRequiredFields` |
 | RL-009 | T-RL-009 | `TestFormalReplaceLabelRL009_CommonValidationConfig` checks that the shared validation-config generator emits the configured `replace_label` entry and field rules. |
 | RL-010 | T-RL-010–011 | `TestFormalCountGate` |
@@ -220,10 +220,10 @@ accepted gap below has a rationale.
 | RL-024 | T-RL-030–031 | `TestFormalRequiredLabelsGate`; JS required-label skip test |
 | RL-025 | T-RL-032–033 | `TestFormalTitlePrefixGate`; JS title-prefix skip test |
 | RL-026 | T-RL-030–033 | JS required-label and title-prefix skip tests |
-| RL-027 | T-RL-060–061; **Gap [Observability]:** preview log text is not asserted directly; operators need a verified record of the proposed change. | `T-RL-060 does not call setLabels in staged mode` |
+| RL-027 | T-RL-060–061; **Gap [Observability]:** preview log text is not asserted directly; operators need a verified record of the proposed change. | `T-RL-060 does not call setLabels in staged mode`. **Owner:** replace-label maintainers. **Close when:** a staged-mode test asserts the complete proposed before/after change in the operator-visible preview log. |
 | RL-028 | T-RL-062 | `TestFormalReplaceLabelP9_StagedHandlerResult`; staged handler test |
 | RL-029 | T-RL-040 | `TestFormalLabelSetComputation` |
-| RL-033 | T-RL-040; **Gap [Pipeline]:** computation is not tied to the live stage-5 REST response; stale or agent-supplied state must not drive the write. | `TestFormalLabelSetComputation` models the current-label input. |
+| RL-033 | T-RL-040; **Gap [Pipeline]:** computation is not tied to the live stage-5 REST response; stale or agent-supplied state must not drive the write. | `TestFormalLabelSetComputation` models the current-label input. **Owner:** replace-label maintainers. **Close when:** handler-level coverage proves the computation consumes the live REST response and stale or agent-supplied state cannot drive the write. |
 | RL-034 | T-RL-044 | `TestFormalReplaceLabelP11_IdempotentMissingRemove`; JS missing-remove test |
 | RL-036 | T-RL-050 | `TestFormalSingleRESTCall` |
 | RL-037 | T-RL-037, T-RL-054 | Handler tests cover 403/429, 5xx, transport timeout, and retry exhaustion. |
@@ -232,7 +232,7 @@ accepted gap below has a rationale.
 | RL-040 | `replace_label.test.cjs`: “asserts success logs, complete result fields, and execution-state metadata.” | Asserts `before_state` and `after_state` fields and label values. |
 | RL-041 | T-RL-040, T-RL-050 | `TestFormalLabelSetComputation` |
 | RL-042 | T-RL-053 | `TestFormalAddDeduplication` |
-| RL-043 | T-RL-050; **Gap [External guarantee]:** GitHub's server-side atomicity guarantee cannot be verified locally; a local test cannot establish remote behavior. | `TestFormalSingleRESTCall` |
+| RL-043 | T-RL-050; **Gap [External guarantee]:** GitHub's server-side atomicity guarantee cannot be verified locally; a local test cannot establish remote behavior. | `TestFormalSingleRESTCall`. **Owner:** replace-label maintainers. **Close when:** GitHub documents the guarantee and independent integration evidence can verify it; otherwise retain this as an explicit external limitation. |
 | RL-044 | `replace_label.test.cjs`: warning-only assertions cover missing fields, count limit, target/repository rejection, blocked/allowlist validation, and required-label/title gates. | Each soft-skip path asserts warning output and no `core.error()`. |
 | RL-045 | `replace_label.test.cjs`: HTTP 404, retry exhaustion, REST failure, and postcondition failures assert hard-error logging. | `core.error()` is asserted for each hard-error category exercised by the handler. |
 | RL-046 | T-RL-052 | `TestFormalHardErrorOnRESTFail`; JS setLabels failure test |
@@ -245,9 +245,9 @@ accepted gap below has a rationale.
 | RL-049 | T-RL-020–025 | `TestFormalBlocklistOrdering`; JS allow/blocklist tests |
 | RL-049a | T-RL-026 | `T-RL-026 rechecks blocklist state before setLabels`; `TestFormalBlockedLabelAddedViaReplaceLabelMidBlocklistChange_NoWriteAPI` |
 | RL-050 | T-RL-070–072 | `TestFormalCrossRepoRestriction` |
-| RL-051 | **Accepted gap [Security]:** GitHub enforces token grants on the target repository at the write endpoint. Offline tests cannot inspect a live token's repository grant; a denied write is handled as a hard error, but no proactive scope check is performed. |
+| RL-051 | **Accepted gap [Security]:** GitHub enforces token grants on the target repository at the write endpoint. Offline tests cannot inspect a live token's repository grant; a denied write is handled as a hard error, but no proactive scope check is performed. **Owner:** replace-label maintainers. **Close when:** workflow-level credential integration verifies the target-repository grant before the write, or preserve the documented server-side enforcement limitation. |
 | RL-052 | T-RL-041 | JS nonexistent-label hard-error test |
 | RL-053 | T-RL-030–031 | JS required-label gate test uses the REST response; the agent message has no label-state field. |
-| RL-054 | **Accepted gap [Security]:** `TestFormalSec_P8_TokenScopeMinimum` checks a standalone predicate, not the credential path; no conformance test establishes that the token used by `replace-label` has `issues:write`. |
-| RL-055 | **Accepted gap [Security]:** the SHOULD applies only when the default token is broader; confirming per-type token selection and its relative grants requires workflow-level credential integration. |
+| RL-054 | **Accepted gap [Security]:** `TestFormalSec_P8_TokenScopeMinimum` checks a standalone predicate, not the credential path; no conformance test establishes that the token used by `replace-label` has `issues:write`. **Owner:** replace-label maintainers. **Close when:** workflow-level credential integration proves that the actual token used by `replace-label` has `issues:write`. |
+| RL-055 | **Accepted gap [Security]:** the SHOULD applies only when the default token is broader; confirming per-type token selection and its relative grants requires workflow-level credential integration. **Owner:** replace-label maintainers. **Close when:** workflow-level credential tests prove dedicated-token selection and its grants when the default token is broader. |
 | RL-056 | T-RL-060 | `T-RL-060 does not call setLabels in staged mode` |
