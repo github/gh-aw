@@ -124,7 +124,7 @@ func FuzzSanitizeRunStepExpressions(f *testing.F) {
 				t.Errorf("executable portion of sanitized run field still contains a complete expression: %q", sanitizedRun)
 			}
 			// An incomplete wrapper cannot be extracted, but must fail validation.
-			if err := validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{result}}); err == nil {
+			if err := validateRunScriptExpressions(map[string]any{"steps": []any{result}}, true); err == nil {
 				t.Errorf("remaining malformed expression bypassed validation: %q", sanitizedRun)
 			}
 		}

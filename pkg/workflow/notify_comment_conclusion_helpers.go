@@ -70,7 +70,8 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 
 	// Add GitHub App token minting step if app is configured
 	if data.SafeOutputs.GitHubApp != nil {
-		permissions := computeConclusionJobPermissions(data)
+		// Reaction cleanup uses the activation credential, not the safe-output App.
+		permissions := conclusionSafeOutputAppPermissions(data)
 		var appTokenFallbackRepo string
 		if hasWorkflowCallTrigger(data.On) {
 			appTokenFallbackRepo = activationTargetRepoNameExpr
@@ -112,6 +113,12 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	}
 	steps = append(steps, buildUsageArtifactInputDownloadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin)...)
 	return steps
+}
+
+func conclusionSafeOutputAppPermissions(data *WorkflowData) *Permissions {
+	appData := *data
+	appData.ReactionRemoveOnComplete = false
+	return computeConclusionJobPermissions(&appData)
 }
 
 func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []string {
@@ -677,9 +684,9 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 		if IsDetectionJobEnabled(data.SafeOutputs) {
 			noComment = BuildOr(noComment, buildDetectionNoVerdictCondition())
 		}
-		return BuildAnd(condition, noComment)
+		condition = BuildAnd(condition, noComment)
 	}
-	return condition
+	return withReactionCleanupCondition(data, condition)
 }
 
 // buildConclusionJobNeeds builds dependencies for the conclusion job.

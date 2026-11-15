@@ -136,27 +136,16 @@ func GetWorkflowStatuses(ctx context.Context, pattern string, ref string, labelF
 			}
 		}
 
-		// Extract "on" field and labels from frontmatter
+		// Extract "on", labels, source and dependencies from frontmatter
 		var onField any
 		var labels []string
+		var source string
 		var dependencies []string
 		if content, err := os.ReadFile(file); err == nil {
 			contentStr := string(content)
-			if result, err := parser.ExtractFrontmatterFromContent(contentStr); err == nil {
-				if result.Frontmatter != nil {
-					onField = result.Frontmatter["on"]
-					dependencies = extractWorkflowDependencies(contentStr, result.Frontmatter)
-					// Extract labels field if present
-					if labelsField, ok := result.Frontmatter["labels"]; ok {
-						if labelsArray, ok := labelsField.([]any); ok {
-							for _, label := range labelsArray {
-								if labelStr, ok := label.(string); ok {
-									labels = append(labels, labelStr)
-								}
-							}
-						}
-					}
-				}
+			if result, err := parser.ExtractFrontmatterFromContent(contentStr); err == nil && result.Frontmatter != nil {
+				onField, labels, source = frontmatterListFields(result.Frontmatter)
+				dependencies = extractWorkflowDependencies(contentStr, result.Frontmatter)
 			}
 		}
 
@@ -193,6 +182,7 @@ func GetWorkflowStatuses(ctx context.Context, pattern string, ref string, labelF
 				Compiled: compiled,
 				Labels:   labels,
 				On:       onField,
+				Source:   source,
 			},
 			Status:        status,
 			TimeRemaining: timeRemaining,

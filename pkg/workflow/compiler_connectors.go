@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,8 +165,11 @@ func (c *Compiler) attachConnectorInputSchemas(data *WorkflowData) error {
 			if err != nil {
 				return fmt.Errorf("encode connector content configuration: %w", err)
 			}
-			data.SafeOutputs.Scripts[name].Script = "const connectorContentDefaults = JSON.parse(Buffer.from(" +
-				strconv.Quote(base64.StdEncoding.EncodeToString(encodedConfig)) + ", 'base64').toString('utf8'));\n" +
+			// Emit the trusted defaults as a JSON object literal (a JS expression).
+			// json.Marshal escapes <, >, &, U+2028 and U+2029, so the literal is
+			// safe to embed. Avoid base64 decode chains, which static scanners
+			// (runner-guard RGS-018) flag as obfuscated payload execution.
+			data.SafeOutputs.Scripts[name].Script = "const connectorContentDefaults = " + string(encodedConfig) + ";\n" +
 				data.SafeOutputs.Scripts[name].Script
 		}
 		// Imports may contribute the final global staged value after expansion.

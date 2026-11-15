@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -140,8 +139,8 @@ func TestConnectorContentCompilerDefaults(t *testing.T) {
 	), filepath.Join(root, "content.md"))
 	require.NoError(t, err)
 	script := data.SafeOutputs.Scripts["tracker-add-comment"].Script
-	encoded := base64.StdEncoding.EncodeToString([]byte(`{"body_footer":"Trusted policy for {workflow_name}","footer":false}`))
-	require.Contains(t, script, fmt.Sprintf("const connectorContentDefaults = JSON.parse(Buffer.from(%q, 'base64').toString('utf8'));", encoded))
+	require.Contains(t, script, `const connectorContentDefaults = {"body_footer":"Trusted policy for {workflow_name}","footer":false};`)
+	require.NotContains(t, script, "Buffer.from(")
 	require.Contains(t, script, "formatConnectorArguments(decodePlan(env.GH_AW_CONNECTOR_PLAN)")
 	require.Less(t, strings.Index(script, "const args = formatConnectorArguments"), strings.Index(script, "const bindings ="))
 }

@@ -191,6 +191,11 @@ function normalizeProjectUTC(content) {
   return content.replace(/^\s*GH_AW_PROJECT_UTC:.*(?:\r?\n|$)/gm, "");
 }
 
+// Keep MCP-script GitHub token environment names stable across native and wasm output.
+function normalizeMCPGitHubTokenEnv(content) {
+  return content.replace(/GH_AW_MCP_SCRIPTS_ENV_[0-9a-f]+_47485f544f4b454e/g, "GH_AW_MCP_SCRIPTS_ENV_TOKEN");
+}
+
 // ── Normalize copilot model fallback ───────────────────────────────────
 // Keep golden fixtures stable across copilot default model fallback updates.
 // Mirrors normalizeOutput() in pkg/workflow/wasm_golden_test.go.
@@ -199,12 +204,6 @@ function normalizeCopilotDefaultModel(content) {
     .replace(/\|\| 'claude-sonnet-[\d.]+'/g, "|| 'default'")
     .replace(/\|\| 'auto'/g, "|| 'default'")
     .replace(/\|\| 'gpt-[\d.][\w.-]*'/g, "|| 'default'");
-}
-
-// ── Normalize MCP GitHub token environment names ────────────────────────────
-// Mirrors testMCPGitHubTokenEnvRE in pkg/workflow/wasm_golden_test.go.
-function normalizeMCPGitHubTokenEnv(content) {
-  return content.replace(/GH_AW_MCP_SCRIPTS_ENV_[0-9a-f]+_47485f544f4b454e/g, "GH_AW_MCP_SCRIPTS_ENV_TOKEN");
 }
 
 // ── Normalize AWF config payload ─────────────────────────────────────────
@@ -254,9 +253,14 @@ function normalizeDefaultRuntimeVersions(content) {
 // new normalization steps only need to be added in one place.
 // Mirrors normalizeOutput() in pkg/workflow/wasm_golden_test.go.
 function normalize(content) {
-  return normalizeAWFConfigPayload(
-    normalizeCheckoutPin(normalizeDefaultRuntimeVersions(normalizeCopilotDefaultModel(normalizeProjectUTC(normalizeMCPGitHubTokenEnv(normalizeAWFImageTagDigests(normalizeContainerPins(normalizeHeredocDelimiters(content))))))))
-  );
+  const heredocNormalized = normalizeHeredocDelimiters(content);
+  const containerNormalized = normalizeContainerPins(heredocNormalized);
+  const imageTagsNormalized = normalizeAWFImageTagDigests(containerNormalized);
+  const projectUTCNormalized = normalizeProjectUTC(imageTagsNormalized);
+  const modelNormalized = normalizeCopilotDefaultModel(projectUTCNormalized);
+  const runtimeNormalized = normalizeDefaultRuntimeVersions(modelNormalized);
+  const checkoutNormalized = normalizeCheckoutPin(runtimeNormalized);
+  return normalizeMCPGitHubTokenEnv(normalizeAWFConfigPayload(checkoutNormalized));
 }
 
 // ── Load golden file ─────────────────────────────────────────────────

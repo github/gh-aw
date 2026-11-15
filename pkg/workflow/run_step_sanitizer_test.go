@@ -732,7 +732,7 @@ func TestSanitizeRunStepExpressionsRejectsShellCodeEvaluation(t *testing.T) {
 			workflow := map[string]any{
 				"steps": []any{result},
 			}
-			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
+			require.Error(t, validateRunScriptExpressions(workflow, true))
 		})
 	}
 }
@@ -755,8 +755,8 @@ func TestRunStepShellEvaluationRejectsAllowlistedExpressions(t *testing.T) {
 			assert.Equal(t, before, step)
 			assert.Equal(t, before, result)
 			workflow := map[string]any{"steps": []any{result}}
-			require.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow))
-			require.Error(t, validateNoTemplateInjectionFromParsed(workflow))
+			require.Error(t, validateRunScriptExpressions(workflow, true))
+			require.Error(t, validateRunScriptTemplateInjection(workflow, true))
 		})
 	}
 }
@@ -841,9 +841,9 @@ func TestSanitizeRunStepExpressionsAllowsDataAndScriptArguments(t *testing.T) {
 			assert.NotContains(t, run, "${{")
 			_, hasEnv := result["env"]
 			assert.True(t, hasEnv)
-			assert.NoError(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{
+			assert.NoError(t, validateRunScriptExpressions(map[string]any{
 				"steps": []any{result},
-			}))
+			}, true))
 		})
 	}
 }
@@ -1105,5 +1105,5 @@ func TestSanitizeRunStepExpressions_ExpressionInQuotedHeredocNotReplaced(t *test
 		"expression inside quoted heredoc must be preserved verbatim")
 
 	assert.Len(t, warnings, 1)
-	assert.Error(t, validateNoGitHubExpressionsInRunScriptsFromParsed(map[string]any{"steps": []any{result}}))
+	assert.Error(t, validateRunScriptExpressions(map[string]any{"steps": []any{result}}, true))
 }

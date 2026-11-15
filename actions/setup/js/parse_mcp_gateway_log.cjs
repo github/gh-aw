@@ -53,7 +53,7 @@ const AI_CREDITS_RATE_LIMIT_PATTERNS = [
   /\b429\b.{0,80}(?:rate[\s-]*limit|too many requests|ai[\s_-]*credits?)/i,
 ];
 // Detects the AWF API proxy HTTP 400 error emitted when maxAiCredits is active and
-// the requested model is not in the built-in pricing table.
+// AWF has no pricing for the requested model.
 const UNKNOWN_MODEL_AI_CREDITS_PATTERNS = [/\bunknown_model_ai_credits\b/i];
 
 /**

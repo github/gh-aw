@@ -2,7 +2,7 @@
 //
 // # MCP Validation Entry Points
 //
-//   - ValidateMCPConfigs() - Orchestrates MCP validation for merged tools map entries
+//   - validateMCPConfigsWithWarnings() - Orchestrates MCP validation for merged tools map entries
 //   - ValidateToolsSection() - Validates built-in tool names in tools:
 //   - getRawMCPConfig() - Extracts raw MCP config fields and checks unknown properties
 //   - inferMCPType() - Infers MCP type (http/stdio) from present fields
@@ -55,14 +55,6 @@ var builtInToolNamesForError = func() string {
 	names := sliceutil.SortedKeys(builtInToolNames)
 	return strings.Join(names, ", ")
 }()
-
-// ValidateMCPConfigs validates all MCP configurations in the tools section using JSON schema.
-// It validates MCP server entries (from mcp-servers, merged into tools) but does not check
-// for unknown tool names — that is done earlier by ValidateToolsSection.
-func ValidateMCPConfigs(tools map[string]any) error {
-	_, err := validateMCPConfigsWithWarnings(tools)
-	return err
-}
 
 func validateMCPConfigsWithWarnings(tools map[string]any) ([]string, error) {
 	mcpValidationLog.Printf("Validating MCP configurations for %d tools", len(tools))

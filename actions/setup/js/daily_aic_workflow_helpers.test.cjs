@@ -72,13 +72,10 @@ describe("daily_aic_workflow_helpers", () => {
       expect(exports.sumAICFromUsageJSONLFiles([filePath])).toBe(0.15);
     });
 
-    it("falls back to inference-cost computation from token fields when no explicit AIC", () => {
+    it("reports token-only usage as unpriced when model pricing is unavailable", () => {
       const filePath = path.join(tmpDir, "usage.jsonl");
       fs.writeFileSync(filePath, JSON.stringify({ model: "gpt-4o", provider: "openai", input_tokens: 1000, output_tokens: 500 }), "utf8");
-      const result = exports.sumAICFromUsageJSONLFiles([filePath]);
-      // Intentionally pinned to current catalog pricing so a legitimate pricing-table change fails loudly here.
-      // Current catalog pricing for openai/gpt-4o: 1000 * 2.5e-06 USD + 500 * 1e-05 USD = 0.0075 USD = 0.75 AIC.
-      expect(result).toBe(0.75);
+      expect(() => exports.sumAICFromUsageJSONLFiles([filePath])).toThrow("unpriced");
     });
 
     it("ignores malformed (non-JSON) lines", () => {

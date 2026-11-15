@@ -137,7 +137,7 @@ func validateRunInputs(inputs []string) error {
 }
 
 func prepareWorkflowRun(ctx context.Context, workflowIdOrName string, opts RunOptions) (*workflowRunPreparation, error) {
-	if err := validateWorkflowForRun(workflowIdOrName, opts); err != nil {
+	if err := validateWorkflowForRun(ctx, workflowIdOrName, opts); err != nil {
 		return nil, err
 	}
 	enableState, err := handleWorkflowEnablement(ctx, workflowIdOrName, opts)
@@ -159,10 +159,10 @@ func prepareWorkflowRun(ctx context.Context, workflowIdOrName string, opts RunOp
 	return prep, nil
 }
 
-func validateWorkflowForRun(workflowIdOrName string, opts RunOptions) error {
+func validateWorkflowForRun(ctx context.Context, workflowIdOrName string, opts RunOptions) error {
 	if opts.RepoOverride != "" {
 		executionLog.Printf("Validating remote workflow: %s in repo %s", workflowIdOrName, opts.RepoOverride)
-		if err := validateRemoteWorkflow(workflowIdOrName, opts.RepoOverride, opts.Verbose); err != nil {
+		if err := validateRemoteWorkflow(ctx, workflowIdOrName, opts.RepoOverride, opts.Verbose); err != nil {
 			return fmt.Errorf("failed to validate remote workflow: %w", err)
 		}
 		return nil
@@ -559,13 +559,13 @@ func restoreEnabledWorkflow(workflowIdOrName string, opts RunOptions, state work
 }
 
 // validateWorkflowsForRun validates all workflow names before running.
-func validateWorkflowsForRun(workflowNames []string, opts RunOptions) error {
+func validateWorkflowsForRun(ctx context.Context, workflowNames []string, opts RunOptions) error {
 	for _, workflowName := range workflowNames {
 		if workflowName == "" {
 			return errors.New("workflow name cannot be empty")
 		}
 		if opts.RepoOverride != "" {
-			if err := validateRemoteWorkflow(workflowName, opts.RepoOverride, opts.Verbose); err != nil {
+			if err := validateRemoteWorkflow(ctx, workflowName, opts.RepoOverride, opts.Verbose); err != nil {
 				return fmt.Errorf("failed to validate remote workflow '%s': %w", workflowName, err)
 			}
 		} else {
@@ -659,7 +659,7 @@ func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, opts RunO
 		return ctx.Err()
 	default:
 	}
-	if err := validateWorkflowsForRun(workflowNames, opts); err != nil {
+	if err := validateWorkflowsForRun(ctx, workflowNames, opts); err != nil {
 		return err
 	}
 	runAllWorkflows := func() error {

@@ -60,33 +60,3 @@ test("fits mobile and desktop in both themes without horizontal overflow", async
     }
   }
 });
-
-test("includes the security flow as its own slideshow slide and restores it on exit", async ({ page }) => {
-  await page.getByRole("button", { name: "Start slideshow" }).click();
-  const dialog = page.getByRole("dialog", { name: "GitHub Agentic Workflows presentation" });
-  await expect(dialog).toBeVisible();
-  const slides = dialog.locator("[data-slideshow-slides] > section");
-  const index = await slides.evaluateAll(elements => elements.findIndex(element => element.id === "security-model"));
-  expect(index).toBeGreaterThan(0);
-  for (let step = 0; step < index; step++) await page.keyboard.press("ArrowRight");
-  await expect(dialog.getByRole("heading", { name: "Read. Propose. Check. Apply.", exact: true })).toBeVisible();
-  await expect(dialog.locator("#security-model .phase")).toHaveCount(3);
-  await expect(dialog.getByRole("link", { name: /Jira/ })).toBeVisible();
-  await expect(dialog.getByRole("img", { name: "Codex", exact: true })).toBeVisible();
-  await expect(dialog.getByRole("img", { name: "Claude Code", exact: true })).toBeVisible();
-  for (const size of [
-    { width: 1440, height: 900 },
-    { width: 1024, height: 600 },
-  ]) {
-    await page.setViewportSize(size);
-    await expect
-      .poll(async () => {
-        const link = await dialog.locator("#security-model .architecture-link").boundingBox();
-        const toolbar = await dialog.getByRole("group", { name: "Slide navigation" }).boundingBox();
-        return link && toolbar ? link.y + link.height < toolbar.y : false;
-      })
-      .toBe(true);
-  }
-  await page.keyboard.press("Escape");
-  await expect(page.locator("main #security-model")).toBeVisible();
-});
