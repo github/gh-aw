@@ -1,11 +1,14 @@
-# Workflow Health — 2026-11-14T04:30Z (Workflow Health Manager)
-- Compile: 367/367 executable `.md` workflows have `.lock.yml`. compile-validate.txt holds only the install line (no fresh compile result).
-- Trend: not computed. Daily snapshots lack a consistent ecosystem-level series, so no 7-day vs prior-7-day comparison is reported.
-- Metrics: `metrics/latest.json` (window 2026-11-13T02:31Z to 2026-11-14T02:31Z): 592 runs, 584 executed, 423 ok, 161 failed (72.4%).
-- Tiers (executed >=2): Healthy 12, Warning 3, Critical 8, Low-sample 136, Inactive 208. Differs from the 2026-11-13 dashboard basis (121/6/84/150); not reconciled.
-- Critical: auditor 2/21; daily-go-test-parallelizer 0/9 (tracked #77069); pr-specification-reviewer 20/67 overall; command/mention-triggered (slash_command), so score activated runs only. Last 15 runs: 9 success, 3 failure, 2 action_required (approval gate), 1 skipped; smoke-copilot 0/2; also 1/2: daily-credit-limit-test, dependabot-burner, smoke-claude-dynamic, visual-regression-checker (n too small).
-- Auditor P1 tracker #77062 EXPIRED and auto-closed 2026-11-13T04:37Z while failing (21/23 scheduled runs failed 11-13 05:27Z to 11-14 03:28Z). Re-filed this run as temp id #77641. Failing step: "Collect health failures, cached logs and bounded audits". Root cause unverified (job logs HTTP 403, DIFC).
-- Systemic (no tracker found): "Handle agent failure" conclusion job fails while agent succeeds in daily-doc-updater (11-13 10:36Z), daily-experiment-report (07:50Z), daily-byok-ollama-test (22:20Z).
-- AWF "Install AWF binary" failure recurred: daily-spending-forecast 2026-11-13T09:36Z. Prior note said none since 11-12 23:30Z, so the cluster is not closed.
-- Daily RAI Specification Review: safe_outputs failure, patch outside allowed-files (#77631, tracked).
-- Actions this run: re-filed Auditor P1 tracker (create_issue, temp id #77641); created 2026-11-14 dashboard (create_issue, temp id #77642). Supersedes dashboard #77346.
+# Workflow Health — 2026-11-15T04:30Z (Workflow Health Manager)
+- Compile: 367/367 executable `.md` workflows have `.lock.yml` (lock presence only; compile-validate.txt holds only the install line).
+- Metrics: `metrics/latest.json`, window 2026-11-14T02:33:44Z to 2026-11-15T02:33:44Z. Daily 2026-11-15 snapshot is identical.
+- Tiers, all 367 workflows: Healthy 17, Warning 3, Critical 8, Low-sample 141, Inactive 198.
+- Tiers, excluding 69 command/mention-triggered workflows (298 measured): Healthy 9, Warning 2, Critical 6, Low-sample 118, Inactive 163.
+- Critical (scored): auditor 0/21; daily-go-test-parallelizer 0/9; contribution-check 3/6; daily-credit-limit-test 1/2; smoke-codex-routed-openai 0/2.
+- Critical (command-triggered, activated runs only): ai-moderator 2/10; smoke-copilot-aoai-apikey 0/2.
+- Warning: aw-failure-investigator 3/4; code-scanning-fixer 3/4.
+- Trend: 7-day unavailable. Daily snapshots 11-11 and 11-12 have null counts, 11-09 is partial, 11-10 is missing.
+- Auditor P1 tracker #77641 open (#77062 closed not_planned). Failing step: Collect failure evidence. Root cause unverified (logs HTTP 403, DIFC).
+- DGTP parent #77069 closed not_planned while 0/9. Agent succeeds, conclusion job fails.
+- NEW tracker (temp id aw_cj01, output so_kzALXOX1QwCY): conclusion-job "Handle agent failure" fails while agent succeeds. 14/40 sampled failed runs, 10 workflows. Previously untracked.
+- Dashboard filed: "Workflow Health Dashboard - 2026-11-15" (output so_oSSnc3KBQg-f).
+- Metrics caveat: total != successful+failed+skipped+action_required for several rows. Unexplained.

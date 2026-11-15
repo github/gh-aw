@@ -293,3 +293,11 @@
 - #77069 (DGTP parent) closed not_planned 2026-11-14 while DGTP is still 0/9 (9 runs, 6.06M tokens). Five open incomplete-result issues from today: #77638, #77686, #77715, #77726, #77743. Prompt-improvement issue filed this run (cursor retry loop, no stop rule).
 - pr-specification-reviewer failures (7 open "Failed jobs" issues: #77467, #77485, #77487, #77489, #77492, #77520, #77521) all trace to the non-agent `push_ledger_changes` job. Existing tracker #77383. Do not file a duplicate.
 - Auditor: #77062 closed not_planned 2026-11-13. Current tracker #77641 is open. Logs HTTP 403; time_budget cause is still unverified.
+
+## Update — 2026-11-15T04:30Z (Workflow Health Manager)
+- **New tracker for the conclusion-job pattern.** Filed "Conclusion job fails while agent succeeds across several agentic workflows" (temp id aw_cj01, output so_kzALXOX1QwCY). In 40 sampled failed runs, 14 had agent=success and conclusion=failure, across 10 workflows. Do not file per-workflow duplicates; cite this tracker.
+- **Dashboard filed** for 2026-11-15 (output so_oSSnc3KBQg-f). Tier counts use the same metrics window in both views.
+- Auditor: #77062 is closed. Only #77641 is open. Root cause still unverified (logs HTTP 403).
+- DGTP: #77069 closed not_planned while 0/9. Its conclusion-job failures are part of the aw_cj01 pattern.
+- Smoke: smoke-copilot-aoai-apikey (0/2) and smoke-codex-routed-openai (0/2) are tracked in #77939, #77767, #77926, #77928. Do not open duplicates.
+- Stale notes, do not cite as pending: avenger.md npm-symlink, gpclean.md retired model, #63656 and #63657 (closed not_planned, per the 2026-11-14 note). The model-provider gap on metrics-collector.md was not re-verified this run; treat it as unverified.
