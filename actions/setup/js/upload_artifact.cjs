@@ -253,6 +253,9 @@ function listFilesRecursive(dir, baseDir) {
  * @returns {{ error: string|null }}
  */
 function copySingleFileToStaging(sourcePath, destRelPath) {
+  if (path.basename(destRelPath).startsWith("-")) {
+    return { error: `filenames beginning with "-" are not allowed: ${destRelPath}` };
+  }
   const destPath = path.join(stagingDirectory(), destRelPath);
   // Never overwrite a file that is already staged — the pre-staged version takes precedence.
   if (fs.existsSync(destPath)) {
@@ -526,6 +529,10 @@ function resolveFiles(request, allowedPaths, defaultInclude, defaultExclude) {
 
   // Deduplicate and sort deterministically.
   const unique = Array.from(new Set(candidateRelPaths)).sort();
+  const leadingDashFilename = unique.find(filename => path.basename(filename).startsWith("-"));
+  if (leadingDashFilename) {
+    return { files: [], error: `filenames beginning with "-" are not allowed: ${leadingDashFilename}` };
+  }
   if (currentClaimHandle()) for (const filename of unique) assertClaimArtifactFile(path.join(stagingDirectory(), filename), stagingDirectory());
   return { files: unique, error: null };
 }
