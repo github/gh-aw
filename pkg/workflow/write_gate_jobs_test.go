@@ -95,6 +95,76 @@ func TestWriteGateGuardsAllPublicationJobs(t *testing.T) {
 	}
 }
 
+func TestWriteGatePreservesOriginalDependencySuccess(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		condition    string
+		implicit     bool
+		explicitMode string
+	}{
+		{"empty", "", true, ""},
+		{"simple", "vars.PUBLISH == 'true'", true, ""},
+		{"wrapped simple", "${{ vars.PUBLISH == 'true' }}", true, ""},
+		{"quoted status text", "vars.MODE == 'always()'", true, ""},
+		{"always", "always()", false, "always"},
+		{"case insensitive always", "ALWAYS ()", false, "always"},
+		{"failure", "failure()", false, "failure"},
+		{"success", "success()", false, "success"},
+		{"not cancelled", "!cancelled()", false, "always"},
+		{"cancelled", "cancelled()", false, "cancelled"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.jobManager = NewJobManager()
+			require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "safe_outputs"}))
+			require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "extra"}))
+			writer := &Job{Name: "publish_result", If: test.condition, Needs: []string{"extra"}}
+			require.NoError(t, compiler.jobManager.AddJob(writer))
+			require.NoError(t, compiler.guardPublicationWriteGate(writeGateTestData()))
+			require.NotContains(t, writer.If, "${{", "a wrapped original condition must not become an embedded interpolation")
+			if test.implicit {
+				require.Contains(t, writer.If, "success()", "the added status check must not remove implicit dependency success")
+			}
+			for _, result := range []string{"success", "failure", "cancelled", "skipped"} {
+				replacements := []string{
+					"!cancelled()", "('true' == 'true')",
+					"cancelled()", "('true' == 'false')",
+					"success()", "needs.extra.result == 'success'",
+					"failure()", "needs.extra.result == 'failure'",
+				}
+				if test.explicitMode == "always" {
+					replacements = append(replacements, "always()", "('true' == 'true')", "ALWAYS ()", "('true' == 'true')")
+				}
+				condition := strings.NewReplacer(replacements...).Replace(writer.If)
+				for _, verdict := range []string{"allow", "partial", "deny", ""} {
+					want := verdict == "allow" || verdict == "partial"
+					switch test.explicitMode {
+					case "always":
+					case "failure":
+						want = want && result == "failure"
+					case "cancelled":
+						want = false
+					default:
+						want = want && result == "success"
+					}
+					require.Equal(t, want, evaluateTestCondition(t, condition, map[string]string{
+						"needs.extra.result": result, "needs.safe_outputs.result": "success",
+						"needs.safe_outputs.outputs.write_gate": verdict,
+						"vars.PUBLISH":                          "true", "vars.MODE": "always()",
+					}), "extra=%s verdict=%s", result, verdict)
+				}
+				if strings.Contains(test.condition, "vars.") {
+					require.False(t, evaluateTestCondition(t, condition, map[string]string{
+						"needs.extra.result": result, "needs.safe_outputs.result": "success",
+						"needs.safe_outputs.outputs.write_gate": "allow",
+						"vars.PUBLISH":                          "false", "vars.MODE": "never()",
+					}), "the original false predicate must still block publication")
+				}
+			}
+		})
+	}
+}
+
 func TestWriteGateRejectsPublicationDependencyCycle(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.jobManager = NewJobManager()

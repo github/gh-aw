@@ -7,6 +7,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 // publicationJobNames is shared by the write gate and require-agent-success.
@@ -108,12 +109,30 @@ func (c *Compiler) guardPublicationWriteGate(data *WorkflowData) error {
 		if !exists {
 			continue
 		}
+		originalCondition := stripExpressionWrapper(c.extractExpressionFromIfString(job.If))
+		hasOriginalStatus := false
+		if originalCondition != "" {
+			expression, err := actionslanguageservice.ParseSyntax(originalCondition)
+			if err != nil {
+				return fmt.Errorf("jobs.%s.if: expected one valid GitHub Actions expression: %w", name, err)
+			}
+			actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+				if node.Kind == "call" && isStatusFunc(BuildFunctionCall(strings.ToLower(node.Token.Text))) {
+					hasOriginalStatus = true
+				}
+				return !hasOriginalStatus
+			})
+		}
 		if !slices.Contains(job.Needs, string(constants.SafeOutputsJobName)) {
 			job.Needs = append(job.Needs, string(constants.SafeOutputsJobName))
 		}
 		condition := buildWriteGateAllowedCondition()
-		if job.If != "" {
-			condition = BuildAnd(condition, &ExpressionNode{Expression: c.extractExpressionFromIfString(job.If)})
+		// Adding !cancelled() must not remove Actions' implicit dependency gate.
+		if !hasOriginalStatus {
+			condition = BuildAnd(BuildFunctionCall("success"), condition)
+		}
+		if originalCondition != "" {
+			condition = BuildAnd(condition, &ExpressionNode{Expression: originalCondition})
 		}
 		// Keep the existing require-agent-success rendering outside gated mode.
 		if !strings.Contains(job.If, "needs.agent.result == 'success'") {
