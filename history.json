@@ -239,8 +239,21 @@
       "avg_comments": 0.93,
       "success_rate": 0.7333,
       "note": "primary analysis window (2026-11-13T00:00:00Z..2026-11-14T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=15, 2 still open at collection time (#77471 model-pricing-catalog removal, long-running with many CI follow-up cycles; #77573 startup-failure log capture, created 22:30Z, not stalled); agent_prs_merged_from_created=11, closed_prs=2 (#77506 'Close daily SPDD specification gaps' and #77473 '[WIP] Refactor logs_orchestrator_download.go', both have substantive bodies describing real work, not bare placeholders); agent_success_rate=73.3%, down vs 11-12 (81.0%->73.3%, -9.5% relative, not significant) but down sharply vs 11-11 (87.5%->73.3%, -16.2% relative over the 3-day window, significant); avg_duration created->merged over 11 merged PRs=400.34min, down vs 11-12 (645.0->400.34min, -37.9%, significant) but up vs 11-11 (282.53->400.34min, +41.7%, significant); agent_prs_merged (event-scoped, mergedAt in window)=13, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range, total_count=13), cross-checked against 47 all-author merged PRs in window (13<=47, consistent); volume down sharply vs 11-11 (32->15, -53.1%, significant); avg_comments=0.93 is human (non-bot) issue-thread comments only via get_comments across all 15 cohort PRs (review-thread comments via get_review_comments not collected due to cost) \u2014 most PR interaction here is automated reviewer-bot activity (Design Decision Gate, PR Code Quality Reviewer, Test Quality Sentinel, etc.), not human comments, so this is a low but expected figure, not directly comparable to pre-11-10 days that used a different comment-counting method"
+    },
+    {
+      "date": "2026-11-14",
+      "agent_prs_total": 1,
+      "agent_prs_merged": 7,
+      "agent_prs_merged_from_created": 1,
+      "closed_prs": 0,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 96.93,
+      "avg_total_duration_minutes": 96.93,
+      "avg_comments": 0.0,
+      "success_rate": 1.0,
+      "note": "primary analysis window (2026-11-14T00:00:00Z..2026-11-15T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=1 (#77798 'Redraw centralized campaigns as an enterprise network'), merged same day, 0 open, 0 closed-without-merge; agent_success_rate=100% (1/1) but N=1 so not statistically meaningful vs prior days; avg_duration created->merged for the 1 merged PR=96.93min (14:52:32Z->16:29:28Z), total_duration same since merged_at==closed_at; agent_prs_merged (event-scoped, mergedAt in window)=7, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged:2026-11-14T00:00:00Z..2026-11-14T23:59:59Z, total_count=7), cross-checked against 106 all-author merged PRs in window (7<=106, consistent); avg_comments=0.0 human (non-bot) comments on the 1 cohort PR (its sole comment was from github-actions[bot] Test Quality Sentinel); success_rate up vs 11-13 (73.3%->100%, +36.5% relative, significant) but driven by extremely low volume (N=1); avg_duration down sharply vs 11-13 (400.34->96.93min, -75.8%, significant); volume down sharply vs 11-13 (15->1, -93.3%, significant) \u2014 lowest creation-cohort volume in the retained history window"
     }
   ],
-  "last_updated": "2026-11-13",
+  "last_updated": "2026-11-14",
   "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward; gap-filled 11-08..11-10 during the 2026-11-11 run after a 3-day workflow gap (same pattern as the 11-04..11-06 gap resolved on 2026-11-07) Gap-filled 11-11..11-13 during the 2026-11-14 run after a 3-day workflow gap (same recurring pattern as the 11-04..11-06 and 11-08..11-10 gaps)."
 }
