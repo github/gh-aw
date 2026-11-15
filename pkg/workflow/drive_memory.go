@@ -16,6 +16,7 @@ func generateDriveMemorySteps(builder *strings.Builder, data *WorkflowData, pinA
 	}
 
 	threatDetectionEnabled := IsDetectionJobEnabled(data.SafeOutputs)
+	deferPersistence := threatDetectionEnabled || hasWriteGateSteps(data)
 	var githubConfig *GitHubToolConfig
 	if data.ParsedTools != nil {
 		githubConfig = data.ParsedTools.GitHub
@@ -38,12 +39,12 @@ func generateDriveMemorySteps(builder *strings.Builder, data *WorkflowData, pinA
 		if drive.Prefetch {
 			builder.WriteString("          prefetch: true\n")
 		}
-		if data.DryRun || drive.RestoreOnly || threatDetectionEnabled {
+		if data.DryRun || drive.RestoreOnly || deferPersistence {
 			builder.WriteString("          write: false\n")
 		} else {
 			builder.WriteString("          write: true\n")
 		}
-		if threatDetectionEnabled && !drive.RestoreOnly {
+		if deferPersistence && !drive.RestoreOnly {
 			generateDriveMemoryBaselineSteps(builder, data, drive, mountPath, pinAction)
 		}
 
@@ -152,7 +153,7 @@ func generateDriveMemoryPersistence(builder *strings.Builder, data *WorkflowData
 		if drive.RestoreOnly {
 			continue
 		}
-		if threatDetectionEnabled {
+		if threatDetectionEnabled || hasWriteGateSteps(data) {
 			recoveryStepID := "validate_recovery_drive_" + SanitizeWorkflowIDForCacheKey(drive.ID)
 			generateRecoveryEnvelopeValidationStep(builder, recoveryStepID, data, pinAction, "${{ github.workspace }}/"+driveMemoryMountPathFor(drive.ID))
 			fmt.Fprintf(builder, "      - name: Upload drive-memory data as artifact (%s)\n", drive.ID)
@@ -211,7 +212,7 @@ func generateDriveMemoryBaselineArtifactName(data *WorkflowData, id string) stri
 }
 
 func (c *Compiler) buildUpdateDriveMemoryJob(data *WorkflowData, threatDetectionEnabled bool) (*Job, error) {
-	if !threatDetectionEnabled || data.DriveMemoryConfig == nil {
+	if (!threatDetectionEnabled && !hasWriteGateSteps(data)) || data.DriveMemoryConfig == nil {
 		return nil, nil
 	}
 
@@ -240,6 +241,13 @@ func (c *Compiler) buildUpdateDriveMemoryJob(data *WorkflowData, threatDetection
 		BuildStringLiteral("success"),
 	)
 	condition := RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), buildDetectionAcceptedCondition()), agentSucceeded))
+	needs := []string{string(constants.AgentJobName), string(constants.DetectionJobName), string(constants.ActivationJobName)}
+	if hasWriteGateSteps(data) {
+		condition = RenderCondition(BuildAnd(BuildFunctionCall("always"), agentSucceeded))
+		if !threatDetectionEnabled {
+			needs = []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
+		}
+	}
 	perms := NewPermissionsEmpty()
 	perms.Set(PermissionContents, PermissionRead)
 	perms.Set(PermissionIdToken, PermissionWrite)
@@ -249,7 +257,7 @@ func (c *Compiler) buildUpdateDriveMemoryJob(data *WorkflowData, threatDetection
 		RunsOn:      "runs-on: ubuntu-latest",
 		If:          condition,
 		Permissions: perms.RenderToYAML(),
-		Needs:       []string{string(constants.AgentJobName), string(constants.DetectionJobName), string(constants.ActivationJobName)},
+		Needs:       needs,
 		Steps:       steps,
 	}, nil
 }

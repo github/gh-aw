@@ -101,7 +101,7 @@ These are reproducible finite bounds, not a proof over arbitrary inputs.
 
 In the last recorded run, all ten negative controls produced their required
 invariant counterexamples. They were not rerun for this update; verification
-against the current 95-case corpus and controls is pending.
+against the current full corpus and controls is pending.
 
 | Deliberate defect | Required invariant violation |
 |---|---|

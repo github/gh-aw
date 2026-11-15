@@ -108,6 +108,28 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 	manifest.MCPServers = collectMCPServersForManifest(data)
 	manifest.ThreatDetection = collectDetectionPolicyForManifest(data)
 	manifest.Admission = data.AdmissionEnabled
+	if hasWriteGateSteps(data) {
+		recordJob, exists := c.jobManager.GetJob("conclusion")
+		if !exists {
+			return fmt.Errorf("jobs.safe_outputs.gate-steps requires conclusion to record the verdict")
+		}
+		recordJobName := recordJob.DisplayName
+		if recordJobName == "" {
+			recordJobName = recordJob.Name
+		}
+		replayConfig, err := c.buildWriteGateReplayConfig(data)
+		if err != nil {
+			return err
+		}
+		replayTypes := sliceutil.Filter(sliceutil.SortedKeys(handlerRegistry), func(name string) bool {
+			return replayConfig[name] != nil && isStaticWriteGateReplayType(name, data)
+		})
+		manifest.WriteGate = &GHAWManifestWriteGate{
+			Version: 1, RecordJob: recordJobName, ArtifactImmutable: !data.GHES,
+			ReplayConfig: replayConfig, ReplayTypes: replayTypes,
+			ReplayStaged: data.SafeOutputs != nil && templatableBoolIsTrue(data.SafeOutputs.Staged),
+		}
+	}
 	manifest.WebhookSubscriptions = data.WebhookSubscriptions
 	if err := deduplicateMarkdownMetadata(yaml.String(), manifest); err != nil {
 		return fmt.Errorf("cannot generate gh-aw-manifest header: cannot deduplicate Markdown metadata: %w", err)

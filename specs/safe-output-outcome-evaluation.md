@@ -81,6 +81,14 @@ separately count `gate_denied`, `gate_held`, `gate_staged`, and `gate_dropped`;
 these counts are not acceptance, rejection, or unknown counts. Ungated runs
 retain their existing output shape.
 
+When denial prevents the handler result file from being created, conclusion
+MAY record compiler-owned skipped `safe_output.result` events from the verified
+pending manifest and independently pinned decision inventory. These records
+identify policy suppression, not execution; they MUST NOT invent resource
+URLs or successful effects. Logs outcomes merge these events with handler
+records by `output_id`, preferring actual execution evidence. Missing or
+invalid policy pins MUST NOT synthesize a skipped or successful effect.
+
 ### CLI conformance
 
 The Go CLI executes the cases in `pkg/cli/testdata/outcome_conformance.json`.
