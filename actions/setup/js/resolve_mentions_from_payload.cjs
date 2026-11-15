@@ -292,6 +292,12 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
  * @returns {Promise<string[]>}
  */
 async function resolveMentionsForItem(context, github, core, mentionsConfig, defaultAliases, defaultRepo, itemRepo) {
+  const { pendingWritesEnabled, currentPendingWrite, integrityError } = require("./pending_writes.cjs");
+  if (pendingWritesEnabled()) {
+    const pending = currentPendingWrite();
+    if (!pending?.settings?.mention_allowances) throw integrityError("mention_plan_missing");
+    return [...pending.settings.mention_allowances];
+  }
   if (mentionsConfig == null || mentionsConfig === false || itemRepo.repo.toLowerCase() === defaultRepo.toLowerCase()) {
     return defaultAliases;
   }
@@ -309,6 +315,7 @@ async function resolveMentionsForItem(context, github, core, mentionsConfig, def
  * @returns {Promise<string[]>}
  */
 async function resolveDefaultMentions(context, github, core, mentionsConfig, defaultRepo) {
+  if (require("./pending_writes.cjs").pendingWritesEnabled()) return [];
   const targetRepo = parseRepoSlug(defaultRepo);
   return targetRepo ? resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, undefined, targetRepo) : [];
 }
