@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 96 active analyzers:
+// All 97 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -40,6 +40,7 @@
 //   - ignoredlocalerror — reports discarded errors from functions in the gh-aw module
 //   - ioutildeprecated — reports uses of deprecated io/ioutil functions that should be replaced with io or os package equivalents
 //   - jsonmarshalignoredeerror — flags json.Marshal/Unmarshal calls where the error is discarded with _
+//   - jsondecodertrailingdataunchecked — reports json.Decoder.Decode calls on in-memory decoders that do not verify io.EOF
 //   - jsonunmarshalbytesconversion — reports json.Unmarshal calls that convert a string to []byte
 //   - largefunc — flags function bodies that exceed a configurable line-count threshold
 //   - lenstringsplit — flags len(strings.Split(s, sep)) with a non-empty separator that should use strings.Count(s, sep)+1
