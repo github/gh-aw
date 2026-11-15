@@ -21,6 +21,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -399,6 +400,28 @@ func TestFormalReplaceLabelP3_ValidationConfigFields(t *testing.T) {
 	assert.True(t, cfg.Fields["item_number"].IssueNumberOrTemporaryID)
 	assert.Equal(t, "string", cfg.Fields["repo"].Type)
 	assert.Equal(t, 256, cfg.Fields["repo"].MaxLength)
+}
+
+func TestFormalReplaceLabelRL009_CommonValidationConfig(t *testing.T) {
+	configJSON, err := GetValidationConfigJSONWithDataSchema([]string{"replace_label"}, nil, false, nil)
+	require.NoError(t, err)
+
+	var config map[string]TypeValidationConfig
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+	require.Contains(t, config, "replace_label")
+	assert.Equal(t, ValidationConfig["replace_label"], config["replace_label"])
+}
+
+func TestFormalReplaceLabelRL011_MaxExpressionPreservedForRuntime(t *testing.T) {
+	max := "${{ inputs.max }}"
+	config := &SafeOutputsConfig{
+		ReplaceLabel: &ReplaceLabelConfig{
+			BaseSafeOutputConfig: BaseSafeOutputConfig{Max: &max},
+		},
+	}
+
+	require.NoError(t, validateSafeOutputsMax(config))
+	assert.Equal(t, "${{ inputs.max }}", *config.ReplaceLabel.Max)
 }
 
 func TestFormalReplaceLabelP4_AllowlistEnforcement(t *testing.T) {
