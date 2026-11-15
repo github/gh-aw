@@ -68,6 +68,9 @@ url=""
 prev=""
 https_only=false
 https_redirects=false
+retry=""
+retry_max_time=""
+connect_timeout=""
 for arg in "$@"; do
   if [ "$prev" = "-o" ]; then
     out="$arg"
@@ -76,11 +79,22 @@ for arg in "$@"; do
   fi
   if [ "$prev" = "--proto" ] && [ "$arg" = "=https" ]; then https_only=true; fi
   if [ "$prev" = "--proto-redir" ] && [ "$arg" = "=https" ]; then https_redirects=true; fi
+  if [ "$prev" = "--retry" ]; then retry="$arg"; fi
+  if [ "$prev" = "--retry-max-time" ]; then retry_max_time="$arg"; fi
+  if [ "$prev" = "--connect-timeout" ]; then connect_timeout="$arg"; fi
+  if [ "$arg" = "--retry-delay" ] || [ "$arg" = "--max-time" ]; then
+    echo "download must use exponential backoff without a total transfer timeout" >&2
+    exit 97
+  fi
   prev="$arg"
 done
 if [ "$https_only" != true ] || [ "$https_redirects" != true ]; then
   echo "missing HTTPS-only initial/redirect policy" >&2
   exit 96
+fi
+if [ "$retry" != 8 ] || [ "$retry_max_time" != 180 ] || [ "$connect_timeout" != 15 ]; then
+  echo "missing bounded exponential retry policy" >&2
+  exit 97
 fi
 echo "$url" >>"${SANDBOX_URL_LOG}"
 printf '%s\n' '#!/usr/bin/env bash' 'echo verified >>"${SANDBOX_EXECUTION_LOG}"' >"$out"
