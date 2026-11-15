@@ -71,6 +71,7 @@ const { collectDeliveryEvidence, publishDeliveryEvidence } = require("./work_que
 const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
 const { assertPendingWritesIntegrity, withPendingWrite } = require("./pending_writes.cjs");
+const { createWriteGateRuntime } = require("./write_gate_runtime.cjs");
 
 /**
  * Handler map configuration
@@ -1021,7 +1022,7 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  *
  * @param {Map<string, Function>} messageHandlers - Map of message handler functions
  * @param {Array<Object>} messages - Array of safe output messages
- * @param {((item: {type: string, url?: string, number?: number, repo?: string, temporaryId?: string}) => void)|null} [onItemCreated] - Optional callback invoked after each successful create operation (for manifest logging)
+ * @param {((item: Omit<import("./safe_output_manifest.cjs").ManifestEntry, "timestamp">) => void)|null} [onItemCreated] - Optional callback invoked after each successful create operation (for manifest logging)
  * @param {((results: Array<any>, protectedTargets: Set<string>, requiredComments: Map<string, any[]>) => Promise<void>)|null} [finalizeBufferedOutputs] - Finalize buffered effects before resolving waiting dependencies
  * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
  */
@@ -1036,7 +1037,8 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       return { ...message, _claimScopeError: getErrorMessage(error) };
     }
   });
-  const dependencyPlan = buildSafeOutputDependencyPlan(messages);
+  const writeGate = createWriteGateRuntime(messages);
+  const dependencyPlan = buildSafeOutputDependencyPlan(writeGate?.planningMessages || messages);
   if (dependencyPlan.cyclic) core.warning("Safe-output dependency cycle detected; preserving legacy temporary-ID ordering only for messages without depends-on");
   const processingOrder = dependencyPlan.order;
   const waitingMessages = [];
@@ -1142,12 +1144,17 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   async function processMessage(i, allowWaiting) {
     let message = messages[i];
     const messageType = message.type;
+    const gateSelection = writeGate ? await writeGate.select(i, getThreatWarningPolicy(messageType, messageHandlers).policy) : null;
     const dependency = checkSafeOutputDependencies(dependencyPlan, i, results, allowWaiting, reviewCommentPrerequisites(i));
     if (dependency.state === "waiting") {
       waitingMessages.push(i);
       return;
     }
     if (dependency.state === "failed") {
+      if (writeGate) {
+        writeGate.drop(i, "gate_dependency_unapplied");
+        onItemCreated?.({ type: messageType, status: "skipped", skipped: true, reason: "gate_dropped", ...writeGate.metadata(i) });
+      }
       results.push({ type: messageType, messageIndex: i, success: false, errorCode: dependency.errorCode, error: dependency.error });
       return;
     }
@@ -1170,6 +1177,30 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
     if (!messageType) {
       core.warning(`Skipping message ${i + 1} without type`);
       return;
+    }
+
+    if (writeGate && gateSelection) {
+      const selection = gateSelection;
+      if (selection.decision !== "apply") {
+        if (selection.decision === "review") {
+          try {
+            const result = await writeGate.review(i);
+            const record = { type: messageType, success: result.success, ...(result.skipped ? { skipped: true, reason: result.reason } : {}), result, ...writeGate.metadata(i) };
+            results.push(record);
+            if (result.success) logCreatedItemFromResult(onItemCreated ? item => onItemCreated({ ...item, ...writeGate.metadata(i) }) : null, messageType, result);
+            else onItemCreated?.({ type: messageType, status: "skipped", skipped: true, ...writeGate.metadata(i) });
+          } catch (error) {
+            core.error(`Write gate review failed: ${getErrorMessage(error)}`);
+            results.push({ type: messageType, success: false, error: getErrorMessage(error), ...writeGate.metadata(i) });
+          }
+        } else {
+          const reason = selection.reason === "gate_denied" ? "gate_denied" : selection.decision === "hold" ? "gate_held" : selection.decision === "stage" ? "gate_staged" : "gate_dropped";
+          core.warning(`Write gate ${selection.decision}: output ${writeGate.metadata(i).output_id} was not applied (${selection.reason})`);
+          results.push({ type: messageType, success: false, skipped: true, reason, skipReason: reason, ...writeGate.metadata(i) });
+          onItemCreated?.({ type: messageType, status: "skipped", skipped: true, reason, ...writeGate.metadata(i) });
+        }
+        return;
+      }
     }
 
     if (detectionConclusion === "failure" || detectionConclusionMissing) {
@@ -1564,7 +1595,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       });
 
       // Log to manifest if this was a create operation
-      logCreatedItemFromResult(onItemCreated, messageType, result);
+      logCreatedItemFromResult(writeGate && onItemCreated ? item => onItemCreated({ ...item, ...writeGate.metadata(i) }) : onItemCreated, messageType, result);
 
       core.info(`✓ Message ${i + 1} (${messageType}) completed successfully`);
     } catch (error) {
@@ -1628,7 +1659,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
           // Call the handler again with updated temp ID map
           await assertClaimAuthorized(deferred.message);
           const stalePRReason = localDiagnosticHandlers.has(deferred.handler) ? null : await getStalePullRequestReason(global.github, global.context);
-          const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
+          const result = stalePRReason
+            ? { skipped: true, reason: stalePRReason }
+            : recordMergeDecision(deferred.type, await withPendingWrite(messages[deferred.messageIndex], () => deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex), deferred.messageIndex);
 
           if (result && result.skipped === true && !result.deferred) {
             const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
@@ -1712,7 +1745,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
             }
 
             // Log to manifest after deferred retry success
-            logCreatedItemFromResult(onItemCreated, deferred.type, result);
+            logCreatedItemFromResult(writeGate && onItemCreated ? item => onItemCreated({ ...item, ...writeGate.metadata(deferred.messageIndex) }) : onItemCreated, deferred.type, result);
           }
         } catch (error) {
           const errorMsg = deferred.type === "merge_pull_request" ? mergeProcessingError() : getErrorMessage(error);
@@ -1781,6 +1814,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
   for (const result of results) {
     const outputId = messages[result.messageIndex]?.output_id;
     if (outputId !== undefined) result.output_id = outputId;
+    if (writeGate) Object.assign(result, writeGate.metadata(result.messageIndex));
   }
 
   // Return outputs with unresolved IDs for synthetic update processing
@@ -2414,7 +2448,7 @@ async function main(options = {}) {
     // Load and initialize handlers based on configuration (factory pattern)
     const messageHandlers = await loadHandlers(config, prReviewBufferRegistry, undefined, activationCommentLinks);
 
-    if (messageHandlers.size === 0) {
+    if (messageHandlers.size === 0 && process.env.GH_AW_PENDING_WRITES_REQUIRED !== "true") {
       const delegatedTypes = new Set([...STANDALONE_STEP_TYPES, ...loadCustomSafeOutputJobTypes()]);
       outcomeResults = allMessages.map((message, messageIndex) => ({
         type: message.type,
@@ -2435,7 +2469,7 @@ async function main(options = {}) {
     // Create manifest logger for recording created items.
     // createManifestLogger() touches the file immediately so it exists for artifact upload.
     // In staged mode, pass null so no items are logged (nothing is actually created).
-    const logCreatedItem = isStaged ? null : createManifestLogger();
+    const logCreatedItem = isStaged && process.env.GH_AW_PENDING_WRITES_REQUIRED !== "true" ? null : createManifestLogger();
 
     // Pre-check: log a warning when the installation token's rate-limit headroom is low.
     // This surfaces quota pressure before writes start so it is visible in the job log

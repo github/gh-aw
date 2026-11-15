@@ -47,8 +47,8 @@ const TITLE_DEDUP_MIN_SEARCH_RATE_LIMIT_FRACTION = 0.2;
  * @typedef {import("./types/safe-outputs").IssueArtifactBodyInput} IssueArtifactBodyInput
  * @typedef {import("./types/safe-outputs").IssueArtifact} IssueArtifact
  * @typedef {import("./types/safe-outputs").CreatedIssueArtifact} CreatedIssueArtifact
- * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, artifacts?: IssueArtifactBodyInput[]}} CreateIssueParameters
- * @typedef {{staged: false, issue: Issue, artifacts?: CreatedIssueArtifact[]} | {staged: true, preview: IssueParameters & {artifacts?: IssueArtifact[]}}} CreateIssueResult
+ * @typedef {Omit<IssueParameters, "owner" | "repo" | "title" | "body"> & {owner?: string, repo?: string, title: string, body: string, output_id?: string, artifacts?: IssueArtifactBodyInput[]}} CreateIssueParameters
+ * @typedef {{staged: false, issue: Issue, artifacts?: CreatedIssueArtifact[]} | {staged: true, preview: IssueParameters & {artifacts?: IssueArtifact[]}, gate_decision?: string, decision_reason?: string}} CreateIssueResult
  */
 
 /**
@@ -97,7 +97,7 @@ async function createIssue(parameters) {
   if (issueArrayLimitError) {
     throw new Error(`${ERR_VALIDATION}: ${issueArrayLimitError}`);
   }
-  const { artifacts: artifactInput, ...issueParameters } = parameters;
+  const { artifacts: artifactInput, output_id: outputId, ...issueParameters } = parameters;
   const artifacts = normalizeIssueArtifacts(artifactInput);
   const report = buildIssueBodyReport(parameters.title, parameters.body, { repo: { owner, repo } });
   /** @type {IssueParameters & {title: string, body: string}} */
@@ -108,7 +108,39 @@ async function createIssue(parameters) {
     core.info(`Staged: would create issue in ${owner}/${repo} with title: ${request.title}`);
     return { staged: true, preview: { ...request, ...(artifacts.length > 0 ? { artifacts } : {}) } };
   }
-  const { data: issue } = await withRetry(() => createReportIssue(github, request), RATE_LIMIT_RETRY_CONFIG, `create_issue in ${owner}/${repo}`);
+  const { getHelperWriteDecision, withHelperWrite } = require("./write_gate_runtime.cjs");
+  const authorization = getHelperWriteDecision(outputId);
+  if (authorization) {
+    const { item, selection } = authorization;
+    if (`${owner}/${repo}` !== item.target.repository) throw new Error(`${ERR_VALIDATION}: Custom createIssue target does not match its pending item`);
+    if (artifacts.length > 0) throw new Error(`${ERR_VALIDATION}: Gated custom createIssue artifacts require a complete pending plan`);
+    if (selection.decision === "review") {
+      const { createGateReviewIssue } = require("./write_gate_review.cjs");
+      const { parseAllowedRepos, getDefaultTargetRepo } = require("./repo_helpers.cjs");
+      const { assertPendingWritesIntegrity } = require("./pending_writes.cjs");
+      const review = await createGateReviewIssue({
+        message: { type: item.type, output_id: item.output_id, title: parameters.title, body: parameters.body },
+        reviewRepo: process.env.GH_AW_WRITE_GATE_REVIEW_REPO,
+        defaultRepo: getDefaultTargetRepo(),
+        allowedRepos: parseAllowedRepos(process.env.GH_AW_WRITE_GATE_ALLOWED_REPOS),
+        client: github,
+        assertUnchanged: () => {
+          assertPendingWritesIntegrity();
+        },
+      });
+      if (review.success && review.issue) return { staged: false, issue: review.issue };
+      return { staged: true, preview: request, gate_decision: "stage", decision_reason: "gate_review_repo_unusable" };
+    }
+    if (selection.decision !== "apply") {
+      core.warning(`Custom createIssue ${selection.decision}: output ${item.output_id} was not applied (${selection.reason})`);
+      return { staged: true, preview: request, gate_decision: selection.decision, decision_reason: selection.reason };
+    }
+  }
+  const { data: issue } = await withRetry(
+    () => (authorization ? withHelperWrite(authorization.item, () => createReportIssue(github, request)) : createReportIssue(github, request)),
+    RATE_LIMIT_RETRY_CONFIG,
+    `create_issue in ${owner}/${repo}`
+  );
   core.info(`Created issue ${owner}/${repo}#${issue.number}: ${issue.html_url}`);
   const createdArtifacts = await createIssueArtifacts(github, owner, repo, issue.number, artifacts);
   return { staged: false, issue, ...(createdArtifacts.length > 0 ? { artifacts: createdArtifacts } : {}) };
