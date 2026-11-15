@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-15",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/gallery/docs-automation.md",
+      "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-continuous-simplicity.md"
+    ],
+    "cli": [
+      "gh aw (root help)",
+      "gh aw compile",
+      "gh aw run"
+    ],
+    "messages": [
+      ".github/workflows/approach-validator.md",
+      ".github/workflows/smoke-copilot.md"
+    ],
+    "validation": [
+      "pkg/workflow/cache_retention_days_validation_test.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "gallery/docs-automation.md uses clear structure and realistic examples",
+    "approach-validator messages use a consistent [workflow_name](run_url) link pattern"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "docs/src/content/docs/blog/2026-10-26-weekly-update.md",
+      "priority": "high",
+      "issue": "Line 3 description says 'Five releases (v0.93.0-v0.93.5)'; body line 11 says six, which is correct. Change description to 'Six releases'. Re-confirmed this run."
+    },
+    {
+      "file": "pkg/workflow/mcp_scripts_dependencies_validation.go",
+      "priority": "high",
+      "issue": "newInvalidDependencyNameError (lines 152-157) hardcodes 'Example: dependencies: [requests]' and 'inferred package manager'. Sibling newUnpinnedDependencyError takes manager and example. Re-confirmed this run. Keep the prefix asserted by tests."
+    }
+  ],
+  "deferred_observations": [
+    "cmd/gh-aw/main.go root Common Tasks rows use tab padding (line 93); the doctor row column drifts",
+    "cmd/gh-aw/main.go compile help line ~265 places the 'Unlike gh aw upgrade' sentence inside action-mode section",
+    "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-continuous-simplicity.md line 29 has a double space ('aspects of  code')"
+  ],
+  "notes": [
+    "git tag was denied by workflow tool permissions this run; release counts rest on in-file evidence only",
+    "Prior pending items were not re-verified unless listed above"
+  ]
+}

@@ -1,6 +1,12 @@
 {
-  "last_updated": "2026-11-14",
+  "last_updated": "2026-11-15",
   "pending_tasks": [
+    {
+      "file": "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-continuous-simplicity.md",
+      "created": "2026-11-15",
+      "status": "pending",
+      "issue": "Line 29 has a double space ('aspects of  code'); collapse to a single space"
+    },
     {
       "file": "docs/src/content/docs/reference/fork-support.md",
       "created": "2026-11-14",
