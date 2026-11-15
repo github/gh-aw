@@ -43,6 +43,11 @@ describe("handler-derived pending writes", () => {
     vi.stubEnv("GH_AW_PENDING_WRITES_SHA256", result.sha256);
     vi.stubEnv("GH_AW_PENDING_WRITES_BINDINGS", JSON.stringify(result.bindings));
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify(options.handlerConfig));
+    const { buildWriteDecisionInventory, writeDecisionInventory } = require("./write_gate_inventory.cjs");
+    const decisions = path.join(directory, "write-decisions.normalized.json");
+    const inventory = buildWriteDecisionInventory(result.manifest, result.sha256, { decision: "allow", reason: "clear" }, () => {});
+    vi.stubEnv("GH_AW_WRITE_GATE_DECISIONS", decisions);
+    vi.stubEnv("GH_AW_WRITE_GATE_DECISIONS_SHA256", writeDecisionInventory(decisions, inventory));
     return result;
   }
 
@@ -137,6 +142,32 @@ describe("handler-derived pending writes", () => {
     expect(() => assertPendingPublication("push_repo_memory", "default", { ...supplied, files: describeDirectory(memoryDir) })).toThrow("inputs_changed");
     expect(() => assertPendingWritesIntegrity()).toThrow("inputs_changed");
     expect(write).toHaveBeenCalledOnce();
+  });
+
+  it.each(["hold", "review", "stage", "drop"])("does not run a %s secondary publication in a partial batch", async decision => {
+    const memoryDir = path.join(directory, "memory");
+    fs.mkdirSync(memoryDir);
+    fs.writeFileSync(path.join(memoryDir, "notes.txt"), "unchanged");
+    options.bindings = [{ id: "memory:default", kind: "directory", path: memoryDir }];
+    options.publications = [{ job: "push_repo_memory", id: "default", type: "repo_memory", binding_id: "memory:default" }];
+    const result = await authorize();
+    const file = process.env.GH_AW_WRITE_GATE_DECISIONS;
+    const inventory = JSON.parse(fs.readFileSync(file, "utf8"));
+    inventory.decision = "partial";
+    inventory.items.find(item => item.output_id.startsWith("job_")).gate_decision = decision;
+    fs.writeFileSync(file, JSON.stringify(inventory));
+    vi.stubEnv("GH_AW_WRITE_GATE_DECISIONS_SHA256", sha256(fs.readFileSync(file)));
+    const write = vi.fn();
+    const { withPendingPublication } = require("./pending_writes.cjs");
+    await expect(withPendingPublication("push_repo_memory", "default", () => result.manifest.inputs.find(input => input.id === "memory:default"), write)).rejects.toThrow("item_not_authorized");
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("keeps native staging as a veto after an apply authorization", async () => {
+    options.staged = true;
+    options.publications = [{ job: "custom", id: "custom", type: "custom_job", binding_id: "agent_output" }];
+    const result = await authorize();
+    expect(() => assertPendingPublication("custom", "custom", result.manifest.inputs[0])).toThrow("native_policy_veto");
   });
 
   it("normalizes ledger records with the same helper as ledger_append", async () => {

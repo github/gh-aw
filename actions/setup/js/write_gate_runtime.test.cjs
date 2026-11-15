@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
-import { canonicalPendingJSON, inputDigest, itemDigest } from "./pending_writes.cjs";
+import { canonicalPendingJSON, inputDigest, itemDigest, gateConfigFromEnv, pendingContext, pendingEnvironment } from "./pending_writes.cjs";
 import { readInput, sha256 } from "./pending_writes_files.cjs";
 import { publishWriteDecisionInventory } from "./write_gate_runtime.cjs";
 import { processMessages } from "./safe_output_handler_manager.cjs";
@@ -77,6 +77,9 @@ describe("pinned per-item manager enforcement", () => {
       inputs: [
         { id: "agent_output", kind: "file", length: file.length, sha256: file.sha256, mode: file.mode },
         { id: "handler_config", kind: "value", sha256: inputDigest(config) },
+        { id: "gate_config", kind: "value", sha256: inputDigest(gateConfigFromEnv()) },
+        { id: "context", kind: "value", sha256: inputDigest(pendingContext()) },
+        { id: "environment", kind: "value", sha256: inputDigest(pendingEnvironment()) },
       ],
       items,
     };
@@ -91,6 +94,9 @@ describe("pinned per-item manager enforcement", () => {
       JSON.stringify([
         { id: "agent_output", kind: "file", path: agentOutput },
         { id: "handler_config", kind: "value", value: config },
+        { id: "gate_config", kind: "value" },
+        { id: "context", kind: "value" },
+        { id: "environment", kind: "value" },
       ])
     );
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify(config));
