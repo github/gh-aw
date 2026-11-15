@@ -469,7 +469,7 @@ class RuntimeCheckoutModelTest(unittest.TestCase):
             self.assertEqual(report["additional_models"],
                              ["RuntimeRepositoryCheckout", "StatusOnlyJob", "MCPCompile",
                               "ActivationAdmission", "AdmissionConclusion",
-                              "IssueRelationshipAuthorization"])
+                              "IssueRelationshipAuthorization", "WriteGate"])
             cases = {case["case"] for case in report["cases"]
                      if case["model"] == "RuntimeRepositoryCheckout"}
             self.assertEqual(cases, {"secure-runtime-checkout"} |
@@ -486,6 +486,31 @@ class RuntimeCheckoutModelTest(unittest.TestCase):
             self.assertEqual(sum(case["model"] == "AdmissionConclusion"
                                  for case in report["cases"]),
                              2 + len(check.CONCLUSION_MUTATIONS) + len(check.CONCLUSION_WITNESSES))
+            self.assertEqual(sum(case["model"] == "WriteGate"
+                                 for case in report["cases"]), 9)
+
+    def test_write_gate_preserves_pinned_runtime_text_trace(self):
+        text = (
+            "Error: Invariant NoConclusionRecovery is violated.\n"
+            "State 1: <Initial predicate>\n"
+            's = [lastEvent |-> "Init"]\n\n'
+            "State 2: <Conclusion line 1>\n"
+            's = [lastEvent |-> "Conclusion"]\n\n'
+            "4 states generated, 4 distinct states found\n"
+            "Finished in 00s\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(check.subprocess, "run", return_value=
+                              subprocess.CompletedProcess([], 12, text, "")) as run:
+                check.run_case("java", root / "jar", root, "text-trace",
+                               model="WriteGate", fault="conclusion-recovery",
+                               invariant="NoConclusionRecovery")
+            self.assertNotIn("-dumpTrace", run.call_args.args[0])
+            trace = json.loads((root / "text-trace" / "trace.json").read_text())
+            self.assertEqual([state["s"]["lastEvent"] for state in trace["states"]],
+                             ["Init", "Conclusion"])
+            self.assertIn("raw_tla", trace["states"][0]["s"])
 
 
 class MCPCompileModelTest(unittest.TestCase):
