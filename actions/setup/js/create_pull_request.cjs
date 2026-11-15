@@ -1575,7 +1575,7 @@ async function main(config = {}) {
       // Preserve the original agent branch name for bundle transport (the bundle was created
       // using this branch name as the refs/heads ref inside the bundle file).
       const originalAgentBranch = branchName;
-      const randomHex = crypto.randomBytes(8).toString("hex");
+      const randomHex = require("./pending_writes.cjs").pendingBranchSalt() || crypto.randomBytes(8).toString("hex");
 
       // SECURITY: Sanitize branch name to prevent shell injection (CWE-78)
       // Branch names from user input must be normalized before use in git commands.
