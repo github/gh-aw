@@ -817,7 +817,9 @@ jobs:
           EXPECTED_SOURCE_SHA: ${{ needs.graphify-index.outputs.source-sha }}
           RESTORED_KEY: ${{ steps.graphify-cache.outputs.cache-matched-key }}
         name: Authenticate snapshot
-        run: "set -euo pipefail\nCHECKOUT_SHA=\"$(git rev-parse HEAD)\"\nexport CHECKOUT_SHA\npython3 - <<'PY'\nimport hashlib, json, os\nfrom datetime import datetime, timezone\nfrom pathlib import Path\n\nindex = Path(\"/tmp/gh-aw-graphify/index\")\nif index.is_symlink() or {p.name for p in index.iterdir()} != {\"graph.json\", \"manifest.json\"}:\n    raise ValueError(\"Graphify: expected only graph.json and manifest.json\")\nif any(p.is_symlink() or not p.is_file() for p in index.iterdir()):\n    raise ValueError(\"Graphify: symlink or non-file in snapshot\")\ngraph = (index / \"graph.json\").read_bytes()\nmanifest_bytes = (index / \"manifest.json\").read_bytes()\nif not os.environ[\"EXPECTED_KEY\"] or os.environ[\"RESTORED_KEY\"] != os.environ[\"EXPECTED_KEY\"]:\n    raise ValueError(\"Graphify: cache key mismatch with publisher\")\nif hashlib.sha256(graph + b\"\\0\" + manifest_bytes).hexdigest() != os.environ[\"EXPECTED_DIGEST\"]:\n    raise ValueError(\"Graphify: digest mismatch with publisher\")\nmanifest = json.loads(manifest_bytes)\nexpected = {\n    \"schema\": 1, \"tool\": \"graphifyy==0.9.106\",\n    \"dependency_cutoff\": \"2026-11-12T00:00:00Z\",\n    \"corpus\": \"repository-code-only\",\n    \"source_sha\": os.environ[\"EXPECTED_SOURCE_SHA\"],\n    \"graph_sha256\": hashlib.sha256(graph).hexdigest(),\n}\nif any(manifest.get(key) != value for key, value in expected.items()):\n    raise ValueError(\"Graphify: incompatible snapshot\")\nif not expected[\"source_sha\"] or expected[\"source_sha\"] != os.environ[\"CHECKOUT_SHA\"]:\n    raise ValueError(\"Graphify: source mismatch with checkout\")\nage = (datetime.now(timezone.utc) - datetime.fromisoformat(manifest[\"built_at\"])).total_seconds()\nif not 0 <= age <= 86400:\n    raise ValueError(\"Graphify: snapshot must be at most 24 hours old\")\nPY\n"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: "const fs = require(\"node:fs\");\nconst { createHash } = require(\"node:crypto\");\nconst index = \"/tmp/gh-aw-graphify/index\";\nif (fs.lstatSync(index).isSymbolicLink()) throw new Error(\"Graphify: symlink in snapshot\");\nconst entries = fs.readdirSync(index, { withFileTypes: true });\nif (entries.length !== 2 || entries.some(p => ![\"graph.json\", \"manifest.json\"].includes(p.name))) {\n  throw new Error(\"Graphify: expected only graph.json and manifest.json\");\n}\nif (entries.some(p => !p.isFile())) throw new Error(\"Graphify: snapshot symlink or non-file\");\nconst graph = fs.readFileSync(`${index}/graph.json`);\nconst bytes = fs.readFileSync(`${index}/manifest.json`);\nconst { EXPECTED_KEY, RESTORED_KEY, EXPECTED_DIGEST, EXPECTED_SOURCE_SHA } = process.env;\nif (!EXPECTED_KEY || RESTORED_KEY !== EXPECTED_KEY) throw new Error(\"Graphify: publisher cache key mismatch\");\nconst digest = createHash(\"sha256\").update(graph).update(\"\\0\").update(bytes).digest(\"hex\");\nif (digest !== EXPECTED_DIGEST) throw new Error(\"Graphify: publisher digest mismatch\");\nconst manifest = JSON.parse(bytes);\nconst expected = {\n  schema: 1, tool: \"graphifyy==0.9.106\",\n  dependency_cutoff: \"2026-11-12T00:00:00Z\",\n  corpus: \"repository-code-only\",\n  source_sha: EXPECTED_SOURCE_SHA,\n  graph_sha256: createHash(\"sha256\").update(graph).digest(\"hex\"),\n};\nif (Object.entries(expected).some(([key, value]) => manifest[key] !== value)) throw new Error(\"Graphify: incompatible snapshot\");\nconst checkout = require(\"node:child_process\").execFileSync(\"git\", [\"rev-parse\", \"HEAD\"], { encoding: \"utf8\" }).trim();\nif (!EXPECTED_SOURCE_SHA || EXPECTED_SOURCE_SHA !== checkout) throw new Error(\"Graphify: checkout source mismatch\");\nconst age = Date.now() - Date.parse(manifest.built_at);\nif (!Number.isFinite(age) || age < 0 || age > 86400000) throw new Error(\"Graphify: invalid age (maximum 24 hours)\");\n"
 
       - name: Download container images
         run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/astral-sh/uv:python3.12-bookworm-slim@sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58 ghcr.io/github/gh-aw-firewall/agent:0.29.13@sha256:ba33f16e83150bdc87af596c29c76a251256eb678159d93f2754b73b3cf9225e ghcr.io/github/gh-aw-firewall/api-proxy:0.29.13@sha256:5d980a4a883db7b59b09427a9add4c0b1a32ff8659847afcaa9b82821d3376bd ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.13@sha256:0c590164caac6adcec76c242c9a2b2fc4f4127afcf65994922e3e8360745784e ghcr.io/github/gh-aw-firewall/squid:0.29.13@sha256:6c746bfa88dfa13cd7f21b26ac0028cbde8975830d447f649173acd9fb629fef ghcr.io/github/gh-aw-mcpg:v0.5.9@sha256:cce8accd79c9364f0886be8837d74dda2baff1b7d1c9cc6490a7adef727c79f0 ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc ghcr.io/github/github-mcp-server:v2.1.0@sha256:f6056fc10bfffcc8c81a6417a2e9ca12808647e8dd6049642a4feaadee0e0f8a
@@ -2753,42 +2755,36 @@ jobs:
             graphify extract /source --code-only --no-cluster --max-workers 2 --output /build
       - name: Seal snapshot
         id: snapshot
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import hashlib, json, os
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          root = Path("/tmp/gh-aw-graphify")
-          graph = (root / "build/graphify-out/graph.json").read_bytes()
-          data = json.loads(graph)
-          if (not isinstance(data, dict) or not isinstance(data.get("nodes"), list)
-                  or not data["nodes"] or not isinstance(data.get("edges"), list)):
-              raise ValueError("Graphify: empty or invalid code graph")
-          index = root / "index"
-          index.mkdir(parents=True, exist_ok=False)
-          (index / "graph.json").write_bytes(graph)
-          manifest = json.dumps({
-              "schema": 1, "tool": "graphifyy==0.9.106",
-              "dependency_cutoff": "2026-11-12T00:00:00Z",
-              "corpus": "repository-code-only",
-              "source_sha": os.environ["SOURCE_SHA"],
-              "built_at": datetime.now(timezone.utc).isoformat(),
-              "graph_sha256": hashlib.sha256(graph).hexdigest(),
-          }, sort_keys=True).encode()
-          (index / "manifest.json").write_bytes(manifest)
-          digest = hashlib.sha256(graph + b"\0" + manifest).hexdigest()
-          key = "graphify-v1-0.9.106-linux-{}-{}-{}".format(
-              os.environ["SOURCE_SHA"], os.environ["BUILD_ID"], os.environ["BUILD_ATTEMPT"])
-          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write(f"cache-key={key}\nsnapshot-digest={digest}\n")
-              output.write(f"source-sha={os.environ['SOURCE_SHA']}\n")
-          PY
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           BUILD_ATTEMPT: ${{ github.run_attempt }}
           BUILD_ID: ${{ github.run_id }}
           SOURCE_SHA: ${{ github.sha }}
+        with:
+          script: |
+            const fs = require("node:fs");
+            const { createHash } = require("node:crypto");
+            const root = "/tmp/gh-aw-graphify";
+            const graph = fs.readFileSync(`${root}/build/graphify-out/graph.json`);
+            const data = JSON.parse(graph);
+            if (!data || !Array.isArray(data.nodes) || !data.nodes.length || !Array.isArray(data.edges)) throw new Error("Graphify: empty or invalid graph");
+            const index = `${root}/index`;
+            fs.mkdirSync(index);
+            fs.writeFileSync(`${index}/graph.json`, graph);
+            const manifest = JSON.stringify({
+              schema: 1, tool: "graphifyy==0.9.106",
+              dependency_cutoff: "2026-11-12T00:00:00Z",
+              corpus: "repository-code-only",
+              source_sha: process.env.SOURCE_SHA,
+              built_at: new Date().toISOString(),
+              graph_sha256: createHash("sha256").update(graph).digest("hex"),
+            });
+            fs.writeFileSync(`${index}/manifest.json`, manifest);
+            const digest = createHash("sha256").update(graph).update("\0").update(manifest).digest("hex");
+            const { SOURCE_SHA, BUILD_ID, BUILD_ATTEMPT } = process.env;
+            core.setOutput("cache-key", `graphify-v1-0.9.106-linux-${SOURCE_SHA}-${BUILD_ID}-${BUILD_ATTEMPT}`);
+            core.setOutput("snapshot-digest", digest);
+            core.setOutput("source-sha", SOURCE_SHA);
       - name: Save snapshot
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
