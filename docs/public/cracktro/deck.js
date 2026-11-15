@@ -10042,6 +10042,210 @@
     });
   }
 
+  // Imports & reuse: shared components (no on:) are written once; a workflow imports them by path, with typed inputs or from another repo at a ref; the compiler merges each field by its own rule and hashes every import into the lock
+  {
+    resetIndex();
+    // [colour, owner prefix, file, tag, frontmatter fields, editor lines]
+    const SRC = [
+      ["#79c0ff", "", "shared/mcp/serena.md", "uses · with", ["import-schema", "mcp-servers"], [4, 5]],
+      ["#3fb950", "", "shared/otlp.md", "local", ["network", "observability"], [6]],
+      ["#e3b341", "", "shared/rotate-token.md", "local", ["steps"], [7]],
+      ["#ab7df8", "acme-org/shared-workflows/", "shared/tools.md@v2.1.0", "remote · @ref", ["tools", "safe-outputs"], [8]],
+      ["#f778ba", "", ".github/shared/editorial.md", "runtime", ["prompt snippet"], [13]],
+    ];
+    const K = "#ff7b72",
+      D = "#656c76",
+      T = "#f0f6fc",
+      V = "#a5d6ff";
+    const files = SRC.map(([c, owner, name, tag, fields]) =>
+      h(
+        "div",
+        { class: "imp-f", "--k": c },
+        owner ? h("small", {}, owner) : null,
+        h("div", {}, h("b", {}, name), h("em", {}, tag)),
+        h(
+          "p",
+          {},
+          fields.map(f => h("span", {}, f))
+        )
+      )
+    );
+    const lib = h("div", { class: "imp-pane imp-lib" }, h("div", { class: "imp-tab" }, "shared components", h("span", {}, "NO TRIGGER")), h("div", { class: "imp-fs" }, files));
+
+    const LINES = [
+      [["---", D]],
+      [
+        ["on: ", K],
+        ["issues", V],
+      ],
+      [
+        ["engine: ", K],
+        ["copilot", V],
+      ],
+      [["imports:", K]],
+      [
+        ["  - uses: ", K],
+        ["shared/mcp/serena.md", V],
+      ],
+      [
+        ["    with: ", K],
+        ["{ languages: [go, typescript] }", V],
+      ],
+      [
+        ["  - ", K],
+        ["shared/otlp.md", V],
+      ],
+      [
+        ["  - ", K],
+        ["shared/rotate-token.md", V],
+      ],
+      [
+        ["  - ", K],
+        ["acme-org/shared-workflows/shared/tools.md@v2.1.0", V],
+      ],
+      [["permissions:", K]],
+      [
+        ["  contents: ", K],
+        ["read", V],
+      ],
+      [["---", D]],
+      [["# Triage", T]],
+      [["{{#runtime-import .github/shared/editorial.md}}", "#f778ba"]],
+      [["Label the issue. Propose one comment.", T]],
+    ];
+    const rows = LINES.map((parts, i) =>
+      h(
+        "div",
+        { class: "imp-row" },
+        h("span", { class: "no" }, String(i + 1)),
+        h(
+          "span",
+          {},
+          parts.map(([s, c]) => h("span", { style: { color: c } }, s))
+        )
+      )
+    );
+    const ed = h("div", { class: "imp-pane imp-ed" }, h("div", { class: "imp-tab" }, "triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "imp-code" }, rows));
+
+    // [source index (-1 = the importing workflow), merged field, merge rule]
+    const MERGE = [
+      [0, "mcp-servers.serena", "with → languages: go, typescript"],
+      [1, "network.allowed", "domains unioned, deduped, sorted"],
+      [2, "steps", "imported steps run first"],
+      [3, "tools", "deep merge · allowed lists deduped"],
+      [3, "safe-outputs", "each type defined once"],
+      [-1, "permissions", "validated against main, never merged"],
+      [4, "prompt", "runtime-import read at run time"],
+      [-1, "frontmatter hash", "covers every import, nested too"],
+    ];
+    const merged = MERGE.map(([s, k, d]) => h("div", { class: "imp-r", "--k": s < 0 ? "#f0f6fc" : SRC[s][0] }, h("b", {}, k), h("span", {}, d)));
+    const status = h("span", {}, "");
+    const lock = h("div", { class: "imp-pane imp-lock" }, h("div", { class: "imp-tab" }, "triage.lock.yml", status), h("div", { class: "imp-rs" }, merged));
+
+    const cols = [
+      [110, "1", "Write once", "shared/ · no on: · not compiled alone", ".2s"],
+      [600, "2", "Import anywhere", "path · uses/with · owner/repo@ref", ".3s"],
+      [1360, "3", "Compile & merge", "one lock · one rule per field", ".4s"],
+    ].map(([x, n, t, s, d]) => h("div", { class: "imp-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
+    const RULES = ["same file, different with → compile error", "missing import fails · path? skips it", "runtime imports stay local, never the network"];
+    const el = h(
+      "section",
+      { class: "slide imp" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Shared components · reviewed once, reused by every workflow"), h("h2", {}, letters("Imports "), letters("& reuse", "l-grad"))),
+      cols,
+      lib,
+      ed,
+      lock,
+      h(
+        "div",
+        { class: "imp-rules" },
+        h("small", {}, "Guardrails"),
+        RULES.map(r => h("span", {}, r))
+      )
+    );
+
+    // ms into the cycle when each source is imported, compilation starts, each merged field lands and the lock is written
+    const SRC_AT = [700, 1700, 2700, 3700, 4700],
+      COMPILE_AT = 5900,
+      MERGE_AT = MERGE.map((_, i) => 6400 + i * 420),
+      DONE_AT = 10000,
+      CYC = 13500;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      [...files, ...merged].forEach(x => x.classList.remove("on", "seen"));
+      rows.forEach(r => r.classList.remove("hot", "seen"));
+      lock.classList.remove("hot");
+      status.textContent = "";
+      status.classList.remove("ok");
+    };
+    const focus = i => {
+      files.forEach((f, j) => {
+        f.classList.toggle("on", j === i);
+        if (j === i) f.classList.add("seen");
+      });
+      rows.forEach(r => r.classList.remove("hot"));
+      if (i < 0) return;
+      for (const n of SRC[i][5]) {
+        rows[n].style.setProperty("--k", SRC[i][0]);
+        rows[n].classList.add("hot", "seen");
+      }
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Imports and reuse, an illustrative example with a synthetic workflow, file names and organisation. A Markdown file without an on: trigger is a shared component: it is validated, never compiled on its own, and any workflow can import it. Write a tool set, an MCP server, network rules, steps or safe outputs once, review it once, and reuse it. A workflow lists its imports in frontmatter by path. A component that declares an import-schema takes typed inputs through uses and with, so one Serena file serves Go and TypeScript repositories. A path of the form owner/repo/path@ref is fetched from another repository at a tag, branch or commit and cached by commit SHA under .github/aw/imports, so compilation also works offline. Compiling merges each field by its own rule: tools deep-merge with their allowed lists deduplicated, network domains are unioned, imported steps run first, each safe-output type is defined once, and permissions are never merged, only validated: the main workflow must already grant what an import needs. The lock records a hash over every import, nested ones too, so editing a shared file makes the lock stale until you recompile. Guardrails: a file may appear once per import graph and importing it twice with different with values is a compile error, a missing import fails compilation unless the path ends in a question mark, and runtime-import in the prompt body injects a local file under .github at run time and never fetches from the network. The index and search pattern on the previous slide ships exactly this way: one shared import adds the indexing job and the search server to any workflow.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        SRC_AT.forEach((ms, i) => u >= ms && fire("s" + i, () => (focus(i), sfx.key(0.7), sfx.pop(i))));
+        if (u >= COMPILE_AT)
+          fire("c", () => {
+            focus(-1);
+            lock.classList.add("hot");
+            status.textContent = "COMPILING";
+            sfx.compile();
+          });
+        MERGE_AT.forEach(
+          (ms, i) =>
+            u >= ms &&
+            fire("m" + i, () => {
+              const s = MERGE[i][0];
+              merged[i].classList.add("on");
+              files.forEach((f, j) => f.classList.toggle("on", j === s));
+              sfx.key(0.5);
+            })
+        );
+        if (u >= DONE_AT)
+          fire("d", () => {
+            files.forEach(f => f.classList.remove("on"));
+            lock.classList.remove("hot");
+            status.textContent = "✓ COMPILED";
+            status.classList.add("ok");
+            sfx.notify(false);
+          });
+      },
+      el,
+    });
+  }
+
   // Experiments, graders & evals: each run is assigned an A/B variant, graders measure it, evals judge it, and the analysis decides
   {
     resetIndex();
@@ -12541,210 +12745,6 @@
         repo,
         pkg
       ),
-    });
-  }
-
-  // Imports & reuse: shared components (no on:) are written once; a workflow imports them by path, with typed inputs or from another repo at a ref; the compiler merges each field by its own rule and hashes every import into the lock
-  {
-    resetIndex();
-    // [colour, owner prefix, file, tag, frontmatter fields, editor lines]
-    const SRC = [
-      ["#79c0ff", "", "shared/mcp/serena.md", "uses · with", ["import-schema", "mcp-servers"], [4, 5]],
-      ["#3fb950", "", "shared/otlp.md", "local", ["network", "observability"], [6]],
-      ["#e3b341", "", "shared/rotate-token.md", "local", ["steps"], [7]],
-      ["#ab7df8", "acme-org/shared-workflows/", "shared/tools.md@v2.1.0", "remote · @ref", ["tools", "safe-outputs"], [8]],
-      ["#f778ba", "", ".github/shared/editorial.md", "runtime", ["prompt snippet"], [13]],
-    ];
-    const K = "#ff7b72",
-      D = "#656c76",
-      T = "#f0f6fc",
-      V = "#a5d6ff";
-    const files = SRC.map(([c, owner, name, tag, fields]) =>
-      h(
-        "div",
-        { class: "imp-f", "--k": c },
-        owner ? h("small", {}, owner) : null,
-        h("div", {}, h("b", {}, name), h("em", {}, tag)),
-        h(
-          "p",
-          {},
-          fields.map(f => h("span", {}, f))
-        )
-      )
-    );
-    const lib = h("div", { class: "imp-pane imp-lib" }, h("div", { class: "imp-tab" }, "shared components", h("span", {}, "NO TRIGGER")), h("div", { class: "imp-fs" }, files));
-
-    const LINES = [
-      [["---", D]],
-      [
-        ["on: ", K],
-        ["issues", V],
-      ],
-      [
-        ["engine: ", K],
-        ["copilot", V],
-      ],
-      [["imports:", K]],
-      [
-        ["  - uses: ", K],
-        ["shared/mcp/serena.md", V],
-      ],
-      [
-        ["    with: ", K],
-        ["{ languages: [go, typescript] }", V],
-      ],
-      [
-        ["  - ", K],
-        ["shared/otlp.md", V],
-      ],
-      [
-        ["  - ", K],
-        ["shared/rotate-token.md", V],
-      ],
-      [
-        ["  - ", K],
-        ["acme-org/shared-workflows/shared/tools.md@v2.1.0", V],
-      ],
-      [["permissions:", K]],
-      [
-        ["  contents: ", K],
-        ["read", V],
-      ],
-      [["---", D]],
-      [["# Triage", T]],
-      [["{{#runtime-import .github/shared/editorial.md}}", "#f778ba"]],
-      [["Label the issue. Propose one comment.", T]],
-    ];
-    const rows = LINES.map((parts, i) =>
-      h(
-        "div",
-        { class: "imp-row" },
-        h("span", { class: "no" }, String(i + 1)),
-        h(
-          "span",
-          {},
-          parts.map(([s, c]) => h("span", { style: { color: c } }, s))
-        )
-      )
-    );
-    const ed = h("div", { class: "imp-pane imp-ed" }, h("div", { class: "imp-tab" }, "triage.md", h("span", {}, "SYNTHETIC")), h("div", { class: "imp-code" }, rows));
-
-    // [source index (-1 = the importing workflow), merged field, merge rule]
-    const MERGE = [
-      [0, "mcp-servers.serena", "with → languages: go, typescript"],
-      [1, "network.allowed", "domains unioned, deduped, sorted"],
-      [2, "steps", "imported steps run first"],
-      [3, "tools", "deep merge · allowed lists deduped"],
-      [3, "safe-outputs", "each type defined once"],
-      [-1, "permissions", "validated against main, never merged"],
-      [4, "prompt", "runtime-import read at run time"],
-      [-1, "frontmatter hash", "covers every import, nested too"],
-    ];
-    const merged = MERGE.map(([s, k, d]) => h("div", { class: "imp-r", "--k": s < 0 ? "#f0f6fc" : SRC[s][0] }, h("b", {}, k), h("span", {}, d)));
-    const status = h("span", {}, "");
-    const lock = h("div", { class: "imp-pane imp-lock" }, h("div", { class: "imp-tab" }, "triage.lock.yml", status), h("div", { class: "imp-rs" }, merged));
-
-    const cols = [
-      [110, "1", "Write once", "shared/ · no on: · not compiled alone", ".2s"],
-      [600, "2", "Import anywhere", "path · uses/with · owner/repo@ref", ".3s"],
-      [1360, "3", "Compile & merge", "one lock · one rule per field", ".4s"],
-    ].map(([x, n, t, s, d]) => h("div", { class: "imp-col", "--d": d, style: { left: `${x}px` } }, h("b", {}, h("i", {}, n), t), h("span", {}, s)));
-    const RULES = ["same file, different with → compile error", "missing import fails · path? skips it", "runtime imports stay local, never the network"];
-    const el = h(
-      "section",
-      { class: "slide imp" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Shared components · reviewed once, reused by every workflow"), h("h2", {}, letters("Imports "), letters("& reuse", "l-grad"))),
-      cols,
-      lib,
-      ed,
-      lock,
-      h(
-        "div",
-        { class: "imp-rules" },
-        h("small", {}, "Guardrails"),
-        RULES.map(r => h("span", {}, r))
-      )
-    );
-
-    // ms into the cycle when each source is imported, compilation starts, each merged field lands and the lock is written
-    const SRC_AT = [700, 1700, 2700, 3700, 4700],
-      COMPILE_AT = 5900,
-      MERGE_AT = MERGE.map((_, i) => 6400 + i * 420),
-      DONE_AT = 10000,
-      CYC = 13500;
-    let t0 = 0,
-      cyc = -1,
-      seen = new Set();
-    const fire = (name, fn) => {
-      if (seen.has(name)) return;
-      seen.add(name);
-      fn();
-    };
-    const reset = () => {
-      seen = new Set();
-      [...files, ...merged].forEach(x => x.classList.remove("on", "seen"));
-      rows.forEach(r => r.classList.remove("hot", "seen"));
-      lock.classList.remove("hot");
-      status.textContent = "";
-      status.classList.remove("ok");
-    };
-    const focus = i => {
-      files.forEach((f, j) => {
-        f.classList.toggle("on", j === i);
-        if (j === i) f.classList.add("seen");
-      });
-      rows.forEach(r => r.classList.remove("hot"));
-      if (i < 0) return;
-      for (const n of SRC[i][5]) {
-        rows[n].style.setProperty("--k", SRC[i][0]);
-        rows[n].classList.add("hot", "seen");
-      }
-    };
-    slides.push({
-      group: "enterprise",
-      notes:
-        "Imports and reuse, an illustrative example with a synthetic workflow, file names and organisation. A Markdown file without an on: trigger is a shared component: it is validated, never compiled on its own, and any workflow can import it. Write a tool set, an MCP server, network rules, steps or safe outputs once, review it once, and reuse it. A workflow lists its imports in frontmatter by path. A component that declares an import-schema takes typed inputs through uses and with, so one Serena file serves Go and TypeScript repositories. A path of the form owner/repo/path@ref is fetched from another repository at a tag, branch or commit and cached by commit SHA under .github/aw/imports, so compilation also works offline. Compiling merges each field by its own rule: tools deep-merge with their allowed lists deduplicated, network domains are unioned, imported steps run first, each safe-output type is defined once, and permissions are never merged, only validated: the main workflow must already grant what an import needs. The lock records a hash over every import, nested ones too, so editing a shared file makes the lock stale until you recompile. Guardrails: a file may appear once per import graph and importing it twice with different with values is a compile error, a missing import fails compilation unless the path ends in a question mark, and runtime-import in the prompt body injects a local file under .github at run time and never fetches from the network. Connectors, next, are imports too: a workflow imports a service declaration and selects what it needs.",
-      enter() {
-        t0 = 0;
-        cyc = -1;
-      },
-      tick(t) {
-        if (!t0) t0 = t;
-        const e = t - t0,
-          c = Math.floor(e / CYC),
-          u = e % CYC;
-        if (c !== cyc) {
-          cyc = c;
-          reset();
-        }
-        SRC_AT.forEach((ms, i) => u >= ms && fire("s" + i, () => (focus(i), sfx.key(0.7), sfx.pop(i))));
-        if (u >= COMPILE_AT)
-          fire("c", () => {
-            focus(-1);
-            lock.classList.add("hot");
-            status.textContent = "COMPILING";
-            sfx.compile();
-          });
-        MERGE_AT.forEach(
-          (ms, i) =>
-            u >= ms &&
-            fire("m" + i, () => {
-              const s = MERGE[i][0];
-              merged[i].classList.add("on");
-              files.forEach((f, j) => f.classList.toggle("on", j === s));
-              sfx.key(0.5);
-            })
-        );
-        if (u >= DONE_AT)
-          fire("d", () => {
-            files.forEach(f => f.classList.remove("on"));
-            lock.classList.remove("hot");
-            status.textContent = "✓ COMPILED";
-            status.classList.add("ok");
-            sfx.notify(false);
-          });
-      },
-      el,
     });
   }
 
