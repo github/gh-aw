@@ -64,6 +64,10 @@ digest evidence MUST NOT become verified non-writes. A proven unauthorized
 write or digest mismatch yields `write_gate_violation`; the check never changes
 the recorded verdict.
 
+Integrity verification is independent of whole-plan completeness. A pinned
+partial manifest can describe both supported and incomplete items; a complete,
+independently authorized item may apply while incomplete entries cannot.
+
 Applied item records MUST NOT broaden the independently authorized decision
 under the shared `apply < hold < review < stage < drop` ordering. Native policy
 may narrow a held item to a review issue; this is not application of the held

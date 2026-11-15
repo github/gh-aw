@@ -13,7 +13,7 @@ import { canonicalPendingJSON, itemDigest, SCHEMA } from "./pending_writes.cjs";
 import { writeDecisionInventory } from "./write_gate_inventory.cjs";
 
 const digest = "a".repeat(64);
-const item = { output_id: "so_abcdefghijkl", item_sha256: digest, type: "create_issue" };
+const item = { output_id: "so_abcdefghijkl", item_sha256: digest, type: "create_issue", complete: true };
 const manifest = { complete: true, items: [item] };
 const base = { GH_AW_WRITE_GATE: "allow", GH_AW_WRITE_GATE_REASON: "policy", GH_AW_PENDING_WRITES_SHA256: digest, GH_AW_JOB_RESULTS: "{}", GH_AW_WRITE_GATE_WRITE_JOB_NAMES: "[]" };
 const build = (env = {}, results = [], extra = {}) => buildGateDecision({ env: { ...base, ...env }, results, manifest, actualDigest: digest, resultsComplete: true, ...extra });
@@ -233,7 +233,37 @@ describe("compiler-owned gate conclusion evidence", () => {
     expect(build({}, [{ ...item, item_sha256: "b".repeat(64), status: "success" }]).conclusionCheck).toBe("failed");
     expect(build({}, [], { actualDigest: "b".repeat(64) })).toMatchObject({ integrity: "failed", conclusionCheck: "failed" });
     expect(buildFailureMatchCategories({ hasWriteGateViolation: true })).toEqual(["write_gate_violation"]);
-    expect(build({ GH_AW_WRITE_GATE: "deny" }, [], { manifest: { complete: false, items: [] } })).toMatchObject({ integrity: "unknown", conclusionCheck: "unknown" });
+    expect(build({ GH_AW_WRITE_GATE: "deny" }, [], { manifest: { complete: false, items: [] } })).toMatchObject({ integrity: "verified", conclusionCheck: "verified" });
+  });
+
+  it("verifies supported partial writes without authorizing incomplete plan entries", () => {
+    const unsupported = { ...item, output_id: "so_000000000000", complete: false };
+    const pending = { complete: false, items: [item, unsupported] };
+    const decisions = {
+      schema: "gh-aw/write-decisions/v1",
+      manifest_sha256: digest,
+      items: [
+        { ...item, gate_decision: "apply" },
+        { ...unsupported, gate_decision: "drop" },
+      ],
+    };
+    const env = { GH_AW_WRITE_GATE: "partial", GH_AW_WRITE_GATE_DECISIONS_SHA256: digest };
+    const results = [
+      { ...item, status: "success", gate_decision: "apply" },
+      { ...unsupported, status: "skipped", gate_decision: "drop" },
+    ];
+    const extra = { manifest: pending, decisions, decisionsDigest: digest };
+    expect(build(env, results, extra)).toMatchObject({ verdict: "partial", integrity: "verified", conclusionCheck: "verified" });
+    expect(
+      build(
+        env,
+        [
+          { ...item, status: "success", gate_decision: "apply" },
+          { ...unsupported, status: "success", gate_decision: "apply" },
+        ],
+        extra
+      )
+    ).toMatchObject({ verdict: "partial", conclusionCheck: "failed", failureCategory: "write_gate_violation" });
   });
 
   it("never promotes unknown or failed jobs and missing result/digest evidence to verified", () => {

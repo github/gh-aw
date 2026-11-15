@@ -71,6 +71,11 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 // trigger-reaction cleanup.
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
+	gateInputs, err := c.buildWriteGateConclusionInputSteps(data)
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, gateInputs...)
 	steps = append(steps, c.buildWorkQueueTerminationStep(data)...)
 	steps = append(steps, c.buildWorkQueueIssuesStep(data)...)
 	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)

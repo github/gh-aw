@@ -91,6 +91,14 @@ issues/comments, detection tracking issue, and status comments stay ungated.
 Conclusion records the verdict in the `write-gate` artifact for maintenance
 replay; the record does not assert per-item enforcement or artifact integrity.
 
+Gated conclusion downloads `pending-writes` and `write-decisions` into separate
+runtime directories before a compiler-owned, `always()` enforcement check.
+The check is not best-effort: proven unauthorized publication or digest
+mismatch fails the job without changing the gate verdict. Usage recording
+and failure reporting inherit only pinned gate outputs and the publication
+registry's input receipts. Missing effect evidence remains unknown; input
+receipts alone do not prove publication. No user steps or code run in conclusion.
+
 ## Maintenance workflow jobs
 
 `agentics-maintenance.yml` uses its `GITHUB_TOKEN` with explicit job permissions.

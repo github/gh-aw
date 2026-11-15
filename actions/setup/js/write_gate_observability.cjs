@@ -70,7 +70,7 @@ function buildGateDecision({ env, results, manifest, actualDigest, manifestValid
   const expected = env.GH_AW_PENDING_WRITES_SHA256;
   let integrity = "unknown";
   if (expected && actualDigest) {
-    integrity = DIGEST.test(expected) && expected === actualDigest ? (manifest?.complete === true ? "verified" : "unknown") : "failed";
+    integrity = DIGEST.test(expected) && expected === actualDigest ? (typeof manifest?.complete === "boolean" ? "verified" : "unknown") : "failed";
     if (manifestValid === false) integrity = "failed";
   }
   let failed = integrity === "failed";
@@ -117,8 +117,8 @@ function buildGateDecision({ env, results, manifest, actualDigest, manifestValid
       if (!["skipped", "staged"].includes(result.status) && !blocked) complete = false;
       continue;
     }
-    if (manifest && manifest.complete !== true) failed = true;
     const item = pending.get(result.output_id);
+    if (item && item.complete !== true) failed = true;
     if (verdict === "deny" || ["hold", "stage", "drop"].includes(result.gate_decision)) failed = true;
     if (!item || !DIGEST.test(result.item_sha256)) {
       complete = false;

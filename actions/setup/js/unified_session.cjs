@@ -931,7 +931,7 @@ function collectUnifiedSession({
     const manifest = manifestFile ? records(manifestFile)[0] : undefined;
     const actualDigest = manifestFile ? require("node:crypto").createHash("sha256").update(read(manifestFile)).digest("hex") : undefined;
     let manifestValid;
-    if (manifestFile && manifest?.complete === true && actualDigest === writeGate.GH_AW_PENDING_WRITES_SHA256) {
+    if (manifestFile && typeof manifest?.complete === "boolean" && actualDigest === writeGate.GH_AW_PENDING_WRITES_SHA256) {
       try {
         require("./pending_writes.cjs").readAuthorizedManifest(manifestFile, writeGate.GH_AW_PENDING_WRITES_SHA256);
         manifestValid = true;
