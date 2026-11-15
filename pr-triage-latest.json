@@ -1,33 +1,51 @@
 {
-  "run_id": "43685039795",
-  "run_date": "2026-11-15T06:23:49Z",
+  "generated_at": "2026-11-15T12:21:00Z",
+  "run_id": "43713174212",
   "source": "pr-triage",
-  "eligible_total": 1,
-  "open_copilot_prs": 1,
+  "eligible_total": 3,
+  "open_copilot_prs": 3,
   "cooldown_skipped": 0,
   "category_counts": {
-    "bug": 1
+    "bug": 3
   },
   "risk_counts": {
-    "medium": 1
+    "medium": 3
   },
   "priority_counts": {
-    "medium": 1
+    "medium": 3
   },
   "action_counts": {
     "auto_merge": 0,
     "fast_track": 0,
-    "batch_review": 1,
+    "batch_review": 3,
     "defer": 0,
     "close": 0
   },
   "selected_candidates": [
     {
+      "number": 77994,
+      "title": "Enforce consistent workflow run metrics",
+      "category": "bug",
+      "risk": "medium",
+      "score": 66,
+      "action": "batch_review",
+      "batch": "runtime-ops"
+    },
+    {
       "number": 77573,
       "title": "Capture startup failure log details",
       "category": "bug",
       "risk": "medium",
-      "score": 47,
+      "score": 60,
+      "action": "batch_review",
+      "batch": "runtime-ops"
+    },
+    {
+      "number": 77808,
+      "title": "Make workflow guidance prefix-safe and complete",
+      "category": "bug",
+      "risk": "medium",
+      "score": 55,
       "action": "batch_review",
       "batch": "runtime-ops"
     }
@@ -35,12 +53,10 @@
   "batches": [
     {
       "id": "runtime-ops",
-      "members": [
-        77573
-      ],
+      "members": [77994, 77573, 77808],
       "category": "bug",
       "risk": "medium"
     }
   ],
-  "summary": "1 eligible Copilot PR passed the cooldown; the medium-risk startup failure diagnostics fix is ready for standard batch review."
+  "summary": "Three eligible agent PRs passed the cooldown; all are medium-risk workflow/runtime bug fixes and should be handled as a single runtime-ops batch review."
 }
