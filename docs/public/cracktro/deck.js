@@ -1433,12 +1433,16 @@
   /* --- agentic attacks: attack cards → sandboxed agent terminal → defense layers, OWASP chips below --- */
   .atk .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ff7b72, #f85149, #d29922); }
   .atk-cards { position: absolute; left: 110px; top: 300px; width: 470px; display: flex; flex-direction: column; gap: 9px; }
-  .atk-card { position: relative; height: 94px; padding: 14px 22px 0 84px; border-radius: 16px; background: #161b22c8; border: 2px solid #30363d;
+  .atk-card { position: relative; display: block; width: 100%; height: 94px; padding: 14px 22px 0 84px; border-radius: 16px; background: #161b22c8; border: 2px solid #30363d;
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
     transition: border-color .4s, box-shadow .4s, opacity .4s, transform .4s; opacity: .55; }
+  .atk-card:hover { opacity: .85; border-color: #6e7681; }
+  .atk-card:focus-visible { outline: 3px solid #4493f8; outline-offset: 3px; }
+  .atk-card .h4, .atk-card .p { display: block; }
   .atk-card b { position: absolute; left: 22px; top: 23px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
     font: 700 22px var(--mono); color: #ff7b72; border: 2px solid #f8514966; }
-  .atk-card h4 { margin: 0; font-size: 27px; font-weight: 700; line-height: 1.15; color: #f0f6fc; }
-  .atk-card p { margin: 4px 0 0; font-size: 19px; line-height: 1.3; color: #9198a1; }
+  .atk-card .h4 { margin: 0; font-size: 27px; font-weight: 700; line-height: 1.15; color: #f0f6fc; }
+  .atk-card .p { margin: 4px 0 0; font-size: 19px; line-height: 1.3; color: #9198a1; }
   .atk-card.on { opacity: 1; border-color: #f85149; box-shadow: 0 0 50px -14px #f85149; transform: translateX(10px); }
   .atk-card.done { opacity: .85; }
   .atk-card.done b { color: transparent; border-color: #3fb950; background: #3fb95022; }
@@ -3033,7 +3037,15 @@
       return { ev, len: t + 2400 };
     });
 
-    const cards = SC.map((s, i) => h("div", { class: "atk-card" }, h("b", {}, i + 1), h("h4", {}, s.t), h("p", {}, s.d)));
+    const cards = SC.map((s, i) =>
+      h(
+        "button",
+        { class: "atk-card", type: "button", "aria-pressed": "false", onclick: () => i !== sc && (done.add(sc), setScenario(i), sfx.step()) },
+        h("b", {}, i + 1),
+        h("span", { class: "h4" }, s.t),
+        h("span", { class: "p" }, s.d)
+      )
+    );
     const body = h("div", { class: "atk-body" });
     const term = h(
       "div",
@@ -3068,6 +3080,7 @@
       pkt.style.opacity = 0;
       cards.forEach((c, i) => {
         c.classList.toggle("on", i === n);
+        c.setAttribute("aria-pressed", String(i === n));
         c.classList.toggle("done", done.has(i) && i !== n);
       });
       chips.forEach((c, i) => c.classList.toggle("on", SC[n].tags.includes(OWASP[i][0])));
