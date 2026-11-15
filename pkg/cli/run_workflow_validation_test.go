@@ -72,7 +72,7 @@ func TestValidateRemoteWorkflowPaginated(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NoError(t, os.WriteFile(responsePath, []byte(tt.response), 0o600))
-			err := validateRemoteWorkflow(".github/workflows/eslint-factory-dispatcher.md", tt.repo, true)
+			err := validateRemoteWorkflow(t.Context(), ".github/workflows/eslint-factory-dispatcher.md", tt.repo, true)
 			if tt.wantError == "" {
 				require.NoError(t, err)
 			} else {

@@ -298,7 +298,7 @@ func validateWorkflowInputs(markdownPath string, providedInputs []string) error 
 //   - The workflow can be triggered via GitHub Actions API
 //
 // This follows the principle that domain-specific validation belongs in domain files.
-func validateRemoteWorkflow(workflowName string, repoOverride string, verbose bool) error {
+func validateRemoteWorkflow(ctx context.Context, workflowName string, repoOverride string, verbose bool) error {
 	if repoOverride == "" {
 		return errors.New("repository must be specified for remote workflow validation")
 	}
@@ -313,7 +313,7 @@ func validateRemoteWorkflow(workflowName string, repoOverride string, verbose bo
 		fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Checking if workflow '%s' exists in repository '%s'...", lockFileName, repoOverride)))
 	}
 
-	workflows, err := fetchGitHubWorkflows(context.Background(), repoOverride, verbose)
+	workflows, err := fetchGitHubWorkflows(ctx, repoOverride, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to list workflows in repository '%s': %w", repoOverride, err)
 	}
