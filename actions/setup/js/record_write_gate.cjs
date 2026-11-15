@@ -38,7 +38,7 @@ function buildWriteGateRecord(env = process.env) {
   }
   const result = env.GH_AW_WRITE_GATE_JOB_RESULT || "unknown";
   const verdict = env.GH_AW_WRITE_GATE;
-  const validVerdict = result === "success" && ["allow", "deny", "partial"].includes(verdict || "");
+  const validVerdict = ["allow", "deny", "partial"].includes(verdict || "");
   return {
     version: 1,
     repository,

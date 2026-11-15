@@ -35,12 +35,20 @@ describe("compiler-owned write gate record", () => {
     }
   });
 
-  it("narrows failed, skipped, cancelled, timed-out, or unknown gates to deny", () => {
+  it("preserves a validated allow when later publication fails or is cancelled", () => {
+    const { validateReplayWriteGateRecord } = require("./apply_safe_outputs_replay.cjs");
     for (const result of ["failure", "cancelled", "timed_out", "skipped", undefined]) {
-      const record = buildWriteGateRecord({ ...identity, GH_AW_WRITE_GATE: "allow", GH_AW_WRITE_GATE_JOB_RESULT: result });
-      expect(record.verdict).toBe("deny");
-      expect(record.reason).toBe("gate_unavailable");
+      const record = buildWriteGateRecord({ ...identity, GH_AW_WRITE_GATE: "allow", GH_AW_WRITE_GATE_REASON: "policy_allow", GH_AW_WRITE_GATE_JOB_RESULT: result });
+      expect(record.verdict).toBe("allow");
+      expect(record.reason).toBe("policy_allow");
+      expect(record.safe_outputs_result).toBe(result || "unknown");
+      expect(() => validateReplayWriteGateRecord(record, { repository: "owner/repo", runId: "123", attempt: 1, headSha: "a".repeat(40), workflowSha: "b".repeat(40), workflowPath: ".github/workflows/test.lock.yml" })).toThrow(
+        /successful recorded allow/
+      );
     }
+  });
+
+  it("narrows missing or unknown gate verdicts to deny", () => {
     for (const verdict of ["", "unknown", undefined, "ALLOW"]) {
       expect(buildWriteGateRecord({ ...identity, GH_AW_WRITE_GATE: verdict, GH_AW_WRITE_GATE_JOB_RESULT: "success" }).verdict).toBe("deny");
     }
