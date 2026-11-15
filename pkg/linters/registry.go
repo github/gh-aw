@@ -40,6 +40,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
 	"github.com/github/gh-aw/pkg/linters/ignoredlocalerror"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
+	"github.com/github/gh-aw/pkg/linters/jsondecodertrailingdataunchecked"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
@@ -188,6 +189,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringsjoinone.Analyzer,
 	stringssplitfirst.Analyzer,
 	stringscountcontains.Analyzer,
+	jsondecodertrailingdataunchecked.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
 	jsonunmarshalbytesconversion.Analyzer,
 	lenstringzero.Analyzer,
