@@ -34,6 +34,12 @@ function buildAssetUrl(githubServer, repo, branchName, targetFileName) {
 }
 
 async function main() {
+  const { withPendingPublication } = require("./pending_writes.cjs");
+  const { describeDirectory } = require("./pending_writes_files.cjs");
+  return withPendingPublication("upload_assets", "assets", () => ({ id: "assets", kind: "directory", files: describeDirectory(process.env.GH_AW_ASSETS_DIR || "/tmp/gh-aw/safeoutputs/assets") }), mainUnchecked);
+}
+
+async function mainUnchecked() {
   // Check if we're in staged mode
   const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
 
@@ -206,6 +212,7 @@ async function main() {
       if (!isStaged) {
         const maxPushAttempts = 3;
         for (let attempt = 1; attempt <= maxPushAttempts; attempt++) {
+          require("./pending_writes.cjs").currentPendingWrite()?.recheck?.();
           const pushResult = await exec.getExecOutput("git", ["push", "--porcelain", "origin", normalizedBranchName], { ignoreReturnCode: true });
           if (pushResult.exitCode === 0) {
             break;

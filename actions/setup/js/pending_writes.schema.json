@@ -95,13 +95,15 @@
         "binary": { "type": "boolean" },
         "submodule": { "type": "boolean" },
         "additions": { "type": "integer", "minimum": 0 },
-        "deletions": { "type": "integer", "minimum": 0 }
+        "deletions": { "type": "integer", "minimum": 0 },
+        "content_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "length": { "type": ["integer", "null"], "minimum": 0 }
       }
     },
     "code": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["transport", "base_commit", "sha256", "length", "patch_rendering", "files", "evaluated_paths", "additions", "deletions", "branch_salt", "complete"],
+      "required": ["transport", "base_commit", "sha256", "length", "patch_rendering", "files", "evaluated_paths", "additions", "deletions", "branch_salt", "tree_sha256", "complete"],
       "properties": {
         "transport": { "enum": ["patch", "bundle", "object-pack"] },
         "base_commit": { "type": ["string", "null"] },
@@ -123,6 +125,7 @@
         "additions": { "type": "integer", "minimum": 0 },
         "deletions": { "type": "integer", "minimum": 0 },
         "branch_salt": { "type": ["string", "null"] },
+        "tree_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
         "complete": { "type": "boolean" }
       }
     },
@@ -141,6 +144,7 @@
             "kind": { "type": "string" },
             "number": { "type": "integer", "minimum": 1 },
             "branch": { "type": "string" },
+            "branches": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
             "base": { "type": "string" },
             "head_repository": { "type": "string" },
             "head_commit": { "type": "string" },
@@ -173,7 +177,21 @@
             "id": { "type": "string", "minLength": 1 },
             "scope": { "const": "supplied_inputs" },
             "sha256": { "$ref": "#/$defs/sha256" },
-            "files": { "type": "array", "items": { "$ref": "#/$defs/file" } }
+            "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
+            "records": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ledger", "id", "length", "sha256"],
+                "properties": {
+                  "ledger": { "type": "string" },
+                  "id": { "type": "string" },
+                  "length": { "type": "integer", "minimum": 0 },
+                  "sha256": { "$ref": "#/$defs/sha256" }
+                }
+              }
+            }
           }
         }
       }
