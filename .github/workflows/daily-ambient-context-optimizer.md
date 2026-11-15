@@ -34,7 +34,7 @@ safe-outputs:
   allowed-github-references: []
   create-issue:
     title-prefix: "[ambient-context] "
-    labels: [automation, report, workflow-optimization, analysis]
+    labels: [automation, report, workflow-optimization, analysis, cookie]
     close-older-issues: true
     expires: 7d
     max: 3

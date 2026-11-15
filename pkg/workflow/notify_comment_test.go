@@ -305,6 +305,94 @@ func TestConclusionJobRunsForActivationFailuresButNotSkippedActivation(t *testin
 	assert.Contains(t, condition, "needs.activation.result == 'failure'")
 }
 
+func TestConclusionJobRunsForCustomPrerequisiteFailures(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{},
+		Jobs: map[string]any{
+			"agent":       map[string]any{"needs": []any{"snapshot"}},
+			"snapshot":    map[string]any{"needs": []any{"activation", "extract"}},
+			"extract":     map[string]any{"needs": "activation"},
+			"follow_up":   map[string]any{"needs": "agent"},
+			"after_evals": map[string]any{"needs": "push_evals_state"},
+		},
+	}
+	condition := RenderCondition(compiler.buildConclusionJobCondition(data, "agent", nil))
+	require.Contains(t, condition, "needs.snapshot.result == 'failure'")
+	require.Contains(t, condition, "needs.extract.result == 'failure'")
+	require.NotContains(t, condition, "needs.follow_up.result")
+	require.NotContains(t, condition, "needs.after_evals.result")
+
+	tests := []struct {
+		name        string
+		activation  string
+		snapshot    string
+		extract     string
+		dailyStatus string
+		exceeded    string
+		cancelled   bool
+		want        bool
+	}{
+		{name: "failed snapshot", activation: "success", snapshot: "failure", extract: "success", want: true},
+		{name: "failed transitive prerequisite", activation: "success", snapshot: "skipped", extract: "failure", want: true},
+		{name: "intentionally skipped snapshot", activation: "success", snapshot: "skipped", extract: "success"},
+		{name: "cancelled snapshot", activation: "success", snapshot: "cancelled", extract: "success"},
+		{name: "skipped activation", activation: "skipped", snapshot: "failure", extract: "success"},
+		{name: "cancelled activation", activation: "cancelled", snapshot: "failure", extract: "success"},
+		{name: "workflow cancellation", activation: "success", snapshot: "failure", extract: "success", cancelled: true},
+		{name: "quota stop", activation: "success", snapshot: "failure", extract: "success", dailyStatus: "quota_blocked"},
+		{name: "activation failure remains reportable", activation: "failure", snapshot: "skipped", extract: "skipped", want: true},
+		{name: "budget excess remains reportable", activation: "success", snapshot: "skipped", extract: "success", exceeded: "true", want: true},
+		{name: "accounting failure remains reportable", activation: "failure", snapshot: "skipped", extract: "success", dailyStatus: "structural_error", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			notCancelled := "'true' == 'true'"
+			if tt.cancelled {
+				notCancelled = "'false' == 'true'"
+			}
+			expression := strings.NewReplacer("always()", "('true' == 'true')", "!cancelled()", "("+notCancelled+")").Replace(condition)
+			require.Equal(t, tt.want, evaluateTestCondition(t, expression, map[string]string{
+				"needs.agent.result":      "skipped",
+				"needs.activation.result": tt.activation,
+				"needs.activation.outputs.daily_ai_credits_guardrail_status": tt.dailyStatus,
+				"needs.activation.outputs.daily_ai_credits_exceeded":         tt.exceeded,
+				"needs.snapshot.result":                                      tt.snapshot,
+				"needs.extract.result":                                       tt.extract,
+			}))
+		})
+	}
+}
+
+func TestConclusionCustomPrerequisitesPreserveReportingGates(t *testing.T) {
+	for _, reporting := range []string{"true", "false", "${{ inputs.report-failed-jobs }}"} {
+		t.Run(reporting, func(t *testing.T) {
+			compiler := NewCompiler()
+			data := &WorkflowData{
+				SafeOutputs: &SafeOutputsConfig{ReportFailedJobs: templatableBoolPtr(reporting)},
+				Jobs: map[string]any{
+					"snapshot": map[string]any{},
+				},
+			}
+			require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "agent", Needs: []string{"activation", "snapshot"}}))
+			job, err := compiler.buildConclusionJob(data, "agent", []string{"add_comment"})
+			require.NoError(t, err)
+			if reporting == "false" {
+				require.NotContains(t, job.If, "needs.snapshot.result")
+				require.NotContains(t, strings.Join(job.Steps, ""), "id: report_failed_jobs")
+			} else {
+				require.Contains(t, job.If, "needs.snapshot.result == 'failure'")
+				require.Contains(t, strings.Join(job.Steps, ""), "id: report_failed_jobs\n        if: always()")
+			}
+			require.Contains(t, job.If, "!(needs.add_comment.outputs.comment_id)")
+			if reporting == "true" {
+				data.MaxDailyAICContinueOnError = true
+				require.NotContains(t, RenderCondition(compiler.buildConclusionCustomPrerequisitesFailedCondition(data, "agent")), "quota_blocked")
+			}
+		})
+	}
+}
+
 func TestConclusionHandlerReceivesActivationResult(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

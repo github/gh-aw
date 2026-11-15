@@ -18,6 +18,7 @@ network:
 imports:
 - shared/reporting.md
 - shared/otlp.md
+- shared/graphify.md
 safe-outputs:
   create-issue:
     close-older-issues: true
@@ -105,7 +106,8 @@ Conduct a thorough investigation comparing the **current state of Copilot CLI** 
 **Goal**: Understand what Copilot CLI offers today
 
 1. **Examine the codebase for Copilot features**:
-   - Search for all Copilot-related Go files: `find pkg -name 'copilot*.go'`
+   - Query Graphify first for Copilot engine configuration, execution flags, tool integration, and MCP support. Follow returned nodes and neighbors to identify the relevant implementation files, then read only those source ranges.
+   - Keep the complete Copilot file inventory with `find pkg -name 'copilot*.go'`; graph ranking is not an exhaustive inventory. Use bounded source searches for uncovered files and mark that evidence as degraded Graphify coverage.
    - Review `pkg/workflow/copilot_engine.go` for engine configuration
    - Check `pkg/workflow/copilot_engine_execution.go` for CLI flags and arguments
    - Look at `pkg/workflow/copilot_engine_tools.go` for tool integration
@@ -129,6 +131,7 @@ Conduct a thorough investigation comparing the **current state of Copilot CLI** 
 **Goal**: Understand how Copilot is currently being used
 
 1. **Survey all agentic workflows**:
+   - Read workflow Markdown/YAML directly: Graphify's code-only index does not establish workflow configuration or usage counts.
    - Count workflows using Copilot: `grep -l "engine: copilot" .github/workflows/*.md`
    - Analyze a sample of workflows to understand:
      - Which tools are most commonly configured

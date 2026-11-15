@@ -80,3 +80,9 @@ Accepted values are `OWNER`, `MEMBER`, `COLLABORATOR`, `CONTRIBUTOR`, `FIRST_TIM
 
 > [!NOTE]
 > This filter does not grant permissions or expose secrets. Agent authentication still requires credentials to be available to the fork PR run, for example in a private or internal repository where an administrator has enabled sending secrets to workflows from fork pull requests. Other workflow guards still apply.
+
+## PR builds and deployment credentials
+
+Allowing a fork PR to trigger a workflow does not make its code trusted. Run PR-head builds and tests without deployment credentials and with only the permissions they need. Do not check out or execute PR-head code in a privileged `pull_request_target` or `workflow_run` job.
+
+Deploy production releases only after the change is merged, from a trusted commit, in a separate job that receives deployment credentials. If a pre-merge preview is required, isolate it from production and use credentials scoped to disposable preview resources. Treat artifacts from PR runs as untrusted: validate their provenance and contents, and never execute them in a credentialed job. See [cross-run artifact trust](/gh-aw/reference/artifacts/#cross-run-artifact-trust).
