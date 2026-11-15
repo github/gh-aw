@@ -121,6 +121,112 @@ func TestBuildAgenticAssessmentsFlagsResourceHeavyRun(t *testing.T) {
 	assert.True(t, found, "resource heavy assessment should be present")
 }
 
+func TestBuildAgenticAssessmentsIncludesSessionToolFailuresInControlAssessment(t *testing.T) {
+	t.Parallel()
+	processedRun := ProcessedRun{
+		Run: WorkflowRun{DatabaseID: 1, SafeItemsCount: 6},
+		Friction: &FrictionCostSummary{
+			TotalOccurrences:   1,
+			CountedOccurrences: 1,
+			Drivers: []FrictionDriverSummary{{
+				Driver:                "session_tool_failure",
+				Occurrences:           1,
+				CountedOccurrences:    1,
+				SuppressedOccurrences: 0,
+			}},
+		},
+	}
+	domain := &TaskDomainInfo{Name: "code_fix", Label: "Code Fix"}
+	fingerprint := &BehaviorFingerprint{
+		ExecutionStyle: "directed",
+		ActuationStyle: "write_heavy",
+	}
+
+	assessments := buildAgenticAssessments(processedRun, MetricsData{}, nil, nil, domain, fingerprint, nil)
+
+	require.Len(t, assessments, 1)
+	assert.Equal(t, "poor_agentic_control", assessments[0].Kind)
+	assert.Equal(t, "high", assessments[0].Severity)
+	assert.Contains(t, assessments[0].Evidence, "control_events=max(reported_control_signals=0, friction_counted_occurrences=1)=1")
+}
+
+func TestBuildAgenticAssessmentsLabelsReportedSignalsWhenFrictionIsUnavailable(t *testing.T) {
+	t.Parallel()
+	processedRun := ProcessedRun{
+		Run:          WorkflowRun{DatabaseID: 1, SafeItemsCount: 6},
+		MissingTools: []MissingToolReport{{Tool: "example_tool"}},
+	}
+	domain := &TaskDomainInfo{Name: "code_fix", Label: "Code Fix"}
+	fingerprint := &BehaviorFingerprint{
+		ExecutionStyle: "directed",
+		ActuationStyle: "selective_write",
+	}
+
+	assessments := buildAgenticAssessments(processedRun, MetricsData{}, nil, nil, domain, fingerprint, nil)
+
+	require.Len(t, assessments, 1)
+	assert.Equal(t, "poor_agentic_control", assessments[0].Kind)
+	assert.Contains(t, assessments[0].Evidence, "control_events=1 reported_control_signals=1 friction_counted_occurrences=unavailable")
+}
+
+func TestBuildAgenticAssessmentsControlEventCounts(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name     string
+		reported int
+		friction *FrictionCostSummary
+		want     string
+		severity string
+	}{
+		{"reported greater", 4, &FrictionCostSummary{CountedOccurrences: 1}, "control_events=max(reported_control_signals=4, friction_counted_occurrences=1)=4", "high"},
+		{"equal", 2, &FrictionCostSummary{CountedOccurrences: 2}, "control_events=max(reported_control_signals=2, friction_counted_occurrences=2)=2", "medium"},
+		{"distinct signals", 1, &FrictionCostSummary{CountedOccurrences: 2}, "control_events=max(reported_control_signals=1, friction_counted_occurrences=2)=2", "medium"},
+		{"suppressed", 0, &FrictionCostSummary{TotalOccurrences: 2, SuppressedOccurrences: 2}, "control_events=max(reported_control_signals=0, friction_counted_occurrences=0)=0", "medium"},
+		{"integrity filter", 0, &FrictionCostSummary{CountedOccurrences: 1, Drivers: []FrictionDriverSummary{{Driver: "integrity_filter", CountedOccurrences: 1}}}, "control_events=max(reported_control_signals=0, friction_counted_occurrences=1)=1", "high"},
+		{"unavailable", 0, nil, "control_events=0 reported_control_signals=0 friction_counted_occurrences=unavailable", "medium"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			processedRun := ProcessedRun{MissingTools: make([]MissingToolReport, tt.reported), Friction: tt.friction}
+			domain := &TaskDomainInfo{Name: "triage"}
+			fingerprint := &BehaviorFingerprint{ExecutionStyle: "exploratory", ActuationStyle: "read_only"}
+			if tt.name == "integrity filter" {
+				processedRun.Run.SafeItemsCount = 3
+				fingerprint.ActuationStyle = "write_heavy"
+			}
+			assessments := buildAgenticAssessments(processedRun, MetricsData{}, nil, nil, domain, fingerprint, nil)
+			require.NotEmpty(t, assessments)
+			assert.Equal(t, "poor_agentic_control", assessments[0].Kind)
+			assert.Equal(t, tt.severity, assessments[0].Severity)
+			assert.Contains(t, assessments[0].Evidence, tt.want)
+		})
+	}
+}
+
+func TestBuildAgenticAssessmentsCleanHistoricalSources(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name    string
+		summary *usageActivitySummary
+		usage   *MCPToolUsageData
+		want    string
+	}{
+		{"missing", nil, nil, "friction_counted_occurrences=unavailable"},
+		{"empty gateway", nil, &MCPToolUsageData{}, "friction_counted_occurrences=unavailable"},
+		{"clean session", &usageActivitySummary{Session: &usageActivitySession{TotalEvents: 1}}, nil, "friction_counted_occurrences=0)=0 friction_scope=derived_from_logs"},
+		{"clean gateway", nil, &MCPToolUsageData{ToolCalls: []MCPToolCall{{Status: "success"}}}, "friction_counted_occurrences=0)=0 friction_scope=derived_from_logs"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &DownloadResult{RunAnalysis: RunAnalysis{MCPToolUsage: tt.usage}}
+			applyUsageActivitySummaryToResult(tt.summary, result, true)
+			run := ProcessedRun{Friction: result.Friction}
+			assessments := buildAgenticAssessments(run, MetricsData{}, nil, nil, &TaskDomainInfo{Name: "triage"}, &BehaviorFingerprint{ExecutionStyle: "exploratory"}, nil)
+			require.NotEmpty(t, assessments)
+			assert.Equal(t, "poor_agentic_control", assessments[0].Kind)
+			assert.Contains(t, assessments[0].Evidence, tt.want)
+		})
+	}
+}
+
 func TestBuildAuditDataIncludesAgenticAnalysis(t *testing.T) {
 	t.Parallel()
 	processedRun := ProcessedRun{
