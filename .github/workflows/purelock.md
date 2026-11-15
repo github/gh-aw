@@ -151,7 +151,9 @@ steps:
     run: |
       set -euo pipefail
       make install-golangci-lint
+      test -x "$GOPATH/bin/golangci-lint"
       "$GOPATH/bin/golangci-lint" version
+      echo "$GOPATH/bin" >> "$GITHUB_PATH"
   - name: Download PureLock bundle
     uses: actions/download-artifact@v8.0.2
     with:
@@ -356,7 +358,7 @@ If not fuzz friendly and coverage is still short, extend the table instead; docu
 
 ### E. Validate
 
-Use the focused checks below as the complete validation gate for this test-only change. Do not run `make agent-report-progress` or other repository-wide lint targets. If `golangci-lint` is unavailable or cannot start, call `report_incomplete` with the actual error and stop; do not treat missing lint tooling as a noop.
+Use the focused checks below to validate this test-only change. For intermediate repository validation, use `make agent-report-progress-no-test`, which runs compile checks without Go linting. The required final publication gate remains `make agent-report-progress`. If `golangci-lint` is unavailable or cannot start, call `report_incomplete` with the actual error and stop; do not treat missing lint tooling as a noop.
 
 All of these must pass:
 
@@ -366,6 +368,8 @@ All of these must pass:
 4. `PATH="/tmp/gh-aw/agent/gopath/bin:$PATH" golangci-lint run ./<package-dir>/`.
 5. `coverage_after > coverage_before` for both function and package.
 6. `git diff --name-only` lists only `*_test.go` files and `testdata/fuzz/**`.
+
+Before finishing, manually self-check the Testify lint rules above in addition to running `golangci-lint`.
 
 If a validation check fails after `golangci-lint` starts, revert the test file and write `result.json` with `"outcome":"noop"` and the failure reason.
 
