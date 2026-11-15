@@ -181,6 +181,13 @@ exec /bin/rm "$@"`
     expect(result.calls).not.toContain("logs awmg-cli-proxy");
   });
 
+  it("trusts Copilot review comments without disabling integrity filtering", () => {
+    const result = runProxy({ ready: true });
+    expect(result.status).toBe(0);
+    expect(result.calls).toContain("--trusted-bots github-actions[bot],github-actions,dependabot[bot],copilot,copilot-pull-request-reviewer");
+    expect(result.calls).toContain("--guards-mode filter");
+  });
+
   it.each(["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"])("forwards %s by name without publishing its value", name => {
     const proxy = new URL("http://proxy.example:8080");
     proxy.username = "synthetic-user";
