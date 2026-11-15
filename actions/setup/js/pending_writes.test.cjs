@@ -227,10 +227,35 @@ describe("handler-derived pending writes", () => {
     const result = await authorize();
     expect(result.manifest.complete).toBe(true);
     expect(result.bytes.toString()).not.toContain("private record");
+    expect(result.manifest.items[1].depends_on).toEqual([]);
+    expect(result.manifest.items[1].publication.request_ids).toEqual([result.manifest.items[0].output_id]);
+    const handler = await require("./ledger_append.cjs").main(options.handlerConfig.ledger_append);
+    const message = JSON.parse(fs.readFileSync(options.agentOutputPath, "utf8")).items[0];
+    expect(await withPendingWrite(message, () => handler(message), 0)).toEqual({ success: true, queued: true });
     const expected = require("./pending_writes_plan.cjs").describeLedgerTransaction(JSON.parse(fs.readFileSync(options.agentOutputPath, "utf8")).items, options.handlerConfig, run);
     expect(() => assertPendingPublication("push_ledger_changes", "transactions", expected)).not.toThrow();
     expected.ledgers.metrics.appends[0].record.value = 2;
     expect(() => assertPendingPublication("push_ledger_changes", "transactions", expected)).toThrow("inputs_changed");
+  });
+
+  it("keeps true effect dependencies separate from call request authorization", async () => {
+    options.handlerConfig.call_workflow = { workflows: ["worker"] };
+    options.publications = [{ job: "call-worker", id: "worker", type: "call_workflow", kind: "call", worker: "worker" }];
+    const issueID = "so_aaaaaaaaaaaa";
+    const callID = "so_bbbbbbbbbbbb";
+    fs.writeFileSync(
+      options.agentOutputPath,
+      JSON.stringify({
+        items: [
+          { type: "create_issue", output_id: issueID, title: "issue", body: "body" },
+          { type: "call_workflow", output_id: callID, workflow_name: "worker", inputs: { aw_context: "{}" }, depends_on: [issueID] },
+        ],
+      })
+    );
+    const result = await authorize();
+    expect(result.manifest.complete).toBe(true);
+    expect(result.manifest.items[2].depends_on).toEqual([issueID]);
+    expect(result.manifest.items[2].publication.request_ids).toEqual([callID]);
   });
 
   it("uses the call handler's exact payload and blocks changed reusable-workflow inputs", async () => {

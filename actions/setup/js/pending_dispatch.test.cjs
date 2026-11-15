@@ -207,4 +207,81 @@ describe("handler-derived pending dispatch", () => {
     );
     expect(repositoryDispatch).not.toHaveBeenCalled();
   });
+
+  it("freezes a real default workflow-call payload and verifies exactly what the caller would receive", async () => {
+    const config = { workflows: ["worker"] };
+    const publication = { job: "call-worker", id: "worker", type: "call_workflow", kind: "call", worker: "worker" };
+    options.handlerConfig.call_workflow = config;
+    options.publications = [publication];
+    const message = { type: "call_workflow", workflow_name: "worker", inputs: { value: "original" } };
+    const result = await authorize(message);
+    const callItem = result.manifest.items.find(item => item.target.job === "call-worker" && item.publication);
+    expect(callItem.depends_on).toEqual([]);
+    expect(callItem.publication.request_ids).toEqual([result.manifest.items[0].output_id]);
+    vi.stubEnv("GH_AW_PENDING_WRITES_SPEC", JSON.stringify({ publications: options.publications }));
+    expect(result.manifest.complete).toBe(true);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
+    const rebuilt = await require("./pending_writes_plan.cjs").buildPendingWrites({ ...options });
+    expect(rebuilt.bytes.equals(result.bytes)).toBe(true);
+    const outputs = {};
+    global.core.setOutput = (name, value) => {
+      outputs[name] = value;
+    };
+    vi.stubEnv("GITHUB_RUN_ID", "999");
+    vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
+    const handler = await require("./call_workflow.cjs").main(config);
+    const outcome = await withPendingWrite(message, () => handler(message), 0);
+    expect(outcome.success).toBe(true);
+    expect(outcome.delegated).toBe(true);
+    const payload = JSON.parse(outputs.call_workflow_payload);
+    expect(JSON.parse(payload.aw_context)).toMatchObject({ run_id: "123", root_run_id: "123", run_attempt: "1", time: "2026-11-15T12:00:00.000Z" });
+    expect(process.env.GITHUB_RUN_ID).toBe("999");
+    vi.stubEnv("GH_AW_CALL_WORKFLOW_NAME", outputs.call_workflow_name);
+    vi.stubEnv("GH_AW_CALL_WORKFLOW_PAYLOAD", outputs.call_workflow_payload);
+    const { checkPublication } = require("./pending_writes_runtime.cjs");
+    expect(checkPublication(publication).item.complete).toBe(true);
+    const invoke = vi.fn();
+    vi.stubEnv("GH_AW_CALL_WORKFLOW_PAYLOAD", JSON.stringify({ ...payload, value: "changed" }));
+    expect(() => {
+      checkPublication(publication);
+      invoke();
+    }).toThrow("inputs_changed");
+    expect(invoke).not.toHaveBeenCalled();
+    vi.stubEnv("GH_AW_CALL_WORKFLOW_PAYLOAD", outputs.call_workflow_payload);
+    const decisions = JSON.parse(fs.readFileSync(process.env.GH_AW_WRITE_GATE_DECISIONS, "utf8"));
+    decisions.decision = "partial";
+    decisions.items.find(item => item.output_id === result.manifest.items[0].output_id).gate_decision = "drop";
+    const deniedPath = path.join(directory, "denied-decisions.json");
+    vi.stubEnv("GH_AW_WRITE_GATE_DECISIONS", deniedPath);
+    vi.stubEnv("GH_AW_WRITE_GATE_DECISIONS_SHA256", writeDecisionInventory(deniedPath, decisions));
+    expect(() => checkPublication(publication)).toThrow("request_not_authorized");
+  });
+
+  it.each(["{}", { supplied: true }, null, ""])("preserves explicit legacy workflow-call context %j without a source read", async suppliedContext => {
+    const config = { workflows: ["worker"] };
+    options.handlerConfig.call_workflow = config;
+    options.publications = [{ job: "call-worker", id: "worker", type: "call_workflow", kind: "call", worker: "worker" }];
+    const message = { type: "call_workflow", workflow_name: "worker", inputs: { aw_context: suppliedContext } };
+    const getRun = global.github.rest.actions.getWorkflowRun;
+    const result = await authorize(message);
+    vi.stubEnv("GH_AW_PENDING_WRITES_SPEC", JSON.stringify({ publications: options.publications }));
+    expect(result.manifest.complete).toBe(true);
+    global.core.setOutput = vi.fn();
+    const handler = await require("./call_workflow.cjs").main(config);
+    const outcome = await withPendingWrite(message, () => handler(message), 0);
+    expect(outcome.success).toBe(true);
+    const expected = typeof suppliedContext === "string" && suppliedContext !== "" ? suppliedContext : JSON.stringify(suppliedContext);
+    expect(JSON.parse(outcome.payload).aw_context).toBe(expected);
+    expect(getRun).not.toHaveBeenCalled();
+  });
+
+  it("refuses automatic workflow calls when their source context cannot be read", async () => {
+    options.handlerConfig.call_workflow = { workflows: ["worker"] };
+    options.publications = [{ job: "call-worker", id: "worker", type: "call_workflow", kind: "call", worker: "worker" }];
+    global.github.rest.actions.getWorkflowRun.mockRejectedValue(Object.assign(new Error("unavailable"), { status: 403 }));
+    const result = await authorize({ type: "call_workflow", workflow_name: "worker" });
+    expect(result.manifest.items[0]).toMatchObject({ complete: false, reason_category: "read_unavailable" });
+    expect(result.manifest.items[1]).toMatchObject({ complete: false, reason_category: "unsupported_plan" });
+  });
 });

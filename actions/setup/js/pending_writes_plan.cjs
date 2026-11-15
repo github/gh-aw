@@ -126,6 +126,10 @@ async function describeTarget(message, config, context, branches, options) {
       const publication = options.publications.find(publication => publication.kind === "call" && publication.worker === message.workflow_name);
       if (!publication || !config.workflows?.includes(message.workflow_name)) throw new Error("Unconfigured pending workflow call");
       target.job = publication.job;
+      const explicitContext = message.inputs && typeof message.inputs === "object" && Object.hasOwn(message.inputs, "aw_context");
+      const callerContext = explicitContext ? undefined : await dispatchContext(options);
+      const callPayload = require("./call_workflow.cjs").buildCallWorkflowPayload(message, callerContext);
+      return { target, access, callerContext, callPayload };
     } else target.job = DELEGATED_TYPES.get(message.type);
     return { target, access };
   }
@@ -282,10 +286,11 @@ async function buildPendingWritesUnchecked(options) {
         ? { target: { repository: run.repository, job: message.type }, access: { token: options.readToken, client: options.readClient || globalThis.github } }
         : await describeTarget(message, handlerConfig, context, branches, options);
       item.target = describedTarget.target;
+      if ("callerContext" in describedTarget && describedTarget.callerContext) callerContexts[item.output_id] = describedTarget.callerContext;
+      if ("callPayload" in describedTarget) item.free_text.push(...describeText(describedTarget.callPayload, "/call_payload"));
       if ("dispatch" in describedTarget) {
         item.dispatch = { sha256: inputDigest(describedTarget.dispatch) };
         if (describedTarget.callerContext) {
-          callerContexts[item.output_id] = describedTarget.callerContext;
           item.dispatch.context_time = parsePendingJSON(describedTarget.callerContext).time;
         }
         item.free_text.push(...describeText(describedTarget.dispatch, "/dispatch"));
@@ -317,10 +322,11 @@ async function buildPendingWritesUnchecked(options) {
     items.push(item);
   }
   const publicationInputs = [];
-  if (messages.some(message => ["dispatch_workflow", "dispatch_repository"].includes(message.type))) {
+  if (messages.some(message => ["dispatch_workflow", "dispatch_repository", "call_workflow"].includes(message.type))) {
     bindings.push({ id: "dispatch_contexts", kind: "value", value: callerContexts });
     inputs.push({ id: "dispatch_contexts", kind: "value", sha256: inputDigest(callerContexts) });
   }
+  const requestItems = [...items];
   for (const publication of options.publications || []) {
     let supplied = publication.supplied;
     if (publication.kind === "ledger") supplied = describeLedgerTransaction(messages, config, run);
@@ -328,7 +334,10 @@ async function buildPendingWritesUnchecked(options) {
       const calls = messages.filter(message => message.type === "call_workflow");
       if (calls.length <= 1) {
         const selected = calls.find(message => message.workflow_name === publication.worker);
-        supplied = { workflow_name: publication.worker, payload: selected ? parsePendingJSON(require("./call_workflow.cjs").buildCallWorkflowPayload(selected)) : null };
+        const selectedIndex = selected ? messages.indexOf(selected) : -1;
+        if (!selected || items[selectedIndex]?.complete) {
+          supplied = { workflow_name: publication.worker, payload: selected ? parsePendingJSON(require("./call_workflow.cjs").buildCallWorkflowPayload(selected, callerContexts[ids[selectedIndex]])) : null };
+        }
       }
     } else if (publication.kind === "sarif") {
       const { prepareCodeScanningFinding, buildCodeScanningSarif } = require("./code_scanning_helpers.cjs");
@@ -336,6 +345,7 @@ async function buildPendingWritesUnchecked(options) {
       supplied = buildCodeScanningSarif(findings.slice(0, config.create_code_scanning_alert?.max || findings.length), config.create_code_scanning_alert);
     } else if (publication.binding_id) supplied = inputs.find(input => input.id === publication.binding_id);
     const unsupported = publication.type === "custom_job" || (publication.kind === "ledger" && (config.ledger_append?.ledgers || []).some(ledger => ledger.storage === "comment-memory" && supplied?.ledgers?.[ledger.name]?.appends.length));
+    const requests = requestItems.filter(item => (publication.kind === "ledger" ? item.type === "ledger_append" : publication.kind === "call" && item.type === "call_workflow" && item.target.job === publication.job));
     /** @type {Record<string, any>} */
     const item = {
       output_id: `job_${inputDigest([publication.job, publication.id]).slice(0, 16)}`,
@@ -348,16 +358,17 @@ async function buildPendingWritesUnchecked(options) {
         ...(publication.drive_name ? { drive_name: publication.drive_name } : {}),
         ...(publication.kind === "ledger" ? { branches: (config.ledger_append?.ledgers || []).map(ledger => `ledgers/${ledger.name}`) } : {}),
       },
-      depends_on:
-        publication.kind === "ledger"
-          ? items.filter(item => item.type === "ledger_append").map(item => item.output_id)
-          : publication.kind === "call"
-            ? items.filter(item => item.type === "call_workflow" && item.target.job === publication.job).map(item => item.output_id)
-            : [],
+      depends_on: [...new Set(requests.flatMap(item => item.depends_on))].sort(),
       settings: { staged: options.staged === true, sha256: inputDigest(withoutCredentials(publication.settings || {})) },
       free_text: [],
       input_sha256: inputDigest(supplied ?? null),
-      publication: { id: publication.id, scope: "supplied_inputs", sha256: inputDigest(supplied ?? null), ...(supplied?.files ? { files: supplied.files } : {}) },
+      publication: {
+        id: publication.id,
+        scope: "supplied_inputs",
+        sha256: inputDigest(supplied ?? null),
+        ...(requests.length ? { request_ids: requests.map(item => item.output_id) } : {}),
+        ...(supplied?.files ? { files: supplied.files } : {}),
+      },
       complete: supplied !== undefined && !unsupported,
       reason_category: supplied === undefined || unsupported ? "unsupported_plan" : "ready",
     };

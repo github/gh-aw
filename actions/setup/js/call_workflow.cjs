@@ -8,15 +8,16 @@
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "call_workflow";
 
-const { buildAwContext } = require("./aw_context.cjs");
+const { buildPendingDispatchContext } = require("./pending_writes.cjs");
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
-function buildCallWorkflowPayload(message) {
+/** @param {any} message @param {string} [callerContext] */
+function buildCallWorkflowPayload(message, callerContext = undefined) {
   const inputs = message.inputs && typeof message.inputs === "object" ? { ...message.inputs } : {};
-  if (!("aw_context" in inputs)) inputs.aw_context = JSON.stringify(buildAwContext());
+  if (!("aw_context" in inputs)) inputs.aw_context = JSON.stringify(buildPendingDispatchContext(callerContext));
   else if (typeof inputs.aw_context !== "string" || inputs.aw_context === "") inputs.aw_context = JSON.stringify(inputs.aw_context);
   return JSON.stringify(inputs);
 }

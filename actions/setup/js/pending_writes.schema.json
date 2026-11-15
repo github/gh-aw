@@ -193,6 +193,7 @@
             "id": { "type": "string", "minLength": 1 },
             "scope": { "const": "supplied_inputs" },
             "sha256": { "$ref": "#/$defs/sha256" },
+            "request_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
             "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
             "records": {
               "type": "array",

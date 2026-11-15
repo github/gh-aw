@@ -316,6 +316,19 @@ function assertPendingPublication(job, id, supplied) {
   if (matches.length !== 1 || matches[0].complete !== true || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
   const { inventory, selection } = pendingAuthorization(manifest, matches[0]);
   const mayApply = selection.gate_decision === "apply" || (selection.gate_decision === "hold" && pendingHoldApproved(matches[0]));
+  for (const id of matches[0].publication.request_ids || []) {
+    const request = manifest.items.find(item => item.output_id === id);
+    const decision = inventory.items.find(item => item.output_id === id);
+    if (
+      !request ||
+      request.complete !== true ||
+      !decision ||
+      decision.item_sha256 !== request.item_sha256 ||
+      decision.input_sha256 !== request.input_sha256 ||
+      (decision.gate_decision !== "apply" && !(decision.gate_decision === "hold" && pendingHoldApproved(request)))
+    )
+      throw integrityError("request_not_authorized");
+  }
   if (!mayApply || process.env.GH_AW_REPLAY_FORCE_STAGED === "true" || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
   if (matches[0].settings?.staged === true || (manifest.detection.enabled && ["warning", "failure"].includes(manifest.detection.conclusion))) throw integrityError("native_policy_veto");
   for (const setting of matches[0].publication.invocation?.env || []) {
