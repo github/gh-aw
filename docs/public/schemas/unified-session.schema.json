@@ -1285,6 +1285,7 @@
         "gate_signal": { "type": "string", "enum": ["gate_denied", "gate_held", "gate_staged", "gate_dropped"] },
         "decision_reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
         "item_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "review_publication": { "type": "boolean", "const": true, "description": "Compiler-managed successful gate-review publication, never an agent claim." },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." }
       },
       "additionalProperties": false
@@ -1307,6 +1308,7 @@
         "gate_signal": { "type": "string", "enum": ["gate_denied", "gate_held", "gate_staged", "gate_dropped"] },
         "decision_reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
         "item_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "review_publication": { "type": "boolean", "const": true, "description": "Compiler-managed successful gate-review publication, never an agent claim." },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },

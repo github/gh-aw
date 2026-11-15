@@ -2,7 +2,7 @@
 "use strict";
 
 const VERDICTS = new Set(["allow", "deny", "partial"]);
-const { DECISIONS } = require("./write_gate_decisions.cjs");
+const { DECISIONS, decisionRank } = require("./write_gate_decisions.cjs");
 const SIGNALS = new Set(["gate_denied", "gate_held", "gate_staged", "gate_dropped"]);
 const CODE = /^[a-z0-9_.-]{1,64}$/;
 const DIGEST = /^[a-f0-9]{64}$/;
@@ -120,16 +120,26 @@ function buildGateDecision({ env, results, manifest, actualDigest, manifestValid
       complete = false;
       if ((result.output_id && !item && integrity === "verified") || (result.item_sha256 && !DIGEST.test(result.item_sha256))) failed = true;
     } else if (item.item_sha256 !== result.item_sha256) failed = true;
-    if (verdict === "partial" && !["apply", "review"].includes(result.gate_decision)) failed = true;
+    if (result.gate_decision !== undefined && !DECISIONS.includes(result.gate_decision)) failed = true;
+    if (result.gate_decision === "review") {
+      const reviewUrl = require("./safe_output_outcomes.cjs").canonicalSafeOutputUrl(result.url);
+      const reviewUri = reviewUrl ? new URL(reviewUrl) : undefined;
+      if (result.review_publication !== true) complete = false;
+      else if (result.type !== "create_issue") failed = true;
+      else if (!reviewUri || reviewUri.hash || !/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/[1-9][0-9]*\/?$/.test(reviewUri.pathname)) complete = false;
+    }
     const decision = authorized.get(result.output_id);
     if (decisionsVerified) {
-      if (!decision || !["apply", "review"].includes(decision.gate_decision) || (decision.gate_decision === "review" && result.type !== "create_issue")) failed = true;
+      if (!decision) failed = true;
+      else if (result.gate_decision === undefined) complete = false;
+      else if (decisionRank(result.gate_decision) < decisionRank(decision.gate_decision)) failed = true;
     } else if (verdict === "partial") complete = false;
   }
   let needs;
   let writeJobs;
   let publicationResults;
   const verifiedJobs = new Set();
+  const memoryResults = require("./memory_save_results.cjs").readMemorySaveResults(env.GH_AW_MEMORY_SAVE_RESULTS);
   try {
     needs = JSON.parse(env.GH_AW_JOB_RESULTS ?? "null");
     writeJobs = JSON.parse(env.GH_AW_WRITE_GATE_WRITE_JOB_NAMES ?? "null");
@@ -141,9 +151,14 @@ function buildGateDecision({ env, results, manifest, actualDigest, manifestValid
   else {
     for (const job of writeJobs) {
       const result = needs[job]?.result;
+      const jobItems = [...pending.values()].filter(item => item.target?.job === job);
       if (!["success", "failure", "cancelled", "skipped"].includes(result)) complete = false;
+      if (job === "push_repo_memory" && decisionsVerified) {
+        for (const item of jobItems) {
+          if (memoryResults.some(memory => memory.memoryId === item.publication?.id && memory.status === "saved" && memory.commit) && decisionRank("apply") < decisionRank(authorized.get(item.output_id)?.gate_decision)) failed = true;
+        }
+      }
       if (result === "success") {
-        const jobItems = [...pending.values()].filter(item => item.target?.job === job);
         if (verdict === "deny") failed = true;
         if (verdict === "partial" && decisionsVerified) {
           if (!jobItems.length || jobItems.some(item => !["apply", "review"].includes(authorized.get(item.output_id)?.gate_decision))) failed = true;
@@ -167,7 +182,6 @@ function buildGateDecision({ env, results, manifest, actualDigest, manifestValid
         }
         // Existing memory push outputs attest to saved/unchanged effects. Input
         // receipts alone do not attest to arbitrary custom or action effects.
-        const memoryResults = require("./memory_save_results.cjs").readMemorySaveResults(env.GH_AW_MEMORY_SAVE_RESULTS);
         const effectsVerified =
           job === "push_repo_memory" &&
           jobItems.every(item =>

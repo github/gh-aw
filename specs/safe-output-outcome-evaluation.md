@@ -64,6 +64,15 @@ digest evidence MUST NOT become verified non-writes. A proven unauthorized
 write or digest mismatch yields `write_gate_violation`; the check never changes
 the recorded verdict.
 
+Applied item records MUST NOT broaden the independently authorized decision
+under the shared `apply < hold < review < stage < drop` ordering. Native policy
+may narrow a held item to a review issue; this is not application of the held
+payload. Verification requires `review_publication: true` from the trusted
+successful gate-review branch and a canonical issue URI. Missing publication
+evidence remains unknown; a broader decision or a non-issue review effect is
+a violation. Authorization counts still describe the pinned inventory, while
+safe-output result records describe the effective decision and actual effect.
+
 Gate-blocked rows MUST be evaluated before resource lookup as
 `skipped`/`strong` with `gate_denied`, `gate_held`, `gate_staged`, or
 `gate_dropped`. Strong evidence attests to the recorded suppression, not an

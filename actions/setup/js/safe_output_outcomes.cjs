@@ -76,6 +76,7 @@ function projectSafeOutputData(source) {
   if (SIGNALS.has(source.gate_signal)) data.gate_signal = source.gate_signal;
   if (typeof source.decision_reason === "string" && CODE.test(source.decision_reason)) data.decision_reason = source.decision_reason;
   if (typeof source.item_sha256 === "string" && DIGEST.test(source.item_sha256)) data.item_sha256 = source.item_sha256;
+  if (source.review_publication === true) data.review_publication = true;
   if (source.operation_outcome === "indeterminate") data.operation_outcome = "indeterminate";
   const url = canonicalSafeOutputUrl(source.url);
   if (url) data.url = url;
@@ -100,12 +101,16 @@ function buildSafeOutputOutcomes(results, staged = false) {
       return {
         timestamp: new Date().toISOString(),
         ...projectSafeOutputData({
-          type: record.type,
+          type: record.review_publication === true && record.gate_decision === "review" ? "create_issue" : record.type,
           messageIndex: record.messageIndex,
           output_id: record.output_id,
           errorCode: record.errorCode,
           status: isStaged && status === "success" ? "staged" : status,
           staged: isStaged,
+          gate_decision: record.gate_decision,
+          decision_reason: record.decision_reason,
+          item_sha256: record.item_sha256,
+          review_publication: record.review_publication,
           operation_outcome: pickOutcomeField(item, "operation_outcome"),
           url,
         }),

@@ -60,6 +60,23 @@ describe("safe-output application outcomes", () => {
     expect(outcome).toMatchObject({ status: "failed", operation_outcome: "indeterminate" });
   });
 
+  it("records trusted review publication as an issue without echoing a handler-supplied marker", () => {
+    const result = { success: true, issue_url: "https://github.com/org/reviews/issues/90", review_publication: true };
+    const record = { type: "push_to_pull_request_branch", success: true, gate_decision: "review", decision_reason: "gate_existing_restriction", item_sha256: "a".repeat(64), result };
+    const untrusted = buildSafeOutputOutcomes([record])[0];
+    expect(untrusted.type).toBe("push_to_pull_request_branch");
+    expect(untrusted).not.toHaveProperty("review_publication");
+    expect(buildSafeOutputOutcomes([{ ...record, review_publication: true }])[0]).toMatchObject({
+      type: "create_issue",
+      status: "success",
+      gate_decision: "review",
+      decision_reason: "gate_existing_restriction",
+      review_publication: true,
+      item_sha256: "a".repeat(64),
+      url: "https://github.com/org/reviews/issues/90",
+    });
+  });
+
   it("records queued ledger appends as delegated until persistence", () => {
     const record = { type: "ledger_append", messageIndex: 0, success: true, result: { queued: true } };
     const [outcome] = buildSafeOutputOutcomes([record]);
