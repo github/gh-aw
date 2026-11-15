@@ -68,6 +68,64 @@ test("preserves navigation, slide links, speaker notes, and sound controls", asy
   await expect(page.locator(".count")).toHaveText(at(TOTAL));
 });
 
+test("fuzzy-searches slide titles, summaries and text from the dock's search dialog", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  const count = page.locator(".count");
+  const dialog = page.getByRole("dialog", { name: "Search slides" });
+  const input = dialog.getByRole("combobox", { name: "Search slides" });
+  const options = dialog.getByRole("option");
+  await page.goto("/gh-aw/cracktro/#3");
+  await expect(dialog).toBeHidden();
+
+  // the search button sits just left of the sound toggle
+  const [search, sound] = await Promise.all([page.locator(".fzb").boundingBox(), page.locator(".snd").boundingBox()]);
+  expect(search!.x + search!.width).toBeLessThanOrEqual(sound!.x);
+  expect(Math.abs(search!.y - sound!.y)).toBeLessThan(1);
+
+  // an empty query lists every slide; a typo still finds the slide by its title, with the matched bounds marked
+  await page.getByRole("button", { name: "Search slides (/)", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(input).toBeFocused();
+  await expect(options).toHaveCount(TOTAL);
+  await input.fill("zero secrt");
+  await expect(options.first()).toContainText("Zero-secret agents");
+  await expect(options.first().locator(".fz-t mark")).toHaveText(["Zero", "secret"]);
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeHidden();
+  await expect(count).toHaveText(at(slideNo("Zero-secret agents")));
+  // deck keys work again once the dialog closes
+  await page.keyboard.press("ArrowRight");
+  await expect(count).toHaveText(at(slideNo("Zero-secret agents") + 1));
+
+  // "/" opens it; summaries from slides.md are searchable and shown; arrows pick a result; Escape leaves the deck alone
+  await page.keyboard.press("/");
+  await expect(dialog).toBeVisible();
+  const summary = SLIDES[SECURITY + 1].summary;
+  const words = summary
+    .split(/\W+/)
+    .filter(w => w.length > 6)
+    .slice(0, 2);
+  await input.fill(words.join(" "));
+  await expect(options.filter({ hasText: summary.slice(0, 40) }).first()).toBeVisible();
+  await input.fill("no such slide qqqzzz");
+  await expect(options).toHaveCount(0);
+  await expect(dialog).toContainText("No slides match");
+  await input.fill(`#${SECURITY}`);
+  await expect(options).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(count).toHaveText(at(slideNo("Zero-secret agents") + 1));
+  await page.keyboard.press("/");
+  await input.fill("");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(options.nth(2)).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(count).toHaveText(at(3));
+  expect(errors).toEqual([]);
+});
+
 test("moves through the bands, up/down landing on each band's first slide", async ({ page }) => {
   const count = page.locator(".count");
   await page.goto("/gh-aw/cracktro/#1");
