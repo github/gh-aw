@@ -10308,7 +10308,7 @@
       ekP6: "M440 440 H380",
     };
     const build = () => {
-      let g = `<defs><clipPath id="ekClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="ekBotA"><stop offset="0" stop-color="#a371f7"/><stop offset="1" stop-color="#6e40c9"/></radialGradient><radialGradient id="ekBotB"><stop offset="0" stop-color="#f0883e"/><stop offset="1" stop-color="#9b4215"/></radialGradient></defs>`;
+      let g = `<defs><clipPath id="ekClip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>`;
       // headers
       g += `<g class="ek-area" style="--i:0"><text class="ek-hd b" x="0" y="22">PUBLIC ISSUE</text><text class="ek-hd g" x="440" y="22">AGENTIC WORKFLOW</text><text class="ek-hd o" x="890" y="22">ISOLATED ENCLAVE · SINGLE USE</text><text class="ek-hd o" x="1360" y="22">PRIVATE REPOSITORY</text></g>`;
       // A: public issue + comment
@@ -10319,7 +10319,7 @@
       g += `<text class="ek-tx" x="24" y="470">v2 is <tspan class="ek-hl">compatible</tspan> with our</text><text class="ek-tx" x="24" y="496">internal integration.</text><text class="ek-tx" x="24" y="522"><tspan class="ek-hl">No migration</tspan> is required.</text></g>`;
       g += `<text class="ek-ft f6" x="190" y="582">✓ no project name · no launch date</text>`;
       // B: primary agent + output gate
-      g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="url(#ekBotA)"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
+      g += `<g class="ek-area" style="--i:2"><rect class="ek-card g" x="440" y="50" width="380" height="180" rx="16"/><circle cx="500" cy="118" r="38" fill="#8957e5"/>${bot(500, 120, 0.8, "#f0f6fc")}`;
       g += `<text class="ek-t" x="556" y="112">Primary agent</text><text class="ek-s" x="556" y="140">public repo · untrusted</text>`;
       g += `<rect class="ek-task" x="460" y="176" width="340" height="38" rx="10"/><text class="ek-m c" x="630" y="201">task: check v2 compatibility</text></g>`;
       g += `<g class="ek-area ek-gate" style="--i:3"><rect class="ek-card gt" x="440" y="300" width="380" height="240" rx="16"/><text class="ek-t" x="460" y="338">Output gate</text><text class="ek-s" x="460" y="364">only schema values leave</text>`;
@@ -10328,7 +10328,7 @@
       g += `<text class="ek-ft f5" x="630" y="582">6 answers · 3 bits · within an 8-bit budget</text>`;
       // C: enclave
       g += `<g class="ek-area" style="--i:4"><rect class="ek-wall" x="880" y="40" width="420" height="510" rx="24"/><g class="ek-in">`;
-      g += `<rect class="ek-card o" x="910" y="70" width="360" height="150" rx="16"/><circle cx="970" cy="143" r="36" fill="url(#ekBotB)"/>${bot(970, 145, 0.75, "#f0f6fc")}`;
+      g += `<rect class="ek-card o" x="910" y="70" width="360" height="150" rx="16"/><circle cx="970" cy="143" r="36" fill="#db6d28"/>${bot(970, 145, 0.75, "#f0f6fc")}`;
       g += `<text class="ek-t" x="1024" y="136">Enclave agent</text><text class="ek-s" x="1024" y="164">read-only · no network</text>`;
       g += `<rect class="ek-stat" x="910" y="236" width="360" height="38" rx="19"/><text id="ekStat" class="ek-m c" x="1090" y="261">Waiting for task</text>`;
       g += `<g class="ek-resp"><rect x="910" y="290" width="360" height="96" rx="14"/><text class="ek-m j" x="928" y="330">{"compatibility": "compatible",</text><text class="ek-m j" x="928" y="360"> "migrationRequired": false}</text>`;
