@@ -50,6 +50,29 @@ describe("admission conclusion notification", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("forwards bounded gate counts without item content and within the request limit", async () => {
+    const gate = {
+      type: "gate.decision",
+      data: { verdict: "partial", reason: "policy", integrity: "verified", conclusionCheck: "unknown", counts: { apply: 1, hold: 2, review: 3, stage: 4, drop: 5 }, items: [{ title: "PRIVATE_GATE_CONTENT" }] },
+      provenance: { component: "write_gate", phase: "conclusion", path: "usage/aw_session.jsonl", index: 0 },
+    };
+    fs.appendFileSync(sessionFile, JSON.stringify(gate) + "\n");
+    const fetchImpl = vi.fn().mockImplementationOnce(oidc).mockResolvedValueOnce(accepted());
+    expect(await sendConclusion({ ...options, fetchImpl })).toEqual({ result: "delivered" });
+    const body = fetchImpl.mock.calls[1][1].body;
+    expect(JSON.parse(body).write_gate).toEqual({ verdict: "partial", reason: "policy", counts: { apply: 1, hold: 2, review: 3, stage: 4, drop: 5 } });
+    expect(Buffer.byteLength(body)).toBeLessThan(MAX_REQUEST_BYTES);
+    expect(body).not.toContain("PRIVATE_GATE_CONTENT");
+    gate.data.reason = "a".repeat(64);
+    for (const decision of Object.keys(gate.data.counts)) gate.data.counts[decision] = Number.MAX_SAFE_INTEGER;
+    fs.writeFileSync(sessionFile, session + JSON.stringify(gate) + "\n");
+    const maximumFetch = vi.fn().mockImplementationOnce(oidc).mockResolvedValueOnce(accepted());
+    expect(await sendConclusion({ ...options, fetchImpl: maximumFetch })).toEqual({ result: "delivered" });
+    const maximumBody = maximumFetch.mock.calls[1][1].body;
+    expect(Buffer.byteLength(JSON.stringify(JSON.parse(maximumBody).write_gate))).toBeLessThanOrEqual(512);
+    expect(Buffer.byteLength(maximumBody)).toBeLessThanOrEqual(MAX_REQUEST_BYTES);
+  });
+
   it.each([202, 204])("posts compact unified JSONL, artifact IDs and invocation identity, accepting %i", async status => {
     const fetchImpl = vi.fn().mockImplementationOnce(oidc).mockResolvedValueOnce(new Response(null, { status }));
     const mask = vi.fn();

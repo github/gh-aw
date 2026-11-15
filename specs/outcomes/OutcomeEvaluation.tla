@@ -74,6 +74,11 @@ OtherFacts ==
     {[Base(kind) EXCEPT !.primary = primary, !.reference = reference] :
         kind \in {"generic", "unsupported", "skipped"},
         primary \in {"ok", "404", "error"}, reference \in BOOLEAN}
+GateFacts ==
+    {[Base("gate") EXCEPT !.state = state, !.primary = primary,
+        !.reference = reference] :
+        state \in {"gate_denied", "gate_held", "gate_staged", "gate_dropped"},
+        primary \in {"ok", "404", "error"}, reference \in BOOLEAN}
 UpdateFacts ==
     {[Base("update") EXCEPT !.state = state, !.primary = primary,
         !.reference = reference, !.execution = execution, !.mutation = mutation] :
@@ -105,13 +110,14 @@ ReviewFacts ==
 BoundedObservations ==
     PRFacts \cup IssueFacts \cup CommentFacts \cup CloseFacts \cup
     MutationFacts \cup PushFacts \cup DispatchFacts \cup OtherFacts \cup
-    UpdateFacts \cup MilestoneFacts \cup ActorTimeFacts \cup ReviewFacts
+    UpdateFacts \cup MilestoneFacts \cup ActorTimeFacts \cup ReviewFacts \cup GateFacts
 NoExpectations == {}
 
 \* Engagement is already actor/time-filtered. Reactions have no actor identity
 \* and are medium evidence. The fixture projection checks that filtering.
 Classify(o) ==
-    CASE o.kind = "skipped" -> Result("skipped", "none", "skipped")
+    CASE o.kind = "gate" -> Result("skipped", "strong", o.state)
+      [] o.kind = "skipped" -> Result("skipped", "none", "skipped")
       [] o.kind = "unsupported" ->
             Result("unknown", "none", "unsupported_evaluator")
       [] ~o.reference ->
@@ -228,7 +234,9 @@ Classify(o) ==
 Evaluate(o, engine) ==
     LET correct == Classify(o) IN
     IF engine = "go" THEN correct
-    ELSE CASE Bug = "existence" /\ o.kind = "generic" /\ o.reference /\
+    ELSE CASE Bug = "gate" /\ o.kind = "gate" ->
+                    Result("unknown", "none", "missing_reference")
+           [] Bug = "existence" /\ o.kind = "generic" /\ o.reference /\
                     o.primary = "ok" /\ correct.status = "unknown" ->
                     Result("accepted", "weak", "target_exists_only")
            [] Bug = "bot" /\ o.kind = "issue" /\ o.state = "open" /\
@@ -305,6 +313,11 @@ TypeOK ==
 PrimaryFailureCannotAccept ==
     Computed /\ observation.primary # "ok" =>
         \A r \in {goResult, jsResult} : r.status # "accepted"
+GateBlocksRemainSkipped ==
+    Computed /\ observation.kind = "gate" =>
+        \A r \in {goResult, jsResult} :
+            r.status = "skipped" /\ r.strength = "strong" /\
+            r.signal = observation.state
 AcceptanceEvidence ==
     Computed => \A r \in {goResult, jsResult} :
         r.status = "accepted" => Classify(observation).status = "accepted"

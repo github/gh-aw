@@ -95,6 +95,7 @@
       { "if": { "properties": { "type": { "const": "firewall.steering" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallSteeringData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.token_usage" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.upstream_error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallUpstreamErrorData" } } } },
+      { "if": { "properties": { "type": { "const": "gate.decision" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GateDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "github_api.rate_limit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GitHubApiRateLimitData" } } } },
       { "if": { "properties": { "type": { "const": "grader.manifest" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderManifestData" } } } },
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
@@ -697,6 +698,26 @@
       "additionalProperties": false,
       "description": "Proxy-written upstream error response, projected without bodies, headers or messages."
     },
+    "GateDecisionData": {
+      "type": "object",
+      "properties": {
+        "verdict": { "type": "string", "enum": ["allow", "deny", "partial"] },
+        "reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
+        "manifestDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "integrity": { "type": "string", "enum": ["verified", "failed", "unknown"] },
+        "conclusionCheck": { "type": "string", "enum": ["verified", "failed", "unknown"] },
+        "failureCategory": { "type": "string", "const": "write_gate_violation" },
+        "counts": {
+          "type": "object",
+          "properties": { "apply": { "type": "number" }, "hold": { "type": "number" }, "review": { "type": "number" }, "stage": { "type": "number" }, "drop": { "type": "number" } },
+          "required": ["apply", "hold", "review", "stage", "drop"],
+          "additionalProperties": false
+        },
+        "items": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
+      },
+      "required": ["verdict", "reason", "integrity", "conclusionCheck"],
+      "additionalProperties": false
+    },
     "GitHubApiRateLimitData": {
       "type": "object",
       "properties": {
@@ -1260,6 +1281,10 @@
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
+        "gate_decision": { "type": "string", "enum": ["apply", "hold", "review", "stage", "drop"] },
+        "gate_signal": { "type": "string", "enum": ["gate_denied", "gate_held", "gate_staged", "gate_dropped"] },
+        "decision_reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
+        "item_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." }
       },
       "additionalProperties": false
@@ -1278,6 +1303,10 @@
         "output_id": { "type": "string" },
         "messageIndex": { "type": "number" },
         "staged": { "type": "boolean" },
+        "gate_decision": { "type": "string", "enum": ["apply", "hold", "review", "stage", "drop"] },
+        "gate_signal": { "type": "string", "enum": ["gate_denied", "gate_held", "gate_staged", "gate_dropped"] },
+        "decision_reason": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
+        "item_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "operation_outcome": { "type": "string", "const": "indeterminate", "description": "The operation may have applied even though processing failed to confirm it." },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },

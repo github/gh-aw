@@ -263,6 +263,12 @@ func renderLogsOutcomes(w io.Writer, data LogsData) error {
 			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.Ignored, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total); err != nil {
 			return err
 		}
+		if run.Summary.GateDenied+run.Summary.GateHeld+run.Summary.GateStaged+run.Summary.GateDropped > 0 {
+			if _, err := fmt.Fprintf(w, "  Gate skipped: %d denied, %d held, %d staged, %d dropped\n",
+				run.Summary.GateDenied, run.Summary.GateHeld, run.Summary.GateStaged, run.Summary.GateDropped); err != nil {
+				return err
+			}
+		}
 		if run.EvalError != "" {
 			if _, err := fmt.Fprintln(w, "  Missing evidence: "+run.EvalError); err != nil {
 				return err

@@ -5,6 +5,7 @@ const { AdmissionError, readAdmissionConfig, buildAdmissionIdentity } = require(
 const { requestAuthority } = require("./check_admission.cjs");
 const { compactUnifiedSession, readCompactUnifiedSession, MAX_COMPACT_SESSION_BYTES, MAX_COMPACT_SESSION_EVENTS } = require("./compact_unified_session.cjs");
 const { iterateLines, parseJsonlContent } = require("./jsonl_helpers.cjs");
+const { isCompilerGateDecision } = require("./write_gate_observability.cjs");
 
 const SESSION_FILE = "/tmp/gh-aw/usage/aw_session.jsonl";
 const MAX_REQUEST_BYTES = 64 * 1024;
@@ -78,11 +79,15 @@ async function sendConclusion({ env = process.env, sessionFile = SESSION_FILE, .
   const identity = JSON.parse(buildAdmissionIdentity(env));
   const usageArtifactIds = readUsageArtifactIds(env);
   const { version, session, includedEvents, omittedEvents, oversizedLines, scanTruncated, truncated } = readCompactSession(env, sessionFile);
+  const gates = parseJsonlContent(session).filter(isCompilerGateDecision);
+  if (gates.length > 1) throw new AdmissionError();
+  const gate = gates[0]?.data;
   const body = JSON.stringify({
     ...identity,
     session,
     session_compaction: { version, included_events: includedEvents, omitted_events: omittedEvents, oversized_lines: oversizedLines, scan_truncated: scanTruncated, truncated },
     usage_artifact_ids: usageArtifactIds,
+    ...(gate ? { write_gate: { verdict: gate.verdict, reason: gate.reason, counts: gate.counts } } : {}),
   });
   if (Buffer.byteLength(body) > MAX_REQUEST_BYTES) throw new AdmissionError();
   const endpoint = config.endpoint.replace(/\/api\/admission$/, "/api/conclusion");
