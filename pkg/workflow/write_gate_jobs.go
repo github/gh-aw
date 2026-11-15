@@ -43,7 +43,8 @@ func hasWritePublicationPath(data *WorkflowData) bool {
 	for name := range publicationJobNames(data.SafeOutputs) {
 		switch name {
 		case "safe_outputs":
-			if HasSafeOutputsEnabled(data.SafeOutputs) || data.CommentMemoryConfig != nil {
+			if hasNonBuiltinSafeOutputsEnabled(data.SafeOutputs) || data.CommentMemoryConfig != nil ||
+				(data.SafeOutputs != nil && len(data.SafeOutputs.Steps) > 0) {
 				return true
 			}
 		case pushRepoMemoryJobName:

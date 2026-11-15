@@ -7,6 +7,9 @@ import (
 )
 
 func (c *Compiler) buildWriteGateReplayConfig(data *WorkflowData) (map[string]any, error) {
+	if isWorkQueueParticipant(data) {
+		return nil, nil
+	}
 	if data.SafeOutputs != nil && data.SafeOutputs.Staged != nil && isExpression(data.SafeOutputs.Staged.String()) {
 		return nil, nil
 	}
