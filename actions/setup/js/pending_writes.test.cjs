@@ -183,6 +183,38 @@ describe("handler-derived pending writes", () => {
     expect(() => assertPendingPublication("push_ledger_changes", "transactions", expected)).toThrow("inputs_changed");
   });
 
+  it("uses the call handler's exact payload and blocks changed reusable-workflow inputs", async () => {
+    options.handlerConfig = { call_workflow: { workflows: ["worker"], max: 1 } };
+    const message = { type: "call_workflow", workflow_name: "worker", inputs: { value: "selected", aw_context: "{}" } };
+    fs.writeFileSync(options.agentOutputPath, JSON.stringify({ items: [message] }));
+    options.publications = [{ job: "call-worker", id: "worker", worker: "worker", type: "call_workflow", kind: "call" }];
+    const result = await authorize();
+    expect(result.manifest.complete).toBe(true);
+    expect(result.manifest.items[0].target.job).toBe("call-worker");
+    const { buildCallWorkflowPayload } = require("./call_workflow.cjs");
+    vi.stubEnv("GH_AW_CALL_WORKFLOW_NAME", "worker");
+    vi.stubEnv("GH_AW_CALL_WORKFLOW_PAYLOAD", buildCallWorkflowPayload(message));
+    const { checkPublication } = require("./pending_writes_runtime.cjs");
+    expect(() => checkPublication({ job: "call-worker", id: "worker", kind: "call" })).not.toThrow();
+    vi.stubEnv("GH_AW_CALL_WORKFLOW_PAYLOAD", JSON.stringify({ value: "unapproved", aw_context: "{}" }));
+    expect(() => checkPublication({ job: "call-worker", id: "worker", kind: "call" })).toThrow("inputs_changed");
+  });
+
+  it("rejects an upload selecting a file outside its bound staging inventory", async () => {
+    const reports = path.join(directory, "reports");
+    fs.mkdirSync(reports);
+    fs.writeFileSync(path.join(reports, "coverage.json"), "{}");
+    options.bindings = [{ id: "coverage", kind: "directory", path: reports }];
+    options.publications = [{ job: "upload_code_coverage", id: "coverage", type: "upload_code_coverage", binding_id: "coverage" }];
+    await authorize();
+    const { checkPublication } = require("./pending_writes_runtime.cjs");
+    const spec = { job: "upload_code_coverage", id: "coverage", kind: "directory", binding_id: "coverage", path: reports };
+    vi.stubEnv("GH_AW_PENDING_SELECTED_PATH", path.join(reports, "coverage.json"));
+    expect(() => checkPublication(spec)).not.toThrow();
+    vi.stubEnv("GH_AW_PENDING_SELECTED_PATH", path.join(reports, "..", "unreviewed.json"));
+    expect(() => checkPublication(spec)).toThrow("target_changed");
+  });
+
   it("fails closed on unsupported publication or dynamic target inputs", async () => {
     options.handlerConfig.create_issue.group = true;
     options.publications = [{ job: "unknown_job", id: "unknown", type: "custom_job" }];

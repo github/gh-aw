@@ -108,3 +108,26 @@ func TestPendingWriteGuardRejectsUnrepresentedPublisher(t *testing.T) {
 	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "unexpected", Needs: []string{"safe_outputs"}, Steps: []string{"      - run: echo publish\n"}}))
 	require.ErrorContains(t, compiler.guardPendingWritePublications(data, true, map[string]struct{}{"unexpected": {}}), "no handler-derived pending-write entry")
 }
+
+func TestPendingWriteCallHasVerifiedImmutableInputs(t *testing.T) {
+	compiler := NewCompiler()
+	data := pendingWriteTestData(t, compiler)
+	data.SafeOutputs.CallWorkflow = &CallWorkflowConfig{Workflows: []string{"worker"}}
+	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "safe_outputs", Steps: []string{"      - run: echo ready\n"}}))
+	call := &Job{
+		Name: "call-worker", Uses: "./.github/workflows/worker.yml", Needs: []string{"safe_outputs"},
+		If:   "needs.safe_outputs.outputs.call_workflow_name == 'worker'",
+		With: map[string]any{"payload": "${{ needs.safe_outputs.outputs.call_workflow_payload }}"},
+	}
+	require.NoError(t, compiler.jobManager.AddJob(call))
+	require.NoError(t, compiler.guardPendingWritePublications(data, true, map[string]struct{}{"call-worker": {}}))
+	verification, exists := compiler.jobManager.GetJob("verify-pending-call-worker")
+	require.True(t, exists)
+	require.Contains(t, verification.Permissions, "contents: read")
+	require.NotContains(t, verification.Permissions, "write")
+	require.Contains(t, strings.Join(verification.Steps, ""), "GH_AW_CALL_WORKFLOW_PAYLOAD")
+	require.Contains(t, call.Needs, "verify-pending-call-worker")
+	require.Contains(t, call.If, "outputs.pending_writes_verified == 'true'")
+	require.Nil(t, call.Env)
+	require.Equal(t, "${{ needs.safe_outputs.outputs.call_workflow_payload }}", call.With["payload"])
+}

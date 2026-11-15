@@ -33,6 +33,9 @@ type pendingWritePublication struct {
 	Path       string `json:"path,omitempty"`
 	Branch     string `json:"branch,omitempty"`
 	Repository string `json:"repository,omitempty"`
+	Worker     string `json:"worker,omitempty"`
+	StorageKey string `json:"storage_key,omitempty"`
+	DriveName  string `json:"drive_name,omitempty"`
 }
 
 type pendingWriteSpec struct {
@@ -73,6 +76,15 @@ func buildPendingWriteSpec(data *WorkflowData) pendingWriteSpec {
 				artifact += "-" + cache.ID
 			}
 			addDirectory("cache_memory:"+cache.ID, updateCacheMemoryJobName, "cache_memory", artifact, cacheMemoryDirFor(cache.ID), "", "")
+			var githubConfig *GitHubToolConfig
+			if data.ParsedTools != nil {
+				githubConfig = data.ParsedTools.GitHub
+			}
+			key := computeIntegrityCacheKey(cache, githubConfig)
+			if !strings.HasSuffix(key, "-${{ github.run_id }}") {
+				key += "-${{ github.run_id }}"
+			}
+			spec.Publications[len(spec.Publications)-1].StorageKey = key
 		}
 	}
 	if data.DriveMemoryConfig != nil {
@@ -81,6 +93,7 @@ func buildPendingWriteSpec(data *WorkflowData) pendingWriteSpec {
 				continue
 			}
 			addDirectory("drive_memory:"+drive.ID, updateDriveMemoryJobName, "drive_memory", generateDriveMemoryArtifactName(data, drive.ID), "/tmp/gh-aw/pending-drive/"+drive.ID, "", "")
+			spec.Publications[len(spec.Publications)-1].DriveName = drive.DriveName
 		}
 	}
 	if data.Evals != nil && data.Evals.HasEvals() {
@@ -103,6 +116,11 @@ func buildPendingWriteSpec(data *WorkflowData) pendingWriteSpec {
 	}
 	if data.SafeOutputs.CreateCodeScanningAlerts != nil {
 		spec.Publications = append(spec.Publications, pendingWritePublication{ID: "sarif", Job: "upload_code_scanning_sarif", Type: "create_code_scanning_alert", Kind: "sarif", Path: constants.SarifArtifactDownloadPath.String() + "/" + constants.SarifFileName.String()})
+	}
+	if data.SafeOutputs.CallWorkflow != nil {
+		for _, worker := range data.SafeOutputs.CallWorkflow.Workflows {
+			spec.Publications = append(spec.Publications, pendingWritePublication{ID: worker, Job: "call-" + sanitizeJobName(worker), Type: "call_workflow", Kind: "call", Worker: worker})
+		}
 	}
 	for name := range data.SafeOutputs.Jobs {
 		normalized := stringutil.NormalizeSafeOutputIdentifier(name)
@@ -298,8 +316,22 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 		job.Env["GH_AW_WRITE_GATE_DECISIONS"] = "/tmp/gh-aw/write-decisions.normalized.json"
 		job.Env["GH_AW_WRITE_GATE_DECISIONS_SHA256"] = "${{ needs.safe_outputs.outputs.write_gate_decisions_sha256 }}"
 		if job.Uses != "" {
-			return fmt.Errorf("pending-write integrity for reusable publication job %s requires a verified call-input transport", name)
+			var publication *pendingWritePublication
+			for index := range spec.Publications {
+				if spec.Publications[index].Job == name && spec.Publications[index].Kind == "call" {
+					publication = &spec.Publications[index]
+					break
+				}
+			}
+			if publication == nil {
+				return fmt.Errorf("publication job %s has no verified call-input transport", name)
+			}
+			if err := c.addPendingCallVerificationJob(data, job, *publication); err != nil {
+				return err
+			}
+			continue
 		}
+
 		var parsed struct {
 			Steps []map[string]any `yaml:"steps"`
 		}
@@ -335,7 +367,22 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 				if err != nil {
 					return fmt.Errorf("encoding pending publication %s: %w", publication.ID, err)
 				}
-				steps = append(steps, "      - name: Verify pending-write publication inputs\n", "        id: "+id+"\n", fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)), "        env:\n", fmt.Sprintf("          GH_AW_PENDING_PUBLICATION: %q\n", publicationJSON), "        with:\n", "          script: |\n", "            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n", "            setupGlobals(core, github, context, exec, io, getOctokit);\n", "            require('"+SetupActionDestination+"/pending_writes_runtime.cjs').checkPublicationFromEnv();\n")
+				steps = append(steps, "      - name: Verify pending-write publication inputs\n", "        id: "+id+"\n", fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)), "        env:\n", fmt.Sprintf("          GH_AW_PENDING_PUBLICATION: %q\n", publicationJSON))
+				if inputs, ok := step["with"].(map[string]any); ok {
+					if key, exists := inputs["key"]; exists {
+						steps = append(steps, fmt.Sprintf("          GH_AW_PENDING_STORAGE_KEY: %q\n", fmt.Sprint(key)))
+					}
+					if drive, exists := inputs["drive-name"]; exists {
+						steps = append(steps, fmt.Sprintf("          GH_AW_PENDING_DRIVE_NAME: %q\n", fmt.Sprint(drive)))
+					}
+					for _, input := range []string{"file", "sarif_file", "path"} {
+						if selected, exists := inputs[input]; exists {
+							steps = append(steps, fmt.Sprintf("          GH_AW_PENDING_SELECTED_PATH: %q\n", fmt.Sprint(selected)))
+							break
+						}
+					}
+				}
+				steps = append(steps, "        with:\n", "          script: |\n", "            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n", "            setupGlobals(core, github, context, exec, io, getOctokit);\n", "            require('"+SetupActionDestination+"/pending_writes_runtime.cjs').checkPublicationFromEnv();\n")
 				condition := fmt.Sprintf("steps.%s.outcome == 'success' && steps.%s.outputs.pending_writes_verified == 'true'", id, id)
 				if original, exists := step["if"]; exists {
 					condition += " && (" + c.extractExpressionFromIfString(fmt.Sprint(original)) + ")"

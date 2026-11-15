@@ -148,7 +148,9 @@
             "base": { "type": "string" },
             "head_repository": { "type": "string" },
             "head_commit": { "type": "string" },
-            "job": { "type": "string" }
+            "job": { "type": "string" },
+            "storage_key": { "type": "string" },
+            "drive_name": { "type": "string" }
           }
         },
         "depends_on": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
