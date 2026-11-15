@@ -8803,485 +8803,6 @@
     });
   }
 
-  // Model routing: the router reads each run, weighs what a mistake would cost and picks the cheapest model and effort that is good enough
-  {
-    resetIndex();
-    // Illustrative runs: each tagged phrase (k kind, s scope, d difficulty) lifts out into a label chip.
-    const RUNS = [
-      {
-        wf: "daily-report",
-        text: [["Summarize "], ["yesterday's activity", "s"], [" into a "], ["short", "d"], [" "], ["daily report", "k"], ["."]],
-        chips: ["report", "repo-wide", "easy"],
-        stakes: 0,
-        why: "a report is easy to ignore",
-        tier: 0,
-        effort: "HIGH",
-      },
-      {
-        wf: "security-audit",
-        text: [["Audit", "k"], [" "], ["the auth module", "s"], [" for "], ["subtle injection bugs", "d"], ["."]],
-        chips: ["security", "subsystem", "hard"],
-        stakes: 1,
-        why: "a missed bug would be silent",
-        tier: 1,
-        effort: "HIGH",
-      },
-      {
-        wf: "pr-review",
-        text: [["Review", "k"], [" "], ["this pull request", "s"], [" for "], ["common code smells", "d"], ["."]],
-        chips: ["review", "multi-file", "medium"],
-        stakes: 0,
-        why: "a review is only a suggestion",
-        tier: 0,
-        effort: "XHIGH",
-      },
-      {
-        wf: "release",
-        text: [["Merge", "k"], [" "], ["the release branch", "s"], [" once "], ["checks are green", "d"], ["."]],
-        chips: ["release", "repo-wide", "easy"],
-        stakes: 2,
-        why: "easy, but a merge can't be undone",
-        tier: 2,
-        effort: "MEDIUM",
-      },
-      {
-        wf: "issue-triage",
-        text: [["Label", "k"], [" "], ["the new issue", "s"], [" with "], ["one area tag", "d"], ["."]],
-        chips: ["triage", "one issue", "trivial"],
-        stakes: 0,
-        why: "a label is easy to change",
-        tier: 0,
-        effort: "LOW",
-      },
-      {
-        wf: "docs-sync",
-        text: [["Update the docs", "k"], [" to match "], ["the new CLI flags", "s"], [" in "], ["a few lines", "d"], ["."]],
-        chips: ["docs", "multi-file", "easy"],
-        stakes: 0,
-        why: "docs are easy to fix",
-        tier: 0,
-        effort: "MEDIUM",
-      },
-    ];
-    const TIERS = [
-      ["SMALL", "#3fb950", "$", "small"],
-      ["MID-SIZE", "#4493f8", "$$", "mid-size"],
-      ["FRONTIER", "#ab7df8", "$$$", "frontier"],
-    ];
-    const ZONES = [
-      ["low", "economy", "#3fb950", 150],
-      ["medium", "balanced", "#4493f8", 90],
-      ["high", "robust", "#ab7df8", 30],
-    ];
-    const CHIPS = [
-      ["kind", "#f778ba", "k"],
-      ["scope", "#39c5cf", "s"],
-      ["difficulty", "#e3b341", "d"],
-    ];
-    // Measured on gh-aw's own workflows: cost per run by day, relative to each workflow's own two weeks before routing (through 12 Nov 2026).
-    const DAYS = [1.02, 1.02, 0.97, 1.06, 1.04, 1.05, 0.95, 1.06, 0.95, 1.05, 0.99, 0.99, 0.93, 0.89, 0.63, 0.5, 0.2, 0.2, 0.23, 0.31, 0.24, 0.15, 0.15];
-    const ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$-";
-    // each run plays out at about 56% of its first pace (0.75 x 0.75), so the eye can follow every step
-    const SLOW = 16 / 9;
-    const svgOf = (cls, vb, inner) => {
-      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      s.setAttribute("class", cls);
-      s.setAttribute("viewBox", vb);
-      s.innerHTML = inner;
-      return s;
-    };
-
-    // the stakes gauge: three zones on a half dial, and a sprung needle
-    const GX = 190,
-      GY = 200,
-      GR = 128;
-    const pt = (a, r) => [GX + r * Math.cos((a * Math.PI) / 180), GY - r * Math.sin((a * Math.PI) / 180)];
-    const arc = (a0, a1) => {
-      const [x0, y0] = pt(a0, GR),
-        [x1, y1] = pt(a1, GR);
-      return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${GR} ${GR} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
-    };
-    let gs = `<path class="mr-track" d="${arc(180, 0)}"/>`;
-    ZONES.forEach(([lab, , c, mid], i) => {
-      const [lx, ly] = pt(mid, 164);
-      gs += `<path class="mr-z" d="${arc(180 - i * 60 - (i ? 1.5 : 0), 120 - i * 60 + (i < 2 ? 1.5 : 0))}" stroke="${c}" style="color:${c}"/>`;
-      gs += `<text class="mr-zl" x="${lx.toFixed(1)}" y="${(ly + 6).toFixed(1)}" fill="${c}">${lab}</text>`;
-    });
-    gs += `<g class="mr-needle"><path d="M${GX - 5} ${GY}L${GX} ${GY - 112}L${GX + 5} ${GY}Z"/><circle cx="${GX}" cy="${GY}" r="13"/></g>`;
-    gs += `<text class="mr-read" x="${GX}" y="${GY + 46}"></text><text class="mr-read2" x="${GX}" y="${GY + 66}"></text>`;
-    const gauge = svgOf("mr-gauge", "0 0 380 270", gs);
-    const zones = [...gauge.querySelectorAll(".mr-z")],
-      zlabs = [...gauge.querySelectorAll(".mr-zl")],
-      needleEl = gauge.querySelector(".mr-needle"),
-      read = gauge.querySelector(".mr-read"),
-      read2 = gauge.querySelector(".mr-read2");
-
-    // the run card: the workflow's model line, the task, its labels, the gauge and the reason
-    const wf = h("span", { class: "mr-wf" }),
-      text = h("div", { class: "mr-text" }),
-      caret = h("span", { class: "pf-caret" }),
-      beam = h("div", { class: "mr-beam" }),
-      chips = CHIPS.map(([l, c]) => h("div", { class: "mr-chip", "--c": c }, h("i", {}, l), h("b", {}))),
-      chipRow = h("div", { class: "mr-chips" }, chips),
-      why = h("div", { class: "mr-why" });
-    const card = h(
-      "div",
-      { class: "mr-run" },
-      h(
-        "div",
-        { class: "mr-bar" },
-        ["#ff5f57", "#febc2e", "#28c840"].map(c => h("i", { style: { background: c } })),
-        wf,
-        h("span", { class: "mr-gap" }),
-        h("span", { class: "mr-model" }, "model: ", h("b", {}, "router"))
-      ),
-      text,
-      beam,
-      chipRow,
-      gauge,
-      why
-    );
-    const fields = [
-      ["model", 8],
-      ["effort", 7],
-      ["cost", 3],
-    ].map(([l, n]) => {
-      const tiles = Array.from({ length: n }, () => h("span", { class: "mr-t" }, " "));
-      return { el: h("div", { class: "mr-field" }, h("i", {}, l), h("div", { class: "mr-tiles" }, tiles)), tiles };
-    });
-    const tiles = fields.flatMap(f => f.tiles);
-    const hero = h(
-      "div",
-      { class: "mr-hero" },
-      card,
-      h(
-        "div",
-        { class: "mr-flap" },
-        h("b", { class: "mr-arrow" }, "→"),
-        fields.map(f => f.el)
-      )
-    );
-
-    // measured results: the day-by-day cost strip, with the switch to model: router on day 0
-    let ss = `<line x1="0" y1="25" x2="544" y2="25"/>`;
-    DAYS.forEach((v, i) => {
-      ss += `<rect class="${i < 14 ? "pre" : "post"}" x="${(i * 23.6).toFixed(1)}" y="${(125 - v * 100).toFixed(1)}" width="18" height="${(v * 100).toFixed(1)}" rx="3" style="--i:${i}"/>`;
-    });
-    ss += `<line class="mk" x1="327.6" y1="6" x2="327.6" y2="128"/><text class="mk" x="336" y="46">model: router</text>`;
-    ss += `<text x="0" y="148">two weeks before</text><text x="336" y="148">after</text>`;
-    const big = h("b", {}, "0%");
-    const proof = h(
-      "div",
-      { class: "mr-proof" },
-      h("div", { class: "mr-pf-h" }, "gh-aw's own workflows", h("em", {}, "measured")),
-      h("div", { class: "mr-big" }, big, h("span", {}, "cost per run", h("small", {}, "65 → 16 AI credits"))),
-      svgOf("mr-strip", "0 0 544 150", ss),
-      h("div", { class: "mr-held" }, h("span", {}, h("i", {}, "✓"), "run success", h("b", {}, "87.6% → 88.5%")), h("span", {}, h("i", {}, "✓"), "quality", h("b", {}, "83.9 → 83.6")))
-    );
-
-    // built for workflows that repeat: a week of one workflow's runs, one square each, coloured by the model it got (illustrative)
-    const week = h("div", { class: "mr-week" }, ["M", "T", "W", "T", "F", "S", "S"].map(d => [h("i", {}, d), Array.from({ length: 24 }, () => h("b", {}))]).flat(2));
-    const cells = [...week.querySelectorAll("b")];
-    const runCount = h("b", {}, "0"),
-      weekNo = h("span", {}, "week 1");
-    const rep = h(
-      "div",
-      { class: "mr-rep" },
-      h("div", { class: "mr-rh" }, "Built for workflows that repeat"),
-      week,
-      h(
-        "div",
-        { class: "mr-rf" },
-        TIERS.map(([, c, , name]) => h("span", { "--c": c }, name)),
-        h("em", {}, runCount, " runs · ", weekNo)
-      )
-    );
-    const cv = h("canvas", { class: "mr-cv", width: 1920, height: 1080 }),
-      cx = cv.getContext("2d");
-    const sec = h("section", { class: "slide mr" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The right model for every run"), h("h2", {}, letters("Model "), letters("routing", "l-grad"))), hero, proof, rep, cv);
-
-    // builds: 0 the router at work, 1 measured results, 2 built for workflows that repeat
-    let t0 = 0,
-      last = 0,
-      build = 0,
-      tb = 0,
-      si = 0,
-      no = 0,
-      run = null,
-      needle = -90,
-      nv = 0,
-      nt = -90,
-      flipT = 0,
-      savedAt = 0,
-      saved = false,
-      weekAt = 0,
-      wk = 1,
-      lit = 0,
-      picks = [],
-      bits = [],
-      ghosts = [];
-    // sparks from an element's centre, in stage coordinates
-    const burst = (el, c, n) => {
-      const r = el.getBoundingClientRect(),
-        s = sec.getBoundingClientRect(),
-        k = 1920 / s.width,
-        x = (r.left + r.width / 2 - s.left) * k,
-        y = (r.top + r.height / 2 - s.top) * k;
-      for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2,
-          v = 0.1 + Math.random() * 0.3;
-        bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.1, life: 1, c, s: 2 + Math.random() * 3 });
-      }
-    };
-    const startRun = t => {
-      const r = RUNS[si++ % RUNS.length];
-      no += 1 + ((Math.random() * 4) | 0);
-      run = { ...r, t, words: [], typed: -1, ok: [], read: false, gauged: false, said: false, flap: false, done: false };
-      wf.replaceChildren(`${r.wf}.md`, h("small", {}, `run #${no}`));
-      text.replaceChildren();
-      let n = 0;
-      for (const [s, k] of r.text) {
-        const el = h("span", { class: k ? `mr-w ${k}` : "" });
-        text.append(el);
-        run.words.push({ el, s, k, at: n, lit: false });
-        n += s.length;
-      }
-      run.len = n;
-      chips.forEach((c, j) => {
-        c.classList.remove("on");
-        c.lastChild.textContent = r.chips[j];
-      });
-      [text, chipRow].forEach(x => x.classList.remove("mr-out"));
-      [why, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
-      // the previous pick fades back until the board flips to this run's pick
-      tiles.forEach(x => x.classList.add("old"));
-      nt = -90;
-      read.textContent = read2.textContent = "";
-    };
-    const lift = (w, t) => {
-      w.lit = true;
-      w.el.classList.add("on");
-      const j = CHIPS.findIndex(c => c[2] === w.k),
-        chip = chips[j];
-      const g = h("div", { class: "mr-ghost", "--c": CHIPS[j][1], style: { left: `${36 + w.el.offsetLeft}px`, top: `${84 + w.el.offsetTop}px` } }, w.s);
-      card.append(g);
-      void g.offsetWidth;
-      g.style.transform = `translate(${chip.offsetLeft - w.el.offsetLeft}px, ${300 + chip.offsetTop - 84 - w.el.offsetTop}px) scale(.6)`;
-      g.style.opacity = "0";
-      ghosts.push({ g, t, chip });
-      sfx.pop(j + 3);
-    };
-    const stepRun = t => {
-      // run time at the first pace, so the steps below keep their relative timing
-      const e = (t - run.t) / SLOW,
-        n = Math.min(run.len, Math.floor((e / 520) * run.len));
-      // untyped letters keep their place but stay invisible, so the lines never reflow while typing
-      if (n !== run.typed) {
-        run.typed = n;
-        for (const w of run.words) {
-          const k = Math.max(0, Math.min(w.s.length, n - w.at));
-          w.el.replaceChildren(w.s.slice(0, k), ...(n >= w.at && k < w.s.length ? [caret] : []), h("span", { class: "mr-hide" }, w.s.slice(k)));
-        }
-      }
-      // the beam reads the task; each tagged phrase lifts out into its label chip
-      const u = (e - 620) / 600;
-      beam.style.opacity = u > 0 && u < 1 ? 1 : 0;
-      if (u > 0 && !run.read) {
-        const x = Math.min(1, u) * 584;
-        beam.style.transform = `translateX(${x}px)`;
-        for (const w of run.words) if (w.k && !w.lit && x > w.el.offsetLeft + w.el.offsetWidth / 2) lift(w, t);
-        run.read = u >= 1;
-      }
-      if (!run.gauged && e > 1350) {
-        run.gauged = true;
-        const [lab, mode, c, deg] = ZONES[run.stakes];
-        nt = 90 - deg;
-        zones[run.stakes].classList.add("on");
-        zlabs[run.stakes].classList.add("on");
-        read.textContent = `${lab.toUpperCase()} STAKES`;
-        read.style.fill = c;
-        read2.textContent = mode;
-      }
-      if (!run.said && e > 1600) {
-        run.said = true;
-        why.textContent = run.why;
-        why.classList.add("on");
-      }
-      if (!run.flap && e > 1800) {
-        run.flap = true;
-        const [m, c, co] = TIERS[run.tier];
-        run.target = m.padEnd(8) + run.effort.padEnd(7) + co.padEnd(3);
-        run.c = c;
-        run.settle = tiles.map((_, i) => t + (220 + i * 28) * SLOW);
-        tiles.forEach((x, i) => {
-          x.classList.remove("set", "old");
-          x.style.setProperty("--c", c);
-          run.ok[i] = false;
-        });
-        flipT = 0;
-      }
-      if (run.flap && !run.done) {
-        const flip = t - flipT > 55 * SLOW;
-        if (flip) {
-          flipT = t;
-          sfx.mr.flap();
-        }
-        let left = 0;
-        tiles.forEach((x, i) => {
-          if (run.ok[i]) return;
-          if (t >= run.settle[i]) {
-            run.ok[i] = true;
-            x.textContent = run.target[i];
-            if (run.target[i] !== " ") x.classList.add("set");
-          } else {
-            left++;
-            if (flip) x.textContent = ALPH[(Math.random() * ALPH.length) | 0];
-          }
-        });
-        if (!left) {
-          run.done = true;
-          burst(fields[0].el, run.c, 26);
-          sfx.mr.pick(run.tier);
-        }
-      }
-      if (run.done && e > 3440) [text, chipRow].forEach(x => x.classList.add("mr-out"));
-      if (run.done && e > 3700) startRun(t);
-    };
-    const newWeek = () => {
-      picks = cells.map(() => {
-        const r = Math.random();
-        return r < 0.71 ? 0 : r < 0.87 ? 1 : 2;
-      });
-      lit = 0;
-      cells.forEach(c => (c.className = ""));
-    };
-    const setBuild = (b, t) => {
-      const was = build;
-      build = b;
-      tb = t;
-      sec.classList.toggle("side", b >= 1);
-      proof.classList.toggle("on", b >= 1);
-      rep.classList.toggle("on", b >= 2);
-      if (b === 1 && was < 1) {
-        savedAt = t;
-        saved = false;
-        big.textContent = "0%";
-      }
-      if (b === 2 && was < 2) {
-        wk = 1;
-        weekNo.textContent = "week 1";
-        newWeek();
-        weekAt = t;
-      }
-      // stepping back cancels a count-up or a week that hasn't finished
-      if (b < 1) savedAt = 0;
-      if (b < 2) weekAt = 0;
-    };
-    slides.push({
-      group: "cost",
-      notes:
-        "Model routing. Every workflow run pays for a model, and the usual habit is to pin one strong model for every run. With one line, model: router, the router reads each run's task before the agent starts, labels the kind of work, its scope and its difficulty, weighs what a mistake would cost (low, medium or high stakes, which gh-aw calls economy, balanced and robust), then picks the cheapest model and reasoning effort that is good enough, using benchmark results that ship with the AWF firewall. It runs inside the firewall, respects the workflow's model policy, and gh aw audit shows what it picked and why. The tasks, labels and picks in the animation are illustrative. The results are measured on gh-aw's own workflows: across 127 routed workflows and 3,097 routed runs through 12 Nov 2026, each compared with its own two weeks before routing, cost per run fell 75% (65 to 16 AI credits) while run success (87.6% to 88.5%) and judged quality (83.9 to 83.6 out of 100) held steady. Most routers pick a model for one prompt in a chat, with a person watching. This one is built for workflows that repeat: the same job runs on every schedule, issue and pull request with no one watching, so the router weighs the stakes of each run itself, and the saving repeats on every run. The week of runs is illustrative. Keys: → next step.",
-      enter() {
-        t0 = last = build = si = 0;
-        run = null;
-        // jump straight back to the centred layout instead of gliding there
-        hero.style.transition = "none";
-        sec.classList.remove("side");
-        void hero.offsetWidth;
-        [proof, rep, why, ...chips, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
-        big.textContent = "0%";
-        savedAt = weekAt = 0;
-        ghosts.forEach(g => g.g.remove());
-        ghosts = [];
-        bits = [];
-        tiles.forEach(x => {
-          x.textContent = " ";
-          x.classList.remove("set", "old");
-        });
-        text.replaceChildren();
-        wf.replaceChildren();
-        read.textContent = read2.textContent = "";
-        beam.style.opacity = 0;
-        needle = nt = -90;
-        nv = 0;
-        no = 4180 + ((Math.random() * 60) | 0);
-        sfx.mr.reset();
-        cx.clearRect(0, 0, 1920, 1080);
-      },
-      onNext() {
-        if (build >= 2) return false;
-        setBuild(build + 1, performance.now());
-        return true;
-      },
-      onPrev() {
-        if (!build) return false;
-        setBuild(build - 1, performance.now());
-        return true;
-      },
-      tick(t) {
-        if (!t0) {
-          t0 = last = tb = t;
-          hero.style.transition = "";
-        }
-        const dt = Math.min(50, t - last);
-        last = t;
-        // two full runs before the results, then the week
-        if (build === 0 && t - tb > 900 + 2 * 3700 * SLOW) setBuild(1, t);
-        else if (build === 1 && t - tb > 7500) setBuild(2, t);
-        if (!run && t - t0 > 900) startRun(t);
-        if (run) stepRun(t);
-        // damped spring at the slower pace, so the needle overshoots and settles
-        const ds = dt / SLOW;
-        nv += (0.00025 * (nt - needle) - 0.011 * nv) * ds;
-        needle += nv * ds;
-        needleEl.setAttribute("transform", `rotate(${needle.toFixed(2)} ${GX} ${GY})`);
-        ghosts = ghosts.filter(g => {
-          if (t - g.t > 380 * SLOW) g.chip.classList.add("on");
-          if (t - g.t < 700 * SLOW) return true;
-          g.g.remove();
-          return false;
-        });
-        if (savedAt) {
-          const u = Math.max(0, Math.min(1, (t - savedAt - 950) / 800));
-          if (u > 0 && !saved) {
-            saved = true;
-            sfx.mr.saved();
-          }
-          big.textContent = `${u ? "−" : ""}${Math.round(75 * (1 - (1 - u) ** 3))}%`;
-          if (u >= 1) savedAt = 0;
-        }
-        // the week fills run by run at the same slower pace, then the next week starts
-        if (weekAt) {
-          const e = t - weekAt,
-            n = Math.max(0, Math.min(cells.length, Math.floor((e - 600) / 35)));
-          for (; lit < n; lit++) {
-            cells[lit].className = `t${picks[lit]} hot`;
-            if (wk === 1 && lit % 24 === 23) sfx.mr.day(Math.floor(lit / 24));
-          }
-          runCount.textContent = ((wk - 1) * cells.length + lit).toLocaleString("en-US");
-          if (lit === cells.length && e > 600 + cells.length * 35 + 2400) {
-            weekNo.textContent = `week ${++wk}`;
-            newWeek();
-            weekAt = t - 200;
-          }
-        }
-        cx.clearRect(0, 0, 1920, 1080);
-        for (const b of bits) {
-          b.x += b.vx * dt;
-          b.y += b.vy * dt;
-          b.vy += 0.0005 * dt;
-          b.life -= dt / 850;
-          cx.globalAlpha = Math.max(0, b.life);
-          cx.fillStyle = b.c;
-          cx.fillRect(b.x - b.s / 2, b.y - b.s / 2, b.s, b.s);
-        }
-        cx.globalAlpha = 1;
-        bits = bits.filter(b => b.life > 0);
-      },
-      el: sec,
-    });
-  }
-
   // Cost guardrails: an event burst hits execution controls (user-rate-limit cancels one run, concurrency queues one); run A passes the
   // daily check at activation, spends AI credits, gets budget notices and hard-stops at max-ai-credits; queued run B is then blocked at
   // activation by the rolling 24 h max-daily-ai-credits budget; finally an admission authority approves run D with an allowance and denies run E
@@ -9821,6 +9342,485 @@
         }
       },
       el: root,
+    });
+  }
+
+  // Model routing: the router reads each run, weighs what a mistake would cost and picks the cheapest model and effort that is good enough
+  {
+    resetIndex();
+    // Illustrative runs: each tagged phrase (k kind, s scope, d difficulty) lifts out into a label chip.
+    const RUNS = [
+      {
+        wf: "daily-report",
+        text: [["Summarize "], ["yesterday's activity", "s"], [" into a "], ["short", "d"], [" "], ["daily report", "k"], ["."]],
+        chips: ["report", "repo-wide", "easy"],
+        stakes: 0,
+        why: "a report is easy to ignore",
+        tier: 0,
+        effort: "HIGH",
+      },
+      {
+        wf: "security-audit",
+        text: [["Audit", "k"], [" "], ["the auth module", "s"], [" for "], ["subtle injection bugs", "d"], ["."]],
+        chips: ["security", "subsystem", "hard"],
+        stakes: 1,
+        why: "a missed bug would be silent",
+        tier: 1,
+        effort: "HIGH",
+      },
+      {
+        wf: "pr-review",
+        text: [["Review", "k"], [" "], ["this pull request", "s"], [" for "], ["common code smells", "d"], ["."]],
+        chips: ["review", "multi-file", "medium"],
+        stakes: 0,
+        why: "a review is only a suggestion",
+        tier: 0,
+        effort: "XHIGH",
+      },
+      {
+        wf: "release",
+        text: [["Merge", "k"], [" "], ["the release branch", "s"], [" once "], ["checks are green", "d"], ["."]],
+        chips: ["release", "repo-wide", "easy"],
+        stakes: 2,
+        why: "easy, but a merge can't be undone",
+        tier: 2,
+        effort: "MEDIUM",
+      },
+      {
+        wf: "issue-triage",
+        text: [["Label", "k"], [" "], ["the new issue", "s"], [" with "], ["one area tag", "d"], ["."]],
+        chips: ["triage", "one issue", "trivial"],
+        stakes: 0,
+        why: "a label is easy to change",
+        tier: 0,
+        effort: "LOW",
+      },
+      {
+        wf: "docs-sync",
+        text: [["Update the docs", "k"], [" to match "], ["the new CLI flags", "s"], [" in "], ["a few lines", "d"], ["."]],
+        chips: ["docs", "multi-file", "easy"],
+        stakes: 0,
+        why: "docs are easy to fix",
+        tier: 0,
+        effort: "MEDIUM",
+      },
+    ];
+    const TIERS = [
+      ["SMALL", "#3fb950", "$", "small"],
+      ["MID-SIZE", "#4493f8", "$$", "mid-size"],
+      ["FRONTIER", "#ab7df8", "$$$", "frontier"],
+    ];
+    const ZONES = [
+      ["low", "economy", "#3fb950", 150],
+      ["medium", "balanced", "#4493f8", 90],
+      ["high", "robust", "#ab7df8", 30],
+    ];
+    const CHIPS = [
+      ["kind", "#f778ba", "k"],
+      ["scope", "#39c5cf", "s"],
+      ["difficulty", "#e3b341", "d"],
+    ];
+    // Measured on gh-aw's own workflows: cost per run by day, relative to each workflow's own two weeks before routing (through 12 Nov 2026).
+    const DAYS = [1.02, 1.02, 0.97, 1.06, 1.04, 1.05, 0.95, 1.06, 0.95, 1.05, 0.99, 0.99, 0.93, 0.89, 0.63, 0.5, 0.2, 0.2, 0.23, 0.31, 0.24, 0.15, 0.15];
+    const ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$-";
+    // each run plays out at about 56% of its first pace (0.75 x 0.75), so the eye can follow every step
+    const SLOW = 16 / 9;
+    const svgOf = (cls, vb, inner) => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      s.setAttribute("class", cls);
+      s.setAttribute("viewBox", vb);
+      s.innerHTML = inner;
+      return s;
+    };
+
+    // the stakes gauge: three zones on a half dial, and a sprung needle
+    const GX = 190,
+      GY = 200,
+      GR = 128;
+    const pt = (a, r) => [GX + r * Math.cos((a * Math.PI) / 180), GY - r * Math.sin((a * Math.PI) / 180)];
+    const arc = (a0, a1) => {
+      const [x0, y0] = pt(a0, GR),
+        [x1, y1] = pt(a1, GR);
+      return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${GR} ${GR} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+    };
+    let gs = `<path class="mr-track" d="${arc(180, 0)}"/>`;
+    ZONES.forEach(([lab, , c, mid], i) => {
+      const [lx, ly] = pt(mid, 164);
+      gs += `<path class="mr-z" d="${arc(180 - i * 60 - (i ? 1.5 : 0), 120 - i * 60 + (i < 2 ? 1.5 : 0))}" stroke="${c}" style="color:${c}"/>`;
+      gs += `<text class="mr-zl" x="${lx.toFixed(1)}" y="${(ly + 6).toFixed(1)}" fill="${c}">${lab}</text>`;
+    });
+    gs += `<g class="mr-needle"><path d="M${GX - 5} ${GY}L${GX} ${GY - 112}L${GX + 5} ${GY}Z"/><circle cx="${GX}" cy="${GY}" r="13"/></g>`;
+    gs += `<text class="mr-read" x="${GX}" y="${GY + 46}"></text><text class="mr-read2" x="${GX}" y="${GY + 66}"></text>`;
+    const gauge = svgOf("mr-gauge", "0 0 380 270", gs);
+    const zones = [...gauge.querySelectorAll(".mr-z")],
+      zlabs = [...gauge.querySelectorAll(".mr-zl")],
+      needleEl = gauge.querySelector(".mr-needle"),
+      read = gauge.querySelector(".mr-read"),
+      read2 = gauge.querySelector(".mr-read2");
+
+    // the run card: the workflow's model line, the task, its labels, the gauge and the reason
+    const wf = h("span", { class: "mr-wf" }),
+      text = h("div", { class: "mr-text" }),
+      caret = h("span", { class: "pf-caret" }),
+      beam = h("div", { class: "mr-beam" }),
+      chips = CHIPS.map(([l, c]) => h("div", { class: "mr-chip", "--c": c }, h("i", {}, l), h("b", {}))),
+      chipRow = h("div", { class: "mr-chips" }, chips),
+      why = h("div", { class: "mr-why" });
+    const card = h(
+      "div",
+      { class: "mr-run" },
+      h(
+        "div",
+        { class: "mr-bar" },
+        ["#ff5f57", "#febc2e", "#28c840"].map(c => h("i", { style: { background: c } })),
+        wf,
+        h("span", { class: "mr-gap" }),
+        h("span", { class: "mr-model" }, "model: ", h("b", {}, "router"))
+      ),
+      text,
+      beam,
+      chipRow,
+      gauge,
+      why
+    );
+    const fields = [
+      ["model", 8],
+      ["effort", 7],
+      ["cost", 3],
+    ].map(([l, n]) => {
+      const tiles = Array.from({ length: n }, () => h("span", { class: "mr-t" }, " "));
+      return { el: h("div", { class: "mr-field" }, h("i", {}, l), h("div", { class: "mr-tiles" }, tiles)), tiles };
+    });
+    const tiles = fields.flatMap(f => f.tiles);
+    const hero = h(
+      "div",
+      { class: "mr-hero" },
+      card,
+      h(
+        "div",
+        { class: "mr-flap" },
+        h("b", { class: "mr-arrow" }, "→"),
+        fields.map(f => f.el)
+      )
+    );
+
+    // measured results: the day-by-day cost strip, with the switch to model: router on day 0
+    let ss = `<line x1="0" y1="25" x2="544" y2="25"/>`;
+    DAYS.forEach((v, i) => {
+      ss += `<rect class="${i < 14 ? "pre" : "post"}" x="${(i * 23.6).toFixed(1)}" y="${(125 - v * 100).toFixed(1)}" width="18" height="${(v * 100).toFixed(1)}" rx="3" style="--i:${i}"/>`;
+    });
+    ss += `<line class="mk" x1="327.6" y1="6" x2="327.6" y2="128"/><text class="mk" x="336" y="46">model: router</text>`;
+    ss += `<text x="0" y="148">two weeks before</text><text x="336" y="148">after</text>`;
+    const big = h("b", {}, "0%");
+    const proof = h(
+      "div",
+      { class: "mr-proof" },
+      h("div", { class: "mr-pf-h" }, "gh-aw's own workflows", h("em", {}, "measured")),
+      h("div", { class: "mr-big" }, big, h("span", {}, "cost per run", h("small", {}, "65 → 16 AI credits"))),
+      svgOf("mr-strip", "0 0 544 150", ss),
+      h("div", { class: "mr-held" }, h("span", {}, h("i", {}, "✓"), "run success", h("b", {}, "87.6% → 88.5%")), h("span", {}, h("i", {}, "✓"), "quality", h("b", {}, "83.9 → 83.6")))
+    );
+
+    // built for workflows that repeat: a week of one workflow's runs, one square each, coloured by the model it got (illustrative)
+    const week = h("div", { class: "mr-week" }, ["M", "T", "W", "T", "F", "S", "S"].map(d => [h("i", {}, d), Array.from({ length: 24 }, () => h("b", {}))]).flat(2));
+    const cells = [...week.querySelectorAll("b")];
+    const runCount = h("b", {}, "0"),
+      weekNo = h("span", {}, "week 1");
+    const rep = h(
+      "div",
+      { class: "mr-rep" },
+      h("div", { class: "mr-rh" }, "Built for workflows that repeat"),
+      week,
+      h(
+        "div",
+        { class: "mr-rf" },
+        TIERS.map(([, c, , name]) => h("span", { "--c": c }, name)),
+        h("em", {}, runCount, " runs · ", weekNo)
+      )
+    );
+    const cv = h("canvas", { class: "mr-cv", width: 1920, height: 1080 }),
+      cx = cv.getContext("2d");
+    const sec = h("section", { class: "slide mr" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "The right model for every run"), h("h2", {}, letters("Model "), letters("routing", "l-grad"))), hero, proof, rep, cv);
+
+    // builds: 0 the router at work, 1 measured results, 2 built for workflows that repeat
+    let t0 = 0,
+      last = 0,
+      build = 0,
+      tb = 0,
+      si = 0,
+      no = 0,
+      run = null,
+      needle = -90,
+      nv = 0,
+      nt = -90,
+      flipT = 0,
+      savedAt = 0,
+      saved = false,
+      weekAt = 0,
+      wk = 1,
+      lit = 0,
+      picks = [],
+      bits = [],
+      ghosts = [];
+    // sparks from an element's centre, in stage coordinates
+    const burst = (el, c, n) => {
+      const r = el.getBoundingClientRect(),
+        s = sec.getBoundingClientRect(),
+        k = 1920 / s.width,
+        x = (r.left + r.width / 2 - s.left) * k,
+        y = (r.top + r.height / 2 - s.top) * k;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2,
+          v = 0.1 + Math.random() * 0.3;
+        bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.1, life: 1, c, s: 2 + Math.random() * 3 });
+      }
+    };
+    const startRun = t => {
+      const r = RUNS[si++ % RUNS.length];
+      no += 1 + ((Math.random() * 4) | 0);
+      run = { ...r, t, words: [], typed: -1, ok: [], read: false, gauged: false, said: false, flap: false, done: false };
+      wf.replaceChildren(`${r.wf}.md`, h("small", {}, `run #${no}`));
+      text.replaceChildren();
+      let n = 0;
+      for (const [s, k] of r.text) {
+        const el = h("span", { class: k ? `mr-w ${k}` : "" });
+        text.append(el);
+        run.words.push({ el, s, k, at: n, lit: false });
+        n += s.length;
+      }
+      run.len = n;
+      chips.forEach((c, j) => {
+        c.classList.remove("on");
+        c.lastChild.textContent = r.chips[j];
+      });
+      [text, chipRow].forEach(x => x.classList.remove("mr-out"));
+      [why, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
+      // the previous pick fades back until the board flips to this run's pick
+      tiles.forEach(x => x.classList.add("old"));
+      nt = -90;
+      read.textContent = read2.textContent = "";
+    };
+    const lift = (w, t) => {
+      w.lit = true;
+      w.el.classList.add("on");
+      const j = CHIPS.findIndex(c => c[2] === w.k),
+        chip = chips[j];
+      const g = h("div", { class: "mr-ghost", "--c": CHIPS[j][1], style: { left: `${36 + w.el.offsetLeft}px`, top: `${84 + w.el.offsetTop}px` } }, w.s);
+      card.append(g);
+      void g.offsetWidth;
+      g.style.transform = `translate(${chip.offsetLeft - w.el.offsetLeft}px, ${300 + chip.offsetTop - 84 - w.el.offsetTop}px) scale(.6)`;
+      g.style.opacity = "0";
+      ghosts.push({ g, t, chip });
+      sfx.pop(j + 3);
+    };
+    const stepRun = t => {
+      // run time at the first pace, so the steps below keep their relative timing
+      const e = (t - run.t) / SLOW,
+        n = Math.min(run.len, Math.floor((e / 520) * run.len));
+      // untyped letters keep their place but stay invisible, so the lines never reflow while typing
+      if (n !== run.typed) {
+        run.typed = n;
+        for (const w of run.words) {
+          const k = Math.max(0, Math.min(w.s.length, n - w.at));
+          w.el.replaceChildren(w.s.slice(0, k), ...(n >= w.at && k < w.s.length ? [caret] : []), h("span", { class: "mr-hide" }, w.s.slice(k)));
+        }
+      }
+      // the beam reads the task; each tagged phrase lifts out into its label chip
+      const u = (e - 620) / 600;
+      beam.style.opacity = u > 0 && u < 1 ? 1 : 0;
+      if (u > 0 && !run.read) {
+        const x = Math.min(1, u) * 584;
+        beam.style.transform = `translateX(${x}px)`;
+        for (const w of run.words) if (w.k && !w.lit && x > w.el.offsetLeft + w.el.offsetWidth / 2) lift(w, t);
+        run.read = u >= 1;
+      }
+      if (!run.gauged && e > 1350) {
+        run.gauged = true;
+        const [lab, mode, c, deg] = ZONES[run.stakes];
+        nt = 90 - deg;
+        zones[run.stakes].classList.add("on");
+        zlabs[run.stakes].classList.add("on");
+        read.textContent = `${lab.toUpperCase()} STAKES`;
+        read.style.fill = c;
+        read2.textContent = mode;
+      }
+      if (!run.said && e > 1600) {
+        run.said = true;
+        why.textContent = run.why;
+        why.classList.add("on");
+      }
+      if (!run.flap && e > 1800) {
+        run.flap = true;
+        const [m, c, co] = TIERS[run.tier];
+        run.target = m.padEnd(8) + run.effort.padEnd(7) + co.padEnd(3);
+        run.c = c;
+        run.settle = tiles.map((_, i) => t + (220 + i * 28) * SLOW);
+        tiles.forEach((x, i) => {
+          x.classList.remove("set", "old");
+          x.style.setProperty("--c", c);
+          run.ok[i] = false;
+        });
+        flipT = 0;
+      }
+      if (run.flap && !run.done) {
+        const flip = t - flipT > 55 * SLOW;
+        if (flip) {
+          flipT = t;
+          sfx.mr.flap();
+        }
+        let left = 0;
+        tiles.forEach((x, i) => {
+          if (run.ok[i]) return;
+          if (t >= run.settle[i]) {
+            run.ok[i] = true;
+            x.textContent = run.target[i];
+            if (run.target[i] !== " ") x.classList.add("set");
+          } else {
+            left++;
+            if (flip) x.textContent = ALPH[(Math.random() * ALPH.length) | 0];
+          }
+        });
+        if (!left) {
+          run.done = true;
+          burst(fields[0].el, run.c, 26);
+          sfx.mr.pick(run.tier);
+        }
+      }
+      if (run.done && e > 3440) [text, chipRow].forEach(x => x.classList.add("mr-out"));
+      if (run.done && e > 3700) startRun(t);
+    };
+    const newWeek = () => {
+      picks = cells.map(() => {
+        const r = Math.random();
+        return r < 0.71 ? 0 : r < 0.87 ? 1 : 2;
+      });
+      lit = 0;
+      cells.forEach(c => (c.className = ""));
+    };
+    const setBuild = (b, t) => {
+      const was = build;
+      build = b;
+      tb = t;
+      sec.classList.toggle("side", b >= 1);
+      proof.classList.toggle("on", b >= 1);
+      rep.classList.toggle("on", b >= 2);
+      if (b === 1 && was < 1) {
+        savedAt = t;
+        saved = false;
+        big.textContent = "0%";
+      }
+      if (b === 2 && was < 2) {
+        wk = 1;
+        weekNo.textContent = "week 1";
+        newWeek();
+        weekAt = t;
+      }
+      // stepping back cancels a count-up or a week that hasn't finished
+      if (b < 1) savedAt = 0;
+      if (b < 2) weekAt = 0;
+    };
+    slides.push({
+      group: "cost",
+      notes:
+        "Model routing. Every workflow run pays for a model, and the usual habit is to pin one strong model for every run. With one line, model: router, the router reads each run's task before the agent starts, labels the kind of work, its scope and its difficulty, weighs what a mistake would cost (low, medium or high stakes, which gh-aw calls economy, balanced and robust), then picks the cheapest model and reasoning effort that is good enough, using benchmark results that ship with the AWF firewall. It runs inside the firewall, respects the workflow's model policy, and gh aw audit shows what it picked and why. The tasks, labels and picks in the animation are illustrative. The results are measured on gh-aw's own workflows: across 127 routed workflows and 3,097 routed runs through 12 Nov 2026, each compared with its own two weeks before routing, cost per run fell 75% (65 to 16 AI credits) while run success (87.6% to 88.5%) and judged quality (83.9 to 83.6 out of 100) held steady. Most routers pick a model for one prompt in a chat, with a person watching. This one is built for workflows that repeat: the same job runs on every schedule, issue and pull request with no one watching, so the router weighs the stakes of each run itself, and the saving repeats on every run. The week of runs is illustrative. Keys: → next step.",
+      enter() {
+        t0 = last = build = si = 0;
+        run = null;
+        // jump straight back to the centred layout instead of gliding there
+        hero.style.transition = "none";
+        sec.classList.remove("side");
+        void hero.offsetWidth;
+        [proof, rep, why, ...chips, ...zones, ...zlabs].forEach(x => x.classList.remove("on"));
+        big.textContent = "0%";
+        savedAt = weekAt = 0;
+        ghosts.forEach(g => g.g.remove());
+        ghosts = [];
+        bits = [];
+        tiles.forEach(x => {
+          x.textContent = " ";
+          x.classList.remove("set", "old");
+        });
+        text.replaceChildren();
+        wf.replaceChildren();
+        read.textContent = read2.textContent = "";
+        beam.style.opacity = 0;
+        needle = nt = -90;
+        nv = 0;
+        no = 4180 + ((Math.random() * 60) | 0);
+        sfx.mr.reset();
+        cx.clearRect(0, 0, 1920, 1080);
+      },
+      onNext() {
+        if (build >= 2) return false;
+        setBuild(build + 1, performance.now());
+        return true;
+      },
+      onPrev() {
+        if (!build) return false;
+        setBuild(build - 1, performance.now());
+        return true;
+      },
+      tick(t) {
+        if (!t0) {
+          t0 = last = tb = t;
+          hero.style.transition = "";
+        }
+        const dt = Math.min(50, t - last);
+        last = t;
+        // two full runs before the results, then the week
+        if (build === 0 && t - tb > 900 + 2 * 3700 * SLOW) setBuild(1, t);
+        else if (build === 1 && t - tb > 7500) setBuild(2, t);
+        if (!run && t - t0 > 900) startRun(t);
+        if (run) stepRun(t);
+        // damped spring at the slower pace, so the needle overshoots and settles
+        const ds = dt / SLOW;
+        nv += (0.00025 * (nt - needle) - 0.011 * nv) * ds;
+        needle += nv * ds;
+        needleEl.setAttribute("transform", `rotate(${needle.toFixed(2)} ${GX} ${GY})`);
+        ghosts = ghosts.filter(g => {
+          if (t - g.t > 380 * SLOW) g.chip.classList.add("on");
+          if (t - g.t < 700 * SLOW) return true;
+          g.g.remove();
+          return false;
+        });
+        if (savedAt) {
+          const u = Math.max(0, Math.min(1, (t - savedAt - 950) / 800));
+          if (u > 0 && !saved) {
+            saved = true;
+            sfx.mr.saved();
+          }
+          big.textContent = `${u ? "−" : ""}${Math.round(75 * (1 - (1 - u) ** 3))}%`;
+          if (u >= 1) savedAt = 0;
+        }
+        // the week fills run by run at the same slower pace, then the next week starts
+        if (weekAt) {
+          const e = t - weekAt,
+            n = Math.max(0, Math.min(cells.length, Math.floor((e - 600) / 35)));
+          for (; lit < n; lit++) {
+            cells[lit].className = `t${picks[lit]} hot`;
+            if (wk === 1 && lit % 24 === 23) sfx.mr.day(Math.floor(lit / 24));
+          }
+          runCount.textContent = ((wk - 1) * cells.length + lit).toLocaleString("en-US");
+          if (lit === cells.length && e > 600 + cells.length * 35 + 2400) {
+            weekNo.textContent = `week ${++wk}`;
+            newWeek();
+            weekAt = t - 200;
+          }
+        }
+        cx.clearRect(0, 0, 1920, 1080);
+        for (const b of bits) {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.vy += 0.0005 * dt;
+          b.life -= dt / 850;
+          cx.globalAlpha = Math.max(0, b.life);
+          cx.fillStyle = b.c;
+          cx.fillRect(b.x - b.s / 2, b.y - b.s / 2, b.s, b.s);
+        }
+        cx.globalAlpha = 1;
+        bits = bits.filter(b => b.life > 0);
+      },
+      el: sec,
     });
   }
 
