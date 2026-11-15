@@ -183,9 +183,9 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `NO_CONTEXT` | Trigger context; explicit target. | Supply authorized target/context-appropriate output. |
 | `NO_LABELS_PROVIDED` | Requested/existing labels. | Supply valid labels; don't claim mutation. |
 | `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title vs guards. | Respect deliberate skip; fix mistaken target/config only. |
-| `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL` | Lock/approval state. | Respect state; no unrelated unlock/approval. |
-| `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Quota/retry-not-before. | Stop/defer within bounds; missing accounting != zero. |
-| `AIC_USAGE_UNKNOWN` | Missing usage/accounting. | Fix collection/access; remaining budget stays unknown. |
+| `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL` | Lock/approval state. | Respect it; no unrelated unlock/approval. |
+| `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Quota/retry-not-before. | Stop/defer in bounds; missing accounting != zero. |
+| `AIC_USAGE_UNKNOWN`, `AIC_USAGE_UNPRICED` | Missing usage/pricing. | Fix collection/pricing; budget stays unknown. |
 | `permission_denied` | Business response; operation authority. | Fix authorized credentials/permissions, not quota. |
 
 ## Merge guard codes
