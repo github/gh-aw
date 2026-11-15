@@ -25,6 +25,11 @@ The resolver validates output references and job dependencies without changing t
 
 Workflow and step IDs are job-scoped. A step can read only outputs from earlier steps in its job, and workflow-level environment values cannot reference job or step outputs.
 
+Expression nodes also include `Binary`, `Boolean`, `Call`, `Context`, `Literal`,
+`Not`, `Number`, `OutputName`, `SecretRef`, `StepID`, `StepOptions`, and
+`VariableRef`. `Concat`, `Or`, `Secret`, and `Variable` construct expressions
+for those values, and `Visit` traverses expression nodes.
+
 ## Related documentation
 
 The parent [`workflow` package specification](../README.md) documents compiler integration and the other workflow subsystems.

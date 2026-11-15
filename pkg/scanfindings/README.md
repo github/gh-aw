@@ -32,6 +32,10 @@ Each scanner speaks its own native JSON dialect, with severities spelled in a di
 | `CountAtLeast` | `func CountAtLeast(findings []Finding, min SeverityLevel) int` | Counts findings at or above a severity |
 | `ContextLines` | `func ContextLines(fileLines []string, line int) []string` | Returns the source lines surrounding a finding |
 
+`SourceLocation` represents a finding's source position. The
+`SeverityUnknown`, `SeverityInfo`, `SeverityLow`, `SeverityMedium`, and
+`SeverityCritical` constants are the package's canonical severity levels.
+
 ## Usage Examples
 
 Keep native wire structs and scanner-specific messages, location selection, and
