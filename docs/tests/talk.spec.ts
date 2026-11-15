@@ -463,6 +463,30 @@ test("places the enterprise tracing, access and event slides beside their neighb
   expect(errors).toEqual([]);
 });
 
+test("labels exactly the slides that show experimental features", async ({ page }) => {
+  await page.goto("/gh-aw/cracktro/");
+  const labelled = await page.evaluate(() =>
+    [...document.querySelectorAll("section.slide")]
+      .filter(s => s.querySelector(":scope > .xbadge"))
+      .map(s => (s.querySelector("h2")?.textContent || "").replace(/\s+/g, " ").trim())
+  );
+  expect(labelled).toEqual([
+    "Zero-secret agents",
+    "Need-to-know enclaves",
+    "Cost management",
+    "Cost guardrails",
+    "Model routing",
+    "Don’t Run the Agent",
+    "Durable execution",
+    "Index & search",
+    "Experiments, graders & evals",
+    "OIDC token broker",
+    "Connectors",
+    "Webhook gateway",
+  ]);
+  for (const heading of labelled) expect(SLIDES[slideNo(heading) - 1].summary, heading).toMatch(/experimental/i);
+});
+
 test("keeps the frame loop running through the routed steps of the enterprise diagrams", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
