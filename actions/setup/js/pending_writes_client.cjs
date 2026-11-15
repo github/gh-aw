@@ -65,7 +65,7 @@ function guardPendingWriteClient(client) {
             const repository = `${request.owner}/${request.repo}`;
             if (![item.target.repository, item.target.head_repository].includes(repository)) throw integrityError("target_changed");
             if (item.code) {
-              if (namespace === "issues") throw integrityError("unplanned_fallback");
+              if (namespace === "issues" && key === "create") throw integrityError("unplanned_fallback");
               if (request.ref && ![`refs/heads/${item.target.branch}`, `heads/${item.target.branch}`].includes(request.ref)) throw integrityError("target_changed");
               if (key === "create" && namespace === "pulls") {
                 const expectedHead = item.target.head_repository && item.target.head_repository !== item.target.repository ? `${item.target.head_repository.split("/")[0]}:${item.target.branch}` : item.target.branch;

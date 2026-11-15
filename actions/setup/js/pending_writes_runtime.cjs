@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { parsePendingJSON, prepare, verify, readAuthorizedManifest, assertPendingPublication, integrityError } = require("./pending_writes.cjs");
+const { parsePendingJSON, prepare, verify, readAuthorizedManifest, assertPendingPublication, integrityError, resolvedGateConfig } = require("./pending_writes.cjs");
 const { readInput, describeDirectory } = require("./pending_writes_files.cjs");
 
 function optionsFromEnv() {
@@ -13,8 +13,10 @@ function optionsFromEnv() {
     handlerConfig: parsePendingJSON(process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG || "{}"),
     context,
     readToken: process.env.GITHUB_TOKEN,
+    readTokens: parsePendingJSON(process.env.GH_AW_PENDING_READ_TOKENS || "{}"),
     staged: process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true",
     workflowId: process.env.GH_AW_WORKFLOW_ID,
+    gateConfig: resolvedGateConfig(),
     run: {
       repository: process.env.GITHUB_REPOSITORY,
       workflow_ref: process.env.GITHUB_WORKFLOW_REF,
@@ -42,6 +44,15 @@ async function main() {
     core.setOutput("bindings", JSON.stringify(result.bindings.map(({ id, kind, path }) => ({ id, kind, ...(path ? { path } : {}) }))));
     core.exportVariable("GH_AW_PENDING_WRITES", options.manifestPath);
     core.exportVariable("GH_AW_AGENT_OUTPUT", options.agentOutputPath);
+    const { writePendingInputSnapshot } = require("./pending_write_inputs.cjs");
+    const snapshot = writePendingInputSnapshot({
+      directory: "/tmp/gh-aw/pending-write-inputs",
+      manifest: result.manifest,
+      bindings: result.bindings,
+      handlerConfig: options.handlerConfig,
+      gateConfig: options.gateConfig,
+    });
+    core.setOutput("pending_write_inputs_sha256", snapshot.sha256);
     if (!result.manifest.complete) core.warning("Pending writes include an unsupported or incomplete plan; writes will be refused");
   } catch (cause) {
     core.setOutput("complete", "false");
@@ -51,7 +62,18 @@ async function main() {
 }
 
 async function verifyFromEnv() {
-  return verify(process.env.GH_AW_PENDING_WRITES_SHA256, optionsFromEnv());
+  const result = await verify(process.env.GH_AW_PENDING_WRITES_SHA256, optionsFromEnv());
+  if (!result.allow) return result;
+  try {
+    require("./pending_write_inputs.cjs").verifyPendingInputSnapshot({
+      directory: "/tmp/gh-aw/pending-write-inputs",
+      expectedSha256: process.env.GH_AW_PENDING_WRITE_INPUTS_SHA256,
+      manifest: result.manifest,
+    });
+    return result;
+  } catch {
+    return { allow: false, reason: "inputs_changed" };
+  }
 }
 
 /** Read the supplied data using the same shape the compiler-owned plan bound. */

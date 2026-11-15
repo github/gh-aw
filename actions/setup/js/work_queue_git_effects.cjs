@@ -40,8 +40,9 @@ function gitPushRepository(url) {
 
 /** @param {{remote?: string, cwd?: string, branch: string, execGitSync?: typeof execGitSync, gitAuthEnv?: NodeJS.ProcessEnv, github?: object, authorize?: (request: Record<string, unknown>) => unknown}} options */
 async function assertGitPushAuthorized(options) {
-  if (!currentClaimHandle() && !readClaimScopeContext()) return;
-  if (!currentClaimHandle()) throw new Error("Queue git pushes require a trusted per-Claim context");
+  const { pendingWritesEnabled, assertPendingGitDestination } = require("./pending_writes.cjs");
+  if (!currentClaimHandle() && !readClaimScopeContext() && !pendingWritesEnabled()) return;
+  if (readClaimScopeContext() && !currentClaimHandle()) throw new Error("Queue git pushes require a trusted per-Claim context");
   const remote = options.remote || "origin";
   const direct = /^(?:https?|ssh):\/\//.test(remote) || remote.includes(":");
   if (!direct && !/^[A-Za-z0-9_.-]{1,256}$/.test(remote)) throw new Error("Claim git remote alias is invalid");
@@ -61,6 +62,7 @@ async function assertGitPushAuthorized(options) {
   if (!urls.length || urls.length > 128) throw new Error("Claim git remote targets exceed the count bound");
   for (const url of urls) {
     const repository = gitPushRepository(url);
+    assertPendingGitDestination(repository, options.branch);
     await withGitClaimEffects({ repository, branch: options.branch, github: options.github, authorize: options.authorize }, () => {});
   }
 }

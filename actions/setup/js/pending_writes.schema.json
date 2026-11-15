@@ -160,6 +160,7 @@
             "staged": { "type": "boolean" },
             "draft": { "type": "boolean" },
             "protected_files_policy": { "type": "string" },
+            "mention_allowances": { "type": "array", "items": { "type": "string" } },
             "sha256": { "$ref": "#/$defs/sha256" }
           }
         },
@@ -167,7 +168,7 @@
         "input_sha256": { "$ref": "#/$defs/sha256" },
         "item_sha256": { "$ref": "#/$defs/sha256" },
         "complete": { "type": "boolean" },
-        "reason_category": { "enum": ["ready", "unsupported_plan"] },
+        "reason_category": { "enum": ["ready", "unsupported_plan", "read_unavailable"] },
         "code": { "$ref": "#/$defs/code" },
         "publication": {
           "type": "object",

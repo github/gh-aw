@@ -34,9 +34,8 @@ function buildAssetUrl(githubServer, repo, branchName, targetFileName) {
 }
 
 async function main() {
-  const { withPendingPublication } = require("./pending_writes.cjs");
-  const { describeDirectory } = require("./pending_writes_files.cjs");
-  return withPendingPublication("upload_assets", "assets", () => ({ id: "assets", kind: "directory", files: describeDirectory(process.env.GH_AW_ASSETS_DIR || "/tmp/gh-aw/safeoutputs/assets") }), mainUnchecked);
+  const { withPendingDirectoryPublication } = require("./pending_writes.cjs");
+  return withPendingDirectoryPublication("upload_assets", "assets", "assets", process.env.GH_AW_ASSETS_DIR || "/tmp/gh-aw/safeoutputs/assets", mainUnchecked);
 }
 
 async function mainUnchecked() {
@@ -132,7 +131,9 @@ async function mainUnchecked() {
       let fileContent;
       try {
         const maxSizeKB = process.env.GH_AW_ASSETS_MAX_SIZE_KB ? Number(process.env.GH_AW_ASSETS_MAX_SIZE_KB) : 10240;
-        fileContent = readGuardedFile(assetSourcePath, maxSizeKB * 1024);
+        const captured = require("./pending_writes.cjs").capturedPublicationFile(assetSourcePath);
+        fileContent = captured ? captured.bytes : readGuardedFile(assetSourcePath, maxSizeKB * 1024);
+        if (fileContent.length > maxSizeKB * 1024) throw new Error(`${ERR_VALIDATION}: Asset exceeds configured max size`);
       } catch (error) {
         if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") throw error;
         core.warning(`${ERR_SYSTEM}: Asset file not found: ${assetSourcePath} — skipping`);
@@ -213,6 +214,7 @@ async function mainUnchecked() {
         const maxPushAttempts = 3;
         for (let attempt = 1; attempt <= maxPushAttempts; attempt++) {
           require("./pending_writes.cjs").currentPendingWrite()?.recheck?.();
+          await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ branch: normalizedBranchName, cwd: process.cwd() });
           const pushResult = await exec.getExecOutput("git", ["push", "--porcelain", "origin", normalizedBranchName], { ignoreReturnCode: true });
           if (pushResult.exitCode === 0) {
             break;

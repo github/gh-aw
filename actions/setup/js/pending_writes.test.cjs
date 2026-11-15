@@ -174,7 +174,7 @@ describe("handler-derived pending writes", () => {
     expect(await withPendingWrite({}, () => "unchanged")).toBe("unchanged");
   });
 
-  it("binds the published tree and refuses same-path different-content before any push", async () => {
+  it.each(["owner/repo", "other/project"])("binds the published tree in %s and refuses same-path different-content before any push", async repository => {
     const repo = path.join(directory, "repo");
     fs.mkdirSync(repo);
     const git = args => execFileSync("git", ["-c", "commit.gpgsign=false", ...args], { cwd: repo, encoding: "utf8" });
@@ -191,27 +191,51 @@ describe("handler-derived pending writes", () => {
     git(["add", "file.txt"]);
     git(["commit", "--quiet", "-m", "approved"]);
     const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
-    const patchPath = getPatchPathForBranchInRepo(branch, "owner/repo");
+    const patchPath = getPatchPathForBranchInRepo(branch, repository);
     fs.mkdirSync(path.dirname(patchPath), { recursive: true });
     try {
       fs.writeFileSync(patchPath, git(["format-patch", "--stdout", `${base}..HEAD`]));
-      const message = { type: "create_pull_request", branch, title: "a", body: "b" };
+      const message = { type: "create_pull_request", repo: repository, branch, title: "a", body: "b" };
       fs.writeFileSync(options.agentOutputPath, JSON.stringify({ items: [message] }));
-      options.handlerConfig = { create_pull_request: { base_branch: "main", preserve_branch_name: true, protected_files_policy: "allowed" } };
+      options.handlerConfig = { create_pull_request: { "target-repo": "*", base_branch: "main", preserve_branch_name: true, protected_files_policy: "allowed" } };
       options.localRepository = repo;
       vi.stubGlobal("github", { rest: { repos: { getBranch: async () => ({ data: { commit: { sha: base } } }) } } });
+      if (repository !== "owner/repo") {
+        options.handlerConfig.create_pull_request["github-token"] = "existing-scoped-read-token";
+        const scopedClient = {
+          rest: {
+            repos: {
+              getBranch: vi.fn(async request => {
+                expect(`${request.owner}/${request.repo}`).toBe(repository);
+                return { data: { commit: { sha: base } } };
+              }),
+            },
+          },
+        };
+        vi.stubGlobal(
+          "getOctokit",
+          vi.fn(() => scopedClient)
+        );
+        global.github.rest.repos.getBranch = vi.fn(async () => {
+          throw new Error("default token cannot read this target");
+        });
+      }
       const result = await authorize();
       expect(result.manifest.complete).toBe(true);
       expect(result.manifest.items[0].code.tree_sha256).toMatch(/^[0-9a-f]{64}$/);
       const { assertPendingCodePublication } = require("./pending_writes.cjs");
-      await withPendingWrite(message, () => assertPendingCodePublication({ owner: "owner", repo: "repo", branch, baseRef: base, cwd: repo }), 0);
-      fs.writeFileSync(path.join(repo, "file.txt"), "not approved\n");
-      git(["add", "file.txt"]);
-      git(["commit", "--quiet", "-m", "unreviewed edit"]);
+      const [owner, repoName] = repository.split("/");
+      await withPendingWrite(message, () => assertPendingCodePublication({ owner, repo: repoName, branch, baseRef: base, cwd: repo }), 0);
+      git(["remote", "add", "origin", "https://github.com/not-authorized/other.git"]);
       const push = vi.fn();
       vi.stubGlobal("exec", { getExecOutput: push, exec: push });
       const { pushSignedCommits } = require("./push_signed_commits.cjs");
-      await expect(withPendingWrite(message, () => pushSignedCommits({ githubClient: global.github, owner: "owner", repo: "repo", branch, baseRef: base, cwd: repo, signedCommits: false }), 0)).rejects.toThrow("content_changed");
+      await expect(withPendingWrite(message, () => pushSignedCommits({ githubClient: global.github, owner, repo: repoName, branch, baseRef: base, cwd: repo, signedCommits: false }), 0)).rejects.toThrow("target_changed");
+      expect(push).not.toHaveBeenCalled();
+      fs.writeFileSync(path.join(repo, "file.txt"), "not approved\n");
+      git(["add", "file.txt"]);
+      git(["commit", "--quiet", "-m", "unreviewed edit"]);
+      await expect(withPendingWrite(message, () => pushSignedCommits({ githubClient: global.github, owner, repo: repoName, branch, baseRef: base, cwd: repo, signedCommits: false }), 0)).rejects.toThrow("content_changed");
       expect(push).not.toHaveBeenCalled();
     } finally {
       fs.unlinkSync(patchPath);
@@ -219,6 +243,7 @@ describe("handler-derived pending writes", () => {
   });
 
   it("refuses publication without an active item and constrains trusted review writes", async () => {
+    vi.stubEnv("GH_AW_WRITE_GATE_REVIEW_REPO", "policy/reviews");
     const result = await authorize();
     expect(() => assertPendingTarget({ repository: "owner/repo" })).toThrow("item_missing");
     const { guardPendingWriteClient } = require("./pending_writes_client.cjs");
@@ -226,11 +251,84 @@ describe("handler-derived pending writes", () => {
     const guarded = guardPendingWriteClient({ rest: { issues: { create } } });
     await expect(guarded.rest.issues.create({ owner: "owner", repo: "repo", title: "a" })).rejects.toThrow("item_missing");
     const { withPendingReview } = require("./pending_writes.cjs");
-    vi.stubEnv("GH_AW_WRITE_GATE_REVIEW_REPO", "policy/reviews");
     await withPendingReview(result.manifest.items[0], "policy/reviews", () => guarded.rest.issues.create({ owner: "policy", repo: "reviews", title: "a" }));
     await expect(withPendingReview(result.manifest.items[0], "policy/reviews", () => guarded.rest.issues.create({ owner: "policy", repo: "reviews", title: "a", assignees: ["copilot"] }))).rejects.toThrow("review_scope_invalid");
     await expect(withPendingReview(result.manifest.items[0], "wrong/repository", () => guarded.rest.issues.create({ owner: "wrong", repo: "repository", title: "a" }))).rejects.toThrow("review_scope_invalid");
     expect(create).toHaveBeenCalledOnce();
+    vi.stubEnv("GH_AW_WRITE_GATE_ALLOWED_REPOS", "different/repo");
+    await expect(withPendingReview(result.manifest.items[0], "policy/reviews", () => guarded.rest.issues.create({ owner: "policy", repo: "reviews", title: "a" }))).rejects.toThrow("inputs_changed");
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it("freezes original data and gate configuration and rejects edited replay inputs", async () => {
+    const { writePendingInputSnapshot, restorePendingInputs, verifyPendingInputSnapshot } = require("./pending_write_inputs.cjs");
+    const { gateConfigFromEnv } = require("./pending_writes.cjs");
+    const sourceRoot = path.join(directory, "source");
+    const sourceDirectory = path.join(sourceRoot, "gh-aw");
+    fs.mkdirSync(sourceDirectory, { recursive: true });
+    fs.copyFileSync(options.agentOutputPath, path.join(sourceDirectory, "agent_output.json"));
+    options.agentOutputPath = path.join(sourceDirectory, "agent_output.json");
+    vi.stubEnv("GH_AW_WRITE_GATE_REVIEW_REPO", "policy/reviews");
+    vi.stubEnv("GH_AW_WRITE_GATE_ALLOWED_REPOS", "policy/reviews,other/project");
+    vi.stubEnv("GH_AW_WRITE_GATE_APPROVAL_ENVIRONMENT", "original-reviewers");
+    const result = await buildPendingWrites(options);
+    const snapshotDirectory = path.join(directory, "snapshot");
+    const snapshot = writePendingInputSnapshot({
+      directory: snapshotDirectory,
+      manifest: result.manifest,
+      bindings: result.bindings,
+      handlerConfig: options.handlerConfig,
+      gateConfig: gateConfigFromEnv(),
+      runnerTemp: sourceRoot,
+    });
+    expect(verifyPendingInputSnapshot({ directory: snapshotDirectory, expectedSha256: snapshot.sha256, manifest: result.manifest }).run).toEqual(result.manifest.run);
+    vi.stubEnv("GH_AW_WRITE_GATE_APPROVAL_ENVIRONMENT", "changed-reviewers");
+    const restored = restorePendingInputs({ directory: snapshotDirectory, expectedSha256: snapshot.sha256, manifest: result.manifest, runnerTemp: path.join(directory, "restored") });
+    expect(restored.gateConfig).toEqual({ review_repo: "policy/reviews", allowed_repos: "policy/reviews,other/project", approval_environment: "original-reviewers" });
+    expect(fs.readFileSync(restored.agentOutputPath)).toEqual(fs.readFileSync(options.agentOutputPath));
+    fs.writeFileSync(path.join(snapshotDirectory, "inputs", "0"), '{"items":[]}');
+    expect(() => restorePendingInputs({ directory: snapshotDirectory, expectedSha256: snapshot.sha256, manifest: result.manifest, runnerTemp: path.join(directory, "not-restored") })).toThrow("snapshot_changed");
+    expect(fs.existsSync(path.join(directory, "not-restored"))).toBe(false);
+  });
+
+  it("fails closed when the one available cross-repository read credential is unavailable", async () => {
+    const branch = `pending-unreadable-${path.basename(directory)}`;
+    const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
+    const patchPath = getPatchPathForBranchInRepo(branch, "private/project");
+    fs.mkdirSync(path.dirname(patchPath), { recursive: true });
+    fs.writeFileSync(patchPath, "diff --git a/a b/a\n");
+    try {
+      const getBranch = vi.fn(async () => {
+        throw Object.assign(new Error("inaccessible"), { status: 403 });
+      });
+      const factory = vi.fn(() => ({ rest: { repos: { getBranch } } }));
+      vi.stubGlobal("getOctokit", factory);
+      options.handlerConfig = { create_pull_request: { "target-repo": "*", "github-token": "existing-scoped-read-token", base_branch: "main" } };
+      fs.writeFileSync(options.agentOutputPath, JSON.stringify({ items: [{ type: "create_pull_request", repo: "private/project", branch, title: "a", body: "b" }] }));
+      const result = await buildPendingWrites(options);
+      expect(result.manifest.items[0]).toMatchObject({ complete: false, reason_category: "read_unavailable" });
+      expect(factory).toHaveBeenCalledExactlyOnceWith("existing-scoped-read-token", { credentialSource: "pat" });
+      expect(getBranch).toHaveBeenCalledOnce();
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("no future write-App token"));
+    } finally {
+      fs.unlinkSync(patchPath);
+    }
+  });
+
+  it("does not persist credential text from the original event context in replay metadata", async () => {
+    const { writePendingInputSnapshot } = require("./pending_write_inputs.cjs");
+    const { gateConfigFromEnv } = require("./pending_writes.cjs");
+    const sourceRoot = path.join(directory, "source");
+    fs.mkdirSync(path.join(sourceRoot, "gh-aw"), { recursive: true });
+    fs.copyFileSync(options.agentOutputPath, path.join(sourceRoot, "gh-aw", "agent_output.json"));
+    options.agentOutputPath = path.join(sourceRoot, "gh-aw", "agent_output.json");
+    global.context.payload.issue.body = ["ghp_", "a".repeat(36)].join("");
+    const result = await buildPendingWrites(options);
+    const destination = path.join(directory, "snapshot");
+    expect(() => writePendingInputSnapshot({ directory: destination, manifest: result.manifest, bindings: result.bindings, handlerConfig: options.handlerConfig, gateConfig: gateConfigFromEnv(), runnerTemp: sourceRoot })).toThrow(
+      "snapshot_secret"
+    );
+    expect(fs.existsSync(path.join(destination, "pending-write-inputs.json"))).toBe(false);
   });
 });
 
