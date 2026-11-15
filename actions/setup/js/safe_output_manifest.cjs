@@ -253,7 +253,7 @@ const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing
 /**
  * @typedef {Object} ManifestEntry
  * @property {string} type - The safe output type (e.g., "create_issue")
- * @property {"success"|"skipped"} [status] - Explicit execution outcome or gated suppression
+ * @property {"success"|"skipped"|"failure"} [status] - Explicit execution outcome or gated suppression
  * @property {boolean} [skipped]
  * @property {string} [reason]
  * @property {string} [output_id]
@@ -339,7 +339,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
     /** @type {ManifestEntry} */
     const entry = {
       type: item.type,
-      ...(item.status === "success" || (item.status === "skipped" && item.gate_decision !== undefined) ? { status: item.status } : {}),
+      ...(item.status === "success" || (["skipped", "failure"].includes(item.status || "") && item.gate_decision !== undefined) ? { status: item.status } : {}),
       ...(item.gate_decision !== undefined
         ? {
             output_id: item.output_id,

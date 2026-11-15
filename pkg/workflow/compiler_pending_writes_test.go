@@ -165,10 +165,10 @@ func TestPendingWriteArtifactsIsolateReusableInvocations(t *testing.T) {
 	data := pendingWriteTestData(t, compiler)
 	data.On = "on:\n  workflow_call:\n"
 	uploads := strings.Join(compiler.buildPendingWritesUploadSteps(data), "")
-	for _, name := range []string{pendingWritesArtifactName, "pending-write-inputs", "write-decisions"} {
+	for _, name := range []string{pendingWritesArtifactName, "pending-write-inputs"} {
 		require.Contains(t, uploads, "name: ${{ needs.agent.outputs.artifact_prefix }}"+name)
 	}
-
+	require.NotContains(t, uploads, "write-decisions")
 	require.Contains(t, strings.Join(compiler.pendingWritesDownloadSteps(data), ""), "name: ${{ needs.activation.outputs.artifact_prefix }}"+pendingWritesArtifactName)
 	for _, name := range []string{"agent", "activation", "safe_outputs"} {
 		require.NoError(t, compiler.jobManager.AddJob(&Job{Name: name, Steps: []string{"      - run: echo ready\n"}}))

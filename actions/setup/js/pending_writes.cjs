@@ -66,6 +66,7 @@ function pendingEnvironment() {
       "GH_AW_WORKFLOW_SOURCE",
       "GH_AW_WORKFLOW_SOURCE_URL",
       "GH_AW_SAFE_OUTPUTS_STAGED",
+      "GH_AW_WRITE_GATE_REVIEW_USE_APP",
       "GH_AW_CUSTOM_BASE_BRANCH",
       "DEFAULT_BRANCH",
       "GITHUB_BASE_REF",
@@ -334,7 +335,7 @@ function assertPendingPublication(job, id, supplied) {
     )
       throw integrityError("request_not_authorized");
   }
-  if (!mayApply || process.env.GH_AW_REPLAY_FORCE_STAGED === "true" || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
+  if (!mayApply || process.env.GH_AW_REPLAY_FORCE_STAGED === "true" || !require("./write_gate_runtime.cjs").publicationDependenciesApplied(matches[0], manifest, inventory)) throw integrityError("item_not_authorized");
   if (matches[0].settings?.staged === true || (manifest.detection.enabled && ["warning", "failure"].includes(manifest.detection.conclusion))) throw integrityError("native_policy_veto");
   require("./write_gate_runtime.cjs").assertWriteGateItemMutation(matches[0]);
   for (const setting of matches[0].publication.invocation?.env || []) {

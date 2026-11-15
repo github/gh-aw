@@ -1,9 +1,9 @@
 // @ts-check
 "use strict";
 
+const path = require("node:path");
 const { parsePendingJSON, prepare, verify, readAuthorizedManifest, assertPendingPublication, integrityError, resolvedGateConfig } = require("./pending_writes.cjs");
 const { readInput, describeDirectory } = require("./pending_writes_files.cjs");
-const path = require("node:path");
 
 function optionsFromEnv() {
   const spec = parsePendingJSON(process.env.GH_AW_PENDING_WRITES_SPEC || "{}");

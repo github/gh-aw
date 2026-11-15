@@ -9,7 +9,7 @@ import (
 )
 
 const pendingIntegrityStepID = "verify_pending_writes"
-const pendingNormalizedDecisionsPath = "/tmp/gh-aw/write-gate/write-decisions.normalized.json"
+const pendingNormalizedDecisionsPath = "/tmp/gh-aw/write-decisions.normalized.json"
 
 func (c *Compiler) pendingGateEnvironment(data *WorkflowData) (map[string]any, error) {
 	lines, err := c.pendingWritesRuntimeEnv(data)
@@ -68,7 +68,7 @@ func (c *Compiler) bindPendingHandlerEnvironment(data *WorkflowData, lines []str
 				env[name] = bound[name]
 			}
 			env["GH_AW_WRITE_GATE_DECISIONS"] = pendingNormalizedDecisionsPath
-			env["GH_AW_WRITE_GATE_DECISIONS_SHA256"] = "${{ steps.write_gate.outputs.write_gate_decisions_sha256 }}"
+			env["GH_AW_WRITE_GATE_DECISIONS_SHA256"] = "${{ steps.normalize_write_decisions.outputs.sha256 }}"
 		}
 		rendered, err := ConvertStepToYAML(step)
 		if err != nil {

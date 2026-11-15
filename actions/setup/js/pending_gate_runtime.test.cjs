@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 const runtime = require("./pending_writes_runtime.cjs");
 const verdict = require("./write_gate_verdict.cjs");
 const { assertPendingWritesIntegrity } = require("./pending_writes.cjs");
+const { publishWriteDecisionInventory } = require("./write_gate_runtime.cjs");
 
 describe("compiler-owned pending gate handoff", () => {
   let directory;
@@ -65,7 +66,11 @@ describe("compiler-owned pending gate handoff", () => {
     vi.stubEnv("GH_AW_PENDING_INPUTS_MATCH", "true");
     verdict.main();
     expect(outputs.write_gate).toBe("allow");
-    expect(outputs.write_gate_decisions_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(outputs.write_gate_decisions_sha256).toBeUndefined();
+    vi.stubEnv("GH_AW_VALIDATED_WRITE_GATE", outputs.write_gate);
+    vi.stubEnv("GH_AW_VALIDATED_WRITE_GATE_REASON", outputs.write_gate_reason);
+    vi.stubEnv("GH_AW_VALIDATED_WRITE_DECISIONS_SHA256", outputs.decisions_sha256);
+    expect(publishWriteDecisionInventory().inventory.decision).toBe("allow");
     fs.writeFileSync(output, JSON.stringify({ items: [{ type: "create_issue", title: "edited", body: "body" }] }));
     expect(await runtime.verifyFromEnv()).toEqual({ allow: false, reason: "inputs_changed" });
     vi.stubEnv("GH_AW_PENDING_INPUTS_MATCH", "false");

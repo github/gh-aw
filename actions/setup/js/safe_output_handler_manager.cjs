@@ -399,6 +399,10 @@ function wrapWithClientRebinding(type, messageHandler, handlerGithubClient) {
 }
 
 async function finalizeLedgerAppend(config, messageHandlers) {
+  if (config.ledger_append && process.env.GH_AW_PENDING_WRITES_REQUIRED === "true" && require("./write_gate_replay_approval.cjs").currentHeldReplayAuthorization()) {
+    require("./write_gate_publications.cjs").verifyFrozenHeldLedgerPreparation();
+    return;
+  }
   let ledgerAppendHandler = messageHandlers.get("ledger_append");
   if (!ledgerAppendHandler && config.ledger_append) {
     const ledgerAppendModule = require(HANDLER_MAP.ledger_append);
@@ -1458,6 +1462,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       }
       const invoke = () => withPendingWrite(message, () => messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
       const result = recordMergeDecision(messageType, await (writeGate ? writeGate.run(i, invoke) : invoke()), i);
+      if (writeGate && messageType === "ledger_append" && result?.queued === true) result.delegated = true;
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
       // no-op warnings, or if_no_changes: warn/ignore). Subsequent messages are still
@@ -2443,7 +2448,7 @@ async function main(options = {}) {
       core.setOutput("processed_count", "0");
       setSafeOutputsStatusOutputs({ itemsSucceeded: 0, itemsFailed: 0, status: "success" });
       statusOutputsSet = true;
-      return undefined;
+      return process.env.GH_AW_PENDING_WRITES_REQUIRED === "true" ? { success: true, delivery: null } : undefined;
     }
 
     // Create the PR review buffer registry (one per-PR buffer created on demand)
@@ -2770,6 +2775,8 @@ async function main(options = {}) {
     if (process.env.GH_AW_PENDING_WRITES_REQUIRED === "true") {
       try {
         ensureManifestExists();
+        require("./write_gate_publications.cjs").recordUnpublishedItemDecisions(outcomeResults);
+        await require("./write_gate_publications.cjs").recordPublicationDecisions();
         core.setOutput("write_gate_items_sha256", require("./pending_writes_files.cjs").readInput(MANIFEST_FILE_PATH).sha256);
       } catch (cause) {
         throw new Error(`${ERR_SYSTEM}: Gated item outcomes could not be pinned for replay`, { cause });
@@ -2792,6 +2799,7 @@ module.exports = {
   loadConfig,
   loadHandlers,
   processMessages,
+  finalizeLedgerAppend,
   sortMessagesByTemporaryIdDependencies,
   sortMessageIndicesByTemporaryIdDependencies,
   buildCommentMemoryMessagesFromFiles,

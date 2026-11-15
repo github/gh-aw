@@ -23,7 +23,6 @@ const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
 
 /**
  * @param {{pushState?: () => Promise<void>}} [options]
- * @returns {Promise<void>}
  */
 async function main({ pushState } = {}) {
   const { withPendingPublication } = require("./pending_writes.cjs");
@@ -42,10 +41,11 @@ async function mainUnchecked({ pushState } = {}) {
   const status = stateDir ? readEvalsNotEvaluatedStatus(path.join(stateDir, EVALS_STATUS_FILENAME)) : null;
   if (status) {
     core.info(`Evals were not evaluated for this run (${status.reason_code || "no reason code"}); skipping the evals results push`);
-    return;
+    return require("./pending_writes.cjs").pendingWritesEnabled() ? { success: true, skipped: true } : undefined;
   }
   const push = pushState ?? require("./push_experiment_state.cjs").main;
-  await push();
+  const result = await push();
+  return require("./pending_writes.cjs").pendingWritesEnabled() ? result : undefined;
 }
 
 module.exports = { main };

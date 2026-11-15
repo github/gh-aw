@@ -75,9 +75,13 @@ async function prepareHeldReplayFromEnv() {
  * Snapshot restoration is supplied by the compiler-owned pending-input module,
  * never selected from agent data. All digests are rechecked after approval.
  *
- * @param {{restorePendingInputs: (options: {directory: string, expectedSha256: string, manifest: any, runnerTemp?: string}) => {handlerConfig: any, gateConfig: any, bindings: any[], agentOutputPath: string, context: any, environment: Record<string, string>}, runHandlers?: () => Promise<any>}} dependencies
+ * @param {{restorePendingInputs: (options: {directory: string, expectedSha256: string, manifest: any, runnerTemp?: string}) => {handlerConfig: any, gateConfig: any, bindings: any[], agentOutputPath: string, context: any, environment: Record<string, string>, publication_invocations: any[], generatedBindings: any[]}, runHandlers?: () => Promise<any>, runPublications?: (restored: any) => Promise<void>}} dependencies
  */
-async function executeHeldReplayFromEnv({ restorePendingInputs, runHandlers = () => require("./safe_output_handler_manager.cjs").main() }) {
+async function executeHeldReplayFromEnv({
+  restorePendingInputs,
+  runHandlers = () => require("./safe_output_handler_manager.cjs").main(),
+  runPublications = restored => require("./write_gate_publications.cjs").executeHeldPublications(restored),
+}) {
   const original = await originalReplayPolicy();
   const replay = await downloadHeldReplayState(original);
   const previousContext = global.context;
@@ -103,7 +107,18 @@ async function executeHeldReplayFromEnv({ restorePendingInputs, runHandlers = ()
     bind("GH_AW_PENDING_WRITES_REQUIRED", "true");
     bind("GH_AW_PENDING_WRITES", replay.paths.manifestPath);
     bind("GH_AW_PENDING_WRITES_SHA256", replay.state.record.pending_writes_sha256);
+    bind("GH_AW_PENDING_WRITE_INPUTS", path.dirname(replay.paths.snapshotPath));
+    bind("GH_AW_PENDING_WRITE_INPUTS_SHA256", replay.state.record.pending_write_inputs_sha256);
     bind("GH_AW_PENDING_WRITES_BINDINGS", JSON.stringify(restored.bindings));
+    bind("GH_AW_PENDING_GENERATED_BINDINGS", JSON.stringify(restored.generatedBindings));
+    const invocations = restored.bindings.find(binding => binding.id === "publication_invocations")?.value;
+    if (!Array.isArray(invocations)) throw new Error(`${ERR_VALIDATION}: Original publication invocation binding is unavailable`);
+    bind(
+      "GH_AW_PENDING_WRITES_SPEC",
+      JSON.stringify({
+        publications: invocations.map(({ job, id, ...invocation }) => ({ job, id, invocation })),
+      })
+    );
     bind("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify(restored.handlerConfig));
     bind("GH_AW_AGENT_OUTPUT", restored.agentOutputPath);
     bind("GH_AW_WRITE_GATE_DECISIONS", replay.paths.decisionsPath);
@@ -116,6 +131,7 @@ async function executeHeldReplayFromEnv({ restorePendingInputs, runHandlers = ()
     await withHeldReplayAuthorization(authorization, async () => {
       const result = await runHandlers();
       if (result?.success !== true) throw new Error(`${ERR_VALIDATION}: Approved held replay did not complete; inspect its item outcomes`);
+      await runPublications(restored);
     });
   } finally {
     global.context = previousContext;

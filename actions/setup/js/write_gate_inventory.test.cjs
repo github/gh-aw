@@ -81,6 +81,39 @@ describe("independent normalized write decision inventory", () => {
     expect(readDecisionInventory(filename, pin, digest).items.at(-1)).toMatchObject({ output_id: publication.output_id, gate_decision: "hold" });
   });
 
+  it.each(DECISIONS.flatMap(request => DECISIONS.map(publication => ({ request, publication }))))("never authorizes publication $publication above source request $request", ({ request, publication }) => {
+    const source = items[0];
+    const effect = { ...items[1], output_id: "job_0123456789abcdef", publication: { request_ids: [source.output_id] } };
+    const inventory = buildWriteDecisionInventory(
+      { items: [source, effect] },
+      digest,
+      {
+        decision: "partial",
+        reason: "checked",
+        items: [
+          { output_id: source.output_id, decision: request, reason: "request_checked" },
+          { output_id: effect.output_id, decision: publication, reason: "publication_checked" },
+        ],
+      },
+      vi.fn()
+    );
+    expect(inventory.items[1].gate_decision).toBe(DECISIONS[Math.max(DECISIONS.indexOf(request), DECISIONS.indexOf(publication))]);
+  });
+
+  it("drops publication authorization on absent, incomplete or invalid source requests", () => {
+    const source = items[0];
+    const effect = { ...items[1], output_id: "job_0123456789abcdef", publication: { request_ids: [source.output_id] } };
+    const verdict = { decision: "partial", reason: "checked", items: [{ output_id: effect.output_id, decision: "apply", reason: "checked" }] };
+    expect(buildWriteDecisionInventory({ items: [source, effect] }, digest, verdict, vi.fn()).items[1].gate_decision).toBe("drop");
+    expect(buildWriteDecisionInventory({ items: [{ ...source, complete: false }, effect] }, digest, { decision: "allow", reason: "checked" }, vi.fn()).items[1].gate_decision).toBe("drop");
+    for (const request of ["so_zzzzzzzzzzzz", effect.output_id]) {
+      const warning = vi.fn();
+      const inventory = buildWriteDecisionInventory({ items: [source, { ...effect, publication: { request_ids: [request] } }] }, digest, { decision: "allow", reason: "checked" }, warning);
+      expect(inventory.items[1]).toMatchObject({ gate_decision: "drop", decision_reason: "gate_request_invalid" });
+      expect(warning).toHaveBeenCalledOnce();
+    }
+  });
+
   it("rejects malformed normalized records even with a matching file digest", () => {
     const inventory = buildWriteDecisionInventory({ items }, digest, { decision: "allow", reason: "clear" }, vi.fn());
     inventory.items[0].gate_decision = "invalid";

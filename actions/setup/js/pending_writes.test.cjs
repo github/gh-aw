@@ -269,10 +269,26 @@ describe("handler-derived pending writes", () => {
     const { buildCallWorkflowPayload } = require("./call_workflow.cjs");
     vi.stubEnv("GH_AW_CALL_WORKFLOW_NAME", "worker");
     vi.stubEnv("GH_AW_CALL_WORKFLOW_PAYLOAD", buildCallWorkflowPayload(message));
-    const { checkPublication } = require("./pending_writes_runtime.cjs");
-    expect(() => checkPublication({ job: "call-worker", id: "worker", kind: "call" })).not.toThrow();
+    const { checkPublication, checkPublicationFromEnv, collectPublicationChecks } = require("./pending_writes_runtime.cjs");
+    const spec = { job: "call-worker", id: "worker", kind: "call" };
+    const outputs = {};
+    global.core.setOutput = (name, value) => {
+      outputs[name] = value;
+    };
+    const handler = await require("./call_workflow.cjs").main(options.handlerConfig.call_workflow);
+    expect(await withPendingWrite(message, () => handler(message), 0)).toMatchObject({ success: true, delegated: true });
+    expect(result.manifest.items[1].depends_on).toEqual([]);
+    expect(() => checkPublication(spec)).not.toThrow();
+    vi.stubEnv("GH_AW_PENDING_PUBLICATION", JSON.stringify(spec));
+    checkPublicationFromEnv();
+    expect(outputs.pending_writes_verified).toBe("true");
+    vi.stubEnv("GH_AW_PENDING_JOB", "call-worker");
+    vi.stubEnv("GH_AW_PENDING_CHECK_NAMES", '["call"]');
+    vi.stubEnv("GH_AW_PENDING_CHECK_call", outputs.pending_writes_item_sha256);
+    collectPublicationChecks();
+    expect(outputs.pending_writes_verified).toBe("true");
     vi.stubEnv("GH_AW_CALL_WORKFLOW_PAYLOAD", JSON.stringify({ value: "unapproved", aw_context: "{}" }));
-    expect(() => checkPublication({ job: "call-worker", id: "worker", kind: "call" })).toThrow("inputs_changed");
+    expect(() => checkPublication(spec)).toThrow("inputs_changed");
   });
 
   it("rejects an upload selecting a file outside its bound staging inventory", async () => {
@@ -288,6 +304,24 @@ describe("handler-derived pending writes", () => {
     expect(() => checkPublication(spec)).not.toThrow();
     vi.stubEnv("GH_AW_PENDING_SELECTED_PATH", path.join(reports, "..", "unreviewed.json"));
     expect(() => checkPublication(spec)).toThrow("target_changed");
+  });
+
+  it.each([
+    { type: "cache_memory", job: "update_cache_memory", name: "storage_key", env: "GH_AW_PENDING_STORAGE_KEY" },
+    { type: "drive_memory", job: "update_drive_memory", name: "drive_name", env: "GH_AW_PENDING_DRIVE_NAME" },
+  ])("binds the actual $type destination, not only uploaded bytes", async ({ type, job, name, env }) => {
+    const directoryPath = path.join(directory, "memory");
+    fs.mkdirSync(directoryPath);
+    fs.writeFileSync(path.join(directoryPath, "notes.json"), "{}");
+    options.bindings = [{ id: type, kind: "directory", path: directoryPath }];
+    const spec = { job, id: type, type, kind: "directory", binding_id: type, path: directoryPath, [name]: "original" };
+    options.publications = [spec];
+    const result = await authorize();
+    expect(result.manifest.items.find(item => item.publication).target[name]).toBe("original");
+    vi.stubEnv(env, "original");
+    expect(() => require("./pending_writes_runtime.cjs").checkPublication(spec)).not.toThrow();
+    vi.stubEnv(env, "unreviewed");
+    expect(() => require("./pending_writes_runtime.cjs").checkPublication(spec)).toThrow("target_changed");
   });
 
   it("fails closed on unsupported publication or dynamic target inputs", async () => {

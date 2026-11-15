@@ -46,6 +46,8 @@ func TestWriteGateNormalizesBeforeReviewCredentialsAndWriters(t *testing.T) {
       - name: Existing writer
         id: process_safe_outputs
         if: ${{ steps.original_gate.outputs.decision == 'allow' }}
+        env:
+          ORIGINAL_SHA: ${{ steps.original_gate.outputs.decision_decisions_sha256 }}
         run: echo write
 `},
 		Outputs: map[string]string{"write_gate": "${{ steps.original_gate.outputs.decision }}", "write_gate_reason": "${{ steps.original_gate.outputs.reason }}"},
@@ -60,6 +62,8 @@ func TestWriteGateNormalizesBeforeReviewCredentialsAndWriters(t *testing.T) {
 	require.Contains(t, text, "permission-issues: write")
 	require.NotContains(t, text, "permission-contents:")
 	require.Contains(t, text, "if: ${{ steps.normalize_write_decisions.outputs.decision == 'allow' }}")
+	require.Contains(t, text, "ORIGINAL_SHA: ${{ steps.original_gate.outputs.decision_decisions_sha256 }}")
+	require.NotContains(t, text, "steps.normalize_write_decisions.outputs.decision_decisions_sha256")
 	require.Contains(t, text, "write-decisions.normalized.json")
 	require.Equal(t, "${{ steps.normalize_write_decisions.outcome == 'success' && steps.normalize_write_decisions.outputs.decision || 'deny' }}", job.Outputs["write_gate"])
 }
@@ -73,6 +77,16 @@ func TestWriteGateConfigRequiresARealGateAndLeavesUngatedJobsUnchanged(t *testin
 	require.ErrorContains(t, err, "gate-steps")
 }
 
+func TestWriteGateAuthoredStepsCannotShadowItemDecisionInfrastructure(t *testing.T) {
+	for _, id := range []string{"normalize_write_decisions", "upload_write_decisions", "write-gate-review-token"} {
+		t.Run(id, func(t *testing.T) {
+			compiler := NewCompiler()
+			_, _, err := compiler.prepareWriteGateSteps([]any{map[string]any{"id": id, "run": "echo authored"}}, writeGateTestData())
+			require.ErrorContains(t, err, "conflicts with another gate or compiler-owned step")
+		})
+	}
+}
+
 func TestMaintenanceHeldReplayUsesOriginalEnvironmentAndPreparedPins(t *testing.T) {
 	opts := buildMaintenanceWorkflowYAMLOptions{hasWriteGate: true, runsOnValue: "ubuntu-latest"}
 	text := buildMaintenanceHeldReplayJobs(opts, "github/gh-aw/actions/setup@1111111111111111111111111111111111111111")
@@ -83,5 +97,9 @@ func TestMaintenanceHeldReplayUsesOriginalEnvironmentAndPreparedPins(t *testing.
 	prepare := text[:strings.Index(text, "\n  apply_held_safe_outputs:")]
 	require.NotContains(t, prepare, "issues: write")
 	require.NotContains(t, prepare, "contents: write")
+	require.NotContains(t, prepare, "actions: write")
+	require.Contains(t, text[strings.Index(text, "\n  apply_held_safe_outputs:"):], "actions: write")
 	require.Contains(t, text, "restorePendingInputs")
+	require.Contains(t, text, "Upload approved held replay receipts")
+	require.Contains(t, text, "/tmp/gh-aw/safe-output-items.jsonl")
 }

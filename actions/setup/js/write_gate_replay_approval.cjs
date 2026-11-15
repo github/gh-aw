@@ -160,11 +160,37 @@ async function authorizeHeldReplay(options) {
 /** @param {object} authorization @param {() => any} operation */
 function withHeldReplayAuthorization(authorization, operation) {
   if (!replayAuthorizations.has(authorization)) throw new Error(`${ERR_VALIDATION}: Held replay approval capability is missing`);
-  return activeReplay.run(authorization, operation);
+  return activeReplay.run({ authorization, completed: new Set() }, operation);
 }
 
 function currentHeldReplayAuthorization() {
-  return activeReplay.getStore();
+  return activeReplay.getStore()?.authorization;
 }
 
-module.exports = { readReplayEnvironmentApproval, readOriginalHeldReplayState, authorizeHeldReplay, withHeldReplayAuthorization, currentHeldReplayAuthorization };
+/** Actual native handler/publication receipts only; approval is not completion. */
+function recordHeldReplayCompletion(item, result) {
+  const scope = activeReplay.getStore();
+  if (!scope) return;
+  const authorization = scope.authorization;
+  if (!authorization.held_ids.includes(item.output_id) || authorization.manifest_sha256 !== process.env.GH_AW_PENDING_WRITES_SHA256 || authorization.write_decisions_sha256 !== process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256)
+    throw new Error(`${ERR_VALIDATION}: Held completion has no matching replay capability`);
+  if (
+    result?.success === true &&
+    !result.skipped &&
+    !result.staged &&
+    !result.deferred &&
+    !result.deferred_manifest &&
+    !result.cancelled &&
+    !result.delegated &&
+    !(item.type === "ledger_append" && result.queued) &&
+    typeof result.action_name !== "string"
+  )
+    scope.completed.add(item.output_id);
+}
+
+function heldReplayDependencyCompleted(id) {
+  const scope = activeReplay.getStore();
+  return scope?.completed.has(id) === true || scope?.authorization.confirmed_dependencies.some(entry => entry.output_id === id) === true;
+}
+
+module.exports = { readReplayEnvironmentApproval, readOriginalHeldReplayState, authorizeHeldReplay, withHeldReplayAuthorization, currentHeldReplayAuthorization, recordHeldReplayCompletion, heldReplayDependencyCompleted };

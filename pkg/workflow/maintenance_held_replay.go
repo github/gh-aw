@@ -49,7 +49,7 @@ func buildMaintenanceHeldReplayJobs(opts buildMaintenanceWorkflowYAMLOptions, se
     environment: ${{ needs.prepare_safe_output_replay.outputs.approval_environment }}
     runs-on: ` + opts.runsOnValue + `
     permissions:
-      actions: read
+      actions: write
       contents: write
       discussions: write
       issues: write
@@ -80,6 +80,15 @@ func buildMaintenanceHeldReplayJobs(opts buildMaintenanceWorkflowYAMLOptions, se
             const { restorePendingInputs } = require('${{ runner.temp }}/gh-aw/actions/pending_write_inputs.cjs');
             const { executeHeldReplayFromEnv } = require('${{ runner.temp }}/gh-aw/actions/write_gate_replay_driver.cjs');
             await executeHeldReplayFromEnv({ restorePendingInputs });
+      - name: Upload approved held replay receipts
+        if: always()
+        uses: ` + getCachedActionPinFromResolver("actions/upload-artifact", opts.resolver) + `
+        with:
+          name: safe-outputs-items
+          path: |
+            /tmp/gh-aw/safe-output-items.jsonl
+            /tmp/gh-aw/safe-output-outcomes.jsonl
+          if-no-files-found: error
       - name: Record approved replay source
         id: record
         env:

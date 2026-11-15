@@ -381,6 +381,7 @@ async function checkoutOrCreateBranch(branchName, repoUrl, workspaceDir, options
 /**
  * Main entry point called by the actions/github-script step.
  */
+/** @returns {Promise<{success: boolean, skipped: boolean, commit: string|undefined}|void>} */
 async function main() {
   const stateDir = process.env.GH_AW_STATE_DIR || process.env.GH_AW_EXPERIMENT_STATE_DIR || "/tmp/gh-aw/experiments";
   const branchName = process.env.GH_AW_STATE_BRANCH || process.env.GH_AW_EXPERIMENT_BRANCH || "";
@@ -522,7 +523,7 @@ async function main() {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     core.info(`Pushing to ${branchName} (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
     try {
-      await pushSignedCommits({
+      const commit = await pushSignedCommits({
         githubClient: github,
         owner,
         repo,
@@ -533,7 +534,7 @@ async function main() {
         resolveRebaseConflict: resolveExperimentStateRebaseConflict,
       });
       core.info(`Successfully pushed ${stateLabel} to ${branchName}`);
-      return;
+      return require("./pending_writes.cjs").pendingWritesEnabled() ? { success: true, skipped: commit === undefined, commit } : undefined;
     } catch (err) {
       const errMsg = getErrorMessage(err);
       if (attempt < MAX_RETRIES) {

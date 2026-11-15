@@ -121,7 +121,8 @@ func (c *Compiler) prepareWriteGateSteps(raw []any, data *WorkflowData) ([]strin
 	}
 	steps := make([]any, len(raw))
 	ids := make([]string, len(raw))
-	seen := map[string]bool{writeGateStepID: true, writeGateInitializeStepID: true, "pending_writes": true, pendingIntegrityStepID: true}
+	seen := map[string]bool{writeGateStepID: true, writeGateInitializeStepID: true, "pending_writes": true, pendingIntegrityStepID: true,
+		"normalize_write_decisions": true, "upload_write_decisions": true, "write-gate-review-token": true}
 	for index, value := range raw {
 		step, ok := value.(map[string]any)
 		if !ok {

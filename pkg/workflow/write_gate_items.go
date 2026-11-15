@@ -37,24 +37,28 @@ func (c *Compiler) addWriteGateItemDecisionSteps(data *WorkflowData) error {
 	const normalizedReference = "steps.normalize_write_decisions.outputs.decision"
 	// Retain the original validated gate as normalization input; all subsequent
 	// compiler-owned guards consume the narrower normalized verdict.
-	tail := strings.ReplaceAll(text[boundary:], reference[0], normalizedReference)
+	exactReference := regexp.MustCompile(regexp.QuoteMeta(reference[0]) + `([^A-Za-z0-9_-]|$)`)
+	tail := exactReference.ReplaceAllString(text[boundary:], normalizedReference+"$1")
 	rawSuccess := "steps." + reference[1] + ".outcome == 'success'"
 	tail = strings.ReplaceAll(tail, rawSuccess, rawSuccess+" && steps.normalize_write_decisions.outcome == 'success'")
-	normalization := `      - name: Normalize write item decisions
-        id: normalize_write_decisions
-        if: always()
-        uses: ` + c.getActionPin("actions/github-script") + `
-        env:
-          GH_AW_VALIDATED_WRITE_GATE: ${{ ` + gateExpression + ` }}
-          GH_AW_VALIDATED_WRITE_GATE_REASON: ` + job.Outputs["write_gate_reason"] + `
-          GH_AW_VALIDATED_WRITE_DECISIONS_SHA256: ${{ steps.` + reference[1] + `.outputs.decisions_sha256 }}
-        with:
-          script: |
-            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { publishWriteDecisionInventory } = require('${{ runner.temp }}/gh-aw/actions/write_gate_runtime.cjs');
-            publishWriteDecisionInventory();
-`
+	env, err := c.pendingGateEnvironment(data)
+	if err != nil {
+		return err
+	}
+	env["GH_AW_VALIDATED_WRITE_GATE"] = "${{ " + gateExpression + " }}"
+	env["GH_AW_VALIDATED_WRITE_GATE_REASON"] = job.Outputs["write_gate_reason"]
+	env["GH_AW_VALIDATED_WRITE_DECISIONS_SHA256"] = "${{ steps." + reference[1] + ".outputs.decisions_sha256 }}"
+	normalization, err := ConvertStepToYAML(map[string]any{
+		"name": "Normalize write item decisions", "id": "normalize_write_decisions", "if": "always()",
+		"uses": c.getActionPin("actions/github-script"), "env": env,
+		"with": map[string]any{"script": `const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
+setupGlobals(core, github, context, exec, io, getOctokit);
+const { publishWriteDecisionInventory } = require('${{ runner.temp }}/gh-aw/actions/write_gate_runtime.cjs');
+publishWriteDecisionInventory();`},
+	})
+	if err != nil {
+		return fmt.Errorf("binding write decision normalization inputs: %w", err)
+	}
 	reviewSteps, err := c.writeGateReviewCredentialSteps(data)
 	if err != nil {
 		return err

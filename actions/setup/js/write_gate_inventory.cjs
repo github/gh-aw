@@ -2,7 +2,7 @@
 
 const fs = require("node:fs");
 const { createHash } = require("node:crypto");
-const { DECISIONS, parseItemDecisions } = require("./write_gate_decisions.cjs");
+const { DECISIONS, parseItemDecisions, restrictiveDecision } = require("./write_gate_decisions.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { parseStrictJSON } = require("./work_queue_codec.cjs");
 
@@ -12,7 +12,7 @@ const OUTPUT_ID_PATTERN = /^(?:so_[A-Za-z0-9_-]{12}|job_[a-f0-9]{16})$/;
 const MAX_INVENTORY_BYTES = 16 * 1024 * 1024;
 
 /**
- * @typedef {{output_id: string, item_sha256: string, input_sha256: string, complete: boolean, depends_on: string[]}} PendingDecisionItem
+ * @typedef {{output_id: string, item_sha256: string, input_sha256: string, complete: boolean, depends_on: string[], publication?: {request_ids?: string[]}}} PendingDecisionItem
  * @typedef {{output_id: string, item_sha256: string, input_sha256: string, gate_decision: string, decision_reason: string}} DecisionInventoryItem
  * @typedef {{schema: string, manifest_sha256: string, decision: string, items: DecisionInventoryItem[]}} DecisionInventory
  */
@@ -49,6 +49,26 @@ function buildWriteDecisionInventory(manifest, manifestSha256, verdict, warn) {
           : parsed.get(item.output_id) || { decision: "drop", reason: "gate_item_missing" };
     return { output_id: item.output_id, item_sha256: item.item_sha256, input_sha256: item.input_sha256, gate_decision: selection.decision, decision_reason: selection.reason };
   });
+  const authorized = new Map(items.map(item => [item.output_id, item]));
+  const planned = new Map(manifest.items.map(item => [item.output_id, item]));
+  for (const item of items) {
+    const requests = planned.get(item.output_id)?.publication?.request_ids;
+    if (requests === undefined) continue;
+    if (!Array.isArray(requests) || new Set(requests).size !== requests.length || requests.some(id => typeof id !== "string" || id === item.output_id || !planned.has(id) || planned.get(id)?.publication)) {
+      item.gate_decision = "drop";
+      item.decision_reason = "gate_request_invalid";
+      warn(`Publication ${item.output_id} has an invalid source request; it was dropped`);
+      continue;
+    }
+    for (const id of requests) {
+      const request = authorized.get(id);
+      const decision = restrictiveDecision(item.gate_decision, request?.gate_decision);
+      if (decision !== item.gate_decision) {
+        item.gate_decision = decision;
+        item.decision_reason = "gate_request_restricted";
+      }
+    }
+  }
   return {
     schema: WRITE_DECISION_SCHEMA,
     manifest_sha256: manifestSha256,

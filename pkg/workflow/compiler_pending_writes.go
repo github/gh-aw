@@ -169,14 +169,6 @@ func (c *Compiler) buildPendingWritesUploadSteps(data *WorkflowData) []string {
 		"          path: /tmp/gh-aw/pending-write-inputs/\n",
 		"          retention-days: 7\n",
 		"          if-no-files-found: error\n",
-		"      - name: Upload normalized write decisions\n",
-		"        if: always() && steps.write_gate.outputs.write_gate_decisions_sha256 != ''\n",
-		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
-		"        with:\n",
-		"          name: " + prefix + "write-decisions\n",
-		"          path: " + pendingNormalizedDecisionsPath + "\n",
-		"          retention-days: 7\n",
-		"          if-no-files-found: error\n",
 	}
 }
 
@@ -187,6 +179,11 @@ func (c *Compiler) pendingWritesDownloadSteps(data *WorkflowData) []string {
 		"        with:\n",
 		"          name: " + artifactPrefixExprForDownstreamJob(data) + pendingWritesArtifactName + "\n",
 		"          path: /tmp/gh-aw/\n",
+		"      - name: Download safe-output prerequisite receipts\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+		"        with:\n",
+		"          name: " + artifactPrefixExprForDownstreamJob(data) + "safe-outputs-items\n",
+		"          path: /tmp/gh-aw/write-prerequisites/\n",
 	}
 }
 
@@ -258,6 +255,8 @@ func (c *Compiler) guardPendingWritePublications(data *WorkflowData, enabled boo
 		job.Env["GH_AW_PENDING_WRITES_SHA256"] = "${{ needs.safe_outputs.outputs.pending_writes_sha256 }}"
 		job.Env["GH_AW_WRITE_GATE_DECISIONS"] = pendingLaterDecisionsPath
 		job.Env["GH_AW_WRITE_GATE_DECISIONS_SHA256"] = "${{ needs.safe_outputs.outputs.write_gate_decisions_sha256 }}"
+		job.Env["GH_AW_WRITE_GATE_ITEMS"] = "/tmp/gh-aw/write-prerequisites/safe-output-items.jsonl"
+		job.Env["GH_AW_WRITE_GATE_ITEMS_SHA256"] = "${{ needs.safe_outputs.outputs.write_gate_items_sha256 }}"
 		if job.Uses != "" {
 			var publication *pendingWritePublication
 			for index := range spec.Publications {

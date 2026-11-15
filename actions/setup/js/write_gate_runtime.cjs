@@ -27,6 +27,34 @@ function dependenciesApplied(item) {
   return item.depends_on.every(id => confirmed.has(id));
 }
 
+function publicationDependenciesApplied(item, manifest, inventory) {
+  if (item.depends_on.length === 0) return true;
+  const replay = replayAuthorization();
+  if (replay) return item.depends_on.every(id => require("./write_gate_replay_approval.cjs").heldReplayDependencyCompleted(id));
+  const filename = process.env.GH_AW_WRITE_GATE_ITEMS;
+  if (!filename) return false;
+  const input = readInput(filename);
+  if (input.sha256 !== process.env.GH_AW_WRITE_GATE_ITEMS_SHA256) throw new Error(`${ERR_VALIDATION}: Publication prerequisite receipt digest mismatch`);
+  const rows = input.bytes.toString("utf8").split("\n").filter(Boolean).map(parsePendingJSON);
+  return item.depends_on.every(id => {
+    const planned = manifest.items.find(candidate => candidate.output_id === id);
+    const selected = inventory.items.find(candidate => candidate.output_id === id);
+    const matching = rows.filter(row => row.output_id === id);
+    return (
+      planned?.complete === true &&
+      planned.settings?.staged !== true &&
+      selected?.gate_decision === "apply" &&
+      matching.length === 1 &&
+      matching[0].item_sha256 === planned.item_sha256 &&
+      matching[0].gate_decision === "apply" &&
+      matching[0].status === "success" &&
+      !matching[0].skipped &&
+      !matching[0].deferred &&
+      !matching[0].cancelled
+    );
+  });
+}
+
 /** Final mutation guard shared by authenticated API clients and git publication. */
 function assertWriteGateItemMutation(scope) {
   const manifest = scope?.publication ? readAuthorizedManifest() : assertPendingWritesIntegrity();
@@ -65,13 +93,7 @@ function assertWriteGateItemMutation(scope) {
     manifestMatches: true,
     staged: item.settings?.staged === true || process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true" || process.env.GH_AW_REPLAY_FORCE_STAGED === "true",
     reviewRepoUsable: resolveGateReviewRepo(process.env.GH_AW_WRITE_GATE_REVIEW_REPO, getDefaultTargetRepo(), parseAllowedRepos(process.env.GH_AW_WRITE_GATE_ALLOWED_REPOS)) !== null,
-    dependenciesApplied: scope.publication
-      ? item.depends_on.every(id => {
-          const source = manifest.items.find(candidate => candidate.output_id === id);
-          const selected = inventory.items.find(candidate => candidate.output_id === id);
-          return source?.complete === true && source.settings?.staged !== true && selected?.gate_decision === "apply";
-        })
-      : dependenciesApplied(item),
+    dependenciesApplied: scope.publication ? publicationDependenciesApplied(item, manifest, inventory) : dependenciesApplied(item),
     replay: replay ? "approved" : "run",
     approverRecorded: !!replay,
   });
@@ -293,7 +315,12 @@ function createWriteGateRuntime(messages) {
     select,
     review,
     /** @param {number} index @param {() => any} operation */
-    run: (index, operation) => activeItemExecution.run({ output_id: boundItems[index].output_id }, operation),
+    run: (index, operation) =>
+      activeItemExecution.run({ output_id: boundItems[index].output_id }, async () => {
+        const result = await operation();
+        if (replay && effective.get(index)?.decision === "apply") require("./write_gate_replay_approval.cjs").recordHeldReplayCompletion(boundItems[index], result);
+        return result;
+      }),
     target: index => boundItems[index].target,
     confirmedPrerequisites: new Set(boundItems.flatMap((item, index) => (replay?.confirmed_dependencies.some(entry => entry.output_id === item.output_id) ? [index] : []))),
     temporaryIds: replay?.confirmed_dependencies || [],
@@ -306,4 +333,4 @@ function createWriteGateRuntime(messages) {
   };
 }
 
-module.exports = { publishWriteDecisionInventory, createWriteGateRuntime, getHelperWriteDecision, withHelperWrite, assertWriteGateItemMutation };
+module.exports = { publishWriteDecisionInventory, createWriteGateRuntime, getHelperWriteDecision, withHelperWrite, assertWriteGateItemMutation, publicationDependenciesApplied };
