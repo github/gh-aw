@@ -1868,6 +1868,8 @@ When `jobs.safe_outputs.gate-steps` is configured, every custom safe-output job,
 
 The gate does not replace existing output selection, staging, cache event policies, or `require-agent-success` checks. Warning-mode detection reaches the trusted gate; failed or strict-mode detection still blocks publication. Cache and drive memory publish through separate jobs even when threat detection is disabled. Workflows without gate steps retain their compiled job graph.
 
+The compiler preserves implicit dependency success checks for jobs with an empty or simple `if`. An unrelated failed prerequisite cannot become runnable merely because the gate adds a status function. Authored `always()`, `failure()`, `cancelled()`, and `success()` semantics remain combined with the write verdict.
+
 Conclusion's failure issues and comments, detection tracking issue, and status comments remain ungated. Activation-owned experiment persistence (`push_experiments_state`) is independent of agent-derived publication and does not wait for the gate.
 
 ### Workflow Call Outputs (`workflow_call`)
