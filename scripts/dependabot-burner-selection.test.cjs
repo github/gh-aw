@@ -27,6 +27,8 @@ test("burner tool-contract commands are executable under the compiled SDK policy
     assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once", command);
   }
   for (const command of [
+    "command -v pull_request_read || command -v github-mcp-server || command -v mcp",
+    "help pull_request_read",
     "sed -n '1,240p' /tmp/gh-aw/agent/dependabot-burner/context.json",
     "gh auth status",
     "git --no-pager status --short --branch",
@@ -37,6 +39,30 @@ test("burner tool-contract commands are executable under the compiled SDK policy
   ]) {
     assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "reject", command);
   }
+});
+
+test("the proxy PR-read route is allowed without standalone command probes", () => {
+  const lock = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "dependabot-burner.lock.yml"), "utf8");
+  const toolConfig = lock.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/);
+  assert.ok(toolConfig);
+  const { permissions } = JSON.parse(toolConfig[1]);
+  const handler = buildCopilotSDKPermissionHandler(permissions, () => assert.fail("Unrestricted approval is not expected"));
+  const command = 'github pull_request_read \'{"method":"get_diff","owner":"example","repo":"repo","pullNumber":1}\'';
+  assert.equal(handler({ kind: "shell", fullCommandText: command }).kind, "approve-once");
+  assert.match(workflow, /Tool names are subcommands of github, not standalone/);
+});
+
+test("one remediation worker replaces analysis fan-out and the parent owns publication", () => {
+  const agents = [...workflow.matchAll(/^## agent: `([^`]+)`/gm)].map(match => match[1]);
+  assert.deepEqual(agents, ["dependabot-remediator"]);
+  assert.match(workflow, /complete Tool contract for every agent above, copied verbatim/);
+  assert.match(workflow, /The remediator must not delegate further/);
+  assert.match(workflow, /orchestrator owns the terminal safe output/);
+  assert.match(workflow, /report incomplete work for a blocked or failed wave/);
+  assert.match(workflow, /Leave `replacement_pr_created` false/);
+  assert.match(workflow, /Do not submit create-pull-request or noop safe outputs from this worker/);
+  assert.match(workflow, /cd \.github\/workflows && npm install --package-lock-only --ignore-scripts/);
+  assert.doesNotMatch(workflow, /npm install --package-lock-only(?:["`]|\n)/);
 });
 
 function pull(number, files, author = "dependabot[bot]") {
