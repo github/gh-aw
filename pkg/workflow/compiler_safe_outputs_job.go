@@ -169,6 +169,11 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 func safeOutputsJobPermissions(data *WorkflowData) (*Permissions, bool) {
 	permissions := ComputePermissionsForSafeOutputs(data.SafeOutputs)
 	addPRLifecycleReadPermission(data, permissions)
+	if hasWriteGateSteps(data) && data.SafeOutputs != nil && (data.SafeOutputs.DispatchWorkflow != nil || data.SafeOutputs.DispatchRepository != nil) {
+		if level, exists := permissions.Get(PermissionActions); !exists || level == PermissionNone {
+			permissions.Set(PermissionActions, PermissionRead)
+		}
+	}
 	// OIDC auth mints the OTLP token from the safe-outputs job.
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 		permissions.Set(PermissionIdToken, PermissionWrite)

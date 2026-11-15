@@ -13,16 +13,18 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { parseRepoSlug, validateTargetRepo, parseAllowedRepos } = require("./repo_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { buildAwContext } = require("./aw_context.cjs");
+const { buildPendingDispatchContext } = require("./pending_writes.cjs");
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 
 /**
  * Main handler factory for dispatch_repository
  * Returns a message handler function that processes individual dispatch_repository messages
- * @type {HandlerFactoryFunction}
+ * @param {any} config
+ * @param {boolean} [planning]
+ * @param {string} [contextJSON]
  */
-async function main(config = {}) {
+async function createHandler(config = {}, planning = false, contextJSON = undefined) {
   const tools = config.tools || {};
   const isStaged = isStagedMode(config);
 
@@ -130,7 +132,7 @@ async function main(config = {}) {
     };
 
     // Inject aw_context so the receiving repository can trace the dispatch back to its caller.
-    clientPayload["aw_context"] = buildAwContext();
+    clientPayload["aw_context"] = buildPendingDispatchContext(contextJSON);
 
     const eventType = toolConfig.event_type || toolConfig.eventType || "";
     if (!eventType) {
@@ -139,6 +141,10 @@ async function main(config = {}) {
         success: false,
         error: `E001: event_type is required for tool "${toolName}"`,
       };
+    }
+
+    if (planning) {
+      return { success: true, target: { repository: targetRepoSlug, event_type: eventType }, effect: { event_type: eventType, client_payload: clientPayload } };
     }
 
     core.info(`dispatch_repository: dispatching event_type="${eventType}" to ${targetRepoSlug} (workflow: ${toolConfig.workflow || "unspecified"})`);
@@ -199,4 +205,14 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { main };
+/** @type {HandlerFactoryFunction} */
+const main = config => createHandler(config);
+
+/** Run the handler's own target and input preparation without credentials or effects. */
+async function plan(config, message, contextJSON = undefined) {
+  if (message.type !== HANDLER_TYPE) return { success: false, error: "Unsupported dispatch planning type" };
+  const handler = await createHandler(config, true, contextJSON);
+  return handler(message, {});
+}
+
+module.exports = { main, plan };

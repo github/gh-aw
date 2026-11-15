@@ -64,7 +64,7 @@ func (c *Compiler) bindPendingHandlerEnvironment(data *WorkflowData, lines []str
 			if err != nil {
 				return nil, err
 			}
-			for _, name := range []string{"GH_AW_PENDING_WRITES_REQUIRED", "GH_AW_PENDING_WRITES", "GH_AW_PENDING_WRITES_SHA256", "GH_AW_PENDING_WRITES_BINDINGS", "GH_AW_PENDING_WRITES_SPEC"} {
+			for _, name := range []string{"GH_AW_PENDING_WRITES_REQUIRED", "GH_AW_PENDING_WRITES", "GH_AW_PENDING_WRITES_SHA256", "GH_AW_PENDING_WRITES_BINDINGS", "GH_AW_PENDING_WRITES_SPEC", "GH_AW_PENDING_WRITE_INPUTS"} {
 				env[name] = bound[name]
 			}
 			env["GH_AW_WRITE_GATE_DECISIONS"] = pendingNormalizedDecisionsPath

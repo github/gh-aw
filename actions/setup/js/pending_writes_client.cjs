@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { pendingWritesEnabled, assertPendingWritesIntegrity, integrityError, currentPendingWrite, assertPendingEffectAllowed } = require("./pending_writes.cjs");
+const { pendingWritesEnabled, assertPendingWritesIntegrity, integrityError, currentPendingWrite, assertPendingEffectAllowed, inputDigest } = require("./pending_writes.cjs");
 const clients = new WeakMap();
 const READ_METHOD = /^(?:get|list|compare|check|download|search|paginate)/;
 
@@ -66,6 +66,12 @@ function guardPendingWriteClient(client) {
             if (item.review && (namespace !== "issues" || key !== "create" || request.assignees?.length)) throw integrityError("review_scope_invalid");
             const repository = `${request.owner}/${request.repo}`;
             if (![item.target.repository, item.target.head_repository].includes(repository)) throw integrityError("target_changed");
+            if (["dispatch_workflow", "dispatch_repository"].includes(item.type)) {
+              const workflow = item.type === "dispatch_workflow";
+              if (!item.dispatch || namespace !== (workflow ? "actions" : "repos") || key !== (workflow ? "createWorkflowDispatch" : "createDispatchEvent")) throw integrityError("unsupported_dispatch_write");
+              const effect = workflow ? { workflow_id: request.workflow_id, ref: request.ref, inputs: request.inputs } : { event_type: request.event_type, client_payload: request.client_payload };
+              if (inputDigest(effect) !== item.dispatch.sha256) throw integrityError("dispatch_changed");
+            }
             if (item.code) {
               if (namespace === "issues" && key === "create") throw integrityError("unplanned_fallback");
               if (request.ref && ![`refs/heads/${item.target.branch}`, `heads/${item.target.branch}`].includes(request.ref)) throw integrityError("target_changed");

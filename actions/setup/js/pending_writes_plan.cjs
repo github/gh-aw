@@ -4,7 +4,7 @@
 const { SCHEMA, canonicalPendingJSON, inputDigest, itemDigest, parsePendingJSON, withPendingPlanning, resolvedGateConfig, pendingContext, pendingEnvironment } = require("./pending_writes.cjs");
 const { readInput, describeDirectory, sha256, MAX_INPUT_BYTES } = require("./pending_writes_files.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
-const { resolveTargetRepoConfig, resolveAndValidateRepo, isExactRepoSlug } = require("./repo_helpers.cjs");
+const { resolveTargetRepoConfig, resolveAndValidateRepo, isExactRepoSlug, parseRepoSlug } = require("./repo_helpers.cjs");
 const { describeCodeWrite } = require("./pending_writes_code.cjs");
 const { buildSafeOutputDependencyPlan } = require("./safe_output_dependencies.cjs");
 const { extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
@@ -15,6 +15,7 @@ const { parseBoolTemplatable } = require("./templatable.cjs");
 const { normalizeThreatKinds } = require("./threat_detection_warning.cjs");
 const { normalizeLedgerAppends } = require("./ledger_transactions.cjs");
 const { pendingReadAccess, pendingRead } = require("./pending_writes_read.cjs");
+const dispatchContexts = new WeakMap();
 
 const NO_WRITE_TYPES = new Set(["noop", "report_missing_tool", "report_missing_data", "report_incomplete", "ledger_mutation"]);
 const CREATION_TYPES = new Set(["create_issue", "create_discussion", "create_security_advisory", "create_project", "create_check_run", "create_agent_session"]);
@@ -81,12 +82,40 @@ function safeTargetString(value) {
   return value;
 }
 
+async function dispatchContext(options) {
+  if (!dispatchContexts.has(options)) {
+    const access = pendingReadAccess({}, options.run.repository, options);
+    dispatchContexts.set(
+      options,
+      pendingRead(async () => {
+        const { data } = await access.client.rest.actions.getWorkflowRun({ ...parseRepoSlug(options.run.repository), run_id: options.run.run_id });
+        if (String(data.id) !== options.run.run_id || typeof data.created_at !== "string" || !Number.isFinite(Date.parse(data.created_at))) throw new Error("Original dispatch run time is unavailable");
+        const value = { ...require("./aw_context.cjs").buildAwContext(), time: new Date(data.created_at).toISOString() };
+        return JSON.stringify(value);
+      })
+    );
+  }
+  return dispatchContexts.get(options);
+}
+
 /**
  * Reuse the same repo/number resolvers as the handlers. Unsupported selectors
  * are explicit incomplete plans; they never silently become triggering.
  */
 async function describeTarget(message, config, context, branches, options) {
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
+  if (["dispatch_workflow", "dispatch_repository"].includes(message.type)) {
+    if ([...extractTemporaryIdReferences(message)].length) throw new Error("Dispatch inputs require unresolved temporary targets");
+    const repository = defaultTargetRepo || `${context.repo.owner}/${context.repo.repo}`;
+    if (!isExactRepoSlug(parseRepoSlug(repository))) throw new Error("Pending dispatch repository cannot be resolved");
+    const access = pendingReadAccess(options.handlerConfig?.[message.type] || {}, repository, options);
+    const callerContext = message.type === "dispatch_repository" || config.aw_context_workflows?.includes(message.workflow_name?.trim()) ? await dispatchContext(options) : undefined;
+    const result = message.type === "dispatch_workflow" ? await require("./dispatch_workflow.cjs").plan(config, message, access.client, callerContext) : await require("./dispatch_repository.cjs").plan(config, message, callerContext);
+    if (!result.success || !result.target || !result.effect) throw new Error("Pending dispatch cannot be prepared from configured inputs");
+    if (!isExactRepoSlug(parseRepoSlug(result.target.repository))) throw new Error("Pending dispatch target is not an exact repository");
+    for (const value of Object.values(result.target)) safeTargetString(value);
+    return { target: result.target, access, dispatch: result.effect, callerContext };
+  }
   const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, message.type);
   if (!repoResult.success || !isExactRepoSlug(repoResult.repoParts)) throw new Error("Pending-write repository cannot be resolved");
   /** @type {Record<string, any>} */
@@ -220,6 +249,7 @@ async function buildPendingWritesUnchecked(options) {
   });
   const producers = new Map(messages.map((message, index) => [getCreatedTemporaryId(message), index]).filter(([id]) => id));
   const items = [];
+  const callerContexts = {};
   for (const [index, message] of messages.entries()) {
     const handlerConfig = config[message.type] || {};
     const dependencies = new Set([...graph.prerequisites[index]].map(producer => ids[producer]));
@@ -252,6 +282,15 @@ async function buildPendingWritesUnchecked(options) {
         ? { target: { repository: run.repository, job: message.type }, access: { token: options.readToken, client: options.readClient || globalThis.github } }
         : await describeTarget(message, handlerConfig, context, branches, options);
       item.target = describedTarget.target;
+      if ("dispatch" in describedTarget) {
+        item.dispatch = { sha256: inputDigest(describedTarget.dispatch) };
+        if (describedTarget.callerContext) {
+          callerContexts[item.output_id] = describedTarget.callerContext;
+          item.dispatch.context_time = parsePendingJSON(describedTarget.callerContext).time;
+        }
+        item.free_text.push(...describeText(describedTarget.dispatch, "/dispatch"));
+        if (message.type === "dispatch_repository") item.settings.staged ||= parseBoolTemplatable(handlerConfig.tools?.[message.tool_name]?.staged, false);
+      }
       if (custom) throw new Error("Custom write effects have no handler-derived inventory");
       if (message.type === "ledger_append" && (handlerConfig.ledgers || []).find(ledger => ledger.name === message.ledger)?.storage === "comment-memory") throw new Error("Comment ledger destinations require dynamic target discovery");
       if (["add_comment", "create_issue", "create_pull_request", "create_discussion", "close_discussion", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"].includes(message.type)) {
@@ -272,12 +311,16 @@ async function buildPendingWritesUnchecked(options) {
     } catch (error) {
       item.complete = false;
       item.reason_category = error?.code === "ERR_PENDING_READ_UNAVAILABLE" ? "read_unavailable" : "unsupported_plan";
-      if (item.reason_category === "read_unavailable") globalThis.core?.warning?.("Pending-write code cannot be read before the gate with the existing scoped credential; no future write-App token or alternate credential will be used");
+      if (item.reason_category === "read_unavailable") globalThis.core?.warning?.("Pending-write target cannot be read before the gate with the existing scoped credential; no future write-App token or alternate credential will be used");
     }
     item.item_sha256 = itemDigest(item);
     items.push(item);
   }
   const publicationInputs = [];
+  if (messages.some(message => ["dispatch_workflow", "dispatch_repository"].includes(message.type))) {
+    bindings.push({ id: "dispatch_contexts", kind: "value", value: callerContexts });
+    inputs.push({ id: "dispatch_contexts", kind: "value", sha256: inputDigest(callerContexts) });
+  }
   for (const publication of options.publications || []) {
     let supplied = publication.supplied;
     if (publication.kind === "ledger") supplied = describeLedgerTransaction(messages, config, run);
