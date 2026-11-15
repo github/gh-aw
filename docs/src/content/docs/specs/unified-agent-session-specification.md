@@ -583,6 +583,7 @@ preserve encounter order and retain only these event kinds and `data` keys:
 | `usage.report`, `firewall.token_usage` | `stepIndex`, `provider`, `model`, `purpose`, `status`, `aic`, `totalAic`, `premiumRequests`, `durationMs`, `sessionId`, `agentId` |
 | `guardrail.admission` | `status`, `maxAiCredits`, `threatDetectionMaxAiCredits`, `evalsMaxAiCredits` |
 | `guardrail.daily_aic` | `status`, `exceeded`, `total`, `estimated`, `threshold` |
+| `gate.decision` | Compiler-owned `write_gate`/`conclusion` metadata only: `verdict`, `reason`, `manifestDigest`, `integrity`, `conclusionCheck`, `failureCategory` |
 | `workflow.job_result` | `jobId`, `result`, `durationMs` |
 | `memory.push` | `memoryId`, `jobResult`, `outcome`, `status`, `branch`, `commit` |
 | `execution.result` | `outcome`, `conclusion`, `exitCode`, `durationMs`, `startedAt`, `finishedAt` |
@@ -597,6 +598,11 @@ its scalar `totalTokens`, `inputTokens`, `outputTokens`, `reasoningOutputTokens`
 `cacheReadInputTokens`, `cacheCreationInputTokens`, and `inputTokensIncludeCache`
 fields. `grader.result` MAY retain `data.run`, restricted to scalar `id`,
 `attempt`, `graderCount`, `passed`, `failed`, and `errors`.
+`gate.decision` additionally retains `counts`, restricted to `apply`, `hold`,
+`review`, `stage`, and `drop`, each a nonnegative safe integer. Full-session
+item details are separate `gate.item_decision` records and MUST NOT enter the
+compact profile. An inline detail array MUST NOT inflate the run-level gate
+record beyond the source-line limit or cause verdict/counts to be omitted.
 These are source observations, not additive contributions: overlapping session,
 usage-report and firewall accounting MUST NOT be summed as independent spend.
 

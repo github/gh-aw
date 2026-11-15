@@ -73,6 +73,12 @@ evidence remains unknown; a broader decision or a non-issue review effect is
 a violation. Authorization counts still describe the pinned inventory, while
 safe-output result records describe the effective decision and actual effect.
 
+New collectors keep the run-level `gate.decision` record compact and emit
+per-item metadata as separate `gate.item_decision` records. Audit reconstructs
+the complete item list; compact admission keeps verdict and aggregate counts
+without scanning an oversized inline item array. Legacy inline item lists
+remain readable.
+
 Gate-blocked rows MUST be evaluated before resource lookup as
 `skipped`/`strong` with `gate_denied`, `gate_held`, `gate_staged`, or
 `gate_dropped`. Strong evidence attests to the recorded suppression, not an

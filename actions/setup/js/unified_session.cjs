@@ -960,8 +960,10 @@ function collectUnifiedSession({
         results: resultFile ? records(resultFile) : [],
         resultsReadable: !resultFile || (!incompleteSources.has(resultFile) && !malformedJsonSources.has(resultFile)),
       });
+      const { items = [], ...runDecision } = data;
       /** @type {SessionEvent[]} */
-      const gateEvents = [{ type: "gate.decision", data }];
+      const gateEvents = [{ type: "gate.decision", data: runDecision }];
+      for (const data of items) gateEvents.push({ type: "gate.item_decision", data });
       for (const data of skipped) gateEvents.push({ type: "safe_output.result", data });
       sources.push({ component: "write_gate", phase: "conclusion", path: "usage/aw_session.jsonl", events: gateEvents });
     }
