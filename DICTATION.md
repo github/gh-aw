@@ -23,7 +23,6 @@ add-reviewer
 add_comment
 agentic
 agentic-ops
-agentic-token-audit
 agentic-token-optimizer
 agentic-workflows
 AGENTS.md
@@ -37,6 +36,7 @@ allowed-repos
 anthropic
 ANTHROPIC_API_KEY
 api-proxy
+api-target
 api.github.com
 api.githubcopilot.com
 approval-labels
@@ -77,6 +77,7 @@ discussions
 dispatch-repository
 dispatch-workflow
 docker-host
+DOCKER_HOST
 domains
 dry-run
 edit
@@ -102,14 +103,13 @@ file-glob
 firewall
 firewall-audit-logs
 footer
+forcePublicRepos
 frontmatter
 fuzzy-schedule
 gemini
 gemini-flash
 GEMINI_API_KEY
 gh-aw
-gh-aw-audit
-gh-aw-logs
 gh-proxy
 GH_HOST
 GH_TOKEN
@@ -119,14 +119,15 @@ github.com
 GITHUB_REPOSITORY
 GITHUB_TOKEN
 gpt-5
+graders
 haiku
 head-repo
 hide-older-comments
 inline-sub-agents
 integrity
 issue
-issue-number
 issue-ops
+issue_comment
 issues
 json
 label
@@ -144,13 +145,11 @@ mcp-gateway
 mcp-scripts
 mcp-server
 mcp-servers
-memory-ops
 merge
 min-integrity
 missing-data
 missing-tool
 model
-monitor-ops
 multi-repo-ops
 network
 network.allowed
@@ -164,7 +163,6 @@ OPENAI_API_KEY
 opencode
 opentelemetry
 opus
-orchestrator-ops
 organization
 otlp
 outcomes
@@ -193,6 +191,7 @@ replay
 report-as-issue
 report-incomplete
 report_incomplete
+report_missing_tool
 repository_dispatch
 required-labels
 required-title-prefix
@@ -206,8 +205,8 @@ runs-on
 runtime
 safe-output
 safe-outputs
-safe-rollout
 safe_outputs
+safeoutputs
 sandbox
 schedule
 secret-masking
@@ -239,6 +238,7 @@ tool-timeout
 tools.bash
 tools.github
 toolsets
+traceparent
 trigger
 trusted-users
 trustedBots
@@ -323,7 +323,11 @@ Common misrecognitions to correct:
 - "push to pull request branch" → "push-to-pull-request-branch" (hyphenated)
 - "resolve pull request review thread" → "resolve-pull-request-review-thread" (hyphenated)
 - "mai code" → "mai-code" (hyphenated)
-- "safe rollout" → "safe-rollout" (hyphenated)
+- "safe outputs CLI" → "safeoutputs" (one word, CLI name)
+- "issue comment" → "issue_comment" (underscore in trigger context)
+- "docker host" → "DOCKER_HOST" (uppercase with underscore, environment variable)
+- "trace parent" → "traceparent" (one word)
+- "API target" → "api-target" (hyphenated in YAML context)
 - "target repo" → "target-repo" (hyphenated)
 
 ## Clean Up and Improve Text
