@@ -47,14 +47,14 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Cost management | illustrative |
 | Model routing | illustrative |
 | DeterministicOps | illustrative |
-| Agents that debug agents | illustrative |
+| Audit & Optimize | illustrative |
 | Agentic Engineering |  |
+| Agents that debug agents | illustrative |
 | Any agent, any provider | illustrative |
 | Agent memory | illustrative |
 | Ephemerals | illustrative |
 | Index & search | illustrative |
 | Experiments, graders & evals | illustrative |
-| Audit & Optimize | illustrative |
 | Enterprise |  |
 | Infrastructure as code | illustrative |
 | OpenTelemetry | illustrative |

@@ -9250,7 +9250,7 @@
       });
     };
     slides.push({
-      group: "cost",
+      group: "engineering",
       notes:
         "Agents that debug agents: every run, number and finding on this slide is illustrative and synthetic. gh aw ships an MCP server, agentic-workflows (gh aw mcp-server), that exposes the CLI as tools: status, health, logs, audit, audit-diff, compile, checks, fix. Any agent that speaks MCP can call it, whether Copilot, Claude or Codex, in an IDE, a terminal or inside another agentic workflow. logs and audit are read-only: they download a run's logs, firewall log and token usage and normalize every engine's trace into one unified session, aw_session.jsonl, with each turn, tool call, token count and denial in one schema. So an agent can debug one failed run with audit, audit twenty runs across engines with logs, and optimize by comparing a run before and after a change with audit-diff. The next slide puts that on a schedule.",
       enter() {
@@ -10437,7 +10437,7 @@
       });
     };
     slides.push({
-      group: "engineering",
+      group: "cost",
       notes:
         "Audit and optimize: every run, number, finding and diff on this slide is illustrative and synthetic. A run fails or burns too many tokens. Nobody has to spot it: an agent runs on a schedule, calls gh aw health, analyzes the health of every workflow, decides which one to audit and optimize (here issue-triage, the regressed one) and hands it to Copilot with the agentic-workflows skill to debug. The agent calls audit, which downloads the run's logs, firewall log, token usage and the unified agent session, aw_session.jsonl: one normalized timeline of every turn, tool call and denial. The same agent reads that session to find repeated calls, blocked requests, oversized reads and where the tokens went, then edits the workflow markdown (another tool, a network allow-list, cache-memory, a sharper prompt) and recompiles. The only human step is the developer approving the pull request; once it merges, health keeps watching the next runs.",
       enter() {
