@@ -113,6 +113,19 @@ function pendingAuthorization(manifest, item) {
   return { inventory, selection };
 }
 
+function pendingHoldApproved(item) {
+  const modulePath = path.join(__dirname, "write_gate_replay_approval.cjs");
+  if (!fs.existsSync(modulePath)) return false;
+  const capability = require(modulePath).currentHeldReplayAuthorization();
+  return Boolean(
+    capability &&
+    capability.manifest_sha256 === process.env.GH_AW_PENDING_WRITES_SHA256 &&
+    capability.write_decisions_sha256 === process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256 &&
+    Array.isArray(capability.held_ids) &&
+    capability.held_ids.includes(item.output_id)
+  );
+}
+
 function assertPendingEffectAllowed() {
   if (!pendingWritesEnabled()) return;
   const active = activeWrite.getStore();
@@ -307,13 +320,21 @@ function assertPendingPublication(job, id, supplied) {
   const matches = manifest.items.filter(item => item.target.job === job && item.publication?.id === id);
   if (matches.length !== 1 || matches[0].complete !== true || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
   const { inventory, selection } = pendingAuthorization(manifest, matches[0]);
-  const replay = require("./write_gate_replay_approval.cjs").currentHeldReplayAuthorization();
-  const approvedHold =
-    selection.gate_decision === "hold" &&
-    replay?.held_ids.includes(matches[0].output_id) &&
-    replay.manifest_sha256 === process.env.GH_AW_PENDING_WRITES_SHA256 &&
-    replay.write_decisions_sha256 === process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256;
-  if ((selection.gate_decision !== "apply" && !approvedHold) || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
+  const mayApply = selection.gate_decision === "apply" || (selection.gate_decision === "hold" && pendingHoldApproved(matches[0]));
+  for (const id of matches[0].publication.request_ids || []) {
+    const request = manifest.items.find(item => item.output_id === id);
+    const decision = inventory.items.find(item => item.output_id === id);
+    if (
+      !request ||
+      request.complete !== true ||
+      !decision ||
+      decision.item_sha256 !== request.item_sha256 ||
+      decision.input_sha256 !== request.input_sha256 ||
+      (decision.gate_decision !== "apply" && !(decision.gate_decision === "hold" && pendingHoldApproved(request)))
+    )
+      throw integrityError("request_not_authorized");
+  }
+  if (!mayApply || process.env.GH_AW_REPLAY_FORCE_STAGED === "true" || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
   if (matches[0].settings?.staged === true || (manifest.detection.enabled && ["warning", "failure"].includes(manifest.detection.conclusion))) throw integrityError("native_policy_veto");
   require("./write_gate_runtime.cjs").assertWriteGateItemMutation(matches[0]);
   for (const setting of matches[0].publication.invocation?.env || []) {

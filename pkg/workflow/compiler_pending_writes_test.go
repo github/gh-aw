@@ -195,4 +195,10 @@ func TestPendingWriteDispatchReadsDoNotRequireEarlyWriteCredentials(t *testing.T
 	withWorkflow, _ := safeOutputsJobPermissions(data)
 	level, _ = withWorkflow.Get(PermissionActions)
 	require.Equal(t, PermissionWrite, level)
+	data.SafeOutputs.DispatchWorkflow = nil
+	data.SafeOutputs.DispatchRepository = nil
+	data.SafeOutputs.CallWorkflow = &CallWorkflowConfig{Workflows: []string{"worker"}}
+	withCall, _ := safeOutputsJobPermissions(data)
+	level, _ = withCall.Get(PermissionActions)
+	require.Equal(t, PermissionRead, level)
 }
