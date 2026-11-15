@@ -1673,7 +1673,8 @@ jobs:
       needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' ||
       needs.activation.outputs.secret_verification_result == 'failed' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' ||
       needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error' ||
-      needs.activation.outputs.steering_issue_number != '')
+      needs.activation.outputs.steering_issue_number != '' || (!cancelled()) && needs.activation.result == 'success' &&
+      needs.activation.outputs.daily_ai_credits_guardrail_status != 'quota_blocked' && needs.check_ci_status.result == 'failure')
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
