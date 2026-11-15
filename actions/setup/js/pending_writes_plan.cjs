@@ -252,6 +252,8 @@ async function buildPendingWritesUnchecked(options) {
         ? { target: { repository: run.repository, job: message.type }, access: { token: options.readToken, client: options.readClient || globalThis.github } }
         : await describeTarget(message, handlerConfig, context, branches, options);
       item.target = describedTarget.target;
+      if (custom) throw new Error("Custom write effects have no handler-derived inventory");
+      if (message.type === "ledger_append" && (handlerConfig.ledgers || []).find(ledger => ledger.name === message.ledger)?.storage === "comment-memory") throw new Error("Comment ledger destinations require dynamic target discovery");
       if (["add_comment", "create_issue", "create_pull_request", "create_discussion", "close_discussion", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"].includes(message.type)) {
         const { resolveAllowedMentionsFromPayload, getMentionsGithubClient } = require("./resolve_mentions_from_payload.cjs");
         const [owner, repo] = item.target.repository.split("/");
@@ -290,6 +292,7 @@ async function buildPendingWritesUnchecked(options) {
       const findings = messages.filter(message => message.type === "create_code_scanning_alert").map(prepareCodeScanningFinding);
       supplied = buildCodeScanningSarif(findings.slice(0, config.create_code_scanning_alert?.max || findings.length), config.create_code_scanning_alert);
     } else if (publication.binding_id) supplied = inputs.find(input => input.id === publication.binding_id);
+    const unsupported = publication.type === "custom_job" || (publication.kind === "ledger" && (config.ledger_append?.ledgers || []).some(ledger => ledger.storage === "comment-memory" && supplied?.ledgers?.[ledger.name]?.appends.length));
     /** @type {Record<string, any>} */
     const item = {
       output_id: `job_${inputDigest([publication.job, publication.id]).slice(0, 16)}`,
@@ -312,8 +315,8 @@ async function buildPendingWritesUnchecked(options) {
       free_text: [],
       input_sha256: inputDigest(supplied ?? null),
       publication: { id: publication.id, scope: "supplied_inputs", sha256: inputDigest(supplied ?? null), ...(supplied?.files ? { files: supplied.files } : {}) },
-      complete: supplied !== undefined,
-      reason_category: supplied === undefined ? "unsupported_plan" : "ready",
+      complete: supplied !== undefined && !unsupported,
+      reason_category: supplied === undefined || unsupported ? "unsupported_plan" : "ready",
     };
     if (publication.invocation) {
       item.publication.invocation = {

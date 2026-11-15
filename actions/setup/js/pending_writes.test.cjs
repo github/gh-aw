@@ -193,9 +193,31 @@ describe("handler-derived pending writes", () => {
 
   it("keeps native staging as a veto after an apply authorization", async () => {
     options.staged = true;
-    options.publications = [{ job: "custom", id: "custom", type: "custom_job", binding_id: "agent_output" }];
+    options.publications = [{ job: "upload_assets", id: "assets", type: "upload_asset", binding_id: "agent_output" }];
     const result = await authorize();
-    expect(() => assertPendingPublication("custom", "custom", result.manifest.inputs[0])).toThrow("native_policy_veto");
+    expect(() => assertPendingPublication("upload_assets", "assets", result.manifest.inputs[0])).toThrow("native_policy_veto");
+  });
+
+  it("refuses arbitrary custom effects even when their supplied bytes are known", async () => {
+    options.customTypes = ["publish"];
+    options.publications = [{ job: "publish", id: "publish", type: "custom_job", binding_id: "agent_output" }];
+    fs.writeFileSync(options.agentOutputPath, JSON.stringify({ items: [{ type: "publish", payload: "known input" }] }));
+    const result = await authorize();
+    expect(result.manifest.items.every(item => !item.complete && item.reason_category === "unsupported_plan")).toBe(true);
+    const persist = vi.fn();
+    await expect(withPendingWrite({ type: "publish", payload: "known input" }, persist, 0)).rejects.toThrow("item_incomplete");
+    expect(() => assertPendingPublication("publish", "publish", result.manifest.inputs[0])).toThrow("inputs_changed");
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("marks discovered comment-memory ledger destinations incomplete before publication", async () => {
+    options.handlerConfig.ledger_append = { ledgers: [{ name: "metrics", storage: "comment-memory", max_record_kb: 32, max_patch_kb: 100 }] };
+    options.publications = [{ job: "push_ledger_changes", id: "transactions", type: "ledger", kind: "ledger" }];
+    fs.writeFileSync(options.agentOutputPath, JSON.stringify({ items: [{ type: "ledger_append", ledger: "metrics", record: { value: 1.5 } }] }));
+    const result = await authorize();
+    expect(result.manifest.complete).toBe(false);
+    expect(result.manifest.items.every(item => !item.complete && item.reason_category === "unsupported_plan")).toBe(true);
+    expect(() => assertPendingPublication("push_ledger_changes", "transactions", {})).toThrow("inputs_changed");
   });
 
   it("normalizes ledger records with the same helper as ledger_append", async () => {
