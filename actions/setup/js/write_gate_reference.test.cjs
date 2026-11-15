@@ -33,6 +33,7 @@ function item(type, output_id, paths) {
       length: 13,
       patch_rendering: { path: "aw.patch", length: 13, sha256: inputDigest("fixture patch") },
       branch_salt: null,
+      tree_sha256: inputDigest("fixture tree"),
       additions: paths.length,
       deletions: 0,
       evaluated_paths: paths,
@@ -100,6 +101,7 @@ async function run(manifest, options = {}) {
           CONTROL_WORKFLOW_SHA: workflowSHA,
           CONTROL_RUN_ID: "123",
           CONTROL_RUN_ATTEMPT: "1",
+          ...options.env,
         },
       },
       require
@@ -144,9 +146,13 @@ describe("control repository reference write gate", () => {
   });
 
   it("considers both sides of a rename and never widens a held type", async () => {
+    const rename = item("create_pull_request", "so_123456789012", [".github/old.yml", "docs/new.md"]);
+    rename.code.files = [{ ...rename.code.files[0], path: "docs/new.md", previous_path: ".github/old.yml", status: "renamed" }];
+    rename.code.additions = 1;
+    rename.item_sha256 = itemDigest(rename);
     const { result } = await run({
       complete: true,
-      items: [item("create_pull_request", "so_123456789012", [".github/old.yml", "docs/new.md"]), item("push_to_pull_request_branch", "so_123456789013", ["docs/guide.md"])],
+      items: [rename, item("push_to_pull_request_branch", "so_123456789013", ["docs/guide.md"])],
     });
     expect(result.items.map(value => value.decision)).toEqual(["hold", "hold"]);
   });
@@ -190,6 +196,7 @@ describe("control repository reference write gate", () => {
     ["incomplete item", { complete: true, items: [{ ...item("create_issue", "so_123456789012"), complete: false }] }],
     ["missing code evidence", { complete: true, items: [item("create_pull_request", "so_123456789012")] }],
     ["incomplete code evidence", { complete: true, items: [{ ...item("create_pull_request", "so_123456789012", ["docs/file.md"]), code: { ...item("create_pull_request", "so_123456789012", ["docs/file.md"]).code, complete: false } }] }],
+    ["missing tree evidence", { complete: true, items: [{ ...item("create_pull_request", "so_123456789012", ["docs/file.md"]), code: { ...item("create_pull_request", "so_123456789012", ["docs/file.md"]).code, tree_sha256: null } }] }],
     ["unsafe path", { complete: true, items: [item("create_pull_request", "so_123456789012", ["../docs/file.md"])] }],
     ["duplicate ID", { complete: true, items: [item("create_issue", "so_123456789012"), item("create_issue", "so_123456789012")] }],
   ])("fails closed on %s", async (_name, manifest) => {
@@ -208,6 +215,12 @@ describe("control repository reference write gate", () => {
     const policyBytes = Buffer.from(JSON.stringify(policy).padEnd(size, " "));
     const { result } = await run({ complete: true, items: [] }, { policyBytes });
     expect(result.decision).toBe(size === 65536 ? "partial" : "deny");
+  });
+
+  it.each([{ CONTROL_WORKFLOW_REF: "" }, { CONTROL_WORKFLOW_SHA: "main" }])("refuses missing or mutable workflow identity before reading policy", async env => {
+    const { result, getContent } = await run({ complete: true, items: [] }, { env });
+    expect(result).toEqual({ decision: "deny", reason: "policy_error" });
+    expect(getContent).not.toHaveBeenCalled();
   });
 
   it.each([1048576, 1048577])("enforces the manifest byte limit at %s bytes", async size => {
