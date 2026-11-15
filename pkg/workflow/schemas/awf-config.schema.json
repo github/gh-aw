@@ -168,9 +168,17 @@
           "description": "Maximum cumulative effective tokens allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'effective_tokens_limit_exceeded'. Tokens are weighted: input \u00d71, cache-read \u00d70.1, output \u00d74, reasoning \u00d74. See spec \u00a710."
         },
         "maxAiCredits": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Maximum cumulative AI credits allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. With apiProxy.steering.budget, advisory notices are queued at 80%, 90%, 95%, and 99% of the effective limit. AWF always enforces an operator-controlled hard cap, defaulting to 10,000 accounted AI credits. Set AWF_AI_CREDITS_HARD_CAP in the host environment or api-proxy container to a positive finite number to lower or raise it; unset, empty, invalid, nonpositive, or non-finite values retain the default. Values above the hard cap are effectively clamped, and the agent cannot raise or disable it."
+          "anyOf": [
+            {
+              "type": "number",
+              "anyOf": [{ "enum": [-1, 0] }, { "exclusiveMinimum": 0 }]
+            },
+            {
+              "type": "string",
+              "pattern": "^\\s*0*(?:(?:[1-9][0-9]{0,14}|[1-8][0-9]{15}|9[0-1][0-9]{14}|92[0-1][0-9]{13}|922[0-2][0-9]{12}|9223[0-2][0-9]{11}|92233[0-6][0-9]{10}|922337[0-1][0-9]{9}|92233720[0-2][0-9]{7}|922337203[0-5][0-9]{6}|9223372036[0-7][0-9]{5}|92233720368[0-4][0-9]{4}|922337203685[0-3][0-9]{3}|9223372036854[0-6][0-9]{2}|92233720368547[0-6][0-9]|922337203685477[0-4]|9223372036854775)[kK]|(?:[1-9][0-9]{0,11}|[1-8][0-9]{12}|9[0-1][0-9]{11}|92[0-1][0-9]{10}|922[0-2][0-9]{9}|9223[0-2][0-9]{8}|92233[0-6][0-9]{7}|922337[0-1][0-9]{6}|92233720[0-2][0-9]{4}|922337203[0-5][0-9]{3}|9223372036[0-7][0-9]{2}|92233720368[0-4][0-9]|922337203685[0-3]|9223372036854)[mM])\\s*$"
+            }
+          ],
+          "description": "Maximum cumulative accounted AI credits allowed for a run. Positive whole-number strings that normalize to a signed 64-bit integer may use a case-insensitive K (\u00d7 1,000) or M (\u00d7 1,000,000) suffix. Set to -1 or 0 to disable the configured budget (the hard cap still applies). When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'ai_credits_limit_exceeded'. With apiProxy.steering.budget, advisory notices are queued at 80%, 90%, 95%, and 99% of the effective limit. AWF always enforces an operator-controlled hard cap, defaulting to 10,000 accounted AI credits. Set AWF_AI_CREDITS_HARD_CAP in the host environment or api-proxy container to a positive finite number to lower or raise it; unset, empty, invalid, nonpositive, or non-finite values retain the default. Values above the hard cap are effectively clamped, and the agent cannot raise or disable it. Models without resolvable pricing are allowed with a warning and unpriced usage is excluded from totals, so actual spending may exceed these limits."
         },
         "defaultAiCreditsPricing": {
           "type": "object",
