@@ -38,6 +38,7 @@ The deck is published at `https://github.github.com/gh-aw/cracktro/`. It is a de
 | `---------- sound:` | WebAudio synth `sfx` (`slide, band, step, cut, techno, pop, key, compile, review, notify, omen, route, mr, toggle, unlock`); `MUSIC` has one theme per band; `slide(dir, music, shift)` transposes by `shift` semitones. |
 | `---------- band themes ----------` | `THEME`: per-band background, grid, angle, accent, red wash and music (see `mechanics.md`). |
 | `---------- navigation ----------` | `go()`, `show(n, horiz)`, keys, dots, notes, hash. |
+| `---------- search ----------` | Slide search dialog (`fz-` CSS prefix, dock button `.fzb`): `fzBuild()` lazily indexes titles, JSON-LD `hasPart` summaries and slide text + notes; `fzBounds()` finds the tightest in-order match window used for scoring and `<mark>` highlights. |
 | `---------- animated background ----------` | Canvas background and grid driven by the current band's `THEME`. |
 
 The stage is a fixed 1920x1080 frame (`W`/`H`), scaled to fit the window.
