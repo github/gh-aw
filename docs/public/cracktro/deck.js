@@ -1167,7 +1167,8 @@
   .zs .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d2a8ff, #f778ba, #3fb950); }
   .ek .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ffa657, #f778ba, #3fb950); }
   .ek-svg { position: absolute; left: 60px; top: 290px; width: 1800px; height: 600px; overflow: visible; font-family: "Mona Sans"; }
-  .ek-area { opacity: 0; } .active .ek-area { animation: rise .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 200ms + 300ms); }
+  .ek-area { opacity: 0; } .active .ek-area { animation: ek-slide .7s cubic-bezier(.2,.9,.2,1) both calc(var(--i) * 200ms + 300ms); }
+  @keyframes ek-slide { from { opacity: 0; transform: translateX(calc(var(--dx, 100%) * .15)); } to { opacity: 1; transform: none; } }
   .ek-hd { font: 600 15px var(--mono); letter-spacing: .12em; } .ek-hd.b { fill: #79c0ff; } .ek-hd.g { fill: #7ee787; } .ek-hd.o { fill: #ffa657; }
   .ek-card { fill: #0d1117f5; stroke-width: 2; } .ek-card.b { stroke: #4493f8; } .ek-card.g { stroke: #3fb950; } .ek-card.o { stroke: #f0883e; }
   .ek-card.c { stroke: #4493f8; stroke-dasharray: 8 6; } .ek-card.gt { stroke: #3fb950; fill: #0e1a13f5; transition: filter .3s; }
@@ -1205,6 +1206,16 @@
   .ek-file { fill: #9198a1; } .ek-file text { fill: #c9d1d9; }
   .ek-file rect { fill: #161b22; stroke: #30363d; stroke-width: 1.5; transition: stroke .3s, filter .3s; }
   .s3 .ek-f2 rect { stroke: #f0883e; filter: drop-shadow(0 0 10px #f0883e88); }
+  .ekb { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; opacity: 0; font-family: var(--mono); }
+  .active .ekb { animation: ekb-in 1.4s cubic-bezier(.26,.86,.44,.985) both; } @keyframes ekb-in { from { opacity: 0; transform: translateX(calc(var(--dx, 100%) * .3)); } to { opacity: 1; transform: none; } }
+  .ekb .gm { stroke: #58a6ff14; stroke-width: 1; fill: none; } .ekb .gM { stroke: #58a6ff26; stroke-width: 1; fill: none; }
+  .ekb .w { fill: none; stroke: #79c0ff4d; stroke-width: 2; } .ekb .w2 { fill: none; stroke: #79c0ff33; stroke-width: 1.25; }
+  .ekb .hz { fill: url(#ekbHatch); stroke: none; }
+  .ekb .dm { stroke: #79c0ff40; stroke-width: 1; fill: none; } .ekb .dm.ar { marker-start: url(#ekbAr); marker-end: url(#ekbAr); }
+  .ekb .cl { stroke: #79c0ff2e; stroke-width: 1; stroke-dasharray: 22 6 4 6; fill: none; }
+  .ekb text { fill: #79c0ff59; font-size: 13px; letter-spacing: .14em; } .ekb text.c { text-anchor: middle; } .ekb text.big { font-size: 18px; font-weight: 700; fill: #79c0ff73; }
+  .ekb .dr { stroke-dasharray: 3000; stroke-dashoffset: 3000; } .active .ekb .dr { animation: ekb-draw 3.2s cubic-bezier(.4,.1,.2,1) forwards .2s; } @keyframes ekb-draw { to { stroke-dashoffset: 0; } }
+  .ekb .door { fill: none; stroke: #79c0ff33; stroke-width: 1; stroke-dasharray: 4 4; }
   .ek-note rect { fill: #0e1a13; stroke: #3fb95088; stroke-width: 1.5; }
   .ek-conf rect { fill: #220b0b; stroke: #f85149; stroke-width: 2; transition: filter .3s; } .s3 .ek-conf rect { filter: drop-shadow(0 0 12px #f8514999); }
   .ek-wire { fill: none; stroke: #3fb950; stroke-width: 3; opacity: .45; stroke-dasharray: 1; stroke-dashoffset: 1; transition: opacity .3s, stroke-dashoffset .75s cubic-bezier(.45,0,.55,1); } .ek-wire.o { stroke: #f0883e; } .ek-wire.r { stroke: #f85149; stroke-dasharray: 6 6; stroke-dashoffset: 0; opacity: 0; }
@@ -10344,6 +10355,57 @@
       g += `<circle id="ekDot" class="ek-dot" r="9"/>`;
       svg.innerHTML = g;
     };
+    // blueprint footprint of the enclave behind the slide content
+    const bp = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    bp.setAttribute("class", "ekb");
+    bp.setAttribute("viewBox", "0 0 1920 1080");
+    bp.setAttribute("aria-hidden", "true");
+    {
+      const L = 150,
+        R = 1770,
+        T = 150,
+        B = 1000,
+        k = 16,
+        X1 = 560,
+        X2 = 1330,
+        Y1 = 560;
+      const room = (x0, y0, x1, y1) => `M${x0} ${y0}H${x1}V${y1}H${x0}Z`;
+      const dimH = (x0, x1, y, t) => `<path class="dm ar" d="M${x0} ${y}H${x1}"/><path class="dm" d="M${x0} ${y - 14}V${y + 6}M${x1} ${y - 14}V${y + 6}"/><text class="c" x="${(x0 + x1) / 2}" y="${y - 8}">${t}</text>`;
+      const dimV = (y0, y1, x, t) => `<path class="dm ar" d="M${x} ${y0}V${y1}"/><path class="dm" d="M${x - 6} ${y0}H${x + 14}M${x - 6} ${y1}H${x + 14}"/><text class="c" transform="translate(${x - 8},${(y0 + y1) / 2}) rotate(-90)">${t}</text>`;
+      const door = (x, y, r, a0, a1) => {
+        const p = a => [x + r * Math.cos(a), y + r * Math.sin(a)];
+        const [sx, sy] = p(a0),
+          [ex, ey] = p(a1);
+        return `<path class="door" d="M${x} ${y}L${sx} ${sy}A${r} ${r} 0 0 1 ${ex} ${ey}"/>`;
+      };
+      let b = `<defs><pattern id="ekbG" width="24" height="24" patternUnits="userSpaceOnUse"><path class="gm" d="M24 0H0V24"/></pattern><pattern id="ekbGM" width="120" height="120" patternUnits="userSpaceOnUse"><path class="gM" d="M120 0H0V120"/></pattern>`;
+      b += `<pattern id="ekbHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V10" stroke="#79c0ff38" stroke-width="2"/></pattern>`;
+      b += `<marker id="ekbAr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 2L10 5L0 8Z" fill="#79c0ff66"/></marker></defs>`;
+      b += `<rect width="1920" height="1080" fill="url(#ekbG)"/><rect width="1920" height="1080" fill="url(#ekbGM)"/>`;
+      // thick outer wall, hatched between the two faces
+      b += `<path class="hz" fill-rule="evenodd" d="${room(L, T, R, B)}${room(L + k, T + k, R - k, B - k)}"/>`;
+      b += `<path class="w dr" d="${room(L, T, R, B)}"/><path class="w dr" d="${room(L + k, T + k, R - k, B - k)}"/>`;
+      // interior partitions with door gaps
+      b += `<path class="w2 dr" d="M${X1} ${T + k}V${Y1 - 70}M${X1} ${Y1 + 30}V${B - k}M${X2} ${T + k}V${Y1 - 140}M${X2} ${Y1 - 40}V${B - k}M${X2} ${Y1}H${R - 300}M${R - 220} ${Y1}H${R - k}"/>`;
+      b += door(X1, Y1 - 70, 100, Math.PI / 2, Math.PI) + door(X2, Y1 - 140, 100, Math.PI / 2, 0) + door(R - 300, Y1, 80, 0, -Math.PI / 2);
+      // centre lines and section marks
+      b += `<path class="cl" d="M${L - 60} 575H${R + 20}M960 ${T - 40}V${B + 20}"/>`;
+      b += [
+        [L - 80, 575],
+        [960, T - 60],
+      ]
+        .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="16" class="w2"/><text class="c" x="${x}" y="${y + 5}">A</text>`)
+        .join("");
+      // room tags (placed where slide content does not cover them)
+      b += `<text x="${L + 34}" y="${B - 34}">01 BROKER AIRLOCK</text><text x="${X1 + 34}" y="${B - 34}">02 AGENT CELL · NO NETWORK</text><text x="${X2 + 34}" y="${B - 34}">03 OUTPUT GATE · SCHEMA ONLY</text><text x="${R - 34}" y="${T + 48}" style="text-anchor:end">04 READ PORT · RO</text>`;
+      // dimensions
+      b += dimH(L, X1, 1040, "410") + dimH(X1, X2, 1040, "770") + dimH(X2, R, 1040, "440") + dimV(T, Y1, 1835, "410") + dimV(Y1, B, 1835, "440");
+      // north arrow + title block
+      b += `<g transform="translate(1420,78)"><circle r="26" class="w2"/><path d="M0 -34L8 0H-8Z" fill="#79c0ff59"/><text class="c" y="-40">N</text></g>`;
+      b += `<rect class="w2" x="1480" y="34" width="380" height="92"/><path class="w2" d="M1480 82H1860M1700 82V126"/>`;
+      b += `<text class="big" x="1496" y="66">ENCLAVE · FOOTPRINT</text><text x="1496" y="110">PLAN · SINGLE USE</text><text x="1716" y="110">DWG EK-01</text>`;
+      bp.innerHTML = b;
+    }
     // [time, path, stage label, sound]
     const STEPS = [
       [400, "ekP1", "Waiting for task", () => sfx.pop(0)],
@@ -10405,7 +10467,7 @@
         dot.setAttribute("class", "ek-dot " + (s[1] === "ekP4" ? "r" : s[1] === "ekP3" ? "o" : ""));
         dot.style.opacity = 1;
       },
-      el: h("section", { class: "slide ek" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
+      el: h("section", { class: "slide ek" }, bp, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repo flows · no private-to-public leaks"), h("h2", {}, letters("Need-to-know "), letters("enclaves", "l-grad"))), svg),
     });
   }
 
