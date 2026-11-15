@@ -57,6 +57,35 @@ func TestBuildAgenticAssessmentsFlagsPotentialDeterministicAlternative(t *testin
 	assert.Equal(t, "overkill_for_agentic", assessments[0].Kind)
 }
 
+func TestBuildAgenticAssessmentsSuppressesDeterministicAlternativeWhenAgentWasSkipped(t *testing.T) {
+	t.Parallel()
+	processedRun := ProcessedRun{
+		Run: WorkflowRun{
+			WorkflowName: "Issue Triage",
+			Status:       "completed",
+			Conclusion:   "failure",
+		},
+		JobDetails: []JobInfoWithDuration{
+			{JobInfo: JobInfo{Name: "pre_activation", Status: "completed", Conclusion: "failure"}},
+			{JobInfo: JobInfo{Name: "agent", Status: "completed", Conclusion: "skipped"}},
+		},
+	}
+	domain := &TaskDomainInfo{Name: "triage", Label: "Triage"}
+	fingerprint := &BehaviorFingerprint{
+		ExecutionStyle:  "directed",
+		ToolBreadth:     "narrow",
+		ActuationStyle:  "read_only",
+		ResourceProfile: "lean",
+		DispatchMode:    "standalone",
+	}
+
+	assessments := buildAgenticAssessments(processedRun, MetricsData{}, nil, nil, domain, fingerprint, nil)
+
+	for _, assessment := range assessments {
+		assert.NotEqual(t, "overkill_for_agentic", assessment.Kind)
+	}
+}
+
 func TestBuildAgenticAssessmentsFlagsResourceHeavyRun(t *testing.T) {
 	t.Parallel()
 	processedRun := ProcessedRun{
