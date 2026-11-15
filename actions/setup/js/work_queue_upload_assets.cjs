@@ -39,7 +39,7 @@ async function main(config = {}, suppliedClient) {
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue asset requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
   const namespace = path.basename(claimArtifactPath("", factoryClaim));
-  const branch = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`) + `-claims/${namespace}`;
+  const branchPrefix = normalizeBranchName(config.branch || `assets/${process.env.GH_AW_WORKFLOW_ID || "work-queue"}`) + `-claims/${namespace}`;
   const allowed = config["allowed-exts"] || [".png", ".jpg", ".jpeg"];
   const maximum = Number(config["max-size"] || 10240) * 1024;
   const limit = Number(config.max || 10);
@@ -63,6 +63,7 @@ async function main(config = {}, suppliedClient) {
     const content = readGuardedFile(staged, maximum);
     const sha256 = crypto.createHash("sha256").update(content).digest("hex");
     if (message.sha !== undefined && message.sha !== sha256) throw new Error("Queue asset staged content differs from its declared digest");
+    const branch = `${branchPrefix}-asset-${count}`;
     const assetPath = `claims/${namespace}/${sha256}${extension}`;
     const authorityResource = await resolveRepositoryTarget(client, { repository, ref: `refs/heads/${branch}`, path: assetPath });
     const git = client.rest?.git;

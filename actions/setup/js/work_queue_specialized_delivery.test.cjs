@@ -42,34 +42,43 @@ afterEach(() => {
 });
 
 function client() {
-  const state = { bad: false, report: null, blob: null, tree: null, commit: null, ref: null };
+  const state = { bad: false, report: null, blobs: new Map(), trees: new Map(), commits: new Map(), refs: new Map() };
+  const objectId = value => crypto.createHash("sha1").update(JSON.stringify(value)).digest("hex");
   const github = {
     rest: {
       repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }), getCommit: async () => ({ data: { sha: process.env.GITHUB_SHA } }) },
       git: {
-        getRef: async () => {
-          if (!state.ref) throw Object.assign(new Error("missing"), { status: 404 });
-          return { data: { object: { sha: state.bad ? "changed" : state.ref } } };
+        getRef: async input => {
+          if (!state.refs.has(input.ref)) throw Object.assign(new Error("missing"), { status: 404 });
+          return { data: { object: { sha: state.bad ? "changed" : state.refs.get(input.ref) } } };
         },
         createBlob: async input => {
-          state.blob = input.content;
-          return { data: { sha: "b".repeat(40) } };
+          const id = objectId(input);
+          state.blobs.set(id, input.content);
+          return { data: { sha: id } };
         },
         createTree: async input => {
-          state.tree = input.tree;
-          return { data: { sha: "c".repeat(40) } };
+          const entries = [...(state.trees.get(input.base_tree) || []), ...input.tree];
+          const id = objectId(entries);
+          state.trees.set(id, entries);
+          return { data: { sha: id } };
         },
         createCommit: async input => {
-          state.commit = { sha: "d".repeat(40), tree: { sha: input.tree }, parents: input.parents };
-          return { data: { sha: state.commit.sha } };
+          const id = objectId(input);
+          state.commits.set(id, { sha: id, tree: { sha: input.tree }, parents: input.parents.map(parent => ({ sha: parent })) });
+          return { data: { sha: id } };
         },
         createRef: async input => {
-          state.ref = input.sha;
+          state.refs.set(input.ref.slice(5), input.sha);
           return { data: { object: { sha: input.sha } } };
         },
-        getCommit: async () => ({ data: state.commit }),
-        getTree: async input => ({ data: { sha: input.tree_sha, truncated: false, tree: state.tree } }),
-        getBlob: async input => ({ data: { sha: input.file_sha, encoding: "base64", content: state.blob } }),
+        updateRef: async input => {
+          state.refs.set(input.ref, input.sha);
+          return { data: { object: { sha: input.sha } } };
+        },
+        getCommit: async input => ({ data: state.commits.get(input.commit_sha) }),
+        getTree: async input => ({ data: { sha: input.tree_sha, truncated: false, tree: state.trees.get(input.tree_sha) } }),
+        getBlob: async input => ({ data: { sha: input.file_sha, encoding: "base64", content: state.blobs.get(input.file_sha) } }),
       },
       codeScanning: {
         uploadSarif: async input => {
@@ -92,6 +101,30 @@ function client() {
   };
   return { github, state };
 }
+
+describe("multiple asset deliveries in one Claim", () => {
+  it.each(["second.png", "first.png"])("keeps both uploads independently verifiable when the second path is %s", async secondPath => {
+    let assets = require("./work_queue_upload_assets.cjs");
+    const { github, state } = client();
+    const directory = scope.claimArtifactPath(root, "h1", assignment);
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, sha("first.png") + ".png"), "first asset");
+    if (secondPath !== "first.png") fs.writeFileSync(path.join(directory, sha(secondPath) + ".png"), "second asset");
+    const results = await execute(async () => {
+      const handler = await assets.main({ "target-repo": "owner/repo", "assets-dir": root, max: 2 }, github);
+      return [await handler({ type: "upload_asset", path: "first.png" }), await handler({ type: "upload_asset", path: secondPath })];
+    });
+    const receipts = await execute(() => results.map(result => assets.durableAssetReceipt(result, claim)));
+    delete require.cache[require.resolve("./work_queue_upload_assets.cjs")];
+    assets = require("./work_queue_upload_assets.cjs");
+    const verify = index => execute(() => assets.verifyAssetDelivery({ claim, github, authorize, durable: true, result: { entry: { index, type: "upload_asset", verifier: "asset", receipt: JSON.parse(JSON.stringify(receipts[index])) } } }));
+    expect((await verify(0)).verified).toBe(true);
+    expect((await verify(1)).verified).toBe(true);
+    state.refs.set(`heads/${results[0].branch}`, "e".repeat(40));
+    expect((await verify(0)).verified).toBe(false);
+    expect((await verify(1)).verified).toBe(true);
+  });
+});
 
 describe.each(Object.entries(modules))("durable %s native verification", (verifier, [filename, name]) => {
   it("round-trips the private receipt, independently reads native state, and fails closed", async () => {
