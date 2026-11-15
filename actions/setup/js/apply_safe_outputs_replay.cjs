@@ -27,6 +27,8 @@ const { ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION, ERR_PARSE } = require("./error_c
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { parseLockFileHeaders } = require("./lock_file_headers.cjs");
 const { parseStrictJSON } = require("./work_queue_codec.cjs");
+const { normalizeSafeOutputConfig, normalizeSafeOutputName } = require("./safe_output_names.cjs");
+const { isDeepStrictEqual } = require("node:util");
 
 /**
  * Parse a run ID from a run URL or plain run ID string.
@@ -69,6 +71,7 @@ function parseRunUrl(runUrl) {
  * @param {string} repo
  */
 async function getReplayPolicy(runId, owner, repo) {
+  if (!Number.isSafeInteger(Number(runId)) || Number(runId) < 1) throw new Error(`${ERR_VALIDATION}: Replay run ID must be a positive safe integer`);
   const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(runId) });
   const workflowPath = run.path?.split("@")[0];
   if (
@@ -226,6 +229,50 @@ async function enforceReplayWriteGate(policy, runId, owner, repo) {
 }
 
 /**
+ * @param {unknown} gate
+ * @param {string} agentOutputFile
+ * @param {string} [override]
+ */
+function prepareGatedReplayConfig(gate, agentOutputFile, override = process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG) {
+  if (
+    !gate ||
+    typeof gate !== "object" ||
+    !("replay_config" in gate) ||
+    !("replay_types" in gate) ||
+    !("replay_staged" in gate) ||
+    typeof gate.replay_staged !== "boolean" ||
+    !gate.replay_config ||
+    typeof gate.replay_config !== "object" ||
+    Array.isArray(gate.replay_config) ||
+    !Array.isArray(gate.replay_types) ||
+    gate.replay_types.some(type => typeof type !== "string")
+  ) {
+    throw new Error(`${ERR_VALIDATION}: Original resolved replay restrictions are unavailable; refusing replay`);
+  }
+  const serialized = JSON.stringify(gate.replay_config);
+  if (serialized.includes("${{") || serialized.includes("${GH_AW_INPUT_") || /"(?:github-token|head-github-token)"\s*:/.test(serialized)) {
+    throw new Error(`${ERR_VALIDATION}: Original replay config requires unavailable runtime restrictions or credentials`);
+  }
+  if (override && !isDeepStrictEqual(parseStrictJSON(override), parseStrictJSON(serialized))) {
+    throw new Error(`${ERR_VALIDATION}: Gated replay cannot override the original handler restrictions`);
+  }
+  const config = normalizeSafeOutputConfig(gate.replay_config);
+  let output;
+  try {
+    output = parseStrictJSON(fs.readFileSync(agentOutputFile, "utf8"));
+  } catch (error) {
+    throw new Error(`${ERR_PARSE}: Cannot read gated replay output`, { cause: error });
+  }
+  if (!output || typeof output !== "object" || !("items" in output) || !Array.isArray(output.items)) throw new Error(`${ERR_VALIDATION}: Gated replay requires a valid output item array`);
+  for (const item of output.items) {
+    if (!item || typeof item !== "object" || typeof item.type !== "string") throw new Error(`${ERR_VALIDATION}: Malformed gated replay item`);
+    const type = normalizeSafeOutputName(item.type);
+    if (!gate.replay_types.includes(type) || !Object.hasOwn(config, type)) throw new Error(`${ERR_VALIDATION}: Replay item has no supported handler in the original policy`);
+  }
+  return { config: serialized, staged: gate.replay_staged ? "true" : "false" };
+}
+
+/**
  * Download the agent artifact from a workflow run using `gh run download`.
  *
  * @param {string} runId - The workflow run ID
@@ -325,8 +372,9 @@ async function main() {
   const displayRepoSlug = repoFromUrl ?? `${context.repo.owner}/${context.repo.repo}`;
   core.info(`Target repository: ${displayRepoSlug}`);
 
+  let policy;
   try {
-    const policy = await getReplayPolicy(runId, owner || context.repo.owner, repo || context.repo.repo);
+    policy = await getReplayPolicy(runId, owner || context.repo.owner, repo || context.repo.repo);
     if (policy.gate && displayRepoSlug.toLowerCase() !== `${context.repo.owner}/${context.repo.repo}`.toLowerCase()) {
       throw new Error(`${ERR_VALIDATION}: Gated outputs can only be replayed in their original repository`);
     }
@@ -353,7 +401,16 @@ async function main() {
   core.info(`Set GH_AW_AGENT_OUTPUT=${agentOutputFile}`);
 
   // Auto-build GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG from the output if not already set
-  if (!process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG) {
+  if (policy.gate) {
+    try {
+      const original = prepareGatedReplayConfig(policy.gate, agentOutputFile);
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = original.config;
+      process.env.GH_AW_SAFE_OUTPUTS_STAGED = original.staged;
+    } catch (error) {
+      core.setFailed(`Cannot authorize gated replay items: ${getErrorMessage(error)}`);
+      throw error;
+    }
+  } else if (!process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG) {
     try {
       const handlerConfig = buildHandlerConfigFromOutput(agentOutputFile);
       process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify(handlerConfig);
@@ -370,4 +427,4 @@ async function main() {
   await runHandlerManager();
 }
 
-module.exports = { main, parseRunUrl, buildHandlerConfigFromOutput, getReplayPolicy, enforceReplayWriteGate, validateReplayWriteGateRecord, loadRecordedWriteGate };
+module.exports = { main, parseRunUrl, buildHandlerConfigFromOutput, getReplayPolicy, enforceReplayWriteGate, validateReplayWriteGateRecord, loadRecordedWriteGate, prepareGatedReplayConfig };

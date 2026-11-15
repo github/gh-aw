@@ -1,6 +1,70 @@
 package workflow
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
+
+func (c *Compiler) buildWriteGateReplayConfig(data *WorkflowData) (map[string]any, error) {
+	if data.SafeOutputs != nil && data.SafeOutputs.Staged != nil && isExpression(data.SafeOutputs.Staged.String()) {
+		return nil, nil
+	}
+	if strings.Contains(data.Env, "GH_AW_SAFE_OUTPUTS_STAGED") {
+		return nil, nil
+	}
+	serialized, err := json.Marshal(c.buildHandlerManagerConfig(data))
+	if err != nil {
+		return nil, fmt.Errorf("cannot serialize original replay policy: %w", err)
+	}
+	var config map[string]any
+	if err := json.Unmarshal(serialized, &config); err != nil {
+		return nil, fmt.Errorf("cannot decode original replay policy: %w", err)
+	}
+	removeReplayCredentials(config)
+	serialized, err = json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("cannot serialize credential-free replay policy: %w", err)
+	}
+	// Today's vars, secrets, needs, or environment cannot stand in for the
+	// original runtime-resolved restrictions.
+	if strings.Contains(string(serialized), "${{") || strings.Contains(string(serialized), "${GH_AW_INPUT_") {
+		return nil, nil
+	}
+	return config, nil
+}
+
+func removeReplayCredentials(value any) {
+	switch value := value.(type) {
+	case map[string]any:
+		delete(value, "github-token")
+		delete(value, "head-github-token")
+		for _, child := range value {
+			removeReplayCredentials(child)
+		}
+	case []any:
+		for _, child := range value {
+			removeReplayCredentials(child)
+		}
+	}
+}
+
+func isStaticWriteGateReplayType(name string, data *WorkflowData) bool {
+	switch name {
+	case "noop", "missing_tool", "missing_data", "report_incomplete", "dispatch_repository":
+		return true
+	case "create_issue":
+		mentions := data.SafeOutputs.Mentions
+		staticMentions := mentions != nil && ((mentions.Enabled != nil && !*mentions.Enabled) ||
+			(mentions.AllowedCollaborators != nil && !*mentions.AllowedCollaborators && mentions.AllowContext != nil && !*mentions.AllowContext))
+		// Grouping and contextual mention allowances need the original resolved
+		// target/context snapshot, not maintenance's current issue or authors.
+		return staticMentions && (data.SafeOutputs.CreateIssues == nil ||
+			data.SafeOutputs.CreateIssues.Group == nil || *data.SafeOutputs.CreateIssues.Group == "false")
+	default:
+		return false
+	}
+}
 
 func (c *Compiler) addWriteGateRecordSteps(data *WorkflowData) error {
 	if !hasWriteGateSteps(data) {

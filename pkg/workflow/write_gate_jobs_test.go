@@ -1,11 +1,16 @@
 package workflow
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
 
@@ -166,4 +171,151 @@ func TestWriteGatePublicationPathIncludesMemoryOnly(t *testing.T) {
 	}
 	require.False(t, hasWritePublicationPath(&WorkflowData{ExperimentsStorage: ExperimentsStorageRepo, Experiments: map[string][]string{"model": {"a", "b"}}}))
 	require.False(t, hasWritePublicationPath(&WorkflowData{CacheMemoryConfig: &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default", RestoreOnly: true}}}}))
+}
+
+func TestWriteGateCompiledPublicationGraph(t *testing.T) {
+	for _, detection := range []string{"false", "true", "{ continue-on-error: false }"} {
+		t.Run(detection, func(t *testing.T) {
+			directory := t.TempDir()
+			require.NoError(t, os.MkdirAll(filepath.Join(directory, ".github", "workflows"), 0700))
+			createWorker(t, filepath.Join(directory, ".github", "workflows"), "worker-one", "")
+			source := fmt.Sprintf(`---
+on: workflow_dispatch
+engine: copilot
+strict: false
+permissions:
+  contents: read
+  copilot-requests: none
+tools:
+  repo-memory:
+    branch-name: memory/test
+  cache-memory:
+    key: memory-test
+  drive-memory:
+    drive-name: memory-test
+jobs:
+  safe_outputs:
+    gate-steps:
+      - run: echo gate
+safe-outputs:
+  require-agent-success: true
+  threat-detection: %s
+  add-comment:
+  upload-asset:
+  create-code-scanning-alert:
+  upload-code-coverage:
+  call-workflow: [worker-one]
+  jobs:
+    publish-result:
+      if: always() || failure()
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo publish
+---
+Publish only after the gate.
+`, detection)
+			compiler := NewCompiler()
+			path := filepath.Join(directory, ".github", "workflows", "workflow.md")
+			data, err := compiler.ParseWorkflowString(source, path)
+			require.NoError(t, err)
+			output, err := compiler.CompileToYAML(data, path)
+			require.NoError(t, err)
+			var compiled map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte(output), &compiled))
+			jobs := compiled["jobs"].(map[string]any)
+			for _, name := range []string{"publish_result", "push_repo_memory", "update_cache_memory", "update_drive_memory", "upload_assets", "upload_code_scanning_sarif", "upload_code_coverage", "call-worker-one"} {
+				job, exists := jobs[name].(map[string]any)
+				require.True(t, exists, name)
+				require.Contains(t, parseNeedsField(job["needs"]), "safe_outputs", name)
+				condition := job["if"].(string)
+				require.Contains(t, condition, "needs.safe_outputs.result == 'success'", name)
+				require.Contains(t, condition, "needs.safe_outputs.outputs.write_gate == 'allow'", name)
+				require.Contains(t, condition, "needs.safe_outputs.outputs.write_gate == 'partial'", name)
+			}
+			if detection == "false" {
+				require.Equal(t, "read", jobs["agent"].(map[string]any)["cache-mode"])
+				require.NotContains(t, parseNeedsField(jobs["update_cache_memory"].(map[string]any)["needs"]), "detection")
+			}
+			conclusion := jobs["conclusion"].(map[string]any)
+			steps, err := yaml.Marshal(conclusion["steps"])
+			require.NoError(t, err)
+			require.Contains(t, string(steps), "GH_AW_WRITE_GATE_WORKFLOW_SHA")
+			require.Contains(t, string(steps), "github.workflow_sha")
+			require.Contains(t, string(steps), "Upload write gate verdict")
+			require.Contains(t, output, `"write_gate":{"version":1,"record_job":"conclusion","artifact_immutable":true`)
+		})
+	}
+}
+
+func TestWriteGateReplayConfigPreservesOriginalRestrictions(t *testing.T) {
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowString(`---
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  create-issue:
+    max: 1
+    target-repo: owner/restricted
+    allowed-repos: [owner/restricted]
+    staged: true
+    github-token: ${{ secrets.ORIGINAL_TOKEN }}
+  merge-pull-request:
+    allowed-base-branches: [agent-work/*]
+    protected-files:
+      exclude: [AGENTS.md]
+---
+Restricted publication.
+`, "workflow.md")
+	require.NoError(t, err)
+	config, err := compiler.buildWriteGateReplayConfig(data)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	issue := config["create_issue"].(map[string]any)
+	require.Equal(t, float64(1), issue["max"])
+	require.Equal(t, "owner/restricted", issue["target-repo"])
+	require.Equal(t, []any{"owner/restricted"}, issue["allowed_repos"])
+	require.Equal(t, true, issue["staged"])
+	require.NotContains(t, issue, "github-token")
+	require.Equal(t, "${{ secrets.ORIGINAL_TOKEN }}", data.SafeOutputs.CreateIssues.GitHubToken)
+	merge := config["merge_pull_request"].(map[string]any)
+	require.NotEmpty(t, merge["protected_files"])
+	require.NotContains(t, merge["protected_files"], "AGENTS.md")
+	original := compiler.buildHandlerManagerConfig(data)
+	delete(original["create_issue"].(map[string]any), "github-token")
+	before, err := json.Marshal(original)
+	require.NoError(t, err)
+	after, err := json.Marshal(config)
+	require.NoError(t, err)
+	require.JSONEq(t, string(before), string(after))
+}
+
+func TestWriteGateReplayConfigRefusesUnresolvedRestrictions(t *testing.T) {
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowString(`---
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  create-issue:
+    target-repo: ${{ vars.ORIGINAL_DESTINATION }}
+    max: ${{ vars.ORIGINAL_LIMIT }}
+---
+Runtime-resolved publication.
+`, "workflow.md")
+	require.NoError(t, err)
+	config, err := compiler.buildWriteGateReplayConfig(data)
+	require.NoError(t, err)
+	require.Nil(t, config, "today's variables must never replace the original resolved policy")
+}
+
+func TestWriteGateStaticReplayRefusesImplicitContext(t *testing.T) {
+	data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}}}
+	require.False(t, isStaticWriteGateReplayType("add_comment", data))
+	require.False(t, isStaticWriteGateReplayType("merge_pull_request", data))
+	require.False(t, isStaticWriteGateReplayType("create_issue", data), "default mention authors depend on the original context")
+	no := false
+	data.SafeOutputs.Mentions = &MentionsConfig{Enabled: &no}
+	require.True(t, isStaticWriteGateReplayType("create_issue", data))
+	data.SafeOutputs.CreateIssues.Group = strPtr("true")
+	require.False(t, isStaticWriteGateReplayType("create_issue", data), "grouping needs the original resolved target")
+	require.False(t, isStaticWriteGateReplayType("call_workflow", data))
 }

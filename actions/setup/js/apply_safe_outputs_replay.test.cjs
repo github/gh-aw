@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 /** Environment variables managed by tests */
-const TEST_ENV_VARS = ["GH_AW_RUN_URL", "GH_TOKEN", "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", "GH_AW_AGENT_OUTPUT"];
+const TEST_ENV_VARS = ["GH_AW_RUN_URL", "GH_TOKEN", "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", "GH_AW_AGENT_OUTPUT", "GH_AW_SAFE_OUTPUTS_STAGED"];
 
 describe("apply_safe_outputs_replay", () => {
   let originalEnv;
@@ -162,6 +162,62 @@ describe("apply_safe_outputs_replay", () => {
       for (const safe_outputs_result of ["failure", "cancelled", "timed_out", "skipped", ""]) {
         expect(() => validateReplayWriteGateRecord({ ...record(), safe_outputs_result }, identity)).toThrow(/successful recorded allow/);
       }
+    });
+
+    describe("original replay restrictions", () => {
+      it("preserves target, staging, protected files, and max instead of synthesizing empty config", async () => {
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const directory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "gated-replay-policy-"));
+        const outputFile = path.join(directory, "agent_output.json");
+        const gate = {
+          replay_staged: true,
+          replay_types: ["create_issue", "merge_pull_request"],
+          replay_config: {
+            create_issue: { "target-repo": "owner/restricted", allowed_repos: ["owner/restricted"], staged: true, max: 1 },
+            merge_pull_request: { protected_files: ["AGENTS.md", "package.json"], max: 1 },
+          },
+        };
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "create_issue", title: "Issue" }] }));
+        try {
+          const { prepareGatedReplayConfig } = await import("./apply_safe_outputs_replay.cjs");
+          expect(JSON.parse(prepareGatedReplayConfig(gate, outputFile).config)).toEqual(gate.replay_config);
+          expect(prepareGatedReplayConfig(gate, outputFile).staged).toBe("true");
+          for (const override of [
+            { create_issue: {} },
+            { ...gate.replay_config, create_issue: { ...gate.replay_config.create_issue, max: 99 } },
+            { ...gate.replay_config, create_issue: { ...gate.replay_config.create_issue, staged: false } },
+            { ...gate.replay_config, merge_pull_request: { max: 1, protected_files: [] } },
+          ]) {
+            expect(() => prepareGatedReplayConfig(gate, outputFile, JSON.stringify(override))).toThrow(/cannot override/);
+          }
+          expect(JSON.parse(prepareGatedReplayConfig(gate, outputFile, JSON.stringify(gate.replay_config)).config)).toEqual(gate.replay_config);
+        } finally {
+          fs.rmSync(directory, { recursive: true });
+        }
+      });
+
+      it("refuses missing/dynamic config, credentials, and unsupported item transports", async () => {
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const directory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "gated-replay-policy-"));
+        const outputFile = path.join(directory, "agent_output.json");
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "custom_publish" }] }));
+        try {
+          const { prepareGatedReplayConfig } = await import("./apply_safe_outputs_replay.cjs");
+          for (const gate of [
+            {},
+            { replay_staged: false, replay_types: ["create_issue"], replay_config: { create_issue: { max: "${{ vars.NOW }}" } } },
+            { replay_staged: false, replay_types: ["create_issue"], replay_config: { create_issue: { "github-token": "credential" } } },
+            { replay_staged: false, replay_types: ["create_issue"], replay_config: { create_issue: { max: 1 } } },
+          ]) {
+            expect(() => prepareGatedReplayConfig(gate, outputFile)).toThrow();
+          }
+          expect(global.exec.exec).not.toHaveBeenCalled();
+        } finally {
+          fs.rmSync(directory, { recursive: true });
+        }
+      });
     });
 
     it("rejects missing, malformed, stale, or cross-repository records", async () => {
