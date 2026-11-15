@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gh-aw/pending-writes/v1",
+  "title": "Pending writes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "run", "detection", "complete", "inputs", "items"],
+  "properties": {
+    "schema": { "const": "gh-aw/pending-writes/v1" },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "workflow_ref", "workflow_sha", "run_id", "run_attempt", "event"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "workflow_ref": { "type": "string", "minLength": 1 },
+        "workflow_sha": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 },
+        "run_attempt": { "type": "string", "minLength": 1 },
+        "event": { "type": "string", "minLength": 1 }
+      }
+    },
+    "detection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "mode", "conclusion", "reason_category", "threat_flags"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "enum": ["block", "warn", "disabled"] },
+        "conclusion": { "enum": ["success", "warning", "failure", "skipped", "cancelled", "unknown"] },
+        "reason_category": { "enum": ["threat_detected", "agent_failure", "parse_error", "github_api_quota_exhausted", "unknown"] },
+        "threat_flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["prompt_injection", "secret_leak", "malicious_patch"] }
+        }
+      }
+    },
+    "complete": { "type": "boolean" },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/input" } },
+    "items": { "type": "array", "items": { "$ref": "#/$defs/item" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "length", "sha256", "mode"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "length": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "mode": { "enum": ["100644", "100755"] }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["file", "directory", "value"] },
+        "length": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "mode": { "enum": ["100644", "100755"] },
+        "files": { "type": "array", "items": { "$ref": "#/$defs/file" } }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "file" } } }, "then": { "required": ["length", "sha256", "mode"] } },
+        { "if": { "properties": { "kind": { "const": "directory" } } }, "then": { "required": ["files"] } },
+        { "if": { "properties": { "kind": { "const": "value" } } }, "then": { "required": ["sha256"] } }
+      ]
+    },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "length", "sha256"],
+      "properties": {
+        "field": { "type": "string" },
+        "length": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "code_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "previous_path", "status", "old_mode", "new_mode", "mode_changed", "binary", "submodule", "additions", "deletions"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "previous_path": { "type": ["string", "null"] },
+        "status": { "enum": ["added", "deleted", "modified", "renamed", "copied"] },
+        "old_mode": { "type": ["string", "null"] },
+        "new_mode": { "type": ["string", "null"] },
+        "mode_changed": { "type": "boolean" },
+        "binary": { "type": "boolean" },
+        "submodule": { "type": "boolean" },
+        "additions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport", "base_commit", "sha256", "length", "patch_rendering", "files", "evaluated_paths", "additions", "deletions", "branch_salt", "complete"],
+      "properties": {
+        "transport": { "enum": ["patch", "bundle", "object-pack"] },
+        "base_commit": { "type": ["string", "null"] },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bundle_sha256": { "$ref": "#/$defs/sha256" },
+        "length": { "type": "integer", "minimum": 0 },
+        "patch_rendering": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "length", "sha256"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "length": { "type": "integer", "minimum": 0 },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "files": { "type": "array", "items": { "$ref": "#/$defs/code_file" } },
+        "evaluated_paths": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "additions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 },
+        "branch_salt": { "type": ["string", "null"] },
+        "complete": { "type": "boolean" }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output_id", "type", "target", "depends_on", "settings", "free_text", "input_sha256", "item_sha256", "complete", "reason_category"],
+      "properties": {
+        "output_id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "kind": { "type": "string" },
+            "number": { "type": "integer", "minimum": 1 },
+            "branch": { "type": "string" },
+            "base": { "type": "string" },
+            "head_repository": { "type": "string" },
+            "head_commit": { "type": "string" },
+            "job": { "type": "string" }
+          }
+        },
+        "depends_on": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["staged", "sha256"],
+          "properties": {
+            "staged": { "type": "boolean" },
+            "draft": { "type": "boolean" },
+            "protected_files_policy": { "type": "string" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "free_text": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+        "input_sha256": { "$ref": "#/$defs/sha256" },
+        "item_sha256": { "$ref": "#/$defs/sha256" },
+        "complete": { "type": "boolean" },
+        "reason_category": { "enum": ["ready", "unsupported_plan"] },
+        "code": { "$ref": "#/$defs/code" },
+        "publication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "scope", "sha256"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "scope": { "const": "supplied_inputs" },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "files": { "type": "array", "items": { "$ref": "#/$defs/file" } }
+          }
+        }
+      }
+    }
+  }
+}

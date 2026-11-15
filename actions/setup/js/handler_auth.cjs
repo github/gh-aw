@@ -42,11 +42,12 @@ async function createAuthenticatedGitHubClient(config) {
   // (not a valid JavaScript identifier). This is consistent with other hyphenated
   // config keys like "target-repo" and "allowed-repos".
   const token = config["github-token"];
+  const { guardPendingWriteClient } = require("./pending_writes_client.cjs");
   if (!token) {
-    return github;
+    return guardPendingWriteClient(github);
   }
   core.info("Using per-handler github-token for cross-repository authentication");
-  return global.getOctokit(token, /** @type {any} */ { credentialSource: "pat" });
+  return guardPendingWriteClient(global.getOctokit(token, /** @type {any} */ { credentialSource: "pat" }));
 }
 
 /**

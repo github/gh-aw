@@ -325,6 +325,7 @@ function resolveAndValidateRepo(item, defaultTargetRepo, allowedRepos, operation
     };
   }
 
+  require("./pending_writes.cjs").assertPendingTarget({ repository: qualifiedItemRepo });
   return {
     success: true,
     repo: qualifiedItemRepo,
