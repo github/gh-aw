@@ -124,6 +124,15 @@ describe("Metrics Collector serialized storage contract", () => {
     expect(fs.readFileSync(path.join(root, "daily/2026-10-14.json"), "utf8")).toBe(content);
   });
 
+  it("rejects workflow totals that do not match outcome counts", () => {
+    const root = temporaryDirectory();
+    const data = JSON.parse(snapshot());
+    data.workflows["workflow-0"].workflow_runs.total++;
+    writeSnapshot(root, JSON.stringify(data, null, 2) + "\n");
+
+    expect(() => runGate(root)).toThrow("Workflow run total does not match outcome counts: workflow-0.");
+  });
+
   it.each(["bootstrap", "next-day", "both-replaced"])("measures the actual %s staged diff, including prefixes and headers", mode => {
     const root = initializeRepository();
     const metrics = path.join(root, "metrics");

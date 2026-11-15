@@ -44,6 +44,24 @@ tools:
             typeof snapshot.workflows !== "object" || Object.keys(snapshot.workflows).length === 0) {
           throw new Error("Latest metrics must contain workflow records.");
         }
+        for (const [name, workflow] of Object.entries(snapshot.workflows)) {
+          const runs = workflow.workflow_runs;
+          const counts = ["total", "successful", "failed", "skipped", "action_required"];
+          if (!runs || counts.some(field => !Number.isSafeInteger(runs[field]) || runs[field] < 0)) {
+            throw new Error(`Workflow run counts must be non-negative integers: ${name}.`);
+          }
+          const outcomeTotal = runs.successful + runs.failed + runs.skipped + runs.action_required;
+          if (runs.total !== outcomeTotal) {
+            throw new Error(`Workflow run total does not match outcome counts: ${name}.`);
+          }
+          if (runs.executed !== runs.successful + runs.failed ||
+              (runs.executed === 0
+                ? runs.success_rate !== null
+                : !Number.isFinite(runs.success_rate) ||
+                  Math.abs(runs.success_rate - runs.successful / runs.executed) >= 0.001)) {
+            throw new Error(`Workflow executed count or success rate is inconsistent: ${name}.`);
+          }
+        }
         const day = timestamp.toISOString().slice(0, 10);
         const dailyPath = path.join(root, "daily", `${day}.json`);
         if (!fs.existsSync(dailyPath) || !fs.readFileSync(dailyPath).equals(latest)) {
@@ -235,13 +253,17 @@ If you see any `.md` files at the root (e.g. `agent-performance-latest.md`, `sha
 - Never issue a single `logs` call with `count >= 100` for the full `-1d` window: that request
   has repeatedly exceeded the 60s tool timeout and yields truncated data.
 - From the logs data, extract for each workflow:
-  - Total runs in last 24 hours
+  - Count completed runs by conclusion, and set `total` to the sum of the reported outcome counts:
+    `successful + failed + skipped + action_required`. Do not count a run twice or include queued
+    or in-progress runs in `total`.
   - Successful runs (conclusion: "success")
-  - Failed runs (conclusion: "failure", "cancelled", "timed_out")
+  - Failed runs (conclusion: "failure", "cancelled", "timed_out", "startup_failure")
   - Skipped runs (conclusion: "skipped")
   - Approval-gated runs (conclusion: "action_required")
   - Executed runs: `successful + failed`
   - Calculate success rate: `successful / executed`; use `null` when `executed` is 0
+  - If any completed run has a conclusion not covered above, set `collection_status` to `partial`
+    and explain its conclusion and count in `collection_note`; do not silently include it in `total`.
   - Token usage and costs (if available in logs)
   - Execution duration statistics
 
@@ -284,13 +306,12 @@ cannot determine outcome status, set those items to `"pending"` rather than omit
 **Workflow Runs Fallback (GitHub API)**:
 
 When the logs-based path is truncated or unavailable, paginate `list_workflow_runs` across the full
-collection window and classify each run by its `conclusion`. Count `success` as `successful`;
-`failure`, `cancelled`, and `timed_out` as `failed`; and count `skipped` and `action_required`
-separately. Set `executed` to `successful + failed` and calculate `success_rate` as
-`successful / executed`; when `executed` is 0, set `success_rate` to `null`. Never treat skipped or
-approval-gated runs as failures. Include all counts in every workflow's `workflow_runs` object,
-including zero values, and set `"data_source": "github_api_fallback"` plus a `collection_note`
-describing why fallback was used.
+collection window and classify each completed run by its `conclusion`. Apply the same outcome
+mapping, `total` invariant, and unknown-conclusion handling as the logs path. Set `executed` to
+`successful + failed` and calculate `success_rate` as `successful / executed`; when `executed` is 0,
+set `success_rate` to `null`. Never treat skipped or approval-gated runs as failures. Include all
+counts in every workflow's `workflow_runs` object, including zero values, and set
+`"data_source": "github_api_fallback"` plus a `collection_note` describing why fallback was used.
 
 **Additional Metrics via GitHub API**:
 - Use GitHub MCP server (default toolset) to supplement with:
@@ -683,9 +704,13 @@ echo "Stored date: $STORED_DATE | Today: $TODAY"
 # Step 5: Validate workflow-run classification and success-rate semantics
 jq -e '
   all(.workflows[]?.workflow_runs;
+    has("total") and
+    has("successful") and
+    has("failed") and
     has("skipped") and
     has("action_required") and
     has("executed") and
+    .total == (.successful + .failed + .skipped + .action_required) and
     .executed == ((.successful // 0) + (.failed // 0)) and
     (if .executed == 0 then
        .success_rate == null
