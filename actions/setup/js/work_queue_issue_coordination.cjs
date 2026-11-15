@@ -4,6 +4,7 @@
 const { randomUUID } = require("node:crypto");
 const { digest, queueError } = require("./work_queue_codec.cjs");
 const { queueLedgerClient } = require("./work_queue_git_transport.cjs");
+const { requestWithDeadline } = require("./work_queue_issue_pacing.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("issue_coordination");
 
 // Locks have no expiring lease: a slow or interrupted write must never overlap a
@@ -26,7 +27,7 @@ async function withProjectionLocks({ githubClient, owner, repo, head, keys, repo
     for (const lock of locks) {
       const { branch } = lock;
       try {
-        await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: head, request: { retries: 0, signal: AbortSignal.timeout(15000) } });
+        await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: head, request: requestWithDeadline(githubClient, 15000) });
       } catch (error) {
         log.failure("projection.locks.acquire.failed", error, true);
         // Even a lost acquisition response is uncertain. Do not delete a lock
@@ -45,7 +46,7 @@ async function withProjectionLocks({ githubClient, owner, repo, head, keys, repo
   } finally {
     for (const { key, branch } of held.reverse()) {
       if (uncertain && (!Array.isArray(retained) || retained.includes(key))) continue;
-      const request = { retries: 0, signal: AbortSignal.timeout(15000) };
+      const request = requestWithDeadline(githubClient, 15000);
       try {
         await githubClient.rest.git.deleteRef({ owner, repo, ref: `heads/${branch}`, request });
       } catch (error) {
@@ -71,7 +72,7 @@ async function withGraphQLProjectionLocks({ githubClient, repositoryId, head, ke
   let response;
   let errors = [];
   try {
-    response = await githubClient.graphql(`mutation WorkQueueProjectionLocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request: { retries: 0, signal: AbortSignal.timeout(30000) } });
+    response = await githubClient.graphql(`mutation WorkQueueProjectionLocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request: requestWithDeadline(githubClient, 30000) });
   } catch (error) {
     log.failure("projection.locks.acquire.failed", error, true, "lock");
     response = error.data;
@@ -109,7 +110,7 @@ async function withGraphQLProjectionLocks({ githubClient, repositoryId, head, ke
       const declarations = release.map((_, index) => `$u${index}:DeleteRefInput!`);
       const selections = release.map((_, index) => `u${index}: deleteRef(input:$u${index}) { clientMutationId }`);
       let result;
-      const request = { retries: 0, signal: AbortSignal.timeout(30000) };
+      const request = requestWithDeadline(githubClient, 30000);
       try {
         result = await githubClient.graphql(`mutation WorkQueueProjectionUnlocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request });
       } catch (error) {

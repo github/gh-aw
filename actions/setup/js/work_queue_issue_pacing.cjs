@@ -5,6 +5,24 @@ const { queueError } = require("./work_queue_codec.cjs");
 const { inheritQueueLedgerClient } = require("./work_queue_git_transport.cjs");
 const { readQueueMetadata } = require("./work_queue_read_retry.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("issues");
+const PACED_CLIENT = Symbol("pacedGithubClient");
+
+function requestWithDeadline(client, milliseconds) {
+  return client[PACED_CLIENT] ? { retries: 0, deadlineMs: milliseconds } : { retries: 0, signal: AbortSignal.timeout(milliseconds) };
+}
+
+function materializeRequest(request) {
+  const options = { ...request };
+  if (options.deadlineMs !== undefined) {
+    const signal = AbortSignal.timeout(options.deadlineMs);
+    request.signal = signal;
+    delete request.deadlineMs;
+    options.signal = signal;
+    delete options.deadlineMs;
+  }
+  options.retries = 0;
+  return options;
+}
 
 function wrapGithubClient(githubClient, { sleep = delay => new Promise(resolve => setTimeout(resolve, delay)), now = Date.now } = {}) {
   const metrics = { requests: 0, reads: 0, mutations: 0, paced_ms: 0 };
@@ -35,7 +53,11 @@ function wrapGithubClient(githubClient, { sleep = delay => new Promise(resolve =
         return async (query, variables) => {
           const mutation = /^\s*mutation/.test(query);
           const cost = Math.max(1, [...query.matchAll(/:\s*(?:createIssue|addComment|updateIssueComment|setIssueFieldValue|addLabelsToLabelable|removeLabelsFromLabelable|closeIssue|createRef|deleteRef)\(/g)].length);
-          const send = () => invoke(mutation, cost, () => target.graphql(query, { ...variables, request: { ...variables?.request, retries: 0 } }));
+          const send = () =>
+            invoke(mutation, cost, () => {
+              const request = variables?.request || {};
+              return target.graphql(query, { ...variables, request: materializeRequest(request) });
+            });
           return mutation ? send() : readQueueMetadata(send, log, "projection.read", sleep);
         };
       if (key === "rest")
@@ -43,11 +65,18 @@ function wrapGithubClient(githubClient, { sleep = delay => new Promise(resolve =
           get(apis, scope) {
             return new Proxy(apis[scope], {
               get(methods, name) {
-                return async (...args) => invoke(!/^(get|list)/.test(String(name)), 1, () => methods[name](...args));
+                return async (...args) =>
+                  invoke(!/^(get|list)/.test(String(name)), 1, () => {
+                    const inputIndex = args.length - 1;
+                    const input = args[inputIndex];
+                    if (input?.request) args[inputIndex] = { ...input, request: materializeRequest(input.request) };
+                    return methods[name](...args);
+                  });
               },
             });
           },
         });
+      if (key === PACED_CLIENT) return true;
       return target[key];
     },
   });
@@ -55,4 +84,4 @@ function wrapGithubClient(githubClient, { sleep = delay => new Promise(resolve =
   return { client, metrics };
 }
 
-module.exports = { wrapGithubClient };
+module.exports = { wrapGithubClient, requestWithDeadline };

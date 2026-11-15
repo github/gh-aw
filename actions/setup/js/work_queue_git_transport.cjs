@@ -146,7 +146,7 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
       fetched = true;
       return;
     }
-    await network(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", remote, `+refs/heads/${branch}:refs/heads/queue`]);
+    await network(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--filter=blob:none", remote, `+refs/heads/${branch}:refs/heads/queue`]);
     if (fs.existsSync(path.join(directory, "shallow"))) throw queueError("checkpoint_invalid", "queue history must not be shallow");
     git(["fsck", "--connectivity-only", "--no-dangling", "--no-reflogs", "refs/heads/queue"]);
     verifiedHead = git(["rev-parse", "--verify", "refs/heads/queue^{commit}"]).toString("utf8").trim();
@@ -159,6 +159,13 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
     const cached = objects.get(key);
     if (cached) return cached;
     await fetchObjects();
+    if (type === "blob") {
+      try {
+        git(["cat-file", "-e", `${oid}^{blob}`]);
+      } catch {
+        await network(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", remote, oid]);
+      }
+    }
     const data = await objectReader.object(oid, type);
     // Keep the immutable ancestry hot without retaining an unbounded ledger.
     if (data.length <= 4 * 1024 * 1024) {

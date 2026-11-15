@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -77,6 +78,15 @@ function fixture(options = {}) {
   return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
 }
 
+async function unusedPort() {
+  const server = net.createServer();
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  await new Promise((resolve, reject) => server.close(error => (error ? reject(error) : resolve())));
+  if (!address || typeof address === "string") throw new Error("temporary Git server did not bind a TCP port");
+  return address.port;
+}
+
 function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound = false, corruptOldest = false } = {}) {
   const f = fixture({
     count: 135,
@@ -112,6 +122,67 @@ function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound 
 }
 
 describe("Git-only work queue ledger", { timeout: 90000 }, () => {
+  it.skipIf(process.platform === "win32")("filters asset blobs from queue history and fetches only requested blobs", async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-git-filter-test-"));
+    cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const remoteDirectory = path.join(directory, "remote.git");
+    const env = {
+      ...gitEnvironment(),
+      GIT_AUTHOR_NAME: "Queue filter fixture",
+      GIT_AUTHOR_EMAIL: "queue-filter@example.invalid",
+      GIT_COMMITTER_NAME: "Queue filter fixture",
+      GIT_COMMITTER_EMAIL: "queue-filter@example.invalid",
+    };
+    const git = (args, input) =>
+      execFileSync("git", ["--git-dir", remoteDirectory, ...args], { env, input, stdio: ["pipe", "pipe", "pipe"] })
+        .toString("utf8")
+        .trim();
+    execFileSync("git", ["init", "--bare", "--quiet", "--initial-branch=main", "--template=", remoteDirectory], { env });
+    git(["config", "uploadpack.allowFilter", "true"]);
+    git(["config", "uploadpack.allowReachableSHA1InWant", "true"]);
+    const queue = queueFixture({ count: 2, batch: 1 });
+    const queueBlob = git(["hash-object", "-w", "--stdin"], serializeTransactionLog(queue.transactions));
+    const assetContent = Buffer.alloc(1024 * 1024, 97);
+    const assetBlob = git(["hash-object", "-w", "--stdin"], assetContent);
+    const tree = git(["mktree", "-z"], [`100644 blob ${queueBlob}\twork-queue.jsonl\0`, `100644 blob ${assetBlob}\tasset.bin\0`].join(""));
+    const commit = git(["commit-tree", tree, "-m", "Queue filter fixture"]);
+    git(["update-ref", "refs/heads/main", commit]);
+    git(["update-ref", "refs/heads/work-queue", commit]);
+
+    const port = await unusedPort();
+    const remote = `git://127.0.0.1:${port}/remote.git`;
+    const daemon = spawn("git", ["daemon", "--reuseaddr", "--export-all", `--base-path=${directory}`, "--listen=127.0.0.1", `--port=${port}`], { stdio: "ignore" });
+    cleanups.push(() => daemon.kill());
+    let advertised = false;
+    for (let attempt = 0; attempt < 50 && !advertised; attempt++) {
+      try {
+        execFileSync("git", ["ls-remote", remote], { env, stdio: "ignore", timeout: 1000 });
+        advertised = true;
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+    expect(advertised).toBe(true);
+
+    let authentications = 0;
+    const githubClient = {
+      auth: async () => {
+        authentications++;
+        return { type: "token", token: "queue-filter-test" };
+      },
+    };
+    const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote });
+    registerQueueLedgerClient(githubClient, ledger);
+    cleanups.push(() => ledger.close());
+
+    const read = await readWorkQueueLog({ githubClient, owner: "owner", repo: "repo" });
+    expect(read.transactions).toEqual(queue.transactions);
+    const afterQueueRead = authentications;
+    const asset = await ledger.rest.git.getBlob({ file_sha: assetBlob });
+    expect(Buffer.from(asset.data.content, "base64")).toEqual(assetContent);
+    expect(authentications).toBe(afterQueueRead + 1);
+  });
+
   it.each([false, true])("shares production ledger clients with a paced Issue wrapper created before the first read: %s", async wrapFirst => {
     const client = { auth: async () => ({ type: "token", token: "offline-queue-token" }) };
     const original = wrapFirst ? undefined : queueLedgerClient(client, "owner", "repo");

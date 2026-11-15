@@ -433,9 +433,15 @@ function registerTests({ describe, it }) {
       const sourcePath = "image.png";
       const content = Buffer.from("claim-only-asset");
       const sha = createHash("sha256").update(content).digest("hex");
+      const queueHead = "a".repeat(40);
+      const queueTree = "b".repeat(40);
+      const assetCommit = "c".repeat(40);
+      const assetTree = "d".repeat(40);
+      const assetBlob = "e".repeat(40);
       const effects = [];
       const calls = [];
-      let ref, file, createdRef;
+      let ref = queueHead;
+      let assetPath;
       let incorrect = false;
       const source = {
         rest: {
@@ -443,35 +449,50 @@ function registerTests({ describe, it }) {
           git: {
             getRef: async (...parameters) => {
               const requested = parameters[0]?.ref;
-              if (requested === "heads/assets/trusted") return { data: { object: { sha: "legacy-sha" } } };
-              if (createdRef && requested === createdRef.replace(/^refs\//, "")) return { data: { object: { sha: ref } } };
+              if (requested === "heads/work-queue") return { data: { object: { sha: ref } } };
               throw Object.assign(new Error("missing"), { status: 404 });
             },
             createBlob: async args => {
               calls.push("blob");
               assert.equal(args.content, content.toString("base64"));
-              return { data: { sha: "blob-sha" } };
+              return { data: { sha: assetBlob } };
             },
             createTree: async args => {
               calls.push("tree");
-              file = args.tree[0];
-              return { data: { sha: "tree-sha" } };
+              assert.equal(args.base_tree, queueTree);
+              assetPath = args.tree[0].path;
+              return { data: { sha: assetTree } };
             },
             createCommit: async args => {
               calls.push("commit");
-              assert.deepEqual(args.parents, []);
-              return { data: { sha: "commit-sha" } };
+              assert.deepEqual(args.parents, [queueHead]);
+              return { data: { sha: assetCommit } };
             },
-            createRef: async args => {
+            updateRef: async args => {
               calls.push("ref");
-              assert.equal(args.ref, `refs/heads/assets/trusted-claims/${namespace}`);
-              createdRef = args.ref;
+              assert.equal(args.ref, "heads/work-queue");
+              assert.equal(args.force, false);
+              assert.equal(args.sha, assetCommit);
               ref = args.sha;
               return { data: { object: { sha: ref } } };
             },
-            getCommit: async () => ({ data: { sha: "commit-sha", tree: { sha: "tree-sha" }, parents: [] } }),
-            getTree: async () => ({ data: { sha: "tree-sha", truncated: false, tree: [file] } }),
-            getBlob: async () => ({ data: { sha: "blob-sha", encoding: "base64", content: (incorrect ? Buffer.from("incorrect") : content).toString("base64") } }),
+            getCommit: async input => {
+              const commitSha = input?.commit_sha || "";
+              return {
+                data: {
+                  sha: commitSha,
+                  tree: { sha: commitSha === assetCommit ? assetTree : queueTree },
+                  parents: commitSha === assetCommit ? [{ sha: queueHead }] : [],
+                },
+              };
+            },
+            getTree: async ({ tree_sha }) => {
+              const segments = assetPath.split("/");
+              const depth = tree_sha === assetTree ? 0 : tree_sha === "claims-tree" ? 1 : 2;
+              const entry = depth === segments.length - 1 ? { path: segments[depth], mode: "100644", type: "blob", sha: assetBlob } : { path: segments[depth], mode: "040000", type: "tree", sha: depth === 0 ? "claims-tree" : "claim-tree" };
+              return { data: { sha: tree_sha, truncated: false, tree: [entry] } };
+            },
+            getBlob: async () => ({ data: { sha: assetBlob, encoding: "base64", content: (incorrect ? Buffer.from("incorrect") : content).toString("base64") } }),
           },
         },
       };
@@ -492,13 +513,16 @@ function registerTests({ describe, it }) {
         await withClaimExecution({ assignment: scoped, claim_handle: "h1", authorize, effects }, async () => {
           const client = wrapClaimEffectClient(source, { claim_handle: "h1", authorize });
           const handler = await createAssetHandler({ "target-repo": "owner/repo", branch: "assets/trusted", "assets-dir": root }, client);
-          assert.equal((await source.rest.git.getRef({ ref: "heads/assets/trusted" })).data.object.sha, "legacy-sha");
+          assert.equal((await source.rest.git.getRef({ ref: "heads/work-queue" })).data.object.sha, queueHead);
           const message = { type: "upload_asset", claim_handle: "h1", path: sourcePath, sha };
           const result = await handler(message);
           assert.equal(result.sha, sha);
           assert.deepEqual(calls, ["blob", "tree", "commit", "ref"]);
-          assert.equal(createdRef, `refs/heads/assets/trusted-claims/${namespace}`);
-          assert.equal((await verifyAssetDelivery({ claim: scoped.claims[0], result, github: source, authorize, context: trustedContext })).verified, true);
+          assert.equal(result.branch, "work-queue");
+          assert.equal(result.path, `claims/${namespace}/${sha}.png`);
+          assert.equal(ref, assetCommit);
+          const proof = await verifyAssetDelivery({ claim: scoped.claims[0], result, github: source, authorize, context: trustedContext });
+          assert.equal(proof.verified, true, JSON.stringify(proof));
           assert.equal((await verifyAssetDelivery({ claim: scoped.claims[0], result: structuredClone(result), github: source })).verified, false);
           const options = {
             assignment: scoped,

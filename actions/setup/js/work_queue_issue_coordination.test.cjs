@@ -5,6 +5,7 @@ const { withProjectionLocks } = require("./work_queue_issue_coordination.cjs");
 const { digest } = require("./work_queue_codec.cjs");
 const { registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
 const { fixture, mock } = require("./work_queue_issues_checks.cjs");
+const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { main } = require("./work_queue_issues.cjs");
 
 function simulateDeadlines() {
@@ -17,7 +18,10 @@ function simulateDeadlines() {
 }
 
 function waitForAbort(request) {
-  return new Promise((_resolve, reject) => request?.signal?.addEventListener("abort", () => reject(request.signal.reason), { once: true }));
+  return new Promise((_resolve, reject) => {
+    if (request?.signal?.aborted) reject(request.signal.reason);
+    else request?.signal?.addEventListener("abort", () => reject(request.signal.reason), { once: true });
+  });
 }
 
 describe("projection lock acquisition diagnostics", () => {
@@ -80,6 +84,36 @@ describe("projection lock acquisition diagnostics", () => {
     expect((await pending).pending).toHaveLength(1);
     expect(operation).not.toHaveBeenCalled();
     expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts paced GraphQL acquisition and release deadlines at dispatch", async () => {
+    simulateDeadlines();
+    const keys = Array.from({ length: 50 }, (_, index) => `work:${index}`);
+    const githubClient = {
+      graphql: vi.fn((query, variables) => {
+        expect(variables.request.signal.aborted).toBe(false);
+        if (query.includes("WorkQueueProjectionUnlocks")) return waitForAbort(variables.request);
+        return Object.fromEntries(
+          keys.map((_key, index) => {
+            const input = variables[`l${index}`];
+            return [`l${index}`, { ref: { id: `lock-${index}`, prefix: "refs/heads/", name: input.name.slice("refs/heads/".length), target: { oid: input.oid } } }];
+          })
+        );
+      }),
+    };
+    const { client } = wrapGithubClient(githubClient);
+    const pending = withProjectionLocks({ githubClient: client, repositoryId: "repository", head: "a".repeat(40), keys }, async () => ({}));
+    const rejected = expect(pending).rejects.toMatchObject({ code: "projection_coordination_pending" });
+
+    await vi.advanceTimersByTimeAsync(50000);
+    expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(50000);
+    expect(githubClient.graphql).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(29999);
+    expect(githubClient.graphql).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    await rejected;
+    expect(githubClient.graphql).toHaveBeenCalledTimes(2);
   });
 
   it.each([false, true])("bounds REST acquisition at 15 seconds and cleans up only acknowledged locks (partial=%s)", async partial => {
