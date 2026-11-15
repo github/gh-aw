@@ -76,6 +76,11 @@ workflow show its original `/agentic-workflows` prompt along the top; click it t
 open the full prompt in a phone-style dialog (Escape or Done closes it).
 Link previews (Open Graph, Slack, X) use `public/cracktro/og-image.png`, a
 1200x630 render of the title slide; regenerate it if the title slide changes.
+The ordered slide list, with a one-sentence summary per slide, lives in
+[`.github/skills/cracktro/slides.md`](../.github/skills/cracktro/slides.md).
+The docs build (and dev server) adds it to the page's JSON-LD as `hasPart`
+entries with `#N` links, so crawlers and agents can find a slide without
+running the deck; `src/lib/cracktro/` holds the parser and Astro integration.
 
 The [daily Cracktro maintainer](../.github/workflows/daily-cracktro-maintainer.md)
 uses `copilot/claude-opus-5.5` to check for missing shipped features and outdated

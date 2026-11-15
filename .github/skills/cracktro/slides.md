@@ -2,77 +2,83 @@
 
 The single ordered list of slides. A slide's number is its row position here (first row = slide 1, `#1`); never write slide numbers anywhere else. Refer to a slide by its heading (and CSS prefix); link previews as `#N` with N looked up here.
 
-`docs/tests/talk.spec.ts` reads this file: it checks the deck has exactly these slides, in this order, with these headings, and that speaker notes of every `illustrative` row match `/illustrative|synthetic|simulated/i`.
+Columns (one table, one row per line; `|` is not allowed inside a cell):
 
-Editing: add, remove or move one row per slide in the same change as `deck.js`. One row per line keeps concurrent PRs merge-friendly; do not renumber anything.
+- **Heading**: the slide's first heading text, exactly as rendered.
+- **Notes**: empty, or `illustrative` when the speaker notes must match `/illustrative|synthetic|simulated/i`.
+- **Summary**: one public sentence with the slide's executive takeaway. Start band headers with `Band header (<band>):`. Describe the durable point, not measured counts or dates that age. No URLs, handles or slide numbers.
 
-| Heading | Notes |
-|---|---|
-| GitHubAgenticWorkflows |  |
-| Agentic Workflows |  |
-| CI/CD meetsContinuous AI | illustrative |
-| Anatomy of a workflow | illustrative |
-| Turn Intent to Automation |  |
-| Turn Automation into Value | illustrative |
-| Security |  |
-| Agentic attacks | illustrative |
-| Safety and control |  |
-| Zero-secret agents | illustrative |
-| Supply chain hardening | illustrative |
-| Safe outputs | illustrative |
-| Need-to-know enclaves | illustrative |
-| Continuous Red Teaming | illustrative |
-| Stop manually translating intent into code. |  |
-| Human agent processes |  |
-| Human Agent Processes | illustrative |
-| Pull Request Review² | illustrative |
-| Issues as intent | illustrative |
-| Repo Assist | illustrative |
-| Daily Unsloppers | illustrative |
-| Merge fast, unslop daily | illustrative |
-| Research · Assign · Observe | illustrative |
-| Query · Ask · Grow | illustrative |
-| Mine · Refine · Apply | illustrative |
-| Explore · Reuse · Lint | illustrative |
-| Semantic clustering | illustrative |
-| Spec · Model · Test | illustrative |
-| Go Fan | illustrative |
-| Spec-driven testing | illustrative |
-| Docs that heal | illustrative |
-| Speak · Map · Grep | illustrative |
-| Scan · Fix · Learn | illustrative |
-| For PMs | illustrative |
-| If every PR needs deep human review, you don’t trust your process. | illustrative |
-| Cost Optimization |  |
-| Cost management | illustrative |
-| Model routing | illustrative |
-| DeterministicOps | illustrative |
-| Audit & Optimize | illustrative |
-| Agentic Engineering |  |
-| Agents that debug agents | illustrative |
-| Any agent, any provider | illustrative |
-| Agent memory | illustrative |
-| Durable execution | illustrative |
-| Ephemerals | illustrative |
-| Index & search | illustrative |
-| Imports & reuse | illustrative |
-| Experiments, graders & evals | illustrative |
-| Enterprise |  |
-| Infrastructure as code | illustrative |
-| OpenTelemetry | illustrative |
-| GitHub-native governance | illustrative |
-| Operator-owned infrastructure | illustrative |
-| Push SDLC | illustrative |
-| Connectors | illustrative |
-| Central Agentic Ops |  |
-| Hyperscale Agentics | illustrative |
-| Centralized campaigns | illustrative |
-| AW maintenance | illustrative |
-| Session data lake | illustrative |
-| Ops data for Agents | illustrative |
-| AW factory |  |
-| First commit to GA |  |
-| How PRs land |  |
-| How workflows evolve |  |
-| Patch to PR | illustrative |
-| GıtHub Agentic Workflows | illustrative |
+`docs/src/lib/cracktro/slides.js` parses this file and fails on a malformed row, an empty Heading or Summary, an unknown Notes value or a duplicate. The docs build injects every row into the talk page's JSON-LD (`hasPart`: position, name, description, `#N` URL); `docs/tests/talk.spec.ts` checks the deck and that metadata against this list.
+
+Editing: add, remove or move one row per slide in the same change as `deck.js`, and rewrite the Summary whenever the slide's message changes. Do not renumber anything.
+
+| Heading | Notes | Summary |
+|---|---|---|
+| GitHubAgenticWorkflows |  | Title slide: GitHub Agentic Workflows are coding agents that run in GitHub Actions, written in Markdown, with guardrails. |
+| Agentic Workflows |  | Band header (Agentic Workflows): what agentic workflows are, how they are written and why they pay off. |
+| CI/CD meetsContinuous AI | illustrative | Agentic steps run inside the GitHub Actions pipelines teams already use, on the same runners, logs and checks. |
+| Anatomy of a workflow | illustrative | A workflow is one Markdown file: front matter declares triggers, tools, permissions, steps and safe outputs, and the body is the agent prompt. |
+| Turn Intent to Automation |  | Describe a job in plain language, an agent writes the Markdown workflow, and gh aw compile deterministically turns it into a hardened Actions lock file. |
+| Turn Automation into Value | illustrative | Track outcomes such as backlog burndown, quality and delivery speed to show what agentic workflows are worth. |
+| Security |  | Band header (Security): design every workflow as if the agent is already compromised. |
+| Agentic attacks | illustrative | Common agent attacks, from prompt injection to secret exfiltration and destructive commands, are each stopped by one or more layered defenses. |
+| Safety and control |  | Inputs are filtered, the agent runs sandboxed with a read-only token behind a firewall and gateway, and writes happen only through scanned safe outputs. |
+| Zero-secret agents | illustrative | The agent runs in an isolated micro-VM holding no credentials; every key stays on the host behind the MCP gateway, API proxy and egress firewall. |
+| Supply chain hardening | illustrative | The compiler applies layered static checks, including trigger admission, expression safety, pinned actions, least privilege and secret scans, before any workflow runs. |
+| Safe outputs | illustrative | Agents only propose writes; threat detection reviews each proposal and a separate, scoped job applies only the declared outputs. |
+| Need-to-know enclaves | illustrative | Single-use, isolated enclave agents read private repositories and return only schema-constrained values, so private data cannot leak into public replies. |
+| Continuous Red Teaming | illustrative | A daily red-team agent keeps trying new ways to escape the agent firewall, and each escape it finds is turned into a firewall fix. |
+| Stop manually translating intent into code. |  | The factory mindset: engineer processes that create trusted features instead of hand-translating intent into code. |
+| Human agent processes |  | Band header (Human agent processes): engineer processes, not code, with patterns that pair people and agents. |
+| Human Agent Processes | illustrative | Event-driven hand-off patterns such as IssueOps, DailyOps, ReviewOps and LabelOps let agents do the work while people make the decisions. |
+| Pull Request Review² | illustrative | Marking a pull request ready starts agentic reviewers, and Copilot is nudged to fix their findings so the human reviewer sees a clean pull request. |
+| Issues as intent | illustrative | Contributors run a debug agent on their own failures and file anonymized issues that state intent, which maintainers plan and assign to Copilot. |
+| Repo Assist | illustrative | A scheduled assistant picks maintenance tasks such as triage and stale pull requests, a maintainer reviews every result, and backlogs shrink. |
+| Daily Unsloppers | illustrative | Scheduled research agents find problems such as duplicated code, assign them to Copilot, and developers refine the resulting pull requests. |
+| Merge fast, unslop daily | illustrative | Merge many small pull requests quickly and let agentic reviewers and daily unsloppers clean up, instead of polishing each one through endless nit rounds. |
+| Research · Assign · Observe | illustrative | A daily benchmark agent files performance regressions, Copilot fixes them, and the next run observes the result to close the loop. |
+| Query · Ask · Grow | illustrative | An expert DevOps agent read live telemetry through observability MCP servers and filed the most important instrumentation gap each day, growing OpenTelemetry support. |
+| Mine · Refine · Apply | illustrative | Recurring review corrections are mined into Go linters, refined through review, and applied across the repository. |
+| Explore · Reuse · Lint | illustrative | A daily code-analysis agent keeps a strategy cache to balance reusing proven strategies with exploring new ones, and every pattern it finds becomes a linter. |
+| Semantic clustering | illustrative | Grouping functions by intent rather than by text exposes misplaced code that duplicate detection misses, and Copilot moves it. |
+| Spec · Model · Test | illustrative | Specification requirements become TLA+ invariants; model checking explores every state, and its traces become conformance tests. |
+| Go Fan | illustrative | A daily agent compares each Go dependency's releases with how the code uses it and files review issues that Copilot turns into fixes. |
+| Spec-driven testing | illustrative | Agents keep specifications current from human intent and code changes, and an enforcer turns the specification into tests that guard the next change. |
+| Docs that heal | illustrative | Small agents update, simplify and test documentation the way a newcomer reads it, then fix the gaps and teach the updater new rules. |
+| Speak · Map · Grep | illustrative | A dictation glossary maps misheard speech-to-text phrases to exact identifiers, so spoken prompts produce terms agents can grep. |
+| Scan · Fix · Learn | illustrative | The .NET runtime team's CI health loop: a scanner files known build errors, a fixer attempts fixes, and a feedback agent tunes both. |
+| For PMs | illustrative | Agentic workflows also serve product managers: an existing team habit triggers an agent, which leaves an artifact for a human to decide on. |
+| If every PR needs deep human review, you don’t trust your process. | illustrative | Trust the process: if every pull request needs deep human review, improve checks, agent reviewers and tests until a skim is enough. |
+| Cost Optimization |  | Band header (Cost Optimization): debug, spend less and route smarter. |
+| Cost management | illustrative | Cut agent spend by scheduling less often, fetching data in deterministic steps, capping credits, using sub-agents and routing models. |
+| Model routing | illustrative | With model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
+| DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
+| Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |
+| Agentic Engineering |  | Band header (Agentic Engineering): give agents memory, expiry, search and measurement. |
+| Agents that debug agents | illustrative | The agentic-workflows MCP server exposes logs, audit and audit-diff so any agent can debug, audit and optimize other workflows from unified sessions. |
+| Any agent, any provider | illustrative | One Markdown workflow switches its coding agent and model provider with two front matter lines while keeping the same guardrails. |
+| Agent memory | illustrative | Configured memories are restored read-only into each run, and trusted jobs persist cache, repository, comment and ledger memory afterward. |
+| Durable execution | illustrative | Durable execution checkpoints the agent's native session, even after a failed step, so a rerun resumes the session instead of starting over. |
+| Ephemerals | illustrative | Safe outputs carry their own end, so old reports, discussions, comments and drafts close or collapse automatically and human attention is protected. |
+| Index & search | illustrative | A non-agentic job builds a search index and the agent gets read-only query access, cutting the tokens spent reading whole files. |
+| Imports & reuse | illustrative | Shared Markdown components are written and reviewed once, imported by path or from another repository at a ref, and merged and hashed by the compiler. |
+| Experiments, graders & evals | illustrative | A/B experiments assign a workflow variant to each run, graders measure every run, and evals judge which variant is better. |
+| Enterprise |  | Band header (Enterprise): any agent, any provider, any scale. |
+| Infrastructure as code | illustrative | Workflows compile to plain Actions YAML, so they run on any runner, reuse the Actions ecosystem and keep enterprise controls, with the agent behind the firewall. |
+| OpenTelemetry | illustrative | Agentic workflows export OpenTelemetry traces to collectors you run, configured per workflow or as an organization default. |
+| GitHub-native governance | illustrative | Defaults and policy variables are set at enterprise, organization or repository scope and enforced with GitHub controls such as protected environments. |
+| Operator-owned infrastructure | illustrative | Operators run agentic jobs on their own Linux runners, on Kubernetes, or in air-gapped networks with mirrored actions and container images. |
+| Push SDLC | illustrative | A task arrives with its own squad of human-led AI agents that join the developer's repository, pair with them, then step back and leave their decisions behind. |
+| Connectors | illustrative | A connector declares everything a third-party service offers; a workflow imports it and selects only the reads and writes it needs. |
+| Central Agentic Ops |  | Band header (Central Agentic Ops): gh cao, a research prototype for operating agentic workflows across many repositories. |
+| Hyperscale Agentics | illustrative | Research prototype: at enterprise scale every agent run reports into telemetry, an operations database and a session data lake, so fleets are managed from aggregates. |
+| Centralized campaigns | illustrative | Research prototype: a control repository installs and tracks campaigns that roll agentic processes out across an enterprise's repositories. |
+| AW maintenance | illustrative | Research prototype: maintenance loops keep a fleet of agentic workflows healthy by updating versions, fixing drifted lock files, clustering failures and optimizing tokens. |
+| Session data lake | illustrative | Research prototype: with opt-in, redacted run sessions land in an immutable, queryable data lake kept separate from the dashboard store. |
+| Ops data for Agents | illustrative | Research prototype: agents query operations data through a constrained dashboard language and a read-only MCP server to find and optimize the costliest workflows. |
+| AW factory |  | Band header (AW factory): measured history of how gh-aw builds itself with agentic workflows. |
+| First commit to GA |  | Measured history of gh-aw from its first commit to general availability, showing how much of the work agents and workflows started. |
+| How PRs land |  | Measured time to merge and size of gh-aw pull requests, compared by whether people, Copilot or workflows started them. |
+| How workflows evolve |  | Measured history of how gh-aw's own workflow Markdown changed and grew over time. |
+| Patch to PR | illustrative | The create-pull-request safe output turns an agent's local commits into a pull request through scanning, file policy checks and signed pushes, falling back to issues. |
+| GıtHub Agentic Workflows | illustrative | Finale: a control repository coordinates small, guarded agentic processes across many repositories; processes, not prompts. |
