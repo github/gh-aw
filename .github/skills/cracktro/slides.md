@@ -43,17 +43,18 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 | Scan · Fix · Learn | illustrative |
 | For PMs | illustrative |
 | If every PR needs deep human review, you don’t trust your process. | illustrative |
-| Cost & context |  |
+| Cost Optimization |  |
 | Cost management | illustrative |
 | Model routing | illustrative |
-| Agents that debug agents | illustrative |
+| DeterministicOps | illustrative |
+| Audit & Optimize | illustrative |
 | Agentic Engineering |  |
+| Agents that debug agents | illustrative |
 | Any agent, any provider | illustrative |
 | Agent memory | illustrative |
 | Ephemerals | illustrative |
 | Index & search | illustrative |
 | Experiments, graders & evals | illustrative |
-| Audit & Optimize | illustrative |
 | Enterprise |  |
 | Infrastructure as code | illustrative |
 | OpenTelemetry | illustrative |
