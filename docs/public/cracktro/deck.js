@@ -2184,7 +2184,7 @@
   .ops-own { position: absolute; left: 110px; right: 110px; top: 990px; font: 500 21px/1.3 var(--mono); color: #9198a1; opacity: 0; }
   .ops-own b { color: #d29922; font-weight: 600; }
   .active .ops-own { animation: rise .7s cubic-bezier(.2,.9,.2,1) both 1.3s; }
-  /* --- enterprise diagrams: distributed tracing, many repositories, App permissions, token broker, webhook gateway (shared xsv vocabulary) --- */
+  /* --- enterprise diagrams: distributed tracing, App permissions, token broker, webhook gateway (shared xsv vocabulary) --- */
   .xsv { position: absolute; left: 110px; top: 290px; width: 1700px; height: 700px; overflow: visible; opacity: 0; }
   .active .xsv { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .3s; }
   .xsv text { fill: #9198a1; font: 500 16px var(--mono); }
@@ -2207,8 +2207,7 @@
   .xbadge { position: absolute; right: 110px; top: 76px; display: flex; align-items: center; gap: 12px; padding: 12px 22px; border: 2px dashed #f0883e; border-radius: 999px; background: #0d1117cc; font: 600 18px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #f0883e; z-index: 5; }
   .xbadge span { color: #9198a1; letter-spacing: .04em; text-transform: none; padding-left: 12px; border-left: 1px solid #3d444d; }
   .dtr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #f0883e, #ab7df8, #79c0ff, #f0883e); }
-  .omr .slide-head h2, .gap .slide-head h2 { font-size: 100px; }
-  .omr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #79c0ff, #3fb950, #ab7df8); }
+  .gap .slide-head h2 { font-size: 100px; }
   .gap .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #d29922, #ff7b72, #3fb950); }
   .otb .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #3fb950, #d29922, #79c0ff); }
   .whg .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #56d4dd, #ab7df8, #f0883e, #56d4dd); }
@@ -12051,7 +12050,7 @@
     });
   }
 
-  // Enterprise diagram helpers shared by Distributed tracing, One agent many repositories, GitHub App permissions,
+  // Enterprise diagram helpers shared by Distributed tracing, GitHub App permissions,
   // OIDC token broker and Webhook gateway: one SVG, parts that light step by step ([data-s], optional end [data-e]),
   // and packets that travel along [data-p] paths to arrive at that step.
   const xSvg = inner => {
@@ -12203,7 +12202,7 @@
     r += `<text x="${R + 28}" y="640">grouped by episode, hop and run attempt</text>`;
     g += `<g data-s="8" style="--hc:#f0883e">${r}</g>`;
     const svg = xSvg(g);
-    const stage = xStage(svg, 9, 900, 5200, k => (k === 6 || k === 7 ? sfx.route(k) : sfx.pop(k)));
+    const stage = xStage(svg, 9, 900, 5200, k => (k === 6 || k === 7 ? sfx.route(k - 5) : sfx.pop(k)));
     const el = h(
       "section",
       { class: "slide dtr" },
@@ -12310,83 +12309,6 @@
     if (s.key === "observability") pushTracingSlide();
   }
 
-  // One agent, many repositories: a coordinator reads three repositories, dispatches each one's worker, the workers open
-  // pull requests through safe outputs, each PR is validated and merged on its own, and status returns to one campaign
-  {
-    resetIndex();
-    const LANES = [
-      [
-        "octo-org/api",
-        "#3fb950",
-        [
-          ["#41", "bump yaml parser", 0, 1],
-          ["#42", "pin action versions", 0, 0],
-        ],
-      ],
-      [
-        "octo-org/web",
-        "#79c0ff",
-        [
-          ["#87", "bump yaml parser", 0, 1],
-          ["#88", "update lockfile", 1, 0],
-        ],
-      ],
-      ["octo-org/docs", "#d29922", [["#19", "refresh examples", 0, 1]]],
-    ];
-    const laneY = i => 20 + i * 195;
-    let g = "";
-    // coordinator
-    g += `<g data-s="0" style="--hc:#ab7df8"><rect class="card" x="0" y="160" width="340" height="320" rx="16" style="stroke:#ab7df8;stroke-width:2.5"/>`;
-    g += `<text class="k" x="24" y="198" style="fill:#ab7df8">coordinator</text><text class="t" x="24" y="234">octo-org/platform</text>`;
-    g += ["reads via tools.github", "allowed-repos: 3 repos", "dispatch-workflow", "  → each repo's worker"].map((l, j) => `<text x="24" y="${276 + j * 30}" xml:space="preserve">${l}</text>`).join("");
-    g += `</g>`;
-    g += `<g data-s="8" class="x" style="--hc:#3fb950"><text class="m" x="24" y="452" style="fill:#3fb950">3 merged · 2 open</text></g>`;
-    LANES.forEach(([repo, c, prs], i) => {
-      const y = laneY(i),
-        mid = y + 85;
-      g += `<path class="ln" data-s="1" data-p="1" data-c="#3fb950" d="M340 290 C392 290 392 ${mid - 10} 440 ${mid - 10}" style="stroke:#3fb950;stroke-dasharray:3 7"/>`;
-      g += `<path class="ln dash" data-s="2" data-p="2" data-c="#ab7df8" d="M340 350 C392 350 392 ${mid + 10} 440 ${mid + 10}" style="stroke:#ab7df8"/>`;
-      g += `<g data-s="2" style="--hc:${c}"><rect class="card" x="440" y="${y + 20}" width="300" height="130" rx="14" style="stroke:${c};stroke-width:2"/><text class="t" x="464" y="${y + 60}">${repo}</text><text class="m" x="464" y="${y + 94}">worker workflow</text><text x="464" y="${y + 126}">own CI · own reviewers</text></g>`;
-      prs.forEach(([no, title, fails, merges], j) => {
-        const x = 790 + j * 360,
-          s = 3 + j,
-          cy = y + 30;
-        g += `<g data-s="${s}" style="--hc:${c}"><rect class="card" x="${x}" y="${cy}" width="330" height="110" rx="12"/><text class="m" x="${x + 18}" y="${cy + 34}"><tspan style="fill:${c}">${no}</tspan> ${title}</text><text x="${x + 18}" y="${cy + 96}" style="font-size:14px">safe output · create-pull-request</text></g>`;
-        const st = (txt, col, a, b) => `<text class="x" data-s="${a}"${b ? ` data-e="${b}"` : ""} x="${x + 18}" y="${cy + 66}" style="fill:${col}">${txt}</text>`;
-        g += st("○ ci running", "#9198a1", s, 5);
-        if (fails) g += st("✗ ci failed", "#ff7b72", 5, 7) + st("✓ fixed, re-run", "#3fb950", 7);
-        else g += st("✓ ci passed", "#3fb950", 5);
-        g += `<text class="x" data-s="7" x="${x + 312}" y="${cy + 66}" text-anchor="end" style="fill:${merges ? "#ab7df8" : "#d29922"};--hc:${merges ? "#ab7df8" : "#d29922"}">${merges ? "merged" : "in review"}</text>`;
-      });
-      if (prs.length < 2)
-        g += `<g data-s="4"><rect x="1150" y="${y + 30}" width="330" height="110" rx="12" fill="none" stroke="#3d444d" stroke-dasharray="8 7"/><text x="1315" y="${y + 92}" text-anchor="middle">nothing else to change</text></g>`;
-      g += `<path class="ln" data-s="6" data-p="6" data-c="${c}" d="M1480 ${mid} H1620 V610" style="stroke:${c};stroke-width:2"/>`;
-    });
-    // campaign board and the status loop back to the coordinator
-    g += `<g data-s="6" style="--hc:#ab7df8"><rect class="card" x="0" y="610" width="1700" height="84" rx="14" style="stroke:#ab7df8"/><text class="k" x="380" y="646" style="fill:#ab7df8">campaign · tracker_id deps-upgrade</text><text x="380" y="676">labels + title prefix tie every PR to one campaign · each PR merges on its own</text></g>`;
-    g += `<text class="m x" data-s="6" data-e="8" x="1680" y="664" text-anchor="end">5 PRs · 1 check failing</text>`;
-    g += `<text class="m x" data-s="8" x="1680" y="664" text-anchor="end" style="fill:#3fb950">5 PRs · 3 merged · 2 open</text>`;
-    g += `<path class="ln" data-s="8" data-p="8" data-c="#ab7df8" d="M170 610 V480" style="stroke:#ab7df8"/>`;
-    g += `<text class="x" data-s="8" x="186" y="552">next run reads PR states</text>`;
-    const svg = xSvg(g);
-    const stage = xStage(svg, 9, 950, 5200, k => (k === 5 ? sfx.block(false) : k === 2 || k === 6 || k === 8 ? sfx.route(k) : sfx.pop(k)));
-    const el = h(
-      "section",
-      { class: "slide omr" },
-      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Cross-repository orchestration · one campaign"), h("h2", {}, letters("One agent, "), letters("many repositories", "l-grad"))),
-      svg,
-      h("div", { class: "xcap" }, h("b", {}, "No atomic cross-repo merge:"), h("span", {}, "workers run independently"), h("span", {}, "each repo's CI validates its PR"), h("span", {}, "status returns on the next run"))
-    );
-    slides.push({
-      group: "enterprise",
-      notes:
-        "One agent, many repositories. A coordinating workflow in a central repository reads several repositories through the GitHub tools, limited by allowed-repos, and stays read-only. It decides what each repository needs and emits dispatch-workflow safe outputs; with target-repo and allowed-repos the dispatch can cross repositories, and GitHub checks that the worker exists when it fires. Each worker is a repository-specific workflow running as its own independent run with its own token, and it opens pull requests through the create-pull-request safe output. Every pull request is validated by that repository's own CI and reviewers: here one check fails and is fixed by a new commit while the others pass. Nothing is merged atomically across repositories; each pull request merges on its own schedule, so the campaign must tolerate partial completion. A tracker id passed as a dispatch input, plus labels or a title prefix, ties the pull requests together, and the coordinator's next run reads their states back, optionally onto a project board, which is experimental. This is the generally available building block; the Centralized campaigns slide later shows the research prototype. Repositories, pull requests and timing are synthetic and illustrative.",
-      enter: () => stage.enter(),
-      tick: t => stage.tick(t),
-      el,
-    });
-  }
-
   // GitHub App permissions: one App installed on selected repositories mints short-lived, scoped tokens; the agent reads,
   // a separate safe-outputs writer writes only where its token reaches, and a request for another repository is refused
   {
@@ -12473,6 +12395,7 @@
         "GitHub App permissions. Instead of a long-lived personal token, a workflow names a GitHub App with a client id and a private key kept in secrets. The App is installed on selected repositories only. At job start gh-aw mints a short-lived installation token and revokes it when the job ends, even on failure. The token for the agent's GitHub tools matches the job's read permissions, so the agent can read but never write; writes happen in the separate safe-outputs job, whose token is minted with only the permissions those outputs need, and a single handler can even use its own App. Each token also lists its repositories: omitted means the current repository, a list narrows it, and a wildcard means the whole installation. That is why access to one repository does not authorize anything in another: the App must be installed there, the token must be minted for it, the job must hold the permission, and allowed-repos or target-repo must name it. Here the writer may open a pull request in api, but a comment in web is refused because its token was minted for api only, and billing is out of reach because the App is not installed there. Repositories and requests are synthetic and illustrative.",
       enter() {
         stage.enter();
+        svg.querySelectorAll(".cell.probe").forEach(c => c.classList.remove("probe"));
         ttl.forEach(r => (r.style.transform = "scaleX(1)"));
       },
       tick(t) {
@@ -14377,7 +14300,7 @@
     ["exclusive: no other trigger", "roles: write or higher", "items read as untrusted", "not the MCP gateway"].forEach((l, j) => (g += `<text class="m" x="1264" y="${548 + j * 36}">${l}</text>`));
     g += `</g>`;
     const svg = xSvg(g);
-    const stage = xStage(svg, 8, 950, 4800, k => (k === 2 ? sfx.block(true) : k >= 5 ? sfx.route(k) : sfx.pop(k)));
+    const stage = xStage(svg, 8, 950, 4800, k => (k === 2 ? sfx.block(true) : k >= 5 ? sfx.route(1 + (k % 2)) : sfx.pop(k)));
     const el = h(
       "section",
       { class: "slide whg" },

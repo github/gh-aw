@@ -294,14 +294,13 @@ test("keeps every key on the host side of the zero-secret agents diagram", async
 
 test("places the enterprise tracing, access and event slides beside their neighbours", async ({ page }) => {
   expect(slideNo("Distributed tracing")).toBe(slideNo("OpenTelemetry") + 1);
-  expect(slideNo("GitHub App permissions")).toBe(slideNo("One agent, many repositories") + 1);
+  expect(slideNo("GitHub App permissions")).toBe(slideNo("Operator-owned infrastructure") + 1);
   expect(slideNo("OIDC token broker")).toBe(slideNo("GitHub App permissions") + 1);
   expect(slideNo("Webhook gateway")).toBe(slideNo("Connectors") + 1);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   const NEW: [string, string | null][] = [
     ["Distributed tracing", null],
-    ["One agent, many repositories", null],
     ["GitHub App permissions", null],
     ["OIDC token broker", "Experimental"],
     ["Webhook gateway", "Experimental"],
@@ -322,6 +321,17 @@ test("places the enterprise tracing, access and event slides beside their neighb
   await expect(page.locator(".count")).toHaveText(at(slideNo("Distributed tracing")));
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".slide.active h2")).toHaveText("GitHub-native governance");
+  expect(errors).toEqual([]);
+});
+
+test("keeps the frame loop running through the routed steps of the enterprise diagrams", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  for (const heading of ["Distributed tracing", "Webhook gateway"]) {
+    await page.goto(`/gh-aw/cracktro/#${slideNo(heading)}`);
+    await expect(page.locator(".slide.active h2")).toHaveText(heading);
+    await expect(page.locator(".slide.active .xsv [data-s='7'].on").first()).toBeAttached({ timeout: 12_000 });
+  }
   expect(errors).toEqual([]);
 });
 

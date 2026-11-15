@@ -69,7 +69,6 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Distributed tracing | illustrative | One shared trace follows a task from its workflow runs and jobs through agent sessions, tool calls, retries and dispatched runs in other repositories, with outcomes and cost on every span. |
 | GitHub-native governance | illustrative | Defaults and policy variables are set at enterprise, organization or repository scope and enforced with GitHub controls such as protected environments. |
 | Operator-owned infrastructure | illustrative | Operators run agentic jobs on their own Linux runners, on Kubernetes, or in air-gapped networks with mirrored actions and container images. |
-| One agent, many repositories | illustrative | A coordinating agent dispatches work to workflows in several repositories, each worker opens and validates its own pull request, and a campaign tracks them together without atomic merging. |
 | GitHub App permissions | illustrative | A GitHub App installed on selected repositories mints short-lived scoped tokens, keeping the agent read-only and leaving writes to trusted safe-output jobs in each repository. |
 | OIDC token broker | illustrative | Experimental: a deployment-owned broker verifies a job's OIDC identity and returns a short-lived credential, so no long-lived secret is stored in the repository. |
 | Push SDLC | illustrative | A task arrives with its own squad of human-led AI agents that join the developer's repository, pair with them, then step back and leave their decisions behind. |
