@@ -292,6 +292,39 @@ test("keeps every key on the host side of the zero-secret agents diagram", async
   expect(errors).toEqual([]);
 });
 
+test("places the enterprise tracing, access and event slides beside their neighbours", async ({ page }) => {
+  expect(slideNo("Distributed tracing")).toBe(slideNo("OpenTelemetry") + 1);
+  expect(slideNo("GitHub App permissions")).toBe(slideNo("One agent, many repositories") + 1);
+  expect(slideNo("OIDC token broker")).toBe(slideNo("GitHub App permissions") + 1);
+  expect(slideNo("Webhook gateway")).toBe(slideNo("Connectors") + 1);
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  const NEW: [string, string | null][] = [
+    ["Distributed tracing", null],
+    ["One agent, many repositories", null],
+    ["GitHub App permissions", null],
+    ["OIDC token broker", "Experimental"],
+    ["Webhook gateway", "Experimental"],
+  ];
+  for (const [heading, badge] of NEW) {
+    const n = slideNo(heading);
+    await page.goto(`/gh-aw/cracktro/#${n}`);
+    await expect(page.locator(".count")).toHaveText(at(n));
+    const slide = page.locator(".slide.active");
+    await expect(slide.locator("h2")).toHaveText(heading);
+    await expect(slide.locator(".xsv")).toBeVisible();
+    await expect(slide.locator(".xsv [data-s]").first()).toBeAttached();
+    if (badge) await expect(slide.locator(".xbadge")).toContainText(badge);
+    else await expect(slide.locator(".xbadge")).toHaveCount(0);
+  }
+  // Arrow navigation reaches the slide after each new one.
+  await page.goto(`/gh-aw/cracktro/#${slideNo("Distributed tracing")}`);
+  await expect(page.locator(".count")).toHaveText(at(slideNo("Distributed tracing")));
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".slide.active h2")).toHaveText("GitHub-native governance");
+  expect(errors).toEqual([]);
+});
+
 test.describe("slides.md metadata", () => {
   const table = (...rows: string[]) => ["# Slides", "", "| Heading | Notes | Summary |", "|---|---|---|", ...rows, ""].join("\n");
 
