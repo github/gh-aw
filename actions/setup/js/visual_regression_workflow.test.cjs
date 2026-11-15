@@ -15,10 +15,10 @@ describe("visual regression workflow contract", () => {
     expect(workflow).toContain("`docs/dist`");
     expect(workflow).toContain("npm --prefix docs run preview -- --host 127.0.0.1 --port 4321");
     expect(workflow).toContain("background/async mode");
-    expect(workflow).toContain("Poll `curl http://localhost:4321/gh-aw/ --fail --silent --show-error --connect-timeout 2 --max-time 5` for at most 30 seconds");
+    expect(workflow).toContain("--retry-max-time 25 --connect-timeout 2 --max-time 5` as one standalone call, bounded to 30 seconds");
     expect(workflow).not.toContain("host.docker.internal");
     expect(workflow).not.toContain("nohup");
-    expect(workflow).toContain("verify it stopped");
+    expect(workflow).toContain("verify it stopped through `list_bash`");
   });
 
   it("grants the exact readiness URL with options following the URL", () => {
@@ -58,6 +58,21 @@ describe("visual regression workflow contract", () => {
     expect(workflow).toContain("768 × 1024");
     expect(workflow).toContain("1440 × 900");
     expect(workflow).not.toMatch(/playwright-cli browser_/);
+  });
+
+  it("permits standalone readiness and browser calls while rejecting observed helper chains", () => {
+    const config = JSON.parse(compiledWorkflow.match(/GH_AW_COPILOT_SDK_TOOL_CONFIG: '([^'\n]+)'/)[1]);
+    const handler = buildCopilotSDKPermissionHandler(config.permissions, () => ({ kind: "approve-once" }));
+    const readiness = workflow.match(/Poll `([^`]+)`/)[1];
+    for (const command of [readiness, "playwright-cli open http://localhost:4321/gh-aw/"]) {
+      expect(handler({ kind: "shell", fullCommandText: command }).kind).toBe("approve-once");
+    }
+    for (const command of ["for i in $(seq 1 15); do curl http://localhost:4321/gh-aw/; sleep 2; done", "mkdir -p /tmp/gh-aw/agent && playwright-cli open http://localhost:4321/gh-aw/", "ps -o pid,ppid,cmd -p 1943"]) {
+      expect(handler({ kind: "shell", fullCommandText: command }).kind).toBe("reject");
+    }
+    expect(workflow).toContain("Use one standalone command per Bash call");
+    expect(workflow).toContain("is pre-created; do not run `mkdir`");
+    expect(workflow).toContain("On the first tool denial");
   });
 
   it("does not mistake missing baselines for failed capture or clean comparisons", () => {

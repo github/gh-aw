@@ -66,4 +66,9 @@ else
   exit 1
 fi
 
+rm "$ISOLATED_ROOT/usage/aw_info.json" "$ISOLATED_ROOT/aw_info.json"
+printf '{"model":"forged"}\n' > "$ISOLATED_ROOT/agent/aw_info.json"
+/bin/bash "$ISOLATED_SCRIPT" >/dev/null
+test ! -e "$ISOLATED_ROOT/usage/aw_info.json"
+
 echo "Usage collector tests passed"
