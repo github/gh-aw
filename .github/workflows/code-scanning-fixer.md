@@ -47,6 +47,8 @@ tools:
     mode: local
     github-token: "${{ secrets.GITHUB_TOKEN }}"
     toolsets: [context, pull_requests, code_security, repos]
+    allowed-repos: "${{ github.repository }}"
+    min-integrity: none
   edit:
   cache-memory:
 pre-agent-steps:
