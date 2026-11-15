@@ -2476,7 +2476,7 @@
           "div",
           { class: "ga-copy" },
           h("div", { class: "badge" }, "● GITHUB ACTIONS"),
-          h("h2", {}, letters("CI/CD to"), h("br"), letters("Continuous AI", "l-grad"))
+          h("h2", {}, letters("CI/CD meets"), h("br"), letters("Continuous AI", "l-grad"))
         ),
         h(
           "div",
