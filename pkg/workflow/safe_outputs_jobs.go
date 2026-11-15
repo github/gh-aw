@@ -129,7 +129,7 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 		safeOutputsJobsLog.Printf("No custom condition provided, using default for job: %s", config.JobName)
 		jobCondition = BuildSafeOutputType(config.JobName)
 	}
-	jobCondition = requireSafeOutputsAgentSuccess(jobCondition, data.SafeOutputs)
+	jobCondition = requirePublicationAgentSuccess(jobCondition, data.SafeOutputs, config.JobName)
 
 	// Determine job needs
 	needs := config.Needs

@@ -123,15 +123,34 @@ describe("main", () => {
 
   it("uses a canonical workflow link when the existing marker contains only a numeric run ID", async () => {
     global.context.payload.issue.body = "<!-- gh-aw-agentic-workflow: my-workflow, id: 456 -->";
+    const replayModule = req("./apply_safe_outputs_replay.cjs");
+    const originalMain = replayModule.main;
+    replayModule.main = vi.fn().mockResolvedValue(undefined);
+    try {
+      await main();
+      expect(process.env.GH_AW_RUN_URL).toBe("456");
+      expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining("[run `456`](https://github.com/test-owner/test-repo/actions/runs/456)"),
+        })
+      );
+    } finally {
+      replayModule.main = originalMain;
+    }
+  });
 
-    await main();
-
-    expect(process.env.GH_AW_RUN_URL).toBe("456");
-    expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith(
-      expect.objectContaining({
-        body: expect.stringContaining("[run `456`](https://github.com/test-owner/test-repo/actions/runs/456)"),
-      })
-    );
+  it("does not report success or remove the label when recorded gate authorization fails", async () => {
+    const replayModule = req("./apply_safe_outputs_replay.cjs");
+    const originalMain = replayModule.main;
+    replayModule.main = vi.fn().mockRejectedValue(new Error("Missing recorded write gate verdict; refusing replay"));
+    try {
+      await main();
+      expect(mockCore.setFailed).toHaveBeenCalled();
+      expect(mockGithub.rest.issues.removeLabel).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("have been applied") }));
+    } finally {
+      replayModule.main = originalMain;
+    }
   });
 
   it("skips silently when event type is not 'issues'", async () => {

@@ -421,6 +421,9 @@ func (c *Compiler) finalizeBuiltJobs(data *WorkflowData) error {
 	c.ensureDriveMemoryJobPermissions(data)
 	c.ensureDurableArtifactJobPermissions(data)
 	c.annotateGeneratedJobs(data)
+	if err := c.addWriteGateRecordSteps(data); err != nil {
+		return err
+	}
 	if err := c.finalizeConclusionJobInventory(); err != nil {
 		return err
 	}
