@@ -46,8 +46,34 @@ func analyzeFunction(pass *analysis.Pass, body *ast.BlockStmt, generatedFiles fi
 		return
 	}
 
+	decodeCallsByDecoder := collectDecodeCalls(pass, body)
+	var firstDecodes []*ast.CallExpr
+	for _, calls := range decodeCallsByDecoder {
+		slices.SortFunc(calls, func(a, b *ast.CallExpr) int {
+			return int(a.Pos() - b.Pos())
+		})
+		if len(calls) > 1 && decodeChecksEOF(pass, body, calls[1]) { //nolint:uncheckedsliceindex // len(calls) > 1 guards the second Decode.
+			continue
+		}
+		firstDecodes = append(firstDecodes, calls[0]) //nolint:uncheckedsliceindex // entries are created only when a Decode call is appended.
+	}
+
+	slices.SortFunc(firstDecodes, func(a, b *ast.CallExpr) int {
+		return int(a.Pos() - b.Pos())
+	})
+	for _, firstDecode := range firstDecodes {
+		pos := pass.Fset.PositionFor(firstDecode.Pos(), false)
+		if filecheck.ShouldSkipFilename(pos.Filename, generatedFiles) ||
+			nolint.HasDirectiveForLinter(pos, noLintIndex, linterName) {
+			continue
+		}
+		pass.ReportRangef(firstDecode, "first Decode on an in-memory JSON reader must be followed by a Decode that checks for io.EOF to reject trailing JSON data")
+	}
+}
+
+func collectDecodeCalls(pass *analysis.Pass, body *ast.BlockStmt) map[types.Object][]*ast.CallExpr {
 	decoders := make(map[types.Object]struct{})
-	var decodeCallsByDecoder = make(map[types.Object][]*ast.CallExpr)
+	decodeCallsByDecoder := make(map[types.Object][]*ast.CallExpr)
 	ast.Inspect(body, func(node ast.Node) bool {
 		if _, ok := node.(*ast.FuncLit); ok {
 			return false
@@ -90,29 +116,7 @@ func analyzeFunction(pass *analysis.Pass, body *ast.BlockStmt, generatedFiles fi
 		}
 		return true
 	})
-
-	var firstDecodes []*ast.CallExpr
-	for _, calls := range decodeCallsByDecoder {
-		slices.SortFunc(calls, func(a, b *ast.CallExpr) int {
-			return int(a.Pos() - b.Pos())
-		})
-		if len(calls) > 1 && decodeChecksEOF(pass, body, calls[1]) {
-			continue
-		}
-		firstDecodes = append(firstDecodes, calls[0])
-	}
-
-	slices.SortFunc(firstDecodes, func(a, b *ast.CallExpr) int {
-		return int(a.Pos() - b.Pos())
-	})
-	for _, firstDecode := range firstDecodes {
-		pos := pass.Fset.PositionFor(firstDecode.Pos(), false)
-		if filecheck.ShouldSkipFilename(pos.Filename, generatedFiles) ||
-			nolint.HasDirectiveForLinter(pos, noLintIndex, linterName) {
-			continue
-		}
-		pass.ReportRangef(firstDecode, "first Decode on an in-memory JSON reader must be followed by a Decode that checks for io.EOF to reject trailing JSON data")
-	}
+	return decodeCallsByDecoder
 }
 
 func inMemoryDecoderObject(pass *analysis.Pass, lhs ast.Expr, rhs ast.Expr) types.Object {
@@ -124,7 +128,7 @@ func inMemoryDecoderObject(pass *analysis.Pass, lhs ast.Expr, rhs ast.Expr) type
 	if !ok || !isPackageCall(pass, decoder, "encoding/json", "NewDecoder") || len(decoder.Args) != 1 {
 		return nil
 	}
-	reader, ok := astutil.UnwrapParenExpr(decoder.Args[0]).(*ast.CallExpr)
+	reader, ok := astutil.UnwrapParenExpr(decoder.Args[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // len(decoder.Args) == 1 is checked above.
 	if !ok || len(reader.Args) != 1 {
 		return nil
 	}
@@ -173,7 +177,7 @@ func decodeChecksEOF(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExp
 					continue
 				}
 				if obj := decodeErrorObject(pass, stmt, call); obj != nil {
-					if next, ok := block.List[i+1].(*ast.IfStmt); ok && conditionChecksEOF(pass, next.Cond, obj) {
+					if next, ok := block.List[i+1].(*ast.IfStmt); ok && conditionChecksEOF(pass, next.Cond, obj) { //nolint:uncheckedsliceindex // i+1 < len(block.List) is checked above.
 						checked = true
 						return false
 					}
@@ -187,10 +191,10 @@ func decodeChecksEOF(pass *analysis.Pass, body *ast.BlockStmt, call *ast.CallExp
 
 func decodeErrorObject(pass *analysis.Pass, stmt ast.Stmt, call *ast.CallExpr) types.Object {
 	assign, ok := stmt.(*ast.AssignStmt)
-	if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 || astutil.UnwrapParenExpr(assign.Rhs[0]) != call {
+	if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 || astutil.UnwrapParenExpr(assign.Rhs[0]) != call { //nolint:uncheckedsliceindex // both assignment lengths are checked above.
 		return nil
 	}
-	ident, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(assign.Lhs[0]).(*ast.Ident) //nolint:uncheckedsliceindex // len(assign.Lhs) == 1 is checked above.
 	if !ok || ident.Name == "_" {
 		return nil
 	}
@@ -211,7 +215,7 @@ func conditionChecksEOF(pass *analysis.Pass, condition ast.Expr, errorObject typ
 			}
 		case *ast.CallExpr:
 			if isPackageCall(pass, node, "errors", "Is") && len(node.Args) == 2 {
-				found = sameObject(pass, node.Args[0], errorObject) && isIOEOF(pass, node.Args[1])
+				found = sameObject(pass, node.Args[0], errorObject) && isIOEOF(pass, node.Args[1]) //nolint:uncheckedsliceindex // len(node.Args) == 2 is checked above.
 			}
 		}
 		return !found
