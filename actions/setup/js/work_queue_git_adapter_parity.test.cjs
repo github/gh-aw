@@ -16,6 +16,7 @@ const patch = require("./git_patch_utils.cjs");
 const scanning = require("./work_queue_code_scanning.cjs");
 const coverage = require("./work_queue_code_coverage.cjs");
 const assets = require("./work_queue_upload_assets.cjs");
+const { createAssetGitFixture } = require("./work_queue_asset_git.test_helpers.cjs");
 const { main: prepareScript } = require("./work_queue_prepare_claim_script.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 
@@ -346,47 +347,19 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
     expect(new Set(uploadedLabels).size).toBe(count);
   });
 
-  it.skipIf(process.platform === "win32")("publishes independently namespaced assets and verifies only the original private Claim receipt", async () => {
+  it.skipIf(process.platform === "win32")("publishes independently namespaced files on work-queue and verifies only the original private Claim receipt", async () => {
     simulateLinuxAssetDescriptors();
     const original = assignment(count);
     const root = directory();
-    const refs = new Map();
-    const trees = new Map();
-    const commits = new Map();
-    const blobs = new Map();
+    const {
+      api,
+      state: { refs },
+    } = createAssetGitFixture(root);
     const results = [];
-    const sha = value => crypto.createHash("sha1").update(JSON.stringify(value)).digest("hex");
     const github = {
       rest: {
         repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
-        git: {
-          getRef: async input => {
-            if (!refs.has(input.ref)) throw Object.assign(new Error("missing ref"), { status: 404 });
-            return { data: { object: { sha: refs.get(input.ref) } } };
-          },
-          createBlob: async input => {
-            const id = sha(input);
-            blobs.set(id, input.content);
-            return { data: { sha: id } };
-          },
-          createTree: async input => {
-            const id = sha(input);
-            trees.set(id, input.tree);
-            return { data: { sha: id } };
-          },
-          createCommit: async input => {
-            const id = sha(input);
-            commits.set(id, { sha: id, tree: { sha: input.tree }, parents: input.parents.map(parent => ({ sha: parent })) });
-            return { data: { sha: id } };
-          },
-          createRef: async input => {
-            refs.set(input.ref.slice(5), input.sha);
-            return { data: { object: { sha: input.sha } } };
-          },
-          getCommit: async input => ({ data: commits.get(input.commit_sha) }),
-          getTree: async input => ({ data: { sha: input.tree_sha, truncated: false, tree: trees.get(input.tree_sha) } }),
-          getBlob: async input => ({ data: { sha: input.file_sha, encoding: "base64", content: blobs.get(input.file_sha) } }),
-        },
+        git: api,
       },
     };
     for (const member of original.claims) {
@@ -394,7 +367,7 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
       fs.mkdirSync(reportRoot, { recursive: true });
       fs.writeFileSync(path.join(reportRoot, digest("same.png") + ".png"), member.work.input);
       await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize: allow, effects: [] }, async () => {
-        const handler = await assets.main({ "assets-dir": root, "target-repo": "owner/repo", branch: "assets/audit" }, github);
+        const handler = await assets.main({ "assets-dir": root, "target-repo": "owner/repo" }, github);
         const message = { type: "upload_asset", ...(count > 1 ? { claim_handle: member.handle } : {}), path: "same.png" };
         const result = await handler(message);
         results.push(result);
@@ -404,8 +377,8 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
         if (results.length > 1) expect((await assets.verifyAssetDelivery({ claim: member, result: results[0], github })).verified).toBe(false);
       });
     }
-    expect(refs.size).toBe(count);
-    expect(new Set(results.map(result => result.branch)).size).toBe(count);
+    expect(refs.size).toBe(1);
+    expect(new Set(results.map(result => result.branch))).toEqual(new Set(["work-queue"]));
     expect(new Set(results.map(result => result.path)).size).toBe(count);
   });
 });

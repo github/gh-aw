@@ -709,7 +709,7 @@ async function reconcileOrphanIssues(options, current, config) {
 function projectionFailureReason(error) {
   const explanations = {
     projection_field_pending: "The configured Issue field could not be synchronized",
-    projection_coordination_pending: "Another projector holds the required coordination lock",
+    projection_coordination_pending: "A coordination lock is held or its acquisition or release is uncertain",
     projection_write_ambiguous: "A native write has no exact acknowledgement and may already have executed",
     projection_target_unavailable: "The Issue target is inaccessible or its immutable identity changed",
     projection_scope_changed: "The authorized target changed after coordination; refresh the checked queue",

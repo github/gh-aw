@@ -6,10 +6,8 @@ import crypto from "node:crypto";
 
 const require = createRequire(import.meta.url);
 const { createHarness } = require("./work_queue_delivery_evidence.test_helpers.cjs");
+const { createAssetGitFixture } = require("./work_queue_asset_git.test_helpers.cjs");
 const REF = "a".repeat(40);
-const BLOB = "b".repeat(40);
-const TREE = "c".repeat(40);
-const COMMIT = "d".repeat(40);
 
 function pendingEvidence(h, verifier) {
   const member = h.fixture.assignment.claims[0];
@@ -46,51 +44,59 @@ function setupAsset(h) {
   fs.writeFileSync(path.join(directory, crypto.createHash("sha256").update("asset.png").digest("hex") + ".png"), "durable asset bytes");
   process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ upload_asset: { max: 1, "target-repo": "owner/repo", "assets-dir": assets } });
   h.state.native = { blob: null, tree: null, commit: null, ref: null };
+  const gitRoot = path.resolve(".queue-assets-test-scratch", crypto.randomUUID());
+  fs.mkdirSync(gitRoot, { recursive: true });
+  h.state.assetGitRoot = gitRoot;
+  const { serializeTransactionLog } = require("./work_queue_replay.cjs");
+  const { api } = createAssetGitFixture(gitRoot, serializeTransactionLog(h.transactions));
   h.state.reads = { ref: 0, commit: 0, tree: 0, blob: 0 };
   const originalGetRef = h.github.rest.git.getRef;
   Object.assign(h.github.rest.git, {
     getRef: async input => {
-      if (!input.ref.startsWith("heads/assets/")) return originalGetRef(input);
+      if (input.ref !== "heads/work-queue") return originalGetRef(input);
       h.state.reads.ref++;
-      if (!h.state.native.ref || h.state.tampered) throw Object.assign(new Error("asset ref missing"), { status: 404 });
-      // Creation's initial missing-ref probe must succeed before readback fails.
-      if (h.state.unavailable) throw Object.assign(new Error("asset readback unavailable"), { status: 503 });
-      return { data: { ref: `refs/${input.ref}`, object: { type: "commit", sha: h.state.native.ref } } };
+      if (h.state.tampered) throw Object.assign(new Error("asset ref missing"), { status: 404 });
+      if (h.state.native.ref && h.state.unavailable) throw Object.assign(new Error("asset readback unavailable"), { status: 503 });
+      return api.getRef(input);
     },
     createBlob: async input => {
       h.state.writes++;
-      h.state.native.blob = input.content;
-      return { data: { sha: BLOB } };
+      const result = await api.createBlob(input);
+      h.state.native.blob = result.data.sha;
+      return result;
     },
     createTree: async input => {
       h.state.writes++;
-      h.state.native.tree = input.tree;
-      return { data: { sha: TREE } };
+      const result = await api.createTree(input);
+      h.state.native.tree = result.data.sha;
+      return result;
     },
     createCommit: async input => {
       h.state.writes++;
-      h.state.native.commit = { sha: COMMIT, tree: { sha: input.tree }, parents: input.parents.map(sha => ({ sha })) };
-      return { data: { sha: COMMIT } };
+      const result = await api.createCommit(input);
+      h.state.native.commit = result.data.sha;
+      return result;
     },
-    createRef: async input => {
+    updateRef: async input => {
       h.state.writes++;
+      const result = await api.updateRef(input);
       h.state.native.ref = input.sha;
-      return { data: { ref: input.ref, object: { type: "commit", sha: input.sha } } };
+      return result;
     },
-    getCommit: async ({ commit_sha }) => {
+    createRef: async () => {
+      throw new Error("queue assets must not create branches");
+    },
+    getCommit: async input => {
       h.state.reads.commit++;
-      expect(commit_sha).toBe(COMMIT);
-      return { data: structuredClone(h.state.native.commit) };
+      return api.getCommit(input);
     },
-    getTree: async ({ tree_sha }) => {
+    getTree: async input => {
       h.state.reads.tree++;
-      expect(tree_sha).toBe(TREE);
-      return { data: { sha: TREE, truncated: false, tree: structuredClone(h.state.native.tree) } };
+      return api.getTree(input);
     },
-    getBlob: async ({ file_sha }) => {
+    getBlob: async input => {
       h.state.reads.blob++;
-      expect(file_sha).toBe(BLOB);
-      return { data: { sha: BLOB, encoding: "base64", content: h.state.native.blob } };
+      return api.getBlob(input);
     },
   });
 }
@@ -135,7 +141,7 @@ describe("durable adapter and queue-control delivery across process restart", ()
     try {
       await h.workerPass();
       const evidence = pendingEvidence(h, "asset");
-      expect(evidence.outputs[0].receipt).toMatchObject({ commit: COMMIT, tree: TREE, blob: BLOB });
+      expect(evidence.outputs[0].receipt).toMatchObject({ commit: h.state.native.commit, tree: h.state.native.tree, blob: h.state.native.blob, branch: "work-queue" });
       expect(evidence.effects).toHaveLength(4);
       expect(evidence.effects.every(effect => effect.outcome === "succeeded")).toBe(true);
       expect(h.state.writes).toBe(4);
@@ -148,11 +154,12 @@ describe("durable adapter and queue-control delivery across process restart", ()
       expect(h.state.reads.ref).toBeGreaterThan(reads.ref);
       if (!tampered) {
         expect(operation.descriptor.outputs).toHaveLength(1);
-        expect(operation.descriptor.outputs[0]).toMatchObject({ type: "upload_asset", resource: { kind: "asset", repository: "owner/repo", id: COMMIT, url: evidence.outputs[0].receipt.url } });
+        expect(operation.descriptor.outputs[0]).toMatchObject({ type: "upload_asset", resource: { kind: "asset", repository: "owner/repo", id: evidence.outputs[0].receipt.commit, url: evidence.outputs[0].receipt.url } });
         for (const kind of ["commit", "tree", "blob"]) expect(h.state.reads[kind]).toBeGreaterThan(reads[kind]);
       }
     } finally {
       h.dispose();
+      fs.rmSync(h.state.assetGitRoot, { recursive: true, force: true });
     }
   });
 

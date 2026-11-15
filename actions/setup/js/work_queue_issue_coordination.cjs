@@ -45,7 +45,13 @@ async function withProjectionLocks({ githubClient, owner, repo, head, keys, repo
   } finally {
     for (const { key, branch } of held.reverse()) {
       if (uncertain && (!Array.isArray(retained) || retained.includes(key))) continue;
-      await githubClient.rest.git.deleteRef({ owner, repo, ref: `heads/${branch}`, request: { retries: 0, signal: AbortSignal.timeout(15000) } });
+      const request = { retries: 0, signal: AbortSignal.timeout(15000) };
+      try {
+        await githubClient.rest.git.deleteRef({ owner, repo, ref: `heads/${branch}`, request });
+      } catch (error) {
+        log.failure("projection.locks.release.failed", error, true);
+        throw projectionReleaseFailure(error, request);
+      }
     }
   }
 }
@@ -103,15 +109,21 @@ async function withGraphQLProjectionLocks({ githubClient, repositoryId, head, ke
       const declarations = release.map((_, index) => `$u${index}:DeleteRefInput!`);
       const selections = release.map((_, index) => `u${index}: deleteRef(input:$u${index}) { clientMutationId }`);
       let result;
+      const request = { retries: 0, signal: AbortSignal.timeout(30000) };
       try {
-        result = await githubClient.graphql(`mutation WorkQueueProjectionUnlocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request: { retries: 0, signal: AbortSignal.timeout(30000) } });
+        result = await githubClient.graphql(`mutation WorkQueueProjectionUnlocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request });
       } catch (error) {
         log.failure("projection.locks.release.failed", error, true, "unlock");
-        throw error;
+        throw projectionReleaseFailure(error, request);
       }
       if (release.some((_, index) => result?.[`u${index}`]?.clientMutationId !== nonce)) throw queueError("projection_coordination_pending", "coordination release is uncertain");
     }
   }
+}
+
+function projectionReleaseFailure(error, request) {
+  if (!request.signal.aborted) return error;
+  return Object.assign(queueError("projection_coordination_pending", "coordination release is uncertain"), { cause: error, originalError: error });
 }
 
 function projectionNonce() {
