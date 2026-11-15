@@ -1,0 +1,110 @@
+//go:build !integration
+
+package workflow
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/require"
+)
+
+func pendingWriteTestData(t *testing.T, compiler *Compiler) *WorkflowData {
+	t.Helper()
+	data, err := compiler.ParseWorkflowString(`---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+checkout:
+  repository: other/project
+  github-token: ${{ secrets.EXISTING_READ_TOKEN }}
+tools:
+  repo-memory:
+    branch-name: memory/test
+  cache-memory: true
+safe-outputs:
+  threat-detection: false
+  create-issue:
+  jobs:
+    publish:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Publish
+          if: always()
+          run: echo publish
+---
+Test pending writes.
+`, filepath.Join(t.TempDir(), "pending.md"))
+	require.NoError(t, err)
+	return data
+}
+
+func TestPendingWriteSpecCoversConfiguredPersistence(t *testing.T) {
+	compiler := NewCompiler()
+	data := pendingWriteTestData(t, compiler)
+	spec := buildPendingWriteSpec(data)
+	publications := map[string]bool{}
+	for _, publication := range spec.Publications {
+		publications[publication.Job] = true
+	}
+	require.True(t, publications[pushRepoMemoryJobName])
+	require.True(t, publications[updateCacheMemoryJobName])
+	require.True(t, publications["publish"])
+	require.Contains(t, spec.CustomTypes, "publish")
+}
+
+func TestPendingWritePreparationUsesAvailableReadCredentials(t *testing.T) {
+	compiler := NewCompiler()
+	data := pendingWriteTestData(t, compiler)
+	steps, err := compiler.buildPendingWritesPreparationSteps(data, true)
+	require.NoError(t, err)
+	output := strings.Join(steps, "")
+	require.Contains(t, output, "id: pending_writes")
+	require.Contains(t, output, "GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}")
+	require.Contains(t, output, "GH_AW_PENDING_READ_TOKENS")
+	require.Contains(t, output, "EXISTING_READ_TOKEN")
+	require.NotContains(t, output, "create-github-app-token")
+	require.Contains(t, output, "pending_writes_runtime.cjs")
+	ungated, err := compiler.buildPendingWritesPreparationSteps(data, false)
+	require.NoError(t, err)
+	require.Empty(t, ungated)
+}
+
+func TestPendingWritePublicationGuardCannotBeBypassedByAlways(t *testing.T) {
+	compiler := NewCompiler()
+	data := pendingWriteTestData(t, compiler)
+	for _, name := range []string{"agent", "safe_outputs"} {
+		require.NoError(t, compiler.jobManager.AddJob(&Job{Name: name, RunsOn: "runs-on: ubuntu-latest", Steps: []string{"      - run: echo ready\n"}}))
+	}
+	job := &Job{
+		Name:  "publish",
+		Needs: []string{string(constants.SafeOutputsJobName)},
+		Steps: []string{
+			"      - name: Download agent output artifact\n        uses: actions/download-artifact@v4\n        with:\n          name: agent\n          path: /tmp/input/\n",
+			"      - name: Publish\n        id: writer\n        if: always()\n        env:\n          GH_AW_AGENT_OUTPUT: /tmp/wrong/input.json\n        run: echo publish\n",
+		},
+	}
+	require.NoError(t, compiler.jobManager.AddJob(job))
+	require.NoError(t, compiler.guardPendingWritePublications(data, true, map[string]struct{}{"publish": {}}))
+	output := strings.Join(job.Steps, "")
+	require.Contains(t, output, "Download authorized pending writes")
+	require.Contains(t, output, "pending_writes_setup")
+	require.Contains(t, output, "pending_writes_runtime.cjs")
+	require.Contains(t, output, "outputs.pending_writes_verified == 'true'")
+	require.Contains(t, output, "always()")
+	require.NotContains(t, output, "/tmp/wrong/input.json")
+	require.Contains(t, job.Env["GH_AW_PENDING_WRITES_SHA256"], "needs.safe_outputs.outputs.pending_writes_sha256")
+	require.Contains(t, job.Env["GH_AW_WRITE_GATE_DECISIONS_SHA256"], "needs.safe_outputs.outputs.write_gate_decisions_sha256")
+	require.NotEmpty(t, job.Outputs["pending_writes_item_sha256"])
+}
+
+func TestPendingWriteGuardRejectsUnrepresentedPublisher(t *testing.T) {
+	compiler := NewCompiler()
+	data := pendingWriteTestData(t, compiler)
+	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "safe_outputs", Steps: []string{"      - run: echo ready\n"}}))
+	require.NoError(t, compiler.jobManager.AddJob(&Job{Name: "unexpected", Needs: []string{"safe_outputs"}, Steps: []string{"      - run: echo publish\n"}}))
+	require.ErrorContains(t, compiler.guardPendingWritePublications(data, true, map[string]struct{}{"unexpected": {}}), "no handler-derived pending-write entry")
+}
