@@ -89,7 +89,7 @@ engine:
         });
         writeSecureOutput("/tmp/gh-aw/opencode-mcp.json", JSON.stringify({ mcp: { servers } }, null, 2));
     harness-script: |
-      const { readFileSync } = require("fs");
+      const { readFileSync, existsSync } = require("fs");
       const { execFile } = require("child_process");
       const { runProcess } = require("./process_runner.cjs");
       const { isOpenCodeEvent, getOpenCodeMCPFailures, getOpenCodeSessionSteps } = require("./parse_opencode_log.cjs");
@@ -105,6 +105,12 @@ engine:
           throw new Error("OPENCODE_MODEL must use provider/model format");
         }
         const model = selectedModel.slice(separator + 1);
+        const rosterEnv = process.env.GH_AW_OPENCODE_MODELS || "";
+        const roster = rosterEnv
+          .split(",")
+          .map(entry => entry.trim())
+          .filter((entry, index, all) => entry && all.indexOf(entry) === index);
+        if (!roster.includes(model)) roster.unshift(model);
         const provider = process.env.GH_AW_LLM_PROVIDER;
         if (!["github", "anthropic", "openai"].includes(provider)) {
           throw new Error("GH_AW_LLM_PROVIDER must be github, anthropic, or openai");
@@ -171,7 +177,7 @@ engine:
               name: "GitHub Agentic Workflows",
               package: isAnthropic ? "@opencode/ai/providers/anthropic" : "@opencode/ai/providers/openai-compatible",
               settings: { baseURL, apiKey },
-              models: { [model]: { name: model } },
+              models: Object.fromEntries(roster.map(entry => [entry, { name: entry }])),
             },
           },
         };
@@ -201,40 +207,59 @@ engine:
         const observedMCPFailures = new Set();
         const runtimeEnv = { ...process.env, OPENCODE_CONFIG_CONTENT: JSON.stringify(config) };
         delete runtimeEnv.PWD;
-        const result = await runProcess({
+        const hasSafeOutputs = () => {
+          const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS;
+          return !safeOutputsPath || (existsSync(safeOutputsPath) && readFileSync(safeOutputsPath, "utf8").trim() !== "");
+        };
+        const handleEvent = line => {
+          let entry;
+          try { entry = JSON.parse(line); } catch { return; }
+          if (!isOpenCodeEvent(entry)) return;
+          if (entry.sessionID) sessionID = entry.sessionID;
+          if (entry?.type === "error" && entry.error) reportedError = true;
+          if (maxTurns !== undefined && entry.type === "tool_use" && entry.part?.state?.status === "error" && entry.part.state.error === "Tools are disabled after the maximum agent steps") {
+            maxTurnsHit = true;
+          }
+          if (entry?.type !== "step_finish") return;
+          const messageIdentity = typeof entry.part.messageID === "string" ? JSON.stringify([entry.sessionID, entry.part.messageID]) : undefined;
+          const identity = messageIdentity ?? (typeof entry.part.id === "string" ? JSON.stringify([entry.sessionID, "part", entry.part.id]) : undefined);
+          if (identity !== undefined && finishedSteps.has(identity)) return;
+          if (identity !== undefined) finishedSteps.add(identity);
+          if (messageIdentity !== undefined) finishedMessageParts.set(messageIdentity, { id: entry.part.id, messageID: entry.part.messageID });
+          turns++;
+          if (maxTurns !== undefined && turns >= maxTurns && entry.part?.reason === "tool-calls") {
+            maxTurnsHit = true;
+          }
+        };
+        const runOptions = {
           command,
-          args: [...commandArgs, "--model", `awf-proxy/${model}`],
-          logArgs: [...commandArgs, "--model", "(configured model)"],
-          attempt: 0,
           log,
-          stdin: prompt,
           env: runtimeEnv,
           maxCollectedOutputBytes: 1024 * 1024,
           onStderrLine: line => {
             for (const server of getOpenCodeMCPFailures(line)) observedMCPFailures.add(server);
           },
-          onStdoutLine: line => {
-            let entry;
-            try { entry = JSON.parse(line); } catch { return; }
-            if (!isOpenCodeEvent(entry)) return;
-            if (entry.sessionID) sessionID = entry.sessionID;
-            if (entry?.type === "error" && entry.error) reportedError = true;
-            if (maxTurns !== undefined && entry.type === "tool_use" && entry.part?.state?.status === "error" && entry.part.state.error === "Tools are disabled after the maximum agent steps") {
-              maxTurnsHit = true;
-            }
-            if (entry?.type !== "step_finish") return;
-            const messageIdentity = typeof entry.part.messageID === "string" ? JSON.stringify([entry.sessionID, entry.part.messageID]) : undefined;
-            const identity = messageIdentity ?? (typeof entry.part.id === "string" ? JSON.stringify([entry.sessionID, "part", entry.part.id]) : undefined);
-            if (identity !== undefined && finishedSteps.has(identity)) return;
-            if (identity !== undefined) finishedSteps.add(identity);
-            if (messageIdentity !== undefined) finishedMessageParts.set(messageIdentity, { id: entry.part.id, messageID: entry.part.messageID });
-            turns++;
-            if (maxTurns !== undefined && turns >= maxTurns && entry.part?.reason === "tool-calls") {
-              maxTurnsHit = true;
-            }
-          },
+          onStdoutLine: handleEvent,
           runtimeGuard: { shouldTerminate: () => ({ terminate: maxTurnsHit, reason: "OpenCode max-turns limit reached" }), pollIntervalMs: 100 },
+        };
+        let result = await runProcess({
+          ...runOptions,
+          args: [...commandArgs, "--model", `awf-proxy/${model}`],
+          logArgs: [...commandArgs, "--model", "(configured model)"],
+          attempt: 0,
+          stdin: prompt,
         });
+        for (let nudge = 1; nudge <= 2; nudge++) {
+          if (result.exitCode !== 0 || maxTurnsHit || hasSafeOutputs() || !sessionID) break;
+          log(`No safe output yet, continuing the session (nudge ${nudge} of 2)`);
+          result = await runProcess({
+            ...runOptions,
+            args: [...commandArgs, "--session", sessionID],
+            logArgs: [...commandArgs, "--session", "(continued session)"],
+            attempt: nudge,
+            stdin: "Your last message ended without a tool call, so nothing has been delivered and this run is about to end with no output. Do not explain or plan: continue the task now and finish with the safe-output call the task names.",
+          });
+        }
         if (maxTurnsHit) {
           process.stdout.write(JSON.stringify({ type: "opencode.max_turns", timestamp: Date.now(), data: { maxTurns } }) + "\n");
           throw new Error("OpenCode max-turns limit reached");
@@ -327,6 +352,15 @@ MCP startup failures also fail the step, even when OpenCode exits successfully.
 Configured MCP startup/tool timeouts are converted from gh-aw seconds to
 OpenCode milliseconds: startup also bounds catalog loading, while tool timeout
 bounds execution.
+
+`GH_AW_OPENCODE_MODELS` optionally adds a comma-separated roster of model IDs;
+entries are trimmed and deduplicated, and the lead model is always included.
+All roster models use the same proxy, so the provider policy surface is unchanged.
+
+After a clean run with no safe output, the harness can continue the captured
+session up to two times to request the task's safe-output call. It does not
+continue nonzero runs, max-turns hits, runs with existing safe output, or runs
+without a captured session ID.
 
 Repository `opencode.json`, `opencode.jsonc`, `.opencode/` agents, and `AGENTS.md`
 retain native discovery and JSONC parsing. Runtime configuration is supplied
