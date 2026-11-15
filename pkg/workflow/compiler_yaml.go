@@ -55,6 +55,9 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 	if err := c.guardPublicationWriteGate(data); err != nil {
 		return err
 	}
+	if err := c.guardPendingWritePublications(data, hasWriteGateSteps(data), publicationJobNames(data.SafeOutputs)); err != nil {
+		return err
+	}
 	if err := c.wireCreateTokenJobs(data); err != nil {
 		return err
 	}

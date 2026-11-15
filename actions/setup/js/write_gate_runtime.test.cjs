@@ -81,6 +81,7 @@ describe("pinned per-item manager enforcement", () => {
         { id: "gate_config", kind: "value", sha256: inputDigest(gateConfigFromEnv()) },
         { id: "context", kind: "value", sha256: inputDigest(pendingContext()) },
         { id: "environment", kind: "value", sha256: inputDigest(pendingEnvironment()) },
+        { id: "publication_invocations", kind: "value", sha256: inputDigest([]) },
       ],
       items,
     };
@@ -98,6 +99,7 @@ describe("pinned per-item manager enforcement", () => {
         { id: "gate_config", kind: "value" },
         { id: "context", kind: "value" },
         { id: "environment", kind: "value" },
+        { id: "publication_invocations", kind: "value" },
       ])
     );
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify(config));

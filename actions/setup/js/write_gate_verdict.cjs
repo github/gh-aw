@@ -64,7 +64,15 @@ function main() {
   } catch {
     outcomes = null;
   }
-  const verdict = evaluate({ filename: process.env.GH_AW_WRITE_DECISIONS, outcomes, dryRun: process.env.GH_AW_WRITE_GATE_DRY_RUN === "true" });
+  let verdict = evaluate({ filename: process.env.GH_AW_WRITE_DECISIONS, outcomes, dryRun: process.env.GH_AW_WRITE_GATE_DRY_RUN === "true" });
+  if (process.env.GH_AW_PENDING_WRITES_REQUIRED === "true" && process.env.GH_AW_WRITE_GATE_DRY_RUN !== "true") {
+    if (process.env.GH_AW_PENDING_INPUTS_MATCH !== "true") verdict = { decision: "deny", reason: "inputs_changed", error: false };
+    else if (!verdict.error) {
+      const normalized = require("./write_gate_runtime.cjs").publishWriteDecisionInventory();
+      verdict = { ...verdict, decision: normalized.inventory.decision };
+      core.setOutput("write_gate_decisions_sha256", normalized.sha256);
+    }
+  }
   core.setOutput("write_gate", verdict.decision);
   core.setOutput("write_gate_reason", verdict.reason);
   core.setOutput("decisions_sha256", verdict.sha256 || "");

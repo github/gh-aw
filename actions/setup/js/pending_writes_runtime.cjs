@@ -11,6 +11,7 @@ function optionsFromEnv() {
     ...spec,
     agentOutputPath: process.env.GH_AW_AGENT_OUTPUT,
     manifestPath: process.env.GH_AW_PENDING_WRITES,
+    snapshotPath: process.env.GH_AW_PENDING_WRITE_INPUTS || path.join(path.dirname(process.env.GH_AW_PENDING_WRITES || "/tmp/gh-aw/pending-writes.json"), "pending-write-inputs"),
     handlerConfig: parsePendingJSON(process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG || "{}"),
     context,
     readToken: process.env.GH_AW_PENDING_DEFAULT_READ_TOKEN || process.env.GITHUB_TOKEN,
@@ -47,11 +48,12 @@ async function main() {
     core.exportVariable("GH_AW_AGENT_OUTPUT", options.agentOutputPath);
     const { writePendingInputSnapshot } = require("./pending_write_inputs.cjs");
     const snapshot = writePendingInputSnapshot({
-      directory: "/tmp/gh-aw/pending-write-inputs",
+      directory: options.snapshotPath,
       manifest: result.manifest,
       bindings: result.bindings,
       handlerConfig: options.handlerConfig,
       gateConfig: options.gateConfig,
+      publicationInputs: result.publicationInputs,
     });
     core.setOutput("pending_write_inputs_sha256", snapshot.sha256);
     if (!result.manifest.complete) core.warning("Pending writes include an unsupported or incomplete plan; writes will be refused");
@@ -67,7 +69,7 @@ async function verifyFromEnv() {
   if (!result.allow) return result;
   try {
     require("./pending_write_inputs.cjs").verifyPendingInputSnapshot({
-      directory: "/tmp/gh-aw/pending-write-inputs",
+      directory: optionsFromEnv().snapshotPath,
       expectedSha256: process.env.GH_AW_PENDING_WRITE_INPUTS_SHA256,
       manifest: result.manifest,
     });

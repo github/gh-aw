@@ -202,6 +202,9 @@ async function buildPendingWritesUnchecked(options) {
   const environment = pendingEnvironment();
   bindings.push({ id: "environment", kind: "value", value: environment });
   inputs.push({ id: "environment", kind: "value", sha256: inputDigest(environment) });
+  const invocationDescriptors = (options.publications || []).filter(publication => publication.invocation).map(publication => ({ job: publication.job, id: publication.id, ...publication.invocation }));
+  bindings.push({ id: "publication_invocations", kind: "value", value: invocationDescriptors });
+  inputs.push({ id: "publication_invocations", kind: "value", sha256: inputDigest(invocationDescriptors) });
   const graph = buildSafeOutputDependencyPlan(messages);
   const ids = messages.map((message, index) => message.output_id || `so_${inputDigest([index, message]).slice(0, 12)}`);
   const branches = new Map();
@@ -272,6 +275,7 @@ async function buildPendingWritesUnchecked(options) {
     item.item_sha256 = itemDigest(item);
     items.push(item);
   }
+  const publicationInputs = [];
   for (const publication of options.publications || []) {
     let supplied = publication.supplied;
     if (publication.kind === "ledger") supplied = describeLedgerTransaction(messages, config, run);
@@ -311,6 +315,20 @@ async function buildPendingWritesUnchecked(options) {
       complete: supplied !== undefined,
       reason_category: supplied === undefined ? "unsupported_plan" : "ready",
     };
+    if (publication.invocation) {
+      item.publication.invocation = {
+        module: publication.invocation.module,
+        sha256: inputDigest(publication.invocation),
+        input_binding_ids: publication.invocation.input_binding_ids,
+        env: Object.entries(publication.invocation.env).map(([name, value]) => ({
+          name,
+          length: Buffer.byteLength(value, "utf8"),
+          sha256: sha256(value),
+          ...(publication.invocation.path_env?.[name] ? { binding_id: publication.invocation.path_env[name] } : {}),
+        })),
+      };
+    }
+    if (publication.kind === "ledger") publicationInputs.push({ job: publication.job, id: publication.id, input_id: `generated:${publication.job}:${publication.id}`, path: publication.path, value: supplied });
     if (publication.kind === "ledger") {
       item.publication.records = Object.entries(supplied.ledgers).flatMap(([ledger, batch]) =>
         batch.appends.map(append => ({ ledger, id: append.record.id, length: Buffer.byteLength(canonicalPendingJSON(append.record), "utf8"), sha256: inputDigest(append.record) }))
@@ -324,7 +342,7 @@ async function buildPendingWritesUnchecked(options) {
   for (const [key, value] of Object.entries(process.env)) {
     if (/(?:TOKEN|SECRET|PASSWORD|PRIVATE_KEY)/.test(key) && value && value.length >= 8 && bytes.includes(Buffer.from(value))) throw new Error("Pending-write metadata contains a secret; refusing publication");
   }
-  return { manifest, bytes, sha256: sha256(bytes), bindings };
+  return { manifest, bytes, sha256: sha256(bytes), bindings, publicationInputs };
 }
 
 module.exports = { buildPendingWrites, describeText, describeDetection, describeLedgerTransaction, withoutCredentials };

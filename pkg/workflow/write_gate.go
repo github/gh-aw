@@ -92,11 +92,27 @@ func (c *Compiler) buildWriteGatePhaseSteps(data *WorkflowData) ([]string, error
 		"GH_AW_WRITE_GATE_STEP_OUTCOMES": string(encoded),
 		"GH_AW_WRITE_GATE_DRY_RUN":       fmt.Sprint(data.DryRun),
 	}
+	pendingEnv, err := c.pendingGateEnvironment(data)
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(env, pendingEnv)
+	env["GH_AW_PENDING_INPUTS_MATCH"] = "${{ steps.verify_pending_writes.outputs.allowed }}"
 	verdict, err := c.writeGateRuntimeStep("Validate write gate verdict", writeGateStepID, "main", env, "always()")
 	if err != nil {
 		return nil, err
 	}
-	return append(append([]string{initial}, configured...), verdict), nil
+	preparation, err := c.buildPendingWritesPreparationSteps(data, true)
+	if err != nil {
+		return nil, err
+	}
+	integrity, err := c.buildPendingIntegrityStep(data)
+	if err != nil {
+		return nil, err
+	}
+	result := append([]string{initial}, preparation...)
+	result = append(result, configured...)
+	return append(result, integrity, verdict), nil
 }
 
 func (c *Compiler) prepareWriteGateSteps(raw []any, data *WorkflowData) ([]string, []string, error) {
@@ -105,7 +121,7 @@ func (c *Compiler) prepareWriteGateSteps(raw []any, data *WorkflowData) ([]strin
 	}
 	steps := make([]any, len(raw))
 	ids := make([]string, len(raw))
-	seen := map[string]bool{writeGateStepID: true, writeGateInitializeStepID: true}
+	seen := map[string]bool{writeGateStepID: true, writeGateInitializeStepID: true, "pending_writes": true, pendingIntegrityStepID: true}
 	for index, value := range raw {
 		step, ok := value.(map[string]any)
 		if !ok {
@@ -230,8 +246,17 @@ func (c *Compiler) insertWriteGatePhase(data *WorkflowData, steps, tokens []stri
 	if err != nil {
 		return nil, err
 	}
+	guarded, err = c.bindPendingHandlerEnvironment(data, guarded)
+	if err != nil {
+		return nil, err
+	}
 	outputs["write_gate"] = "${{ steps.write_gate.outcome == 'success' && steps.write_gate.outputs.write_gate || 'deny' }}"
 	outputs["write_gate_reason"] = "${{ (steps.write_gate.outcome == 'success' || steps.write_gate.outputs.write_gate == 'deny') && steps.write_gate.outputs.write_gate_reason || 'gate_error' }}"
+	outputs["pending_writes_sha256"] = "${{ steps.pending_writes.outputs.sha256 }}"
+	outputs["pending_writes_complete"] = "${{ steps.pending_writes.outputs.complete }}"
+	outputs["pending_write_inputs_sha256"] = "${{ steps.pending_writes.outputs.pending_write_inputs_sha256 }}"
+	outputs["write_gate_decisions_sha256"] = "${{ steps.write_gate.outputs.write_gate_decisions_sha256 }}"
 	result := append(append([]string{}, steps[:index]...), gate...)
-	return append(result, guarded...), nil
+	result = append(result, guarded...)
+	return append(result, c.buildPendingWritesUploadSteps(data)...), nil
 }
