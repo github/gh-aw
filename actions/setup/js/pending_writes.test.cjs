@@ -8,7 +8,19 @@ import { buildPendingWrites } from "./pending_writes_plan.cjs";
 import { describeDirectory, sha256 } from "./pending_writes_files.cjs";
 import { describePatchFiles, extractPathsFromPatch, checkFileProtectionPostApply } from "./manifest_file_helpers.cjs";
 const require = createRequire(import.meta.url);
-const { canonicalPendingJSON, inputDigest, itemDigest, prepare, verify, assertPendingWritesIntegrity, assertPendingPublication, withPendingWrite, assertPendingCodeFiles, assertPendingTarget } = require("./pending_writes.cjs");
+const {
+  canonicalPendingJSON,
+  inputDigest,
+  itemDigest,
+  prepare,
+  verify,
+  assertPendingWritesIntegrity,
+  assertPendingPublication,
+  withPendingWrite,
+  withPendingReview,
+  assertPendingCodeFiles,
+  assertPendingTarget,
+} = require("./pending_writes.cjs");
 
 describe("handler-derived pending writes", () => {
   let directory;
@@ -43,6 +55,7 @@ describe("handler-derived pending writes", () => {
     vi.stubEnv("GH_AW_PENDING_WRITES_SHA256", result.sha256);
     vi.stubEnv("GH_AW_PENDING_WRITES_BINDINGS", JSON.stringify(result.bindings));
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify(options.handlerConfig));
+    vi.stubEnv("GH_AW_PENDING_WRITES_SPEC", JSON.stringify({ publications: options.publications || [] }));
     const { buildWriteDecisionInventory, writeDecisionInventory } = require("./write_gate_inventory.cjs");
     const decisions = path.join(directory, "write-decisions.normalized.json");
     const inventory = buildWriteDecisionInventory(result.manifest, result.sha256, { decision: "allow", reason: "clear" }, () => {});
@@ -90,6 +103,21 @@ describe("handler-derived pending writes", () => {
     fs.writeFileSync(path.join(directory, "replacement"), '{"items":[]}');
     fs.symlinkSync(path.join(directory, "replacement"), options.agentOutputPath);
     await expect(buildPendingWrites(options)).rejects.toThrow();
+  });
+
+  it.each(["GH_AW_WRITE_GATE_REVIEW_REPO", "GH_AW_WRITE_GATE_ALLOWED_REPOS"])("refuses a review write when %s changes after scope initialization", async name => {
+    vi.stubEnv("GH_AW_WRITE_GATE_REVIEW_REPO", "owner/reviews");
+    vi.stubEnv("GH_AW_WRITE_GATE_ALLOWED_REPOS", "owner/reviews,owner/repo");
+    const result = await authorize();
+    const create = vi.fn();
+    const client = require("./pending_writes_client.cjs").guardPendingWriteClient({ rest: { issues: { create } } });
+    await expect(
+      withPendingReview(result.manifest.items[0], "owner/reviews", () => {
+        vi.stubEnv(name, "other/reviews");
+        return client.rest.issues.create({ owner: "owner", repo: "reviews", title: "review", body: "details" });
+      })
+    ).rejects.toThrow("inputs_changed");
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("resolves cross-repository and triggering targets through the handlers' resolvers", async () => {

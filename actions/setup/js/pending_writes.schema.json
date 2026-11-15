@@ -78,7 +78,8 @@
       "properties": {
         "field": { "type": "string" },
         "length": { "type": "integer", "minimum": 0 },
-        "sha256": { "$ref": "#/$defs/sha256" }
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "binding_id": { "type": "string" }
       }
     },
     "code_file": {
@@ -190,6 +191,30 @@
                   "id": { "type": "string" },
                   "length": { "type": "integer", "minimum": 0 },
                   "sha256": { "$ref": "#/$defs/sha256" }
+                }
+              }
+            },
+            "invocation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["module", "sha256", "input_binding_ids", "env"],
+              "properties": {
+                "module": { "type": "string" },
+                "sha256": { "$ref": "#/$defs/sha256" },
+                "input_binding_ids": { "type": "array", "items": { "type": "string" } },
+                "env": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "length", "sha256"],
+                    "properties": {
+                      "name": { "type": "string" },
+                      "length": { "type": "integer", "minimum": 0 },
+                      "sha256": { "$ref": "#/$defs/sha256" },
+                      "binding_id": { "type": "string" }
+                    }
+                  }
                 }
               }
             }

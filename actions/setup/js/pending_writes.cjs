@@ -168,6 +168,10 @@ function assertPendingWritesIntegrity() {
   const environmentBinding = bindings.find(binding => binding.id === "environment");
   if (!environmentBinding) throw integrityError("manifest_invalid");
   environmentBinding.value = pendingEnvironment();
+  const invocationBinding = bindings.find(binding => binding.id === "publication_invocations");
+  if (!invocationBinding) throw integrityError("manifest_invalid");
+  const spec = parsePendingJSON(process.env.GH_AW_PENDING_WRITES_SPEC || "{}");
+  invocationBinding.value = (spec.publications || []).filter(publication => publication.invocation).map(publication => ({ job: publication.job, id: publication.id, ...publication.invocation }));
   try {
     assertManifestInputs(manifest, bindings);
   } catch (cause) {
@@ -289,6 +293,14 @@ function assertPendingPublication(job, id, supplied) {
   if ((selection.gate_decision !== "apply" && !approvedHold) || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
   if (matches[0].settings?.staged === true || (manifest.detection.enabled && ["warning", "failure"].includes(manifest.detection.conclusion))) throw integrityError("native_policy_veto");
   require("./write_gate_runtime.cjs").assertWriteGateItemMutation(matches[0]);
+  for (const setting of matches[0].publication.invocation?.env || []) {
+    const current = process.env[setting.name] || "";
+    if (sha256(current) === setting.sha256) continue;
+    const bindings = parsePendingJSON(process.env.GH_AW_PENDING_WRITES_BINDINGS || "[]");
+    const generated = parsePendingJSON(process.env.GH_AW_PENDING_GENERATED_BINDINGS || "[]");
+    const binding = [...bindings, ...generated].find(binding => binding.id === setting.binding_id && binding.path === current);
+    if (!setting.binding_id || !binding) throw integrityError("invocation_changed");
+  }
 }
 
 async function withPendingPublication(job, id, readSupplied, operation) {
