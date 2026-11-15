@@ -353,6 +353,35 @@ confirm TLC reports `NoUntrustedCheckoutAcceptance`. This model specifies the
 compiler decision boundary; it does not model Git's parser or prove safety of
 the contents at an otherwise trusted mutable ref.
 
+## Write-gate publication boundary
+
+[`WriteGate.tla`](WriteGate.tla) is a separate bounded publication model for
+optional manifest-bound write gates. It explores a two-item batch, batch
+allow/partial/deny/errors, an empty held selection, metadata mutation, and a
+prior-attempt replay. It checks completed allowance before each effect,
+item-subset narrowing, manifest identity, invocation identity, and conclusion
+classification without agent-output recovery.
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
+  python3 specs/workflow-security/check.py --model write-gate \
+  --results /tmp/write-gate-results
+```
+
+The secure profile exhausts 122 states. Five synthetic negative controls
+remove gate completion, item narrowing, manifest binding, invocation binding,
+or conclusion isolation. Three reachability witnesses exercise live allowance,
+partial publication, and an entirely held batch. The checksum-pinned checker
+retains model/config digests, commands, state counts, logs, and text-derived
+counterexample traces using the pinned v1.7.4 runtime.
+
+This model does not prove runtime refinement, hash collision resistance,
+Git/JSON parsing, GitHub approval services, arbitrary custom gate code, or
+individual publisher implementations. Approved held replay and review/staged
+rendering are abstracted, not fully modeled. Framework status writes are outside
+the agent-derived effect set. Implementation tests and the security guarantee
+must establish those boundaries independently.
+
 ## Safe-output transport lifecycle
 
 [`SafeOutputTransport.tla`](SafeOutputTransport.tla) supplements the job-level

@@ -12,6 +12,7 @@ const { getMcpRateLimitHint, getRpcRateLimitHint } = require("./mcp_rate_limit.c
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
 const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
+const { projectGateDecision } = require("./write_gate_observability.cjs");
 const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, normalizeHarnessDecisionData } = require("./harness_retry_record.cjs");
 const { sessionMessageTimestamp } = require("./unified_session_order.cjs");
 
@@ -902,6 +903,10 @@ function normalizeUnifiedSessionEvent(event, phase) {
   if (event.type.startsWith("safe_output.")) {
     for (const key of Object.keys(data)) delete data[key];
     Object.assign(data, projectSafeOutputData(source));
+  }
+  if (event.type === "gate.decision") {
+    for (const key of Object.keys(data)) delete data[key];
+    Object.assign(data, projectGateDecision(source));
   }
   if (event.type === "safe_output.error") {
     const errors = source.errors ?? source.failures;

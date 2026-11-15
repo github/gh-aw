@@ -325,7 +325,7 @@ def run_case(java, jar, results, name, fault="none", profile="sparse",
         "-workers", "1", "-seed", "1", "-fp", "0",
         "-config", "model.cfg", "-metadir", "states",
     ]
-    if invariant:
+    if invariant and model != "WriteGate":
         command += ["-dumpTrace", "json", str(destination / "tlc-trace.json")]
     command += [f"{model}.tla"]
     (destination / "command.json").write_text(
@@ -345,7 +345,20 @@ def run_case(java, jar, results, name, fault="none", profile="sparse",
     try:
         counts = check_result(result.returncode, text, invariant)
         if invariant:
-            trace = normalize_trace(json.loads((destination / "tlc-trace.json").read_text()))
+            if model == "WriteGate":
+                # The pinned v1.7.4 runtime emits text traces, not -dumpTrace JSON.
+                states = re.findall(r"State \d+: <[^\n]+>\n([\s\S]*?)(?=\nState \d+:|Finished in)", text)
+                if len(states) < 2:
+                    raise RuntimeError("Counterexample has no transition")
+                trace = {"states": []}
+                for index, state in enumerate(states, 1):
+                    event = re.search(r'lastEvent \|-> "([^"]+)"', state)
+                    if not event:
+                        raise RuntimeError("Counterexample state has no lastEvent")
+                    trace["states"].append({"index": index, "s": {
+                        "lastEvent": event.group(1), "raw_tla": state.strip()}})
+            else:
+                trace = normalize_trace(json.loads((destination / "tlc-trace.json").read_text()))
             (destination / "trace.json").write_text(json.dumps(trace, indent=2) + "\n")
             (destination / "events.txt").write_text(
                 "\n".join(state["s"]["lastEvent"] for state in trace["states"]) + "\n"
@@ -624,8 +637,8 @@ def check_workflow_models(java, jar, results):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", choices=["all", "admission", "conclusion", "issue-relationships"], default="all",
-                        help="Check all models, admission and conclusion, only conclusion, or issue relationships")
+    parser.add_argument("--model", choices=["all", "admission", "conclusion", "issue-relationships", "write-gate"], default="all",
+                        help="Check all models or a selected protocol")
     parser.add_argument("--results", type=Path, help="New directory for all reports and traces")
     parser.add_argument("--compiler", type=Path, help="Local gh-aw binary for source acceptance/rejection checks")
     parser.add_argument("--write-examples", action="store_true", help="Regenerate checked-in representative traces")
@@ -656,6 +669,20 @@ def main():
         cases.extend(check_admission_conclusion(java, jar, results))
     if args.model in {"all", "issue-relationships"}:
         cases.extend(check_issue_relationships(java, jar, results))
+    if args.model in {"all", "write-gate"}:
+        cases.append(run_case(java, jar, results, "write-gate-secure", model="WriteGate"))
+        for fault, invariant in {
+            "gate-bypass": "CompletedGateBeforeWrite",
+            "partial-widen": "ItemNarrowing",
+            "manifest-mutation": "ManifestBinding",
+            "stale-replay": "InvocationBinding",
+            "conclusion-recovery": "NoConclusionRecovery",
+        }.items():
+            cases.append(run_case(java, jar, results, f"write-gate-{fault}",
+                                  fault=fault, invariant=invariant, model="WriteGate"))
+        for invariant in ["NoSuccessfulWrite", "NoPartialWrite", "NoHeldRun"]:
+            cases.append(run_case(java, jar, results, f"write-gate-{invariant}",
+                                  invariant=invariant, witness=True, model="WriteGate"))
     current_hashes = {model: hashlib.sha256((ROOT / f"{model}.tla").read_bytes()).hexdigest()
                       for model in {case["model"] for case in cases}}
     if any(case["model_sha256"] != current_hashes[case["model"]] for case in cases):

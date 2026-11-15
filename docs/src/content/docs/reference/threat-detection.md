@@ -542,14 +542,14 @@ An AI agent operating in a repository can be tricked (through prompt injection o
 
 ### Default Remediation
 
-Protected file protection is **enabled by default** for `create-pull-request` and `push-to-pull-request-branch`. Any patch that touches a protected file or directory causes the safe output to fail with a clear error:
+Protected-file checks are independent of threat detection. See the
+[protected-file policy reference](/gh-aw/reference/safe-outputs-pull-requests/#protected-files)
+for the authoritative defaults, matching rules, and exclusions. A protected-file
+match does not necessarily reject publication: the configured policy determines
+whether the handler blocks, preserves a review proposal, or creates a fallback issue.
 
-```
-Cannot create pull request: patch modifies protected files (package.json).
-Set protected-files: fallback-to-issue to create a review issue instead.
-```
-
-This error is also surfaced as a **🛡️ Protected Files** section in the agent failure issue or comment created by the conclusion job.
+An explicit `blocked` policy produces an error that also appears in the
+**🛡️ Protected Files** section of the conclusion failure issue or comment.
 
 ### Policy Options
 
@@ -557,7 +557,7 @@ Configure how each safe output handles protected file changes using the `protect
 
 | Value | Behavior |
 |-------|-----------|
-| `request_review` (default) | Create the pull request and submit a `REQUEST_CHANGES` review listing the protected files. A human reviewer must approve before merge. |
+| `request-review` | Create a review proposal with a `REQUEST_CHANGES` review listing the protected files. Repository merge protections must enforce independent approval. The legacy `request_review` spelling is also accepted. |
 | `blocked` | Hard-block: the safe output fails with an error message |
 | `allowed` | No restriction — all protected file changes are permitted |
 | `fallback-to-issue` | Create a review issue instead of a PR / push, so a human can inspect and apply the changes manually |

@@ -48,6 +48,7 @@ func renderConsole(data AuditData, logsPath string) {
 	renderConsoleTokenUsage(data.FirewallTokenUsage)
 	renderConsoleDetectionModelUsage(data.DetectionModelUsage)
 	renderConsoleModelRouting(data.ModelRouting)
+	renderConsoleWriteGate(data.WriteGate)
 	renderConsoleModelCatalog(data.ModelCatalog, data.EngineConfig)
 	renderConsoleModelEndpointMismatches(data.ModelEndpointMismatches)
 	renderConsoleGitHubAPIUsage(data.GitHubRateLimitUsage)
