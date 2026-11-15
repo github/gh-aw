@@ -244,7 +244,7 @@ function eventDetail(event) {
     case "safe_output.request":
       return `${fields(data, ["type", "repo", "number"])} [requested, not executed]`;
     case "safe_output.result":
-      return `${fields(data, ["type", "status", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
+      return `${fields(data, ["type", "status", "gate_decision", "gate_signal", "decision_reason", "repo", "number", "provider", "identifier", "url"])} [${data.gate_signal && data.status === "skipped" ? "publication suppressed" : "execution recorded"}]`;
     case "safe_output.outcome":
       return fields(data, ["type", "messageIndex", "status", "staged", "operation_outcome", "url"]);
     case "gate.decision":

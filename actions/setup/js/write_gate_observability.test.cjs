@@ -9,6 +9,7 @@ import { renderUnifiedSession } from "./unified_session_render.cjs";
 import { compactUnifiedSession } from "./compact_unified_session.cjs";
 import { buildFailureMatchCategories } from "./handle_agent_failure.cjs";
 import { canonicalPendingJSON, itemDigest, SCHEMA } from "./pending_writes.cjs";
+import { writeDecisionInventory } from "./write_gate_inventory.cjs";
 
 const digest = "a".repeat(64);
 const item = { output_id: "so_abcdefghijkl", item_sha256: digest, type: "create_issue" };
@@ -21,7 +22,7 @@ describe("compiler-owned gate conclusion evidence", () => {
     ["allow", [{ ...item, status: "success", gate_decision: "apply" }], "verified"],
     ["deny", [{ ...item, status: "skipped", gate_signal: "gate_denied" }], "verified"],
     ["partial", [{ ...item, status: "skipped", gate_decision: "hold", decision_reason: "gate_held" }], "verified"],
-    ["", [], "verified"],
+    ["", [], "unknown"],
   ])("records %s without changing enforcement", (verdict, results, check) => {
     const data = build({ GH_AW_WRITE_GATE: verdict }, results);
     expect(data.verdict).toBe(verdict || "deny");
@@ -34,7 +35,7 @@ describe("compiler-owned gate conclusion evidence", () => {
     expect(decisions).toMatchInlineSnapshot(`
       [
         {
-          "conclusionCheck": "verified",
+          "conclusionCheck": "unknown",
           "counts": {
             "apply": 0,
             "drop": 0,
@@ -49,7 +50,7 @@ describe("compiler-owned gate conclusion evidence", () => {
           "verdict": "allow",
         },
         {
-          "conclusionCheck": "verified",
+          "conclusionCheck": "unknown",
           "counts": {
             "apply": 0,
             "drop": 0,
@@ -64,7 +65,7 @@ describe("compiler-owned gate conclusion evidence", () => {
           "verdict": "deny",
         },
         {
-          "conclusionCheck": "verified",
+          "conclusionCheck": "unknown",
           "counts": {
             "apply": 0,
             "drop": 0,
@@ -79,7 +80,7 @@ describe("compiler-owned gate conclusion evidence", () => {
           "verdict": "partial",
         },
         {
-          "conclusionCheck": "verified",
+          "conclusionCheck": "unknown",
           "counts": {
             "apply": 0,
             "drop": 0,
@@ -122,7 +123,7 @@ describe("compiler-owned gate conclusion evidence", () => {
       \`\`\`text
       Chronological trace (user prompts omitted; untimed observations follow):
 
-      [1] write_gate/conclusion gate.decision verdict=allow reason=policy manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=verified counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
+      [1] write_gate/conclusion gate.decision verdict=allow reason=policy manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=unknown counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
         path=usage/aw_session.jsonl
       \`\`\`
 
@@ -152,7 +153,7 @@ describe("compiler-owned gate conclusion evidence", () => {
       \`\`\`text
       Chronological trace (user prompts omitted; untimed observations follow):
 
-      [1] write_gate/conclusion gate.decision verdict=deny reason=policy manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=verified counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
+      [1] write_gate/conclusion gate.decision verdict=deny reason=policy manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=unknown counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
         path=usage/aw_session.jsonl
       \`\`\`
 
@@ -182,7 +183,7 @@ describe("compiler-owned gate conclusion evidence", () => {
       \`\`\`text
       Chronological trace (user prompts omitted; untimed observations follow):
 
-      [1] write_gate/conclusion gate.decision verdict=partial reason=policy manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=verified counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
+      [1] write_gate/conclusion gate.decision verdict=partial reason=policy manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=unknown counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
         path=usage/aw_session.jsonl
       \`\`\`
 
@@ -212,7 +213,7 @@ describe("compiler-owned gate conclusion evidence", () => {
       \`\`\`text
       Chronological trace (user prompts omitted; untimed observations follow):
 
-      [1] write_gate/conclusion gate.decision verdict=deny reason=gate_error manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=verified counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
+      [1] write_gate/conclusion gate.decision verdict=deny reason=gate_error manifestDigest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa integrity=verified conclusionCheck=unknown counts={   "apply": 0,   "hold": 0,   "review": 0,   "stage": 0,   "drop": 0 } items=[] [untimed]
         path=usage/aw_session.jsonl
       \`\`\`
 
@@ -236,6 +237,7 @@ describe("compiler-owned gate conclusion evidence", () => {
 
   it("never promotes unknown or failed jobs and missing result/digest evidence to verified", () => {
     expect(build({}, [], { resultsComplete: false }).conclusionCheck).toBe("unknown");
+    expect(build({}, []).conclusionCheck).toBe("unknown");
     expect(build({}, [], { actualDigest: undefined }).integrity).toBe("unknown");
     expect(build({}, [{ status: "success" }]).conclusionCheck).toBe("unknown");
     expect(build({ GH_AW_WRITE_GATE_WRITE_JOB_NAMES: '["upload_assets"]' }).conclusionCheck).toBe("unknown");
@@ -267,10 +269,29 @@ describe("compiler-owned gate conclusion evidence", () => {
     expect(build({ ...env, GH_AW_WRITE_GATE_DECISIONS_SHA256: undefined }, [], { ...extra, decisions: undefined, decisionsDigest: undefined }).conclusionCheck).toBe("unknown");
   });
 
+  it("checks partial memory publication against input receipts and existing effect outputs", () => {
+    const jobItem = { output_id: "job_aaaaaaaaaaaaaaaa", item_sha256: digest, target: { job: "push_repo_memory", branch: "memory/default" }, publication: { id: "default" } };
+    const decisions = { schema: "gh-aw/write-decisions/v1", manifest_sha256: digest, items: [{ ...jobItem, gate_decision: "apply" }] };
+    const proof = { push_repo_memory: { pending_writes_verified: "true", pending_writes_item_sha256: JSON.stringify({ [jobItem.output_id]: digest }) } };
+    const env = {
+      GH_AW_WRITE_GATE: "partial",
+      GH_AW_WRITE_GATE_DECISIONS_SHA256: digest,
+      GH_AW_WRITE_GATE_WRITE_JOB_NAMES: '["push_repo_memory"]',
+      GH_AW_JOB_RESULTS: '{"push_repo_memory":{"result":"success"}}',
+      GH_AW_WRITE_GATE_PUBLICATION_RESULTS: JSON.stringify(proof),
+      GH_AW_MEMORY_SAVE_RESULTS: JSON.stringify({ default: { jobResult: "success", outcome: "success", status: "saved", branch: "memory/default", commit: "b".repeat(40) } }),
+    };
+    const extra = { manifest: { complete: true, items: [jobItem] }, decisions, decisionsDigest: digest };
+    expect(build(env, [], extra).conclusionCheck).toBe("verified");
+    expect(build({ ...env, GH_AW_MEMORY_SAVE_RESULTS: undefined }, [], extra).conclusionCheck).toBe("unknown");
+    proof.push_repo_memory.pending_writes_item_sha256 = JSON.stringify({ [jobItem.output_id]: "c".repeat(64) });
+    expect(build({ ...env, GH_AW_WRITE_GATE_PUBLICATION_RESULTS: JSON.stringify(proof) }, [], extra).conclusionCheck).toBe("failed");
+  });
+
   it("collects trusted events with bounded summary/compact metadata and leaves ungated collection unchanged", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "gate-observability-"));
     try {
-      const collectorItem = { ...item, complete: true };
+      const collectorItem = { ...item, input_sha256: digest, complete: true };
       collectorItem.item_sha256 = itemDigest(collectorItem);
       const encoded = canonicalPendingJSON({ schema: SCHEMA, ...manifest, inputs: [], items: [collectorItem] });
       fs.writeFileSync(path.join(root, "pending-writes.json"), encoded);
@@ -293,6 +314,20 @@ describe("compiler-owned gate conclusion evidence", () => {
       checkConclusion({ rootDir: root, env: { ...base, GH_AW_WRITE_GATE: "deny" }, core });
       expect(core.setFailed).toHaveBeenCalledWith("ERR_WRITE_GATE: Conclusion detected an unauthorized write or publication digest mismatch.");
       expect(JSON.parse(fs.readFileSync(path.join(root, "failure_categories.json"), "utf8"))).toEqual(["write_gate_violation"]);
+      const inventoryFile = path.join(root, "write-decisions.normalized.json");
+      const manifestSha256 = createHash("sha256").update(encoded).digest("hex");
+      const inventorySha256 = writeDecisionInventory(inventoryFile, {
+        schema: "gh-aw/write-decisions/v1",
+        manifest_sha256: manifestSha256,
+        decision: "partial",
+        items: [{ output_id: collectorItem.output_id, input_sha256: collectorItem.input_sha256, item_sha256: collectorItem.item_sha256, gate_decision: "hold", decision_reason: "approval_required" }],
+      });
+      fs.writeFileSync(path.join(root, "safe-output-items.jsonl"), JSON.stringify({ ...collectorItem, status: "success", gate_decision: "apply" }) + "\n");
+      const writeGate = { ...base, GH_AW_WRITE_GATE: "partial", GH_AW_PENDING_WRITES_SHA256: manifestSha256, GH_AW_WRITE_GATE_DECISIONS_SHA256: inventorySha256 };
+      const checked = collectUnifiedSession({ ...options, writeGate }).events.find(event => event.type === "gate.decision").data;
+      expect(checked).toMatchObject({ conclusionCheck: "failed", counts: { apply: 0, hold: 1 } });
+      fs.appendFileSync(inventoryFile, "\n");
+      expect(collectUnifiedSession({ ...options, writeGate }).events.find(event => event.type === "gate.decision").data.conclusionCheck).toBe("failed");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
