@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { pendingWritesEnabled, assertPendingWritesIntegrity, integrityError, currentPendingWrite } = require("./pending_writes.cjs");
+const { pendingWritesEnabled, assertPendingWritesIntegrity, integrityError, currentPendingWrite, assertPendingEffectAllowed } = require("./pending_writes.cjs");
 const clients = new WeakMap();
 const READ_METHOD = /^(?:get|list|compare|check|download|search|paginate)/;
 
@@ -38,6 +38,7 @@ function guardPendingWriteClient(client) {
               if (branch?.repositoryNameWithOwner !== repository || (item.target.branch && branch?.branchName !== item.target.branch)) throw integrityError("target_changed");
               if (item.publication) item.recheck();
               else assertPendingWritesIntegrity();
+              assertPendingEffectAllowed();
             }
             return value.apply(target, args);
           };
@@ -59,13 +60,14 @@ function guardPendingWriteClient(client) {
             if (!item || item.planning) throw integrityError("item_missing");
             if (item.publication) item.recheck();
             else assertPendingWritesIntegrity();
+            assertPendingEffectAllowed();
             const request = args[0];
             if (!request || typeof request !== "object") throw integrityError("target_changed");
             if (item.review && (namespace !== "issues" || key !== "create" || request.assignees?.length)) throw integrityError("review_scope_invalid");
             const repository = `${request.owner}/${request.repo}`;
             if (![item.target.repository, item.target.head_repository].includes(repository)) throw integrityError("target_changed");
             if (item.code) {
-              if (namespace === "issues") throw integrityError("unplanned_fallback");
+              if (namespace === "issues" && key === "create") throw integrityError("unplanned_fallback");
               if (request.ref && ![`refs/heads/${item.target.branch}`, `heads/${item.target.branch}`].includes(request.ref)) throw integrityError("target_changed");
               if (key === "create" && namespace === "pulls") {
                 const expectedHead = item.target.head_repository && item.target.head_repository !== item.target.repository ? `${item.target.head_repository.split("/")[0]}:${item.target.branch}` : item.target.branch;

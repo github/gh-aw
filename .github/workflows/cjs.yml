@@ -6,6 +6,7 @@ on:
     paths:
       - 'actions/setup/js/**'
       - 'actions/setup/md/**'
+      - 'docs/examples/write-gate/**'
       - 'scripts/**/*.js'
       - 'scripts/check-cgo-cjs-workflow-purity.sh'
       - 'Makefile'
@@ -16,6 +17,7 @@ on:
     paths:
       - 'actions/setup/js/**'
       - 'actions/setup/md/**'
+      - 'docs/examples/write-gate/**'
       - 'scripts/**/*.js'
       - 'scripts/check-cgo-cjs-workflow-purity.sh'
       - 'Makefile'

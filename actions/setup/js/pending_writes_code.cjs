@@ -15,18 +15,19 @@ const { sha256 } = require("./pending_writes_files.cjs");
 const { getBundlePreApplyFiles } = require("./push_to_pull_request_branch.cjs");
 const { isObjectPack } = require("./object_pack_transport.cjs");
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const { pendingRead } = require("./pending_writes_read.cjs");
 
 /**
  * Bundle manifests use Git and the publisher's own changed-file helper. Work in
  * an isolated object store; never deepen or mutate the user's checkout.
  */
-async function inspectTransport(transport, message, target, config, token, localRepository = undefined) {
+async function inspectTransport(transport, message, target, config, token, localRepository = undefined, githubClient = globalThis.github) {
   const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
   if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) throw new Error("Pending bundle requires the trusted GitHub server");
   const [owner, repo] = target.repository.split("/");
   let base = target.head_commit;
   if (!base) {
-    const { data: branch } = await github.rest.repos.getBranch({ owner, repo, branch: target.base });
+    const { data: branch } = await pendingRead(() => githubClient.rest.repos.getBranch({ owner, repo, branch: target.base }));
     base = branch?.commit?.sha;
   }
   if (!OID.test(base || "")) throw new Error("Pending bundle requires an independently resolved base commit");
@@ -55,7 +56,9 @@ async function inspectTransport(transport, message, target, config, token, local
     if (localRepository) {
       execGitSync(["-c", "core.hooksPath=/dev/null", "fetch", "--no-tags", localRepository, base], { ...options, env: { ...env, GIT_ALLOW_PROTOCOL: "file" } });
     } else {
-      execGitSync(["-c", "core.hooksPath=/dev/null", "fetch", "--no-tags", "--depth=1", `${server.origin}/${target.repository}.git`, base], { ...options, env: { ...env, GIT_ALLOW_PROTOCOL: "https" } });
+      await pendingRead(async () =>
+        execGitSync(["-c", "core.hooksPath=/dev/null", "fetch", "--no-tags", "--depth=1", `${server.origin}/${target.repository}.git`, base], { ...options, env: { ...env, GIT_ALLOW_PROTOCOL: "https" }, silent: true })
+      );
     }
     git(["checkout", "--quiet", "--detach", base]);
     let candidate = "HEAD";
@@ -91,7 +94,7 @@ async function inspectTransport(transport, message, target, config, token, local
   }
 }
 
-async function describeCodeWrite(message, target, config, salt, token, localRepository = undefined) {
+async function describeCodeWrite(message, target, config, salt, token, localRepository = undefined, githubClient = globalThis.github) {
   const transport = resolveTransportPaths(message, target.repository);
   if (!transport.patchPath) throw new Error("Pending-write patch is missing");
   const patch = readInput(transport.patchPath);
@@ -107,7 +110,7 @@ async function describeCodeWrite(message, target, config, salt, token, localRepo
   }
   let treeSha256;
   if (!objectPack) {
-    const inspected = await inspectTransport(transport, message, target, config, token, localRepository);
+    const inspected = await inspectTransport(transport, message, target, config, token, localRepository, githubClient);
     base = inspected.base;
     treeSha256 = inspected.tree_sha256;
     described = inspected;

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "types": {
+    "create_issue": "apply",
+    "create_pull_request": "apply",
+    "push_to_pull_request_branch": "hold"
+  },
+  "paths": {
+    "apply": ["docs/"],
+    "review": ["src/"],
+    "hold": [".github/"]
+  }
+}

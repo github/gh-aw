@@ -12,6 +12,7 @@ on:
       - 'go.sum'
       - 'Makefile'
       - 'actions/setup/**'
+      - 'docs/examples/write-gate/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/*.md'
       - '.github/workflows/*.lock.yml'

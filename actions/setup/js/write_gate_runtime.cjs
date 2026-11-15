@@ -2,7 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const path = require("node:path");
-const { assertPendingWritesIntegrity, findPendingItem, inputDigest, withPendingWrite, currentPendingWrite, parsePendingJSON } = require("./pending_writes.cjs");
+const { assertPendingWritesIntegrity, findPendingItem, inputDigest, withPendingWrite, currentPendingWrite, parsePendingJSON, withPendingReview } = require("./pending_writes.cjs");
 const { readInput } = require("./pending_writes_files.cjs");
 const { readDecisionInventory, buildWriteDecisionInventory, writeDecisionInventory } = require("./write_gate_inventory.cjs");
 const { evaluateItemDecision } = require("./write_gate_decisions.cjs");
@@ -172,17 +172,19 @@ function createWriteGateRuntime(messages) {
       if (patch.sha256 !== item.code.patch_rendering.sha256) throw new Error(`${ERR_VALIDATION}: Gate review patch integrity mismatch`);
       patchContent = patch.bytes.toString("utf8");
     }
-    const result = await createGateReviewIssue({
-      message: { ...messages[index], output_id: item.output_id },
-      reviewRepo,
-      defaultRepo,
-      allowedRepos,
-      client: github,
-      assertUnchanged: () => {
-        assertPendingWritesIntegrity();
-      },
-      patchContent,
-    });
+    const result = await withPendingReview(item, reviewRepo, () =>
+      createGateReviewIssue({
+        message: { ...messages[index], output_id: item.output_id },
+        reviewRepo,
+        defaultRepo,
+        allowedRepos,
+        client: require("./pending_writes_client.cjs").guardPendingWriteClient(github),
+        assertUnchanged: () => {
+          assertPendingWritesIntegrity();
+        },
+        patchContent,
+      })
+    );
     if (result.gate_decision === "stage") effective.set(index, { decision: "stage", reason: result.reason });
     return result;
   }

@@ -356,10 +356,9 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
  */
 
 async function main() {
-  const { withPendingPublication } = require("./pending_writes.cjs");
-  const { describeDirectory } = require("./pending_writes_files.cjs");
+  const { withPendingDirectoryPublication } = require("./pending_writes.cjs");
   const id = process.env.MEMORY_ID;
-  return withPendingPublication("push_repo_memory", id, () => ({ id: `repo_memory:${id}`, kind: "directory", files: describeDirectory(process.env.ARTIFACT_DIR || "") }), mainUnchecked);
+  return withPendingDirectoryPublication("push_repo_memory", id, `repo_memory:${id}`, process.env.ARTIFACT_DIR || "", mainUnchecked);
 }
 
 async function mainUnchecked() {
@@ -808,7 +807,9 @@ async function mainUnchecked() {
       fs.mkdirSync(destDir, { recursive: true });
 
       // Copy file
-      fs.copyFileSync(file.source, destFilePath);
+      const captured = require("./pending_writes.cjs").capturedPublicationFile(file.source);
+      if (captured) require("./symlink_guard.cjs").writeGuardedFile(destFilePath, captured.bytes, { mode: captured.mode === "100755" ? 0o755 : 0o644 });
+      else fs.copyFileSync(file.source, destFilePath);
       core.info(`Copied: ${file.relativePath} (${file.size} bytes)`);
     } catch (error) {
       await setPushRepoMemoryFailure(`Failed to copy file ${file.relativePath}: ${getErrorMessage(error)}`);

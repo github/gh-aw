@@ -22,7 +22,7 @@ const { execGitSync } = require("./git_helpers.cjs");
  *   If provided, the issue_comment PR lookup (step 4) and repository default-branch
  *   lookup (step 6b) use this instead of context.repo, which is needed for
  *   cross-repo scenarios where the target repo differs from the workflow repository.
- * @param {{preferLocalDefaultBranchMetadata?: boolean, preferCheckedOutBranch?: boolean, cwd?: string}|null} [options] - Optional resolution hints.
+ * @param {{preferLocalDefaultBranchMetadata?: boolean, preferCheckedOutBranch?: boolean, cwd?: string, githubClient?: any, failClosed?: boolean}|null} [options] - Optional resolution hints.
  *   When preferLocalDefaultBranchMetadata is true and cwd is set, git is queried for
  *   refs/remotes/origin/HEAD in that repository to derive the repository default branch
  *   before falling back to payload/API-based default branch resolution.
@@ -30,6 +30,7 @@ const { execGitSync } = require("./git_helpers.cjs");
  * @returns {Promise<string>} The base branch name
  */
 async function getBaseBranch(targetRepo = null, options = null) {
+  const githubClient = options?.githubClient ?? (typeof github !== "undefined" ? github : null);
   // 1. Custom base branch from workflow configuration
   if (process.env.GH_AW_CUSTOM_BASE_BRANCH) {
     return process.env.GH_AW_CUSTOM_BASE_BRANCH;
@@ -49,7 +50,7 @@ async function getBaseBranch(targetRepo = null, options = null) {
   // Use targetRepo if provided (cross-repo scenarios), otherwise fall back to context.repo
   if (typeof context !== "undefined" && context.eventName === "issue_comment" && context.payload?.issue?.pull_request) {
     try {
-      if (typeof github !== "undefined") {
+      if (githubClient) {
         const repoOwner = targetRepo?.owner ?? context.repo.owner;
         const repoName = targetRepo?.repo ?? context.repo.repo;
 
@@ -67,7 +68,7 @@ async function getBaseBranch(targetRepo = null, options = null) {
           }
         }
 
-        const { data: pr } = await github.rest.pulls.get({
+        const { data: pr } = await githubClient.rest.pulls.get({
           owner: repoOwner,
           repo: repoName,
           pull_number: context.payload.issue.number,
@@ -75,6 +76,7 @@ async function getBaseBranch(targetRepo = null, options = null) {
         return pr.base.ref;
       }
     } catch (/** @type {any} */ error) {
+      if (options?.failClosed) throw new Error("Pending-write base branch cannot be read with the available credential", { cause: error });
       // Fall through to default if API call fails
       if (typeof core !== "undefined") {
         core.warning(`Failed to fetch PR base branch: ${getErrorMessage(error)}`);
@@ -121,7 +123,7 @@ async function getBaseBranch(targetRepo = null, options = null) {
     }
 
     // Otherwise fall back to repos.get() API call
-    if (repoOwner && repoName && typeof github !== "undefined") {
+    if (repoOwner && repoName && githubClient) {
       try {
         // SECURITY: Validate target repo against allowlist before any API calls
         const targetRepoSlug = `${repoOwner}/${repoName}`;
@@ -137,12 +139,13 @@ async function getBaseBranch(targetRepo = null, options = null) {
           }
         }
 
-        const { data: repoData } = await github.rest.repos.get({
+        const { data: repoData } = await githubClient.rest.repos.get({
           owner: repoOwner,
           repo: repoName,
         });
         return repoData.default_branch;
       } catch (/** @type {any} */ error) {
+        if (options?.failClosed) throw new Error("Pending-write base branch cannot be read with the available credential", { cause: error });
         // Fall through to default if API call fails
         if (typeof core !== "undefined") {
           core.warning(`Failed to fetch repository default branch: ${getErrorMessage(error)}`);
@@ -152,6 +155,7 @@ async function getBaseBranch(targetRepo = null, options = null) {
   }
 
   // 7. Fallback to DEFAULT_BRANCH env var or "main"
+  if (options?.failClosed) throw new Error("Pending-write base branch is unavailable; refusing a guessed default");
   return process.env.DEFAULT_BRANCH || "main";
 }
 
