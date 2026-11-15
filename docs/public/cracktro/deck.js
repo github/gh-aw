@@ -93,7 +93,7 @@
     color: transparent; -webkit-text-stroke: 2px #ffffff26; animation: scroll 30s linear infinite; }
   .ga-bg div:nth-child(2) { animation-direction: reverse; animation-duration: 36s; -webkit-text-stroke-color: #2ea04355; }
   .ga-copy { position: absolute; left: 110px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; gap: 26px; }
-  .ga-copy h2 { margin: 0; font-size: 106px; line-height: .92; font-variation-settings: "wght" 700, "wdth" 100; }
+  .ga-copy h2 { margin: 0; font-size: 96px; line-height: .92; white-space: nowrap; font-variation-settings: "wght" 700, "wdth" 100; }
   .ga-copy h2 .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #4493f8, #ab7df8, #3fb950); }
   .badge { align-self: flex-start; font: 500 22px/1 "Mona Sans"; color: #3fb950; background: #2ea04326;
     border: 1px solid #2ea04366; padding: 10px 18px; border-radius: 2em; box-shadow: 0 0 30px #2ea04333; }
@@ -1565,7 +1565,6 @@
   .pf-tta .fg { stroke: #3fb950; stroke-linecap: round; }
   .pf-tta i { display: block; font: 600 17px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: #9198a1; font-style: normal; margin-bottom: 10px; }
   .pf-tta b { font: 700 64px/1 var(--mono); color: #f0f6fc; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-  .pf-tta small { font: 500 26px/1 var(--mono); color: #9198a1; margin-left: 10px; }
   .pf-tta.done { border-color: #3fb950; box-shadow: 0 0 60px -10px #3fb95088; }
   .pf-tta.done b { color: #3fb950; }
   .pf-card .cap { font: 600 16px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: var(--c); position: absolute; top: -40px; left: 4px; }
@@ -2492,7 +2491,7 @@
           "div",
           { class: "ga-copy" },
           h("div", { class: "badge" }, "● GITHUB ACTIONS"),
-          h("h2", {}, letters("CI/CD to"), h("br"), letters("Continuous", "l-grad"), h("br"), letters("AI", "l-grad"))
+          h("h2", {}, letters("CI/CD meets"), h("br"), letters("Continuous AI", "l-grad"))
         ),
         h(
           "div",
@@ -2709,7 +2708,7 @@
       ttaSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     ttaSvg.setAttribute("viewBox", "0 0 96 96");
     ttaSvg.innerHTML = `<circle class="bg" cx="48" cy="48" r="40"/><circle class="fg" cx="48" cy="48" r="40" stroke-dasharray="${RC}" stroke-dashoffset="${RC}"/>`;
-    const tta = h("div", { class: "pf-tta" }, ttaSvg, h("div", {}, h("i", {}, "Time to agent"), ttaT, h("small", {}, "min")));
+    const tta = h("div", { class: "pf-tta" }, ttaSvg, h("div", {}, h("i", {}, "Time to agent"), ttaT));
     let t0 = 0,
       now = 0,
       snd = { p: 0, m: -2, go: false, card: [] };

@@ -10,7 +10,7 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`. 
 |---|---|
 | GitHubAgenticWorkflows |  |
 | Agentic Workflows |  |
-| CI/CD toContinuousAI | illustrative |
+| CI/CD meetsContinuous AI | illustrative |
 | Anatomy of a workflow | illustrative |
 | Turn Intent to Automation |  |
 | Turn Automation into Value | illustrative |
