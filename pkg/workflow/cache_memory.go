@@ -66,7 +66,7 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		// When threat detection is enabled, we only restore the cache and defer saving to a separate job after detection
 		// Use actions/cache for normal caches (which auto-saves via post-action)
 		threatDetectionEnabled := IsDetectionJobEnabled(data.SafeOutputs)
-		useRestoreOnly := data.DryRun || cache.RestoreOnly || threatDetectionEnabled
+		useRestoreOnly := data.DryRun || cache.RestoreOnly || threatDetectionEnabled || hasWriteGateSteps(data)
 
 		actionName := "Restore cache-memory file share data"
 
@@ -229,7 +229,7 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 	// Only upload artifacts when threat detection is enabled (needed for update_cache_memory job)
 	// When threat detection is disabled, cache is saved automatically by actions/cache post-action
 	threatDetectionEnabled := IsDetectionJobEnabled(data.SafeOutputs)
-	if !threatDetectionEnabled {
+	if !threatDetectionEnabled && !hasWriteGateSteps(data) {
 		cacheLog.Print("Skipping cache-memory artifact upload (threat detection disabled)")
 		return
 	}
@@ -425,7 +425,7 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 
 	// Only create this job if threat detection is enabled
 	// Otherwise, cache is updated automatically by actions/cache post-action
-	if !threatDetectionEnabled {
+	if !threatDetectionEnabled && !hasWriteGateSteps(data) {
 		return nil, nil
 	}
 
@@ -565,6 +565,15 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		BuildAnd(BuildAnd(BuildFunctionCall("always"), buildDetectionAcceptedCondition()), agentSucceeded),
 		cacheWriteAllowedCondition(),
 	))
+	jobNeeds := []string{string(constants.AgentJobName), string(constants.DetectionJobName), string(constants.ActivationJobName)}
+	if hasWriteGateSteps(data) {
+		// The trusted gate may accept warning-mode findings. Its verdict, not
+		// detection_success, authorizes publication in the final graph pass.
+		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), agentSucceeded), cacheWriteAllowedCondition()))
+		if !threatDetectionEnabled {
+			jobNeeds = []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
+		}
+	}
 
 	// Set up permissions for the cache update job.
 	// actions: write is required only when this job actually emits cache-save steps.
@@ -593,7 +602,7 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		RunsOn:      c.formatFrameworkJobRunsOn(data),
 		If:          jobCondition,
 		Permissions: permissions,
-		Needs:       []string{string(constants.AgentJobName), string(constants.DetectionJobName), string(constants.ActivationJobName)},
+		Needs:       jobNeeds,
 		Env:         jobEnv,
 		Steps:       steps,
 	}
