@@ -39,7 +39,7 @@ safe-outputs:
     max: 1
     close-older-issues: true
     close-older-key: daily-spec-coverage-kiro
-  missing-tool:
+  report-missing-tool:
 timeout-minutes: 20
 imports:
   - shared/otlp.md
@@ -64,8 +64,11 @@ references, and missing sections.
 node .github/scripts/audit_spec_coverage.cjs
 ```
 
-Run this exact command from the repository root without `cd`, pipelines, or
-shell loops. The read-only scanner checks every top-level `.github/aw/*.md`
+Run this exact command as one standalone Bash call from the repository root:
+no `cd`, pipelines, shell loops, or appended commands such as `; echo "EXIT=$?"`.
+Read the Bash tool's exit result directly. On a tool denial, report the exact
+command as incomplete; do not retry variants or claim Bash itself is unavailable.
+The read-only scanner checks every top-level `.github/aw/*.md`
 specification and its inline local Markdown links, ignoring fenced and inline
 code examples and external URLs. It returns complete counts, broken links, and
 missing frontmatter descriptions; do not limit the scan to the first 30 files
@@ -75,11 +78,16 @@ with the error rather than substituting a truncated grep result.
 
 ## Step 4 — Search for open issues mentioning spec gaps
 
-Use the GitHub MCP `list_issues` tool to fetch the 5 most-recently-created open issues from
-`${{ github.repository }}` that contain "spec" or "docs" in their title. Record issue numbers
-and titles.
+Use GitHub MCP `search_issues` for these two queries, each with `perPage: 5`:
 
-If integrity policy filters the results, call `report_incomplete` and describe
+- `repo:${{ github.repository }} is:issue is:open spec in:title sort:created-desc`
+- `repo:${{ github.repository }} is:issue is:open docs in:title sort:created-desc`
+
+Merge visible results, deduplicate by issue number, sort newest-created first,
+and retain at most five issue numbers and titles. Do not use `list_issues`:
+its newest five overall are not the newest five matching titles.
+
+If integrity policy filters either response, call `report_incomplete` and describe
 this required check as unavailable, not as an empty issue list. Do not bypass
 the policy with another API or repeatedly request the same filtered data.
 Preserve this limitation in any partial findings report; do not claim all
