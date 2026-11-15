@@ -304,7 +304,7 @@ async function lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken
  * @param {any} [opts.gitAuthEnv]
  * @param {string} [opts.pushRemoteUrl]
  * @param {string} [opts.pushToken]
- * @param {() => void} [opts.assertTransportUnchanged]
+ * @param {() => void | string} [opts.assertTransportUnchanged]
  * @param {boolean} [opts.requireExistingBranch]
  * @returns {Promise<string>}
  */
@@ -318,9 +318,11 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
       if (ancestor.exitCode !== 0) throw new Error(`${ERR_API}: non-fast-forward update to ${branch} refused`);
       pushArgs.push(`--force-with-lease=refs/heads/${branch}:${expectedHead}`);
     }
-    pushArgs.push(pushRemoteUrl || "origin", branch);
     await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: pushRemoteUrl || "origin", branch, cwd, gitAuthEnv });
-    assertTransportUnchanged?.();
+    const approvedHead = assertTransportUnchanged?.();
+    const gated = require("./pending_writes.cjs").pendingWritesEnabled();
+    if (gated && typeof approvedHead !== "string") throw new Error("Pending-write push requires a verified immutable commit");
+    pushArgs.push(pushRemoteUrl || "origin", gated ? `${approvedHead}:refs/heads/${branch}` : branch);
     const result = await getGitExecOutput(pushArgs, {
       cwd,
       env: { ...process.env, ...(gitAuthEnv || {}) },
@@ -334,6 +336,7 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
         .replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
       throw new Error(`${ERR_SYSTEM}: git push failed (exit code ${result.exitCode}): ${detail}${getWorkflowPermissionHint(detail)}`);
     }
+    if (gated && typeof approvedHead === "string") return approvedHead;
     return resolveLocalHeadSha(cwd);
   };
   if (!pushRemoteUrl || !pushToken) {
@@ -428,7 +431,7 @@ async function resolveLocalHeadSha(cwd) {
  * @param {string} [opts.currentRepo] - Repository slug used for same-repo temporary ID resolution
  * @param {Record<string, any>} [opts.validationConfig] - Optional safe-output policy config applied to synthesized GraphQL fileChanges
  * @param {(context: {cwd: string, branch: string, output: string}) => (boolean|Promise<boolean>)} [opts.resolveRebaseConflict]
- * @param {() => void} [opts.assertTransportUnchanged] - Check captured safe-output inputs immediately before remote writes
+ * @param {() => void | string} [opts.assertTransportUnchanged] - Check captured safe-output inputs immediately before remote writes
  * @returns {Promise<string | undefined>} SHA of the commit that landed on the target branch
  */
 async function pushSignedCommits({
@@ -456,7 +459,7 @@ async function pushSignedCommits({
     const originalAssertion = assertTransportUnchanged;
     assertTransportUnchanged = () => {
       originalAssertion?.();
-      assertPendingCodePublication({ owner, repo, branch, baseRef, cwd });
+      return assertPendingCodePublication({ owner, repo, branch, baseRef, cwd });
     };
     assertTransportUnchanged();
   }

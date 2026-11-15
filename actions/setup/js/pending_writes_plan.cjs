@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { SCHEMA, canonicalPendingJSON, inputDigest, itemDigest, parsePendingJSON } = require("./pending_writes.cjs");
+const { SCHEMA, canonicalPendingJSON, inputDigest, itemDigest, parsePendingJSON, withPendingPlanning } = require("./pending_writes.cjs");
 const { readInput, describeDirectory, sha256, MAX_INPUT_BYTES } = require("./pending_writes_files.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo, isExactRepoSlug } = require("./repo_helpers.cjs");
@@ -33,6 +33,13 @@ const PR_TYPES = new Set([
   "resolve_pull_request_review_thread",
 ]);
 const TEXT_FIELDS = new Set(["title", "body", "message", "reason", "details", "content", "description", "name", "record", "value", "patch", "labels", "assignees", "reviewers", "text", "comment"]);
+const DELEGATED_TYPES = new Map([
+  ["upload_asset", "upload_assets"],
+  ["upload_artifact", "safe_outputs"],
+  ["upload_code_coverage", "upload_code_coverage"],
+  ["create_code_scanning_alert", "upload_code_scanning_sarif"],
+  ["call_workflow", "call_workflow"],
+]);
 
 function withoutCredentials(value) {
   if (Array.isArray(value)) return value.map(withoutCredentials);
@@ -83,11 +90,19 @@ async function describeTarget(message, config, context, branches) {
   if (!repoResult.success || !isExactRepoSlug(repoResult.repoParts)) throw new Error("Pending-write repository cannot be resolved");
   /** @type {Record<string, any>} */
   const target = { repository: safeTargetString(repoResult.repo) };
+  if (DELEGATED_TYPES.has(message.type)) {
+    target.job = DELEGATED_TYPES.get(message.type);
+    return target;
+  }
   if (message.type === "create_pull_request") {
     const base = config.base_branch || (await getBaseBranch(repoResult.repoParts));
     target.base = safeTargetString(message.base || base);
     target.branch = branches.get(message);
-    if (config.head_repo) target.head_repository = safeTargetString(config.head_repo);
+    if (config["head-repo"]) {
+      const head = resolveAndValidateRepo({ repo: config["head-repo"] }, repoResult.repo, allowedRepos, "pull request head repository");
+      if (!head.success) throw new Error("Pending-write head repository cannot be resolved");
+      target.head_repository = safeTargetString(head.repo);
+    }
     return target;
   }
   if (CREATION_TYPES.has(message.type) || NO_WRITE_TYPES.has(message.type) || message.type === "ledger_append") return target;
@@ -153,6 +168,11 @@ function describeLedgerTransaction(messages, config, run) {
  * @param {Record<string, any>} options
  */
 async function buildPendingWrites(options) {
+  return withPendingPlanning(() => buildPendingWritesUnchecked(options));
+}
+
+/** @param {Record<string, any>} options */
+async function buildPendingWritesUnchecked(options) {
   const { bytes: agentBytes } = readInput(options.agentOutputPath);
   const output = parsePendingJSON(agentBytes.toString("utf8"));
   if (!output || !Array.isArray(output.items) || output.items.length > 1000) throw new Error("Pending writes require a bounded items array");
@@ -178,7 +198,8 @@ async function buildPendingWrites(options) {
     salts.set(message, salt);
     const handlerConfig = config.create_pull_request || {};
     const branch = message.branch ? normalizeBranchName(message.branch.trim(), handlerConfig.preserve_branch_name === true ? null : salt) : `${options.workflowId || "workflow"}-${salt}`;
-    branches.set(message, `${handlerConfig.branch_prefix || ""}${branch}`);
+    const prefix = normalizeBranchName(handlerConfig.branch_prefix || "");
+    branches.set(message, prefix && !branch.startsWith(prefix) ? `${prefix}${branch}` : branch);
   });
   const producers = new Map(messages.map((message, index) => [getCreatedTemporaryId(message), index]).filter(([id]) => id));
   const items = [];
@@ -192,12 +213,12 @@ async function buildPendingWrites(options) {
     /** @type {Record<string, any>} */
     const item = {
       output_id: ids[index],
-      type: message.type,
+      type: config[message.type] || NO_WRITE_TYPES.has(message.type) || (options.customTypes || []).includes(message.type) ? message.type : "unsupported",
       target: {},
       depends_on: [...dependencies].sort(),
       settings: {
         staged: parseBoolTemplatable(handlerConfig.staged, options.staged === true),
-        draft: parseBoolTemplatable(message.draft, parseBoolTemplatable(handlerConfig.draft, false)),
+        draft: parseBoolTemplatable(message.draft, parseBoolTemplatable(handlerConfig.draft, message.type === "create_pull_request")),
         protected_files_policy: handlerConfig.protected_files_policy || (message.type === "create_pull_request" ? "request_review" : "blocked"),
         sha256: inputDigest(handlerConfig),
       },
@@ -207,12 +228,13 @@ async function buildPendingWrites(options) {
       reason_category: "ready",
     };
     try {
-      if (!config[message.type] && !NO_WRITE_TYPES.has(message.type)) throw new Error("Unconfigured pending-write handler");
+      const custom = (options.customTypes || []).includes(message.type);
+      if (!config[message.type] && !NO_WRITE_TYPES.has(message.type) && !custom) throw new Error("Unconfigured pending-write handler");
       if (graph.invalid.has(index) || graph.cyclic) throw new Error("Invalid pending-write dependency graph");
-      item.target = await describeTarget(message, handlerConfig, context, branches);
+      item.target = custom ? { repository: run.repository, job: message.type } : await describeTarget(message, handlerConfig, context, branches);
       if (dynamicSettings(handlerConfig, message)) throw new Error("Pending-write plan requires dynamic auxiliary targets");
       if (["create_pull_request", "push_to_pull_request_branch"].includes(message.type)) {
-        const described = await describeCodeWrite(message, item.target, handlerConfig, salts.get(message), options.readToken);
+        const described = await describeCodeWrite(message, item.target, handlerConfig, salts.get(message), options.readToken, options.localRepository);
         item.code = described.code;
         for (const binding of described.bindings) {
           bindings.push({ id: `${binding.suffix}:${ids[index]}`, kind: binding.kind, path: binding.path });
@@ -230,12 +252,21 @@ async function buildPendingWrites(options) {
   for (const publication of options.publications || []) {
     let supplied = publication.supplied;
     if (publication.kind === "ledger") supplied = describeLedgerTransaction(messages, config, run);
-    else if (publication.binding_id) supplied = inputs.find(input => input.id === publication.binding_id);
+    else if (publication.kind === "sarif") {
+      const { prepareCodeScanningFinding, buildCodeScanningSarif } = require("./code_scanning_helpers.cjs");
+      const findings = messages.filter(message => message.type === "create_code_scanning_alert").map(prepareCodeScanningFinding);
+      supplied = buildCodeScanningSarif(findings.slice(0, config.create_code_scanning_alert?.max || findings.length), config.create_code_scanning_alert);
+    } else if (publication.binding_id) supplied = inputs.find(input => input.id === publication.binding_id);
     /** @type {Record<string, any>} */
     const item = {
       output_id: `job_${inputDigest([publication.job, publication.id]).slice(0, 16)}`,
       type: publication.type,
-      target: { repository: publication.repository || run.repository, job: publication.job, ...(publication.branch ? { branch: publication.branch } : {}) },
+      target: {
+        repository: publication.repository || run.repository,
+        job: publication.job,
+        ...(publication.branch ? { branch: publication.branch } : {}),
+        ...(publication.kind === "ledger" ? { branches: (config.ledger_append?.ledgers || []).map(ledger => `ledgers/${ledger.name}`) } : {}),
+      },
       depends_on: publication.kind === "ledger" ? items.filter(item => item.type === "ledger_append").map(item => item.output_id) : [],
       settings: { staged: options.staged === true, sha256: inputDigest(withoutCredentials(publication.settings || {})) },
       free_text: [],
@@ -244,6 +275,11 @@ async function buildPendingWrites(options) {
       complete: supplied !== undefined,
       reason_category: supplied === undefined ? "unsupported_plan" : "ready",
     };
+    if (publication.kind === "ledger") {
+      item.publication.records = Object.entries(supplied.ledgers).flatMap(([ledger, batch]) =>
+        batch.appends.map(append => ({ ledger, id: append.record.id, length: Buffer.byteLength(canonicalPendingJSON(append.record), "utf8"), sha256: inputDigest(append.record) }))
+      );
+    }
     item.item_sha256 = itemDigest(item);
     items.push(item);
   }
