@@ -11,6 +11,7 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 const fs = require("fs");
 const path = require("path");
+const { prepareCodeScanningFinding, buildCodeScanningSarif } = require("./code_scanning_helpers.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "create_code_scanning_alert";
@@ -55,37 +56,7 @@ async function main(config = {}) {
       return;
     }
 
-    const sarifContent = {
-      $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-      version: "2.1.0",
-      runs: [
-        {
-          tool: {
-            driver: {
-              name: driverName,
-              version: "1.0.0",
-              informationUri: "https://github.com/github/gh-aw",
-            },
-          },
-          results: validFindings.map((finding, index) => ({
-            ruleId: finding.ruleIdSuffix ? `${workflowFilename}-${finding.ruleIdSuffix}` : `${workflowFilename}-security-finding-${index + 1}`,
-            message: { text: finding.message },
-            level: finding.sarifLevel,
-            locations: [
-              {
-                physicalLocation: {
-                  artifactLocation: { uri: finding.file },
-                  region: {
-                    startLine: finding.line,
-                    startColumn: finding.column,
-                  },
-                },
-              },
-            ],
-          })),
-        },
-      ],
-    };
+    const sarifContent = buildCodeScanningSarif(validFindings, { driver: driverName, workflow_filename: workflowFilename });
 
     try {
       fs.writeFileSync(sarifFilePath, JSON.stringify(sarifContent, null, 2));
@@ -235,15 +206,7 @@ async function main(config = {}) {
     processedCount++;
 
     // Create a valid finding object
-    const finding = {
-      file: securityItem.file.trim(),
-      line: line,
-      column: column,
-      severity: normalizedSeverity,
-      sarifLevel: sarifLevel,
-      message: securityItem.message.trim(),
-      ruleIdSuffix: ruleIdSuffix,
-    };
+    const finding = prepareCodeScanningFinding({ ...securityItem, line, column, severity: normalizedSeverity, ...(ruleIdSuffix === null ? {} : { ruleIdSuffix }) });
 
     validFindings.push(finding);
 

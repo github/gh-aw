@@ -730,6 +730,7 @@ async function main(config = {}) {
           await assertClaimAuthorized({ ...message, repo: repository }, { effect: true, resource: { repository, host: expectedGitHubHost(), repository_id: String(nativeRepository.id), run_id: process.env.GITHUB_RUN_ID } });
         }
         const effect = recordClaimEffect({ kind: "artifact", repository, outcome: "unknown" });
+        require("./pending_writes.cjs").assertPendingWritesIntegrity();
         const uploadResult = await client.uploadArtifact(artifactName, absoluteFiles, stagingDirectory(), uploadOpts);
         if (effect) {
           effect.outcome = "succeeded";

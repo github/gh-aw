@@ -26,6 +26,18 @@ const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
  * @returns {Promise<void>}
  */
 async function main({ pushState } = {}) {
+  const { withPendingPublication } = require("./pending_writes.cjs");
+  const { describeDirectory } = require("./pending_writes_files.cjs");
+  return withPendingPublication(
+    "push_evals_state",
+    "evals",
+    () => ({ id: "evals", kind: "directory", files: describeDirectory(process.env.GH_AW_STATE_DIR || "") }),
+    () => mainUnchecked({ pushState })
+  );
+}
+
+/** @param {{pushState?: () => Promise<void>}} [options] */
+async function mainUnchecked({ pushState } = {}) {
   const stateDir = process.env.GH_AW_STATE_DIR || "";
   const status = stateDir ? readEvalsNotEvaluatedStatus(path.join(stateDir, EVALS_STATUS_FILENAME)) : null;
   if (status) {

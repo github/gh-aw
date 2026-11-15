@@ -310,6 +310,16 @@ function appendLedgerRecords(ledger, appends, config) {
 }
 
 async function main(options = {}) {
+  const { withPendingPublication } = require("./pending_writes.cjs");
+  return withPendingPublication(
+    "push_ledger_changes",
+    "transactions",
+    () => options.artifact || readTransactions(options.file),
+    () => mainUnchecked(options)
+  );
+}
+
+async function mainUnchecked(options = {}) {
   const artifact = options.artifact || readTransactions(options.file);
   const ledgerConfigs = options.ledgerConfigs || readLedgerConfig(options.config);
   validateTransactions(artifact, ledgerConfigs);

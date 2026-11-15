@@ -62,12 +62,12 @@ function readAuthorizedManifest(file = process.env.GH_AW_PENDING_WRITES, expecte
   }
   if (sha256(bytes) !== expected) throw integrityError();
   const manifest = parsePendingJSON(bytes.toString("utf8"));
-  if (manifest.schema !== SCHEMA || manifest.complete !== true || !Array.isArray(manifest.items) || !Array.isArray(manifest.inputs) || canonicalPendingJSON(manifest) !== bytes.toString("utf8")) {
+  if (manifest.schema !== SCHEMA || typeof manifest.complete !== "boolean" || !Array.isArray(manifest.items) || !Array.isArray(manifest.inputs) || canonicalPendingJSON(manifest) !== bytes.toString("utf8")) {
     throw integrityError("manifest_incomplete");
   }
   const ids = new Set();
   for (const item of manifest.items) {
-    if (item.complete !== true || typeof item.output_id !== "string" || ids.has(item.output_id) || item.item_sha256 !== itemDigest(item)) throw integrityError("manifest_invalid");
+    if (typeof item.complete !== "boolean" || typeof item.output_id !== "string" || ids.has(item.output_id) || item.item_sha256 !== itemDigest(item)) throw integrityError("manifest_invalid");
     ids.add(item.output_id);
   }
   return manifest;
@@ -121,7 +121,19 @@ async function withPendingWrite(message, operation, index = undefined) {
   if (!pendingWritesEnabled()) return operation();
   const manifest = assertPendingWritesIntegrity();
   const item = findPendingItem(manifest, message, index);
+  if (item.complete !== true) throw integrityError("item_incomplete");
   return activeWrite.run(item, operation);
+}
+
+function withPendingPlanning(operation) {
+  return activeWrite.run({ planning: true }, operation);
+}
+
+async function withPendingReview(item, repository, operation) {
+  if (!pendingWritesEnabled()) throw integrityError("review_scope_missing");
+  const manifest = assertPendingWritesIntegrity();
+  if (repository !== process.env.GH_AW_WRITE_GATE_REVIEW_REPO || !manifest.items.some(candidate => candidate.output_id === item.output_id && candidate.item_sha256 === item.item_sha256)) throw integrityError("review_scope_invalid");
+  return activeWrite.run({ type: "create_issue", review: true, target: { repository }, output_id: item.output_id, item_sha256: item.item_sha256 }, operation);
 }
 
 function pendingBranchSalt() {
@@ -136,8 +148,10 @@ function currentPendingWrite() {
 function assertPendingTarget(target) {
   if (!pendingWritesEnabled()) return;
   const item = activeWrite.getStore();
-  if (!item) return;
+  if (item?.planning) return;
+  if (!item) throw integrityError("item_missing");
   for (const [key, value] of Object.entries(target)) {
+    if (key === "repository" && value === item.target.head_repository) continue;
     if (value !== undefined && item.target[key] !== value) throw integrityError("target_changed");
   }
 }
@@ -155,16 +169,24 @@ function assertPendingCodeFiles(actualFiles) {
 function assertPendingCodePublication({ owner, repo, branch, baseRef, cwd }) {
   if (!pendingWritesEnabled()) return;
   const item = activeWrite.getStore();
+  const { execLocalGitSync } = require("./git_helpers.cjs");
+  if (item?.publication) {
+    item.recheck();
+    if (`${owner}/${repo}` !== item.target.repository || (item.target.branch && branch !== item.target.branch) || (item.target.branches && !item.target.branches.includes(branch))) throw integrityError("target_changed");
+    return execLocalGitSync(["rev-parse", "--verify", "HEAD^{commit}"], { cwd }).trim();
+  }
   if (!item?.code?.complete) throw integrityError("code_plan_incomplete");
   if (`${owner}/${repo}` !== (item.target.head_repository || item.target.repository) || branch !== item.target.branch) throw integrityError("target_changed");
-  const { execLocalGitSync } = require("./git_helpers.cjs");
   const options = { cwd, timeout: 10000, maxBuffer: MAX_INPUT_BYTES };
+  const head = execLocalGitSync(["rev-parse", "--verify", "HEAD^{commit}"], options).trim();
   const base = execLocalGitSync(["rev-parse", "--verify", `${baseRef}^{commit}`], options).trim();
   if (item.code.base_commit && !base.startsWith(item.code.base_commit)) throw integrityError("base_changed");
-  const files = execLocalGitSync(["diff", "--name-only", "--no-renames", "-z", `${base}..HEAD`], options)
+  const files = execLocalGitSync(["diff", "--name-only", "--no-renames", "-z", `${base}..${head}`], options)
     .split("\0")
     .filter(Boolean);
   assertPendingCodeFiles(files);
+  if (!item.code.tree_sha256 || sha256(Buffer.from(execLocalGitSync(["ls-tree", "-r", "-z", head], { ...options, encoding: "latin1" }), "latin1")) !== item.code.tree_sha256) throw integrityError("content_changed");
+  return head;
 }
 
 /**
@@ -175,7 +197,17 @@ function assertPendingPublication(job, id, supplied) {
   if (!pendingWritesEnabled()) return;
   const manifest = readAuthorizedManifest();
   const matches = manifest.items.filter(item => item.target.job === job && item.publication?.id === id);
-  if (matches.length !== 1 || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
+  if (matches.length !== 1 || matches[0].complete !== true || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
+}
+
+async function withPendingPublication(job, id, readSupplied, operation) {
+  if (!pendingWritesEnabled()) return operation();
+  const manifest = readAuthorizedManifest();
+  const item = manifest.items.find(item => item.target.job === job && item.publication?.id === id);
+  if (!item) throw integrityError("item_missing");
+  const recheck = () => assertPendingPublication(job, id, readSupplied());
+  recheck();
+  return activeWrite.run({ ...item, recheck }, operation);
 }
 
 /** Compiler-owned check after authored gate steps. */
@@ -185,7 +217,7 @@ async function verify(expected, options) {
     const current = await buildPendingWrites(options);
     const bytes = readInput(options.manifestPath).bytes;
     if (current.sha256 !== expected || sha256(bytes) !== expected) return { allow: false, reason: "inputs_changed" };
-    return current.manifest.complete ? { allow: true, reason: "allowed", manifest: current.manifest } : { allow: false, reason: "manifest_incomplete" };
+    return { allow: true, reason: current.manifest.complete ? "allowed" : "manifest_incomplete", manifest: current.manifest };
   } catch {
     return { allow: false, reason: "inputs_changed" };
   }
@@ -212,12 +244,15 @@ module.exports = {
   assertPendingWritesIntegrity,
   findPendingItem,
   withPendingWrite,
+  withPendingPlanning,
+  withPendingReview,
   pendingBranchSalt,
   currentPendingWrite,
   assertPendingTarget,
   assertPendingCodeFiles,
   assertPendingCodePublication,
   assertPendingPublication,
+  withPendingPublication,
   integrityError,
   verify,
   prepare,
