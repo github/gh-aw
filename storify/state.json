@@ -1,31 +1,24 @@
 {
-  "last_run_date": "2026-11-14",
+  "last_run_date": "2026-11-15",
   "last_window": {
-    "start": "2026-11-13T07:55:59Z",
-    "end": "2026-11-14T07:55:59Z"
+    "start": "2026-11-14T07:52:42Z",
+    "end": "2026-11-15T07:52:42Z"
   },
   "observed_window": {
-    "coverage": "Partial: 255 cached runs created 2026-11-13T23:50:23Z through 2026-11-14T07:54:11Z. Count-limit continuation identifies uncollected window 2026-11-13T07:55:59Z through 23:46:46Z; no fleet refetch.",
-    "representative_audits": [
-      43571242815,
-      43563607650,
-      43553145754,
-      43551265838,
-      43556706803,
-      43562505048,
-      43563606942,
-      43565779985
-    ]
+    "coverage": "413 cached runs, created 2026-11-14T17:05:45Z through 2026-11-15T07:52:42Z. Count-limited collection leaves earlier requested window missing; no fleet refetch. GitHub reads corroborate selected events in the gap.",
+    "continuation_start": "2026-11-14T07:55:09Z",
+    "continuation_end": "2026-11-14T17:05:26Z",
+    "continuation_before_run_id": 43619207978
   },
   "key_themes": [
-    "Auditor collection failed in eight cached runs; Health Manager refiled P1 #77641 and Issue Monster requested assignment.",
-    "Three workflows failed safe-output processing; reviewer and Sous Chef feedback drove revisions in open ledger PR #77644.",
-    "Dashboard comparability PR #77676 merged after Health Manager issue and Issue Monster assignment."
+    "Auditor collection failed in 15 cached runs; tracker #77641 expired; dashboard #77985 and assignment request remain.",
+    "Four workflows failed Process Safe Outputs after agent success; causes unknown. PR #77644 merged; reviewer failed on #77899.",
+    "Conclusion failure tracker #77984 opened; Sous Chef sample fails checkout ahead of failure handler."
   ],
   "carry_forward_questions": [
-    "Did Auditor collection recover, and what was its actual error?",
-    "Did the ledger reviewer publication failure recur, and was the reported invalid-append cause confirmed?",
-    "Did the dashboard tier and trend changes produce comparable subsequent snapshots?",
-    "What happened in the uncollected earlier window?"
+    "Did Auditor collection recover and was its dedicated tracker replaced or reopened?",
+    "Do safe-output failures share a cause and did ledger diagnostics help?",
+    "What causes conclusion failures across workflows and is the tracker progressing?",
+    "Can the missing early portion of the window be assessed separately?"
   ]
 }
