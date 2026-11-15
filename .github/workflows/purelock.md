@@ -349,6 +349,8 @@ If not fuzz friendly and coverage is still short, extend the table instead; docu
 
 ### E. Validate
 
+Use the focused checks below as the complete validation gate for this test-only change. Do not run `make agent-report-progress` or other repository-wide lint targets: they invoke Go lint tooling, including `golangci-lint`, which is not installed in the agent sandbox.
+
 All of these must pass:
 
 1. `gofmt -l <test_file>` reports nothing.
