@@ -72,6 +72,7 @@ jobs:
                 let decision = Object.hasOwn(policy.types, item.type) ? policy.types[item.type] : "drop";
                 if (codeTypes.has(item.type)) {
                   if (!object(item.code) || item.code.complete !== true ||
+                      !/^[a-f0-9]{64}$/.test(item.code.tree_sha256 || "") ||
                       !Array.isArray(item.code.files) || item.code.files.length === 0 ||
                       !Array.isArray(item.code.evaluated_paths) || item.code.evaluated_paths.length === 0 ||
                       item.code.evaluated_paths.some(path => !pathValid(path))) throw new Error("code_evidence");
