@@ -74,7 +74,7 @@ Prose != native error.
 | `model_policy_violation`, `content_filter` | Provider/proxy reason; endpoint mismatch separately. | Correct request within policy; no credential swap/bypass. |
 | `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone != authentication failure. |
 | `capi_quota_exceeded_error` | Native 429; exhausted retries. | Respect quota/reset; no retry storm. |
-| `rate_limit_wait_exceeded`, `rate_limit_error` | 429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout. | GitHub models (Copilot/Claude/Codex): wait within both bounds or defer. Preserve other providers' policy and terminal quota/proxy guards. No unauthorized redispatch. |
+| `rate_limit_wait_exceeded`, `rate_limit_error` | 429/provider, usable `Retry-After`, harness retries, `max-delay-ms`, timeout. | GitHub models (Copilot/Claude/Codex): wait within both bounds or defer. Keep other providers' policy and terminal guards. No unauthorized redispatch. |
 | `capi_server_error`, `engine_outage`, `infrastructure_error` | Exhausted native 5xx/infrastructure timeline. | Report cause; bounded backoff, no unapproved redispatch. |
 | `agentic_engine_timeout` | Step/SDK budget vs post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone != timeout. |
 | `sandbox_runtime_crash` | Exit/signal, resources, runtime revision. | Fix crash/resources; retain redacted diagnostic/version. |
@@ -185,7 +185,7 @@ Nonempty `safeoutputs.jsonl` != publication.
 | `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title vs guards. | Respect deliberate skip; fix mistaken target/config only. |
 | `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL` | Lock/approval state. | Respect state; no unrelated unlock/approval. |
 | `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Quota/retry-not-before. | Stop/defer within bounds; missing accounting != zero. |
-| `AIC_USAGE_UNKNOWN` | Missing usage/accounting. | Fix collection/access; remaining budget stays unknown. |
+| `AIC_USAGE_UNKNOWN`, `AIC_USAGE_UNPRICED` | Missing usage/pricing. | Fix collection/pricing; not zero. |
 | `permission_denied` | Business response; operation authority. | Fix authorized credentials/permissions, not quota. |
 
 ## Merge guard codes
