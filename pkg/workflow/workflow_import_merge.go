@@ -86,6 +86,11 @@ func (c *Compiler) processAndMergeServices(frontmatter map[string]any, workflowD
 // mergeJobsFromYAMLImports merges jobs from imported YAML workflows with main workflow jobs
 // Main workflow jobs take precedence, with outputs and injected steps merged.
 func (c *Compiler) mergeJobsFromYAMLImports(mainJobs map[string]any, mergedJobsJSON string) (map[string]any, error) {
+	var err error
+	mainJobs, mergedJobsJSON, err = normalizeWriteGateImportJobs(mainJobs, mergedJobsJSON)
+	if err != nil {
+		return nil, err
+	}
 	if mergedJobsJSON == "" || mergedJobsJSON == "{}" {
 		workflowImportMergeLog.Print("No imported jobs to merge")
 		return mainJobs, nil
@@ -324,6 +329,9 @@ func mergeJobInjectedSteps(jobName string, mainJob any, importedJob any) (map[st
 
 	mergedAny := false
 	fieldNames := []string{"setup-steps", "pre-steps"}
+	if normalizeBuiltinJobAlias(jobName) == string(constants.SafeOutputsJobName) {
+		fieldNames = append(fieldNames, "gate-steps")
+	}
 	if jobName == string(constants.ActivationJobName) {
 		fieldNames = append(fieldNames, "steps")
 	}

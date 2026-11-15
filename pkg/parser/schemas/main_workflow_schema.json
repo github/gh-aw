@@ -3152,6 +3152,14 @@
             ],
             "description": "Optional steps inserted after setup-injected steps and before any checkout step in this custom job. Uses the same schema as `steps`."
           },
+          "gate-steps": {
+            "allOf": [
+              {
+                "$ref": "#/properties/jobs/additionalProperties/properties/steps"
+              }
+            ],
+            "description": "Data-only write-gate steps for jobs.safe_outputs. Runs after artifact downloads and preparation, before compiler-managed write credentials and handlers. Imported steps run first."
+          },
           "setup-steps": {
             "allOf": [
               {

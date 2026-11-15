@@ -1,0 +1,62 @@
+// @ts-check
+import { describe, it, expect } from "vitest";
+
+const { buildWriteGateRecord } = require("./record_write_gate.cjs");
+const identity = {
+  GH_AW_WRITE_GATE_REPOSITORY: "owner/repo",
+  GH_AW_WRITE_GATE_RUN_ID: "123",
+  GH_AW_WRITE_GATE_RUN_ATTEMPT: "1",
+  GH_AW_WRITE_GATE_HEAD_SHA: "a".repeat(40),
+  GH_AW_WRITE_GATE_WORKFLOW_SHA: "b".repeat(40),
+  GH_AW_WRITE_GATE_WORKFLOW_REF: "owner/repo/.github/workflows/test.lock.yml@refs/heads/main",
+};
+
+describe("compiler-owned write gate record", () => {
+  it("records successful gate decisions without claiming item enforcement", () => {
+    for (const verdict of ["allow", "deny", "partial"]) {
+      const record = buildWriteGateRecord({
+        ...identity,
+        GH_AW_WRITE_GATE: verdict,
+        GH_AW_WRITE_GATE_REASON: "policy",
+        GH_AW_WRITE_GATE_JOB_RESULT: "success",
+      });
+      expect(record).toEqual({
+        version: 1,
+        repository: "owner/repo",
+        run_id: "123",
+        run_attempt: "1",
+        head_sha: "a".repeat(40),
+        workflow_sha: "b".repeat(40),
+        workflow_ref: "owner/repo/.github/workflows/test.lock.yml@refs/heads/main",
+        verdict,
+        reason: "policy",
+        safe_outputs_result: "success",
+      });
+    }
+  });
+
+  it("preserves a validated allow when later publication fails or is cancelled", () => {
+    const { validateReplayWriteGateRecord } = require("./apply_safe_outputs_replay.cjs");
+    for (const result of ["failure", "cancelled", "timed_out", "skipped", undefined]) {
+      const record = buildWriteGateRecord({ ...identity, GH_AW_WRITE_GATE: "allow", GH_AW_WRITE_GATE_REASON: "policy_allow", GH_AW_WRITE_GATE_JOB_RESULT: result });
+      expect(record.verdict).toBe("allow");
+      expect(record.reason).toBe("policy_allow");
+      expect(record.safe_outputs_result).toBe(result || "unknown");
+      expect(() => validateReplayWriteGateRecord(record, { repository: "owner/repo", runId: "123", attempt: 1, headSha: "a".repeat(40), workflowSha: "b".repeat(40), workflowPath: ".github/workflows/test.lock.yml" })).toThrow(
+        /successful recorded allow/
+      );
+    }
+  });
+
+  it("narrows missing or unknown gate verdicts to deny", () => {
+    for (const verdict of ["", "unknown", undefined, "ALLOW"]) {
+      expect(buildWriteGateRecord({ ...identity, GH_AW_WRITE_GATE: verdict, GH_AW_WRITE_GATE_JOB_RESULT: "success" }).verdict).toBe("deny");
+    }
+  });
+
+  it("rejects records without immutable run identity", () => {
+    for (const key of Object.keys(identity)) {
+      expect(() => buildWriteGateRecord({ ...identity, [key]: "" })).toThrow(/commit identity/);
+    }
+  });
+});
