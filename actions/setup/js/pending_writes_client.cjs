@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { pendingWritesEnabled, assertPendingWritesIntegrity, integrityError, currentPendingWrite } = require("./pending_writes.cjs");
+const { pendingWritesEnabled, assertPendingWritesIntegrity, integrityError, currentPendingWrite, assertPendingEffectAllowed } = require("./pending_writes.cjs");
 const clients = new WeakMap();
 const READ_METHOD = /^(?:get|list|compare|check|download|search|paginate)/;
 
@@ -38,6 +38,7 @@ function guardPendingWriteClient(client) {
               if (branch?.repositoryNameWithOwner !== repository || (item.target.branch && branch?.branchName !== item.target.branch)) throw integrityError("target_changed");
               if (item.publication) item.recheck();
               else assertPendingWritesIntegrity();
+              assertPendingEffectAllowed();
             }
             return value.apply(target, args);
           };
@@ -59,6 +60,7 @@ function guardPendingWriteClient(client) {
             if (!item || item.planning) throw integrityError("item_missing");
             if (item.publication) item.recheck();
             else assertPendingWritesIntegrity();
+            assertPendingEffectAllowed();
             const request = args[0];
             if (!request || typeof request !== "object") throw integrityError("target_changed");
             if (item.review && (namespace !== "issues" || key !== "create" || request.assignees?.length)) throw integrityError("review_scope_invalid");
