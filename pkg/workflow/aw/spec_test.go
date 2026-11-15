@@ -140,7 +140,70 @@ func TestSpec_DesignDecision_CompilerResponsibilities(t *testing.T) {
 	}
 }
 
-// SPEC_AMBIGUITY: README.md names ExecutionBlocks, AuthoredJobDependencies, and
-// ValidateStatusOnlyJob without defining execution-block forms, dependency input
-// forms, or status-only requirements. Their behavior needs a fuller specification
-// before it can be asserted without assumptions.
+// SPEC_AMBIGUITY: README.md does not define execution-block forms, authored
+// dependency input forms, status-only opt-in syntax, or prohibited agent-data
+// references. Those cases need a fuller specification before they can be asserted
+// without assumptions. The explicit graph and empty-condition contracts are
+// tested below.
+
+// TestSpec_PublicAPI_ParseActionsExpression checks README.md / Public API:
+// accept one nonempty expression using syntax alone, without semantic validation.
+func TestSpec_PublicAPI_ParseActionsExpression(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name       string
+		expression string
+		wantErr    bool
+	}{
+		{name: "context reference", expression: "github.ref"},
+		{name: "comparison", expression: "github.ref == 'refs/heads/main'"},
+		{name: "unvalidated context", expression: "spec_unknown_context.value"},
+		{name: "unvalidated function", expression: "spec_unknown_function('value')"},
+		{name: "empty expression", wantErr: true},
+		{name: "incomplete comparison", expression: "github.ref ==", wantErr: true},
+		{name: "two expressions", expression: "github.ref github.sha", wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, tree, err := aw.ParseActionsExpression(tt.expression)
+			if tt.wantErr {
+				require.Error(t, err, "input must contain exactly one complete nonempty expression: %s", tt.name)
+				return
+			}
+			require.NoError(t, err, "syntactically valid expressions must parse without semantic validation: %s", tt.name)
+			assert.NotNil(t, tree, "parsing a nonempty expression must return its syntax tree")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_JobDependencyGraphDependsOn checks README.md / Public API:
+// dependency queries are transitive and safe before cycle validation.
+func TestSpec_PublicAPI_JobDependencyGraphDependsOn(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name       string
+		graph      aw.JobDependencyGraph
+		job        string
+		dependency string
+		expected   bool
+	}{
+		{name: "direct dependency", graph: aw.JobDependencyGraph{"publish": {"build"}, "build": {}}, job: "publish", dependency: "build", expected: true},
+		{name: "transitive dependency", graph: aw.JobDependencyGraph{"publish": {"test"}, "test": {"build"}, "build": {}}, job: "publish", dependency: "build", expected: true},
+		{name: "disconnected jobs", graph: aw.JobDependencyGraph{"publish": {}, "build": {}}, job: "publish", dependency: "build"},
+		{name: "dependency is directional", graph: aw.JobDependencyGraph{"publish": {"build"}, "build": {}}, job: "build", dependency: "publish"},
+		{name: "reachable through a cycle", graph: aw.JobDependencyGraph{"first": {"second"}, "second": {"first", "build"}, "build": {}}, job: "first", dependency: "build", expected: true},
+		{name: "cycle disconnected from target", graph: aw.JobDependencyGraph{"first": {"second"}, "second": {"first"}, "build": {}}, job: "first", dependency: "build"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.graph.DependsOn(tt.job, tt.dependency), "dependency queries must follow graph edges even before cycle validation: %s", tt.name)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_HasSuccessfulDetectionCondition checks README.md / Public
+// API's explicit rule that an empty condition is considered successful.
+func TestSpec_PublicAPI_HasSuccessfulDetectionCondition(t *testing.T) {
+	t.Parallel()
+	assert.True(t, aw.HasSuccessfulDetectionCondition(""), "an empty job condition must be considered successful")
+}
