@@ -76,16 +76,22 @@ A policy decision MUST be deterministic: given identical attribution inputs, the
 The minimum conformance fixture set for these RFC 2119 norms is tracked in
 `specs/intent-attribution-compliance/`:
 
+The directory contains six YAML fixtures and this README.
+
 - `specs/intent-attribution-compliance/explicit-intent-wins.yaml`
 - `specs/intent-attribution-compliance/ambiguous-root-closing-issues.yaml`
 - `specs/intent-attribution-compliance/unlinked-pr-fail-closed.yaml`
-
+- `specs/intent-attribution-compliance/multi-root-policy.yaml`
+- `specs/intent-attribution-compliance/suggested-attribution-fail-closed.yaml`
+- `specs/intent-attribution-compliance/unmapped-labels-fail-closed.yaml`
 
 ## Current implementation
 
 Implementation status, operational sync guidance, and the runtime enforcement map are maintained in the [implementation companion](intent-attribution-agent-governance-implementation.md#current-implementation). This heading remains as a stable reference anchor; normative safeguards remain below.
 
 ### Safeguards
+
+In this repository, `.github/intent-policy.json` is an illustrative future migration path; the checked-in attribution source is `.github/objective-mapping.json`.
 
 When governance policy resolution fails because `.github/objective-mapping.json`,
 `.github/intent-policy.json`, or equivalent policy inputs are missing, malformed,
@@ -1397,6 +1403,11 @@ It is a deterministic control layer for agentic GitHub work.
 > **Intent determines authority. Execution produces evidence.**
 
 ## Change Log
+
+### 2026-11-15
+
+- Listed all six YAML conformance fixtures currently present in `specs/intent-attribution-compliance/`.
+- Assigned the unverified three-consecutive-CI-run drift escalation norm to Intent Attribution maintainers, with a planned CI enforcement path recorded in the implementation companion.
 
 ### 2026-11-09
 

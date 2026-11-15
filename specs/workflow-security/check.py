@@ -435,8 +435,27 @@ def check_sources(compiler, results):
                 f"see compiler output: {compile_result.stdout}{compile_result.stderr}"
             )
         lock_contents = lock_path.read_text()
+        expected_counts = re.search(
+            r"<!-- Expected compile-only lock properties:\s*"
+            r"checkout-token-count:\s*(\d+)\s*"
+            r"github-app-safe-output-count:\s*(\d+)\s*-->",
+            seed,
+        )
+        if not expected_counts:
+            raise RuntimeError("Cross-repo fixture is missing its expected compile-only counts")
+        expected_checkout_count = int(expected_counts.group(1))
+        expected_app_safe_output_count = int(expected_counts.group(2))
+        manifest_count = re.search(
+            r'(?m)^[ \t]+GH_AW_CHECKOUT_MANIFEST_COUNT: "(\d+)"$', lock_contents
+        )
+        if not manifest_count or int(manifest_count.group(1)) != expected_checkout_count:
+            actual_count = manifest_count.group(1) if manifest_count else "missing"
+            raise RuntimeError(
+                f"Cross-repo lock has {actual_count} checkout tokens; "
+                f"fixture expects {expected_checkout_count}"
+            )
         expected_lock_properties = [
-            'GH_AW_CHECKOUT_MANIFEST_COUNT: "2"',
+            f'GH_AW_CHECKOUT_MANIFEST_COUNT: "{expected_checkout_count}"',
             'GH_AW_CHECKOUT_REPO_0: "github/gh-aw"',
             'GH_AW_CHECKOUT_REPO_1: "example/private-dependency"',
             "GH_AW_CHECKOUT_TOKEN_1: ${{ secrets.MODEL_DEPENDENCY_READ_TOKEN }}",
@@ -450,9 +469,12 @@ def check_sources(compiler, results):
         app_token_count = len(re.findall(
             r"(?m)^[ \t]+uses: actions/create-github-app-token@", lock_contents
         ))
-        if app_token_count != 2:
+        expected_app_token_count = expected_app_safe_output_count * 2
+        if app_token_count != expected_app_token_count:
             raise RuntimeError(
-                f"Cross-repo lock has {app_token_count} GitHub App token steps; expected 2"
+                f"Cross-repo lock has {app_token_count} GitHub App token steps; "
+                f"expected {expected_app_token_count} for "
+                f"{expected_app_safe_output_count} GitHub App safe-output binding(s)"
             )
         for property_text in [
             "client-id: ${{ vars.MODEL_APP_ID }}",

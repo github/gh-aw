@@ -26,6 +26,11 @@ The concrete boundary tests are in
 `actions/setup/js/daily_aic_component_coverage.test.cjs` and include the
 T-AIC-DG-026 verified-carry-forward case.
 
+Configuration alignment (2026-11-15): `CHECK_DEADLOCK FALSE` matches the
+workflow-security TLA+ configurations. TLC was not run for this update because
+the pinned `TLA2TOOLS_JAR` is unavailable in the environment; the invocation
+above remains the reproducible model-check command.
+
 ## Requirements
 
 `CancelledRerunAccounting.tla` must never accept carried-forward usage unless

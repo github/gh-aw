@@ -35,6 +35,7 @@ The normative safeguards remain in the main specification's
 
 Until repositories migrate fully to `.github/intent-policy.json`, `.github/objective-mapping.json`
 remains the authoritative label-to-intent source for attribution fallback and drift detection.
+Here, `.github/intent-policy.json` is an illustrative future path and is not currently checked in.
 This specification defines the precedence and sync expectations for that migration, but does
 not assign a mandatory repository-by-repository completion deadline.
 For this document, "fully migrate" means all active intent keys and governance rules are
@@ -55,8 +56,18 @@ keys, the first-detected date, and the on-call maintainer as the default assigne
 ensures that aspirational migration language does not mask persistent, unaddressed
 configuration drift.
 
-**Status (2026-11-09)**: The escalation norm remains in force. This pass did not verify that
-a CI check currently enforces the threshold or opens/updates the required tracking issue.
+**Status (2026-11-15)**: The escalation norm remains in force, but enforcement is not implemented
+or verified in this repository.
+
+### Operations
+
+**Owner:** Intent Attribution maintainers.
+
+**Enforcement path (planned, not implemented):** Add a CI check in
+`.github/workflows/intent-attribution-drift.yml` that invokes a `pkg/intent` drift comparison,
+tracks consecutive warnings by affected key, fails on the third consecutive run, and opens or
+updates the tracking issue with affected keys, first-detected date, and the on-call maintainer
+as assignee. Until that check exists and is verified, the escalation norm is not enforced.
 
 ## Runtime enforcement map
 
