@@ -1046,6 +1046,7 @@ describe("handle_agent_failure", () => {
 
     it("withholds oversized startup job logs before parsing", async () => {
       vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
       const download = vi.fn().mockResolvedValue({ data: new Uint8Array(5 * 1024 * 1024 + 1) });
       global.github = {
         paginate: vi.fn().mockResolvedValue([
@@ -1070,6 +1071,7 @@ describe("handle_agent_failure", () => {
 
     it("does not expose startup logs when retrieval fails or redaction failed", async () => {
       vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
       const download = vi.fn().mockRejectedValue(new Error("private response"));
       const steps = [
         { name: "Install AWF binary", conclusion: "failure", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:02Z" },
@@ -1089,6 +1091,7 @@ describe("handle_agent_failure", () => {
 
     it("withholds startup output when runner boundaries cannot be established", async () => {
       vi.stubEnv("GH_AW_STARTUP_LOG_EXCERPT_ALLOWED", "true");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "STARTUP_TEST");
       const download = vi.fn().mockResolvedValue({ data: "2026-10-10T10:00:02.500Z unbounded output" });
       global.github = {
         paginate: vi.fn().mockResolvedValue([
