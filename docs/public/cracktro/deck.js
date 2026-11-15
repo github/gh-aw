@@ -1755,6 +1755,99 @@
   .cm-route.on i { color: #d2a8ff; }
   .cm-route canvas { position: absolute; left: 0; top: -14px; width: 630px; height: 284px; }
 
+  /* --- cost guardrails --- */
+  .cg .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #f85149, #d29922, #ab7df8, #f85149); }
+  .cg-now * { transition: none !important; }
+  .cg-modes { position: absolute; left: 1180px; top: 84px; width: 630px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; opacity: 0; }
+  .active .cg-modes { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .2s; }
+  .cg-mode { padding: 14px 16px; border-radius: 14px; border: 1px solid #3d444d; background: #161b22d8; transition: border-color .5s, background .5s, box-shadow .5s; }
+  .cg-mode b { display: block; font: 700 18px/1 var(--mono); letter-spacing: .16em; color: #8b949e; transition: color .5s; }
+  .cg-mode span { display: block; margin-top: 10px; font: 600 19px/1.2 "Mona Sans"; color: #8b949e; transition: color .5s; }
+  .cg-mode small { display: block; margin-top: 8px; font: 500 13px/1.3 var(--mono); color: #8b949e; }
+  .cg-mode.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, #161b22); box-shadow: 0 0 40px -14px var(--c); }
+  .cg-mode.on b { color: var(--c); }
+  .cg-mode.on span { color: #f0f6fc; }
+  .cg-pipe { position: absolute; left: 110px; top: 296px; width: 1700px; height: 280px; opacity: 0; }
+  .active .cg-pipe { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .35s; }
+  .cg-lane { position: absolute; left: 20px; top: 239px; width: 1660px; border-top: 2px dashed #3d444d; }
+  .cg-node { position: absolute; top: 90px; height: 124px; padding: 20px 16px 8px; box-sizing: border-box; border-radius: 14px; border: 2px solid color-mix(in srgb, var(--c) 40%, #3d444d); background: #0d1117e8; transition: border-color .4s, box-shadow .4s, background .4s; }
+  .cg-node small { display: block; font: 500 15px/1 var(--mono); color: #9198a1; }
+  .cg-node b { display: block; margin-top: 8px; font: 700 26px/1 "Mona Sans"; color: var(--c); transition: opacity .4s; }
+  .cg-node span { display: block; margin-top: 9px; font: 500 14px/1.2 var(--mono); color: #d1d7e0; white-space: nowrap; }
+  .cg-node em { display: block; margin-top: 7px; font: 600 13px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; font-style: normal; color: #8b949e; white-space: nowrap; }
+  .cg-node i { position: absolute; right: 12px; top: -14px; padding: 5px 10px; border-radius: 99px; font: 700 14px/1 var(--mono); font-style: normal; white-space: nowrap; opacity: 0; transition: opacity .3s; }
+  .cg-node.on { border-color: var(--c); box-shadow: 0 0 40px -12px var(--c); }
+  .cg-node.pass { border-color: var(--c); }
+  .cg-node.pass i { opacity: 1; color: #0d1117; background: #3fb950; }
+  .cg-node.skip { border-style: dashed; border-color: #3d444d; }
+  .cg-node.skip b { opacity: .55; }
+  .cg-node.skip i { opacity: 1; color: #d1d7e0; background: #21262d; border: 1px dashed #6e7681; }
+  .cg-node.stop { border-color: #f85149; background: #2d1215ee; box-shadow: 0 0 50px -10px #f85149; }
+  .cg-node.stop i { opacity: 1; color: #fff; background: #da3633; }
+  .cg-node.allow i { opacity: 1; color: #0d1117; background: #ab7df8; }
+  .cg-auth { position: absolute; left: 550px; top: 0; width: 400px; height: 62px; box-sizing: border-box; padding: 10px 16px; border-radius: 12px; border: 2px dashed #3d444d; background: #0d1117d8; transition: border-color .4s, box-shadow .4s; }
+  .cg-auth b { display: block; font: 700 21px/1 "Mona Sans"; color: #8b949e; transition: color .4s; }
+  .cg-auth small { display: block; margin-top: 6px; font: 500 13px/1 var(--mono); color: #8b949e; }
+  .cg-auth i { position: absolute; right: 14px; top: 17px; padding: 6px 10px; border-radius: 8px; font: 700 15px/1 var(--mono); font-style: normal; color: #8b949e; border: 1px solid #3d444d; transition: all .3s; }
+  .cg-auth:not(.off) { border-style: solid; border-color: #ab7df8; box-shadow: 0 0 40px -14px #ab7df8; }
+  .cg-auth:not(.off) b { color: #d2a8ff; }
+  .cg-auth.ask i { color: #d2a8ff; border-color: #ab7df8; animation: cgBlink .5s steps(2) infinite; }
+  .cg-auth.ok i { color: #0d1117; background: #3fb950; border-color: #3fb950; }
+  .cg-auth.deny i { color: #fff; background: #da3633; border-color: #da3633; }
+  .cg-alink { position: absolute; left: 620px; top: 62px; height: 28px; border-left: 2px dashed #3d444d; }
+  .cg-alink:not(.off) { border-left: 2px solid #ab7df8; box-shadow: 0 0 12px #ab7df8; }
+  .cg-tok { position: absolute; top: 222px; width: 36px; height: 36px; margin-left: -18px; border-radius: 99px; display: grid; place-items: center; font: 700 17px/1 var(--mono); color: #0d1117; background: #f0f6fc; box-shadow: 0 0 18px -2px #f0f6fc; opacity: 0; z-index: 2;
+    transition: left .9s cubic-bezier(.5,0,.3,1), opacity .4s, background .3s, box-shadow .3s; }
+  .cg-tok.ok { background: #3fb950; box-shadow: 0 0 22px -2px #3fb950; }
+  .cg-tok.q { background: #d29922; box-shadow: 0 0 22px -2px #d29922; }
+  .cg-tok.x { background: #f85149; color: #fff; box-shadow: 0 0 26px 0 #f85149; }
+  .cg-tok u { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); white-space: nowrap; text-decoration: none; font: 600 14px/1 var(--mono); color: #d1d7e0; }
+  .cg-tok.x u { color: #ff7b72; }
+  .cg-tok.q u { color: #e3b341; }
+  .cg-ed { position: absolute; left: 110px; top: 604px; width: 800px; height: 412px; border-radius: 16px; background: #0d1117f0; border: 1px solid #3d444d; box-shadow: 0 30px 80px -30px #000; overflow: hidden; opacity: 0; }
+  .active .cg-ed { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .5s; }
+  .cg-tab { display: flex; align-items: center; height: 46px; padding: 0 20px; background: #151b23; border-bottom: 1px solid #3d444d; font: 500 18px/1 var(--mono); color: #f0f6fc; }
+  .cg-tab b { margin-left: auto; font: 500 14px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #9198a1; }
+  .cg-code { padding: 12px 0; font: 500 20px/28px var(--mono); }
+  .cg-row { display: flex; height: 28px; white-space: pre; transition: background .4s, box-shadow .4s; }
+  .cg-row .no { width: 56px; padding-right: 20px; text-align: right; color: #656c76; flex: none; }
+  .cg-row.hot { background: color-mix(in srgb, var(--c) 18%, transparent); box-shadow: inset 4px 0 0 var(--c); }
+  .cg-meter { position: absolute; left: 950px; top: 604px; width: 860px; height: 412px; box-sizing: border-box; padding: 20px 28px; border-radius: 16px; background: #161b22e8; border: 1px solid #3d444d; opacity: 0; }
+  .active .cg-meter { animation: rise .8s cubic-bezier(.2,.9,.2,1) both .65s; }
+  .cg-meter > i { display: block; font: 600 15px/1 var(--mono); letter-spacing: .25em; text-transform: uppercase; color: #9198a1; font-style: normal; }
+  .cg-run { display: flex; align-items: baseline; gap: 14px; margin-top: 12px; }
+  .cg-run span { align-self: center; font: 700 17px/1 var(--mono); padding: 7px 10px; border-radius: 8px; border: 1px solid #3d444d; color: #d1d7e0; }
+  .cg-run b { font: 700 60px/1 var(--mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: #f0f6fc; transition: color .4s; }
+  .cg-run b.stop { color: #ff7b72; }
+  .cg-run small { font: 500 22px/1 var(--mono); color: #9198a1; }
+  .cg-run em { align-self: center; margin-left: auto; padding: 8px 12px; border-radius: 8px; font: 700 17px/1 var(--mono); letter-spacing: .12em; font-style: normal; opacity: 0; }
+  .cg-run em.warn { opacity: 1; color: #0d1117; background: #d29922; animation: cgBlink .8s steps(2) infinite; }
+  .cg-run em.stop { opacity: 1; color: #fff; background: #da3633; }
+  .cg-run em.skip { opacity: 1; color: #d1d7e0; border: 1px dashed #6e7681; }
+  .cg-run em.allow { opacity: 1; color: #0d1117; background: #ab7df8; }
+  .cg-bar { position: relative; margin-top: 16px; height: 24px; border-radius: 8px; background: #0d1117; border: 1px solid #3d444d; }
+  .cg-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 7px; background: linear-gradient(90deg, #3fb950, #d29922 62%, #f85149 84%) 0 0 / 804px 100% no-repeat; }
+  .cg-bar .zone { position: absolute; top: -6px; bottom: -6px; background: repeating-linear-gradient(135deg, #d2992240 0 6px, transparent 6px 12px); border-radius: 4px; transition: left .6s, width .6s; }
+  .cg-bar .cap { position: absolute; top: -10px; bottom: -10px; width: 4px; margin-left: -2px; background: #f85149; box-shadow: 0 0 12px #f85149; transition: left .6s; }
+  .cg-key { display: flex; gap: 26px; margin-top: 12px; font: 500 14px/1 var(--mono); color: #9198a1; }
+  .cg-key span::before { content: ""; display: inline-block; width: 14px; height: 12px; margin-right: 8px; vertical-align: -1px; }
+  .cg-key .z::before { background: repeating-linear-gradient(135deg, #d29922a0 0 3px, transparent 3px 6px); }
+  .cg-key .c::before { width: 4px; background: #f85149; }
+  .cg-day { display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; font: 600 15px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #9198a1; }
+  .cg-day b { font: 700 20px/1 var(--mono); letter-spacing: 0; color: #f0f6fc; font-variant-numeric: tabular-nums; transition: color .4s; }
+  .cg-day b.over { color: #ff7b72; }
+  .cg-dbar { position: relative; display: flex; margin-top: 10px; height: 24px; border-radius: 8px; background: #0d1117; border: 1px solid #3d444d; }
+  .cg-dbar .seg { flex: none; height: 100%; width: 0; overflow: hidden; display: grid; place-items: center; background: var(--c); font: 700 13px/1 var(--mono); color: #0d1117; white-space: nowrap; }
+  .cg-dbar .seg:first-child { border-radius: 7px 0 0 7px; }
+  .cg-dbar .dcap { position: absolute; top: -10px; bottom: -10px; width: 4px; margin-left: -2px; background: #d29922; box-shadow: 0 0 12px #d29922; transition: background .4s, box-shadow .4s; }
+  .cg-dbar .dcap.over { background: #f85149; box-shadow: 0 0 16px #f85149; }
+  .cg-status { display: flex; align-items: center; gap: 16px; margin-top: 24px; min-height: 84px; box-sizing: border-box; padding: 12px 18px; border-radius: 12px; border: 1px solid #3d444d; border-left: 6px solid var(--c, #3d444d); background: #0d1117c0; font: 600 21px/1.3 "Mona Sans"; color: #e6edf3; }
+  .cg-status b { flex: none; width: 128px; font: 700 15px/1.2 var(--mono); letter-spacing: .12em; color: var(--c); }
+  .cg-status.pop span { animation: cgPop .5s cubic-bezier(.2,.9,.2,1) both; }
+  .cg-foot { position: absolute; left: 110px; top: 1034px; margin: 0; font: 500 15px/1 "Mona Sans"; color: #8b949e; }
+  @keyframes cgBlink { 50% { opacity: .45; } }
+  @keyframes cgPop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
   /* --- model routing --- */
   .mr .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950, #ab7df8); }
   /* the run card starts centred, then glides left when the results arrive */
@@ -8742,6 +8835,548 @@
         drawRoute(t, dt);
       },
       el: h("section", { class: "slide cm" }, h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Guard · measure · optimize"), h("h2", {}, letters("Cost "), letters("management", "l-grad"))), ed, meter, route),
+    });
+  }
+
+  // Cost guardrails: an event burst hits execution controls (user-rate-limit cancels one run, concurrency queues one); run A passes the
+  // daily check at activation, spends AI credits, gets budget notices and hard-stops at max-ai-credits; queued run B is then blocked at
+  // activation by the rolling 24 h max-daily-ai-credits budget; finally an admission authority approves run D with an allowance and denies run E
+  {
+    resetIndex();
+    const RUNW = 804,
+      RUNMAX = 600,
+      DAYMAX = 1250,
+      DAYCAP = 1000,
+      EARLIER = 540;
+    const kx = v => (v / RUNMAX) * RUNW,
+      kd = v => (v / DAYMAX) * RUNW;
+    const TX = { trig: [110, 70, 30], pre: 460, adm: 750, act: 1140, agent: 1530 };
+    // [id, left, width, colour, job, gate, settings, when it applies]
+    const NODES = [
+      ["trig", 0, 140, "#8b949e", "on:", "Events", "issues", null],
+      ["pre", 190, 340, "#4493f8", "pre_activation", "Execution controls", "user-rate-limit · concurrency", "every event · before start"],
+      ["adm", 580, 340, "#ab7df8", "admission · optional", "Admission", "on.admission · OIDC", "central · before activation"],
+      ["act", 970, 340, "#d29922", "activation", "Daily budget", "max-daily-ai-credits", "rolling 24 h · before start"],
+      ["agent", 1360, 340, "#f85149", "agent", "Per-run limits", "max-ai-credits · max-turns · timeout", "during the run · hard stop"],
+    ];
+    const node = {};
+    const nodeEls = NODES.map(([id, x, w, c, job, title, tags, when]) => {
+      const st = h("i", {});
+      const el = h("div", { class: "cg-node", "--c": c, style: { left: `${x}px`, width: `${w}px` } }, h("small", {}, job), h("b", {}, title), h("span", {}, tags), when ? h("em", {}, when) : null, st);
+      node[id] = { el, st };
+      return el;
+    });
+    const nset = (id, cls = "", text = "") => {
+      node[id].el.className = `cg-node ${cls}`;
+      node[id].st.textContent = text;
+    };
+    const tok = {};
+    const tokEls = ["A", "B", "C", "D", "E"].map(id => {
+      const lab = h("u", {});
+      const el = h("div", { class: "cg-tok" }, id, lab);
+      tok[id] = { el, lab };
+      return el;
+    });
+    const put = (id, x, ms = 900) => {
+      const s = tok[id].el.style;
+      s.transitionDuration = `${ms}ms, .4s, .3s, .3s`;
+      s.left = `${x}px`;
+      s.opacity = "1";
+    };
+    const mark = (id, cls = "", text = "") => {
+      tok[id].el.className = `cg-tok ${cls}`;
+      tok[id].lab.textContent = text;
+    };
+    const hide = id => (tok[id].el.style.opacity = "0");
+    const authResp = h("i", {});
+    const auth = h("div", { class: "cg-auth off" }, h("b", {}, "Admission authority"), h("small", {}, "org policy · OIDC identity"), authResp);
+    const alink = h("div", { class: "cg-alink off" });
+    const authSet = (cls, text) => {
+      auth.className = `cg-auth ${cls}`;
+      alink.className = `cg-alink ${cls}`;
+      authResp.textContent = text;
+    };
+    const pipe = h("div", { class: "cg-pipe" }, h("div", { class: "cg-lane" }), auth, alink, nodeEls, tokEls);
+
+    const MODES = [
+      ["OPTIMIZE", "#3fb950", "Spend less per run", "schedule · steps · routing"],
+      ["BUDGET", "#d29922", "Cap what runs may spend", "per run · per 24 h · per event"],
+      ["ADMIT", "#ab7df8", "Decide if a run may start", "central authority"],
+    ];
+    const modes = MODES.map(([b, c, s, d]) => h("div", { class: "cg-mode", "--c": c }, h("b", {}, b), h("span", {}, s), h("small", {}, d)));
+    const mode = i => modes.forEach((m, j) => m.classList.toggle("on", j === i));
+
+    const K = "#ff7b72",
+      V = "#a5d6ff",
+      O = "#ffa657",
+      G = "#7ee787",
+      C = "#8b949e";
+    const CODE = [
+      [["on:", K]],
+      [["  issues:", K]],
+      [
+        ["    types: ", K],
+        ["[opened]", V],
+      ],
+      [
+        ["  admission: ", K],
+        ["true", O],
+        ["         # opt-in · URL set by org", C],
+      ],
+      [["user-rate-limit:", K]],
+      [
+        ["  max-runs-per-window: ", K],
+        ["3", O],
+        ["   # per user · 60 min", C],
+      ],
+      [["concurrency:", K]],
+      [
+        ["  group: ", K],
+        ["issue-triage", G],
+        ["   # one run at a time", C],
+      ],
+      [
+        ["max-ai-credits: ", K],
+        ["500", O],
+        ["         # per run · default 1,000", C],
+      ],
+      [
+        ["max-turns: ", K],
+        ["30", O],
+      ],
+      [
+        ["timeout-minutes: ", K],
+        ["20", O],
+        ["        # agent step · default 20", C],
+      ],
+      [
+        ["max-daily-ai-credits: ", K],
+        ["1000", O],
+        ["  # 24 h · default 5,000", C],
+      ],
+    ];
+    const rows = CODE.map((parts, i) =>
+      h(
+        "div",
+        { class: "cg-row" },
+        h("span", { class: "no" }, String(i + 1)),
+        h(
+          "span",
+          {},
+          parts.map(([x, c]) => h("span", { style: { color: c } }, x))
+        )
+      )
+    );
+    const hot = (lines, c) =>
+      rows.forEach((r, i) => {
+        r.classList.toggle("hot", lines.includes(i + 1));
+        r.style.setProperty("--c", c);
+      });
+    const ed = h("div", { class: "cg-ed" }, h("div", { class: "cg-tab" }, "⬇ issue-triage.md", h("b", {}, "front matter")), h("div", { class: "cg-code" }, rows));
+
+    const rid = h("span", {}, "RUN —"),
+      num = h("b", {}, "0"),
+      capTxt = h("small", {}, "/ 500 AIC"),
+      flag = h("em", {});
+    const fill = h("div", { class: "fill" }),
+      zone = h("div", { class: "zone" }),
+      capM = h("div", { class: "cap" });
+    const capKey = h("span", { class: "c" }, "max-ai-credits hard stop");
+    const segA = h("div", { class: "seg", "--c": "#f85149" }, "A"),
+      segD = h("div", { class: "seg", "--c": "#ab7df8" }, "D");
+    const dcap = h("div", { class: "dcap", style: { left: `${kd(DAYCAP)}px` } });
+    const dayV = h("b", {});
+    const statB = h("b", {}),
+      statT = h("span", {});
+    const status = h("div", { class: "cg-status" }, statB, statT);
+    const say = (c, b, t) => {
+      status.style.setProperty("--c", c);
+      statB.textContent = b;
+      statT.textContent = t;
+      status.classList.remove("pop");
+      void status.offsetWidth;
+      status.classList.add("pop");
+    };
+    const meter = h(
+      "div",
+      { class: "cg-meter" },
+      h("i", {}, "AI credits · illustrative"),
+      h("div", { class: "cg-run" }, rid, num, capTxt, flag),
+      h("div", { class: "cg-bar" }, zone, fill, capM),
+      h("div", { class: "cg-key" }, h("span", { class: "z" }, "budget notices to the agent"), capKey),
+      h("div", { class: "cg-day" }, h("span", {}, "Rolling 24 h · this workflow"), dayV),
+      h("div", { class: "cg-dbar" }, h("div", { class: "seg", "--c": "#6e7681", style: { width: `${kd(EARLIER)}px` } }, "earlier runs"), segA, segD, dcap),
+      status
+    );
+
+    let cur = null,
+      cap = 500,
+      aim = 0,
+      rate = 0.2,
+      shown = 0,
+      rstate = "idle",
+      allowance = false,
+      spent = { A: 0, D: 0 },
+      quiet = false,
+      stage = 0,
+      tS = 0,
+      last = 0,
+      q = [];
+    const snd = f => quiet || f();
+    const setCap = v => {
+      cap = v;
+      capTxt.textContent = `/ ${v} AIC`;
+      capM.style.left = `${kx(v)}px`;
+      zone.style.left = `${kx(v * 0.8)}px`;
+      zone.style.width = `${kx(v * 0.2)}px`;
+    };
+    const run = (id, c = 500) => {
+      if (cur in spent) spent[cur] = aim;
+      cur = id;
+      rid.textContent = `RUN ${id}`;
+      setCap(c);
+      aim = shown = 0;
+      rstate = "idle";
+      allowance = false;
+    };
+    const rise = (to, r) => {
+      aim = to;
+      rate = r;
+      rstate = "run";
+    };
+    const draw = () => {
+      num.textContent = Math.round(shown).toLocaleString("en-US");
+      num.classList.toggle("stop", rstate === "stop");
+      fill.style.width = `${kx(Math.min(shown, RUNMAX))}px`;
+      if (cur in spent) spent[cur] = shown;
+      const total = EARLIER + spent.A + spent.D;
+      segA.style.width = `${kd(spent.A)}px`;
+      segD.style.width = `${kd(spent.D)}px`;
+      dayV.textContent = `${Math.round(total).toLocaleString("en-US")} / 1,000 AIC`;
+      dayV.classList.toggle("over", total > DAYCAP);
+      dcap.classList.toggle("over", total > DAYCAP);
+      const f =
+        rstate === "stop" ? ["stop", "HARD STOP"] : rstate === "skip" ? ["skip", "AGENT SKIPPED"] : rstate === "run" && shown >= cap * 0.8 && !allowance ? ["warn", "BUDGET NOTICE"] : allowance ? ["allow", `ALLOWANCE ${cap}`] : ["", ""];
+      flag.className = f[0];
+      flag.textContent = f[1];
+    };
+    const reset = () => {
+      Object.keys(tok).forEach(id => {
+        mark(id);
+        tok[id].el.style.opacity = "0";
+        tok[id].el.style.left = `${TX.trig[0]}px`;
+      });
+      NODES.forEach(([id]) => nset(id));
+      authSet("off", "no URL");
+      hot([], C);
+      mode(1);
+      cur = null;
+      rid.textContent = "RUN —";
+      setCap(500);
+      capKey.textContent = "max-ai-credits hard stop";
+      aim = shown = 0;
+      rstate = "idle";
+      allowance = false;
+      spent = { A: 0, D: 0 };
+      say("#3d444d", "", "");
+    };
+    // Each step is a list of [ms after the step starts, action]; going back replays earlier steps instantly.
+    const ACTS = [
+      [
+        [
+          0,
+          () => {
+            mode(1);
+            hot([5, 6, 7, 8], "#4493f8");
+            ["A", "B", "C"].forEach((id, i) => put(id, TX.trig[i], 0));
+            say("#4493f8", "EVENTS", "Three issues open at once. Every event meets the execution controls first.");
+          },
+        ],
+        [
+          300,
+          () => {
+            put("A", TX.pre);
+            put("B", TX.pre - 100);
+            put("C", TX.pre - 200);
+            nset("pre", "on");
+          },
+        ],
+        [
+          1300,
+          () => {
+            nset("pre", "pass", "3 events → 1 run");
+            mark("A", "ok");
+            mark("B", "q", "queued");
+            mark("C", "x", "rate-limited");
+            say("#4493f8", "THROTTLE", "user-rate-limit cancels the excess run; concurrency queues the next one behind run A.");
+            snd(() => sfx.block(true));
+          },
+        ],
+      ],
+      [
+        [
+          0,
+          () => {
+            hot([12], "#d29922");
+            hide("C");
+            put("A", TX.adm);
+            nset("adm", "skip", "skipped · no URL");
+          },
+        ],
+        [1000, () => put("A", TX.act, 800)],
+        [
+          1800,
+          () => {
+            nset("act", "pass", "540 ≤ 1,000 ✓");
+            say("#d29922", "CHECKED", "Before activation, this workflow's last 24 h total 540 of 1,000 AIC: run A may start.");
+            snd(() => sfx.pop(2));
+          },
+        ],
+        [
+          2500,
+          () => {
+            put("A", TX.agent, 700);
+            nset("agent", "on");
+            run("A");
+          },
+        ],
+        [
+          3100,
+          () => {
+            rise(380, 0.3);
+            say("#3fb950", "RUNNING", "Run A's agent spends AI credits against its 500 AIC per-run cap.");
+          },
+        ],
+      ],
+      [
+        [
+          0,
+          () => {
+            hot([9], "#f85149");
+            rise(470, 0.07);
+          },
+        ],
+        [
+          400,
+          () => {
+            say("#d29922", "NOTICE", "As spend nears max-ai-credits, the firewall sends the agent budget notices.");
+            snd(() => sfx.notify(false));
+          },
+        ],
+      ],
+      [
+        [
+          0,
+          () => {
+            hot([9, 10, 11], "#f85149");
+            rise(500, 0.04);
+          },
+        ],
+        [
+          800,
+          () => {
+            aim = shown = spent.A = 500;
+            rstate = "stop";
+            nset("agent", "stop", "hard stop");
+            mark("A", "x", "stopped");
+            say("#f85149", "HARD STOP", "Run A ends at 500 AIC. max-turns and timeout-minutes cut a run off the same way.");
+            snd(() => sfx.block(false));
+          },
+        ],
+      ],
+      [
+        [
+          0,
+          () => {
+            hot([12], "#d29922");
+            hide("A");
+            mark("B", "ok");
+            nset("agent");
+            nset("act");
+            run("B");
+            put("B", TX.adm, 1100);
+          },
+        ],
+        [1200, () => put("B", TX.act, 800)],
+        [
+          2100,
+          () => {
+            nset("act", "stop", "1,040 > 1,000");
+            nset("agent", "skip", "skipped · 0 AIC");
+            mark("B", "x", "blocked");
+            rstate = "skip";
+            say("#d29922", "BLOCKED", "Run B never starts: the rolling 24 h total is over max-daily-ai-credits, so no AI credits are spent.");
+            snd(() => sfx.block(false));
+          },
+        ],
+      ],
+      [
+        [
+          0,
+          () => {
+            mode(2);
+            hot([4], "#ab7df8");
+            hide("B");
+            ["pre", "adm", "act", "agent"].forEach(id => nset(id));
+            authSet("on", "URL set");
+            mark("D");
+            put("D", TX.trig[0], 0);
+            say("#ab7df8", "ADMISSION", "The org points opted-in workflows at a central admission authority.");
+          },
+        ],
+        [
+          500,
+          () => {
+            put("D", TX.pre, 800);
+            nset("pre", "on");
+          },
+        ],
+        [
+          1300,
+          () => {
+            put("D", TX.adm, 800);
+            nset("adm", "on");
+          },
+        ],
+        [
+          2100,
+          () => {
+            authSet("ask", "OIDC ↑");
+            snd(() => sfx.pop(4));
+          },
+        ],
+        [
+          2700,
+          () => {
+            authSet("ok", "200 · 250 AIC");
+            nset("adm", "pass", "approved");
+            mark("D", "ok");
+            say("#ab7df8", "APPROVED", "Approved before activation with a 250 AIC allowance that replaces max-ai-credits; the daily check is superseded.");
+            snd(() => sfx.review());
+          },
+        ],
+        [
+          3300,
+          () => {
+            put("D", TX.act, 700);
+            nset("act", "skip", "superseded");
+          },
+        ],
+        [
+          4000,
+          () => {
+            put("D", TX.agent, 700);
+            nset("agent", "on allow", "allowance 250");
+            run("D", 250);
+            allowance = true;
+            capKey.textContent = "allowance hard stop";
+            rise(180, 0.2);
+          },
+        ],
+      ],
+      [
+        [
+          0,
+          () => {
+            mark("E");
+            put("E", TX.trig[0], 0);
+          },
+        ],
+        [400, () => put("E", TX.pre, 800)],
+        [
+          1200,
+          () => {
+            put("E", TX.adm, 800);
+            nset("adm", "on");
+          },
+        ],
+        [2000, () => authSet("ask", "OIDC ↑")],
+        [
+          2600,
+          () => {
+            authSet("deny", "403 · denied");
+            nset("adm", "stop", "denied");
+            mark("E", "x", "denied");
+            say("#f85149", "DENIED", "Denied runs never activate. On an outage, ignore (the default) keeps local guardrails; block stops.");
+            snd(() => sfx.bug());
+          },
+        ],
+      ],
+    ];
+    const DUR = ACTS.map(a => a[a.length - 1][0] + 3600);
+    const root = h(
+      "section",
+      { class: "slide cg" },
+      h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "Stop runaway agents"), h("h2", {}, letters("Cost "), letters("guardrails", "l-grad"))),
+      h("div", { class: "cg-modes" }, modes),
+      pipe,
+      ed,
+      meter,
+      h(
+        "p",
+        { class: "cg-foot" },
+        "Illustrative: synthetic runs and numbers. Defaults: 1,000 AIC per run, 5,000 AIC per workflow per 24 h, 20 min agent step. Negative values disable a guardrail; the daily check skips dispatch and workflow_call runs."
+      )
+    );
+    const begin = s => {
+      stage = s;
+      tS = performance.now();
+      q = ACTS[s].slice();
+    };
+    const jump = s => {
+      root.classList.add("cg-now");
+      reset();
+      quiet = true;
+      for (let k = 0; k < s; k++) ACTS[k].forEach(([, f]) => f());
+      quiet = false;
+      shown = aim;
+      draw();
+      void root.offsetWidth;
+      root.classList.remove("cg-now");
+      begin(s);
+    };
+    const flush = () => {
+      quiet = true;
+      q.forEach(([, f]) => f());
+      quiet = false;
+      q = [];
+    };
+    slides.push({
+      group: "cost",
+      notes:
+        "Cost guardrails: stop runaway agents. Illustrative: synthetic runs and numbers. Optimization (previous slide) makes each run cheaper; guardrails cap what runs may spend; admission decides centrally whether a run may start. Execution controls come first: user-rate-limit cancels a user's excess runs, concurrency serializes runs, and items created by safe outputs do not trigger further workflows. The daily budget, max-daily-ai-credits, is checked at activation before the agent starts: it sums this workflow's runs over the rolling 24 hours and, when the total exceeds the limit, skips the agent job; it does not apply to workflow_dispatch, repository_dispatch or workflow_call runs. Per-run limits are hard stops during the run: max-ai-credits (budget notices first, then the firewall stops the run), max-turns and timeout-minutes. Defaults: 1,000 AIC per run, 5,000 AIC per workflow per day, 20 minutes for the agent step; negative values disable an AIC guardrail. Admission is optional (on.admission: true plus an org-provided URL): before activation the authority verifies the run's OIDC identity and either approves with an AIC allowance that replaces max-ai-credits and supersedes the daily check, or denies. Denial and invalid approval always block; on an outage the default, ignore, keeps the local guardrails, and block stops. Admission is cooperative, not a hard spending cap. Keys: → next step.",
+      enter() {
+        last = 0;
+        jump(0);
+      },
+      onNext() {
+        if (stage < ACTS.length - 1) {
+          flush();
+          begin(stage + 1);
+          return true;
+        }
+        return false;
+      },
+      onPrev() {
+        if (stage > 0) {
+          jump(stage - 1);
+          return true;
+        }
+        return false;
+      },
+      tick(t) {
+        const now = performance.now();
+        while (q.length && now - tS >= q[0][0]) q.shift()[1]();
+        const dt = last ? Math.min(50, t - last) : 16;
+        last = t;
+        if (shown < aim) shown = Math.min(aim, shown + rate * dt);
+        draw();
+        if (stage < ACTS.length - 1 && !q.length && now - tS > DUR[stage]) {
+          begin(stage + 1);
+          sfx.step(1);
+        }
+      },
+      el: root,
     });
   }
 
