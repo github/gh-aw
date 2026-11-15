@@ -2,6 +2,10 @@
 runtimes:
   node:
     version: "24"
+resources:
+  - graft/package.json
+  - graft/package-lock.json
+  - graft/query.cjs
 tools:
   bash:
     - "graft --help"
