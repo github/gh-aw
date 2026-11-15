@@ -1862,7 +1862,8 @@
   .progress { position: fixed; left: 0; bottom: 0; height: 5px; width: 100%; transform-origin: 0 50%;
     background: linear-gradient(90deg, #ab7df8, #4493f8, #3fb950); transition: transform .8s cubic-bezier(.7,0,.2,1); z-index: 5; }
   /* dot map: one row per band, header dot outlined; the band you are in is bright, others dim until hovered */
-  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; flex-direction: column; gap: 5px; z-index: 5; }
+  .dots { position: fixed; left: 28px; bottom: 22px; display: flex; flex-direction: column; gap: 5px; z-index: 5; opacity: .25; transition: opacity .3s; }
+  .dots:hover, .dots:focus-within { opacity: 1; }
   .dots .drow { display: flex; gap: 5px; opacity: .45; transition: opacity .3s; }
   .dots .drow.on, .dots:hover .drow { opacity: 1; }
   .dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #ffffff40; cursor: pointer;
