@@ -54,11 +54,15 @@ Editing: add, remove or move one row per slide in the same change as `deck.js`, 
 | Model routing | illustrative | With model: router, each run gets the cheapest model and reasoning effort that is good enough for its task and stakes, and audit shows why. |
 | DeterministicOps | illustrative | Run history reveals data-gathering calls repeated on every run; audit flags them, and moving them into deterministic steps cuts token use. |
 | Audit & Optimize | illustrative | A health agent spots a failing or costly workflow, audits its unified session through the agentic-workflows skill, and tunes it so the next run is cheaper. |
-| Agentic Engineering |  | Band header (Agentic Engineering): give agents memory, expiry, search and measurement. |
+| Agentic Engineering |  | Band header (Agentic Engineering): skip needless runs and give agents memory, queues, hand-offs, expiry, search and measurement. |
 | Agents that debug agents | illustrative | The agentic-workflows MCP server exposes logs, audit and audit-diff so any agent can debug, audit and optimize other workflows from unified sessions. |
 | Any agent, any provider | illustrative | One Markdown workflow switches its coding agent and model provider with two front matter lines while keeping the same guardrails. |
+| Don’t Run the Agent | illustrative | The cheapest agent call is the one never made: cheap deterministic gates from triggers to noop short-circuits run first, and a model-based skip decision only when necessary. |
 | Agent memory | illustrative | Configured memories are restored read-only into each run, and trusted jobs persist cache, repository, comment and ledger memory afterward. |
+| Memory with a History | illustrative | Ledgers keep append-only records on their own branch, agents read a disposable SQLite projection and request changes, and trusted jobs validate and append them. |
 | Durable execution | illustrative | Durable execution checkpoints the agent's native session, even after a failed step, so a rerun resumes the session instead of starting over. |
+| Agents with a Job Queue | illustrative | A Git-backed work queue dispatches immutable work to independent workers and keeps claims, completions and verified delivery separate. |
+| Agents Trigger Agents | illustrative | Agents chain through safe-output dispatches with typed inputs and completion signals, each running inside its own workflow run. |
 | Ephemerals | illustrative | Safe outputs carry their own end, so old reports, discussions, comments and drafts close or collapse automatically and human attention is protected. |
 | Index & search | illustrative | A non-agentic job builds a search index and the agent gets read-only query access, cutting the tokens spent reading whole files. |
 | Imports & reuse | illustrative | Shared Markdown components are written and reviewed once, imported by path or from another repository at a ref, and merged and hashed by the compiler. |

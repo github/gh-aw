@@ -1414,6 +1414,47 @@
   .dur-foot { position: absolute; left: 150px; top: 930px; font: 500 22px/1 var(--mono); color: #9198a1; opacity: 0; }
   .dur-foot b { color: #f0f6fc; font-weight: 600; }
   .active .dur-foot { animation: rise .6s ease-out both 1.6s; }
+  /* Agentic Engineering: Don’t Run the Agent, Memory with a History, Agents with a Job Queue, Agents Trigger Agents */
+  .dra .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ff7b72, #3fb950); }
+  .mhl .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #ab7df8, #d2a8ff, #3fb950, #ab7df8); }
+  .jq .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #d29922, #3fb950, #79c0ff, #d29922); }
+  .att .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #79c0ff, #ab7df8, #f778ba, #79c0ff); }
+  .aex-svg { left: 150px; top: 300px; width: 1620px; height: 620px; }
+  .active .aex-svg { animation: rise .9s cubic-bezier(.2,.9,.2,1) both .35s; }
+  .aex-t { fill: #f0f6fc; font: 600 19px var(--mono); }
+  .aex-c { fill: #c9d1d9; font: 500 16px var(--mono); } .aex-c.k { fill: #c297ff; font-weight: 600; }
+  .aex-d { fill: #9198a1; font: 500 14px var(--mono); }
+  .aex-st { fill: #9198a1; font: 600 16px var(--mono); transition: fill .3s; }
+  .aex-st.ok { fill: #3fb950; } .aex-st.ko { fill: #ff7b72; } .aex-st.b { fill: #79c0ff; } .aex-st.y { fill: #e3b341; }
+  .aex-row { opacity: 0; transition: opacity .35s; } .aex-row.on { opacity: 1; } .aex-row.new.on .aex-c { fill: #3fb950; }
+  .aex-chip { opacity: .3; transition: opacity .35s; } .aex-chip.on { opacity: 1; }
+  .aex-chip rect { fill: #161b22; stroke: #3d444d; stroke-width: 2; transition: stroke .35s, filter .35s; }
+  .aex-chip.on rect { stroke: var(--c, #ab7df8); filter: drop-shadow(0 0 8px var(--c, #ab7df8)); }
+  .aex-foot { position: absolute; left: 150px; top: 940px; font: 500 22px/1 var(--mono); color: #9198a1; opacity: 0; }
+  .aex-foot b { color: #f0f6fc; font-weight: 600; }
+  .active .aex-foot { animation: rise .6s ease-out both 1.6s; }
+  .dra-skipt { fill: #ff7b72; font: 700 24px var(--mono); letter-spacing: .12em; }
+  .dra-rail { stroke: #f85149; stroke-width: 2; stroke-dasharray: 6 8; opacity: .5; }
+  .dra-pipe { stroke: #3d444d; stroke-width: 4; stroke-dasharray: 10 8; }
+  .dra-src { fill: #8957e5; stroke: #ab7df8; stroke-width: 2; }
+  .dra-up { stroke: #f85149; stroke-width: 2; stroke-dasharray: 4 6; opacity: .15; transition: opacity .3s; } .dra-gate.on .dra-up { opacity: .8; }
+  .dra-out { fill: #ff7b72; font: 600 16px var(--mono); text-anchor: middle; opacity: 0; transition: opacity .3s; } .dra-out.on { opacity: 1; }
+  .dra-park { fill: #ff7b72; opacity: 0; transition: opacity .3s; } .dra-park.on { opacity: 1; filter: drop-shadow(0 0 6px #f85149); }
+  .dra-bar { fill: #30363d; transition: fill .3s, filter .3s; } .dra-gate.on .dra-bar { fill: var(--c); }
+  .dra-gate.shut .dra-bar { fill: #f85149; filter: drop-shadow(0 0 12px #f85149); }
+  .dra-card { opacity: .3; transition: opacity .4s; } .dra-gate.on .dra-card { opacity: 1; } .dra-gate.on .dra-card .sfl-card { stroke: var(--c); }
+  .dra-gate .aex-t { font-size: 17px; } .dra-gate .aex-c { font-size: 15px; } .dra-gate .aex-d { font-size: 13px; }
+  .dra-pill { fill: var(--c); fill-opacity: .16; stroke: var(--c); stroke-width: 1.5; }
+  .dra-cost { fill: var(--c); font: 600 15px var(--mono); text-anchor: middle; }
+  .dra-exp { fill: #e3b341; font: 600 12px var(--mono); letter-spacing: .12em; text-anchor: middle; }
+  .dra-eng.on .sfl-card { stroke: #3fb950; filter: drop-shadow(0 0 14px #3fb95088); }
+  .dra-adm { opacity: .45; transition: opacity .4s; } .dra-adm.on { opacity: 1; }
+  .dra-adm rect { fill: #0d1117e8; stroke: #9198a1; stroke-width: 2; stroke-dasharray: 6 6; }
+  .dra-tok { fill: #f0f6fc; filter: drop-shadow(0 0 8px currentColor); opacity: 0; }
+  .mhl-svg .sfl-row text { font-size: 16px; }
+  .att-edge { fill: none; stroke: #3d444d; stroke-width: 2; stroke-dasharray: 8 8; transition: stroke .4s; }
+  .att-run.on .att-edge { stroke: #ab7df8; } .att-run.done .att-edge { stroke: #3fb950; }
+  .att-tag { fill: #9198a1; font: 600 14px var(--mono); letter-spacing: .04em; }
 
   /* --- index & search: a non-agentic indexing job writes the index; the agent job only searches a read-only copy --- */
   .ix .slide-head .l-grad .ch { background-image: linear-gradient(90deg, #3fb950, #79c0ff, #ab7df8); }
@@ -8669,7 +8710,7 @@
     slides.push({
       group: "cost",
       notes:
-        "Cost management: guard, measure, optimize. Start from a daily PR summary. 1) Scheduling: does it really need to run daily? Weekly cuts runs 7x. 2) Deterministic compute: fetch the PRs with a plain gh step instead of letting the agent explore with tools. 3) Guard: max-ai-credits per run and max-daily-ai-credits cap spend. 4) Sub-agents: fan per-PR summaries out to a pr-summary sub-agent on a smaller model. 5) Model routing: use the documented model: router modes to balance cost and quality for eligible main-agent runs. Numbers are illustrative, not internal usage or billing data: roughly 2,800 to 110 AIC a week. Keys: → next optimization.",
+        "Cost management: guard, measure, optimize. Start from a daily PR summary. 1) Scheduling: does it really need to run daily? Weekly cuts runs 7x. 2) Deterministic compute: fetch the PRs with a plain gh step instead of letting the agent explore with tools. 3) Guard: max-ai-credits per run and max-daily-ai-credits cap spend; an optional central admission service, enabled with on.admission, can also deny activation before any agent runs. 4) Sub-agents: fan per-PR summaries out to a pr-summary sub-agent on a smaller model. 5) Model routing: use the documented model: router modes to balance cost and quality for eligible main-agent runs. Numbers are illustrative, not internal usage or billing data: roughly 2,800 to 110 AIC a week. Keys: → next optimization.",
       enter() {
         t0 = last = spawn = 0;
         pk = [];
@@ -9939,6 +9980,140 @@
     });
   }
 
+  // Don’t Run the Agent: a stream of workflow events meets cheap deterministic gates first (triggers, if:, search checks, on.steps, custom jobs, a noop short-circuit) and a model-based skip-if-decision gate last; each gate routes one event to SKIP and one survivor reaches the AI engine
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620,
+      PY = 250,
+      RY = 70;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    // [title, code line 1, code line 2, when it runs, cost, cost colour, what a skip saves]
+    const GATES = [
+      ["TRIGGERS", "on: types", "branches · paths", "GitHub · pre-run", "free", "#3fb950", "no run"],
+      ["IF:", "if: !draft", "agent.if · needs", "job expression", "no runner", "#3fb950", "jobs skipped"],
+      ["SEARCH", "skip-if-match", "skip-if-no-match", "pre-activation", "search API", "#79c0ff", "no agent job"],
+      ["ON.STEPS", "on.steps:", "id → _result", "pre-activation", "1 step", "#79c0ff", "no agent job"],
+      ["CUSTOM JOB", "jobs: filter:", "should-run", "before activation", "+1 runner job", "#d29922", "no agent job"],
+      ["NOOP", "pre-agent-steps", "→ noop record", "agent job start", "runner · 0 AIC", "#f0883e", "no inference"],
+      ["DECISION", "skip-if-decision", "LLM: useful?", "before each call", "model decision", "#ff7b72", "deny → skip"],
+    ];
+    const GX = i => 170 + i * 186,
+      EX = 1400;
+    let g = `<defs><linearGradient id="draCost" x1="0" x2="1"><stop offset="0" stop-color="#3fb950"/><stop offset=".45" stop-color="#79c0ff"/><stop offset=".75" stop-color="#d29922"/><stop offset="1" stop-color="#ff7b72"/></linearGradient></defs>`;
+    // SKIP rail along the top, the pipeline through the gates, and the event source on the left
+    g += `<text class="dra-skipt" x="0" y="${RY + 8}">SKIP</text><line class="dra-rail" x1="74" y1="${RY}" x2="${GX(6) + 40}" y2="${RY}"/>`;
+    g += `<line class="dra-pipe" x1="30" y1="${PY}" x2="${EX}" y2="${PY}"/><circle class="dra-src" cx="30" cy="${PY}" r="14"/><text class="aex-d" x="30" y="${PY + 44}" text-anchor="middle">events</text>`;
+    GATES.forEach(([t, c1, c2, when, cost, col, out], i) => {
+      const x = GX(i);
+      g += `<g class="dra-gate" id="draG${i}" style="--c:${col}">`;
+      g += `<line class="dra-up" x1="${x}" y1="${PY - 48}" x2="${x}" y2="${RY + 10}"/><text class="dra-out" x="${x}" y="${RY - 22}">${out}</text><circle class="dra-park" cx="${x}" cy="${RY}" r="9"/>`;
+      g += `<rect class="dra-bar" x="${x - 8}" y="${PY - 48}" width="16" height="96" rx="5"/>`;
+      g += `<g class="dra-card"><rect class="sfl-card" x="${x - 86}" y="336" width="172" height="186" rx="14"/>`;
+      g += `<text class="aex-t" x="${x - 72}" y="368">${i + 1} ${t}</text>`;
+      g += `<text class="aex-c" x="${x - 72}" y="400">${c1}</text><text class="aex-c" x="${x - 72}" y="424">${c2}</text>`;
+      g += `<text class="aex-d" x="${x - 72}" y="456">${when}</text>`;
+      g += `<rect class="dra-pill" x="${x - 74}" y="474" width="148" height="32" rx="16"/><text class="dra-cost" x="${x}" y="496">${cost}</text></g>`;
+      if (i === 6) g += `<text class="dra-exp" x="${x}" y="328">EXPERIMENTAL</text>`;
+      g += `</g>`;
+    });
+    // the AI engine at the end of the pipeline, and the optional central admission service
+    g += `<g class="sfl-box dra-eng" id="draE"><rect class="sfl-card" x="${EX}" y="150" width="220" height="190" rx="16"/><circle cx="${EX + 110}" cy="206" r="32" fill="#8957e5"/>${ico("copilot", EX + 110, 207, 38)}`;
+    g += `<text class="aex-t" x="${EX + 110}" y="276" text-anchor="middle">AI ENGINE</text><text class="aex-d" x="${EX + 110}" y="304" text-anchor="middle">allow · unknown</text><text class="aex-d" x="${EX + 110}" y="324" text-anchor="middle">→ run as planned</text></g>`;
+    g += `<g class="dra-adm" id="draA"><rect x="${EX}" y="372" width="220" height="150" rx="14"/><text class="dra-exp" x="${EX + 110}" y="400">OPTIONAL</text>`;
+    g += `<text class="aex-c" x="${EX + 18}" y="430">on.admission</text><text class="aex-d" x="${EX + 18}" y="456">central service</text><text class="aex-d" x="${EX + 18}" y="476">may deny activation</text><text class="aex-c k" x="${EX + 18}" y="506">→ Cost management</text></g>`;
+    // cost gradient: cheap deterministic filters first, model decisions last
+    g += `<rect x="${GX(0) - 86}" y="548" width="${GX(6) - GX(0) + 172}" height="8" rx="4" fill="url(#draCost)"/>`;
+    g += `<text class="aex-d" x="${GX(0) - 86}" y="586">cheap · deterministic · first</text><text class="aex-d" x="${GX(6) + 86}" y="586" text-anchor="end">model-based · only when necessary</text>`;
+    g += `<circle class="dra-tok" r="11"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg dra-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      tok = svg.querySelector(".dra-tok");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    // event k is stopped by gate k; event 7 survives every gate and reaches the engine
+    const START = k => 700 + k * 2300,
+      RUN = x => 380 + x * 0.85,
+      UP = 520,
+      CYC = START(7) + RUN(EX) + 4200;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      svg.querySelectorAll(".on, .shut").forEach(x => x.classList.remove("on", "shut"));
+      tok.style.opacity = 0;
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Don’t Run the Agent, an illustrative pipeline with synthetic events, not measured runs. The cheapest, fastest agent invocation is the one you never make, so put cheap deterministic gates first and model-based decisions last. 1) Triggers: GitHub Actions event types, branches, paths and label names stop a workflow from being scheduled at all; actor restrictions (on.roles, on.bots, skip-roles, skip-bots, skip-author-associations) are checked by the compiled pre-activation job and stop the run there. 2) Conditions: a top-level if: on Actions context, such as skipping draft pull requests, skips jobs without a runner; jobs.agent.if and jobs.agent.needs are combined with the compiler's own conditions to gate just the agent job. 3) Search: on.skip-if-match and on.skip-if-no-match run GitHub search queries in pre-activation, alongside cooldown and stop-after; a match skips the agent job, skipped not failed, at the cost of API calls. 4) on.steps: deterministic steps inside the same pre-activation job expose <id>_result outputs for an if: to read, without an extra job. 5) Custom jobs: a jobs: filter job computes an eligibility output such as should-run before activation; it costs a runner job. 6) Noop short-circuit: steps: or pre-agent-steps: write a noop record to $GH_AW_SAFE_OUTPUTS, and the harness exits at startup without inference and without AI Credits, but the agent job has already started and used runner minutes. 7) skip-if-decision, experimental: up to 64 top-level questions evaluated before each otherwise eligible invocation, including retries and continuations. Each answers deny, allow or unknown. Any deny skips that invocation and records a noop; otherwise allow, or all unknown, keeps the path the deterministic harness chose. Model errors and timeouts abstain as unknown, so the gate proceeds rather than failing closed. The decision itself is a model call with its own cost, which is why it comes last. An optional central admission service, on.admission, can also deny activation; it is covered with cost guards on the Cost management slide. Different gates save different things: no run, no runner, no agent job, or no inference. A skipped agent is not necessarily a skipped Actions run.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        tok.style.opacity = 0;
+        for (let k = 0; k <= 7; k++) {
+          const X = k < 7 ? GX(k) : EX,
+            a = START(k),
+            b = a + RUN(X),
+            d = k < 7 ? b + UP : b;
+          if (u >= a && u < d) {
+            tok.style.opacity = 1;
+            let x = X,
+              y = PY;
+            if (u < b) x = 30 + (X - 30) * ease((u - a) / (b - a));
+            else y = PY - (PY - RY) * ease((u - b) / UP);
+            tok.setAttribute("cx", x);
+            tok.setAttribute("cy", y);
+            tok.style.fill = k < 7 && u >= b ? "#ff7b72" : "#f0f6fc";
+          }
+          if (u >= a) fire("s" + k, () => sfx.key(0.6));
+          if (k < 7 && u >= b)
+            fire("g" + k, () => {
+              $("draG" + k).classList.add("on", "shut");
+              sfx.block();
+            });
+          if (k < 7 && u >= d)
+            fire("p" + k, () => {
+              $("draG" + k).classList.remove("shut");
+              svg.querySelectorAll(`#draG${k} .dra-park, #draG${k} .dra-out`).forEach(x => x.classList.add("on"));
+              sfx.pop(k);
+            });
+          if (k === 7 && u >= b)
+            fire("eng", () => {
+              $("draE").classList.add("on");
+              $("draA").classList.add("on");
+              sfx.compile();
+            });
+        }
+      },
+      el: h(
+        "section",
+        { class: "slide dra" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "triggers · if: · skip-if · on.steps · jobs · noop · skip-if-decision"), h("h2", {}, letters("Don’t Run "), letters("the Agent", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "The cheapest agent call is the one you never make"), " · a skipped agent ≠ a skipped Actions run")
+      ),
+    });
+  }
+
   // Agent memory: memories restore read-only (cache-memory recalled by integrity), the agent recalls and works, trusted jobs persist cache, repo, comment and ledger memory
   {
     resetIndex();
@@ -10104,6 +10279,184 @@
         arrMem.classList.toggle("hot", (u >= RESTORE[0] && u < LINE[0] + 300) || (u >= PERSIST[0] && u < PERSIST[3] + 900));
       },
       el,
+    });
+  }
+
+  // Memory with a History: a ledger keeps append-only JSONL records on its own branch; trusted preparation replays them into a disposable read-only SQLite projection, the agent reads state and requests a change through a safe output, and a trusted job validates and appends it
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    let g = `<defs><marker id="mhlP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker></defs>`;
+    // left: the declared state model, then the append-only history on its branch
+    const FM = [
+      [0, "tools:", ""],
+      [1, "ledger:", ""],
+      [2, "findings:", " k"],
+      [3, "type: table · key: id", ""],
+      [3, "schema: { id, status }", ""],
+    ];
+    g += `<g class="sfl-box" id="mhlF"><rect class="sfl-card" x="0" y="0" width="560" height="190" rx="14"/><text class="sfl-title" x="20" y="30">STATE MODEL</text>`;
+    FM.forEach(([ind, t, c], i) => (g += `<text class="aex-c${c}" x="${20 + ind * 22}" y="${64 + i * 27}">${t}</text>`));
+    g += `</g>`;
+    const ROWS = [
+      ['{"op":"insert","id":"F-1","status":"open"}', ""],
+      ['{"op":"insert","id":"F-2","status":"open"}', ""],
+      ['{"op":"update","id":"F-1","status":"triaged"}', ""],
+      ['{"op":"insert","id":"F-3","status":"open"}', ""],
+      ['{"op":"update","id":"F-2","status":"fixed"}', " new"],
+    ];
+    g += `<g class="sfl-box" id="mhlB"><rect class="sfl-card" x="0" y="220" width="560" height="360" rx="14"/><text class="sfl-title" x="20" y="250">BRANCH ledgers/findings · JSONL</text>`;
+    ROWS.forEach(([t, c], i) => (g += `<g class="aex-row${c}" id="mhlR${i}"><text class="aex-d" x="20" y="${296 + i * 46}">${i + 1}</text><text class="aex-c" x="48" y="${296 + i * 46}">${t}</text></g>`));
+    g += `<text class="aex-d" x="20" y="560">append-only · records never rewritten</text></g>`;
+    // middle: the disposable projection, then the agent that reads it
+    const STATE = [
+      ["F-1", "triaged"],
+      ["F-2", "open"],
+      ["F-3", "open"],
+    ];
+    g += `<g class="sfl-box" id="mhlQ"><rect class="sfl-card" x="640" y="0" width="420" height="300" rx="14"/><text class="sfl-title" x="660" y="30">SQLITE · READ-ONLY</text><text class="aex-d" x="660" y="56">ledger.db · rebuilt every run</text>`;
+    g += `<text class="aex-c k" x="660" y="94">state</text><text class="aex-d" x="760" y="94">key</text><text class="aex-d" x="880" y="94">status</text>`;
+    STATE.forEach(([k, v], i) => (g += `<g class="aex-row" id="mhlS${i}"><text class="aex-c" x="760" y="${128 + i * 30}">${k}</text><text class="aex-c" x="880" y="${128 + i * 30}">${v}</text></g>`));
+    g += `<g class="aex-row" id="mhlS3"><text class="aex-c k" x="660" y="236">records</text><text class="aex-c" x="760" y="236">4 rows of history</text></g>`;
+    g += `<text class="aex-d" x="660" y="276">queued writes not visible this run</text></g>`;
+    g += `<g class="sfl-box" id="mhlA"><rect class="sfl-card" x="640" y="360" width="420" height="220" rx="14"/><circle cx="684" cy="402" r="22" fill="#8957e5"/>${ico("copilot", 684, 403, 26)}<text class="aex-t" x="718" y="410">AGENT</text>`;
+    g += `<g class="aex-row" id="mhlA1"><text class="aex-c" x="660" y="452">SELECT … FROM state</text></g>`;
+    g += `<g class="aex-chip" id="mhlA2" style="--c:#ab7df8"><rect x="660" y="472" width="380" height="64" rx="12"/><text class="aex-c k" x="676" y="498">ledger_append</text><text class="aex-c" x="676" y="524">update F-2 → fixed</text></g>`;
+    g += `<text class="aex-st" id="mhlAst" x="660" y="564"></text></g>`;
+    // right: the trusted persistence job
+    const CHECKS = ["schema validates the value", "reconcile with latest branch", "deterministic record id", "append segment · push"];
+    g += `<g class="sfl-box" id="mhlT"><rect class="sfl-card" x="1140" y="0" width="480" height="420" rx="14"/>${ico("shieldCheck", 1180, 38, 30, "#3fb950")}<text class="aex-t" x="1206" y="46">push_ledger_changes</text><text class="aex-d" x="1160" y="80">trusted job · agent holds no write token</text>`;
+    CHECKS.forEach((t, i) => (g += `<g class="sfl-row mhl-k" id="mhlK${i}"><circle cx="1172" cy="${126 + i * 48}" r="8"/><text x="1192" y="${132 + i * 48}">${t}</text></g>`));
+    g += `<g class="aex-row" id="mhlK4"><text class="aex-d" x="1160" y="350">next run replays every record</text><text class="aex-c" x="1160" y="378">→ same state · F-2 fixed</text></g></g>`;
+    const WIRES = [
+      ["mhlW1", "M560 300 C600 300 600 150 640 150"],
+      ["mhlW2", "M850 300 L850 360"],
+      ["mhlW3", "M1060 504 C1100 504 1100 210 1140 210"],
+      ["mhlW4", "M1380 420 L1380 604 L300 604 L300 582"],
+    ];
+    for (const [id, d] of WIRES) g += `<path class="fm-wire p" id="${id}" d="${d}" marker-end="url(#mhlP)"/>`;
+    g += `<circle class="fm-dot mhl-dot" r="8" fill="#ab7df8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg mhl-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".mhl-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const setSt = (t, c = "") => {
+      const x = $("mhlAst");
+      x.textContent = t;
+      x.setAttribute("class", "aex-st" + (c ? " " + c : ""));
+    };
+    // [wire, start, end, what lights on arrival]
+    const FLY = [
+      ["mhlW1", 2700, 3400, "Q"],
+      ["mhlW2", 4300, 4800, "A"],
+      ["mhlW3", 6200, 7000, "T"],
+      ["mhlW4", 9400, 10600, "B"],
+    ];
+    const CYC = 15000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      svg.querySelectorAll(".on, .seen").forEach(x => x.classList.remove("on", "seen"));
+      setSt("");
+      dot.style.opacity = 0;
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Memory with a History, an illustrative ledger with synthetic findings. Ordinary agent memory is files: whatever the last run left behind. A ledger is memory with a history. Declare it under tools.ledger with a built-in state model, log, set, map, table, counter or notes, plus a JSON schema; table ledgers need a string key. Every change is an immutable JSONL record appended to the ledger's own ledgers/<name> branch; nothing is rewritten. Before the agent starts, trusted preparation replays those records into a disposable, read-only SQLite database: state holds the current state and records holds the immutable history. The agent queries it with plain SQL but cannot write to it, or to the branch. To change state it requests a mutation through a safe output, ledger_append here, or ledger_map_put and ledger_note_add for maps and notes. The write is deferred: the reply confirms queuing, not durability, and the queued write is not visible in this run's projection. The trusted push_ledger_changes job validates the value against the schema, reconciles the request with the latest branch state, gives it a deterministic record ID and appends it. The next run replays the same records into the same state. Compaction runs separately in Agentic Maintenance, never in the agent.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        if (u >= 500)
+          fire("f", () => {
+            $("mhlF").classList.add("on");
+            sfx.pop(0);
+          });
+        for (let i = 0; i < 4; i++)
+          if (u >= 1100 + i * 320)
+            fire("r" + i, () => {
+              $("mhlB").classList.add("on");
+              $("mhlR" + i).classList.add("on");
+              sfx.key(0.6);
+            });
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        dot.style.opacity = 0;
+        FLY.forEach(([wid, a, b, n], k) => {
+          if (u >= a && u < b) {
+            const p = $(wid),
+              q = p.getPointAtLength(p.getTotalLength() * ease((u - a) / (b - a)));
+            p.classList.add("hot");
+            dot.style.opacity = 1;
+            dot.setAttribute("cx", q.x);
+            dot.setAttribute("cy", q.y);
+          }
+          if (u >= b)
+            fire("w" + k, () => {
+              if (n === "Q") {
+                $("mhlQ").classList.add("on");
+                for (let i = 0; i < 4; i++) $("mhlS" + i).classList.add("on");
+                sfx.pop(2);
+              } else if (n === "A") {
+                $("mhlA").classList.add("on");
+                $("mhlA1").classList.add("on");
+                sfx.pop(3);
+              } else if (n === "T") {
+                $("mhlT").classList.add("on");
+                sfx.pop(4);
+              } else {
+                $("mhlR4").classList.add("on");
+                setSt("✓ appended by trusted job", "ok");
+                sfx.notify(false);
+              }
+            });
+        });
+        if (u >= 5300)
+          fire("req", () => {
+            $("mhlA2").classList.add("on");
+            setSt("queued · not durable yet", "y");
+            sfx.key(0.8);
+          });
+        for (let i = 0; i < 4; i++)
+          if (u >= 7400 + i * 450)
+            fire("k" + i, () => {
+              $("mhlK" + i).classList.add("seen");
+              sfx.pop(5);
+            });
+        if (u >= 11400)
+          fire("replay", () => {
+            $("mhlK4").classList.add("on");
+            sfx.compile();
+          });
+      },
+      el: h(
+        "section",
+        { class: "slide mhl" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "tools.ledger · JSONL · SQLite projection · safe-output mutations"), h("h2", {}, letters("Memory with "), letters("a History", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "Agents read state and request changes"), " · trusted code validates, appends and replays")
+      ),
     });
   }
 
@@ -10320,6 +10673,398 @@
         h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "engine.durable · checkpoint · interrupt · resume"), h("h2", {}, letters("Durable "), letters("execution", "l-grad"))),
         svg,
         h("div", { class: "dur-foot" }, h("b", {}, "Resume the session, not the side effects"), " · keep every write retry-safe and idempotent")
+      ),
+    });
+  }
+
+  // Agents with a Job Queue: a coordinator dispatches immutable work to independent workers; each attempt is owned by a Claim, the worker's report is a Completion and only independently verified delivery becomes a Result, which then unblocks dependent work
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    let g = `<defs><marker id="jqP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker></defs>`;
+    // left: the coordinator and its immutable work definitions
+    const WORK = [
+      ["W-1", "triage #88", ""],
+      ["W-2", "fix flaky test", ""],
+      ["W-3", "update docs", ""],
+      ["W-4", "release notes", "needs W-1 · W-2"],
+    ];
+    const WY = i => 104 + i * 104;
+    g += `<g class="sfl-box on" id="jqC"><rect class="sfl-card" x="0" y="0" width="400" height="590" rx="14"/>${ico("tasklist", 32, 36, 28, "#d29922")}<text class="aex-t" x="58" y="44">COORDINATOR</text><text class="aex-d" x="20" y="76">work_queue_dispatch_next</text>`;
+    WORK.forEach(([id, t, dep], i) => {
+      g += `<g class="aex-chip on" id="jqW${i}" style="--c:#3d444d"><rect x="20" y="${WY(i)}" width="360" height="84" rx="12"/><text class="aex-c k" x="38" y="${WY(i) + 32}">${id}</text><text class="aex-c" x="96" y="${WY(i) + 32}">${t}</text>`;
+      g += `<text class="aex-d" x="38" y="${WY(i) + 62}">${dep || "immutable definition"}</text><text class="aex-st" id="jqWs${i}" x="364" y="${WY(i) + 62}" text-anchor="end">queued</text></g>`;
+    });
+    g += `<text class="aex-d" x="20" y="566">one dispatch per launch · max: 3</text></g>`;
+    // middle: three independent worker runs
+    const WK = ["A", "B", "C"],
+      KY = i => 60 + i * 185;
+    WK.forEach((w, i) => {
+      g += `<g class="sfl-box" id="jqK${i}"><rect class="sfl-card" x="490" y="${KY(i)}" width="320" height="160" rx="14"/><circle cx="534" cy="${KY(i) + 44}" r="22" fill="#8957e5"/>${ico("copilot", 534, KY(i) + 45, 26)}`;
+      g += `<text class="aex-t" x="568" y="${KY(i) + 52}">WORKER ${w}</text><text class="aex-d" x="510" y="${KY(i) + 100}">own run · worker: true</text><text class="aex-st" id="jqKs${i}" x="510" y="${KY(i) + 140}">idle</text></g>`;
+    });
+    // right: three distinct records per attempt
+    const COLS = [
+      ["CLAIM", "owns the attempt", 900],
+      ["COMPLETION", "worker reports", 1145],
+      ["RESULT", "delivery verified", 1390],
+    ];
+    COLS.forEach(([t, d, x]) => (g += `<text class="aex-t" x="${x}" y="22">${t}</text><text class="aex-d" x="${x + 2}" y="46">${d}</text>`));
+    WK.forEach((w, i) =>
+      COLS.forEach(
+        ([, , x], j) =>
+          (g += `<g class="aex-chip" id="jq${i}${j}" style="--c:#ab7df8"><rect x="${x}" y="${KY(i) + 35}" width="230" height="90" rx="12"/><text class="aex-c" id="jq${i}${j}a" x="${x + 16}" y="${KY(i) + 71}"></text><text class="aex-d" id="jq${i}${j}b" x="${x + 16}" y="${KY(i) + 101}"></text></g>`)
+      )
+    );
+    g += `<text class="aex-d" x="900" y="614">uncertain delivery → verify it · never re-run the effects</text>`;
+    const WIRES = [
+      ["jqD0", `M380 ${WY(0) + 42} C440 ${WY(0) + 42} 440 ${KY(0) + 85} 490 ${KY(0) + 85}`],
+      ["jqD1", `M380 ${WY(1) + 42} C440 ${WY(1) + 42} 440 ${KY(1) + 85} 490 ${KY(1) + 85}`],
+      ["jqD2", `M380 ${WY(2) + 42} C440 ${WY(2) + 42} 440 ${KY(2) + 85} 490 ${KY(2) + 85}`],
+    ];
+    for (const [id, d] of WIRES) g += `<path class="fm-wire p" id="${id}" d="${d}" marker-end="url(#jqP)"/>`;
+    g += `<circle class="fm-dot jq-dot" r="8" fill="#ab7df8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg jq-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".jq-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const setT = (id, t, c = "") => {
+      const x = $(id);
+      x.textContent = t;
+      x.setAttribute("class", "aex-st" + (c ? " " + c : ""));
+    };
+    const cell = (i, j, a, b, col = "#ab7df8") => {
+      const c = $(`jq${i}${j}`);
+      c.style.setProperty("--c", col);
+      c.classList.add("on");
+      $(`jq${i}${j}a`).textContent = a;
+      $(`jq${i}${j}b`).textContent = b;
+    };
+    // [time, action]
+    const EVENTS = [
+      [
+        1500,
+        () => {
+          cell(0, 0, "claim h-a1", "W-1 · worker A");
+          setT("jqWs0", "claimed", "b");
+          setT("jqKs0", "working", "b");
+        },
+      ],
+      [
+        2900,
+        () => {
+          cell(1, 0, "claim h-b1", "W-2 · worker B");
+          setT("jqWs1", "claimed", "b");
+          setT("jqKs1", "working", "b");
+        },
+      ],
+      [
+        4300,
+        () => {
+          cell(2, 0, "claim h-c1", "W-3 · worker C");
+          setT("jqWs2", "claimed", "b");
+          setT("jqKs2", "working", "b");
+        },
+      ],
+      [
+        5600,
+        () => {
+          cell(0, 1, "completed", "before any effect", "#79c0ff");
+          setT("jqKs0", "✓ claim finished", "ok");
+        },
+      ],
+      [
+        6700,
+        () => {
+          cell(0, 2, "✓ PR #91", "delivery verified", "#3fb950");
+          setT("jqWs0", "✓ result", "ok");
+        },
+      ],
+      [
+        7800,
+        () => {
+          cell(2, 1, "cancelled", "outcome recorded", "#f85149");
+          setT("jqKs2", "cancelled", "ko");
+        },
+      ],
+      [
+        8600,
+        () => {
+          cell(2, 2, "— none", "no delivery claimed", "#3d444d");
+          setT("jqWs2", "no result", "ko");
+        },
+      ],
+      [
+        9600,
+        () => {
+          cell(1, 1, "completed", "before any effect", "#79c0ff");
+          setT("jqKs1", "✓ claim finished", "ok");
+        },
+      ],
+      [
+        10600,
+        () => {
+          cell(1, 2, "? uncertain", "verifying delivery", "#d29922");
+          setT("jqWs1", "verifying", "y");
+        },
+      ],
+      [
+        12000,
+        () => {
+          cell(1, 2, "✓ comment", "delivery verified", "#3fb950");
+          setT("jqWs1", "✓ result", "ok");
+        },
+      ],
+      [
+        13000,
+        () => {
+          $("jqW3").style.setProperty("--c", "#3fb950");
+          setT("jqWs3", "ready", "ok");
+        },
+      ],
+    ];
+    const FLY = [
+      ["jqD0", 700, 1500, 0],
+      ["jqD1", 2100, 2900, 1],
+      ["jqD2", 3500, 4300, 2],
+    ];
+    const CYC = 17000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      svg.querySelectorAll(".sfl-box.on, .aex-chip.on").forEach(x => x.classList.remove("on"));
+      $("jqC").classList.add("on");
+      WORK.forEach((_, i) => {
+        $("jqW" + i).classList.add("on");
+        $("jqW" + i).style.setProperty("--c", "#3d444d");
+        setT("jqWs" + i, i === 3 ? "blocked" : "queued");
+      });
+      WK.forEach((_, i) => {
+        setT("jqKs" + i, "idle");
+        for (let j = 0; j < 3; j++) {
+          $(`jq${i}${j}a`).textContent = "";
+          $(`jq${i}${j}b`).textContent = "";
+        }
+      });
+      dot.style.opacity = 0;
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Agents with a Job Queue, an illustrative queue with synthetic work items, claim handles and pull request numbers. tools.work-queue keeps a Git-backed transaction log on its own branch. A producer submits Work: immutable task definitions that can depend on each other, here W-4 waits for W-1 and W-2. A coordinator calls work_queue_dispatch_next; the scheduler, not the agent, selects the Work and launches a worker run through the dispatch-workflow safe output, at most one dispatch per launch, and an uncertain dispatch response never authorizes a second launch. Each attempt is owned by a Claim, and every safe output the worker emits belongs to that claim, so effects can be traced and unauthorized duplicates refused. The worker finishes the claim with work_queue_claim_finish, completed or cancelled, which records a Completion before any effect is delivered. Only independent verification of the delivered effect records a Result, and only a Result satisfies dependencies; a green Actions run alone is not a Result. Cancellation records an outcome; it does not stop a worker that is already running. When delivery is uncertain, the queue verifies it instead of re-running the effects, and Agentic Maintenance reconciles stranded reservations. Keep the three apart: Claim owns the attempt, Completion is the worker's report, Result is verified delivery.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        dot.style.opacity = 0;
+        FLY.forEach(([wid, a, b, i]) => {
+          if (u >= a && u < b) {
+            const p = $(wid),
+              q = p.getPointAtLength(p.getTotalLength() * ease((u - a) / (b - a)));
+            p.classList.add("hot");
+            dot.style.opacity = 1;
+            dot.setAttribute("cx", q.x);
+            dot.setAttribute("cy", q.y);
+          }
+          if (u >= a)
+            fire("d" + i, () => {
+              setT("jqWs" + i, "dispatched", "b");
+              sfx.key(0.7);
+            });
+          if (u >= b)
+            fire("k" + i, () => {
+              $("jqK" + i).classList.add("on");
+              sfx.pop(i);
+            });
+        });
+        EVENTS.forEach(([at, fn], k) => {
+          if (u >= at)
+            fire("e" + k, () => {
+              fn();
+              if (k === EVENTS.length - 1) sfx.compile();
+              else sfx.pop(3 + (k % 4));
+            });
+        });
+      },
+      el: h(
+        "section",
+        { class: "slide jq" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "tools.work-queue · dispatch · claim · completion · result"), h("h2", {}, letters("Agents with "), letters("a Job Queue", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "Claim ≠ Completion ≠ Result"), " · a green Actions run is not verified delivery")
+      ),
+    });
+  }
+
+  // Agents Trigger Agents: a triage agent dispatches a fix agent through the dispatch-workflow safe output with typed inputs, the fix run's completion triggers a verify agent through workflow_run, and each agent works inside its own run boundary
+  {
+    resetIndex();
+    const VW = 1620,
+      VH = 620;
+    const ico = (n, x, y, sz, fill = "#f0f6fc") => `<g transform="translate(${x - sz / 2},${y - sz / 2}) scale(${sz / 24})" fill="${fill}">${OCTI[n].map(d => `<path d="${d}"/>`).join("")}</g>`;
+    let g = `<defs><marker id="attP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ab7df8"/></marker></defs>`;
+    // [x, run, agent, trigger, what it does, safe output]
+    const RUNS = [
+      [0, "RUN 301", "TRIAGE AGENT", "on: issues opened", "classify #88", "dispatch_workflow"],
+      [590, "RUN 302", "FIX AGENT", "on: workflow_dispatch", "patch the flaky test", "create_pull_request"],
+      [1180, "RUN 303", "VERIFY AGENT", "on: workflow_run", "re-check PR #91", "add_comment"],
+    ];
+    RUNS.forEach(([x, run, name, on, act, out], i) => {
+      g += `<g class="sfl-box att-run" id="attR${i}"><rect class="att-edge" x="${x}" y="170" width="440" height="270" rx="18"/><rect class="sfl-card" x="${x + 14}" y="196" width="412" height="230" rx="14"/>`;
+      g += `<text class="att-tag" x="${x + 16}" y="160">${run} · own job · own token · own firewall</text>`;
+      g += `<circle cx="${x + 62}" cy="244" r="26" fill="#8957e5"/>${ico("copilot", x + 62, 245, 30)}<text class="aex-t" x="${x + 102}" y="252">${name}</text>`;
+      g += `<g class="aex-row" id="attR${i}a"><text class="aex-c k" x="${x + 34}" y="306">${on}</text></g>`;
+      g += `<g class="aex-row" id="attR${i}b"><text class="aex-c" x="${x + 34}" y="338">${act}</text></g>`;
+      g += `<g class="aex-chip" id="attR${i}c" style="--c:#3fb950"><rect x="${x + 34}" y="358" width="300" height="44" rx="10"/><text class="aex-c" x="${x + 50}" y="386">${out}</text></g>`;
+      g += `<text class="aex-st" id="attR${i}s" x="${x + 412}" y="386" text-anchor="end"></text></g>`;
+    });
+    // hand-offs between the runs: typed inputs forward, a completion signal next
+    const HAND = [
+      ["attH0", 515, "TYPED INPUTS", ["issue: 88", "tracker_id: t-7", "hint: retry race"]],
+      ["attH1", 1105, "COMPLETION SIGNAL", ["workflow_run", "conclusion: success", "artifact = data"]],
+    ];
+    HAND.forEach(([id, cx, t, lines]) => {
+      g += `<g class="aex-chip" id="${id}" style="--c:#ab7df8"><rect x="${cx - 150}" y="0" width="300" height="130" rx="14"/><text class="sfl-title" x="${cx - 132}" y="30">${t}</text>`;
+      lines.forEach((l, j) => (g += `<text class="aex-c" x="${cx - 132}" y="${62 + j * 26}">${l}</text>`));
+      g += `</g>`;
+    });
+    // the safe-output configuration that authorizes the dispatch
+    const SO = [
+      [0, "safe-outputs:", " k"],
+      [1, "dispatch-workflow:", ""],
+      [2, "workflows: [fix-agent]", ""],
+      [2, "max: 1", ""],
+    ];
+    g += `<g class="sfl-box on" id="attS"><rect class="sfl-card" x="0" y="474" width="1620" height="140" rx="14"/>`;
+    SO.forEach(([ind, t, c], i) => (g += `<text class="aex-c${c}" x="${24 + ind * 22}" y="${506 + i * 26}">${t}</text>`));
+    g += `<text class="aex-c" x="560" y="510">allowlisted target · validated at compile time</text><text class="aex-c" x="560" y="540">each dispatch is a new run with its own boundary</text>`;
+    g += `<text class="aex-c" x="560" y="570">results pass as structured data, never as instructions</text><text class="aex-d" x="1600" y="598" text-anchor="end">call-workflow: compile-time fan-out inside one run</text></g>`;
+    const WIRES = [
+      ["attW0", "M440 305 L590 305"],
+      ["attW1", "M1030 305 L1180 305"],
+    ];
+    for (const [id, d] of WIRES) g += `<path class="fm-wire p" id="${id}" d="${d}" marker-end="url(#attP)"/>`;
+    g += `<circle class="fm-dot att-dot" r="8" fill="#ab7df8"/>`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "fm-svg aex-svg att-svg");
+    svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    svg.innerHTML = g;
+    const $ = id => svg.querySelector("#" + id),
+      dot = svg.querySelector(".att-dot");
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const setT = (id, t, c = "") => {
+      const x = $(id);
+      x.textContent = t;
+      x.setAttribute("class", "aex-st" + (c ? " " + c : ""));
+    };
+    // each run: [start, trigger row, action row, safe output, done]
+    const T = i => 600 + i * 4200;
+    const FLY = [
+      ["attW0", T(0) + 2700, T(1) - 200, "attH0"],
+      ["attW1", T(1) + 2700, T(2) - 200, "attH1"],
+    ];
+    const CYC = T(3) + 2000;
+    let t0 = 0,
+      cyc = -1,
+      seen = new Set();
+    const fire = (name, fn) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      fn();
+    };
+    const reset = () => {
+      seen = new Set();
+      svg.querySelectorAll(".on, .done").forEach(x => x.classList.remove("on", "done"));
+      $("attS").classList.add("on");
+      RUNS.forEach((_, i) => setT(`attR${i}s`, ""));
+      dot.style.opacity = 0;
+    };
+    slides.push({
+      group: "engineering",
+      notes:
+        "Agents Trigger Agents, an illustrative chain with synthetic run numbers, issue and pull request numbers. One agent does not need to do everything. Here a triage agent classifies an issue and asks for a fix by emitting the dispatch_workflow safe output. The workflow it may start is allowlisted under safe-outputs dispatch-workflow and validated at compile time, max caps how many dispatches a run may request, and the trusted safe-outputs job makes the call, not the agent. Context crosses the boundary only as typed workflow_dispatch inputs, such as the issue number and a tracker ID for correlation. The fix agent runs as a separate workflow run with its own job, token, permissions and firewall, and opens a pull request through its own safe outputs. When it finishes, the workflow_run completed event is the completion signal that lets the verify agent proceed; the compiler adds repository and fork checks, and anything downloaded from the upstream run is treated as untrusted data, never as instructions. call-workflow is the compile-time alternative: it fans out to reusable workflows inside the same run with no dispatch API call. Each hop is explicit, authorized and auditable.",
+      enter() {
+        t0 = 0;
+        cyc = -1;
+      },
+      tick(t) {
+        if (!t0) t0 = t;
+        const e = t - t0,
+          c = Math.floor(e / CYC),
+          u = e % CYC;
+        if (c !== cyc) {
+          cyc = c;
+          reset();
+        }
+        for (let i = 0; i < 3; i++) {
+          const a = T(i);
+          if (u >= a)
+            fire("r" + i, () => {
+              $("attR" + i).classList.add("on");
+              $(`attR${i}a`).classList.add("on");
+              setT(`attR${i}s`, "running", "b");
+              sfx.pop(i);
+            });
+          if (u >= a + 900)
+            fire("b" + i, () => {
+              $(`attR${i}b`).classList.add("on");
+              sfx.key(0.6);
+            });
+          if (u >= a + 1900)
+            fire("c" + i, () => {
+              $(`attR${i}c`).classList.add("on");
+              sfx.key(0.8);
+            });
+          if (u >= a + 2500)
+            fire("d" + i, () => {
+              $("attR" + i).classList.add("done");
+              setT(`attR${i}s`, "✓ done", "ok");
+              if (i === 2) sfx.compile();
+              else sfx.notify(false);
+            });
+        }
+        svg.querySelectorAll(".fm-wire.hot").forEach(w => w.classList.remove("hot"));
+        dot.style.opacity = 0;
+        FLY.forEach(([wid, a, b, hid], k) => {
+          if (u >= a - 400) fire("h" + k, () => $(hid).classList.add("on"));
+          if (u >= a && u < b) {
+            const p = $(wid),
+              q = p.getPointAtLength(p.getTotalLength() * ease((u - a) / (b - a)));
+            p.classList.add("hot");
+            dot.style.opacity = 1;
+            dot.setAttribute("cx", q.x);
+            dot.setAttribute("cy", q.y);
+          }
+        });
+      },
+      el: h(
+        "section",
+        { class: "slide att" },
+        h("div", { class: "slide-head" }, h("div", { class: "kicker" }, "dispatch-workflow · typed inputs · workflow_run · call-workflow"), h("h2", {}, letters("Agents "), letters("Trigger Agents", "l-grad"))),
+        svg,
+        h("div", { class: "aex-foot" }, h("b", {}, "Hand off explicitly"), " · every agent in its own run, every dispatch through a safe output")
       ),
     });
   }
@@ -15106,7 +15851,7 @@
     security: ["Security", "Assume the agent is compromised"],
     process: ["Human agent processes", "Engineer processes, not code"],
     cost: ["Cost Optimization", "Debug, spend less, route smarter"],
-    engineering: ["Agentic Engineering", "Remember, expire, search, measure"],
+    engineering: ["Agentic Engineering", "Skip, remember, queue, chain, measure"],
     enterprise: ["Enterprise", "Any agent, any provider, any scale"],
     cao: ["Central Agentic Ops", "CAO · gh cao · research prototype"],
     data: ["AW factory", "Measured on gh-aw's own history"],

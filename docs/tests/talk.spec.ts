@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { readFileSync, readdirSync } from "node:fs";
 import { injectSlideMetadata, loadSlides, parseSlides, serializeJsonLd, slideParts } from "../src/lib/cracktro/slides.js";
 
@@ -290,6 +290,61 @@ test("keeps every key on the host side of the zero-secret agents diagram", async
   await expect(page.locator(".zs-vm-g .zs-key")).toHaveCount(0);
   await expect(page.locator(".zs-svg .zs-key")).toHaveCount(2);
   expect(errors).toEqual([]);
+});
+
+test.describe("agentic engineering slides", () => {
+  const open = async (page: Page, heading: string, ms: number) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.clock.install();
+    await page.goto(`/gh-aw/cracktro/#${slideNo(heading)}`);
+    await expect(page.locator(".slide.active h2")).toHaveText(heading);
+    // Slide timelines derive state from elapsed time, so jumping ahead is equivalent to waiting.
+    await page.clock.runFor(500);
+    await page.clock.fastForward(ms);
+    await page.clock.runFor(200);
+    return errors;
+  };
+
+  test("routes every gate but the last to skip before the agent runs", async ({ page }) => {
+    const errors = await open(page, "Don’t Run the Agent", 19_000);
+    await expect(page.locator(".dra-svg .dra-gate")).toHaveCount(7);
+    for (const text of ["on: types", "if: !draft", "skip-if-match", "skip-if-no-match", "on.steps:", "jobs: filter:", "noop record", "skip-if-decision", "on.admission", "→ Cost management"]) {
+      await expect(page.locator(".dra-svg")).toContainText(text);
+    }
+    await expect(page.locator(".dra-svg .dra-out.on")).toHaveCount(7);
+    await expect(page.locator("#draE")).toHaveClass(/\bon\b/);
+    await page.keyboard.press("n");
+    await expect(page.locator(".notes")).toContainText("Any deny skips that invocation");
+    await expect(page.locator(".notes")).toContainText("abstain as unknown");
+    await expect(page.locator(".notes")).toContainText("Cost management");
+    expect(errors).toEqual([]);
+  });
+
+  test("appends a validated ledger record from a trusted job", async ({ page }) => {
+    const errors = await open(page, "Memory with a History", 12_000);
+    await expect(page.locator("#mhlR4")).toHaveClass(/\bon\b/);
+    await expect(page.locator(".mhl-svg")).toContainText("push_ledger_changes");
+    expect(errors).toEqual([]);
+  });
+
+  test("keeps claims, completions and verified results apart", async ({ page }) => {
+    const errors = await open(page, "Agents with a Job Queue", 14_000);
+    await expect(page.locator(".jq-svg")).toContainText("CLAIM");
+    await expect(page.locator("#jq02a")).toHaveText("✓ PR #91");
+    await expect(page.locator("#jq21a")).toHaveText("cancelled");
+    await expect(page.locator("#jq22a")).toHaveText("— none");
+    await expect(page.locator("#jqWs3")).toHaveText("ready");
+    expect(errors).toEqual([]);
+  });
+
+  test("chains three runs through dispatches and completion signals", async ({ page }) => {
+    const errors = await open(page, "Agents Trigger Agents", 12_500);
+    await expect(page.locator(".att-svg .att-run.done")).toHaveCount(3);
+    await expect(page.locator(".att-svg")).toContainText("dispatch_workflow");
+    await expect(page.locator(".att-svg")).toContainText("workflow_run");
+    expect(errors).toEqual([]);
+  });
 });
 
 test.describe("slides.md metadata", () => {
