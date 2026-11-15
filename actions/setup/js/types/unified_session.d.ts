@@ -460,6 +460,8 @@ export interface SafeOutputData {
   decision_reason?: string;
   /** @pattern ^[a-f0-9]{64}$ */
   item_sha256?: string;
+  /** Compiler-managed successful gate-review publication, never an agent claim. */
+  review_publication?: true;
   /** The operation may have applied even though processing failed to confirm it. */
   operation_outcome?: "indeterminate";
 }
