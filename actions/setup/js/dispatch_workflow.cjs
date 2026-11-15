@@ -14,7 +14,8 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveTargetRepoConfig, parseRepoSlug, validateTargetRepo } = require("./repo_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { buildAwContext, resolveWorkQueueRuntime } = require("./aw_context.cjs");
+const { resolveWorkQueueRuntime } = require("./aw_context.cjs");
+const { buildPendingDispatchContext, pendingWritesEnabled } = require("./pending_writes.cjs");
 const { currentClaimHandle } = require("./work_queue_claim_scope.cjs");
 const { createDispatchCredentialValidator } = require("./work_queue_dispatch_credential.cjs");
 const { loadTemporaryIdMapFromResolved, resolveIssueNumber, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
@@ -23,16 +24,17 @@ const { dispatchWorkflow } = require("./dispatch_workflow_transport.cjs");
 /**
  * Main handler factory for dispatch_workflow
  * Returns a message handler function that processes individual dispatch_workflow messages
- * @type {HandlerFactoryFunction}
+ * @param {any} config
+ * @param {{planning?: boolean, readClient?: any, contextJSON?: string}} [options]
  */
-async function main(config = {}) {
+async function createHandler(config = {}, { planning = false, readClient, contextJSON } = {}) {
   // Extract configuration
   const allowedWorkflows = config.workflows || [];
   const maxCount = config.max || 1;
   const workflowFiles = config.workflow_files || {}; // Map of workflow name to file extension
   const awContextWorkflows = new Set(config.aw_context_workflows || []); // Workflows that accept compiler-managed aw_context
   const workQueueWorkflows = new Set(config.work_queue_workflows || []); // Queue-enabled workers that accept compiler-managed claims
-  const githubClient = await createAuthenticatedGitHubClient(config);
+  const githubClient = planning ? readClient : await createAuthenticatedGitHubClient(config);
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const allowedRefPatterns = parseAllowedRefPatterns(config.allowed_refs);
   const allowedRefRegexes = allowedRefPatterns.map(pattern => globPatternToRegex(pattern, { pathMode: true, caseSensitive: true }));
@@ -103,8 +105,10 @@ async function main(config = {}) {
         owner: repo.owner,
         repo: repo.repo,
       });
+      if ((planning || pendingWritesEnabled()) && (typeof repoData.default_branch !== "string" || !repoData.default_branch)) throw new Error("Dispatch default branch is unavailable");
       return `refs/heads/${repoData.default_branch}`;
     } catch (error) {
+      if (planning || pendingWritesEnabled()) throw error;
       core.warning(`Failed to fetch default branch: ${getErrorMessage(error)}`);
       return "refs/heads/main";
     }
@@ -156,7 +160,8 @@ async function main(config = {}) {
   // Cache the resolved ref so multiple dispatches share a single API lookup, but drop the
   // cache on failure so a transient error doesn't poison every later dispatch in the run.
   const getDefaultRef = () => {
-    defaultRefPromise ??= resolveDefaultRef().catch(error => {
+    const resolve = () => (planning ? require("./pending_writes_read.cjs").pendingRead(resolveDefaultRef) : resolveDefaultRef());
+    defaultRefPromise ??= resolve().catch(error => {
       defaultRefPromise = undefined;
       throw error;
     });
@@ -330,7 +335,7 @@ async function main(config = {}) {
 
       // Inject caller context into any compiler-managed workflow_dispatch target.
       if (awContextWorkflows.has(workflowName)) {
-        inputs["aw_context"] = JSON.stringify(buildAwContext());
+        inputs["aw_context"] = JSON.stringify(buildPendingDispatchContext(contextJSON));
       }
 
       // Get the workflow file extension from compile-time resolution
@@ -348,6 +353,10 @@ async function main(config = {}) {
 
       const workflowFile = `${workflowName}${extension}`;
       core.info(`Dispatching workflow: ${workflowFile}`);
+
+      if (planning) {
+        return { success: true, target: { repository: resolvedRepoSlug, workflow_id: workflowFile, ref }, effect: { workflow_id: workflowFile, ref, inputs } };
+      }
 
       // If in staged mode, preview the dispatch without executing it
       if (isStaged) {
@@ -393,6 +402,7 @@ async function main(config = {}) {
         run_id: runId,
       };
     } catch (error) {
+      if (planning && error && typeof error === "object" && "code" in error && error.code === "ERR_PENDING_READ_UNAVAILABLE") throw error;
       const errorMessage = getErrorMessage(error);
       core.error(`Failed to dispatch workflow "${workflowName}": ${errorMessage}`);
 
@@ -452,4 +462,15 @@ function normalizeRefPattern(pattern) {
   return `refs/heads/${pattern}`;
 }
 
-module.exports = { main };
+/** @type {HandlerFactoryFunction} */
+const main = config => createHandler(config);
+
+/** Run the handler's own target and input preparation without credentials or effects. */
+async function plan(config, message, readClient, contextJSON = undefined) {
+  if (message.type !== HANDLER_TYPE) return { success: false, error: "Unsupported dispatch planning type" };
+  if (message.ref != null && typeof message.ref !== "string") return { success: false, error: "Dispatch ref must be a string" };
+  const handler = await createHandler(config, { planning: true, readClient, contextJSON });
+  return handler(message, {});
+}
+
+module.exports = { main, plan };

@@ -79,6 +79,7 @@ function writePendingInputSnapshot({ directory, manifest, bindings, handlerConfi
     context: context || bindings.find(binding => binding.id === "context")?.value,
     environment: bindings.find(binding => binding.id === "environment")?.value,
     publication_invocations: bindings.find(binding => binding.id === "publication_invocations")?.value,
+    dispatch_contexts: bindings.find(binding => binding.id === "dispatch_contexts")?.value || {},
     generated_inputs: publicationInputs.filter(input => input.path).map(input => ({ job: input.job, id: input.id, input_id: input.input_id, ...scopedPath(input.path, runnerTemp), value: input.value })),
     bindings: snapshotBindings,
   };
@@ -92,7 +93,7 @@ function writePendingInputSnapshot({ directory, manifest, bindings, handlerConfi
   };
   bindings.forEach((binding, index) => {
     if (binding.kind === "value") {
-      if (!["handler_config", "gate_config", "context", "environment", "publication_invocations"].includes(binding.id)) throw integrityError("snapshot_input_unsupported");
+      if (!["handler_config", "gate_config", "context", "environment", "publication_invocations", "dispatch_contexts"].includes(binding.id)) throw integrityError("snapshot_input_unsupported");
       metadata.bindings.push({ id: binding.id, kind: "value" });
       return;
     }
@@ -125,14 +126,14 @@ function verifyPendingInputSnapshot({ directory, expectedSha256, manifest }) {
   if (readInput(path.join(directory, "pending-writes.json")).sha256 !== metadata.manifest_sha256) throw integrityError("snapshot_changed");
   if (
     canonicalPendingJSON(metadata) !== input.bytes.toString("utf8") ||
-    Object.keys(metadata).some(key => !["schema", "manifest_sha256", "run", "handler_config", "gate_config", "context", "environment", "publication_invocations", "generated_inputs", "bindings"].includes(key))
+    Object.keys(metadata).some(key => !["schema", "manifest_sha256", "run", "handler_config", "gate_config", "context", "environment", "publication_invocations", "dispatch_contexts", "generated_inputs", "bindings"].includes(key))
   )
     throw integrityError("snapshot_invalid");
   const descriptions = metadata.bindings.map(binding => {
     const expected = manifest.inputs.find(input => input.id === binding.id);
     if (!expected || binding.kind !== expected.kind) throw integrityError("snapshot_invalid");
     if (binding.kind === "value") {
-      if (!["handler_config", "gate_config", "context", "environment", "publication_invocations"].includes(binding.id)) throw integrityError("snapshot_invalid");
+      if (!["handler_config", "gate_config", "context", "environment", "publication_invocations", "dispatch_contexts"].includes(binding.id)) throw integrityError("snapshot_invalid");
       return { id: binding.id, kind: "value", sha256: inputDigest(metadata[binding.id]) };
     }
     const source = path.join(directory, relativePath(binding.artifact_path));
@@ -162,7 +163,7 @@ function restorePendingInputs({ directory, expectedSha256, manifest, runnerTemp 
     if (!binding || typeof binding.id !== "string" || ids.has(binding.id)) throw integrityError("snapshot_invalid");
     ids.add(binding.id);
     if (binding.kind === "value") {
-      if (!["handler_config", "gate_config", "context", "environment", "publication_invocations"].includes(binding.id)) throw integrityError("snapshot_invalid");
+      if (!["handler_config", "gate_config", "context", "environment", "publication_invocations", "dispatch_contexts"].includes(binding.id)) throw integrityError("snapshot_invalid");
       return { id: binding.id, kind: "value", value: metadata[binding.id] };
     }
     const root = destinations[binding.scope];

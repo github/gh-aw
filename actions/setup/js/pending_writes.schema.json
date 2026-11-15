@@ -149,7 +149,12 @@
             "base": { "type": "string" },
             "head_repository": { "type": "string" },
             "head_commit": { "type": "string" },
-            "job": { "type": "string" }
+            "job": { "type": "string" },
+            "storage_key": { "type": "string" },
+            "drive_name": { "type": "string" },
+            "workflow_id": { "type": "string" },
+            "ref": { "type": "string" },
+            "event_type": { "type": "string" }
           }
         },
         "depends_on": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
@@ -171,6 +176,15 @@
         "complete": { "type": "boolean" },
         "reason_category": { "enum": ["ready", "unsupported_plan", "read_unavailable"] },
         "code": { "$ref": "#/$defs/code" },
+        "dispatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sha256"],
+          "properties": {
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "context_time": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" }
+          }
+        },
         "publication": {
           "type": "object",
           "additionalProperties": false,

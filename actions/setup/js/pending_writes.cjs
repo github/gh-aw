@@ -72,8 +72,29 @@ function pendingEnvironment() {
       "GH_AW_DETECTION_CONCLUSION",
       "GH_AW_DETECTION_REASON",
       "GH_AW_DETECTION_THREAT_KINDS",
+      "GITHUB_REF",
+      "GITHUB_HEAD_REF",
     ].map(name => [name, process.env[name] || ""])
   );
+}
+
+function pendingDispatchContexts(manifest, bindings) {
+  const binding = bindings.find(binding => binding.id === "dispatch_contexts");
+  const directory = process.env.GH_AW_PENDING_WRITE_INPUTS || path.join(path.dirname(process.env.GH_AW_PENDING_WRITES || ""), "pending-write-inputs");
+  const value = binding?.value ?? parsePendingJSON(readInput(path.join(directory, "pending-write-inputs.json")).bytes.toString("utf8")).dispatch_contexts;
+  const expected = manifest.inputs.find(input => input.id === "dispatch_contexts" && input.kind === "value");
+  if (!expected || inputDigest(value) !== expected.sha256) throw integrityError("dispatch_context_changed");
+  return value;
+}
+
+/** @param {string} [planningContext] */
+function buildPendingDispatchContext(planningContext = undefined) {
+  if (planningContext !== undefined) return parsePendingJSON(planningContext);
+  if (!pendingWritesEnabled()) return require("./aw_context.cjs").buildAwContext();
+  const contexts = pendingDispatchContexts(readAuthorizedManifest(), parsePendingJSON(process.env.GH_AW_PENDING_WRITES_BINDINGS || "[]"));
+  const value = contexts[activeWrite.getStore()?.output_id];
+  if (typeof value !== "string") throw integrityError("dispatch_context_missing");
+  return parsePendingJSON(value);
 }
 
 function integrityError(reason = "inputs_changed") {
@@ -172,6 +193,8 @@ function assertPendingWritesIntegrity() {
   if (!invocationBinding) throw integrityError("manifest_invalid");
   const spec = parsePendingJSON(process.env.GH_AW_PENDING_WRITES_SPEC || "{}");
   invocationBinding.value = (spec.publications || []).filter(publication => publication.invocation).map(publication => ({ job: publication.job, id: publication.id, ...publication.invocation }));
+  const dispatchBinding = bindings.find(binding => binding.id === "dispatch_contexts");
+  if (dispatchBinding) dispatchBinding.value = pendingDispatchContexts(manifest, bindings);
   try {
     assertManifestInputs(manifest, bindings);
   } catch (cause) {
@@ -369,6 +392,7 @@ async function prepare(options) {
 }
 
 module.exports = {
+  buildPendingDispatchContext,
   SCHEMA,
   canonicalPendingJSON,
   parsePendingJSON,

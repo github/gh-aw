@@ -168,6 +168,7 @@ func TestPendingWriteArtifactsIsolateReusableInvocations(t *testing.T) {
 	for _, name := range []string{pendingWritesArtifactName, "pending-write-inputs", "write-decisions"} {
 		require.Contains(t, uploads, "name: ${{ needs.agent.outputs.artifact_prefix }}"+name)
 	}
+
 	require.Contains(t, strings.Join(compiler.pendingWritesDownloadSteps(data), ""), "name: ${{ needs.activation.outputs.artifact_prefix }}"+pendingWritesArtifactName)
 	for _, name := range []string{"agent", "activation", "safe_outputs"} {
 		require.NoError(t, compiler.jobManager.AddJob(&Job{Name: name, Steps: []string{"      - run: echo ready\n"}}))
@@ -177,4 +178,21 @@ func TestPendingWriteArtifactsIsolateReusableInvocations(t *testing.T) {
 	require.NoError(t, compiler.guardPendingWritePublications(data, true, map[string]struct{}{"publish": {}}))
 	require.Contains(t, writer.Needs, "activation")
 	require.Contains(t, strings.Join(writer.Steps, ""), "name: ${{ needs.activation.outputs.artifact_prefix }}write-decisions")
+}
+
+func TestPendingWriteDispatchReadsDoNotRequireEarlyWriteCredentials(t *testing.T) {
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{DispatchRepository: &DispatchRepositoryConfig{Tools: map[string]*DispatchRepositoryToolConfig{"deploy": {EventType: "deploy"}}}},
+	}
+	ungated, _ := safeOutputsJobPermissions(data)
+	level, _ := ungated.Get(PermissionActions)
+	require.NotEqual(t, PermissionRead, level)
+	data.Jobs = map[string]any{"safe_outputs": map[string]any{"gate-steps": []any{map[string]any{"run": "echo policy"}}}}
+	gated, _ := safeOutputsJobPermissions(data)
+	level, _ = gated.Get(PermissionActions)
+	require.Equal(t, PermissionRead, level)
+	data.SafeOutputs.DispatchWorkflow = &DispatchWorkflowConfig{Workflows: []string{"worker"}}
+	withWorkflow, _ := safeOutputsJobPermissions(data)
+	level, _ = withWorkflow.Get(PermissionActions)
+	require.Equal(t, PermissionWrite, level)
 }
