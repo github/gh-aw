@@ -80,6 +80,29 @@ function integrityError(reason = "inputs_changed") {
   return Object.assign(new Error(`Pending writes refused: ${reason}`), { code: "ERR_PENDING_WRITES", reason });
 }
 
+function pendingAuthorization(manifest, item) {
+  const { readDecisionInventory } = require("./write_gate_inventory.cjs");
+  const file = process.env.GH_AW_WRITE_GATE_DECISIONS;
+  const sha = process.env.GH_AW_WRITE_GATE_DECISIONS_SHA256;
+  if (!file || !sha) throw integrityError("decisions_missing");
+  const inventory = readDecisionInventory(file, sha, process.env.GH_AW_PENDING_WRITES_SHA256 || "");
+  if (inventory.items.length !== manifest.items.length) throw integrityError("decisions_invalid");
+  const selection = inventory.items.find(selection => selection.output_id === item.output_id);
+  if (!selection || selection.item_sha256 !== item.item_sha256 || selection.input_sha256 !== item.input_sha256) throw integrityError("decisions_invalid");
+  return { inventory, selection };
+}
+
+function assertPendingEffectAllowed() {
+  if (!pendingWritesEnabled()) return;
+  const active = activeWrite.getStore();
+  if (!active || active.planning) throw integrityError("item_missing");
+  const manifest = readAuthorizedManifest();
+  const item = manifest.items.find(item => item.output_id === active.output_id && item.item_sha256 === active.item_sha256);
+  if (!item || item.complete !== true) throw integrityError("item_missing");
+  const { selection } = pendingAuthorization(manifest, item);
+  if (item.settings.staged === true || (active.review ? !["apply", "review", "hold"].includes(selection.gate_decision) : selection.gate_decision !== "apply")) throw integrityError("item_not_authorized");
+}
+
 /**
  * Load only the compiler-bound digest. Gate steps may edit the manifest but
  * cannot bless it by rewriting a digest stored alongside the downloaded file.
@@ -210,6 +233,7 @@ function assertPendingGitDestination(repository, branch) {
   if (!pendingWritesEnabled()) return;
   const item = activeWrite.getStore();
   if (!item || item.planning || item.complete !== true) throw integrityError("item_missing");
+  assertPendingEffectAllowed();
   const expected = item.target.head_repository || item.target.repository;
   if (repository.toLowerCase() !== expected.toLowerCase() || (item.target.branch && branch !== item.target.branch) || (item.target.branches && !item.target.branches.includes(branch))) throw integrityError("target_changed");
   if (item.publication) item.recheck();
@@ -218,6 +242,7 @@ function assertPendingGitDestination(repository, branch) {
 /** Signed-push API and git-push transports share this last publication check. */
 function assertPendingCodePublication({ owner, repo, branch, baseRef, cwd }) {
   if (!pendingWritesEnabled()) return;
+  assertPendingEffectAllowed();
   const item = activeWrite.getStore();
   const { execLocalGitSync } = require("./git_helpers.cjs");
   if (item?.publication) {
@@ -248,6 +273,8 @@ function assertPendingPublication(job, id, supplied) {
   const manifest = readAuthorizedManifest();
   const matches = manifest.items.filter(item => item.target.job === job && item.publication?.id === id);
   if (matches.length !== 1 || matches[0].complete !== true || matches[0].publication.sha256 !== inputDigest(supplied)) throw integrityError();
+  const { inventory, selection } = pendingAuthorization(manifest, matches[0]);
+  if (selection.gate_decision !== "apply" || matches[0].depends_on.some(id => inventory.items.find(item => item.output_id === id)?.gate_decision !== "apply")) throw integrityError("item_not_authorized");
   if (matches[0].settings?.staged === true || (manifest.detection.enabled && ["warning", "failure"].includes(manifest.detection.conclusion))) throw integrityError("native_policy_veto");
 }
 
@@ -345,6 +372,8 @@ module.exports = {
   withPendingDirectoryPublication,
   capturedPublicationFile,
   integrityError,
+  pendingAuthorization,
+  assertPendingEffectAllowed,
   verify,
   prepare,
 };
