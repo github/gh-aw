@@ -24,11 +24,28 @@ type SafeOutputStepConfig struct {
 	ContinueOnError            bool              // Whether to continue the job even if this step fails (continue-on-error: true)
 }
 
-//nolint:largefunc // Existing handler configuration assembly remains centralized and sequential.
 func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *WorkflowData) {
+	config := c.buildHandlerManagerConfig(data)
+	if len(config) > 0 {
+		safeOutputsConfigLog.Printf("Marshaling handler config with %d handlers", len(config))
+		configJSON, err := marshalSafeOutputsConfig(config)
+		if err != nil {
+			safeOutputsConfigLog.Printf("Failed to marshal handler config: %v", err)
+			return
+		}
+		configStr := string(configJSON)
+		*steps = append(*steps, fmt.Sprintf("          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: %q\n", configStr))
+		safeOutputsConfigLog.Printf("Added handler config env var: size=%d bytes", len(configStr))
+	} else {
+		safeOutputsConfigLog.Print("No handlers configured, skipping config env var")
+	}
+}
+
+//nolint:largefunc // Shared handler assembly preserves the runtime publication policy.
+func (c *Compiler) buildHandlerManagerConfig(data *WorkflowData) map[string]any {
 	if data.SafeOutputs == nil {
 		safeOutputsConfigLog.Print("No safe-outputs configuration, skipping handler manager config")
-		return
+		return nil
 	}
 
 	safeOutputsConfigLog.Print("Building handler manager configuration for safe-outputs")
@@ -126,21 +143,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 		}
 	}
 
-	// Only add the env var if there are handlers to configure
-	if len(config) > 0 {
-		safeOutputsConfigLog.Printf("Marshaling handler config with %d handlers", len(config))
-		configJSON, err := marshalSafeOutputsConfig(config)
-		if err != nil {
-			safeOutputsConfigLog.Printf("Failed to marshal handler config: %v", err)
-			return
-		}
-		// Escape the JSON for YAML (handle quotes and special chars)
-		configStr := string(configJSON)
-		*steps = append(*steps, fmt.Sprintf("          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: %q\n", configStr))
-		safeOutputsConfigLog.Printf("Added handler config env var: size=%d bytes", len(configStr))
-	} else {
-		safeOutputsConfigLog.Print("No handlers configured, skipping config env var")
-	}
+	return config
 }
 
 // buildMentionsHandlerConfig converts a MentionsConfig into the map format used by

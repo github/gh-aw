@@ -19,6 +19,7 @@ const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
+const { buildGateDecision, buildGateBlockedResults } = require("./write_gate_observability.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -164,7 +165,7 @@ function parseEngineSession(content, engine) {
 /**
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
- * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>}} [options]
+ * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, executionIdentity?: {runId?: string, runAttempt: number}, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>, writeGate?: NodeJS.ProcessEnv}} [options]
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({
@@ -179,6 +180,7 @@ function collectUnifiedSession({
   safeJobNames = process.env.GH_AW_SAFE_JOB_NAMES,
   safeJobResults = process.env.GH_AW_SAFE_JOB_RESULTS,
   jobDurations = {},
+  writeGate = process.env,
 } = {}) {
   const liveIdentity = executionIdentity?.runId && Number.isSafeInteger(executionIdentity.runAttempt) && executionIdentity.runAttempt > 0 ? executionIdentity : undefined;
   let currentRunId = liveIdentity?.runId ?? dailyAIC.GITHUB_RUN_ID;
@@ -904,6 +906,64 @@ function collectUnifiedSession({
         if (events.length) sources.push({ component: "workflow", phase: "conclusion", path: "usage/aw_session.jsonl", events });
         if (outcomes.length) sources.push({ component: "safe_output", phase: "safe_outputs", path: "usage/aw_session.jsonl", events: outcomes });
       }
+    }
+  }
+  if (writeGate.GH_AW_WRITE_GATE !== undefined) {
+    const manifestFile = choose(["pending-writes/pending-writes.json", "pending-writes.json"]);
+    const resultFile = choose(["safe-output-items.jsonl"]);
+    const decisionsFile = choose(["write-decisions.normalized.json", "write-decisions/write-decisions.normalized.json"]);
+    let decisions;
+    let decisionsDigest;
+    let decisionsValid;
+    if (decisionsFile) {
+      decisions = records(decisionsFile)[0];
+      decisionsDigest = require("node:crypto").createHash("sha256").update(read(decisionsFile)).digest("hex");
+      if (writeGate.GH_AW_WRITE_GATE_DECISIONS_SHA256 && writeGate.GH_AW_PENDING_WRITES_SHA256) {
+        try {
+          decisions = require("./write_gate_inventory.cjs").readDecisionInventory(decisionsFile, writeGate.GH_AW_WRITE_GATE_DECISIONS_SHA256, writeGate.GH_AW_PENDING_WRITES_SHA256);
+          decisionsValid = true;
+        } catch {
+          report(decisionsFile, "invalid_write_decision_inventory", undefined);
+          decisionsValid = false;
+        }
+      }
+    }
+    const manifest = manifestFile ? records(manifestFile)[0] : undefined;
+    const actualDigest = manifestFile ? require("node:crypto").createHash("sha256").update(read(manifestFile)).digest("hex") : undefined;
+    let manifestValid;
+    if (manifestFile && manifest?.complete === true && actualDigest === writeGate.GH_AW_PENDING_WRITES_SHA256) {
+      try {
+        require("./pending_writes.cjs").readAuthorizedManifest(manifestFile, writeGate.GH_AW_PENDING_WRITES_SHA256);
+        manifestValid = true;
+      } catch {
+        report(manifestFile, "invalid_pending_manifest", undefined);
+        manifestValid = false;
+      }
+    }
+    const data = buildGateDecision({
+      env: { ...writeGate, ...(jobResults === undefined ? {} : { GH_AW_JOB_RESULTS: jobResults }) },
+      results: resultFile ? records(resultFile) : [],
+      manifest,
+      actualDigest,
+      manifestValid,
+      decisions,
+      decisionsDigest,
+      decisionsValid,
+      resultsComplete: Boolean(resultFile && !incompleteSources.has(resultFile) && !malformedJsonSources.has(resultFile)),
+    });
+    if (data) {
+      const skipped = buildGateBlockedResults({
+        gate: data,
+        manifest,
+        decisions,
+        decisionsValid,
+        results: resultFile ? records(resultFile) : [],
+        resultsReadable: !resultFile || (!incompleteSources.has(resultFile) && !malformedJsonSources.has(resultFile)),
+      });
+      /** @type {SessionEvent[]} */
+      const gateEvents = [{ type: "gate.decision", data }];
+      for (const data of skipped) gateEvents.push({ type: "safe_output.result", data });
+      sources.push({ component: "write_gate", phase: "conclusion", path: "usage/aw_session.jsonl", events: gateEvents });
     }
   }
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));

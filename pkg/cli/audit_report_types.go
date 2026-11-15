@@ -39,6 +39,7 @@ type AuditData struct {
 	FirewallTokenUsage         *TokenUsageSummary       `json:"firewall_token_usage,omitempty"`
 	DetectionModelUsage        []DetectionModelUsage    `json:"detection_model_usage,omitempty"`
 	ModelRouting               *ModelRoutingSummary     `json:"model_routing,omitempty"`
+	WriteGate                  *WriteGateReport         `json:"write_gate,omitempty"`
 	ModelEndpointMismatches    []ModelEndpointMismatch  `json:"model_endpoint_mismatches,omitempty"`
 	GitHubRateLimitUsage       *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"`
 	FirewallAnalysis           *FirewallAnalysis        `json:"firewall_analysis,omitempty"`
@@ -147,6 +148,12 @@ type FileInfo struct {
 // URL is present for creation types (e.g. create_issue, add_comment) but may be empty
 // for modification types (e.g. add_labels, close_issue) that do not return a URL.
 type CreatedItemReport struct {
+	Status          string         `json:"status,omitempty" console:"-"`
+	GateDecision    string         `json:"gate_decision,omitempty" console:"-"`
+	DecisionReason  string         `json:"decision_reason,omitempty" console:"-"`
+	GateSignal      string         `json:"gate_signal,omitempty" console:"-"`
+	OutputID        string         `json:"output_id,omitempty" console:"-"`
+	ItemSHA256      string         `json:"item_sha256,omitempty" console:"-"`
 	Type            string         `json:"type" console:"header:Type"`
 	URL             string         `json:"url,omitempty" console:"header:URL,omitempty"`
 	Number          int            `json:"number,omitempty" console:"header:Number,omitempty"`

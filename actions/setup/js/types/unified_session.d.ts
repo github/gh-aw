@@ -454,8 +454,27 @@ export interface SafeOutputData {
   output_id?: string;
   messageIndex?: number;
   staged?: boolean;
+  gate_decision?: "apply" | "hold" | "review" | "stage" | "drop";
+  gate_signal?: "gate_denied" | "gate_held" | "gate_staged" | "gate_dropped";
+  /** @pattern ^[a-z0-9_.-]{1,64}$ */
+  decision_reason?: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  item_sha256?: string;
   /** The operation may have applied even though processing failed to confirm it. */
   operation_outcome?: "indeterminate";
+}
+
+export interface GateDecisionData {
+  verdict: "allow" | "deny" | "partial";
+  /** @pattern ^[a-z0-9_.-]{1,64}$ */
+  reason: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  manifestDigest?: string;
+  integrity: "verified" | "failed" | "unknown";
+  conclusionCheck: "verified" | "failed" | "unknown";
+  failureCategory?: "write_gate_violation";
+  counts?: { apply: number; hold: number; review: number; stage: number; drop: number };
+  items?: SafeOutputData[];
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {
@@ -947,6 +966,7 @@ export interface UnifiedSessionEventDataMap {
   "safe_output.result": SafeOutputData;
   "safe_output.outcome": SafeOutputData;
   "safe_output.error": SafeOutputErrorData;
+  "gate.decision": GateDecisionData;
   "experiment.state": ExperimentStateData;
   "experiment.assignment": ExperimentAssignmentData;
   "grader.manifest": GraderManifestData;

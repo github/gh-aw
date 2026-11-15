@@ -117,7 +117,18 @@ func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowD
 		if recordJobName == "" {
 			recordJobName = recordJob.Name
 		}
-		manifest.WriteGate = &GHAWManifestWriteGate{Version: 1, RecordJob: recordJobName, ArtifactImmutable: !data.GHES}
+		replayConfig, err := c.buildWriteGateReplayConfig(data)
+		if err != nil {
+			return err
+		}
+		replayTypes := sliceutil.Filter(sliceutil.SortedKeys(handlerRegistry), func(name string) bool {
+			return replayConfig[name] != nil && isStaticWriteGateReplayType(name, data)
+		})
+		manifest.WriteGate = &GHAWManifestWriteGate{
+			Version: 1, RecordJob: recordJobName, ArtifactImmutable: !data.GHES,
+			ReplayConfig: replayConfig, ReplayTypes: replayTypes,
+			ReplayStaged: data.SafeOutputs != nil && templatableBoolIsTrue(data.SafeOutputs.Staged),
+		}
 	}
 	manifest.WebhookSubscriptions = data.WebhookSubscriptions
 	if err := deduplicateMarkdownMetadata(yaml.String(), manifest); err != nil {

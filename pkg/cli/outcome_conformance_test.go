@@ -42,7 +42,7 @@ func TestOutcomeConformance(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			read := func(endpoint string, target any) error {
 				if status := tc.Errors[endpoint]; status != 0 {
-					return fmt.Errorf("HTTP %d Not Found", status)
+					return fmt.Errorf("HTTP %d", status)
 				}
 				raw, ok := tc.Responses[endpoint]
 				if !ok {
@@ -72,7 +72,10 @@ func TestOutcomeConformance(t *testing.T) {
 			if evaluator == nil {
 				evaluator = evalGenericSticky
 			}
-			report := evaluator(context.Background(), tc.Item, "acme/repo")
+			report, blocked := gateBlockedOutcome(tc.Item)
+			if !blocked {
+				report = evaluator(context.Background(), tc.Item, "acme/repo")
+			}
 			require.Equal(t, tc.Expected, normalizeOutcomeEvaluation(report))
 			if tc.ZeroTouch != nil {
 				require.Equal(t, *tc.ZeroTouch, report.ZeroTouch)

@@ -57,6 +57,10 @@ type OutcomeSummary struct {
 	Ignored                 int               `json:"ignored" console:"header:Ignored"`
 	Pending                 int               `json:"pending" console:"header:Pending"`
 	Unknown                 int               `json:"unknown" console:"header:Unknown"`
+	GateDenied              int               `json:"gate_denied,omitempty" console:"-"`
+	GateHeld                int               `json:"gate_held,omitempty" console:"-"`
+	GateStaged              int               `json:"gate_staged,omitempty" console:"-"`
+	GateDropped             int               `json:"gate_dropped,omitempty" console:"-"`
 	AcceptedStrong          int               `json:"accepted_strong,omitempty"`
 	AcceptedMedium          int               `json:"accepted_medium,omitempty"`
 	AcceptedWeak            int               `json:"accepted_weak,omitempty"`
@@ -134,6 +138,12 @@ func evaluateOutcomes(ctx context.Context, items []CreatedItemReport, repoOverri
 		}
 		repo := resolveItemRepo(item, repoOverride)
 		itemID := outcomeItemID(item, occurrences)
+		if report, blocked := gateBlockedOutcome(item); blocked {
+			report.ItemID, report.Repo, report.CreatedAt = itemID, repo, item.Timestamp
+			report.CheckedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			reports = append(reports, report)
+			continue
+		}
 		if !sameOutcomeAPIHost(repo, trustedHost) {
 			reports = append(reports, OutcomeReport{
 				ItemID: itemID, Type: item.Type, ObjectURL: item.URL,
@@ -615,6 +625,17 @@ func (s *OutcomeSummary) countOutcome(r OutcomeReport, eval OutcomeEvaluation) {
 		s.Pending++
 	case OutcomeStatusUnknown:
 		s.Unknown++
+	case OutcomeStatusSkipped:
+		switch eval.Signal {
+		case "gate_denied":
+			s.GateDenied++
+		case "gate_held":
+			s.GateHeld++
+		case "gate_staged":
+			s.GateStaged++
+		case "gate_dropped":
+			s.GateDropped++
+		}
 	}
 	if eval.Signal == "target_exists_only" {
 		s.FallbackExistsOnlyCount++

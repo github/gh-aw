@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 /** Environment variables managed by tests */
-const TEST_ENV_VARS = ["GH_AW_RUN_URL", "GH_TOKEN", "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", "GH_AW_AGENT_OUTPUT"];
+const TEST_ENV_VARS = ["GH_AW_RUN_URL", "GH_TOKEN", "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", "GH_AW_AGENT_OUTPUT", "GH_AW_SAFE_OUTPUTS_STAGED"];
 
 describe("apply_safe_outputs_replay", () => {
   let originalEnv;
@@ -164,6 +164,87 @@ describe("apply_safe_outputs_replay", () => {
       }
     });
 
+    describe("original replay restrictions", () => {
+      it("preserves target, staging, protected files, and max instead of synthesizing empty config", async () => {
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const directory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "gated-replay-policy-"));
+        const outputFile = path.join(directory, "agent_output.json");
+        const gate = {
+          replay_staged: true,
+          replay_types: ["create_issue", "merge_pull_request"],
+          replay_config: {
+            create_issue: { "target-repo": "owner/restricted", allowed_repos: ["owner/restricted"], staged: true, max: 1 },
+            merge_pull_request: { protected_files: ["AGENTS.md", "package.json"], max: 1 },
+          },
+        };
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "create_issue", title: "Issue" }] }));
+        try {
+          const { prepareGatedReplayConfig } = await import("./apply_safe_outputs_replay.cjs");
+          expect(JSON.parse(prepareGatedReplayConfig(gate, outputFile).config)).toEqual(gate.replay_config);
+          expect(prepareGatedReplayConfig(gate, outputFile).staged).toBe("true");
+          for (const override of [
+            { create_issue: {} },
+            { ...gate.replay_config, create_issue: { ...gate.replay_config.create_issue, max: 99 } },
+            { ...gate.replay_config, create_issue: { ...gate.replay_config.create_issue, staged: false } },
+            { ...gate.replay_config, merge_pull_request: { max: 1, protected_files: [] } },
+          ]) {
+            expect(() => prepareGatedReplayConfig(gate, outputFile, JSON.stringify(override))).toThrow(/cannot override/);
+          }
+          expect(JSON.parse(prepareGatedReplayConfig(gate, outputFile, JSON.stringify(gate.replay_config)).config)).toEqual(gate.replay_config);
+        } finally {
+          fs.rmSync(directory, { recursive: true });
+        }
+      });
+
+      it("does not turn malformed numeric restrictions into handler defaults", async () => {
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const directory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "gated-replay-numbers-"));
+        const outputFile = path.join(directory, "agent_output.json");
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "create_issue", title: "Issue" }] }));
+        try {
+          const { prepareGatedReplayConfig } = await import("./apply_safe_outputs_replay.cjs");
+          for (const max of [Infinity, NaN]) {
+            expect(() =>
+              prepareGatedReplayConfig(
+                {
+                  replay_staged: false,
+                  replay_types: ["create_issue"],
+                  replay_config: { create_issue: { max } },
+                },
+                outputFile
+              )
+            ).toThrow(/finite/);
+          }
+        } finally {
+          fs.rmSync(directory, { recursive: true });
+        }
+      });
+
+      it("refuses missing/dynamic config, credentials, and unsupported item transports", async () => {
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const directory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "gated-replay-policy-"));
+        const outputFile = path.join(directory, "agent_output.json");
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "custom_publish" }] }));
+        try {
+          const { prepareGatedReplayConfig } = await import("./apply_safe_outputs_replay.cjs");
+          for (const gate of [
+            {},
+            { replay_staged: false, replay_types: ["create_issue"], replay_config: { create_issue: { max: "${{ vars.NOW }}" } } },
+            { replay_staged: false, replay_types: ["create_issue"], replay_config: { create_issue: { "github-token": "credential" } } },
+            { replay_staged: false, replay_types: ["create_issue"], replay_config: { create_issue: { max: 1 } } },
+          ]) {
+            expect(() => prepareGatedReplayConfig(gate, outputFile)).toThrow();
+          }
+          expect(global.exec.exec).not.toHaveBeenCalled();
+        } finally {
+          fs.rmSync(directory, { recursive: true });
+        }
+      });
+    });
+
     it("rejects missing, malformed, stale, or cross-repository records", async () => {
       const { validateReplayWriteGateRecord } = await import("./apply_safe_outputs_replay.cjs");
       for (const invalid of [
@@ -258,6 +339,7 @@ describe("apply_safe_outputs_replay", () => {
         '# gh-aw-manifest: {"version":1,"write_gate":null}\n',
         '# gh-aw-manifest: {"version":1,"write_gate":{"version":2,"record_job":"conclusion"}}\n',
         '# gh-aw-metadata: {"dry_run":true}\n# gh-aw-manifest: {"version":1}\n',
+        '# gh-aw-metadata: {"dry_run":"true"}\n# gh-aw-manifest: {"version":1}\n',
       ]) {
         global.github.rest.repos.getContent.mockResolvedValue({ data: { type: "file", encoding: "base64", content: Buffer.from(source).toString("base64") } });
         await expect(getReplayPolicy("123", "testowner", "testrepo")).rejects.toThrow();
@@ -465,7 +547,7 @@ describe("apply_safe_outputs_replay", () => {
     it("calls setFailed when GH_AW_RUN_URL is not set", async () => {
       const { main } = await import("./apply_safe_outputs_replay.cjs");
       delete process.env.GH_AW_RUN_URL;
-      await main();
+      await expect(main()).rejects.toThrow(/GH_AW_RUN_URL/);
       expect(global.core.setFailed, "should call setFailed when no run URL").toHaveBeenCalledOnce();
       expect(global.core.setFailed.mock.calls[0][0], "should mention GH_AW_RUN_URL").toMatch(/GH_AW_RUN_URL/);
     });
@@ -473,7 +555,7 @@ describe("apply_safe_outputs_replay", () => {
     it("calls setFailed for an invalid GH_AW_RUN_URL", async () => {
       const { main } = await import("./apply_safe_outputs_replay.cjs");
       process.env.GH_AW_RUN_URL = "not-a-valid-run-url";
-      await main();
+      await expect(main()).rejects.toThrow(/Cannot parse run ID/);
       expect(global.core.setFailed, "should call setFailed for unparseable URL").toHaveBeenCalledOnce();
       expect(global.core.setFailed.mock.calls[0][0], "should describe the parse error").toMatch(/Cannot parse run ID/);
     });
@@ -482,9 +564,33 @@ describe("apply_safe_outputs_replay", () => {
       const { main } = await import("./apply_safe_outputs_replay.cjs");
       process.env.GH_AW_RUN_URL = "23560193313";
       global.exec.exec = vi.fn().mockResolvedValue(1); // non-zero exit code
-      await main();
+      await expect(main()).rejects.toThrow(/Failed to download agent artifact/);
       expect(global.core.setFailed, "should call setFailed on download failure").toHaveBeenCalledOnce();
       expect(global.core.setFailed.mock.calls[0][0], "error should mention ERR_SYSTEM").toMatch(/Failed to download agent artifact/);
+    });
+
+    it("does not report success when the handler manager marks the Actions step failed", async () => {
+      const fs = require("node:fs");
+      const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
+      const manager = require("./safe_output_handler_manager.cjs");
+      const originalMain = manager.main;
+      const originalExitCode = process.exitCode;
+      const exists = fs.existsSync;
+      const outputFile = require("node:path").join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME);
+      const existence = vi.spyOn(fs, "existsSync").mockImplementation(file => file === outputFile || exists(file));
+      manager.main = async () => {
+        process.exitCode = 1;
+      };
+      process.env.GH_AW_RUN_URL = "123";
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = "{}";
+      try {
+        const { main } = await import("./apply_safe_outputs_replay.cjs");
+        await expect(main()).rejects.toThrow(/handler processing failed/);
+      } finally {
+        existence.mockRestore();
+        manager.main = originalMain;
+        process.exitCode = originalExitCode;
+      }
     });
   });
 

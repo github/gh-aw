@@ -156,6 +156,10 @@
       "description": "Require every generated workflow job to select a self-hosted runner. Jobs must use the self-hosted label or a runner group.",
       "type": "boolean"
     },
+    "require_write_gate": {
+      "description": "Require jobs.safe_outputs.gate-steps for workflows with agent-derived write outputs. Imported gate steps satisfy the requirement.",
+      "type": "boolean"
+    },
     "lock_file_logo": {
       "description": "Include the ASCII logo in generated workflow headers. Defaults to true when omitted. Set to false to omit the logo.",
       "type": "boolean"

@@ -577,7 +577,7 @@ checkout:
 
 ## Protected Files
 
-`create-pull-request`, `push-to-pull-request-branch`, and `merge-pull-request` enforce protected-file checks by default. These checks prevent supply-chain changes, such as an agent (through error or prompt injection) altering dependency definitions, CI/CD pipelines, or agent behavior files. Creation and push default to requesting review. Merge defaults to blocking.
+`create-pull-request`, `push-to-pull-request-branch`, and `merge-pull-request` enforce protected-file checks. These checks surface sensitive changes, such as an agent altering dependency definitions, CI/CD pipelines, or agent behavior files. The policy determines whether to reject publication or preserve a proposal for independent review; see [Policy Options](#policy-options) for the authoritative defaults.
 
 ### What is protected
 
@@ -621,7 +621,7 @@ The `protected-files` field accepts either a string policy or an object with `po
 
 | Value | Behavior |
 |-------|-----------|
-| `request-review` (default) | Create the PR and submit a `REQUEST_CHANGES` review listing the protected files. The work is preserved, and a human must approve before merge. The legacy `request_review` spelling is also accepted. |
+| `request-review` (default for creation and push) | Preserve the changes as a review PR and submit a `REQUEST_CHANGES` review listing protected files. Auto-merge remains disabled; repository merge protections must enforce independent approval. The legacy `request_review` spelling is also accepted. |
 | `blocked` | Hard-block: the safe output fails with an error. |
 | `fallback-to-issue` | Create a review issue with instructions for a human to apply or reject the changes. |
 | `allowed` | No restriction. **Use only when the workflow is explicitly designed to manage these files.** |

@@ -272,7 +272,18 @@ The callback reconstructs the same ten identity fields from compiler metadata an
 
 Like `jobs.admission`, `jobs.conclusion_admission` MUST reject all author customization, including setup/pre/regular steps, permissions, conditions, dependencies and environment. Its OIDC capability MUST NOT be shared with author hooks. The ordinary conclusion job retains independently configured OTLP OIDC permissions, including for work-queue participants; admission alone does not enable those permissions.
 
-The complete request is a JSON object containing exactly Section 3's ten admission identity strings plus `session`, `session_compaction`, and `usage_artifact_ids`. `session` contains compact profile version 1 JSONL as defined by the [compact unified session specification](/gh-aw/specs/unified-agent-session-specification/#38-compact-unified-session-normative): at most 128 allowlisted metadata records and 16 KiB of UTF-8 JSONL. Agent conversation, reasoning, prompts, tool input/output and other unbounded payloads MUST NOT be sent. The client MUST derive this projection from the existing generated, redacted unified session using the shared helper, without modifying the full artifact or reparsing raw engine logs.
+The complete request is a JSON object containing Section 3's ten admission identity strings plus `session`, `session_compaction`, and `usage_artifact_ids`, and optionally `write_gate` as defined below. `session` contains compact profile version 1 JSONL as defined by the [compact unified session specification](/gh-aw/specs/unified-agent-session-specification/#38-compact-unified-session-normative): at most 128 allowlisted metadata records and 16 KiB of UTF-8 JSONL. Agent conversation, reasoning, prompts, tool input/output and other unbounded payloads MUST NOT be sent. The client MUST derive this projection from the existing generated, redacted unified session using the shared helper, without modifying the full artifact or reparsing raw engine logs.
+
+For a compiler-owned conclusion `gate.decision` retained in the compact session,
+`write_gate` contains `verdict` (`allow`, `deny`, or `partial`), `reason` (a
+`[a-z0-9_.-]{1,64}` code), and `counts` by `apply`, `hold`, `review`, `stage`, and
+`drop`. Counts are nonnegative safe integers; item IDs, content, targets, and
+free-form reasons MUST NOT be forwarded. The gate object is bounded to 512
+UTF-8 bytes and the complete request retains its 64 KiB bound. Absent gate
+evidence omits the field; absence MUST NOT imply allowance or successful
+enforcement. Gate denial and partial publication are policy outcomes, not
+authority-delivery failures. The authority MUST NOT reinterpret the verdict
+or rewrite earlier outcomes.
 
 `session_compaction` MUST contain exactly `version`, `included_events`, `omitted_events`, `oversized_lines`, `scan_truncated`, and `truncated`, mapping the shared helper's corresponding version and coverage fields. The compact profile is intentionally lossy; false truncation flags MUST NOT be interpreted as a complete session or complete usage accounting.
 

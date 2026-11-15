@@ -76,7 +76,11 @@ function executionID(raw) {
 // This adapter projects raw inputs, never expected classifications, into facts.
 function project(fixture) {
   const { item, responses = {}, errors = {} } = fixture;
-  const kind = kinds[item.type];
+  const explicitSignal = item.gate_signal || item.decision_reason;
+  const decisionSignal = { hold: "gate_held", stage: "gate_staged", drop: "gate_dropped" }[item.gate_decision];
+  const blockedSignal = ["gate_denied", "gate_held", "gate_staged", "gate_dropped"].includes(explicitSignal) ? explicitSignal : ["skipped", "staged"].includes(item.status) ? decisionSignal : undefined;
+  const blocked = blockedSignal && !["success", "warning"].includes(item.status);
+  const kind = blocked ? "gate" : kinds[item.type];
   if (!kind) throw new Error(`Unmapped fixture type: ${item.type}`);
   const number = item.number || Number(String(item.url || "").match(/\/(?:issues|pull)\/(\d+)/)?.[1] || 0);
   const facts = {
@@ -95,6 +99,12 @@ function project(fixture) {
     afterAction: true,
     supplementary: "ok",
   };
+  if (blocked) {
+    facts.state = blockedSignal;
+    const status = Object.values(errors)[0];
+    facts.primary = status === 404 ? "404" : status ? "error" : "ok";
+    return facts;
+  }
   let endpoint = `${["pr", "push", "ready", "submitted", "requested"].includes(kind) || ["close_pull_request", "update_pull_request"].includes(item.type) ? "pulls" : "issues"}/${number}`;
   if (kind === "labels") endpoint += "/labels";
   if (kind === "comment") {
@@ -323,6 +333,7 @@ writeFileSync(
 );
 
 const controls = [
+  ["gate", "GateBlocksRemainSkipped"],
   ["existence", "AcceptanceEvidence"],
   ["bot", "OpenCreationsPending"],
   ["execution", "AcceptanceEvidence"],

@@ -84,6 +84,23 @@ import "embed"
 //go:embed js/parse_kiro_log.cjs
 //go:embed js/parse_deepseek_log.cjs
 //go:embed js/parse_pydantic_log.cjs
+//go:embed js/write_gate_observability.cjs js/write_gate_decisions.cjs js/write_gate_inventory.cjs
+//go:embed js/pending_writes.cjs js/pending_writes_files.cjs js/pending_writes_client.cjs js/pending_writes_plan.cjs js/pending_writes_code.cjs
+//go:embed js/safe_output_dependencies.cjs js/safe_output_execution_metadata.cjs js/safe_output_submission.cjs
+//go:embed js/git_helpers.cjs js/git_auth_helpers.cjs js/git_patch_utils.cjs js/commit_sha_helpers.cjs
+//go:embed js/generate_git_bundle.cjs js/generate_git_patch.cjs js/extra_empty_commit.cjs
+//go:embed js/push_signed_commits.cjs js/push_to_pull_request_branch.cjs
+//go:embed js/resolve_transport_paths.cjs js/transport_integrity.cjs js/manifest_file_helpers.cjs js/patch_path_helpers.cjs
+//go:embed js/object_pack_fetch.cjs js/object_pack_limits.cjs js/object_pack_transport.cjs
+//go:embed js/create_pull_request_helpers.cjs js/pr_helpers.cjs js/pr_lifecycle.cjs js/template_branch.cjs
+//go:embed js/get_base_branch.cjs js/normalize_branch_name.cjs js/find_repo_checkout.cjs js/checkout_manifest.cjs js/workflow_file_exclusions.cjs
+//go:embed js/code_scanning_helpers.cjs js/ledger_builtin.cjs js/ledger_store.cjs js/ledger_transactions.cjs
+//go:embed js/execution_provenance.cjs js/workflow_metadata_helpers.cjs js/actions_secret_masking.cjs js/update_activation_comment.cjs
+//go:embed js/firewall_blocked_domains.cjs js/gateway_difc_filtered.cjs js/limit_enforcement_helpers.cjs
+//go:embed js/messages_footer.cjs js/messages_run_status.cjs js/missing_messages_helper.cjs js/generate_footer.cjs
+//go:embed js/report_markdown.cjs js/report_redaction.cjs js/report_size.cjs js/issue_report.cjs js/render_template.cjs
+//go:embed js/github_api_helpers.cjs js/model_aliases.cjs js/model_attribution.cjs js/compact_numbers.cjs
+//go:embed js/templatable.cjs js/is_truthy.cjs js/threat_detection_warning.cjs js/work_queue_git_effects.cjs
 var SessionParserSources embed.FS
 
 // GitHubNotificationWebhooks is the source catalog shared by compiler and runtime.

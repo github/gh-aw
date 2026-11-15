@@ -22,6 +22,7 @@ const EVENT_FIELDS = {
   "usage.report": ["stepIndex", "provider", "model", "purpose", "status", "aic", "totalAic", "premiumRequests", "durationMs", "sessionId", "agentId"],
   "guardrail.admission": ["status", "maxAiCredits", "threatDetectionMaxAiCredits", "evalsMaxAiCredits"],
   "guardrail.daily_aic": ["status", "exceeded", "total", "estimated", "threshold"],
+  "gate.decision": ["verdict", "reason", "manifestDigest", "integrity", "conclusionCheck", "failureCategory"],
   "workflow.job_result": ["jobId", "result", "durationMs"],
   "memory.push": ["memoryId", "jobResult", "outcome", "status", "branch", "commit"],
   "execution.result": ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"],
@@ -46,6 +47,7 @@ const SESSION_EVENT_PRIORITIES = {
   "workflow.job_result": 2,
   "guardrail.admission": 3,
   "guardrail.daily_aic": 3,
+  "gate.decision": 1,
   "grader.result": 3,
   "harness.retry": 4,
   "harness.attempt": 4,
@@ -117,6 +119,12 @@ function projectEvent(event) {
   if (!isRecord(event) || typeof event.type !== "string" || !Object.hasOwn(EVENT_FIELDS, event.type) || !isRecord(event.data)) return undefined;
   /** @type {Record<string, unknown>} */
   const data = projectScalars(event.data, EVENT_FIELDS[event.type]);
+  if (event.type === "gate.decision") {
+    const gate = require("./write_gate_observability.cjs").projectGateDecision(event.data);
+    if (!gate.verdict) return undefined;
+    Object.assign(data, gate);
+    delete data.items;
+  }
   if (event.type === "harness.decision") {
     const decision = normalizeHarnessDecisionData(event.data);
     if (!decision) return undefined;

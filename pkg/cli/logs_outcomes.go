@@ -162,6 +162,25 @@ func readLogsOutcomeItems(run ProcessedRun) ([]CreatedItemReport, bool, error) {
 		}
 		combined = append(combined, items...)
 	}
+	session, _, err := readSessionModelRouting(run.Run.LogsPath)
+	if err != nil {
+		writeGateLog.Debug("Unable to read optional gate outcome evidence", "error", err)
+	}
+	if session != nil && len(session.GateSkipped) > 0 {
+		found = true
+		observed := make(map[string]bool)
+		for _, item := range combined {
+			if item.OutputID != "" {
+				observed[item.OutputID] = true
+			}
+		}
+		for _, item := range session.GateSkipped {
+			if !observed[item.OutputID] {
+				combined = append(combined, item)
+				observed[item.OutputID] = true
+			}
+		}
+	}
 	return combined, found, nil
 }
 
@@ -262,6 +281,12 @@ func renderLogsOutcomes(w io.Writer, data LogsData) error {
 		if _, err := fmt.Fprintf(w, "\nOutcomes for %s (run %d): %d accepted, %d rejected, %d ignored, %d lifecycle, %d pending, %d unknown, %d errors (%d total)\n",
 			run.Workflow, run.RunID, run.Summary.Accepted, run.Summary.Rejected, run.Summary.Ignored, run.Summary.Lifecycle, run.Summary.Pending, run.Summary.Unknown, run.Summary.Errors, run.Summary.Total); err != nil {
 			return err
+		}
+		if run.Summary.GateDenied+run.Summary.GateHeld+run.Summary.GateStaged+run.Summary.GateDropped > 0 {
+			if _, err := fmt.Fprintf(w, "  Gate skipped: %d denied, %d held, %d staged, %d dropped\n",
+				run.Summary.GateDenied, run.Summary.GateHeld, run.Summary.GateStaged, run.Summary.GateDropped); err != nil {
+				return err
+			}
 		}
 		if run.EvalError != "" {
 			if _, err := fmt.Fprintln(w, "  Missing evidence: "+run.EvalError); err != nil {
