@@ -14,6 +14,7 @@ const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { getErrorStatus } = require("./error_helpers.cjs");
 
 /**
  * No implicit target: an absent or unusable review repository always stages.
@@ -85,7 +86,8 @@ async function createGateReviewIssue({ message, reviewRepo, defaultRepo, allowed
     const { data: repository } = await client.rest.repos.get(target);
     if (repository.has_issues !== true) return stage("gate_review_repo_unusable");
   } catch (error) {
-    if (error.status === 404 || error.status === 410) return stage("gate_review_repo_unusable");
+    const status = getErrorStatus(error);
+    if (status === 404 || status === 410) return stage("gate_review_repo_unusable");
     throw error;
   }
   const secrets = collectArtifactSecretValues();
@@ -105,8 +107,9 @@ async function createGateReviewIssue({ message, reviewRepo, defaultRepo, allowed
     );
     return { success: true, reviewed: true, gate_decision: "review", fallback_used: true, issue_number: issue.number, issue_url: issue.html_url, repo: `${target.owner}/${target.repo}` };
   } catch (error) {
-    const original = error.originalError ?? error;
-    if (original.status === 404 || original.status === 410) return stage("gate_review_repo_unusable");
+    const original = error && typeof error === "object" && "originalError" in error ? error.originalError : error;
+    const status = getErrorStatus(original);
+    if (status === 404 || status === 410) return stage("gate_review_repo_unusable");
     throw error;
   }
 }
