@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-09-30",
-    "workflow_name": "Matt Pocock Skills Reviewer",
-    "workflow_file": "mattpocock-skills-reviewer",
-    "total_aic_analyzed": 310.09,
-    "runs_audited": 4,
-    "recommendations_count": 4,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 60
-  },
-  {
     "date": "2026-10-01",
     "workflow_name": "Deep Report",
     "workflow_file": "deep-report",
@@ -298,5 +288,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 1.2
+  },
+  {
+    "date": "2026-11-16",
+    "workflow_name": "Typist - Go Type Analysis",
+    "workflow_file": "typist",
+    "total_aic_analyzed": 525.6,
+    "runs_audited": 8,
+    "recommendations_count": 5,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 50
   }
 ]
