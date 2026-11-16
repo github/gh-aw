@@ -336,7 +336,7 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 		}
 	}
 
-	if len(events) == 0 && (mcpUsage == nil || (len(mcpUsage.ToolCalls) == 0 && mcpUsage.Integrity == nil)) {
+	if len(events) == 0 && session == nil && (mcpUsage == nil || (len(mcpUsage.ToolCalls) == 0 && mcpUsage.Integrity == nil)) {
 		return nil
 	}
 
