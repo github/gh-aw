@@ -27,21 +27,21 @@ Every slide that shows measured data has a refresh mini skill. Load only the one
 
 | Slide | Refresh skill |
 |---|---|
-| 16 Human Agent Processes | `refresh/human-agent-processes.md` |
-| 18 Pull Request Review² | `refresh/pr-review-squared.md` |
-| 21 Daily Unsloppers | `refresh/daily-unsloppers.md` |
-| 22 Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
-| 23 Issue Monster | `refresh/issue-monster.md` |
-| 24 Research · Assign · Observe | `refresh/research-assign-observe.md` |
-| 25 Hunt · Falsify · Fix | `refresh/hunt-falsify-fix.md` |
-| 28 Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
-| 30 Spec · Model · Test | `refresh/spec-model-test.md` |
-| 32 Decide · Draft · Record | `refresh/decide-draft-record.md` |
-| 33 Spec-driven testing | `refresh/spec-driven-testing.md` |
-| 34 Docs that heal | `refresh/docs-that-heal.md` |
-| 35 Multi-device tester | `refresh/multi-device-tester.md` |
-| 36 Findings that land | `refresh/findings-that-land.md` |
-| 37 Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
-| 39 Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
-| 60 Skills in review | `refresh/skills-in-review.md` |
+| Human Agent Processes | `refresh/human-agent-processes.md` |
+| Pull Request Review² | `refresh/pr-review-squared.md` |
+| Daily Unsloppers | `refresh/daily-unsloppers.md` |
+| Merge fast, unslop daily | `refresh/merge-fast-unslop-daily.md` |
+| Issue Monster | `refresh/issue-monster.md` |
+| Research · Assign · Observe | `refresh/research-assign-observe.md` |
+| Hunt · Falsify · Fix | `refresh/hunt-falsify-fix.md` |
+| Explore · Reuse · Lint | `refresh/explore-reuse-lint.md` |
+| Spec · Model · Test | `refresh/spec-model-test.md` |
+| Decide · Draft · Record | `refresh/decide-draft-record.md` |
+| Spec-driven testing | `refresh/spec-driven-testing.md` |
+| Docs that heal | `refresh/docs-that-heal.md` |
+| Multi-device tester | `refresh/multi-device-tester.md` |
+| Findings that land | `refresh/findings-that-land.md` |
+| Personas · Probe · Patch | `refresh/personas-probe-patch.md` |
+| Scan · Fix · Learn | `refresh/scan-fix-learn.md` |
+| Skills in review | `refresh/skills-in-review.md` |
 
