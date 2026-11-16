@@ -3,19 +3,20 @@
 This directory contains fixture stubs for the Section 11 compliance tests of the
 [GitHub MCP Access Control Specification](../../scratchpad/github-mcp-access-control-specification.md).
 
-**Spec version pinned at commit `20236db49103c7e5551a61ed0b8f430eb9d509a7`.**
+**Spec version pinned at commit `8bce442d1ef6b2a828d2f4c133e3cb4e813d52ff`.**
 
 ## Sync Guard: pinned spec drift check
 
 CI runs the pinned-commit comparison in `.github/workflows/ci.yml` whenever this README or the
-pinned specification changes. Update the pin in this README in the same change as any intentional
-specification update, and update the matching pin in `.github/workflows/ci.yml`.
+pinned specification changes. After committing an intentional specification update, update the pin
+in this README and the matching pin in `.github/workflows/ci.yml` to the spec-changing commit in a
+follow-up commit.
 
 CI fetches the full history so the comparison uses the latest commit that changed
 `scratchpad/github-mcp-access-control-specification.md` and fails when it differs from the pin:
 
 ```bash
-PINNED="20236db49103c7e5551a61ed0b8f430eb9d509a7"
+PINNED="8bce442d1ef6b2a828d2f4c133e3cb4e813d52ff"
 CURRENT="$(git log -n1 --format=%H -- scratchpad/github-mcp-access-control-specification.md)"
 
 test "$CURRENT" = "$PINNED" || {
